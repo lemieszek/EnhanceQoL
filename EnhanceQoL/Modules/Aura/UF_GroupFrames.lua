@@ -18315,6 +18315,8 @@ local function buildEditModeSettings(kind, editModeId)
 					end, function()
 						local cfg = getCfg(kind)
 						if not cfg then return end
+						local tc = cfg and cfg.text or {}
+						local hc = cfg and cfg.health or {}
 						cfg.status = cfg.status or {}
 						cfg.status.levelFontOutline = normalizeFontStyleChoice(option.value, tc.fontOutline or hc.fontOutline or "OUTLINE")
 						if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "levelFontOutline", cfg.status.levelFontOutline, nil, true) end
@@ -18764,6 +18766,8 @@ local function buildEditModeSettings(kind, editModeId)
 					end, function()
 						local cfg = getCfg(kind)
 						if not cfg then return end
+						local hc = cfg and cfg.health or {}
+						local defH = (DEFAULTS[kind] and DEFAULTS[kind].health) or {}
 						cfg.status = cfg.status or {}
 						cfg.status.unitStatus = cfg.status.unitStatus or {}
 						cfg.status.unitStatus.fontOutline = normalizeFontStyleChoice(option.value, hc.fontOutline or defH.fontOutline or "OUTLINE")
