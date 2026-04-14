@@ -304,6 +304,141 @@ local function getActiveProfileName()
 	return nil
 end
 
+local function getCurrentPlayerGUID()
+	local guid = UnitGUID and UnitGUID("player")
+	if issecretvalue and issecretvalue(guid) then guid = nil end
+	if type(guid) == "string" and guid ~= "" then return guid end
+	local fallback = addon and addon.variables and addon.variables.unitPlayerGUID
+	if type(fallback) == "string" and fallback ~= "" then return fallback end
+	return nil
+end
+
+local function trimUFProfileName(name)
+	if type(name) ~= "string" then return nil end
+	local trimmed = name:gsub("^%s+", ""):gsub("%s+$", "")
+	if trimmed == "" then return nil end
+	return trimmed
+end
+
+local function getUFProfilesRoot(profileData)
+	local ufProfiles = type(profileData) == "table" and profileData.ufProfiles or nil
+	if type(ufProfiles) ~= "table" then return nil end
+	return ufProfiles
+end
+
+local function normalizeUFProfileReference(profileData, profileName)
+	profileName = trimUFProfileName(profileName)
+	if not profileName then return nil end
+	local ufProfiles = getUFProfilesRoot(profileData)
+	if ufProfiles and type(ufProfiles[profileName]) ~= "table" then return nil end
+	return profileName
+end
+
+local function normalizeUFSpecMappings(profileData, sourceMappings)
+	if type(sourceMappings) ~= "table" then return nil end
+	local normalized = {}
+	for specKey, mappedProfile in pairs(sourceMappings) do
+		local specID = tonumber(specKey)
+		local profileName = normalizeUFProfileReference(profileData, mappedProfile)
+		if specID and specID > 0 and profileName then normalized[specID] = profileName end
+	end
+	if not next(normalized) then return nil end
+	return normalized
+end
+
+local function captureUFCharacterImportState(profileData)
+	if type(profileData) ~= "table" then return nil end
+	local guid = getCurrentPlayerGUID()
+	if not guid then return nil end
+
+	local state = {
+		hasActiveProfile = true,
+		hasSpecMappings = true,
+	}
+
+	local ufProfileKeys = type(profileData.ufProfileKeys) == "table" and profileData.ufProfileKeys or nil
+	local activeProfile = ufProfileKeys and ufProfileKeys[guid] or nil
+	activeProfile = normalizeUFProfileReference(profileData, activeProfile) or normalizeUFProfileReference(profileData, profileData.ufProfileGlobal)
+	if activeProfile then state.activeProfile = activeProfile end
+
+	local ufProfileSpecKeys = type(profileData.ufProfileSpecKeys) == "table" and profileData.ufProfileSpecKeys or nil
+	local specMappings = ufProfileSpecKeys and normalizeUFSpecMappings(profileData, ufProfileSpecKeys[guid]) or nil
+	state.specMappings = specMappings or {}
+
+	if not activeProfile and not next(state.specMappings) then return nil end
+	return state
+end
+
+local function findLegacyUFCharacterActiveProfile(profileData, currentGuid)
+	local ufProfileKeys = type(profileData.ufProfileKeys) == "table" and profileData.ufProfileKeys or nil
+	if ufProfileKeys then
+		local mapped = normalizeUFProfileReference(profileData, ufProfileKeys[currentGuid])
+		if mapped then return mapped end
+		for guid, profileName in pairs(ufProfileKeys) do
+			if guid ~= currentGuid then
+				mapped = normalizeUFProfileReference(profileData, profileName)
+				if mapped then return mapped end
+			end
+		end
+	end
+	return normalizeUFProfileReference(profileData, profileData.ufProfileGlobal)
+end
+
+local function findLegacyUFCharacterSpecMappings(profileData, currentGuid)
+	local ufProfileSpecKeys = type(profileData.ufProfileSpecKeys) == "table" and profileData.ufProfileSpecKeys or nil
+	if not ufProfileSpecKeys then return nil end
+	local mappings = normalizeUFSpecMappings(profileData, ufProfileSpecKeys[currentGuid])
+	if mappings then return mappings end
+	for guid, sourceMappings in pairs(ufProfileSpecKeys) do
+		if guid ~= currentGuid then
+			mappings = normalizeUFSpecMappings(profileData, sourceMappings)
+			if mappings then return mappings end
+		end
+	end
+	return nil
+end
+
+local function remapImportedUFCharacterState(profileData, meta)
+	if type(profileData) ~= "table" then return end
+	if not getUFProfilesRoot(profileData) then return end
+
+	local guid = getCurrentPlayerGUID()
+	if not guid then return end
+
+	local explicitState = type(meta) == "table" and type(meta.ufCharacter) == "table" and meta.ufCharacter or nil
+	local activeProfile
+	local specMappings
+
+	if explicitState then
+		if explicitState.hasActiveProfile == true then
+			activeProfile = normalizeUFProfileReference(profileData, explicitState.activeProfile)
+		end
+		if explicitState.hasSpecMappings == true then
+			specMappings = normalizeUFSpecMappings(profileData, explicitState.specMappings)
+		end
+	else
+		activeProfile = findLegacyUFCharacterActiveProfile(profileData, guid)
+		specMappings = findLegacyUFCharacterSpecMappings(profileData, guid)
+	end
+
+	if explicitState and explicitState.hasActiveProfile == true then
+		profileData.ufProfileKeys = type(profileData.ufProfileKeys) == "table" and profileData.ufProfileKeys or {}
+		profileData.ufProfileKeys[guid] = activeProfile
+	elseif activeProfile then
+		profileData.ufProfileKeys = type(profileData.ufProfileKeys) == "table" and profileData.ufProfileKeys or {}
+		profileData.ufProfileKeys[guid] = activeProfile
+	end
+
+	if explicitState and explicitState.hasSpecMappings == true then
+		profileData.ufProfileSpecKeys = type(profileData.ufProfileSpecKeys) == "table" and profileData.ufProfileSpecKeys or {}
+		profileData.ufProfileSpecKeys[guid] = specMappings
+		if not specMappings then profileData.ufProfileSpecKeys[guid] = nil end
+	elseif specMappings then
+		profileData.ufProfileSpecKeys = type(profileData.ufProfileSpecKeys) == "table" and profileData.ufProfileSpecKeys or {}
+		profileData.ufProfileSpecKeys[guid] = specMappings
+	end
+end
+
 local EXPORT_BLACKLIST = {
 	-- runtime/session or external data that should never be shared
 	chatChannelHistory = true,
@@ -365,10 +500,11 @@ local function sanitizeProfileData(source)
 	return filtered
 end
 
-local function normalizeProfileStorage(profileData)
+local function normalizeProfileStorage(profileData, meta)
 	if type(profileData) ~= "table" then return end
 	if addon and addon.EditMode and addon.EditMode.MigrateProfileData then addon.EditMode:MigrateProfileData(profileData) end
 	if addon and addon.ContainerActions and addon.ContainerActions.MigrateProfileData then addon.ContainerActions:MigrateProfileData(profileData) end
+	if type(meta) == "table" then remapImportedUFCharacterState(profileData, meta) end
 end
 
 local function resolveExportProfileName(profileName)
@@ -396,8 +532,9 @@ local function exportActiveProfile(profileName)
 			addon = addonName,
 			kind = PROFILE_EXPORT_KIND,
 			version = tostring(C_AddOns.GetAddOnMetadata(addonName, "Version") or ""),
-			profileVersion = 2,
+			profileVersion = 3,
 			profile = profileName,
+			ufCharacter = captureUFCharacterImportState(source),
 		},
 		data = sanitizeProfileData(source),
 	}
@@ -437,7 +574,7 @@ local function importProfile(encoded, options)
 	if not EnhanceQoLDB or type(EnhanceQoLDB.profiles) ~= "table" then return false, "NO_DB" end
 
 	local sanitized = sanitizeProfileData(data)
-	normalizeProfileStorage(sanitized)
+	normalizeProfileStorage(sanitized, meta)
 	EnhanceQoLDB.profiles[target] = sanitized
 
 	if useImportedTarget then

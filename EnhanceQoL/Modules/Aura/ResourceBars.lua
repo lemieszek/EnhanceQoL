@@ -969,12 +969,11 @@ local function ensureGlobalStore()
 	return addon.db.globalResourceBarSettings
 end
 
-ResourceBars.SHARED_SLOT_ORDER = { "HEALTH", "MAIN", "SECONDARY", "TERTIARY" }
+ResourceBars.SHARED_SLOT_ORDER = { "HEALTH", "MAIN", "SECONDARY" }
 ResourceBars.SHARED_SLOT_FRAME_NAME = {
 	HEALTH = "EQOLSharedHealthBar",
 	MAIN = "EQOLSharedMainBar",
 	SECONDARY = "EQOLSharedSecondaryBar",
-	TERTIARY = "EQOLSharedTertiaryBar",
 }
 ResourceBars.SHARED_SLOT_ASSIGNMENTS = {
 	PALADIN = {
@@ -1013,6 +1012,12 @@ for slot, frameName in pairs(ResourceBars.SHARED_SLOT_FRAME_NAME) do
 	ResourceBars.SHARED_SLOT_BY_FRAME_NAME[frameName] = slot
 end
 
+local function normalizeSharedSlotStore(store)
+	if type(store) ~= "table" then store = {} end
+	store.TERTIARY = nil
+	return store
+end
+
 function ResourceBars.GetFixedSharedSlotAssignment(specIndex, classTag)
 	local class = classTag or addon.variables.unitClass
 	local spec = tonumber(specIndex or addon.variables.unitSpec)
@@ -1036,11 +1041,14 @@ end
 
 function ResourceBars.EnsureSharedStore()
 	addon.db.sharedResourceBarSettings = addon.db.sharedResourceBarSettings or {}
+	normalizeSharedSlotStore(addon.db.sharedResourceBarSettings)
 	return addon.db.sharedResourceBarSettings
 end
 
 function ResourceBars.EnsureSharedSlotStore(slot)
 	if not slot then return nil end
+	slot = tostring(slot):upper()
+	if not ResourceBars.SHARED_SLOT_FRAME_NAME[slot] then return nil end
 	local store = ResourceBars.EnsureSharedStore()
 	store[slot] = store[slot] or {}
 	if store[slot].enabled == nil then store[slot].enabled = true end
@@ -1644,8 +1652,9 @@ local function exportResourceProfile(scopeKey, profileName)
 			globals.globalResourceBarSettings = CopyTable(db.globalResourceBarSettings)
 			normalizeVisibilityPayloadMap(globals.globalResourceBarSettings)
 		end
-		if type(db.sharedResourceBarSettings) == "table" then
-			globals.sharedResourceBarSettings = CopyTable(db.sharedResourceBarSettings)
+		local sharedStore = type(db.sharedResourceBarSettings) == "table" and normalizeSharedSlotStore(CopyTable(db.sharedResourceBarSettings)) or nil
+		if type(sharedStore) == "table" and next(sharedStore) then
+			globals.sharedResourceBarSettings = sharedStore
 			normalizeVisibilityPayloadMap(globals.sharedResourceBarSettings)
 		end
 		if next(globals) then return globals end
@@ -1762,7 +1771,7 @@ local function importResourceProfile(encoded, scopeKey)
 			normalizeVisibilityPayloadMap(addon.db.globalResourceBarSettings)
 		end
 		if type(global.sharedResourceBarSettings) == "table" then
-			addon.db.sharedResourceBarSettings = CopyTable(global.sharedResourceBarSettings)
+			addon.db.sharedResourceBarSettings = normalizeSharedSlotStore(CopyTable(global.sharedResourceBarSettings))
 			normalizeVisibilityPayloadMap(addon.db.sharedResourceBarSettings)
 		end
 	end
@@ -3257,6 +3266,7 @@ function ResourceBars.GetSharedSlotPossibleTypes(slot, classTag)
 	local out = {}
 	local seen = {}
 	if slot == "HEALTH" then return { "HEALTH" } end
+	if slot ~= "MAIN" and slot ~= "SECONDARY" then return out end
 
 	local function addType(pType)
 		if type(pType) ~= "string" or pType == "" or wanted[pType] then return end
@@ -3289,7 +3299,6 @@ function ResourceBars.GetSharedSlotPossibleTypes(slot, classTag)
 					if pType ~= mainType and specInfo[pType] then secondaryTypes[#secondaryTypes + 1] = pType end
 				end
 				if slot == "SECONDARY" then addType(secondaryTypes[1]) end
-				if slot == "TERTIARY" then addType(secondaryTypes[2]) end
 			end
 		end
 	end
@@ -3343,7 +3352,6 @@ function ResourceBars.ResolveSharedSlotAssignments(specIndex)
 		end
 		assign("MAIN", fixed.MAIN)
 		assign("SECONDARY", fixed.SECONDARY)
-		assign("TERTIARY", fixed.TERTIARY)
 		resolved.secondaryTypes = secondaryTypes
 		return resolved
 	end
@@ -3368,13 +3376,6 @@ function ResourceBars.ResolveSharedSlotAssignments(specIndex)
 		resolved.SECONDARY = secondary
 		resolved.byType[secondary] = "SECONDARY"
 		resolved.order[#resolved.order + 1] = "SECONDARY"
-	end
-
-	local tertiary = secondaryTypes[2]
-	if tertiary then
-		resolved.TERTIARY = tertiary
-		resolved.byType[tertiary] = "TERTIARY"
-		resolved.order[#resolved.order + 1] = "TERTIARY"
 	end
 
 	return resolved
@@ -6002,7 +6003,7 @@ local function setPowerbars(opts)
 		end
 		if mainType then desiredVisibility[mainType] = enabledMain and true or false end
 
-		for _, slot in ipairs({ "SECONDARY", "TERTIARY" }) do
+		for _, slot in ipairs({ "SECONDARY" }) do
 			local pType = sharedAssignments and sharedAssignments[slot] or nil
 			local slotCfg = ResourceBars.EnsureSharedSlotStore(slot)
 			local showBar = pType and slotCfg and slotCfg.enabled == true

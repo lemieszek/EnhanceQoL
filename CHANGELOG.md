@@ -1,26 +1,58 @@
 # Changelog
 
-## [10.3.0] - 2026-04-14
+## [10.3.0-beta4] - 2026-04-14
 
-### ✨ Added
+### 🔄 Changed
 
-- Profiles / Font: Added a dedicated `Font` section in the profile settings, placed below `Export / Import`, with separate `Global font` and `Global font style` dropdowns.
-- Fonts / Styling: Added full combined font styling across EQOL, including `Shadow`, `Shadow Outline`, `Shadow Thick`, `Monochrome`, `Monochrome Outline`, and `Monochrome Thick` options alongside the existing outline styles.
-- Profiles / Font Migration: Added `Fonts global` and `Styles global` actions so an entire active profile can be switched to the global font or the global font styling without opening every individual submenu.
-- Profiles / Font Migration: Added a confirmation dialog and reload reminder for those mass-overwrite actions so large font changes are applied in a controlled way.
-- Data Panels: Added a proper `Font style` dropdown with global-style support. Existing panels automatically migrate from the old outline and shadow checkboxes.
-- Combat Text: Added full font-style support, including outline, shadow, and combined shadow-outline styles.
-- UI / Visibility & Fading (Frames): Added a `Hide Event Toasts` option to suppress Blizzard event toasts such as scenario and activity banners.
-- Unit Frames / Health Text: Added `Absorb`, `Current (Absorb)`, `Current | Absorb`, and `Current + Absorb` health-text modes using total damage absorbs.
+- Resource Bars / Shared Mode: Shared resource bars now only use `Health`, `Main`, and `Secondary`.
+- Resource Bars / Shared Mode: Legacy shared `Tertiary` data is now removed automatically during load and import.
 
 ### 🐛 Fixed
 
-- Unit Frames / Cast Bar: Fixed cast icon borders sometimes triggering a `Backdrop.lua` secret-number taint error..
-- Unit Frames / Cast Bar: Fixed cast icon borders rendering behind the cast icon because of incorrect frame layering.
-- Group Frames / Disconnected Status: Fixed party and raid frames sometimes keeping stale offline indicators or colors after members reconnected, reloaded, or relogged.
-- Combat Resurrection Tracker / Bloodlust Tracker: Fixed Edit Mode anchor restoration still loading the wrong relative anchor point after relog or reload, and ensured tracker text overlays render above custom borders.
-- Resource Bars / External Backdrop: Fixed the live preview briefly forcing the backdrop texture to white until the saved backdrop color reapplied.
-- Resource Bars / External Backdrop: Fixed external resource bar backdrop textures desyncing after entering or leaving Edit Mode until the next reload.
+- Vendor / Baganator: Fixed missing sell and destroy markers, a missing destroy button, and lag spikes when opening the bank from the inventory button.
+
+---
+
+## [10.3.0-beta3] - 2026-04-14
+
+### 🔄 Changed
+
+- Resource Bars / Shared Mode: Updated shared assignments to follow Blizzard-like main/secondary resource behavior for several classes.
+- Resource Bars / Shared Mode: Druid shared assignments are now form-based instead of using the generic fallback.
+
+### 🐛 Fixed
+
+- Resource Bars / Shared Mode: Fixed Druid form swaps sometimes dropping the shared main bar.
+- Resource Bars / Shared Mode: Fixed shared bars being affected by Druid `Show in` form settings.
+- Resource Bars / Shared Mode: Fixed shared Edit Mode registration during form and spec changes.
+
+---
+
+## [10.3.0-beta2] - 2026-04-14
+
+### ✨ Added
+
+- Resource Bars / Shared Mode: Added optional `Classic` / `Shared` resource bar modes per specialization.
+- Resource Bars / Shared Mode: Added shared slot layouts, shared anchoring, shared Edit Mode support, and export/import support.
+- Resource Bars / Shared Mode: Added per-power styling overrides and bulk enable actions for all specs or all classes.
+
+---
+
+## [10.3.0-beta1] - 2026-04-14
+
+### ✨ Added
+
+- Profiles / Fonts: Added global font and font-style controls, including mass-apply actions for full profiles.
+- Data Panels / Combat Text: Added the new font-style system support.
+- UI / Frames: Added `Hide Event Toasts`.
+- Unit Frames / Health Text: Added absorb-based health text formats.
+
+### 🐛 Fixed
+
+- Unit Frames / Cast Bar: Fixed cast icon border taint and layering issues.
+- Group Frames: Fixed stale disconnected indicators after reconnects and reloads.
+- Combat Resurrection / Bloodlust Tracker: Fixed Edit Mode anchor restoration and text layering.
+- Resource Bars / External Backdrop: Fixed preview and Edit Mode desync issues.
 
 ---
 

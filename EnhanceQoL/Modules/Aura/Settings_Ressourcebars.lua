@@ -1112,7 +1112,6 @@ local function registerEditModeBars()
 				local function displayNameForBarType(pType)
 					if pType == "MAIN" then return L["AutoEnableMain"] or "Main resource" end
 					if pType == "SECONDARY" then return L["AutoEnableSecondary"] or "Secondary" end
-					if pType == "TERTIARY" then return L["ResourceBarsTertiary"] or "Tertiary" end
 					if pType == "HEALTH" then return HEALTH or "Health" end
 					local s = (ResourceBars.PowerLabels and ResourceBars.PowerLabels[pType]) or _G["POWER_TYPE_" .. pType] or _G[pType]
 					if type(s) == "string" and s ~= "" then return s end
@@ -1224,7 +1223,7 @@ local function registerEditModeBars()
 					end
 
 					if sharedSlot then
-						local sharedOrder = ResourceBars.SHARED_SLOT_ORDER or { "HEALTH", "MAIN", "SECONDARY", "TERTIARY" }
+						local sharedOrder = ResourceBars.SHARED_SLOT_ORDER or { "HEALTH", "MAIN", "SECONDARY" }
 						for _, slotKey in ipairs(sharedOrder) do
 							local fname = ResourceBars.GetSharedSlotFrameName and ResourceBars.GetSharedSlotFrameName(slotKey)
 							if fname and isBarEnabled(slotKey) then add(fname, displayNameForBarType(slotKey)) end
@@ -4299,7 +4298,7 @@ local function registerEditModeBars()
 	if sharedMode then
 		local assignments = ResourceBars.ResolveSharedSlotAssignments and ResourceBars.ResolveSharedSlotAssignments(activeSpec) or {}
 		if ResourceBars and ResourceBars.SyncSharedSlotProxyFrames then ResourceBars.SyncSharedSlotProxyFrames(activeSpec) end
-		local allowed = { HEALTH = true, MAIN = true, SECONDARY = true, TERTIARY = true }
+		local allowed = { HEALTH = true, MAIN = true, SECONDARY = true }
 		clearUnusedRegistrations(allowed)
 		registerBar("HEALTH", ResourceBars.GetSharedSlotFrameName and ResourceBars.GetSharedSlotFrameName("HEALTH") or "EQOLSharedHealthBar", "HEALTH", ResourceBars.DEFAULT_HEALTH_WIDTH, ResourceBars.DEFAULT_HEALTH_HEIGHT, {
 			sharedSlot = "HEALTH",
@@ -4308,7 +4307,6 @@ local function registerEditModeBars()
 		local sharedEntries = {
 			{ slot = "MAIN", label = L["AutoEnableMain"] or "Main resource" },
 			{ slot = "SECONDARY", label = L["AutoEnableSecondary"] or "Secondary" },
-			{ slot = "TERTIARY", label = L["ResourceBarsTertiary"] or "Tertiary" },
 		}
 		for _, entry in ipairs(sharedEntries) do
 			local resolvedType = assignments and assignments[entry.slot]
