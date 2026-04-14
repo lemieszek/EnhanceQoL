@@ -175,6 +175,14 @@ end
 
 function ResourceBars.ResolveRelativeFrameByName(relativeName)
 	if type(relativeName) ~= "string" or relativeName == "" or relativeName == "UIParent" then return UIParent end
+	local sharedSlot = ResourceBars.GetSharedSlotFromFrameName and ResourceBars.GetSharedSlotFromFrameName(relativeName)
+	if sharedSlot then
+		local proxy = _G[relativeName]
+		local resolvedType = ResourceBars.GetResolvedBarTypeForSharedSlot and ResourceBars.GetResolvedBarTypeForSharedSlot(sharedSlot)
+		if resolvedType == "HEALTH" then return _G.EQOLHealthBar or proxy or UIParent end
+		if type(resolvedType) == "string" and resolvedType ~= "" then return _G["EQOL" .. resolvedType .. "Bar"] or proxy or UIParent end
+		return proxy or UIParent
+	end
 	local mapped = RB.UNITFRAME_ANCHOR_MAP[relativeName]
 	if mapped then
 		if mapped.ufKey and ResourceBars.IsMappedUFEnabled(mapped.ufKey) then
@@ -190,6 +198,13 @@ end
 function ResourceBars.RelativeFrameMatchesName(relativeName, frameName)
 	if not relativeName or not frameName then return false end
 	if relativeName == frameName then return true end
+	local sharedSlot = ResourceBars.GetSharedSlotFromFrameName and ResourceBars.GetSharedSlotFromFrameName(relativeName)
+	if sharedSlot then
+		local resolvedType = ResourceBars.GetResolvedBarTypeForSharedSlot and ResourceBars.GetResolvedBarTypeForSharedSlot(sharedSlot)
+		if resolvedType == "HEALTH" then return frameName == "EQOLHealthBar" end
+		if type(resolvedType) == "string" and resolvedType ~= "" then return frameName == ("EQOL" .. resolvedType .. "Bar") end
+		return frameName == relativeName
+	end
 	local mapped = RB.UNITFRAME_ANCHOR_MAP[relativeName]
 	if not mapped then return false end
 	return frameName == mapped.uf or frameName == mapped.blizz
@@ -207,6 +222,15 @@ function ResourceBars.GetRelativeFrameHookTargets(relativeName)
 		seen[name] = true
 		targets[#targets + 1] = name
 	end
+	local sharedSlot = ResourceBars.GetSharedSlotFromFrameName and ResourceBars.GetSharedSlotFromFrameName(relativeName)
+	if sharedSlot then
+		local resolvedType = ResourceBars.GetResolvedBarTypeForSharedSlot and ResourceBars.GetResolvedBarTypeForSharedSlot(sharedSlot)
+		if resolvedType == "HEALTH" then add("EQOLHealthBar") end
+		if type(resolvedType) == "string" and resolvedType ~= "" and resolvedType ~= "HEALTH" then add("EQOL" .. resolvedType .. "Bar") end
+		add(relativeName)
+		ResourceBars._relativeFrameHookTargetsCache[relativeName] = targets
+		return targets
+	end
 	local mapped = RB.UNITFRAME_ANCHOR_MAP[relativeName]
 	if mapped then
 		add(mapped.blizz)
@@ -222,6 +246,7 @@ local getStatusbarDropdownLists
 local ensureRelativeFrameHooks
 local scheduleRelativeFrameWidthSync
 local ensureSpecCfg
+local ensureDruidShowFormsDefaults
 local classPowerTypes
 local powertypeClasses
 local auraPowerState = {}
@@ -745,6 +770,22 @@ local function getPowerBarColor(type)
 	return 1, 1, 1
 end
 
+function ResourceBars.GetBasePowerColor(type)
+	local pType = type and tostring(type):upper() or "MANA"
+	if pType == "STAGGER" then
+		local r, g, b, a = getStaggerStateColor(0)
+		return { r or 1, g or 1, b or 1, a or 1 }
+	end
+	local auraCfg = RB.AURA_POWER_CONFIG and RB.AURA_POWER_CONFIG[pType]
+	if auraCfg and auraCfg.defaultColor then return CopyTable(auraCfg.defaultColor) end
+	local colorTable = PowerBarColor
+	if colorTable then
+		local entry = colorTable[pType]
+		if entry and entry.r then return { entry.r or 1, entry.g or 1, entry.b or 1, entry.a or 1 } end
+	end
+	return { 1, 1, 1, 1 }
+end
+
 function ResourceBars.RefreshTextureDropdown()
 	local dd = ResourceBars.ui and ResourceBars.ui.textureDropdown
 	if not dd then return end
@@ -928,6 +969,83 @@ local function ensureGlobalStore()
 	return addon.db.globalResourceBarSettings
 end
 
+ResourceBars.SHARED_SLOT_ORDER = { "HEALTH", "MAIN", "SECONDARY", "TERTIARY" }
+ResourceBars.SHARED_SLOT_FRAME_NAME = {
+	HEALTH = "EQOLSharedHealthBar",
+	MAIN = "EQOLSharedMainBar",
+	SECONDARY = "EQOLSharedSecondaryBar",
+	TERTIARY = "EQOLSharedTertiaryBar",
+}
+ResourceBars.SHARED_SLOT_BY_FRAME_NAME = {}
+for slot, frameName in pairs(ResourceBars.SHARED_SLOT_FRAME_NAME) do
+	ResourceBars.SHARED_SLOT_BY_FRAME_NAME[frameName] = slot
+end
+
+function ResourceBars.NormalizeSpecMode(mode)
+	mode = tostring(mode or ""):upper()
+	if mode == "SHARED" then return "SHARED" end
+	return "SPEC"
+end
+
+function ResourceBars.GetDefaultSpecMode()
+	if addon and addon.db and addon.db.resourceBarsDefaultMode ~= nil then
+		return ResourceBars.NormalizeSpecMode(addon.db.resourceBarsDefaultMode)
+	end
+	return "SHARED"
+end
+
+function ResourceBars.EnsureSharedStore()
+	addon.db.sharedResourceBarSettings = addon.db.sharedResourceBarSettings or {}
+	return addon.db.sharedResourceBarSettings
+end
+
+function ResourceBars.EnsureSharedSlotStore(slot)
+	if not slot then return nil end
+	local store = ResourceBars.EnsureSharedStore()
+	store[slot] = store[slot] or {}
+	if store[slot].enabled == nil then store[slot].enabled = true end
+	return store[slot]
+end
+
+function ResourceBars.SpecConfigHasConcreteData(specCfg)
+	if type(specCfg) ~= "table" then return false end
+	for key, value in pairs(specCfg) do
+		if type(key) == "string" and key:sub(1, 1) ~= "_" and type(value) == "table" then return true end
+	end
+	return false
+end
+
+function ResourceBars.GetSharedSlotFrameName(slot)
+	return ResourceBars.SHARED_SLOT_FRAME_NAME[slot]
+end
+
+function ResourceBars.GetSharedSlotFromFrameName(frameName)
+	return ResourceBars.SHARED_SLOT_BY_FRAME_NAME[frameName]
+end
+
+function ResourceBars.GetSpecMode(specIndex)
+	local class = addon.variables.unitClass
+	local spec = tonumber(specIndex or addon.variables.unitSpec)
+	if not class or not spec then return ResourceBars.GetDefaultSpecMode() end
+	local classCfg = addon.db and addon.db.personalResourceBarSettings and addon.db.personalResourceBarSettings[class]
+	local specCfg = classCfg and classCfg[spec]
+	if type(specCfg) ~= "table" then return ResourceBars.GetDefaultSpecMode() end
+	if specCfg._mode ~= nil then return ResourceBars.NormalizeSpecMode(specCfg._mode) end
+	if ResourceBars.SpecConfigHasConcreteData(specCfg) then return "SPEC" end
+	return ResourceBars.GetDefaultSpecMode()
+end
+
+function ResourceBars.SetSpecMode(specIndex, mode)
+	local specCfg = ensureSpecCfg(specIndex or addon.variables.unitSpec)
+	if not specCfg then return false end
+	specCfg._mode = ResourceBars.NormalizeSpecMode(mode)
+	return true
+end
+
+function ResourceBars.SpecUsesSharedMode(specIndex)
+	return ResourceBars.GetSpecMode(specIndex) == "SHARED"
+end
+
 local function getSpecInfo(specIndex)
 	local class = addon.variables.unitClass
 	local spec = specIndex or addon.variables.unitSpec
@@ -981,7 +1099,11 @@ end
 function ResourceBars.GetEditModeFrameId(barType, classTag, specIndex)
 	local class = classTag or addon.variables.unitClass or "UNKNOWN"
 	local spec = tonumber(specIndex or addon.variables.unitSpec)
-	if spec and spec > 0 then return "resourceBar_" .. tostring(class) .. "_" .. tostring(spec) .. "_" .. tostring(barType or "") end
+	local token = barType
+	if spec and spec > 0 and ResourceBars.SpecUsesSharedMode and ResourceBars.SpecUsesSharedMode(spec) then
+		token = (ResourceBars.GetSharedSlotForResolvedBar and ResourceBars.GetSharedSlotForResolvedBar(barType, spec)) or barType
+	end
+	if spec and spec > 0 then return "resourceBar_" .. tostring(class) .. "_" .. tostring(spec) .. "_" .. tostring(token or "") end
 	return ResourceBars.GetEditModeLegacyFrameId(barType, class)
 end
 
@@ -1157,11 +1279,7 @@ local function applyGlobalProfile(barType, specIndex, cosmeticOnly, sourceKey)
 		do
 			local anchor = copied.anchor
 			local rf = anchor and anchor.relativeFrame
-			if rf == "EQOLHealthBar" then
-				relType = "HEALTH"
-			elseif type(rf) == "string" and rf ~= "" then
-				relType = rf:match("^EQOL(.+)Bar$")
-			end
+			relType = ResourceBars.ResolveBarTypeFromFrameToken(rf, specIndex)
 		end
 		local crossTypeTemplate = sourceBarType and sourceBarType ~= barType
 		local unsupportedRelative = relType and relType ~= "HEALTH" and specInfo and not (specInfo.MAIN == relType or specInfo[relType])
@@ -1223,9 +1341,11 @@ ensureSpecCfg = function(specIndex)
 	addon.db.personalResourceBarSettings[class] = addon.db.personalResourceBarSettings[class] or {}
 	addon.db.personalResourceBarSettings[class][spec] = addon.db.personalResourceBarSettings[class][spec] or {}
 	local specCfg = addon.db.personalResourceBarSettings[class][spec]
+	if specCfg._mode == nil and not ResourceBars.SpecConfigHasConcreteData(specCfg) then specCfg._mode = ResourceBars.GetDefaultSpecMode() end
 
 	-- Auto-populate from global when enabled and spec has no explicit enables yet
 	local function maybeAutoEnableRuntime()
+		if ResourceBars.SpecUsesSharedMode(spec) then return end
 		local specInfo = powertypeClasses[class] and powertypeClasses[class][spec]
 		if not specInfo then return end
 		local selection = autoEnableSelection()
@@ -1341,6 +1461,11 @@ ensureSpecCfg = function(specIndex)
 		specCfg._autoEnableInProgress = nil
 	end
 
+	if ResourceBars.SpecUsesSharedMode(spec) then
+		for _, slot in ipairs(ResourceBars.SHARED_SLOT_ORDER) do
+			ResourceBars.EnsureSharedSlotStore(slot)
+		end
+	end
 	maybeAutoEnableRuntime()
 	return specCfg
 end
@@ -1444,35 +1569,42 @@ local function exportResourceProfile(scopeKey, profileName)
 
 	local payload = {
 		kind = RB.RESOURCE_SHARE_KIND,
-		version = 1,
+		version = 3,
 		class = classKey,
 		enableResourceFrame = db["enableResourceFrame"] and true or false,
 		specs = {},
 		specNames = {},
 	}
 
+	local function buildGlobalSettingsPayload()
+		local globals = {}
+		if type(db.resourceBarsAutoEnable) == "table" then globals.resourceBarsAutoEnable = CopyTable(db.resourceBarsAutoEnable) end
+		if db.resourceBarsDefaultMode ~= nil then globals.resourceBarsDefaultMode = tostring(db.resourceBarsDefaultMode) end
+		if db.resourceBarsHideOutOfCombat ~= nil then globals.resourceBarsHideOutOfCombat = db.resourceBarsHideOutOfCombat and true or false end
+		if db.resourceBarsHideMounted ~= nil then globals.resourceBarsHideMounted = db.resourceBarsHideMounted and true or false end
+		if db.resourceBarsHideVehicle ~= nil then globals.resourceBarsHideVehicle = db.resourceBarsHideVehicle and true or false end
+		if db.resourceBarsHidePetBattle ~= nil then globals.resourceBarsHidePetBattle = db.resourceBarsHidePetBattle and true or false end
+		if db.resourceBarsHideClientScene ~= nil then globals.resourceBarsHideClientScene = db.resourceBarsHideClientScene and true or false end
+		if type(db.globalResourceBarSettings) == "table" then
+			globals.globalResourceBarSettings = CopyTable(db.globalResourceBarSettings)
+			normalizeVisibilityPayloadMap(globals.globalResourceBarSettings)
+		end
+		if type(db.sharedResourceBarSettings) == "table" then
+			globals.sharedResourceBarSettings = CopyTable(db.sharedResourceBarSettings)
+			normalizeVisibilityPayloadMap(globals.sharedResourceBarSettings)
+		end
+		if next(globals) then return globals end
+		return nil
+	end
+
 	if scopeKey == "ALL_CLASSES" then
-		payload.version = 2
 		payload.class = "ALL"
 		payload.specs = nil
 		payload.specNames = nil
 		if type(db.personalResourceBarSettings) ~= "table" then return nil, "EMPTY" end
 		payload.classes = CopyTable(db.personalResourceBarSettings)
 		normalizeVisibilityPayloadMap(payload.classes, "classes")
-		do
-			local globals = {}
-			if type(db.resourceBarsAutoEnable) == "table" then globals.resourceBarsAutoEnable = CopyTable(db.resourceBarsAutoEnable) end
-			if db.resourceBarsHideOutOfCombat ~= nil then globals.resourceBarsHideOutOfCombat = db.resourceBarsHideOutOfCombat and true or false end
-			if db.resourceBarsHideMounted ~= nil then globals.resourceBarsHideMounted = db.resourceBarsHideMounted and true or false end
-			if db.resourceBarsHideVehicle ~= nil then globals.resourceBarsHideVehicle = db.resourceBarsHideVehicle and true or false end
-			if db.resourceBarsHidePetBattle ~= nil then globals.resourceBarsHidePetBattle = db.resourceBarsHidePetBattle and true or false end
-			if db.resourceBarsHideClientScene ~= nil then globals.resourceBarsHideClientScene = db.resourceBarsHideClientScene and true or false end
-			if type(db.globalResourceBarSettings) == "table" then
-				globals.globalResourceBarSettings = CopyTable(db.globalResourceBarSettings)
-				normalizeVisibilityPayloadMap(globals.globalResourceBarSettings)
-			end
-			if next(globals) then payload.globalSettings = globals end
-		end
+		payload.globalSettings = buildGlobalSettingsPayload()
 		if type(payload.classes) ~= "table" or not next(payload.classes) then return nil, "EMPTY" end
 	elseif scopeKey == "ALL" then
 		if type(classConfig) ~= "table" then return nil, "NO_DATA" end
@@ -1501,6 +1633,7 @@ local function exportResourceProfile(scopeKey, profileName)
 		local specName = specNameByIndex(specIndex)
 		if specName then payload.specNames[specIndex] = specName end
 	end
+	payload.globalSettings = payload.globalSettings or buildGlobalSettingsPayload()
 
 	local serializer = LibStub("AceSerializer-3.0")
 	local deflate = LibStub("LibDeflate")
@@ -1562,6 +1695,7 @@ local function importResourceProfile(encoded, scopeKey)
 	local function applyGlobalSettings(global)
 		if type(global) ~= "table" then return end
 		if type(global.resourceBarsAutoEnable) == "table" then addon.db.resourceBarsAutoEnable = CopyTable(global.resourceBarsAutoEnable) end
+		if global.resourceBarsDefaultMode ~= nil then addon.db.resourceBarsDefaultMode = tostring(global.resourceBarsDefaultMode) end
 		if global.resourceBarsHideOutOfCombat ~= nil then addon.db.resourceBarsHideOutOfCombat = global.resourceBarsHideOutOfCombat and true or false end
 		if global.resourceBarsHideMounted ~= nil then addon.db.resourceBarsHideMounted = global.resourceBarsHideMounted and true or false end
 		if global.resourceBarsHideVehicle ~= nil then addon.db.resourceBarsHideVehicle = global.resourceBarsHideVehicle and true or false end
@@ -1571,6 +1705,10 @@ local function importResourceProfile(encoded, scopeKey)
 		if type(global.globalResourceBarSettings) == "table" then
 			addon.db.globalResourceBarSettings = CopyTable(global.globalResourceBarSettings)
 			normalizeVisibilityPayloadMap(addon.db.globalResourceBarSettings)
+		end
+		if type(global.sharedResourceBarSettings) == "table" then
+			addon.db.sharedResourceBarSettings = CopyTable(global.sharedResourceBarSettings)
+			normalizeVisibilityPayloadMap(addon.db.sharedResourceBarSettings)
 		end
 	end
 
@@ -1809,6 +1947,7 @@ local function shouldEnableBarMouse(cfg) return not (cfg and cfg.clickThrough ==
 
 local function isEQOLFrameName(name)
 	if name == "EQOLHealthBar" then return true end
+	if ResourceBars.GetSharedSlotFromFrameName and ResourceBars.GetSharedSlotFromFrameName(name) then return true end
 	return type(name) == "string" and name:match("^EQOL.+Bar$")
 end
 -- Fixed, non-DB defaults are stored in ResourcebarVars (RB)
@@ -2650,6 +2789,9 @@ local function applyBarFillColor(bar, cfg, pType)
 		baseR, baseG, baseB, baseA = getPlayerClassColor()
 		baseA = baseA or (cfg.barColor and cfg.barColor[4]) or 1
 		if pType == "HEALTH" then shouldDesaturate = true end
+	elseif cfg._resolvedDefaultPowerColor then
+		local color = cfg._resolvedDefaultPowerColor
+		baseR, baseG, baseB, baseA = color[1] or 1, color[2] or 1, color[3] or 1, color[4] or 1
 	else
 		baseR, baseG, baseB = getPowerBarColor(pType or "MANA")
 		baseA = (cfg.barColor and cfg.barColor[4]) or 1
@@ -2823,6 +2965,7 @@ registerEditModeCallbacks = function()
 	if not lib or not lib.RegisterCallback then return end
 	local function refreshForEditModeTransition()
 		local rb = addon and addon.Aura and addon.Aura.ResourceBars
+		if rb and rb.RegisterEditModeFrames then rb.RegisterEditModeFrames() end
 		if rb and rb.Refresh then
 			rb:Refresh()
 		else
@@ -2997,7 +3140,165 @@ local function getDruidFormStanceMap()
 	return map
 end
 
-local function ensureDruidShowFormsDefaults(cfg, pType, specInfo)
+function ResourceBars.GetCurrentDruidFormKey()
+	if addon.variables.unitClass ~= "DRUID" then return nil end
+	if GetShapeshiftFormID then
+		local formID = GetShapeshiftFormID()
+		local key = formIDToKey[formID]
+		if key then return key end
+	end
+	local idx = GetShapeshiftForm and (GetShapeshiftForm() or 0) or 0
+	local key = resolveFormKeyFromShapeshiftIndex(idx)
+	if key then return key end
+	key = formIndexToKey[idx]
+	if key then return key end
+	return "HUMANOID"
+end
+
+function ResourceBars.GetSharedVisibilityConfig(pType, specIndex, specInfo)
+	local class = addon.variables.unitClass
+	local spec = tonumber(specIndex or addon.variables.unitSpec)
+	local cfg = addon.db and addon.db.personalResourceBarSettings and addon.db.personalResourceBarSettings[class] and addon.db.personalResourceBarSettings[class][spec]
+	cfg = cfg and cfg[pType] or {}
+	if addon.variables.unitClass == "DRUID" then ensureDruidShowFormsDefaults(cfg, pType, specInfo) end
+	return cfg
+end
+
+function ResourceBars.IsSharedSecondaryCurrentlyVisible(pType, specIndex, specInfo)
+	if addon.variables.unitClass ~= "DRUID" then return true end
+	local cfg = ResourceBars.GetSharedVisibilityConfig(pType, specIndex, specInfo)
+	local showForms = cfg and cfg.showForms
+	if type(showForms) ~= "table" then return true end
+	local currentForm = ResourceBars.GetCurrentDruidFormKey()
+	if currentForm and showForms[currentForm] == false then return false end
+	return true
+end
+
+local function resolveDruidSharedMainAndSecondary(specIndex)
+	local spec = tonumber(specIndex or addon.variables.unitSpec)
+	local formID = GetShapeshiftFormID and GetShapeshiftFormID() or nil
+	local formKey = ResourceBars.GetCurrentDruidFormKey and ResourceBars.GetCurrentDruidFormKey() or nil
+
+	if formID == DRUID_BEAR_FORM then return "RAGE", nil end
+	if formID == DRUID_CAT_FORM then return "ENERGY", "COMBO_POINTS" end
+	if formID == DRUID_MOONKIN_FORM_1 or formID == DRUID_MOONKIN_FORM_2 then return "LUNAR_POWER", "MANA" end
+	if formID == DRUID_TREE_FORM or formID == 36 then return "MANA", nil end
+	if formID == DRUID_TRAVEL_FORM or formID == DRUID_ACQUATIC_FORM or formID == DRUID_FLIGHT_FORM or formID == DRUID_SWIFT_FLIGHT_FORM then
+		return "MANA", nil
+	end
+
+	if formKey == "STAG" or formKey == "TRAVEL" then return "MANA", nil end
+
+	if spec == 1 then return "LUNAR_POWER", "MANA" end
+	return "MANA", nil
+end
+
+function ResourceBars.ResolveSharedSlotAssignments(specIndex)
+	local resolved = {
+		HEALTH = "HEALTH",
+		byType = { HEALTH = "HEALTH" },
+		order = { "HEALTH" },
+	}
+	local specInfo = getSpecInfo(specIndex)
+	if not specInfo then return resolved end
+
+	if addon.variables.unitClass == "DRUID" then
+		local mainType, secondaryType = resolveDruidSharedMainAndSecondary(specIndex)
+		if mainType then
+			resolved.MAIN = mainType
+			resolved.byType[mainType] = "MAIN"
+			resolved.order[#resolved.order + 1] = "MAIN"
+		end
+		resolved.secondaryTypes = secondaryType and { secondaryType } or {}
+		if secondaryType then
+			resolved.SECONDARY = secondaryType
+			resolved.byType[secondaryType] = "SECONDARY"
+			resolved.order[#resolved.order + 1] = "SECONDARY"
+		end
+		return resolved
+	end
+
+	local mainType = specInfo.MAIN
+	if mainType then
+		resolved.MAIN = mainType
+		resolved.byType[mainType] = "MAIN"
+		resolved.order[#resolved.order + 1] = "MAIN"
+	end
+
+	local secondaryTypes = {}
+	for _, pType in ipairs(classPowerTypes or {}) do
+		if pType ~= mainType and specInfo[pType] and ResourceBars.IsSharedSecondaryCurrentlyVisible(pType, specIndex, specInfo) then
+			secondaryTypes[#secondaryTypes + 1] = pType
+		end
+	end
+	resolved.secondaryTypes = secondaryTypes
+
+	local secondary = secondaryTypes[1]
+	if secondary then
+		resolved.SECONDARY = secondary
+		resolved.byType[secondary] = "SECONDARY"
+		resolved.order[#resolved.order + 1] = "SECONDARY"
+	end
+
+	local tertiary = secondaryTypes[2]
+	if tertiary then
+		resolved.TERTIARY = tertiary
+		resolved.byType[tertiary] = "TERTIARY"
+		resolved.order[#resolved.order + 1] = "TERTIARY"
+	end
+
+	return resolved
+end
+
+function ResourceBars.GetResolvedBarTypeForSharedSlot(slot, specIndex)
+	slot = tostring(slot or ""):upper()
+	local assignments = ResourceBars.ResolveSharedSlotAssignments(specIndex)
+	return assignments and assignments[slot] or nil
+end
+
+function ResourceBars.GetSharedSlotForResolvedBar(pType, specIndex)
+	local assignments = ResourceBars.ResolveSharedSlotAssignments(specIndex)
+	return assignments and assignments.byType and assignments.byType[pType] or nil
+end
+
+function ResourceBars.ResolveConfigSourceForBar(pType, specIndex)
+	local spec = tonumber(specIndex or addon.variables.unitSpec)
+	local specInfo = getSpecInfo(spec)
+	if ResourceBars.SpecUsesSharedMode(spec) then
+		if ResourceBars.GetSharedSlotFrameName and ResourceBars.GetSharedSlotFrameName(pType) then
+			return ResourceBars.EnsureSharedSlotStore(pType), "SHARED", pType, specInfo
+		end
+		local slot = ResourceBars.GetSharedSlotForResolvedBar(pType, spec)
+		if slot then
+			return ResourceBars.EnsureSharedSlotStore(slot), "SHARED", slot, specInfo
+		end
+	end
+	local specCfg = ensureSpecCfg(spec)
+	return specCfg and specCfg[pType] or nil, "SPEC", nil, specInfo
+end
+
+function ResourceBars.IsResolvedBarTypeEnabled(pType, specIndex)
+	local spec = tonumber(specIndex or addon.variables.unitSpec)
+	if ResourceBars.SpecUsesSharedMode(spec) then
+		local slot = ResourceBars.GetSharedSlotForResolvedBar(pType, spec)
+		if not slot then return false end
+		local cfg = ResourceBars.EnsureSharedSlotStore(slot)
+		return cfg and cfg.enabled == true
+	end
+	local specCfg = ensureSpecCfg(spec)
+	local cfg = specCfg and specCfg[pType]
+	return cfg and cfg.enabled == true or false
+end
+
+function ResourceBars.ResolveBarTypeFromFrameToken(frameName, specIndex)
+	if frameName == "EQOLHealthBar" then return "HEALTH" end
+	local sharedSlot = ResourceBars.GetSharedSlotFromFrameName and ResourceBars.GetSharedSlotFromFrameName(frameName)
+	if sharedSlot then return ResourceBars.GetResolvedBarTypeForSharedSlot and ResourceBars.GetResolvedBarTypeForSharedSlot(sharedSlot, specIndex) end
+	if type(frameName) ~= "string" then return nil end
+	return frameName:match("^EQOL(.+)Bar$")
+end
+
+ensureDruidShowFormsDefaults = function(cfg, pType, specInfo)
 	if addon.variables.unitClass ~= "DRUID" then return end
 	if not cfg or type(cfg) ~= "table" then return end
 	if pType == "HEALTH" then return end
@@ -3058,7 +3359,10 @@ function ResourceBars.GetRuntimeBarConfig(pType, frame)
 	return cfg
 end
 
-local function isEQOLBarFrameName(name) return type(name) == "string" and name:match("^EQOL.+Bar$") end
+local function isEQOLBarFrameName(name)
+	if ResourceBars.GetSharedSlotFromFrameName and ResourceBars.GetSharedSlotFromFrameName(name) then return true end
+	return type(name) == "string" and name:match("^EQOL.+Bar$")
+end
 
 ensureRelativeFrameFallback = function(anchor, pType, specInfo)
 	if pType == "HEALTH" then return end
@@ -3066,7 +3370,7 @@ ensureRelativeFrameFallback = function(anchor, pType, specInfo)
 	local rf = anchor.relativeFrame
 	if not rf or rf == "" then return end
 	if not isEQOLBarFrameName(rf) then return end
-	local relType = (rf == "EQOLHealthBar") and "HEALTH" or rf:match("^EQOL(.+)Bar$")
+	local relType = ResourceBars.ResolveBarTypeFromFrameToken(rf)
 	if relType and relType ~= "" then
 		-- If the target bar type is valid for this spec, keep it even if the frame isn't created yet
 		if relType == "HEALTH" then return end
@@ -3237,11 +3541,16 @@ end
 function getAnchor(name, spec)
 	local class = addon.variables.unitClass
 	spec = spec or addon.variables.unitSpec
-	addon.db.personalResourceBarSettings = addon.db.personalResourceBarSettings or {}
-	addon.db.personalResourceBarSettings[class] = addon.db.personalResourceBarSettings[class] or {}
-	addon.db.personalResourceBarSettings[class][spec] = addon.db.personalResourceBarSettings[class][spec] or {}
-	addon.db.personalResourceBarSettings[class][spec][name] = addon.db.personalResourceBarSettings[class][spec][name] or {}
-	local cfg = addon.db.personalResourceBarSettings[class][spec][name]
+	if not class or not spec then return {} end
+	ensureSpecCfg(spec)
+	local cfg = select(1, ResourceBars.ResolveConfigSourceForBar(name, spec))
+	if not cfg then
+		addon.db.personalResourceBarSettings = addon.db.personalResourceBarSettings or {}
+		addon.db.personalResourceBarSettings[class] = addon.db.personalResourceBarSettings[class] or {}
+		addon.db.personalResourceBarSettings[class][spec] = addon.db.personalResourceBarSettings[class][spec] or {}
+		addon.db.personalResourceBarSettings[class][spec][name] = addon.db.personalResourceBarSettings[class][spec][name] or {}
+		cfg = addon.db.personalResourceBarSettings[class][spec][name]
+	end
 	cfg.anchor = cfg.anchor or {}
 	local anchor = cfg.anchor
 	if anchor.matchRelativeWidth == nil and anchor.matchEssentialWidth ~= nil then
@@ -3298,7 +3607,7 @@ local function resolveAnchor(info, type)
 		if fname == "EQOLHealthBar" then
 			bType = "HEALTH"
 		else
-			bType = fname:match("^EQOL(.+)Bar$")
+			bType = ResourceBars.ResolveBarTypeFromFrameToken(fname)
 		end
 
 		if not bType then break end
@@ -3315,12 +3624,100 @@ local function resolveAnchor(info, type)
 	return frame or UIParent, false
 end
 
+function ResourceBars.EnsureSharedSlotProxyFrame(slot)
+	local frameName = ResourceBars.GetSharedSlotFrameName and ResourceBars.GetSharedSlotFrameName(slot)
+	if not frameName then return nil end
+	local frame = _G[frameName]
+	if frame then return frame end
+	frame = CreateFrame("Frame", frameName, UIParent)
+	frame:SetClampedToScreen(true)
+	frame:SetMovable(true)
+	frame:EnableMouse(false)
+	frame:SetAlpha(0.01)
+	frame:SetFrameStrata("MEDIUM")
+	frame:SetFrameLevel(1)
+	frame:SetSize(RB.DEFAULT_POWER_WIDTH, RB.DEFAULT_POWER_HEIGHT)
+	frame:Show()
+	return frame
+end
+
+function ResourceBars.SyncSharedSlotProxyFrame(slot, specIndex)
+	local frame = ResourceBars.EnsureSharedSlotProxyFrame(slot)
+	if not frame then return nil end
+	local spec = tonumber(specIndex or addon.variables.unitSpec)
+	local resolvedType = ResourceBars.GetResolvedBarTypeForSharedSlot and ResourceBars.GetResolvedBarTypeForSharedSlot(slot, spec)
+	local liveFrame
+	if resolvedType == "HEALTH" then
+		liveFrame = healthBar or _G.EQOLHealthBar
+	elseif type(resolvedType) == "string" and resolvedType ~= "" then
+		liveFrame = powerbar[resolvedType] or _G["EQOL" .. resolvedType .. "Bar"]
+	end
+
+	local cfg = ResourceBars.EnsureSharedSlotStore and ResourceBars.EnsureSharedSlotStore(slot) or {}
+	local widthDefault = slot == "HEALTH" and RB.DEFAULT_HEALTH_WIDTH or RB.DEFAULT_POWER_WIDTH
+	local heightDefault = slot == "HEALTH" and RB.DEFAULT_HEALTH_HEIGHT or RB.DEFAULT_POWER_HEIGHT
+
+	frame:ClearAllPoints()
+	if liveFrame and liveFrame ~= frame and liveFrame.GetNumPoints and liveFrame:GetNumPoints() > 0 then
+		local point, relativeTo, relativePoint, x, y = liveFrame:GetPoint(1)
+		frame:SetPoint(point or "TOPLEFT", relativeTo or UIParent, relativePoint or point or "TOPLEFT", x or 0, y or 0)
+		frame:SetSize(liveFrame:GetWidth() or cfg.width or widthDefault, liveFrame:GetHeight() or cfg.height or heightDefault)
+		frame:Show()
+		return frame
+	end
+
+	local anchor = getAnchor(slot, spec)
+	if (anchor.relativeFrame or "UIParent") == "UIParent" then
+		anchor.point = anchor.point or "TOPLEFT"
+		anchor.relativePoint = anchor.relativePoint or anchor.point
+		if anchor.x == nil or anchor.y == nil then
+			local pw = UIParent and UIParent.GetWidth and UIParent:GetWidth() or 0
+			local ph = UIParent and UIParent.GetHeight and UIParent:GetHeight() or 0
+			local w = cfg.width or widthDefault
+			local h = cfg.height or heightDefault
+			anchor.x = (pw - w) / 2
+			anchor.y = (h - ph) / 2
+		end
+	end
+
+	local relative, looped = resolveAnchor(anchor, resolvedType or slot)
+	if looped and (anchor.relativeFrame or "UIParent") ~= "UIParent" then
+		local pw = UIParent and UIParent.GetWidth and UIParent:GetWidth() or 0
+		local ph = UIParent and UIParent.GetHeight and UIParent:GetHeight() or 0
+		local w = cfg.width or widthDefault
+		local h = cfg.height or heightDefault
+		anchor.point = "TOPLEFT"
+		anchor.relativeFrame = "UIParent"
+		anchor.relativePoint = "TOPLEFT"
+		anchor.x = (pw - w) / 2
+		anchor.y = (h - ph) / 2
+		relative = UIParent
+	end
+
+	local width = cfg.width or widthDefault
+	local height = cfg.height or heightDefault
+	if anchor.matchRelativeWidth == true and relative and relative ~= UIParent and relative.GetWidth then width = relative:GetWidth() or width end
+	frame:SetSize(width, height)
+	frame:SetPoint(anchor.point or "TOPLEFT", relative or UIParent, anchor.relativePoint or anchor.point or "TOPLEFT", anchor.x or 0, anchor.y or 0)
+	frame:Show()
+	return frame
+end
+
+function ResourceBars.SyncSharedSlotProxyFrames(specIndex)
+	for _, slot in ipairs(ResourceBars.SHARED_SLOT_ORDER or {}) do
+		ResourceBars.SyncSharedSlotProxyFrame(slot, specIndex)
+	end
+end
+
 function createHealthBar()
 	if mainFrame then
 		-- Ensure correct parent when re-enabling
 		if mainFrame:GetParent() ~= UIParent then mainFrame:SetParent(UIParent) end
 		if healthBar and healthBar.GetParent and healthBar:GetParent() ~= UIParent then healthBar:SetParent(UIParent) end
 		if mainFrame.SetClampedToScreen then mainFrame:SetClampedToScreen(true) end
+		if healthBar then
+			healthBar._rbSharedSlot = ResourceBars.SpecUsesSharedMode and ResourceBars.SpecUsesSharedMode(addon.variables.unitSpec) and "HEALTH" or nil
+		end
 		local settings = getBarSettings("HEALTH") or {}
 		healthBar._cfg = settings
 		applyBarFrameLayers(healthBar, settings)
@@ -3338,6 +3735,7 @@ function createHealthBar()
 	healthBar = _G["EQOLHealthBar"] or CreateFrame("StatusBar", "EQOLHealthBar", UIParent, "BackdropTemplate")
 	if healthBar:GetParent() ~= UIParent then healthBar:SetParent(UIParent) end
 	healthBar._rbType = "HEALTH"
+	healthBar._rbSharedSlot = ResourceBars.SpecUsesSharedMode and ResourceBars.SpecUsesSharedMode(addon.variables.unitSpec) and "HEALTH" or nil
 	do
 		local cfg = getBarSettings("HEALTH")
 		local w = max(RB.MIN_RESOURCE_BAR_WIDTH, (cfg and cfg.width) or RB.DEFAULT_HEALTH_WIDTH)
@@ -3518,6 +3916,7 @@ classPowerTypes = {
 
 ResourceBars.powertypeClasses = powertypeClasses
 ResourceBars.classPowerTypes = classPowerTypes
+ResourceBars.COSMETIC_BAR_KEYS = COSMETIC_BAR_KEYS
 ResourceBars.separatorEligible = {
 	HOLY_POWER = true,
 	SOUL_SHARDS = true,
@@ -3532,12 +3931,32 @@ ResourceBars.separatorEligible = {
 	RUNES = true,
 }
 
+function ResourceBars.ApplySharedPowerTypeOverride(runtimeCfg, sourceCfg, pType)
+	local overrides = type(sourceCfg) == "table" and sourceCfg.powerTypeOverrides or nil
+	local override = type(overrides) == "table" and overrides[pType] or nil
+	if type(override) ~= "table" or override.enabled ~= true then return end
+	for _, key in ipairs(COSMETIC_BAR_KEYS) do
+		if override[key] ~= nil then runtimeCfg[key] = type(override[key]) == "table" and CopyTable(override[key]) or override[key] end
+	end
+end
+
 function getBarSettings(pType)
 	local class = addon.variables.unitClass
 	local spec = addon.variables.unitSpec
 	local specInfo = getSpecInfo(spec)
 	if class and not ResourceBars.IsBarTypeSupportedForClass(pType, class, spec) then return nil end
 	if not ResourceBars.IsSpecBarTypeSupported(specInfo, pType) then return nil end
+	local sourceCfg, sourceMode, sharedSlot = ResourceBars.ResolveConfigSourceForBar(pType, spec)
+	if sourceMode == "SHARED" then
+		local runtimeCfg = CopyTable(sourceCfg or {})
+		runtimeCfg._rbSourceMode = "SHARED"
+		runtimeCfg._rbSourceSlot = sharedSlot
+		if ResourceBars.ApplySharedPowerTypeOverride then ResourceBars.ApplySharedPowerTypeOverride(runtimeCfg, sourceCfg, pType) end
+		if type(sourceCfg) == "table" and type(sourceCfg.defaultPowerColors) == "table" and type(sourceCfg.defaultPowerColors[pType]) == "table" then
+			runtimeCfg._resolvedDefaultPowerColor = CopyTable(sourceCfg.defaultPowerColors[pType])
+		end
+		return ResourceBars.PrepareBarConfigForRuntime(runtimeCfg, pType, specInfo)
+	end
 	if addon.db.personalResourceBarSettings and addon.db.personalResourceBarSettings[class] and addon.db.personalResourceBarSettings[class][spec] then
 		local cfg = addon.db.personalResourceBarSettings[class][spec][pType]
 		if cfg then return ResourceBars.PrepareBarConfigForRuntime(cfg, pType, specInfo) end
@@ -3566,11 +3985,7 @@ function getBarSettings(pType)
 				do
 					local anchor = copied.anchor
 					local rf = anchor and anchor.relativeFrame
-					if rf == "EQOLHealthBar" then
-						relType = "HEALTH"
-					elseif type(rf) == "string" and rf ~= "" then
-						relType = rf:match("^EQOL(.+)Bar$")
-					end
+					relType = ResourceBars.ResolveBarTypeFromFrameToken(rf, spec)
 				end
 				local crossTypeTemplate = sourceBarType and sourceBarType ~= pType
 				local unsupportedRelative = relType and relType ~= "HEALTH" and specInfo and not (specInfo.MAIN == relType or specInfo[relType])
@@ -4201,6 +4616,9 @@ function updatePowerBar(type, runeSlot)
 		elseif cfg.useClassColor == true then
 			local cr, cg, cb, ca = getPlayerClassColor()
 			bar._baseColor[1], bar._baseColor[2], bar._baseColor[3], bar._baseColor[4] = cr, cg, cb, ca or (cfg.barColor and cfg.barColor[4]) or 1
+		elseif cfg._resolvedDefaultPowerColor then
+			local c = cfg._resolvedDefaultPowerColor
+			bar._baseColor[1], bar._baseColor[2], bar._baseColor[3], bar._baseColor[4] = c[1] or 1, c[2] or 1, c[3] or 1, c[4] or 1
 		elseif cfgDef and cfgDef.defaultColor then
 			local c = cfgDef.defaultColor
 			bar._baseColor[1], bar._baseColor[2], bar._baseColor[3], bar._baseColor[4] = c[1] or 1, c[2] or 1, c[3] or 1, c[4] or 1
@@ -4354,6 +4772,9 @@ function updatePowerBar(type, runeSlot)
 	elseif cfg.useClassColor == true then
 		local cr, cg, cb, ca = getPlayerClassColor()
 		bar._baseColor[1], bar._baseColor[2], bar._baseColor[3], bar._baseColor[4] = cr, cg, cb, ca or (cfg.barColor and cfg.barColor[4]) or 1
+	elseif cfg._resolvedDefaultPowerColor then
+		local c = cfg._resolvedDefaultPowerColor
+		bar._baseColor[1], bar._baseColor[2], bar._baseColor[3], bar._baseColor[4] = c[1] or 1, c[2] or 1, c[3] or 1, c[4] or 1
 	elseif cfgDef and cfgDef.defaultColor then
 		local c = cfgDef.defaultColor
 		bar._baseColor[1], bar._baseColor[2], bar._baseColor[3], bar._baseColor[4] = c[1] or 1, c[2] or 1, c[3] or 1, c[4] or 1
@@ -5160,7 +5581,7 @@ function layoutRunes(bar)
 	end
 end
 
-local function createPowerBar(type, anchor)
+local function createPowerBar(type, anchor, sharedSlot)
 	-- Reuse existing bar if present; avoid destroying frames to preserve anchors
 	local bar = powerbar[type] or _G["EQOL" .. type .. "Bar"]
 	if not bar then bar = CreateFrame("StatusBar", "EQOL" .. type .. "Bar", UIParent, "BackdropTemplate") end
@@ -5187,6 +5608,7 @@ local function createPowerBar(type, anchor)
 	local h = settings and settings.height or RB.DEFAULT_POWER_HEIGHT
 	bar._cfg = settings
 	bar._rbType = type
+	bar._rbSharedSlot = sharedSlot
 	powerbar[type] = bar
 	local defaultStyle = (type == "MANA" or type == "STAGGER") and "PERCENT" or "CURMAX"
 	bar._style = settings and settings.textStyle or defaultStyle
@@ -5230,8 +5652,9 @@ local function createPowerBar(type, anchor)
 			-- Default stack below provided anchor and persist default anchor in DB
 			bar:ClearAllPoints()
 			bar:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, stackSpacing)
+			local relativeFrameName = (anchor._rbSharedSlot and ResourceBars.GetSharedSlotFrameName and ResourceBars.GetSharedSlotFrameName(anchor._rbSharedSlot)) or (anchor:GetName() or "UIParent")
 			a.point = "TOPLEFT"
-			a.relativeFrame = anchor:GetName() or "UIParent"
+			a.relativeFrame = relativeFrameName
 			a.relativePoint = "BOTTOMLEFT"
 			a.x = 0
 			a.y = stackSpacing
@@ -5303,6 +5726,9 @@ local function createPowerBar(type, anchor)
 	end
 	if type == "RUNES" then
 		bar:SetStatusBarColor(getPowerBarColor(type))
+	elseif settings and settings._resolvedDefaultPowerColor and not (settings.useBarColor == true or settings.useClassColor == true) then
+		local c = settings._resolvedDefaultPowerColor
+		bar:SetStatusBarColor(c[1] or 1, c[2] or 1, c[3] or 1, c[4] or 1)
 	elseif not (settings and (settings.useBarColor == true or settings.useClassColor == true)) then
 		local dr, dg, db = getPowerBarColor(type)
 		local alpha = (settings and settings.barColor and settings.barColor[4]) or 1
@@ -5414,88 +5840,116 @@ local function setPowerbars(opts)
 	local mainPowerBar
 	local lastBar
 	local specCfg = ensureSpecCfg(addon.variables.unitSpec)
+	local specInfo = getSpecInfo(addon.variables.unitSpec)
+	local sharedMode = ResourceBars.SpecUsesSharedMode and ResourceBars.SpecUsesSharedMode(addon.variables.unitSpec)
+	local sharedAssignments = sharedMode and ResourceBars.ResolveSharedSlotAssignments(addon.variables.unitSpec) or nil
 
 	local desiredVisibility = {}
 	ResourceBars._barBuildBatchDepth = (ResourceBars._barBuildBatchDepth or 0) + 1
-
-	if
-		powertypeClasses[addon.variables.unitClass]
-		and powertypeClasses[addon.variables.unitClass][addon.variables.unitSpec]
-		and powertypeClasses[addon.variables.unitClass][addon.variables.unitSpec].MAIN
-	then
-		local mType = powertypeClasses[addon.variables.unitClass][addon.variables.unitSpec].MAIN
-		local enabledMain = specCfg and specCfg[mType] and specCfg[mType].enabled == true
-		if enabledMain then
-			createPowerBar(mType, ((specCfg and specCfg.HEALTH and specCfg.HEALTH.enabled == true) and EQOLHealthBar or nil))
-			mainPowerBar = mType
-			lastBar = mainPowerBar
-		end
-		desiredVisibility[mType] = enabledMain
+	for _, pType in ipairs(classPowerTypes) do
+		desiredVisibility[pType] = false
+	end
+	for pType in pairs(powerbar or {}) do
+		desiredVisibility[pType] = false
 	end
 
-	for _, pType in ipairs(classPowerTypes) do
-		local showBar = false
-		local shouldShow = false
-		if specCfg and specCfg[pType] and specCfg[pType].enabled == true then
-			if mainPowerBar == pType then
-				shouldShow = true
-			elseif
-				powertypeClasses[addon.variables.unitClass]
-				and powertypeClasses[addon.variables.unitClass][addon.variables.unitSpec]
-				and powertypeClasses[addon.variables.unitClass][addon.variables.unitSpec][pType]
-			then
-				shouldShow = true
+	local sharedHealthCfg = sharedMode and ResourceBars.EnsureSharedSlotStore("HEALTH") or nil
+	local healthEnabled = sharedMode and (sharedHealthCfg and sharedHealthCfg.enabled == true) or (specCfg and specCfg.HEALTH and specCfg.HEALTH.enabled == true)
+	if healthBar then healthBar._rbSharedSlot = sharedMode and "HEALTH" or nil end
+
+	if sharedMode then
+		local sharedMainCfg = ResourceBars.EnsureSharedSlotStore("MAIN")
+		local mainType = sharedAssignments and sharedAssignments.MAIN or nil
+		local enabledMain = mainType and sharedMainCfg and sharedMainCfg.enabled == true
+		if enabledMain then
+			createPowerBar(mainType, healthEnabled and healthBar or nil, "MAIN")
+			mainPowerBar = mainType
+			lastBar = mainPowerBar
+			if RB.FREQUENT_POWER_TYPES[mainType] then powerfrequent[mainType] = true end
+		end
+		if mainType then desiredVisibility[mainType] = enabledMain and true or false end
+
+		for _, slot in ipairs({ "SECONDARY", "TERTIARY" }) do
+			local pType = sharedAssignments and sharedAssignments[slot] or nil
+			local slotCfg = ResourceBars.EnsureSharedSlotStore(slot)
+			local showBar = pType and slotCfg and slotCfg.enabled == true
+			if pType then
+				if showBar then
+					if RB.FREQUENT_POWER_TYPES[pType] then powerfrequent[pType] = true end
+					createPowerBar(pType, powerbar[lastBar] or (healthEnabled and healthBar or nil), slot)
+					lastBar = pType
+				end
+				desiredVisibility[pType] = showBar and true or false
 			end
 		end
-
-		if shouldShow then
-			-- Per-form filter for Druid
-			local formAllowed = true
-			local barCfg = specCfg and specCfg[pType]
-			if isDruid and barCfg and barCfg.showForms then
-				local allowed = barCfg.showForms
-				if druidForm and allowed[druidForm] == false then formAllowed = false end
+	else
+		if specInfo and specInfo.MAIN then
+			local mType = specInfo.MAIN
+			local enabledMain = specCfg and specCfg[mType] and specCfg[mType].enabled == true
+			if enabledMain then
+				createPowerBar(mType, (healthEnabled and healthBar or nil))
+				mainPowerBar = mType
+				lastBar = mainPowerBar
 			end
-			if forceAllDruidBars then formAllowed = true end
-			if formAllowed and addon.variables.unitClass == "DRUID" then
-				if RB.FREQUENT_POWER_TYPES[pType] then powerfrequent[pType] = true end
-				if forceAllDruidBars then
+			desiredVisibility[mType] = enabledMain
+		end
+
+		for _, pType in ipairs(classPowerTypes) do
+			local showBar = false
+			local shouldShow = false
+			if specCfg and specCfg[pType] and specCfg[pType].enabled == true then
+				if mainPowerBar == pType then
+					shouldShow = true
+				elseif specInfo and specInfo[pType] then
+					shouldShow = true
+				end
+			end
+
+			if shouldShow then
+				local formAllowed = true
+				local barCfg = specCfg and specCfg[pType]
+				if isDruid and barCfg and barCfg.showForms then
+					local allowed = barCfg.showForms
+					if druidForm and allowed[druidForm] == false then formAllowed = false end
+				end
+				if forceAllDruidBars then formAllowed = true end
+				if formAllowed and addon.variables.unitClass == "DRUID" then
+					if RB.FREQUENT_POWER_TYPES[pType] then powerfrequent[pType] = true end
+					if forceAllDruidBars then
+						if mainPowerBar ~= pType then
+							createPowerBar(pType, powerbar[lastBar] or (healthEnabled and healthBar or nil))
+							lastBar = pType
+						end
+						showBar = true
+					elseif pType == mainPowerBar then
+						showBar = true
+					elseif pType == "COMBO_POINTS" and druidForm == "CAT" then
+						createPowerBar(pType, powerbar[lastBar] or (healthEnabled and healthBar or nil))
+						lastBar = pType
+						showBar = true
+					else
+						createPowerBar(pType, powerbar[lastBar] or (healthEnabled and healthBar or nil))
+						lastBar = pType
+						showBar = true
+					end
+				elseif formAllowed then
+					if RB.FREQUENT_POWER_TYPES[pType] then powerfrequent[pType] = true end
 					if mainPowerBar ~= pType then
-						createPowerBar(pType, powerbar[lastBar] or ((specCfg and specCfg.HEALTH and specCfg.HEALTH.enabled == true) and EQOLHealthBar or nil))
+						createPowerBar(pType, powerbar[lastBar] or (healthEnabled and healthBar or nil))
 						lastBar = pType
 					end
 					showBar = true
-				elseif pType == mainPowerBar then
-					showBar = true
-				elseif pType == "COMBO_POINTS" and druidForm == "CAT" then
-					createPowerBar(pType, powerbar[lastBar] or ((specCfg and specCfg.HEALTH and specCfg.HEALTH.enabled == true) and EQOLHealthBar or nil))
-					lastBar = pType
-					showBar = true
-				else
-					-- For Druids, showForms is the authoritative per-form filter for enabled secondary bars.
-					-- Gating ENERGY/RAGE/MANA on the active power token prevents bars from appearing in forms
-					-- that the user explicitly enabled in "Show in".
-					createPowerBar(pType, powerbar[lastBar] or ((specCfg and specCfg.HEALTH and specCfg.HEALTH.enabled == true) and EQOLHealthBar or nil))
-					lastBar = pType
-					showBar = true
 				end
-			elseif formAllowed then
-				if RB.FREQUENT_POWER_TYPES[pType] then powerfrequent[pType] = true end
-				if mainPowerBar ~= pType then
-					createPowerBar(pType, powerbar[lastBar] or ((specCfg and specCfg.HEALTH and specCfg.HEALTH.enabled == true) and EQOLHealthBar or nil))
-					lastBar = pType
-				end
-				showBar = true
 			end
-		end
 
-		desiredVisibility[pType] = showBar
+			desiredVisibility[pType] = showBar
+		end
 	end
 
 	for pType, wantVisible in pairs(desiredVisibility) do
 		local bar = powerbar[pType]
 		if bar then
-			bar._cfg = specCfg and specCfg[pType] or nil
+			bar._cfg = wantVisible and getBarSettings(pType) or nil
 			bar._rbDesiredVisible = wantVisible and true or false
 			if wantVisible then
 				if not bar:IsShown() then bar:Show() end
@@ -5507,9 +5961,9 @@ local function setPowerbars(opts)
 
 	-- Toggle Health visibility according to config
 	if healthBar then
-		local healthCfg = specCfg and specCfg.HEALTH or nil
+		local healthCfg = getBarSettings("HEALTH") or nil
 		healthBar._cfg = healthCfg
-		local showHealth = healthCfg and healthCfg.enabled == true
+		local showHealth = healthEnabled and true or false
 		healthBar._rbDesiredVisible = showHealth and true or false
 		if showHealth then
 			if not healthBar:IsShown() then healthBar:Show() end
@@ -6162,6 +6616,9 @@ local function scheduleSpecRefresh()
 		ResourceBars._suspendAnchors = true
 		setPowerbars()
 		ResourceBars._suspendAnchors = false
+		if addon.EditMode and addon.EditMode.IsInEditMode and addon.EditMode:IsInEditMode() and ResourceBars.RegisterEditModeFrames then
+			ResourceBars.RegisterEditModeFrames()
+		end
 		if addon and addon.Aura and addon.Aura.ResourceBars and addon.Aura.ResourceBars.ReanchorAll then addon.Aura.ResourceBars.ReanchorAll() end
 		if addon and addon.Aura and addon.Aura.ResourceBars and addon.Aura.ResourceBars.UpdateRuneEventRegistration then addon.Aura.ResourceBars.UpdateRuneEventRegistration() end
 		if addon and addon.Aura and addon.Aura.ResourceBars and addon.Aura.ResourceBars.ForceRuneRecolor then addon.Aura.ResourceBars.ForceRuneRecolor() end
@@ -6273,13 +6730,22 @@ local function eventHandler(self, event, unit, arg1)
 		if scheduleRelativeFrameWidthSync then scheduleRelativeFrameWidthSync() end
 	elseif event == "UPDATE_SHAPESHIFT_FORM" then
 		setPowerbars()
+		if addon.EditMode and addon.EditMode.IsInEditMode and addon.EditMode:IsInEditMode() and ResourceBars.RegisterEditModeFrames then
+			ResourceBars.RegisterEditModeFrames()
+		end
 		-- After initial creation, run a re-anchor pass to ensure all dependent anchors resolve
 		if After then
 			After(0.05, function()
+				if addon.EditMode and addon.EditMode.IsInEditMode and addon.EditMode:IsInEditMode() and ResourceBars.RegisterEditModeFrames then
+					ResourceBars.RegisterEditModeFrames()
+				end
 				if addon and addon.Aura and addon.Aura.ResourceBars and addon.Aura.ResourceBars.ReanchorAll then addon.Aura.ResourceBars.ReanchorAll() end
 				if addon and addon.Aura and addon.Aura.ResourceBars and addon.Aura.ResourceBars.UpdateRuneEventRegistration then addon.Aura.ResourceBars.UpdateRuneEventRegistration() end
 			end)
 		else
+			if addon.EditMode and addon.EditMode.IsInEditMode and addon.EditMode:IsInEditMode() and ResourceBars.RegisterEditModeFrames then
+				ResourceBars.RegisterEditModeFrames()
+			end
 			if addon and addon.Aura and addon.Aura.ResourceBars and addon.Aura.ResourceBars.ReanchorAll then addon.Aura.ResourceBars.ReanchorAll() end
 			if addon and addon.Aura and addon.Aura.ResourceBars and addon.Aura.ResourceBars.UpdateRuneEventRegistration then addon.Aura.ResourceBars.UpdateRuneEventRegistration() end
 		end
@@ -6461,8 +6927,7 @@ function ResourceBars.UpdateRuneEventRegistration()
 	if not frameAnchor then return end
 	local isDK = addon.variables.unitClass == "DEATHKNIGHT"
 	local spec = addon.variables.unitSpec
-	local cfg = addon.db.personalResourceBarSettings and addon.db.personalResourceBarSettings[addon.variables.unitClass] and addon.db.personalResourceBarSettings[addon.variables.unitClass][spec]
-	local enabled = isDK and cfg and cfg.RUNES and (cfg.RUNES.enabled == true)
+	local enabled = isDK and ResourceBars.IsResolvedBarTypeEnabled and ResourceBars.IsResolvedBarTypeEnabled("RUNES", spec)
 	if enabled and not frameAnchor._runeEvtRegistered then
 		frameAnchor:RegisterEvent("RUNE_POWER_UPDATE")
 		frameAnchor._runeEvtRegistered = true
@@ -6502,26 +6967,48 @@ local function getFrameName(pType)
 	return "EQOL" .. pType .. "Bar"
 end
 
+function ResourceBars.GetStoredFrameNameForBarType(pType, specIndex)
+	local spec = tonumber(specIndex or addon.variables.unitSpec)
+	if ResourceBars.SpecUsesSharedMode and ResourceBars.SpecUsesSharedMode(spec) then
+		local slot = ResourceBars.GetSharedSlotForResolvedBar and ResourceBars.GetSharedSlotForResolvedBar(pType, spec)
+		local frameName = slot and ResourceBars.GetSharedSlotFrameName and ResourceBars.GetSharedSlotFrameName(slot)
+		if frameName then return frameName end
+	end
+	return getFrameName(pType)
+end
+
+function ResourceBars.GetAnchorConfigRoot(specIndex)
+	local spec = tonumber(specIndex or addon.variables.unitSpec)
+	if ResourceBars.SpecUsesSharedMode and ResourceBars.SpecUsesSharedMode(spec) then return ResourceBars.EnsureSharedStore() end
+	local class = addon.variables.unitClass
+	return addon.db.personalResourceBarSettings and addon.db.personalResourceBarSettings[class] and addon.db.personalResourceBarSettings[class][spec]
+end
+
+function ResourceBars.ResolveConfigTokenToBarType(token, specIndex)
+	if type(token) ~= "string" then return nil end
+	if ResourceBars.GetSharedSlotFrameName and ResourceBars.GetSharedSlotFrameName(token) then
+		return ResourceBars.GetResolvedBarTypeForSharedSlot and ResourceBars.GetResolvedBarTypeForSharedSlot(token, specIndex)
+	end
+	return token
+end
+
 local function frameNameToBarType(fname)
-	if fname == "EQOLHealthBar" then return "HEALTH" end
-	if type(fname) ~= "string" then return nil end
-	return fname:match("^EQOL(.+)Bar$")
+	return ResourceBars.ResolveBarTypeFromFrameToken(fname, addon.variables and addon.variables.unitSpec)
 end
 
 function ResourceBars.DetachAnchorsFrom(disabledType, specIndex)
-	local class = addon.variables.unitClass
 	local spec = specIndex or addon.variables.unitSpec
-
-	if not addon.db.personalResourceBarSettings or not addon.db.personalResourceBarSettings[class] or not addon.db.personalResourceBarSettings[class][spec] then return end
-
-	local specCfg = addon.db.personalResourceBarSettings[class][spec]
-	local targetName = getFrameName(disabledType)
+	local configRoot = ResourceBars.GetAnchorConfigRoot(spec)
+	if not configRoot then return end
+	local targetName = ResourceBars.GetStoredFrameNameForBarType(disabledType, spec)
+	local targetActualName = getFrameName(disabledType)
 	local disabledAnchor = getAnchor(disabledType, spec)
 	local upstreamName = disabledAnchor and disabledAnchor.relativeFrame or "UIParent"
 
-	for pType, cfg in pairs(specCfg) do
-		if pType ~= disabledType and cfg.anchor and cfg.anchor.relativeFrame == targetName then
-			local depFrame = _G[getFrameName(pType)]
+	for token, cfg in pairs(configRoot) do
+		local pType = ResourceBars.ResolveConfigTokenToBarType(token, spec)
+		if pType and pType ~= disabledType and cfg.anchor and (cfg.anchor.relativeFrame == targetName or ResourceBars.RelativeFrameMatchesName(cfg.anchor.relativeFrame, targetActualName)) then
+			local depFrame = (pType == "HEALTH") and healthBar or powerbar[pType]
 			local upstream = _G[upstreamName]
 			if upstreamName ~= "UIParent" and upstream then
 				-- Reattach below the disabled bar's upstream anchor target for intuitive stacking
@@ -6559,6 +7046,7 @@ end
 
 function ResourceBars.SetPowerBarSize(w, h, pType)
 	local changed = {}
+	local spec = addon.variables.unitSpec
 	-- Ensure sane defaults if nil provided
 	if pType then
 		local s = getBarSettings(pType)
@@ -6571,6 +7059,7 @@ function ResourceBars.SetPowerBarSize(w, h, pType)
 		if powerbar[pType] then
 			powerbar[pType]:SetSize(w, h)
 			changed[getFrameName(pType)] = true
+			changed[ResourceBars.GetStoredFrameNameForBarType(pType, spec)] = true
 		end
 	else
 		local width = max(RB.MIN_RESOURCE_BAR_WIDTH, w or RB.DEFAULT_POWER_WIDTH)
@@ -6578,16 +7067,16 @@ function ResourceBars.SetPowerBarSize(w, h, pType)
 		for t, bar in pairs(powerbar) do
 			bar:SetSize(width, height)
 			changed[getFrameName(t)] = true
+			changed[ResourceBars.GetStoredFrameNameForBarType(t, spec)] = true
 		end
 	end
 
-	local class = addon.variables.unitClass
-	local spec = addon.variables.unitSpec
-	local specCfg = addon.db.personalResourceBarSettings and addon.db.personalResourceBarSettings[class] and addon.db.personalResourceBarSettings[class][spec]
+	local specCfg = ResourceBars.GetAnchorConfigRoot(spec)
 
 	if specCfg then
-		for bType, cfg in pairs(specCfg) do
-			if type(cfg) == "table" then
+		for token, cfg in pairs(specCfg) do
+			local bType = ResourceBars.ResolveConfigTokenToBarType(token, spec)
+			if type(cfg) == "table" and bType then
 				local anchor = cfg.anchor
 				if anchor and changed[anchor.relativeFrame] then
 					local frame = bType == "HEALTH" and healthBar or powerbar[bType]
@@ -6607,13 +7096,13 @@ end
 -- Re-apply anchors for any bars that currently reference a given frame name
 function ResourceBars.ReanchorDependentsOf(frameName)
 	if ResourceBars._reanchoring then return end
-	local class = addon.variables.unitClass
 	local spec = addon.variables.unitSpec
-	local specCfg = addon.db.personalResourceBarSettings and addon.db.personalResourceBarSettings[class] and addon.db.personalResourceBarSettings[class][spec]
+	local specCfg = ResourceBars.GetAnchorConfigRoot(spec)
 	if not specCfg then return end
 
-	for bType, cfg in pairs(specCfg) do
-		if type(cfg) == "table" then
+	for token, cfg in pairs(specCfg) do
+		local bType = ResourceBars.ResolveConfigTokenToBarType(token, spec)
+		if type(cfg) == "table" and bType then
 			local anch = cfg.anchor
 			if anch and ResourceBars.RelativeFrameMatchesName(anch.relativeFrame, frameName) then
 				local frame = (bType == "HEALTH") and healthBar or powerbar[bType]
@@ -6792,13 +7281,14 @@ function ResourceBars.Refresh()
 	updateHealthBar("UNIT_ABSORB_AMOUNT_CHANGED")
 	if addon and addon.Aura and addon.Aura.ResourceBars and addon.Aura.ResourceBars.UpdateRuneEventRegistration then addon.Aura.ResourceBars.UpdateRuneEventRegistration() end
 	-- Ensure RUNES animation stops when not visible/enabled
-	local rcfg = getBarSettings("RUNES")
-	local runesEnabled = rcfg and (rcfg.enabled == true)
+	local runesEnabled = ResourceBars.IsResolvedBarTypeEnabled and ResourceBars.IsResolvedBarTypeEnabled("RUNES")
 	if powerbar and powerbar.RUNES and (not powerbar.RUNES:IsShown() or not runesEnabled) then deactivateRuneTicker(powerbar.RUNES) end
 	-- Ensure ESSENCE animation stops when not visible/enabled
-	local ecfg = getBarSettings("ESSENCE")
-	local essenceEnabled = ecfg and (ecfg.enabled == true)
+	local essenceEnabled = ResourceBars.IsResolvedBarTypeEnabled and ResourceBars.IsResolvedBarTypeEnabled("ESSENCE")
 	if powerbar and powerbar.ESSENCE and (not powerbar.ESSENCE:IsShown() or not essenceEnabled) then ResourceBars.DeactivateEssenceTicker(powerbar.ESSENCE) end
+	if ResourceBars.SpecUsesSharedMode and ResourceBars.SpecUsesSharedMode(addon.variables.unitSpec) and ResourceBars.SyncSharedSlotProxyFrames then
+		ResourceBars.SyncSharedSlotProxyFrames(addon.variables.unitSpec)
+	end
 end
 
 ResourceBars._pendingRefresh = ResourceBars._pendingRefresh or {}
@@ -7004,6 +7494,9 @@ function ResourceBars.ReanchorAll()
 
 	updateHealthBar("UNIT_ABSORB_AMOUNT_CHANGED")
 	if ResourceBars and ResourceBars.SyncRelativeFrameWidths then ResourceBars.SyncRelativeFrameWidths() end
+	if ResourceBars.SpecUsesSharedMode and ResourceBars.SpecUsesSharedMode(addon.variables.unitSpec) and ResourceBars.SyncSharedSlotProxyFrames then
+		ResourceBars.SyncSharedSlotProxyFrames(addon.variables.unitSpec)
+	end
 	ResourceBars._reanchoring = false
 end
 
