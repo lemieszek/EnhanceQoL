@@ -976,9 +976,49 @@ ResourceBars.SHARED_SLOT_FRAME_NAME = {
 	SECONDARY = "EQOLSharedSecondaryBar",
 	TERTIARY = "EQOLSharedTertiaryBar",
 }
+ResourceBars.SHARED_SLOT_ASSIGNMENTS = {
+	PALADIN = {
+		[1] = { MAIN = "MANA", SECONDARY = "HOLY_POWER" },
+		[2] = { MAIN = "MANA", SECONDARY = "HOLY_POWER" },
+		[3] = { MAIN = "MANA", SECONDARY = "HOLY_POWER" },
+	},
+	WARLOCK = {
+		[1] = { MAIN = "MANA", SECONDARY = "SOUL_SHARDS" },
+		[2] = { MAIN = "MANA", SECONDARY = "SOUL_SHARDS" },
+		[3] = { MAIN = "MANA", SECONDARY = "SOUL_SHARDS" },
+	},
+	MAGE = {
+		[1] = { MAIN = "MANA", SECONDARY = "ARCANE_CHARGES" },
+		[2] = { MAIN = "MANA" },
+		[3] = { MAIN = "MANA", SECONDARY = "ICICLES" },
+	},
+	MONK = {
+		[1] = { MAIN = "ENERGY", SECONDARY = "STAGGER" },
+		[2] = { MAIN = "MANA" },
+		[3] = { MAIN = "ENERGY", SECONDARY = "CHI" },
+	},
+	EVOKER = {
+		[1] = { MAIN = "MANA", SECONDARY = "ESSENCE" },
+		[2] = { MAIN = "MANA", SECONDARY = "ESSENCE" },
+		[3] = { MAIN = "MANA", SECONDARY = "ESSENCE" },
+	},
+	SHAMAN = {
+		[1] = { MAIN = "MAELSTROM", SECONDARY = "MANA" },
+		[2] = { MAIN = "MANA", SECONDARY = "MAELSTROM_WEAPON" },
+		[3] = { MAIN = "MANA" },
+	},
+}
 ResourceBars.SHARED_SLOT_BY_FRAME_NAME = {}
 for slot, frameName in pairs(ResourceBars.SHARED_SLOT_FRAME_NAME) do
 	ResourceBars.SHARED_SLOT_BY_FRAME_NAME[frameName] = slot
+end
+
+function ResourceBars.GetFixedSharedSlotAssignment(specIndex, classTag)
+	local class = classTag or addon.variables.unitClass
+	local spec = tonumber(specIndex or addon.variables.unitSpec)
+	local classAssignments = ResourceBars.SHARED_SLOT_ASSIGNMENTS and ResourceBars.SHARED_SLOT_ASSIGNMENTS[class]
+	if not classAssignments or not spec then return nil end
+	return classAssignments[spec]
 end
 
 function ResourceBars.NormalizeSpecMode(mode)
@@ -1070,6 +1110,21 @@ function ResourceBars.IsBarTypeSupportedForClass(barType, classTag, specIndex)
 		if type(specInfo) == "table" and ResourceBars.IsSpecBarTypeSupported(specInfo, barType) then return true end
 	end
 	return false
+end
+
+function ResourceBars.IsRuntimeBarTypeSupported(barType, specIndex)
+	if barType == "HEALTH" then return true end
+	local class = addon.variables.unitClass
+	local spec = tonumber(specIndex or addon.variables.unitSpec)
+	local specInfo = getSpecInfo(spec)
+	if ResourceBars.SpecUsesSharedMode and ResourceBars.SpecUsesSharedMode(spec) then
+		local sharedSlot = ResourceBars.GetSharedSlotForResolvedBar and ResourceBars.GetSharedSlotForResolvedBar(barType, spec)
+		if sharedSlot then
+			return ResourceBars.IsBarTypeSupportedForClass(barType, class, nil)
+		end
+	end
+	if not ResourceBars.IsBarTypeSupportedForClass(barType, class, spec) then return false end
+	return ResourceBars.IsSpecBarTypeSupported(specInfo, barType)
 end
 
 function ResourceBars.GetClassPowerTypes(classTag)
@@ -3063,6 +3118,7 @@ local DRUID_FORM_SEQUENCE = { "HUMANOID", "BEAR", "CAT", "TRAVEL", "MOONKIN", "S
 local function shouldUseDruidFormDriver(cfg)
 	if addon.variables.unitClass ~= "DRUID" then return false end
 	if type(cfg) ~= "table" then return false end
+	if cfg._rbSourceMode == "SHARED" then return false end
 	local showForms = cfg.showForms
 	if type(showForms) ~= "table" then return false end
 	for _, key in ipairs(DRUID_FORM_SEQUENCE) do
@@ -3165,6 +3221,7 @@ function ResourceBars.GetSharedVisibilityConfig(pType, specIndex, specInfo)
 end
 
 function ResourceBars.IsSharedSecondaryCurrentlyVisible(pType, specIndex, specInfo)
+	if ResourceBars.SpecUsesSharedMode and ResourceBars.SpecUsesSharedMode(specIndex) then return true end
 	if addon.variables.unitClass ~= "DRUID" then return true end
 	local cfg = ResourceBars.GetSharedVisibilityConfig(pType, specIndex, specInfo)
 	local showForms = cfg and cfg.showForms
@@ -3193,6 +3250,62 @@ local function resolveDruidSharedMainAndSecondary(specIndex)
 	return "MANA", nil
 end
 
+function ResourceBars.GetSharedSlotPossibleTypes(slot, classTag)
+	slot = tostring(slot or ""):upper()
+	local class = classTag or addon.variables.unitClass
+	local wanted = {}
+	local out = {}
+	local seen = {}
+	if slot == "HEALTH" then return { "HEALTH" } end
+
+	local function addType(pType)
+		if type(pType) ~= "string" or pType == "" or wanted[pType] then return end
+		wanted[pType] = true
+	end
+
+	if class == "DRUID" then
+		if slot == "MAIN" then
+			addType("LUNAR_POWER")
+			addType("MANA")
+			addType("RAGE")
+			addType("ENERGY")
+		elseif slot == "SECONDARY" then
+			addType("MANA")
+			addType("COMBO_POINTS")
+		end
+	end
+
+	for specIndex, specInfo in pairs((powertypeClasses and powertypeClasses[class]) or {}) do
+		if type(specIndex) == "number" and type(specInfo) == "table" then
+			local fixed = ResourceBars.GetFixedSharedSlotAssignment and ResourceBars.GetFixedSharedSlotAssignment(specIndex, class)
+			if fixed then
+				addType(fixed[slot])
+			elseif slot == "MAIN" then
+				addType(specInfo.MAIN)
+			else
+				local mainType = specInfo.MAIN
+				local secondaryTypes = {}
+				for _, pType in ipairs(classPowerTypes or {}) do
+					if pType ~= mainType and specInfo[pType] then secondaryTypes[#secondaryTypes + 1] = pType end
+				end
+				if slot == "SECONDARY" then addType(secondaryTypes[1]) end
+				if slot == "TERTIARY" then addType(secondaryTypes[2]) end
+			end
+		end
+	end
+
+	for _, pType in ipairs(classPowerTypes or {}) do
+		if wanted[pType] and not seen[pType] then
+			out[#out + 1] = pType
+			seen[pType] = true
+		end
+	end
+	for pType in pairs(wanted) do
+		if not seen[pType] then out[#out + 1] = pType end
+	end
+	return out
+end
+
 function ResourceBars.ResolveSharedSlotAssignments(specIndex)
 	local resolved = {
 		HEALTH = "HEALTH",
@@ -3215,6 +3328,23 @@ function ResourceBars.ResolveSharedSlotAssignments(specIndex)
 			resolved.byType[secondaryType] = "SECONDARY"
 			resolved.order[#resolved.order + 1] = "SECONDARY"
 		end
+		return resolved
+	end
+
+	local fixed = ResourceBars.GetFixedSharedSlotAssignment and ResourceBars.GetFixedSharedSlotAssignment(specIndex)
+	if type(fixed) == "table" then
+		local secondaryTypes = {}
+		local function assign(slot, pType)
+			if type(pType) ~= "string" or pType == "" or resolved.byType[pType] then return end
+			resolved[slot] = pType
+			resolved.byType[pType] = slot
+			resolved.order[#resolved.order + 1] = slot
+			if slot ~= "MAIN" then secondaryTypes[#secondaryTypes + 1] = pType end
+		end
+		assign("MAIN", fixed.MAIN)
+		assign("SECONDARY", fixed.SECONDARY)
+		assign("TERTIARY", fixed.TERTIARY)
+		resolved.secondaryTypes = secondaryTypes
 		return resolved
 	end
 
@@ -3301,6 +3431,10 @@ end
 ensureDruidShowFormsDefaults = function(cfg, pType, specInfo)
 	if addon.variables.unitClass ~= "DRUID" then return end
 	if not cfg or type(cfg) ~= "table" then return end
+	if cfg._rbSourceMode == "SHARED" then
+		cfg.showForms = nil
+		return
+	end
 	if pType == "HEALTH" then return end
 
 	-- Combo points are only meaningful in Cat; force that mapping regardless of previous user input.
@@ -3944,8 +4078,7 @@ function getBarSettings(pType)
 	local class = addon.variables.unitClass
 	local spec = addon.variables.unitSpec
 	local specInfo = getSpecInfo(spec)
-	if class and not ResourceBars.IsBarTypeSupportedForClass(pType, class, spec) then return nil end
-	if not ResourceBars.IsSpecBarTypeSupported(specInfo, pType) then return nil end
+	if class and not ResourceBars.IsRuntimeBarTypeSupported(pType, spec) then return nil end
 	local sourceCfg, sourceMode, sharedSlot = ResourceBars.ResolveConfigSourceForBar(pType, spec)
 	if sourceMode == "SHARED" then
 		local runtimeCfg = CopyTable(sourceCfg or {})

@@ -533,6 +533,25 @@ local function registerEditModeBars()
 		local function collectSharedPowerTypes()
 			local liveType = currentLiveBarType()
 			if not genericSharedPowerEditor then return liveType and { liveType } or {} end
+			if ResourceBars and ResourceBars.GetSharedSlotPossibleTypes then
+				local wanted = {}
+				local out = {}
+				local seen = {}
+				for _, pType in ipairs(ResourceBars.GetSharedSlotPossibleTypes(sharedSlot, addon.variables.unitClass) or {}) do
+					if pType then wanted[pType] = true end
+				end
+				if liveType then wanted[liveType] = true end
+				for _, pType in ipairs(ResourceBars.classPowerTypes or {}) do
+					if wanted[pType] and not seen[pType] then
+						out[#out + 1] = pType
+						seen[pType] = true
+					end
+				end
+				for pType in pairs(wanted) do
+					if not seen[pType] then out[#out + 1] = pType end
+				end
+				return out
+			end
 
 			local class = addon.variables.unitClass
 			local specTable = ResourceBars and ResourceBars.powertypeClasses and ResourceBars.powertypeClasses[class] or {}
@@ -1832,8 +1851,8 @@ local function registerEditModeBars()
 				end
 			end
 
-			-- Druid: Show in (forms), exclude Health and enforced Cat-only Combo Points
-			if addon.variables.unitClass == "DRUID" and barType ~= "HEALTH" and barType ~= "COMBO_POINTS" then
+			-- Druid: Show in (forms) is only available for classic/spec bars, not shared slots.
+			if addon.variables.unitClass == "DRUID" and not sharedSlot and barType ~= "HEALTH" and barType ~= "COMBO_POINTS" then
 				local forms = { "HUMANOID", "BEAR", "CAT", "TRAVEL", "MOONKIN", "STAG" }
 				local formLabels = {
 					HUMANOID = L["Humanoid"] or "Humanoid",
