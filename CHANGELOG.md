@@ -14,6 +14,11 @@
 ### 🐛 Fixed
 
 - Resource Bars / Shared Mode: Improved cleanup when switching between `Classic` and `Shared`.
+- Resource Bars / Druid Shapeshift: Reduced Bear/Cat form-swap CPU and memory overhead by avoiding unnecessary reanchors and repeated shared-config rebuilds.
+- Food / Macros: Reduced repeated drink sorting, item-count scans, and health-macro rebuild work during frequent state changes.
+- Tooltip / Spells: Reduced repeated spell-tooltip refresh work, especially while bars and forms update.
+- Action Bars / Visibility: Reduced unnecessary visibility alpha refreshes for setups that do not depend on flight or shapeshift visibility rules.
+- Unit Frames: Reduced `UNIT_DISPLAYPOWER`, text refresh, and name/level update overhead, especially with `Target` and `Focus` active.
 - Data Panels: Fixed the new `Tooltip growth` dropdown showing up empty in Edit Mode.
 - Data Panels: Tooltip direction is now applied more consistently across the supported panel tooltips.
 - Locales: Added the missing translations for the `Tooltip growth` setting.
