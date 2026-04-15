@@ -466,6 +466,117 @@ function UFProfileManager._getCurrentSpecID()
 	return specID
 end
 
+function UFProfileManager._getCurrentClassSpecIDs()
+	local classID = UnitClass and select(3, UnitClass("player")) or nil
+	if issecretvalue and issecretvalue(classID) then classID = nil end
+	local specIDs
+	if type(classID) == "number" and classID > 0 and GetNumSpecializationsForClassID and GetSpecializationInfoForClassID then
+		local numSpecs = GetNumSpecializationsForClassID(classID)
+		if type(numSpecs) == "number" and numSpecs > 0 then
+			for index = 1, numSpecs do
+				local specID = select(1, GetSpecializationInfoForClassID(classID, index))
+				if type(specID) == "number" and specID > 0 then
+					specIDs = specIDs or {}
+					specIDs[specID] = true
+				end
+			end
+		end
+	end
+	local currentSpecID = UFProfileManager._getCurrentSpecID()
+	if not specIDs and currentSpecID then specIDs = { [currentSpecID] = true } end
+	return specIDs, currentSpecID
+end
+
+function UFProfileManager._copyUFSpecMappings(map, profiles)
+	if type(map) ~= "table" then return nil end
+	local copy = {}
+	for specKey, profileName in pairs(map) do
+		local specID = tonumber(specKey)
+		local normalizedName = UFProfileManager._trimProfileName(profileName)
+		if specID and specID > 0 and normalizedName and (not profiles or profiles[normalizedName]) then copy[specID] = normalizedName end
+	end
+	if not next(copy) then return nil end
+	return copy
+end
+
+function UFProfileManager._scoreUFSpecMappings(map, profiles, classSpecIDs, currentSpecID)
+	if type(map) ~= "table" or type(profiles) ~= "table" then return nil end
+	local overlap = 0
+	local foreign = 0
+	local score = 0
+	local hasAny = false
+	for specKey, profileName in pairs(map) do
+		local specID = tonumber(specKey)
+		local normalizedName = UFProfileManager._trimProfileName(profileName)
+		if specID and specID > 0 and normalizedName and profiles[normalizedName] then
+			hasAny = true
+			if classSpecIDs and classSpecIDs[specID] then
+				overlap = overlap + 1
+				score = score + 10
+				if currentSpecID and specID == currentSpecID then score = score + 100 end
+			elseif classSpecIDs then
+				foreign = foreign + 1
+				score = score - 5
+			end
+		end
+	end
+	if not hasAny then return nil end
+	if classSpecIDs and overlap == 0 then return nil end
+	return score, overlap, foreign
+end
+
+function UFProfileManager._resolveUFSpecMappingsForGUID(profiles, guid, adopt)
+	if type(profiles) ~= "table" or type(guid) ~= "string" or guid == "" then return nil end
+	local mappings = addon.db and addon.db.ufProfileSpecKeys
+	if type(mappings) ~= "table" then return nil end
+
+	local classSpecIDs, currentSpecID = UFProfileManager._getCurrentClassSpecIDs()
+	local currentMap = type(mappings[guid]) == "table" and mappings[guid] or nil
+	local bestMap = currentMap
+	local bestSourceGuid = guid
+	local bestScore, bestOverlap, bestForeign = UFProfileManager._scoreUFSpecMappings(currentMap, profiles, classSpecIDs, currentSpecID)
+
+	for sourceGuid, candidateMap in pairs(mappings) do
+		if sourceGuid ~= guid and type(candidateMap) == "table" then
+			local score, overlap, foreign = UFProfileManager._scoreUFSpecMappings(candidateMap, profiles, classSpecIDs, currentSpecID)
+			if score ~= nil then
+				local isBetter = bestScore == nil
+					or score > bestScore
+					or (score == bestScore and (overlap or 0) > (bestOverlap or 0))
+					or (score == bestScore and (overlap or 0) == (bestOverlap or 0) and (foreign or math.huge) < (bestForeign or math.huge))
+				if isBetter then
+					bestMap = candidateMap
+					bestSourceGuid = sourceGuid
+					bestScore = score
+					bestOverlap = overlap
+					bestForeign = foreign
+				end
+			end
+		end
+	end
+
+	if type(bestMap) ~= "table" then return nil end
+	if adopt and bestSourceGuid ~= guid then
+		bestMap = UFProfileManager._copyUFSpecMappings(bestMap, profiles)
+		if not bestMap then return nil end
+		mappings[guid] = bestMap
+		UFProfileManager.Debug("adopted UF spec mappings %s -> %s", tostring(bestSourceGuid), tostring(guid))
+		UFProfileManager.Trace("SPEC_MAP_ADOPT", string.format("%s->%s", tostring(bestSourceGuid), tostring(guid)))
+		return bestMap
+	end
+	return bestMap
+end
+
+function UFProfileManager._resolveUFSpecMappedProfileFromMappings(profiles, byGuid, specID)
+	if type(profiles) ~= "table" or type(byGuid) ~= "table" then return nil end
+	if type(specID) ~= "number" or specID <= 0 then return nil end
+	local mapped = byGuid[specID]
+	if type(mapped) ~= "string" or mapped == "" then mapped = byGuid[tostring(specID)] end
+	mapped = UFProfileManager._trimProfileName(mapped)
+	if not mapped or not profiles[mapped] then return nil end
+	return mapped
+end
+
 function UFProfileManager._ensureUFProfilePayload(profile)
 	if type(profile) ~= "table" then profile = {} end
 	profile.ufFrames = type(profile.ufFrames) == "table" and profile.ufFrames or {}
@@ -648,15 +759,10 @@ end
 
 function UFProfileManager._resolveUFSpecMappedProfileName(profiles, guid)
 	if type(profiles) ~= "table" or type(guid) ~= "string" or guid == "" then return nil end
-	local byGuid = addon.db and addon.db.ufProfileSpecKeys and addon.db.ufProfileSpecKeys[guid]
+	local byGuid = UFProfileManager._resolveUFSpecMappingsForGUID(profiles, guid, true)
 	if type(byGuid) ~= "table" then return nil end
 	local specID = UFProfileManager._getCurrentSpecID()
-	if not specID then return nil end
-	local mapped = byGuid[specID]
-	if type(mapped) ~= "string" or mapped == "" then mapped = byGuid[tostring(specID)] end
-	mapped = UFProfileManager._trimProfileName(mapped)
-	if not mapped or not profiles[mapped] then return nil end
-	return mapped
+	return UFProfileManager._resolveUFSpecMappedProfileFromMappings(profiles, byGuid, specID)
 end
 
 function UFProfileManager._resolveUFActiveProfileName(profiles)
@@ -929,15 +1035,11 @@ function UFProfileManager.GetSpecMapping(specID)
 	if not UFProfileManager.Initialize() then return nil end
 	local guid = UFProfileManager._getCurrentPlayerGUID()
 	if not guid then return nil end
-	local byGuid = addon.db.ufProfileSpecKeys and addon.db.ufProfileSpecKeys[guid]
+	local byGuid = UFProfileManager._resolveUFSpecMappingsForGUID(addon.db.ufProfiles, guid, true)
 	if type(byGuid) ~= "table" then return nil end
 	local key = tonumber(specID)
 	if not key then return nil end
-	local mapped = byGuid[key]
-	if type(mapped) ~= "string" or mapped == "" then mapped = byGuid[tostring(key)] end
-	if type(mapped) ~= "string" or mapped == "" then return nil end
-	if not addon.db.ufProfiles[mapped] then return nil end
-	return mapped
+	return UFProfileManager._resolveUFSpecMappedProfileFromMappings(addon.db.ufProfiles, byGuid, key)
 end
 
 function UFProfileManager.SetSpecMapping(specID, profileName)
@@ -2062,13 +2164,17 @@ local function hasVisibilityRules(cfg)
 	return type(raw) == "table" and next(raw) ~= nil
 end
 
-local function syncTargetRangeFadeConfig(cfg, def)
-	local st = states[UNIT.TARGET]
-	if not st then
-		st = {}
-		states[UNIT.TARGET] = st
+function UF.BuildTargetRangeFadeSpellListKey(spellList)
+	if type(spellList) ~= "table" or #spellList == 0 then return "" end
+	local parts = {}
+	for i = 1, #spellList do
+		parts[i] = tostring(tonumber(spellList[i]) or 0)
 	end
-	cfg = cfg or st.cfg or ensureDB(UNIT.TARGET)
+	return table.concat(parts, ",")
+end
+
+function UF.BuildTargetRangeFadeSnapshot(cfg, def)
+	cfg = cfg or ensureDB(UNIT.TARGET)
 	def = def or defaultsFor(UNIT.TARGET)
 	local rcfg = (cfg and cfg.rangeFade) or (def and def.rangeFade) or {}
 	local blockedByVisibility = hasVisibilityRules(cfg) == true
@@ -2083,15 +2189,47 @@ local function syncTargetRangeFadeConfig(cfg, def)
 	else
 		ignoreUnlimited = ignoreUnlimited == true
 	end
-	st._rangeFadeEnabledCfg = enabled == true
-	st._rangeFadeBlockedByVisibility = blockedByVisibility
-	st._rangeFadeAlphaCfg = alpha
-	st._rangeFadeIgnoreUnlimited = ignoreUnlimited
+	local specId = UFHelper and UFHelper.RangeFadeGetCurrentSpecId and UFHelper.RangeFadeGetCurrentSpecId() or nil
+	local spellList
 	if UFHelper and UFHelper.RangeFadeBuildSpellListForConfig then
-		st._rangeFadeSpellListCfg = UFHelper.RangeFadeBuildSpellListForConfig(rcfg, UFHelper.RangeFadeGetCurrentSpecId and UFHelper.RangeFadeGetCurrentSpecId() or nil)
-	else
-		st._rangeFadeSpellListCfg = nil
+		spellList = UFHelper.RangeFadeBuildSpellListForConfig(rcfg, specId)
 	end
+	local spellListKey = UF.BuildTargetRangeFadeSpellListKey(spellList)
+	local configKey = (enabled == true and "1" or "0")
+		.. "|"
+		.. (blockedByVisibility == true and "1" or "0")
+		.. "|"
+		.. tostring(alpha)
+		.. "|"
+		.. (ignoreUnlimited == true and "1" or "0")
+	return {
+		enabled = enabled == true,
+		blockedByVisibility = blockedByVisibility == true,
+		alpha = alpha,
+		ignoreUnlimited = ignoreUnlimited == true,
+		spellList = spellList,
+		spellListKey = spellListKey,
+		configKey = configKey,
+	}
+end
+
+local function syncTargetRangeFadeConfig(cfg, def)
+	local st = states[UNIT.TARGET]
+	if not st then
+		st = {}
+		states[UNIT.TARGET] = st
+	end
+	local snapshot = UF.BuildTargetRangeFadeSnapshot(cfg or st.cfg or ensureDB(UNIT.TARGET), def)
+	local configChanged = st._rangeFadeConfigKey ~= snapshot.configKey
+	local spellListChanged = st._rangeFadeSpellListKey ~= snapshot.spellListKey
+	st._rangeFadeEnabledCfg = snapshot.enabled
+	st._rangeFadeBlockedByVisibility = snapshot.blockedByVisibility
+	st._rangeFadeAlphaCfg = snapshot.alpha
+	st._rangeFadeIgnoreUnlimited = snapshot.ignoreUnlimited
+	st._rangeFadeSpellListCfg = snapshot.spellList
+	st._rangeFadeConfigKey = snapshot.configKey
+	st._rangeFadeSpellListKey = snapshot.spellListKey
+	return configChanged, spellListChanged
 end
 
 if UFHelper and UFHelper.RangeFadeRegister then
@@ -2124,12 +2262,33 @@ if UFHelper and UFHelper.RangeFadeRegister then
 	end)
 end
 
-local function refreshRangeFadeSpells(rebuildSpellList)
+function UF.RefreshRangeFadeSpellsNow(rebuildSpellList)
 	if not UFHelper then return end
-	syncTargetRangeFadeConfig(ensureDB(UNIT.TARGET), defaultsFor(UNIT.TARGET))
-	if UFHelper.RangeFadeMarkConfigDirty then UFHelper.RangeFadeMarkConfigDirty() end
-	if rebuildSpellList and UFHelper.RangeFadeMarkSpellListDirty then UFHelper.RangeFadeMarkSpellListDirty() end
+	local configChanged, spellListChanged = syncTargetRangeFadeConfig(ensureDB(UNIT.TARGET), defaultsFor(UNIT.TARGET))
+	local wantsSpellListRefresh = rebuildSpellList == true or spellListChanged == true
+	if not configChanged and not wantsSpellListRefresh then return false end
+	if configChanged and UFHelper.RangeFadeMarkConfigDirty then UFHelper.RangeFadeMarkConfigDirty() end
+	if wantsSpellListRefresh and UFHelper.RangeFadeMarkSpellListDirty then UFHelper.RangeFadeMarkSpellListDirty() end
 	if UFHelper.RangeFadeUpdateSpells then UFHelper.RangeFadeUpdateSpells() end
+	return true
+end
+
+function UF.ScheduleRangeFadeRefresh(rebuildSpellList)
+	if not UFHelper then return end
+	if rebuildSpellList == true then UF._rangeFadeRefreshNeedsSpellList = true end
+	if UF._rangeFadeRefreshScheduled then return end
+	UF._rangeFadeRefreshScheduled = true
+	local function run()
+		UF._rangeFadeRefreshScheduled = nil
+		local wantsSpellListRefresh = UF._rangeFadeRefreshNeedsSpellList == true
+		UF._rangeFadeRefreshNeedsSpellList = nil
+		UF.RefreshRangeFadeSpellsNow(wantsSpellListRefresh)
+	end
+	if After then
+		After(0, run)
+	else
+		run()
+	end
 end
 
 local function copySettings(fromUnit, toUnit, opts)
@@ -10372,7 +10531,7 @@ onEvent = function(self, event, unit, ...)
 		or event == "ACTIVE_TALENT_GROUP_CHANGED"
 		or event == "TRAIT_CONFIG_UPDATED"
 	then
-		refreshRangeFadeSpells(true)
+		UF.ScheduleRangeFadeRefresh(true)
 		if
 			event == "PLAYER_SPECIALIZATION_CHANGED"
 			or event == "PLAYER_TALENT_UPDATE"
@@ -10394,7 +10553,7 @@ onEvent = function(self, event, unit, ...)
 		local petCfg = getCfg(UNIT.PET)
 		local focusCfg = getCfg(UNIT.FOCUS)
 		local bossCfg = getCfg("boss")
-		refreshRangeFadeSpells(true)
+		UF.ScheduleRangeFadeRefresh(true)
 		refreshMainPower(UNIT.PLAYER)
 		applyConfig("player")
 		refreshNameAndLevelSoon(UNIT.PLAYER)
@@ -10999,7 +11158,7 @@ local function ensureEventHandling()
 	UF.RecomputeAnyUFEnabled()
 	if not anyUFEnabled() then
 		hideBossFrames()
-		refreshRangeFadeSpells(true)
+		UF.ScheduleRangeFadeRefresh(true)
 		UF.CancelTextTicker()
 		if UFHelper and UFHelper.disableCombatFeedbackAll then UFHelper.disableCombatFeedbackAll(states) end
 		if eventFrame and eventFrame.UnregisterAllEvents then eventFrame:UnregisterAllEvents() end
@@ -11027,7 +11186,7 @@ local function ensureEventHandling()
 				if states[UNIT.PLAYER] and states[UNIT.PLAYER].castBar then setCastInfoFromUnit(UNIT.PLAYER) end
 				if states[UNIT.TARGET] and states[UNIT.TARGET].castBar then setCastInfoFromUnit(UNIT.TARGET) end
 				if states[UNIT.FOCUS] and states[UNIT.FOCUS].castBar then setCastInfoFromUnit(UNIT.FOCUS) end
-				refreshRangeFadeSpells(false)
+				UF.ScheduleRangeFadeRefresh(false)
 			end)
 
 			addon.EditModeLib:RegisterCallback("exit", function()
@@ -11045,7 +11204,7 @@ local function ensureEventHandling()
 				if states[UNIT.PLAYER] and states[UNIT.PLAYER].castBar then setCastInfoFromUnit(UNIT.PLAYER) end
 				if states[UNIT.TARGET] and states[UNIT.TARGET].castBar then setCastInfoFromUnit(UNIT.TARGET) end
 				if states[UNIT.FOCUS] and states[UNIT.FOCUS].castBar then setCastInfoFromUnit(UNIT.FOCUS) end
-				refreshRangeFadeSpells(false)
+				UF.ScheduleRangeFadeRefresh(false)
 				if UFHelper and UFHelper.stopCombatFeedbackSample then
 					for _, st in pairs(states) do
 						UFHelper.stopCombatFeedbackSample(st)
@@ -11071,7 +11230,7 @@ local function ensureEventHandling()
 	end
 	UF._registerUnitScopedEvents(anyPortraitEnabled())
 	syncTargetRangeFadeConfig(ensureDB(UNIT.TARGET), defaultsFor(UNIT.TARGET))
-	refreshRangeFadeSpells(false)
+	UF.ScheduleRangeFadeRefresh(false)
 	UF.EnsureTextTicker()
 	UF.UpdateAllTexts(true)
 end
