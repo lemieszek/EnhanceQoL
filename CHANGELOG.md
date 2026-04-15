@@ -6,8 +6,14 @@
 
 - Data Panels: Added a per-panel tooltip direction setting so each panel can open its tooltip automatically, upward, or downward.
 
+### 🔄 Changed
+
+- Resource Bars / Shared Mode: `Mode` is now class-wide.
+- Resource Bars / Shared Mode: `Classic` and `Shared` settings are now separated more clearly.
+
 ### 🐛 Fixed
 
+- Resource Bars / Shared Mode: Improved cleanup when switching between `Classic` and `Shared`.
 - Data Panels: Fixed the new `Tooltip growth` dropdown showing up empty in Edit Mode.
 - Data Panels: Tooltip direction is now applied more consistently across the supported panel tooltips.
 - Locales: Added the missing translations for the `Tooltip growth` setting.
