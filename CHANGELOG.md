@@ -1,5 +1,17 @@
 # Changelog
 
+## [10.3.0-beta6] - 2026-04-15
+
+### 🔄 Changed
+
+- Resource Bars / Shared Mode: Swapped `Fury` and `Void Metamorphosis` for the `Devourer` setup.
+
+### 🐛 Fixed
+
+- Resource Bars / Shared Mode: Power-type overrides now only affect power-specific styling and no longer apply size, backdrop, separator, or other layout settings.
+
+---
+
 ## [10.3.0-beta5] - 2026-04-15
 
 ### ✨ Added

@@ -735,11 +735,15 @@ registerEditModeBars = function()
 			local entry = getPowerTypeOverrideEntry(pType)
 			return entry and entry.enabled == true or false
 		end
-		local function currentEditorPowerType()
-			if genericSharedPowerEditor then return selectedSharedPowerTypeTarget() end
-			return currentLiveBarType() or barType
-		end
-		local function currentPowerConfigTarget()
+			local function currentEditorPowerType()
+				if genericSharedPowerEditor then return selectedSharedPowerTypeTarget() end
+				return currentLiveBarType() or barType
+			end
+			local function currentEditorSupportsSeparators()
+				local pType = currentEditorPowerType()
+				return ResourceBars and ResourceBars.separatorEligible and pType and ResourceBars.separatorEligible[pType] == true
+			end
+			local function currentPowerConfigTarget()
 			if genericSharedPowerEditor and isPowerTypeOverrideEnabled() then
 				return ensurePowerTypeOverrideEntry(selectedSharedPowerTypeTarget())
 			end
@@ -1713,15 +1717,18 @@ registerEditModeBars = function()
 						local r, g, b, a = toColorComponents(col, SEP_DEFAULT)
 						return { r = r, g = g, b = b, a = a }
 					end,
-					colorSet = function(_, value)
-						local c = curSpecCfg()
-						if not c then return end
-						c.separatorColor = toColorArray(value, SEP_DEFAULT)
-						queueRefresh()
-					end,
-					hasOpacity = true,
-					parentId = "frame",
-				}
+						colorSet = function(_, value)
+							local c = curSpecCfg()
+							if not c then return end
+							c.separatorColor = toColorArray(value, SEP_DEFAULT)
+							queueRefresh()
+						end,
+						isShown = function()
+							return not genericSharedPowerEditor or currentEditorSupportsSeparators()
+						end,
+						hasOpacity = true,
+						parentId = "frame",
+					}
 
 				settingsList[#settingsList + 1] = {
 					name = L["Separator thickness"] or "Separator thickness",
@@ -1744,12 +1751,15 @@ registerEditModeBars = function()
 						queueRefresh()
 					end,
 					default = (cfg and cfg.separatorThickness) or SEPARATOR_THICKNESS,
-					isEnabled = function()
-						local c = curSpecCfg()
-						return c and c.showSeparator == true
-					end,
-					parentId = "frame",
-				}
+						isEnabled = function()
+							local c = curSpecCfg()
+							return c and c.showSeparator == true
+						end,
+						isShown = function()
+							return not genericSharedPowerEditor or currentEditorSupportsSeparators()
+						end,
+						parentId = "frame",
+					}
 
 				settingsList[#settingsList + 1] = {
 					name = L["Separated offset"] or "Separated offset",
@@ -1773,11 +1783,13 @@ registerEditModeBars = function()
 						c.separatedOffset = new
 						queueRefresh()
 					end,
-					default = (cfg and cfg.separatedOffset) or 0,
-					isShown = function() return true end,
-					isEnabled = function()
-						local c = curSpecCfg()
-						if not c then return false end
+						default = (cfg and cfg.separatedOffset) or 0,
+						isShown = function()
+							return not genericSharedPowerEditor or currentEditorSupportsSeparators()
+						end,
+						isEnabled = function()
+							local c = curSpecCfg()
+							if not c then return false end
 						return c.showSeparator == true or c.useGradient == true
 					end,
 					parentId = "frame",
@@ -2823,14 +2835,14 @@ registerEditModeBars = function()
 							entry.enabled = value and true or false
 							if value and base then
 								local hasStoredFields = false
-								for key in pairs(entry) do
-									if key ~= "enabled" then
+								for _, key in ipairs((ResourceBars and ResourceBars.POWER_TYPE_STYLE_OVERRIDE_KEYS) or {}) do
+									if entry[key] ~= nil then
 										hasStoredFields = true
 										break
 									end
 								end
 								if not hasStoredFields then
-									for _, key in ipairs((ResourceBars and ResourceBars.COSMETIC_BAR_KEYS) or {}) do
+									for _, key in ipairs((ResourceBars and ResourceBars.POWER_TYPE_STYLE_OVERRIDE_KEYS) or {}) do
 										if entry[key] == nil and base[key] ~= nil then
 											entry[key] = type(base[key]) == "table" and CopyTable(base[key]) or base[key]
 										end

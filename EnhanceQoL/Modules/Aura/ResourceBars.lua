@@ -338,6 +338,36 @@ local COSMETIC_BAR_KEYS = {
 	"cooldownTextFontSize",
 	"backdrop",
 }
+ResourceBars.POWER_TYPE_STYLE_OVERRIDE_KEYS = {
+	"useBarColor",
+	"barColor",
+	"useClassColor",
+	"useMaxColor",
+	"maxColor",
+	"useGradient",
+	"gradientStartColor",
+	"gradientEndColor",
+	"gradientDirection",
+	"useHolyThreeColor",
+	"holyThreeColor",
+	"useMaelstromFiveColor",
+	"useMaelstromTenStacks",
+	"useMaelstromCarryFill",
+	"maelstromFiveColor",
+	"maelstromMidStack",
+	"useChargedComboStyling",
+	"chargedComboAffectFill",
+	"chargedComboUseCustomFillColor",
+	"chargedComboFillColor",
+	"chargedComboFillLighten",
+	"chargedComboFillAlphaBoost",
+	"chargedComboAffectBackground",
+	"chargedComboUseCustomBackgroundColor",
+	"chargedComboBackgroundColor",
+	"chargedComboBackgroundLighten",
+	"chargedComboBackgroundAlphaBoost",
+	"runeCooldownColor",
+}
 
 local wasMax = false
 local wasMaxPower = {}
@@ -1005,6 +1035,11 @@ ResourceBars.SHARED_SLOT_ASSIGNMENTS = {
 		[1] = { MAIN = "MAELSTROM", SECONDARY = "MANA" },
 		[2] = { MAIN = "MANA", SECONDARY = "MAELSTROM_WEAPON" },
 		[3] = { MAIN = "MANA" },
+	},
+	DEMONHUNTER = {
+		[1] = { MAIN = "FURY" },
+		[2] = { MAIN = "FURY" },
+		[3] = { MAIN = "FURY", SECONDARY = "VOID_METAMORPHOSIS" },
 	},
 }
 ResourceBars.SHARED_SLOT_BY_FRAME_NAME = {}
@@ -4271,7 +4306,7 @@ function ResourceBars.ApplySharedPowerTypeOverride(runtimeCfg, sourceCfg, pType)
 	local overrides = type(sourceCfg) == "table" and sourceCfg.powerTypeOverrides or nil
 	local override = type(overrides) == "table" and overrides[pType] or nil
 	if type(override) ~= "table" or override.enabled ~= true then return end
-	for _, key in ipairs(COSMETIC_BAR_KEYS) do
+	for _, key in ipairs(ResourceBars.POWER_TYPE_STYLE_OVERRIDE_KEYS or {}) do
 		if override[key] ~= nil then runtimeCfg[key] = type(override[key]) == "table" and CopyTable(override[key]) or override[key] end
 	end
 end
