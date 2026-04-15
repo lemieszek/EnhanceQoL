@@ -9338,14 +9338,20 @@ local eventFrame
 UF._unitEventFrames = UF._unitEventFrames or {}
 local onEvent
 
-local function anyUFEnabled()
+function UF.RecomputeAnyUFEnabled()
 	local p = ensureDB("player").enabled
 	local t = ensureDB("target").enabled
 	local tt = ensureDB(UNIT.TARGET_TARGET).enabled
 	local pet = ensureDB(UNIT.PET).enabled
 	local focus = ensureDB(UNIT.FOCUS).enabled
 	local boss = ensureDB("boss").enabled
-	return p or t or tt or pet or focus or boss
+	UF._anyUFEnabledCached = (p or t or tt or pet or focus or boss) and true or false
+	return UF._anyUFEnabledCached
+end
+
+local function anyUFEnabled()
+	if UF._anyUFEnabledCached == nil then return UF.RecomputeAnyUFEnabled() end
+	return UF._anyUFEnabledCached == true
 end
 
 function UF.UnitHasDirtyTexts(unit)
@@ -10990,6 +10996,7 @@ end
 
 local function ensureEventHandling()
 	rebuildAllowedEventUnits()
+	UF.RecomputeAnyUFEnabled()
 	if not anyUFEnabled() then
 		hideBossFrames()
 		refreshRangeFadeSpells(true)
