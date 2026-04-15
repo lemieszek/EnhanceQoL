@@ -5764,8 +5764,10 @@ end
 
 local function createPowerBar(type, anchor, sharedSlot)
 	-- Reuse existing bar if present; avoid destroying frames to preserve anchors
-	local bar = powerbar[type] or _G["EQOL" .. type .. "Bar"]
+	local existingBar = powerbar[type] or _G["EQOL" .. type .. "Bar"]
+	local bar = existingBar
 	if not bar then bar = CreateFrame("StatusBar", "EQOL" .. type .. "Bar", UIParent, "BackdropTemplate") end
+	if not existingBar then ResourceBars._reanchorRequested = true end
 	-- Ensure a valid parent when reusing frames after disable
 	if bar:GetParent() ~= UIParent then bar:SetParent(UIParent) end
 
@@ -5825,6 +5827,7 @@ local function createPowerBar(type, anchor, sharedSlot)
 				a.x = (pw - w) / 2
 				a.y = (h - ph) / 2
 				a.autoSpacing = nil
+				ResourceBars._reanchorRequested = true
 				rel = UIParent
 			end
 			bar:ClearAllPoints()
@@ -5841,6 +5844,7 @@ local function createPowerBar(type, anchor, sharedSlot)
 			a.y = stackSpacing
 			a.autoSpacing = true
 			if a.matchRelativeWidth == nil then a.matchRelativeWidth = true end
+			ResourceBars._reanchorRequested = true
 		else
 			-- No anchor in DB and no previous anchor in code path; default: center on UIParent
 			bar:ClearAllPoints()
@@ -5854,6 +5858,7 @@ local function createPowerBar(type, anchor, sharedSlot)
 			a.relativePoint = "TOPLEFT"
 			a.x = cx
 			a.y = cy
+			ResourceBars._reanchorRequested = true
 		end
 	end
 
@@ -5994,8 +5999,10 @@ end
 
 local function setPowerbars(opts)
 	if ResourceBars.BeginRuntimeConfigBatch then ResourceBars.BeginRuntimeConfigBatch() end
+	ResourceBars._reanchorRequested = false
 	if not isResourceFrameEnabled() then
 		if ResourceBars and ResourceBars.DisableResourceBars then ResourceBars.DisableResourceBars() end
+		ResourceBars._reanchorRequested = nil
 		if ResourceBars.EndRuntimeConfigBatch then ResourceBars.EndRuntimeConfigBatch() end
 		return
 	end
@@ -6145,7 +6152,10 @@ local function setPowerbars(opts)
 	if addon and addon.Aura and addon.Aura.ResourceBars and addon.Aura.ResourceBars.ApplyVisibilityPreference then addon.Aura.ResourceBars.ApplyVisibilityPreference("fromSetPowerbars") end
 	if ResourceBars and ResourceBars.SyncRelativeFrameWidths then ResourceBars.SyncRelativeFrameWidths() end
 	if ensureEditModeRegistration then ensureEditModeRegistration() end
+	local needsPostReanchor = ResourceBars._reanchorRequested == true
+	ResourceBars._reanchorRequested = nil
 	if ResourceBars.EndRuntimeConfigBatch then ResourceBars.EndRuntimeConfigBatch() end
+	return needsPostReanchor
 end
 addon.Aura.functions.setPowerBars = setPowerbars
 
@@ -6897,19 +6907,20 @@ local function eventHandler(self, event, unit, arg1)
 		end) end
 		if scheduleRelativeFrameWidthSync then scheduleRelativeFrameWidthSync() end
 	elseif event == "UPDATE_SHAPESHIFT_FORM" then
-		setPowerbars()
-		if addon.EditMode and addon.EditMode.IsInEditMode and addon.EditMode:IsInEditMode() and ResourceBars.RegisterEditModeFrames then ResourceBars.RegisterEditModeFrames() end
-		-- After initial creation, run a re-anchor pass to ensure all dependent anchors resolve
-		if After then
-			After(0.05, function()
-				if addon.EditMode and addon.EditMode.IsInEditMode and addon.EditMode:IsInEditMode() and ResourceBars.RegisterEditModeFrames then ResourceBars.RegisterEditModeFrames() end
-				if addon and addon.Aura and addon.Aura.ResourceBars and addon.Aura.ResourceBars.ReanchorAll then addon.Aura.ResourceBars.ReanchorAll() end
-				if addon and addon.Aura and addon.Aura.ResourceBars and addon.Aura.ResourceBars.UpdateRuneEventRegistration then addon.Aura.ResourceBars.UpdateRuneEventRegistration() end
-			end)
-		else
+		local needsPostReanchor = setPowerbars() == true
+		local spec = addon.variables.unitSpec
+		local sharedMode = ResourceBars.SpecUsesSharedMode and ResourceBars.SpecUsesSharedMode(spec)
+		local function finalizeShapeshiftLayout()
 			if addon.EditMode and addon.EditMode.IsInEditMode and addon.EditMode:IsInEditMode() and ResourceBars.RegisterEditModeFrames then ResourceBars.RegisterEditModeFrames() end
-			if addon and addon.Aura and addon.Aura.ResourceBars and addon.Aura.ResourceBars.ReanchorAll then addon.Aura.ResourceBars.ReanchorAll() end
+			if sharedMode and addon and addon.Aura and addon.Aura.ResourceBars and addon.Aura.ResourceBars.SyncSharedSlotProxyFrames then addon.Aura.ResourceBars.SyncSharedSlotProxyFrames(spec) end
+			if needsPostReanchor and addon and addon.Aura and addon.Aura.ResourceBars and addon.Aura.ResourceBars.ReanchorAll then addon.Aura.ResourceBars.ReanchorAll() end
 			if addon and addon.Aura and addon.Aura.ResourceBars and addon.Aura.ResourceBars.UpdateRuneEventRegistration then addon.Aura.ResourceBars.UpdateRuneEventRegistration() end
+		end
+		-- Reanchor only when setPowerbars had to introduce or repair anchor state.
+		if needsPostReanchor and After then
+			After(0.05, finalizeShapeshiftLayout)
+		else
+			finalizeShapeshiftLayout()
 		end
 	elseif event == "UNIT_AURA" and unit == "player" then
 		local info = arg1
