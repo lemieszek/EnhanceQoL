@@ -8669,8 +8669,19 @@ refreshNameAndLevelSoon = function(unit)
 		updateNameAndLevel(cfg, unit)
 	end
 
+	local st = states[unit]
+	if st and st._nameLevelRefreshPending then return end
 	refresh()
-	if After then After(0, function() refresh() end) end
+	if After then
+		st = states[unit]
+		if not st then return end
+		st._nameLevelRefreshPending = true
+		After(0, function()
+			local delayedState = states[unit]
+			if delayedState then delayedState._nameLevelRefreshPending = nil end
+			refresh()
+		end)
+	end
 end
 
 local function applyConfig(unit)
@@ -9335,6 +9346,50 @@ local function anyUFEnabled()
 	local focus = ensureDB(UNIT.FOCUS).enabled
 	local boss = ensureDB("boss").enabled
 	return p or t or tt or pet or focus or boss
+end
+
+function UF.UnitHasDirtyTexts(unit)
+	local st = states[unit]
+	return st and (st._healthTextDirty or st._powerTextDirty or st._secondaryPowerTextDirty) and true or false
+end
+
+function UF.UpdateTextUnits(force, dirtyOnly)
+	if not dirtyOnly then
+		UF.UpdateUnitTexts(UNIT.PLAYER, force)
+		UF.UpdateUnitTexts(UNIT.TARGET, force)
+		UF.UpdateUnitTexts(UNIT.TARGET_TARGET, force)
+		UF.UpdateUnitTexts(UNIT.FOCUS, force)
+		UF.UpdateUnitTexts(UNIT.PET, force)
+		local bossCount = UF.GetBossFrameCount()
+		for i = 1, bossCount do
+			UF.UpdateUnitTexts("boss" .. i, force)
+		end
+		return
+	end
+
+	if UF.UnitHasDirtyTexts(UNIT.PLAYER) then UF.UpdateUnitTexts(UNIT.PLAYER, force) end
+	if UF.UnitHasDirtyTexts(UNIT.TARGET) then UF.UpdateUnitTexts(UNIT.TARGET, force) end
+	if UF.UnitHasDirtyTexts(UNIT.TARGET_TARGET) then UF.UpdateUnitTexts(UNIT.TARGET_TARGET, force) end
+	if UF.UnitHasDirtyTexts(UNIT.FOCUS) then UF.UpdateUnitTexts(UNIT.FOCUS, force) end
+	if UF.UnitHasDirtyTexts(UNIT.PET) then UF.UpdateUnitTexts(UNIT.PET, force) end
+	local bossCount = UF.GetBossFrameCount()
+	for i = 1, bossCount do
+		local unit = "boss" .. i
+		if UF.UnitHasDirtyTexts(unit) then UF.UpdateUnitTexts(unit, force) end
+	end
+end
+
+function UF.HasDirtyTexts()
+	if UF.UnitHasDirtyTexts(UNIT.PLAYER) then return true end
+	if UF.UnitHasDirtyTexts(UNIT.TARGET) then return true end
+	if UF.UnitHasDirtyTexts(UNIT.TARGET_TARGET) then return true end
+	if UF.UnitHasDirtyTexts(UNIT.FOCUS) then return true end
+	if UF.UnitHasDirtyTexts(UNIT.PET) then return true end
+	local bossCount = UF.GetBossFrameCount()
+	for i = 1, bossCount do
+		if UF.UnitHasDirtyTexts("boss" .. i) then return true end
+	end
+	return false
 end
 
 local function portraitEnabledFor(unit)
@@ -10243,22 +10298,20 @@ function UF.UpdateUnitTexts(unit, force)
 end
 
 function UF.UpdateAllTexts(force)
-	UF.UpdateUnitTexts(UNIT.PLAYER, force)
-	UF.UpdateUnitTexts(UNIT.TARGET, force)
-	UF.UpdateUnitTexts(UNIT.TARGET_TARGET, force)
-	UF.UpdateUnitTexts(UNIT.FOCUS, force)
-	UF.UpdateUnitTexts(UNIT.PET, force)
-	local bossCount = UF.GetBossFrameCount()
-	for i = 1, bossCount do
-		UF.UpdateUnitTexts("boss" .. i, force)
+	if force then
+		UF.UpdateTextUnits(true, false)
+		return
 	end
+	if not UF.HasDirtyTexts() then return end
+	UF.UpdateTextUnits(false, true)
 end
 
 function UF.EnsureTextTicker()
 	if UF._textTicker or not NewTicker then return end
 	UF._textTicker = NewTicker(TEXT_UPDATE_INTERVAL, function()
 		if not anyUFEnabled() then return end
-		UF.UpdateAllTexts(false)
+		if not UF.HasDirtyTexts() then return end
+		UF.UpdateTextUnits(false, true)
 	end)
 end
 
