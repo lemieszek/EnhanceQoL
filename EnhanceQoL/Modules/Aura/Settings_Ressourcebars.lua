@@ -507,6 +507,7 @@ local function setSharedSlotEnabled(slot, enabled)
 	if specIndex then
 		if ResourceBars.QueueRefresh then ResourceBars.QueueRefresh(specIndex) end
 		if ResourceBars.MaybeRefreshActive then ResourceBars.MaybeRefreshActive(specIndex) end
+		if specIndex == addon.variables.unitSpec and ResourceBars.Refresh then ResourceBars.Refresh() end
 		if EditMode and EditMode.RefreshFrame then
 			local frameId = (ResourceBars.GetEditModeFrameId and ResourceBars.GetEditModeFrameId(slot, addon.variables.unitClass, specIndex))
 				or ("resourceBar_" .. tostring(addon.variables.unitClass or "UNKNOWN") .. "_" .. tostring(specIndex) .. "_" .. tostring(slot))
@@ -543,31 +544,35 @@ registerEditModeBars = function()
 		local sharedSlot = opts.sharedSlot
 		local genericSharedPowerEditor = sharedSlot and sharedSlot ~= "HEALTH"
 		local frame
-		if sharedSlot and ResourceBars and ResourceBars.SyncSharedSlotProxyFrame then ResourceBars.SyncSharedSlotProxyFrame(sharedSlot, getActiveSpecIndex()) end
-		if sharedSlot and ResourceBars and ResourceBars.EnsureSharedSlotProxyFrame then
+		if sharedSlot and sharedSlot ~= "HEALTH" and ResourceBars and ResourceBars.SyncSharedSlotProxyFrame then
+			ResourceBars.SyncSharedSlotProxyFrame(sharedSlot, getActiveSpecIndex())
+		end
+		if sharedSlot and sharedSlot ~= "HEALTH" and ResourceBars and ResourceBars.EnsureSharedSlotProxyFrame then
 			frame = ResourceBars.EnsureSharedSlotProxyFrame(sharedSlot)
 		else
 			frame = _G[frameName]
 		end
 		if not frame then return end
+		local actualFrameName = (frame.GetName and frame:GetName()) or frameName
 		local curSpec = tonumber(getActiveSpecIndex()) or 0
 		local registeredSpec = curSpec
 		local frameId = (ResourceBars.GetEditModeFrameId and ResourceBars.GetEditModeFrameId(idSuffix, addon.variables.unitClass, registeredSpec))
 			or ("resourceBar_" .. tostring(addon.variables.unitClass or "UNKNOWN") .. "_" .. tostring(curSpec) .. "_" .. tostring(idSuffix))
 		local prevId = registeredByBar[idSuffix]
 		local prevFrameName = registeredFrameNameByBar[idSuffix]
+		local existingEntry = EditMode and EditMode.frames and EditMode.frames[frameId] or nil
+		local existingFrame = existingEntry and existingEntry.frame or nil
 		if prevId and prevId ~= frameId and EditMode and EditMode.UnregisterFrame then
 			EditMode:UnregisterFrame(prevId, false)
 			registeredFrames[prevId] = nil
 		end
-		if prevId == frameId and prevFrameName and prevFrameName ~= frameName and EditMode and EditMode.UnregisterFrame then
+		if prevId == frameId and EditMode and EditMode.UnregisterFrame and ((prevFrameName and prevFrameName ~= actualFrameName) or (existingFrame and existingFrame ~= frame)) then
 			EditMode:UnregisterFrame(frameId, false)
 			registeredFrames[frameId] = nil
 		end
-		if registeredFrames[frameId] then return end
-		registeredFrames[frameId] = true
+		if registeredFrames[frameId] and existingFrame == frame then return end
 		registeredByBar[idSuffix] = frameId
-		registeredFrameNameByBar[idSuffix] = frameName
+		registeredFrameNameByBar[idSuffix] = actualFrameName
 		local function currentLiveBarType()
 			local spec = registeredSpec or getActiveSpecIndex()
 			if sharedSlot and ResourceBars and ResourceBars.GetResolvedBarTypeForSharedSlot then return ResourceBars.GetResolvedBarTypeForSharedSlot(sharedSlot, spec) end
@@ -4385,6 +4390,13 @@ registerEditModeBars = function()
 				local bcfg = curSpecCfg()
 				if not bcfg then return end
 				bcfg.anchor = bcfg.anchor or {}
+				local oldPoint = bcfg.anchor.point
+				local oldRelativePoint = bcfg.anchor.relativePoint
+				local oldX = bcfg.anchor.x
+				local oldY = bcfg.anchor.y
+				local oldRelativeFrame = bcfg.anchor.relativeFrame
+				local oldWidth = bcfg.width
+				local oldHeight = bcfg.height
 				local hydrationToken = tostring(addon.db) .. ":" .. tostring(frameId)
 				if frame._eqolEditModeHydratedToken ~= hydrationToken then
 					frame._eqolEditModeHydratedToken = hydrationToken
@@ -4413,22 +4425,33 @@ registerEditModeBars = function()
 				end
 				bcfg.width = data.width or bcfg.width
 				bcfg.height = data.height or bcfg.height
+				local anchorChanged = oldPoint ~= bcfg.anchor.point
+					or oldRelativePoint ~= bcfg.anchor.relativePoint
+					or oldRelativeFrame ~= bcfg.anchor.relativeFrame
+					or oldX ~= bcfg.anchor.x
+					or oldY ~= bcfg.anchor.y
+				local sizeChanged = (oldWidth ~= nil or bcfg.width ~= nil) and math.abs((tonumber(oldWidth) or 0) - (tonumber(bcfg.width) or 0)) >= 0.5
+					or (oldHeight ~= nil or bcfg.height ~= nil) and math.abs((tonumber(oldHeight) or 0) - (tonumber(bcfg.height) or 0)) >= 0.5
+				local liveLayoutChanged = anchorChanged or sizeChanged
+				local isBarEnabled = addon.db["enableResourceFrame"] == true and bcfg.enabled == true
 				if spec == addon.variables.unitSpec then
 					local liveBarType = currentLiveBarType()
-					if liveBarType == "HEALTH" then
+					if liveLayoutChanged and isBarEnabled and liveBarType == "HEALTH" then
 						ResourceBars.SetHealthBarSize(bcfg.width, bcfg.height)
-					elseif liveBarType then
+					elseif liveLayoutChanged and isBarEnabled and liveBarType then
 						ResourceBars.SetPowerBarSize(bcfg.width, bcfg.height, liveBarType)
 					end
-					if ResourceBars.ReanchorAll then ResourceBars.ReanchorAll() end
-					if ResourceBars.Refresh then ResourceBars.Refresh() end
-					if sharedSlot and ResourceBars and ResourceBars.SyncSharedSlotProxyFrame then ResourceBars.SyncSharedSlotProxyFrame(sharedSlot, spec) end
-					if addon.EditModeLib and addon.EditModeLib.internal and addon.EditModeLib.internal.RefreshSettingValues then addon.EditModeLib.internal:RefreshSettingValues() end
+					if liveLayoutChanged and isBarEnabled then
+						if ResourceBars.ReanchorAll then ResourceBars.ReanchorAll() end
+						if ResourceBars.Refresh then ResourceBars.Refresh() end
+						if sharedSlot and ResourceBars and ResourceBars.SyncSharedSlotProxyFrame then ResourceBars.SyncSharedSlotProxyFrame(sharedSlot, spec) end
+						if addon.EditModeLib and addon.EditModeLib.internal and addon.EditModeLib.internal.RefreshSettingValues then addon.EditModeLib.internal:RefreshSettingValues() end
+					end
 				end
 			end,
 			isEnabled = function()
 				local c = curSpecCfg()
-				return c and c.enabled == true
+				return addon.db["enableResourceFrame"] == true and c and c.enabled == true
 			end,
 			settings = settingsList,
 			buttons = buttons,
@@ -4457,7 +4480,7 @@ registerEditModeBars = function()
 		if ResourceBars and ResourceBars.SyncSharedSlotProxyFrames then ResourceBars.SyncSharedSlotProxyFrames(activeSpec) end
 		local allowed = { HEALTH = true, MAIN = true, SECONDARY = true }
 		clearUnusedRegistrations(allowed)
-		registerBar("HEALTH", ResourceBars.GetSharedSlotFrameName and ResourceBars.GetSharedSlotFrameName("HEALTH") or "EQOLSharedHealthBar", "HEALTH", ResourceBars.DEFAULT_HEALTH_WIDTH, ResourceBars.DEFAULT_HEALTH_HEIGHT, {
+		registerBar("HEALTH", "EQOLHealthBar", "HEALTH", ResourceBars.DEFAULT_HEALTH_WIDTH, ResourceBars.DEFAULT_HEALTH_HEIGHT, {
 			sharedSlot = "HEALTH",
 			titleLabel = HEALTH or "Health",
 		})
@@ -4801,16 +4824,18 @@ local function buildSettings()
 			order = RESOURCE_MODE_ORDER,
 			get = function() return getSpecMode(specIndex) end,
 			set = function(value)
+				local previousMode = getSpecMode(specIndex)
+				if previousMode == value then return end
 				if not setSpecMode(specIndex, value) then return end
 				if value == "SHARED" and ResourceBars and ResourceBars.EnsureSharedSlotStore then
 					for _, slot in ipairs(ResourceBars.SHARED_SLOT_ORDER or {}) do
 						ResourceBars.EnsureSharedSlotStore(slot)
 					end
 				end
-				addon.Aura.functions.requestActiveRefresh(specIndex)
 				notifyResourceBarSettings()
 				refreshSettingsUI()
-				registerEditModeBars()
+				addon.variables.requireReload = true
+				if addon.functions and addon.functions.checkReloadFrame then addon.functions.checkReloadFrame() end
 			end,
 			default = "SHARED",
 			parentSection = expandable,

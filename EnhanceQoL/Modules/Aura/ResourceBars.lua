@@ -1011,6 +1011,8 @@ ResourceBars.SHARED_SLOT_BY_FRAME_NAME = {}
 for slot, frameName in pairs(ResourceBars.SHARED_SLOT_FRAME_NAME) do
 	ResourceBars.SHARED_SLOT_BY_FRAME_NAME[frameName] = slot
 end
+ResourceBars._sharedSlotFrames = ResourceBars._sharedSlotFrames or {}
+ResourceBars._sharedSlotResolvedTypes = ResourceBars._sharedSlotResolvedTypes or {}
 
 local function normalizeSharedSlotStore(store)
 	if type(store) ~= "table" then store = {} end
@@ -1064,6 +1066,53 @@ end
 function ResourceBars.GetSharedSlotFrameName(slot) return ResourceBars.SHARED_SLOT_FRAME_NAME[slot] end
 
 function ResourceBars.GetSharedSlotFromFrameName(frameName) return ResourceBars.SHARED_SLOT_BY_FRAME_NAME[frameName] end
+
+function ResourceBars.GetSharedSlotLiveFrame(slot)
+	slot = tostring(slot or ""):upper()
+	if slot == "HEALTH" then return healthBar or _G.EQOLHealthBar or _G[ResourceBars.GetSharedSlotFrameName and ResourceBars.GetSharedSlotFrameName(slot)] end
+	local frameName = ResourceBars.GetSharedSlotFrameName and ResourceBars.GetSharedSlotFrameName(slot)
+	if not frameName then return nil end
+	ResourceBars._sharedSlotFrames = ResourceBars._sharedSlotFrames or {}
+	return ResourceBars._sharedSlotFrames[slot] or _G[frameName]
+end
+
+function ResourceBars.BindSharedSlotRuntimeFrame(slot, pType, frame)
+	slot = tostring(slot or ""):upper()
+	if slot == "" then return end
+	ResourceBars._sharedSlotFrames = ResourceBars._sharedSlotFrames or {}
+	ResourceBars._sharedSlotResolvedTypes = ResourceBars._sharedSlotResolvedTypes or {}
+	local sharedFrame = frame or ResourceBars.GetSharedSlotLiveFrame(slot)
+	if sharedFrame then
+		ResourceBars._sharedSlotFrames[slot] = sharedFrame
+		sharedFrame._rbSharedSlot = slot
+		sharedFrame._rbType = pType
+		if ResourceBars.ApplyRuntimeForceHiddenAlphaToFrame then ResourceBars.ApplyRuntimeForceHiddenAlphaToFrame(sharedFrame, false) end
+	end
+	local previousType = ResourceBars._sharedSlotResolvedTypes[slot]
+	if previousType and previousType ~= pType and sharedFrame and powerbar[previousType] == sharedFrame then powerbar[previousType] = nil end
+	ResourceBars._sharedSlotResolvedTypes[slot] = pType
+	if sharedFrame and type(pType) == "string" and pType ~= "" then powerbar[pType] = sharedFrame end
+end
+
+function ResourceBars.ClearSharedSlotRuntimeFrame(slot, hideFrame)
+	slot = tostring(slot or ""):upper()
+	if slot == "" then return end
+	ResourceBars._sharedSlotFrames = ResourceBars._sharedSlotFrames or {}
+	ResourceBars._sharedSlotResolvedTypes = ResourceBars._sharedSlotResolvedTypes or {}
+	local sharedFrame = ResourceBars.GetSharedSlotLiveFrame(slot)
+	local previousType = ResourceBars._sharedSlotResolvedTypes[slot]
+	if previousType and sharedFrame and powerbar[previousType] == sharedFrame then powerbar[previousType] = nil end
+	ResourceBars._sharedSlotResolvedTypes[slot] = nil
+	if hideFrame and sharedFrame then
+		if applyVisibilityDriverToFrame then applyVisibilityDriverToFrame(sharedFrame, nil) end
+		sharedFrame._rbManualVisibilityHidden = nil
+		sharedFrame._rbDesiredVisible = false
+		sharedFrame._cfg = nil
+		sharedFrame._rbType = nil
+		if ResourceBars.ApplyRuntimeForceHiddenAlphaToFrame then ResourceBars.ApplyRuntimeForceHiddenAlphaToFrame(sharedFrame, true) end
+		sharedFrame:Hide()
+	end
+end
 
 function ResourceBars.GetSpecMode(specIndex)
 	local class = addon.variables.unitClass
@@ -3305,7 +3354,7 @@ local function resolveDruidSharedMainAndSecondary(specIndex)
 	return "MANA", nil
 end
 
-local function scheduleDelayedSharedShapeshiftRefresh()
+function ResourceBars.ScheduleDelayedSharedShapeshiftRefresh()
 	if addon.variables.unitClass ~= "DRUID" then return end
 	local spec = addon.variables.unitSpec
 	if not (ResourceBars.SpecUsesSharedMode and ResourceBars.SpecUsesSharedMode(spec)) then return end
@@ -3840,19 +3889,29 @@ local function resolveAnchor(info, type)
 end
 
 function ResourceBars.EnsureSharedSlotProxyFrame(slot)
+	slot = tostring(slot or ""):upper()
+	if slot == "HEALTH" then
+		if healthBar then return healthBar end
+	end
 	local frameName = ResourceBars.GetSharedSlotFrameName and ResourceBars.GetSharedSlotFrameName(slot)
 	if not frameName then return nil end
-	local frame = _G[frameName]
+	local frame = ResourceBars.GetSharedSlotLiveFrame and ResourceBars.GetSharedSlotLiveFrame(slot) or _G[frameName]
 	if frame then return frame end
-	frame = CreateFrame("Frame", frameName, UIParent)
+	frame = CreateFrame("StatusBar", frameName, UIParent, "BackdropTemplate")
 	frame:SetClampedToScreen(true)
 	frame:SetMovable(true)
 	frame:EnableMouse(false)
-	frame:SetAlpha(0.01)
 	frame:SetFrameStrata("MEDIUM")
 	frame:SetFrameLevel(1)
+	frame:SetMinMaxValues(0, 1)
+	frame:SetValue(0)
 	frame:SetSize(RB.DEFAULT_POWER_WIDTH, RB.DEFAULT_POWER_HEIGHT)
-	frame:Show()
+	frame:Hide()
+	if slot ~= "HEALTH" then
+		ResourceBars._sharedSlotFrames = ResourceBars._sharedSlotFrames or {}
+		ResourceBars._sharedSlotFrames[slot] = frame
+		frame._rbSharedSlot = slot
+	end
 	return frame
 end
 
@@ -3861,6 +3920,7 @@ function ResourceBars.SyncSharedSlotProxyFrame(slot, specIndex)
 	if not frame then return nil end
 	local spec = tonumber(specIndex or addon.variables.unitSpec)
 	local resolvedType = ResourceBars.GetResolvedBarTypeForSharedSlot and ResourceBars.GetResolvedBarTypeForSharedSlot(slot, spec)
+	local editModeActive = addon.EditMode and addon.EditMode.IsInEditMode and addon.EditMode:IsInEditMode()
 	local liveFrame
 	if resolvedType == "HEALTH" then
 		liveFrame = healthBar or _G.EQOLHealthBar
@@ -3871,6 +3931,16 @@ function ResourceBars.SyncSharedSlotProxyFrame(slot, specIndex)
 	local cfg = ResourceBars.EnsureSharedSlotStore and ResourceBars.EnsureSharedSlotStore(slot) or {}
 	local widthDefault = slot == "HEALTH" and RB.DEFAULT_HEALTH_WIDTH or RB.DEFAULT_POWER_WIDTH
 	local heightDefault = slot == "HEALTH" and RB.DEFAULT_HEALTH_HEIGHT or RB.DEFAULT_POWER_HEIGHT
+	if cfg.enabled ~= true then
+		frame._rbDesiredVisible = false
+		frame:Hide()
+		return frame
+	end
+	if not editModeActive and ((slot ~= "HEALTH" and type(resolvedType) ~= "string") or (slot ~= "HEALTH" and resolvedType == "")) then
+		frame._rbDesiredVisible = false
+		frame:Hide()
+		return frame
+	end
 
 	frame:ClearAllPoints()
 	if liveFrame and liveFrame ~= frame and liveFrame.GetNumPoints and liveFrame:GetNumPoints() > 0 then
@@ -5837,7 +5907,12 @@ function ResourceBars.RequestStructuralLayoutRefresh(needsReanchor)
 end
 
 function ResourceBars.ReuseExistingPowerBar(type, sharedSlot)
-	local bar = powerbar[type] or _G["EQOL" .. type .. "Bar"]
+	local bar
+	if sharedSlot then
+		bar = ResourceBars.GetSharedSlotLiveFrame and ResourceBars.GetSharedSlotLiveFrame(sharedSlot)
+	else
+		bar = powerbar[type] or _G["EQOL" .. type .. "Bar"]
+	end
 	if not bar or not bar._rbInitialized then return false end
 	if bar._rbSharedSlot ~= sharedSlot then return false end
 	if bar:GetParent() ~= UIParent then bar:SetParent(UIParent) end
@@ -5876,7 +5951,11 @@ function ResourceBars.ReuseExistingPowerBar(type, sharedSlot)
 	configureBarBehavior(bar, settings, type)
 	bar:SetMovable(false)
 	bar:EnableMouse(shouldEnableBarMouse(settings))
-	powerbar[type] = bar
+	if sharedSlot and ResourceBars.BindSharedSlotRuntimeFrame then
+		ResourceBars.BindSharedSlotRuntimeFrame(sharedSlot, type, bar)
+	else
+		powerbar[type] = bar
+	end
 	if not bar:IsShown() then bar:Show() end
 	if type == "RUNES" then ResourceBars.ForceRuneRecolor() end
 	updatePowerBar(type)
@@ -5891,10 +5970,11 @@ end
 
 local function createPowerBar(type, anchor, sharedSlot)
 	-- Reuse existing bar if present; avoid destroying frames to preserve anchors
-	local existingBar = powerbar[type] or _G["EQOL" .. type .. "Bar"]
+	local sharedFrameName = sharedSlot and ResourceBars.GetSharedSlotFrameName and ResourceBars.GetSharedSlotFrameName(sharedSlot) or nil
+	local existingBar = sharedSlot and ResourceBars.GetSharedSlotLiveFrame and ResourceBars.GetSharedSlotLiveFrame(sharedSlot) or powerbar[type] or _G["EQOL" .. type .. "Bar"]
 	local bar = existingBar
-	if not bar then bar = CreateFrame("StatusBar", "EQOL" .. type .. "Bar", UIParent, "BackdropTemplate") end
-	if not existingBar then ResourceBars.RequestStructuralLayoutRefresh(true) end
+	if not bar then bar = CreateFrame("StatusBar", sharedFrameName or ("EQOL" .. type .. "Bar"), UIParent, "BackdropTemplate") end
+	if not existingBar or not existingBar._rbInitialized then ResourceBars.RequestStructuralLayoutRefresh(true) end
 	-- Ensure a valid parent when reusing frames after disable
 	if bar:GetParent() ~= UIParent then bar:SetParent(UIParent) end
 
@@ -5922,7 +6002,11 @@ local function createPowerBar(type, anchor, sharedSlot)
 	ResourceBars.AssignFrameRuntimeConfig(bar, settings)
 	bar._rbType = type
 	bar._rbSharedSlot = sharedSlot
-	powerbar[type] = bar
+	if sharedSlot and ResourceBars.BindSharedSlotRuntimeFrame then
+		ResourceBars.BindSharedSlotRuntimeFrame(sharedSlot, type, bar)
+	else
+		powerbar[type] = bar
+	end
 	local defaultStyle = (type == "MANA" or type == "STAGGER") and "PERCENT" or "CURMAX"
 	bar._style = settings and settings.textStyle or defaultStyle
 	if previousSharedSlot ~= sharedSlot then ResourceBars.RequestRelativeWidthSync() end
@@ -6171,6 +6255,10 @@ local function setPowerbars(opts)
 	for pType in pairs(powerbar or {}) do
 		desiredVisibility[pType] = false
 	end
+	if not sharedMode and ResourceBars.ClearSharedSlotRuntimeFrame then
+		ResourceBars.ClearSharedSlotRuntimeFrame("MAIN", true)
+		ResourceBars.ClearSharedSlotRuntimeFrame("SECONDARY", true)
+	end
 
 	local sharedHealthCfg = sharedMode and ResourceBars.EnsureSharedSlotStore("HEALTH") or nil
 	local healthEnabled = sharedMode and (sharedHealthCfg and sharedHealthCfg.enabled == true) or (specCfg and specCfg.HEALTH and specCfg.HEALTH.enabled == true)
@@ -6199,6 +6287,8 @@ local function setPowerbars(opts)
 					lastBar = pType
 				end
 				desiredVisibility[pType] = showBar and true or false
+			elseif ResourceBars.ClearSharedSlotRuntimeFrame then
+				ResourceBars.ClearSharedSlotRuntimeFrame(slot, true)
 			end
 		end
 	else
@@ -6275,6 +6365,11 @@ local function setPowerbars(opts)
 			else
 				if bar:IsShown() then bar:Hide() end
 			end
+		end
+	end
+	if sharedMode and ResourceBars.ClearSharedSlotRuntimeFrame then
+		for _, slot in ipairs({ "MAIN", "SECONDARY" }) do
+			if not (sharedAssignments and sharedAssignments[slot]) then ResourceBars.ClearSharedSlotRuntimeFrame(slot, true) end
 		end
 	end
 
@@ -6991,7 +7086,7 @@ end
 local function eventHandler(self, event, unit, arg1)
 	if event == "UNIT_DISPLAYPOWER" and unit == "player" then
 		setPowerbars()
-		scheduleDelayedSharedShapeshiftRefresh()
+		if ResourceBars.ScheduleDelayedSharedShapeshiftRefresh then ResourceBars.ScheduleDelayedSharedShapeshiftRefresh() end
 	elseif event == "PLAYER_SPECIALIZATION_CHANGED" then
 		ResourceBars.SyncRuntimeSpecContext()
 		scheduleSpecRefresh()
@@ -7062,7 +7157,7 @@ local function eventHandler(self, event, unit, arg1)
 		if scheduleRelativeFrameWidthSync then scheduleRelativeFrameWidthSync() end
 	elseif event == "UPDATE_SHAPESHIFT_FORM" then
 		local needsPostReanchor = setPowerbars({ fastReuseExisting = true }) == true
-		scheduleDelayedSharedShapeshiftRefresh()
+		if ResourceBars.ScheduleDelayedSharedShapeshiftRefresh then ResourceBars.ScheduleDelayedSharedShapeshiftRefresh() end
 		local spec = addon.variables.unitSpec
 		local sharedMode = ResourceBars.SpecUsesSharedMode and ResourceBars.SpecUsesSharedMode(spec)
 		local function finalizeShapeshiftLayout()
@@ -7256,6 +7351,8 @@ function ResourceBars.DisableResourceBars()
 		powerbar[pType] = nil
 	end
 	powerbar = {}
+	ResourceBars._sharedSlotFrames = {}
+	ResourceBars._sharedSlotResolvedTypes = {}
 	for _, slot in ipairs(ResourceBars.SHARED_SLOT_ORDER or {}) do
 		local frameName = ResourceBars.GetSharedSlotFrameName and ResourceBars.GetSharedSlotFrameName(slot)
 		local frame = frameName and _G[frameName]

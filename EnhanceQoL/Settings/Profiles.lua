@@ -346,6 +346,132 @@ local function normalizeUFSpecMappings(profileData, sourceMappings)
 	return normalized
 end
 
+local function getCurrentUFSpecContext()
+	local currentSpecID
+	if PlayerUtil and PlayerUtil.GetCurrentSpecID then
+		currentSpecID = PlayerUtil.GetCurrentSpecID()
+	end
+	if (not currentSpecID or currentSpecID <= 0) and GetSpecialization and GetSpecializationInfo then
+		local specIndex = GetSpecialization()
+		if specIndex then currentSpecID = select(1, GetSpecializationInfo(specIndex)) end
+	end
+	if type(currentSpecID) ~= "number" or currentSpecID <= 0 then currentSpecID = nil end
+
+	local classSpecIDs
+	local classID = UnitClass and select(3, UnitClass("player")) or nil
+	if issecretvalue and issecretvalue(classID) then classID = nil end
+	if type(classID) == "number" and classID > 0 and GetNumSpecializationsForClassID and GetSpecializationInfoForClassID then
+		local numSpecs = GetNumSpecializationsForClassID(classID)
+		if type(numSpecs) == "number" and numSpecs > 0 then
+			for index = 1, numSpecs do
+				local specID = select(1, GetSpecializationInfoForClassID(classID, index))
+				if type(specID) == "number" and specID > 0 then
+					classSpecIDs = classSpecIDs or {}
+					classSpecIDs[specID] = true
+				end
+			end
+		end
+	end
+	if not classSpecIDs and currentSpecID then classSpecIDs = { [currentSpecID] = true } end
+	return {
+		currentSpecID = currentSpecID,
+		classSpecIDs = classSpecIDs,
+	}
+end
+
+local function getMappedUFProfileForSpec(profileData, specMappings, specID)
+	if type(specMappings) ~= "table" or type(specID) ~= "number" or specID <= 0 then return nil end
+	return normalizeUFProfileReference(profileData, specMappings[specID] or specMappings[tostring(specID)])
+end
+
+local function scoreUFSpecMappings(specMappings, specContext)
+	if type(specMappings) ~= "table" then return nil end
+	specContext = specContext or getCurrentUFSpecContext()
+	local classSpecIDs = specContext.classSpecIDs
+	local currentSpecID = specContext.currentSpecID
+	local overlap = 0
+	local foreign = 0
+	local score = 0
+
+	for specID in pairs(specMappings) do
+		if classSpecIDs and classSpecIDs[specID] then
+			overlap = overlap + 1
+			score = score + 10
+			if currentSpecID and specID == currentSpecID then score = score + 100 end
+		elseif classSpecIDs then
+			foreign = foreign + 1
+			score = score - 5
+		end
+	end
+
+	if classSpecIDs and overlap == 0 then return nil end
+	return score, overlap, foreign
+end
+
+local function resolveLegacyUFCharacterState(profileData, currentGuid)
+	local ufProfileKeys = type(profileData.ufProfileKeys) == "table" and profileData.ufProfileKeys or nil
+	local ufProfileSpecKeys = type(profileData.ufProfileSpecKeys) == "table" and profileData.ufProfileSpecKeys or nil
+	local specContext = getCurrentUFSpecContext()
+	local currentSpecID = specContext.currentSpecID
+	local selectedGuid
+	local selectedMappings
+
+	if ufProfileSpecKeys and currentGuid then
+		selectedMappings = normalizeUFSpecMappings(profileData, ufProfileSpecKeys[currentGuid])
+		if selectedMappings then selectedGuid = currentGuid end
+	end
+
+	if not selectedMappings and ufProfileSpecKeys then
+		local bestScore, bestOverlap, bestForeign
+		local fallbackGuid, fallbackMappings
+		for guid, sourceMappings in pairs(ufProfileSpecKeys) do
+			if guid ~= currentGuid then
+				local normalized = normalizeUFSpecMappings(profileData, sourceMappings)
+				if normalized then
+					fallbackGuid = fallbackGuid or guid
+					fallbackMappings = fallbackMappings or normalized
+					local score, overlap, foreign = scoreUFSpecMappings(normalized, specContext)
+					if score ~= nil then
+						local isBetter = bestScore == nil
+							or score > bestScore
+							or (score == bestScore and (overlap or 0) > (bestOverlap or 0))
+							or (score == bestScore and (overlap or 0) == (bestOverlap or 0) and (foreign or math.huge) < (bestForeign or math.huge))
+						if isBetter then
+							bestScore = score
+							bestOverlap = overlap
+							bestForeign = foreign
+							selectedGuid = guid
+							selectedMappings = normalized
+						end
+					end
+				end
+			end
+		end
+		if not selectedMappings then
+			selectedGuid = fallbackGuid
+			selectedMappings = fallbackMappings
+		end
+	end
+
+	local activeProfile
+	if ufProfileKeys and currentGuid then activeProfile = normalizeUFProfileReference(profileData, ufProfileKeys[currentGuid]) end
+	if not activeProfile and selectedMappings and currentSpecID then
+		activeProfile = getMappedUFProfileForSpec(profileData, selectedMappings, currentSpecID)
+	end
+	if not activeProfile and ufProfileKeys and selectedGuid then
+		activeProfile = normalizeUFProfileReference(profileData, ufProfileKeys[selectedGuid])
+	end
+	if not activeProfile then activeProfile = normalizeUFProfileReference(profileData, profileData.ufProfileGlobal) end
+
+	return {
+		activeProfile = activeProfile,
+		sourceGuid = selectedGuid,
+		specMappings = selectedMappings,
+		specScore = scoreUFSpecMappings(selectedMappings, specContext),
+		specContext = specContext,
+	}
+end
+
 local function captureUFCharacterImportState(profileData)
 	if type(profileData) ~= "table" then return nil end
 	local guid = getCurrentPlayerGUID()
@@ -356,13 +482,11 @@ local function captureUFCharacterImportState(profileData)
 		hasSpecMappings = true,
 	}
 
-	local ufProfileKeys = type(profileData.ufProfileKeys) == "table" and profileData.ufProfileKeys or nil
-	local activeProfile = ufProfileKeys and ufProfileKeys[guid] or nil
-	activeProfile = normalizeUFProfileReference(profileData, activeProfile) or normalizeUFProfileReference(profileData, profileData.ufProfileGlobal)
+	local resolved = resolveLegacyUFCharacterState(profileData, guid)
+	local activeProfile = resolved and resolved.activeProfile or nil
 	if activeProfile then state.activeProfile = activeProfile end
 
-	local ufProfileSpecKeys = type(profileData.ufProfileSpecKeys) == "table" and profileData.ufProfileSpecKeys or nil
-	local specMappings = ufProfileSpecKeys and normalizeUFSpecMappings(profileData, ufProfileSpecKeys[guid]) or nil
+	local specMappings = resolved and resolved.specMappings or nil
 	state.specMappings = specMappings or {}
 
 	if not activeProfile and not next(state.specMappings) then return nil end
@@ -370,32 +494,13 @@ local function captureUFCharacterImportState(profileData)
 end
 
 local function findLegacyUFCharacterActiveProfile(profileData, currentGuid)
-	local ufProfileKeys = type(profileData.ufProfileKeys) == "table" and profileData.ufProfileKeys or nil
-	if ufProfileKeys then
-		local mapped = normalizeUFProfileReference(profileData, ufProfileKeys[currentGuid])
-		if mapped then return mapped end
-		for guid, profileName in pairs(ufProfileKeys) do
-			if guid ~= currentGuid then
-				mapped = normalizeUFProfileReference(profileData, profileName)
-				if mapped then return mapped end
-			end
-		end
-	end
-	return normalizeUFProfileReference(profileData, profileData.ufProfileGlobal)
+	local resolved = resolveLegacyUFCharacterState(profileData, currentGuid)
+	return resolved and resolved.activeProfile or nil
 end
 
 local function findLegacyUFCharacterSpecMappings(profileData, currentGuid)
-	local ufProfileSpecKeys = type(profileData.ufProfileSpecKeys) == "table" and profileData.ufProfileSpecKeys or nil
-	if not ufProfileSpecKeys then return nil end
-	local mappings = normalizeUFSpecMappings(profileData, ufProfileSpecKeys[currentGuid])
-	if mappings then return mappings end
-	for guid, sourceMappings in pairs(ufProfileSpecKeys) do
-		if guid ~= currentGuid then
-			mappings = normalizeUFSpecMappings(profileData, sourceMappings)
-			if mappings then return mappings end
-		end
-	end
-	return nil
+	local resolved = resolveLegacyUFCharacterState(profileData, currentGuid)
+	return resolved and resolved.specMappings or nil
 end
 
 local function remapImportedUFCharacterState(profileData, meta)
@@ -406,6 +511,9 @@ local function remapImportedUFCharacterState(profileData, meta)
 	if not guid then return end
 
 	local explicitState = type(meta) == "table" and type(meta.ufCharacter) == "table" and meta.ufCharacter or nil
+	local legacyState = resolveLegacyUFCharacterState(profileData, guid)
+	local legacySpecScore = legacyState and legacyState.specScore or nil
+	local specContext = legacyState and legacyState.specContext or getCurrentUFSpecContext()
 	local activeProfile
 	local specMappings
 
@@ -416,10 +524,20 @@ local function remapImportedUFCharacterState(profileData, meta)
 		if explicitState.hasSpecMappings == true then
 			specMappings = normalizeUFSpecMappings(profileData, explicitState.specMappings)
 		end
-	else
-		activeProfile = findLegacyUFCharacterActiveProfile(profileData, guid)
-		specMappings = findLegacyUFCharacterSpecMappings(profileData, guid)
 	end
+
+	local explicitSpecScore = scoreUFSpecMappings(specMappings, specContext)
+	if legacySpecScore and (not explicitSpecScore or legacySpecScore > explicitSpecScore) then
+		specMappings = legacyState.specMappings
+	end
+
+	if specMappings and specContext.currentSpecID then
+		activeProfile = getMappedUFProfileForSpec(profileData, specMappings, specContext.currentSpecID) or activeProfile
+	end
+	if not activeProfile and explicitState and explicitState.hasActiveProfile == true then
+		activeProfile = normalizeUFProfileReference(profileData, explicitState.activeProfile)
+	end
+	if not activeProfile and legacyState then activeProfile = legacyState.activeProfile end
 
 	if explicitState and explicitState.hasActiveProfile == true then
 		profileData.ufProfileKeys = type(profileData.ufProfileKeys) == "table" and profileData.ufProfileKeys or {}

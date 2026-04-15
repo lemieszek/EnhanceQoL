@@ -27,15 +27,34 @@ function ResourceBars.ShouldHideInVehicle(cfg) return resolveVisibilityFlag(cfg,
 
 function ResourceBars.ShouldHideInPetBattle(cfg) return resolveVisibilityFlag(cfg, "hidePetBattle", "resourceBarsHidePetBattle", false) end
 
+local function updateManagedFrameAlpha(frame)
+	if not (frame and frame.SetAlpha) then return end
+	local shouldHide = frame._rbClientSceneAlphaHidden == true or frame._rbRuntimeForcedAlphaHidden == true
+	if shouldHide then
+		if frame.GetAlpha and frame:GetAlpha() ~= 0 then frame:SetAlpha(0) end
+	else
+		if frame.GetAlpha and frame:GetAlpha() == 0 then frame:SetAlpha(1) end
+	end
+end
+
 function ResourceBars.ApplyClientSceneAlphaToFrame(frame, forceHide)
 	if not (frame and frame.SetAlpha) then return end
 	if forceHide then
 		frame._rbClientSceneAlphaHidden = true
-		if frame.GetAlpha and frame:GetAlpha() ~= 0 then frame:SetAlpha(0) end
 	elseif frame._rbClientSceneAlphaHidden then
 		frame._rbClientSceneAlphaHidden = nil
-		if frame.GetAlpha and frame:GetAlpha() == 0 then frame:SetAlpha(1) end
 	end
+	updateManagedFrameAlpha(frame)
+end
+
+function ResourceBars.ApplyRuntimeForceHiddenAlphaToFrame(frame, forceHide)
+	if not (frame and frame.SetAlpha) then return end
+	if forceHide then
+		frame._rbRuntimeForcedAlphaHidden = true
+	elseif frame._rbRuntimeForcedAlphaHidden then
+		frame._rbRuntimeForcedAlphaHidden = nil
+	end
+	updateManagedFrameAlpha(frame)
 end
 
 local function normalizeGradientColor(value)
