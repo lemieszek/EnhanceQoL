@@ -19,6 +19,7 @@ local _, race = UnitRace("player")
 local isEarthen = (race == "EarthenDwarf")
 
 addon.Drinks._wrapped = addon.Drinks._wrapped or {}
+addon.Drinks._allowedCache = addon.Drinks._allowedCache or {}
 addon.Drinks.filteredDrinks = addon.Drinks.filteredDrinks or {}
 addon.Drinks.mageFood = addon.Drinks.mageFood or {}
 
@@ -45,6 +46,22 @@ local function wrapDrink(drink)
 		obj.isSpell = drink.isSpell == true
 	end
 	return obj
+end
+
+local function ensureMageFoodMap()
+	local drinks = addon.Drinks
+	local mageFoodMap = drinks and drinks.mageFood
+	if not drinks or not mageFoodMap then return end
+	if drinks._mageFoodMapReady == true then return end
+
+	wipeTable(mageFoodMap)
+	local list = drinks.drinkList
+	if not list then return end
+	for i = 1, #list do
+		local drink = list[i]
+		if drink and drink.isMageFood and drink.id then mageFoodMap[drink.id] = true end
+	end
+	drinks._mageFoodMapReady = true
 end
 
 addon.Drinks.drinkList = { -- Special Food
@@ -509,8 +526,10 @@ local function refreshDrinkSortKeys(maxMana)
 end
 
 local function sortDrinkList(maxMana)
-	local list = addon.Drinks and addon.Drinks.drinkList
+	local drinks = addon.Drinks
+	local list = drinks and drinks.drinkList
 	if not list then return end
+	if drinks._lastSortedMana == maxMana then return end
 	refreshDrinkSortKeys(maxMana)
 	table.sort(list, function(a, b)
 		local manaA = (a and a._eqolSortMana) or 0
@@ -527,45 +546,89 @@ local function sortDrinkList(maxMana)
 
 		return (tonumber(a and a.id) or 0) < (tonumber(b and b.id) or 0)
 	end)
+	drinks._lastSortedMana = maxMana
+end
+
+local function getSpellDrinkAvailabilityMask()
+	local list = addon.Drinks and addon.Drinks.drinkList
+	if not list then return 0 end
+
+	local mask = 0
+	local bit = 1
+	for i = 1, #list do
+		local drink = list[i]
+		if drink and drink.isSpell then
+			if IsSpellInSpellBook(drink.id) then mask = mask + bit end
+			bit = bit * 2
+		end
+	end
+
+	return mask
+end
+
+local function isAllowedDrinkCacheCurrent(cache, playerLevel, mana, minManaFoodValue, preferMage, allowRecuperate, unitClass, spellMask)
+	return cache
+		and cache.playerLevel == playerLevel
+		and cache.mana == mana
+		and cache.minManaFoodValue == minManaFoodValue
+		and cache.preferMage == preferMage
+		and cache.allowRecuperate == allowRecuperate
+		and cache.unitClass == unitClass
+		and cache.spellMask == spellMask
+end
+
+local function updateAllowedDrinkCache(cache, playerLevel, mana, minManaFoodValue, preferMage, allowRecuperate, unitClass, spellMask)
+	cache.playerLevel = playerLevel
+	cache.mana = mana
+	cache.minManaFoodValue = minManaFoodValue
+	cache.preferMage = preferMage
+	cache.allowRecuperate = allowRecuperate
+	cache.unitClass = unitClass
+	cache.spellMask = spellMask
 end
 
 function addon.functions.updateAllowedDrinks()
 	-- cache globals as locals
 	local db = addon.db
 	if not db then return end
+	local drinks = addon.Drinks
+	if not drinks then return end
 
 	local playerLevel = UnitLevel("player")
 	local mana = UnitPowerMax("player", 0)
 	if mana <= 0 then return end
+
+	ensureMageFoodMap()
+	local minManaFoodValue = tonumber(db.minManaFoodValue) or 50
+	local preferMage = db.preferMageFood == true
+	local allowRecuperate = db.allowRecuperate == true
+	local unitClass = addon.variables and addon.variables.unitClass
+	local spellMask = getSpellDrinkAvailabilityMask()
+	local cache = drinks._allowedCache or {}
+	drinks._allowedCache = cache
+	if isAllowedDrinkCacheCurrent(cache, playerLevel, mana, minManaFoodValue, preferMage, allowRecuperate, unitClass, spellMask) then return end
+
 	sortDrinkList(mana)
 
-	local minManaValue = mana * ((db.minManaFoodValue or 50) / 100)
+	local minManaValue = mana * (minManaFoodValue / 100)
 
 	-- Reuse result tables to avoid allocations on refresh.
-	local filtered = addon.Drinks.filteredDrinks or {}
-	local mageFoodMap = addon.Drinks.mageFood or {}
+	local filtered = drinks.filteredDrinks or {}
 	wipeTable(filtered)
-	wipeTable(mageFoodMap)
-	addon.Drinks.filteredDrinks = filtered
-	addon.Drinks.mageFood = mageFoodMap
+	drinks.filteredDrinks = filtered
 
-	local preferMage = db.preferMageFood
 	-- Always ignore Well Fed buff food and Jewelcrafting gem foods
 	local ignoreBuff = true
 	local ignoreGems = true
-	local allowRecuperate = db.allowRecuperate
 
 	-- iterate only once over the master list
-	for i = 1, #addon.Drinks.drinkList do
-		local drink = addon.Drinks.drinkList[i]
-		-- track mage food separately without modifying the original mana
-		if drink.isMageFood then mageFoodMap[drink.id] = true end
-
+	for i = 1, #drinks.drinkList do
+		local drink = drinks.drinkList[i]
 		local req = drink.requiredLevel
 		local dMana = drink._eqolSortMana
 		if dMana == nil then dMana = getDrinkManaValue(drink, mana) end
-		local isRecuperateDrink = allowRecuperate and drink.id == 1231411 and addon.variables.unitClass ~= "MAGE"
-		local isMageRefreshment = drink.id == 190336 and addon.variables.unitClass == "MAGE"
+		local isRecuperateDrink = allowRecuperate and drink.id == 1231411 and unitClass ~= "MAGE"
+		local isMageRefreshment = drink.id == 190336 and unitClass == "MAGE"
 		if req <= playerLevel and (dMana >= minManaValue or isRecuperateDrink or isMageRefreshment) then
 			if
 				not (drink.isBuffFood and ignoreBuff)
@@ -586,4 +649,6 @@ function addon.functions.updateAllowedDrinks()
 			end
 		end
 	end
+
+	updateAllowedDrinkCache(cache, playerLevel, mana, minManaFoodValue, preferMage, allowRecuperate, unitClass, spellMask)
 end
