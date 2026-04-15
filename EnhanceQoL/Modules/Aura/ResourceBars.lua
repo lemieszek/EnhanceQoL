@@ -3607,8 +3607,9 @@ function updateHealthBar(evt)
 			end
 		else
 			local lc = healthBar._lastColor or {}
-			if lc[1] ~= baseR or lc[2] ~= baseG or lc[3] ~= baseB or lc[4] ~= baseA then
-				if (settings.useBarColor or settings.useClassColor) and not settings.useMaxColor then
+			if (settings.useBarColor or settings.useClassColor) and not settings.useMaxColor then
+				if lc[1] ~= baseR or lc[2] ~= baseG or lc[3] ~= baseB or lc[4] ~= baseA then
+					lc[1], lc[2], lc[3], lc[4] = baseR, baseG, baseB, baseA or 1
 					healthBar._lastColor = lc
 					healthBar:GetStatusBarTexture():SetVertexColor(1, 1, 1, 1)
 					if ResourceBars.SetStatusBarColorWithGradient then
@@ -3616,17 +3617,27 @@ function updateHealthBar(evt)
 					else
 						healthBar:SetStatusBarColor(baseR, baseG, baseB, baseA)
 					end
-				else
-					if wasMax ~= settings.useMaxColor then
-						wasMax = settings.useMaxColor
-						if settings.useMaxColor then
-							SetColorCurvePoints(settings.maxColor or RB.DEFAULT_MAX_COLOR)
-						else
-							SetColorCurvePoints()
+				end
+			else
+				if wasMax ~= settings.useMaxColor then
+					wasMax = settings.useMaxColor
+					if settings.useMaxColor then
+						SetColorCurvePoints(settings.maxColor or RB.DEFAULT_MAX_COLOR)
+					else
+						SetColorCurvePoints()
+					end
+				end
+				local color = UnitHealthPercent("player", true, curve)
+				if color then
+					local tex = healthBar:GetStatusBarTexture()
+					if tex and tex.SetVertexColor then
+						if color.GetRGBA then
+							tex:SetVertexColor(color:GetRGBA())
+						elseif color.GetRGB then
+							tex:SetVertexColor(color:GetRGB())
 						end
 					end
-					local color = UnitHealthPercent("player", true, curve)
-					healthBar:GetStatusBarTexture():SetVertexColor(color:GetRGB())
+					healthBar._lastColor = nil
 				end
 			end
 		end
@@ -7015,12 +7026,20 @@ end
 function ResourceBars.DisableResourceBars()
 	ResourceBars._clientSceneOpen = false
 	ResourceBars._petBattleOpen = false
+	ResourceBars._pendingVisibilityDriver = nil
+	ResourceBars._visibilityDriverActive = false
+	if ResourceBars._pendingRefresh then
+		for spec in pairs(ResourceBars._pendingRefresh) do
+			ResourceBars._pendingRefresh[spec] = nil
+		end
+	end
 	if frameAnchor then
 		frameAnchor:UnregisterAllEvents()
 		frameAnchor:SetScript("OnEvent", nil)
 		frameAnchor = nil
 		addon.Aura.anchorFrame = nil
 	end
+	if ResourceBars.UnregisterEditModeFrames then ResourceBars.UnregisterEditModeFrames() end
 	if mainFrame then
 		applyVisibilityDriverToFrame(mainFrame, nil)
 		mainFrame:Hide()
@@ -7054,6 +7073,16 @@ function ResourceBars.DisableResourceBars()
 		powerbar[pType] = nil
 	end
 	powerbar = {}
+	for _, slot in ipairs(ResourceBars.SHARED_SLOT_ORDER or {}) do
+		local frameName = ResourceBars.GetSharedSlotFrameName and ResourceBars.GetSharedSlotFrameName(slot)
+		local frame = frameName and _G[frameName]
+		if frame then
+			applyVisibilityDriverToFrame(frame, nil)
+			frame._rbManualVisibilityHidden = nil
+			frame._rbDesiredVisible = false
+			frame:Hide()
+		end
+	end
 end
 
 -- Register/unregister DK rune event depending on class and user config
