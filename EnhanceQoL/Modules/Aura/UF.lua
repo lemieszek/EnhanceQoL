@@ -6943,11 +6943,12 @@ local function updateHealth(cfg, unit)
 	st._healthTextDirty = true
 end
 
-local function updatePower(cfg, unit)
+local function updatePower(cfg, unit, allowVisibilityChanges)
 	cfg = cfg or (states[unit] and states[unit].cfg) or ensureDB(unit)
 	if cfg and cfg.enabled == false then return end
 	local st = states[unit]
 	if not st then return end
+	if allowVisibilityChanges == nil then allowVisibilityChanges = true end
 	if addon.EditModeLib and addon.EditModeLib.IsInEditMode and addon.EditModeLib:IsInEditMode() and isBossUnit(unit) then
 		local idx = tonumber(type(unit) == "string" and unit:match("^boss(%d+)$") or nil)
 		if idx then
@@ -6973,14 +6974,14 @@ local function updatePower(cfg, unit)
 	local powerDetached = powerEnabled and pcfg.detached == true
 	if bar then
 		if not powerEnabled then
-			bar:Hide()
+			if allowVisibilityChanges then bar:Hide() end
 			bar:SetValue(0, interpolation)
 			if st.powerTextLeft then st.powerTextLeft:SetText("") end
 			if st.powerTextCenter then st.powerTextCenter:SetText("") end
 			if st.powerTextRight then st.powerTextRight:SetText("") end
 			st._powerTextDirty = nil
 		else
-			bar:Show()
+			if allowVisibilityChanges then bar:Show() end
 			powerEnum = powerEnum or 0
 			local cur = UnitPower(unit, powerEnum)
 			local maxv = UnitPowerMax(unit, powerEnum)
@@ -7026,7 +7027,7 @@ local function updatePower(cfg, unit)
 		local secondaryEnabled = unit == UNIT.PLAYER and secondaryCfg.enabled ~= false and secondaryToken ~= nil
 		local secondaryDetached = secondaryEnabled and secondaryCfg.detached == true
 		if not secondaryEnabled then
-			secondaryBar:Hide()
+			if allowVisibilityChanges then secondaryBar:Hide() end
 			secondaryBar:SetValue(0, interpolation)
 			if st.secondaryPowerTextLeft then st.secondaryPowerTextLeft:SetText("") end
 			if st.secondaryPowerTextCenter then st.secondaryPowerTextCenter:SetText("") end
@@ -7035,7 +7036,7 @@ local function updatePower(cfg, unit)
 			st._secondaryPowerToken = nil
 			st._secondaryPowerTextDirty = nil
 		else
-			secondaryBar:Show()
+			if allowVisibilityChanges then secondaryBar:Show() end
 			local cur, maxv, enumId, resolvedToken
 			if UFHelper and UFHelper.GetPowerValuesForToken then
 				cur, maxv, enumId, resolvedToken = UFHelper.GetPowerValuesForToken(unit, secondaryToken)
@@ -8702,7 +8703,10 @@ local function applyConfig(unit)
 			if st._highlightFrame then st._highlightFrame:Hide() end
 			st._hovered = false
 		end
-		if st then st._highlightCfg = nil end
+		if st then
+			st._highlightCfg = nil
+			st._displayPowerStructureKey = nil
+		end
 		if UFHelper and UFHelper.updateCombatFeedback then UFHelper.updateCombatFeedback(st, unit, cfg, def) end
 		applyVisibilityDriver(unit, false)
 		if unit == UNIT.PLAYER then applyFrameRuleOverride(BLIZZ_FRAME_NAMES.player, false) end
@@ -8782,6 +8786,10 @@ local function applyConfig(unit)
 	updateNameAndLevel(cfg, unit)
 	updateHealth(cfg, unit)
 	updatePower(cfg, unit)
+	if unit == UNIT.PLAYER then
+		local sig = UF.BuildPlayerDisplayPowerSignature(cfg)
+		st._displayPowerStructureKey = sig and sig.key or nil
+	end
 	updatePortrait(cfg, unit)
 	AuraUtil.UpdateSingleDispelIndicator(unit, addon.EditModeLib and addon.EditModeLib:IsInEditMode())
 	checkRaidTargetIcon(unit, st)
@@ -9535,6 +9543,176 @@ local function reapplyPlayerFrameAfterSpecChange()
 	applyConfig(UNIT.PLAYER)
 end
 
+function UF.BuildPlayerDisplayPowerSignature(cfg)
+	local def = defaultsFor(UNIT.PLAYER) or {}
+	local pcfg = cfg.power or {}
+	local powerDef = def.power or {}
+	local secondaryCfg = cfg.secondaryPower or {}
+	local secondaryDef = def.secondaryPower or {}
+	refreshMainPower(UNIT.PLAYER)
+	local mainEnum, mainToken = getMainPower(UNIT.PLAYER)
+	local primaryEnabled = pcfg.enabled ~= false
+	if primaryEnabled and UFHelper and UFHelper.IsPrimaryPowerAllowed then
+		primaryEnabled = UFHelper.IsPrimaryPowerAllowed(pcfg, powerDef, mainToken, mainEnum, UNIT.PLAYER) ~= false
+	end
+	local primaryDetached = primaryEnabled and pcfg.detached == true
+	local secondaryToken
+	if UFHelper and UFHelper.ResolveSecondaryPowerToken then
+		secondaryToken = UFHelper.ResolveSecondaryPowerToken(secondaryCfg, secondaryDef, addon.variables and addon.variables.unitClass, addon.variables and addon.variables.unitSpec)
+	end
+	local secondaryEnabled = secondaryCfg.enabled ~= false and secondaryToken ~= nil
+	local secondaryDetached = secondaryEnabled and secondaryCfg.detached == true
+	local secondaryEnum, secondaryResolvedToken
+	if secondaryEnabled and UFHelper and UFHelper.GetPowerValuesForToken then
+		local _, _, enumId, tokenId = UFHelper.GetPowerValuesForToken(UNIT.PLAYER, secondaryToken)
+		secondaryEnum, secondaryResolvedToken = enumId, tokenId
+	end
+	if secondaryEnabled then secondaryResolvedToken = secondaryResolvedToken or secondaryToken end
+	local classResourceMode
+	if addon.variables and addon.variables.unitClass == "DRUID" then classResourceMode = mainToken == "ENERGY" and "CAT_LIKE" or "NON_CAT" end
+	local key = (primaryEnabled and "1" or "0")
+		.. "|"
+		.. (primaryDetached and "1" or "0")
+		.. "|"
+		.. (secondaryEnabled and "1" or "0")
+		.. "|"
+		.. (secondaryDetached and "1" or "0")
+		.. "|"
+		.. (secondaryToken or "-")
+		.. "|"
+		.. (classResourceMode or "-")
+	return {
+		key = key,
+		mainEnum = mainEnum,
+		mainToken = mainToken,
+		primaryEnabled = primaryEnabled,
+		secondaryEnabled = secondaryEnabled,
+		secondaryToken = secondaryToken,
+		secondaryEnum = secondaryEnum,
+		secondaryResolvedToken = secondaryResolvedToken,
+	}
+end
+
+function UF.ApplyPlayerDisplayPowerVisuals(cfg, sig, st)
+	st = st or states[UNIT.PLAYER]
+	if not st then return end
+	local pcfg = cfg.power or {}
+	local secondaryCfg = cfg.secondaryPower or {}
+	if st.power and sig.primaryEnabled and UFHelper and UFHelper.configureSpecialTexture then
+		UFHelper.configureSpecialTexture(st.power, sig.mainToken, pcfg.texture, pcfg, sig.mainEnum)
+	end
+	if st.secondaryPower and sig.secondaryEnabled and UFHelper and UFHelper.configureSpecialTexture then
+		UFHelper.configureSpecialTexture(st.secondaryPower, sig.secondaryResolvedToken or sig.secondaryToken, secondaryCfg.texture, secondaryCfg, sig.secondaryEnum)
+	end
+	st._powerColorDirty = true
+	st._secondaryPowerColorDirty = true
+end
+
+function UF.SchedulePlayerDisplayPowerFlush(reason, wantFullRebuild)
+	if wantFullRebuild then UF._playerDPWantFull = true end
+	UF._playerDPPending = true
+	if InCombatLockdown and InCombatLockdown() then
+		UF._playerDisplayPowerLayoutPending = true
+		return
+	end
+	if UF._playerDPScheduled then return end
+	UF._playerDPScheduled = true
+	local function runner()
+		UF._playerDPScheduled = nil
+		if InCombatLockdown and InCombatLockdown() then
+			UF._playerDisplayPowerLayoutPending = true
+			return
+		end
+		UF.FlushPlayerDisplayPower(reason)
+	end
+	if After then
+		After(0, runner)
+	else
+		runner()
+	end
+end
+
+function UF.FlushPlayerDisplayPower(reason)
+	if UF._playerDPBusy then
+		UF._playerDPPending = true
+		return
+	end
+	UF._playerDPBusy = true
+	UF._playerDPPending = nil
+	local ok = xpcall(function()
+		local cfg = ensureDB(UNIT.PLAYER)
+		if not cfg or cfg.enabled == false then
+			UF._playerDPWantFull = nil
+			return
+		end
+		local st = states[UNIT.PLAYER]
+		if not st or not st.frame or not st.power then UF._playerDPWantFull = true end
+		if UF._playerDPWantFull then
+			UF._playerDPWantFull = nil
+			reapplyPlayerFrameAfterSpecChange()
+			st = states[UNIT.PLAYER]
+			if st then
+				local rebuiltSig = UF.BuildPlayerDisplayPowerSignature(cfg)
+				st._displayPowerStructureKey = rebuiltSig and rebuiltSig.key or nil
+			end
+			return
+		end
+		local sig = UF.BuildPlayerDisplayPowerSignature(cfg)
+		if not st._displayPowerStructureKey or st._displayPowerStructureKey ~= sig.key then
+			applyBars(cfg, UNIT.PLAYER)
+			layoutFrame(cfg, UNIT.PLAYER)
+			st._displayPowerStructureKey = sig.key
+		end
+		UF.ApplyPlayerDisplayPowerVisuals(cfg, sig, st)
+		updatePower(cfg, UNIT.PLAYER)
+		UF.UpdateUnitTexts(UNIT.PLAYER, true)
+	end, geterrorhandler())
+	UF._playerDPBusy = nil
+	if not ok then
+		UF._playerDPWantFull = true
+		UF.SchedulePlayerDisplayPowerFlush(reason or "DISPLAYPOWER_ERROR", true)
+		return
+	end
+	if UF._playerDPPending then
+		local wantFull = UF._playerDPWantFull == true
+		UF._playerDPPending = nil
+		UF.SchedulePlayerDisplayPowerFlush(reason or "DISPLAYPOWER_DRAIN", wantFull)
+	end
+end
+
+function UF.ApplyPlayerDisplayPowerChange()
+	local cfg = ensureDB(UNIT.PLAYER)
+	if not cfg or cfg.enabled == false then return end
+	local st = states[UNIT.PLAYER]
+	if not st or not st.frame or not st.power then
+		UF.SchedulePlayerDisplayPowerFlush("DISPLAYPOWER_MISSING", true)
+		return
+	end
+	if UF._playerDPBusy then
+		UF._playerDPPending = true
+		if InCombatLockdown and InCombatLockdown() then UF._playerDisplayPowerLayoutPending = true end
+		return
+	end
+	UF._playerDPBusy = true
+	local ok = xpcall(function()
+		local sig = UF.BuildPlayerDisplayPowerSignature(cfg)
+		UF.ApplyPlayerDisplayPowerVisuals(cfg, sig, st)
+		updatePower(cfg, UNIT.PLAYER, false)
+		if st._displayPowerStructureKey ~= sig.key then UF.SchedulePlayerDisplayPowerFlush("UNIT_DISPLAYPOWER", false) end
+	end, geterrorhandler())
+	UF._playerDPBusy = nil
+	if not ok then
+		UF._playerDPWantFull = true
+		UF.SchedulePlayerDisplayPowerFlush("DISPLAYPOWER_IMMEDIATE_ERROR", true)
+		return
+	end
+	if UF._playerDPPending then
+		local wantFull = UF._playerDPWantFull == true
+		UF._playerDPPending = nil
+		UF.SchedulePlayerDisplayPowerFlush("UNIT_DISPLAYPOWER_DRAIN", wantFull)
+	end
+end
+
 local function updateTargetTargetFrame(cfg, forceApply)
 	cfg = cfg or ensureDB(UNIT.TARGET_TARGET)
 	local st = states[UNIT.TARGET_TARGET]
@@ -10172,9 +10350,9 @@ onEvent = function(self, event, unit, ...)
 			if bossHidePending then hideBossFrames(true) end
 			if bossShowPending or bossInitPending then updateBossFrames(true) end
 			bossLayoutDirty, bossHidePending, bossShowPending, bossInitPending = nil, nil, nil, nil
-			if UF._playerDisplayPowerLayoutPending then
+			if UF._playerDisplayPowerLayoutPending or UF._playerDPPending or UF._playerDPWantFull then
 				UF._playerDisplayPowerLayoutPending = nil
-				reapplyPlayerFrameAfterSpecChange()
+				UF.SchedulePlayerDisplayPowerFlush("PLAYER_REGEN_ENABLED", UF._playerDPWantFull == true)
 			end
 			if UF._pendingProfileApply and UFProfileManager and UFProfileManager.ApplyCurrent then UFProfileManager.ApplyCurrent(UF._pendingProfileApplyReason or "PLAYER_REGEN_ENABLED") end
 		end
@@ -10452,22 +10630,7 @@ onEvent = function(self, event, unit, ...)
 		if unit == UNIT.PLAYER then
 			local playerCfg = getCfg(UNIT.PLAYER)
 			if playerCfg.enabled == false then return end
-			if InCombatLockdown() then
-				refreshMainPower(unit)
-				local st = states[unit]
-				local pcfg = playerCfg.power or {}
-				if st and st.power and pcfg.enabled ~= false then
-					local powerEnum, powerToken = getMainPower(unit)
-					UFHelper.configureSpecialTexture(st.power, powerToken, (playerCfg.power or {}).texture, playerCfg.power, powerEnum)
-				elseif st and st.power then
-					st.power:Hide()
-				end
-				updatePower(playerCfg, UNIT.PLAYER)
-				UF._playerDisplayPowerLayoutPending = true
-			else
-				UF._playerDisplayPowerLayoutPending = nil
-				reapplyPlayerFrameAfterSpecChange()
-			end
+			UF.ApplyPlayerDisplayPowerChange()
 		elseif unit == UNIT.TARGET then
 			local targetCfg = getCfg(UNIT.TARGET)
 			if targetCfg.enabled == false then return end
