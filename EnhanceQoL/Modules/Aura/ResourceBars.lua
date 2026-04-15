@@ -3270,6 +3270,28 @@ local function resolveDruidSharedMainAndSecondary(specIndex)
 	local spec = tonumber(specIndex or addon.variables.unitSpec)
 	local formID = GetShapeshiftFormID and GetShapeshiftFormID() or nil
 	local formKey = ResourceBars.GetCurrentDruidFormKey and ResourceBars.GetCurrentDruidFormKey() or nil
+	local currentPowerTypeId, currentPowerToken
+	if UnitPowerType then
+		currentPowerTypeId, currentPowerToken = UnitPowerType("player")
+	end
+	currentPowerToken = type(currentPowerToken) == "string" and currentPowerToken:upper() or nil
+	if currentPowerToken == "ALTERNATE" and currentPowerTypeId == (POWER_ENUM and POWER_ENUM.LUNAR_POWER) then currentPowerToken = "LUNAR_POWER" end
+	if (not currentPowerToken or currentPowerToken == "") and currentPowerTypeId ~= nil and POWER_ENUM then
+		for pType, enumId in pairs(POWER_ENUM) do
+			if enumId == currentPowerTypeId then
+				currentPowerToken = pType
+				break
+			end
+		end
+	end
+
+	if currentPowerToken == "RAGE" then return "RAGE", nil end
+	if currentPowerToken == "ENERGY" then return "ENERGY", "COMBO_POINTS" end
+	if currentPowerToken == "LUNAR_POWER" then return "LUNAR_POWER", "MANA" end
+	if currentPowerToken == "MANA" then
+		if spec == 1 then return "LUNAR_POWER", "MANA" end
+		return "MANA", nil
+	end
 
 	if formID == DRUID_BEAR_FORM then return "RAGE", nil end
 	if formID == DRUID_CAT_FORM then return "ENERGY", "COMBO_POINTS" end
@@ -3281,6 +3303,28 @@ local function resolveDruidSharedMainAndSecondary(specIndex)
 
 	if spec == 1 then return "LUNAR_POWER", "MANA" end
 	return "MANA", nil
+end
+
+local function scheduleDelayedSharedShapeshiftRefresh()
+	if addon.variables.unitClass ~= "DRUID" then return end
+	local spec = addon.variables.unitSpec
+	if not (ResourceBars.SpecUsesSharedMode and ResourceBars.SpecUsesSharedMode(spec)) then return end
+	if not After then return end
+	if frameAnchor and frameAnchor._sharedShapeshiftRefreshScheduled then return end
+	if frameAnchor then frameAnchor._sharedShapeshiftRefreshScheduled = true end
+	After(0, function()
+		if frameAnchor then frameAnchor._sharedShapeshiftRefreshScheduled = false end
+		if not frameAnchor then return end
+		local runtimeSpec = addon.variables.unitSpec
+		if addon.variables.unitClass ~= "DRUID" then return end
+		if not (ResourceBars.SpecUsesSharedMode and ResourceBars.SpecUsesSharedMode(runtimeSpec)) then return end
+		local setBars = addon and addon.Aura and addon.Aura.functions and addon.Aura.functions.setPowerBars
+		if type(setBars) ~= "function" then return end
+		local needsPostReanchor = setBars({ fastReuseExisting = true }) == true
+		if addon.EditMode and addon.EditMode.IsInEditMode and addon.EditMode:IsInEditMode() and ResourceBars.RegisterEditModeFrames then ResourceBars.RegisterEditModeFrames() end
+		if ResourceBars.SyncSharedSlotProxyFrames then ResourceBars.SyncSharedSlotProxyFrames(runtimeSpec) end
+		if needsPostReanchor and ResourceBars.ReanchorAll then ResourceBars.ReanchorAll() end
+	end)
 end
 
 function ResourceBars.GetSharedSlotPossibleTypes(slot, classTag)
@@ -6848,6 +6892,10 @@ function ResourceBars.ApplyVisibilityPreference(context)
 				frame._rbManualVisibilityHidden = nil
 				releasedManualHidden = true
 			end
+			if frame then
+				frame._rbDesiredVisible = false
+				if frame:IsShown() then frame:Hide() end
+			end
 			if ResourceBars.ApplyClientSceneAlphaToFrame then ResourceBars.ApplyClientSceneAlphaToFrame(frame, false) end
 		end
 	end)
@@ -6943,6 +6991,7 @@ end
 local function eventHandler(self, event, unit, arg1)
 	if event == "UNIT_DISPLAYPOWER" and unit == "player" then
 		setPowerbars()
+		scheduleDelayedSharedShapeshiftRefresh()
 	elseif event == "PLAYER_SPECIALIZATION_CHANGED" then
 		ResourceBars.SyncRuntimeSpecContext()
 		scheduleSpecRefresh()
@@ -7013,6 +7062,7 @@ local function eventHandler(self, event, unit, arg1)
 		if scheduleRelativeFrameWidthSync then scheduleRelativeFrameWidthSync() end
 	elseif event == "UPDATE_SHAPESHIFT_FORM" then
 		local needsPostReanchor = setPowerbars({ fastReuseExisting = true }) == true
+		scheduleDelayedSharedShapeshiftRefresh()
 		local spec = addon.variables.unitSpec
 		local sharedMode = ResourceBars.SpecUsesSharedMode and ResourceBars.SpecUsesSharedMode(spec)
 		local function finalizeShapeshiftLayout()

@@ -8118,10 +8118,6 @@ local function layoutFrame(cfg, unit)
 			end
 		end
 	end
-	if unit == UNIT.PLAYER then
-		if ClassResourceUtil.ApplyLayout then ClassResourceUtil.ApplyLayout(cfg) end
-		if TotemFrameUtil.ApplyLayout then TotemFrameUtil.ApplyLayout(cfg) end
-	end
 	syncTextFrameLevels(st)
 end
 
@@ -8781,6 +8777,7 @@ local function applyConfig(unit)
 	else
 		UFHelper.applyHighlightStyle(st, st._highlightCfg)
 	end
+	if unit == UNIT.PLAYER then UF.ApplyPlayerDisplayPowerManagedLayouts(cfg) end
 	updateStatus(cfg, unit)
 	if UFHelper and UFHelper.updateCombatFeedback then UFHelper.updateCombatFeedback(st, unit, cfg, def) end
 	updateNameAndLevel(cfg, unit)
@@ -9549,18 +9546,43 @@ function UF.BuildPlayerDisplayPowerSignature(cfg)
 	local powerDef = def.power or {}
 	local secondaryCfg = cfg.secondaryPower or {}
 	local secondaryDef = def.secondaryPower or {}
-	refreshMainPower(UNIT.PLAYER)
-	local mainEnum, mainToken = getMainPower(UNIT.PLAYER)
-	local primaryEnabled = pcfg.enabled ~= false
+	local rcfg = cfg.classResource or {}
+	local resourceDef = def.classResource or {}
+	local trackPrimary = pcfg.enabled ~= false
+	local trackSecondary = secondaryCfg.enabled ~= false
+	local classKey = addon.variables and addon.variables.unitClass
+	local trackClassResource = classKey and classResourceFramesByClass[classKey] and rcfg.enabled ~= false
+	local tcfg = normalizeTotemFrameConfig(rcfg.totemFrame)
+	local tdef = normalizeTotemFrameConfig(resourceDef.totemFrame)
+	local trackTotem = classKey and totemFrameClasses[classKey] and ((tcfg.enabled == true) or (tcfg.enabled == nil and tdef.enabled == true))
+	local tracked = trackPrimary or trackSecondary or trackClassResource or trackTotem
+	if not tracked then
+		return {
+			key = "0|0|0|0|-|-",
+			tracked = false,
+			needsBarLayout = false,
+			needsAuxLayouts = false,
+			trackPrimary = false,
+			trackSecondary = false,
+			trackClassResource = false,
+			trackTotem = false,
+		}
+	end
+	local mainEnum, mainToken
+	if trackPrimary or trackClassResource or trackTotem then
+		refreshMainPower(UNIT.PLAYER)
+		mainEnum, mainToken = getMainPower(UNIT.PLAYER)
+	end
+	local primaryEnabled = trackPrimary
 	if primaryEnabled and UFHelper and UFHelper.IsPrimaryPowerAllowed then
 		primaryEnabled = UFHelper.IsPrimaryPowerAllowed(pcfg, powerDef, mainToken, mainEnum, UNIT.PLAYER) ~= false
 	end
 	local primaryDetached = primaryEnabled and pcfg.detached == true
 	local secondaryToken
-	if UFHelper and UFHelper.ResolveSecondaryPowerToken then
+	if trackSecondary and UFHelper and UFHelper.ResolveSecondaryPowerToken then
 		secondaryToken = UFHelper.ResolveSecondaryPowerToken(secondaryCfg, secondaryDef, addon.variables and addon.variables.unitClass, addon.variables and addon.variables.unitSpec)
 	end
-	local secondaryEnabled = secondaryCfg.enabled ~= false and secondaryToken ~= nil
+	local secondaryEnabled = trackSecondary and secondaryToken ~= nil
 	local secondaryDetached = secondaryEnabled and secondaryCfg.detached == true
 	local secondaryEnum, secondaryResolvedToken
 	if secondaryEnabled and UFHelper and UFHelper.GetPowerValuesForToken then
@@ -9569,7 +9591,9 @@ function UF.BuildPlayerDisplayPowerSignature(cfg)
 	end
 	if secondaryEnabled then secondaryResolvedToken = secondaryResolvedToken or secondaryToken end
 	local classResourceMode
-	if addon.variables and addon.variables.unitClass == "DRUID" then classResourceMode = mainToken == "ENERGY" and "CAT_LIKE" or "NON_CAT" end
+	if (trackClassResource or trackTotem) and addon.variables and addon.variables.unitClass == "DRUID" then
+		classResourceMode = mainToken == "ENERGY" and "CAT_LIKE" or "NON_CAT"
+	end
 	local key = (primaryEnabled and "1" or "0")
 		.. "|"
 		.. (primaryDetached and "1" or "0")
@@ -9583,6 +9607,13 @@ function UF.BuildPlayerDisplayPowerSignature(cfg)
 		.. (classResourceMode or "-")
 	return {
 		key = key,
+		tracked = true,
+		needsBarLayout = trackPrimary or trackSecondary,
+		needsAuxLayouts = trackClassResource or trackTotem,
+		trackPrimary = trackPrimary,
+		trackSecondary = trackSecondary,
+		trackClassResource = trackClassResource == true,
+		trackTotem = trackTotem == true,
 		mainEnum = mainEnum,
 		mainToken = mainToken,
 		primaryEnabled = primaryEnabled,
@@ -9598,14 +9629,20 @@ function UF.ApplyPlayerDisplayPowerVisuals(cfg, sig, st)
 	if not st then return end
 	local pcfg = cfg.power or {}
 	local secondaryCfg = cfg.secondaryPower or {}
-	if st.power and sig.primaryEnabled and UFHelper and UFHelper.configureSpecialTexture then
+	if st.power and sig.trackPrimary and sig.primaryEnabled and UFHelper and UFHelper.configureSpecialTexture then
 		UFHelper.configureSpecialTexture(st.power, sig.mainToken, pcfg.texture, pcfg, sig.mainEnum)
 	end
-	if st.secondaryPower and sig.secondaryEnabled and UFHelper and UFHelper.configureSpecialTexture then
+	if st.secondaryPower and sig.trackSecondary and sig.secondaryEnabled and UFHelper and UFHelper.configureSpecialTexture then
 		UFHelper.configureSpecialTexture(st.secondaryPower, sig.secondaryResolvedToken or sig.secondaryToken, secondaryCfg.texture, secondaryCfg, sig.secondaryEnum)
 	end
-	st._powerColorDirty = true
-	st._secondaryPowerColorDirty = true
+	if sig.trackPrimary then st._powerColorDirty = true end
+	if sig.trackSecondary then st._secondaryPowerColorDirty = true end
+end
+
+function UF.ApplyPlayerDisplayPowerManagedLayouts(cfg, sig)
+	if sig and sig.needsAuxLayouts == false then return end
+	if ClassResourceUtil.ApplyLayout then ClassResourceUtil.ApplyLayout(cfg) end
+	if TotemFrameUtil.ApplyLayout then TotemFrameUtil.ApplyLayout(cfg) end
 end
 
 function UF.SchedulePlayerDisplayPowerFlush(reason, wantFullRebuild)
@@ -9658,13 +9695,18 @@ function UF.FlushPlayerDisplayPower(reason)
 			return
 		end
 		local sig = UF.BuildPlayerDisplayPowerSignature(cfg)
-		if not st._displayPowerStructureKey or st._displayPowerStructureKey ~= sig.key then
+		if not sig.tracked then
+			st._displayPowerStructureKey = sig.key
+			return
+		end
+		if sig.needsBarLayout and (not st._displayPowerStructureKey or st._displayPowerStructureKey ~= sig.key) then
 			applyBars(cfg, UNIT.PLAYER)
 			layoutFrame(cfg, UNIT.PLAYER)
-			st._displayPowerStructureKey = sig.key
 		end
+		if sig.needsAuxLayouts then UF.ApplyPlayerDisplayPowerManagedLayouts(cfg, sig) end
+		st._displayPowerStructureKey = sig.key
 		UF.ApplyPlayerDisplayPowerVisuals(cfg, sig, st)
-		updatePower(cfg, UNIT.PLAYER)
+		if sig.trackPrimary or sig.trackSecondary then updatePower(cfg, UNIT.PLAYER) end
 		UF.UpdateUnitTexts(UNIT.PLAYER, true)
 	end, geterrorhandler())
 	UF._playerDPBusy = nil
@@ -9696,8 +9738,12 @@ function UF.ApplyPlayerDisplayPowerChange()
 	UF._playerDPBusy = true
 	local ok = xpcall(function()
 		local sig = UF.BuildPlayerDisplayPowerSignature(cfg)
+		if not sig.tracked then
+			st._displayPowerStructureKey = sig.key
+			return
+		end
 		UF.ApplyPlayerDisplayPowerVisuals(cfg, sig, st)
-		updatePower(cfg, UNIT.PLAYER, false)
+		if sig.trackPrimary or sig.trackSecondary then updatePower(cfg, UNIT.PLAYER, false) end
 		if st._displayPowerStructureKey ~= sig.key then UF.SchedulePlayerDisplayPowerFlush("UNIT_DISPLAYPOWER", false) end
 	end, geterrorhandler())
 	UF._playerDPBusy = nil
