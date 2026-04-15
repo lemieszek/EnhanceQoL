@@ -421,7 +421,11 @@ local provider = {
 	OnMouseEnter = function(btn)
 		local tip = GameTooltip
 		tip:ClearLines()
-		tip:SetOwner(btn, "ANCHOR_TOPLEFT")
+		if addon.DataPanel and addon.DataPanel.SetTooltipOwner then
+			addon.DataPanel.SetTooltipOwner(btn, tip)
+		else
+			tip:SetOwner(btn, "ANCHOR_TOPLEFT")
+		end
 
 		local function addSection(title, items, color)
 			if #items == 0 then return end

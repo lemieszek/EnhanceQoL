@@ -2457,6 +2457,7 @@ L["Toggle sample frames"] = "Переключить примерные фрей�
 L["Toggle status text"] = "Переключить текст статуса"
 L["trinkets"] = "Аксессуары"
 L["Tooltip"] = "Подсказка"
+L["Tooltip growth"] = "Направление роста подсказки"
 L["Tooltip modifier"] = "Модификатор подсказки"
 L["TooltipAnchorOffsetX"] = "Горизонтальное смещение"
 L["TooltipAnchorOffsetY"] = "Вертикальное смещение"

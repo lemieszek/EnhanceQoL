@@ -1,5 +1,19 @@
 # Changelog
 
+## [10.3.0-beta5] - 2026-04-15
+
+### ✨ Added
+
+- Data Panels: Added a per-panel tooltip direction setting so each panel can open its tooltip automatically, upward, or downward.
+
+### 🐛 Fixed
+
+- Data Panels: Fixed the new `Tooltip growth` dropdown showing up empty in Edit Mode.
+- Data Panels: Tooltip direction is now applied more consistently across the supported panel tooltips.
+- Locales: Added the missing translations for the `Tooltip growth` setting.
+
+---
+
 ## [10.3.0-beta4] - 2026-04-15
 
 ### 🔄 Changed

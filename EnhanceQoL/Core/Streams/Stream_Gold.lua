@@ -333,7 +333,11 @@ local provider = {
 		ensureDB()
 		local tip = GameTooltip
 		tip:ClearLines()
-		tip:SetOwner(btn, "ANCHOR_TOPLEFT")
+		if addon.DataPanel and addon.DataPanel.SetTooltipOwner then
+			addon.DataPanel.SetTooltipOwner(btn, tip)
+		else
+			tip:SetOwner(btn, "ANCHOR_TOPLEFT")
+		end
 
 		local warband = getPrivateDB().warbandGold
 		if warband ~= nil then tip:AddDoubleLine(L["warbandGold"] or "Warband gold", formatMoney(warband)) end

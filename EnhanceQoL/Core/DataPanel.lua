@@ -75,6 +75,16 @@ local CONTENT_ANCHOR_OPTIONS = {
 	{ value = "CENTER", label = L["Center"] or "Center" },
 	{ value = "RIGHT", label = L["Right"] or "Right" },
 }
+local TOOLTIP_GROWTH_ORDER = { "AUTO", "UP", "DOWN" }
+local VALID_TOOLTIP_GROWTH = {}
+for _, growth in ipairs(TOOLTIP_GROWTH_ORDER) do
+	VALID_TOOLTIP_GROWTH[growth] = true
+end
+local TOOLTIP_GROWTH_OPTIONS = {
+	{ value = "AUTO", text = L["Auto"] or "Auto" },
+	{ value = "UP", text = L["Up"] or "Up" },
+	{ value = "DOWN", text = L["Down"] or "Down" },
+}
 
 local function normalizePercent(value, fallback)
 	local num = tonumber(value)
@@ -406,6 +416,47 @@ local function normalizeContentAnchor(anchor, fallback)
 	return "LEFT"
 end
 
+local function normalizeTooltipGrowth(value, fallback)
+	if type(value) == "string" then
+		local upper = string.upper(value)
+		if VALID_TOOLTIP_GROWTH[upper] then return upper end
+	end
+	if type(fallback) == "string" then
+		local upper = string.upper(fallback)
+		if VALID_TOOLTIP_GROWTH[upper] then return upper end
+	end
+	return "AUTO"
+end
+
+local function resolveTooltipGrowthMode(panel)
+	return normalizeTooltipGrowth(panel and panel.info and panel.info.tooltipGrowth, "AUTO")
+end
+
+function DataPanel.SetTooltipOwner(owner, tooltip, panel)
+	local tip = tooltip or GameTooltip
+	if not tip or not owner then return end
+	if tip.ClearAllPoints then tip:ClearAllPoints() end
+	if tip.SetOwner then tip:SetOwner(owner, "ANCHOR_NONE") end
+
+	local mode = resolveTooltipGrowthMode(panel or (owner.slot and owner.slot.panel))
+	if mode == "UP" then
+		if tip.SetPoint then tip:SetPoint("BOTTOMLEFT", owner, "TOPLEFT", 0, 2) end
+		return
+	end
+	if mode == "DOWN" then
+		if tip.SetPoint then tip:SetPoint("TOPLEFT", owner, "BOTTOMLEFT", 0, -2) end
+		return
+	end
+
+	local ownerY = owner.GetCenter and select(2, owner:GetCenter())
+	local parentY = UIParent and UIParent.GetCenter and select(2, UIParent:GetCenter())
+	if ownerY and parentY and ownerY <= parentY then
+		if tip.SetPoint then tip:SetPoint("TOPLEFT", owner, "BOTTOMLEFT", 0, -2) end
+	else
+		if tip.SetPoint then tip:SetPoint("BOTTOMLEFT", owner, "TOPLEFT", 0, 2) end
+	end
+end
+
 local function hasInlineTexture(text)
 	if type(text) ~= "string" then return false end
 	return text:find("|T", 1, true) or text:find("|A", 1, true)
@@ -561,7 +612,7 @@ local function ldbWrapMouseEnter(dataobj)
 		end
 		if type(onTooltipShow) == "function" and GameTooltip and GameTooltip.SetOwner and GameTooltip.ClearLines then
 			if not (GameTooltip.IsOwned and GameTooltip:IsOwned(button)) then
-				GameTooltip:SetOwner(button, "ANCHOR_TOPLEFT")
+				DataPanel.SetTooltipOwner(button, GameTooltip)
 				GameTooltip:ClearLines()
 			end
 			local ok, err = pcall(onTooltipShow, GameTooltip)
@@ -723,7 +774,7 @@ local function partsOnEnter(b)
 	end
 
 	if s.perCurrency and b.currencyID then
-		GameTooltip:SetOwner(b, "ANCHOR_TOPLEFT")
+		DataPanel.SetTooltipOwner(b, GameTooltip)
 		GameTooltip:SetCurrencyByID(b.currencyID)
 		if s.showDescription == false then
 			local info = C_CurrencyInfo.GetCurrencyInfo(b.currencyID)
@@ -745,7 +796,7 @@ local function partsOnEnter(b)
 		end
 		GameTooltip:Show()
 	elseif s.tooltip then
-		GameTooltip:SetOwner(b, "ANCHOR_TOPLEFT")
+		DataPanel.SetTooltipOwner(b, GameTooltip)
 		GameTooltip:SetText(s.tooltip)
 		GameTooltip:Show()
 	end
@@ -823,6 +874,7 @@ local function seedEditModeRecordFromPanelInfo(panel, defaults, record)
 	record.borderSize = normalizeBorderSize(info.borderSize, defaults.borderSize)
 	record.borderOffset = normalizeBorderOffset(info.borderOffset, defaults.borderOffset)
 	record.showTooltips = info.showTooltips ~= false
+	record.tooltipGrowth = normalizeTooltipGrowth(info.tooltipGrowth, defaults.tooltipGrowth)
 	record.textAlphaInCombat = normalizePercent(info.textAlphaInCombat, defaults.textAlphaInCombat)
 	record.textAlphaOutOfCombat = normalizePercent(info.textAlphaOutOfCombat, defaults.textAlphaOutOfCombat)
 end
@@ -860,6 +912,7 @@ local function registerEditModePanel(panel)
 		borderSize = normalizeBorderSize(panel.info.borderSize, DEFAULT_BORDER_SIZE),
 		borderOffset = normalizeBorderOffset(panel.info.borderOffset, DEFAULT_BORDER_OFFSET),
 		showTooltips = panel.info.showTooltips ~= false,
+		tooltipGrowth = normalizeTooltipGrowth(panel.info.tooltipGrowth, "AUTO"),
 		textAlphaInCombat = normalizePercent(panel.info.textAlphaInCombat, DEFAULT_TEXT_ALPHA),
 		textAlphaOutOfCombat = normalizePercent(panel.info.textAlphaOutOfCombat, panel.info.textAlphaInCombat),
 	}
@@ -874,6 +927,7 @@ local function registerEditModePanel(panel)
 	panel.info.borderSize = defaults.borderSize
 	panel.info.borderOffset = defaults.borderOffset
 	panel.info.showTooltips = defaults.showTooltips
+	panel.info.tooltipGrowth = defaults.tooltipGrowth
 	panel.info.streamGap = defaults.streamGap
 
 	local settings
@@ -1077,6 +1131,21 @@ local function registerEditModePanel(panel)
 				field = "showTooltips",
 				default = defaults.showTooltips,
 				isEnabled = function(layoutName) return not isClickThrough(layoutName) end,
+			},
+			{
+				name = L["Tooltip growth"] or "Tooltip growth",
+				kind = SettingType.Dropdown,
+				field = "tooltipGrowth",
+				default = defaults.tooltipGrowth,
+				values = TOOLTIP_GROWTH_OPTIONS,
+				isEnabled = function(layoutName)
+					if isClickThrough(layoutName) then return false end
+					if EditMode and EditMode.GetValue then
+						local value = EditMode:GetValue(id, "showTooltips", layoutName)
+						if value ~= nil then return value == true end
+					end
+					return panel.info and panel.info.showTooltips ~= false
+				end,
 			},
 			{
 				name = L["Frame strata"],
@@ -1353,6 +1422,7 @@ local function ensureSettings(id, name)
 			borderSize = DEFAULT_BORDER_SIZE,
 			borderOffset = DEFAULT_BORDER_OFFSET,
 			showTooltips = true,
+			tooltipGrowth = "AUTO",
 			textAlphaInCombat = DEFAULT_TEXT_ALPHA,
 			textAlphaOutOfCombat = DEFAULT_TEXT_ALPHA,
 		}
@@ -1389,6 +1459,7 @@ local function ensureSettings(id, name)
 		info.borderSize = normalizeBorderSize(info.borderSize, DEFAULT_BORDER_SIZE)
 		info.borderOffset = normalizeBorderOffset(info.borderOffset, DEFAULT_BORDER_OFFSET)
 		if info.showTooltips == nil then info.showTooltips = true end
+		info.tooltipGrowth = normalizeTooltipGrowth(info.tooltipGrowth, "AUTO")
 		info.textAlphaInCombat = normalizePercent(info.textAlphaInCombat, DEFAULT_TEXT_ALPHA)
 		info.textAlphaOutOfCombat = normalizePercent(info.textAlphaOutOfCombat, info.textAlphaInCombat)
 	end
@@ -1753,6 +1824,7 @@ function DataPanel.Create(id, name, existingOnly)
 			or field == "streamFontScale"
 			or field == "useClassTextColor"
 			or field == "showTooltips"
+			or field == "tooltipGrowth"
 			or field == "textAlphaInCombat"
 			or field == "textAlphaOutOfCombat"
 			or field == "backgroundTexture"
@@ -1941,6 +2013,12 @@ function DataPanel.Create(id, name, existingOnly)
 				if not desired then GameTooltip:Hide() end
 			end
 		end
+		if data.tooltipGrowth ~= nil then
+			local desired = normalizeTooltipGrowth(data.tooltipGrowth, info.tooltipGrowth)
+			if info.tooltipGrowth ~= desired then
+				info.tooltipGrowth = desired
+			end
+		end
 		if data.textAlphaInCombat ~= nil then
 			local value = normalizePercent(data.textAlphaInCombat, info.textAlphaInCombat)
 			if info.textAlphaInCombat ~= value then
@@ -2057,7 +2135,7 @@ function DataPanel.Create(id, name, existingOnly)
 			local s = b.slot
 			if slotTooltipsEnabled(s) then
 				if s.tooltip then
-					GameTooltip:SetOwner(b, "ANCHOR_TOPLEFT")
+					DataPanel.SetTooltipOwner(b, GameTooltip)
 					GameTooltip:SetText(s.tooltip)
 					GameTooltip:Show()
 				end
