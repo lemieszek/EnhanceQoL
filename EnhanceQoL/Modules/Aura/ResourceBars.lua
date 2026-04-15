@@ -4182,6 +4182,27 @@ function getBarSettings(pType)
 	return nil
 end
 
+function ResourceBars.GetFrameRuntimeConfigToken(specIndex)
+	local class = tostring(addon.variables.unitClass or "")
+	local spec = tonumber(specIndex or addon.variables.unitSpec) or 0
+	local mode = (ResourceBars.SpecUsesSharedMode and ResourceBars.SpecUsesSharedMode(spec)) and "SHARED" or "SPEC"
+	return class .. "|" .. tostring(spec) .. "|" .. mode
+end
+
+function ResourceBars.AssignFrameRuntimeConfig(frame, cfg, specIndex)
+	if not frame then return cfg end
+	frame._cfg = cfg
+	frame._rbCfgCacheToken = cfg and ResourceBars.GetFrameRuntimeConfigToken(specIndex) or nil
+	return cfg
+end
+
+function ResourceBars.GetFrameRuntimeConfig(pType, frame, specIndex)
+	if not frame then return getBarSettings(pType) end
+	local token = ResourceBars.GetFrameRuntimeConfigToken(specIndex)
+	if frame._cfg and frame._rbCfgCacheToken == token then return frame._cfg end
+	return ResourceBars.AssignFrameRuntimeConfig(frame, getBarSettings(pType), specIndex)
+end
+
 local function wantsRelativeFrameWidthMatch(anchor) return anchor and (anchor.relativeFrame or "UIParent") ~= "UIParent" and anchor.matchRelativeWidth == true end
 
 local function getConfiguredBarWidth(pType, frame)
@@ -5777,7 +5798,7 @@ function ResourceBars.ReuseExistingPowerBar(type, sharedSlot)
 	if bar._rbSharedSlot ~= sharedSlot then return false end
 	if bar:GetParent() ~= UIParent then bar:SetParent(UIParent) end
 
-	local settings = getBarSettings(type) or bar._cfg or {}
+	local settings = ResourceBars.GetFrameRuntimeConfig(type, bar) or bar._cfg or {}
 	local defaultStyle = (type == "MANA" or type == "STAGGER") and "PERCENT" or "CURMAX"
 	bar._cfg = settings
 	bar._rbType = type
@@ -5851,10 +5872,10 @@ local function createPowerBar(type, anchor, sharedSlot)
 	local previousWidth = bar.GetWidth and bar:GetWidth() or 0
 	local previousHeight = bar.GetHeight and bar:GetHeight() or 0
 	local previousSharedSlot = bar._rbSharedSlot
-	local settings = getBarSettings(type) or bar._cfg or {}
+	local settings = ResourceBars.GetFrameRuntimeConfig(type, bar) or bar._cfg or {}
 	local w = max(RB.MIN_RESOURCE_BAR_WIDTH, (settings and settings.width) or RB.DEFAULT_POWER_WIDTH)
 	local h = settings and settings.height or RB.DEFAULT_POWER_HEIGHT
-	bar._cfg = settings
+	ResourceBars.AssignFrameRuntimeConfig(bar, settings)
 	bar._rbType = type
 	bar._rbSharedSlot = sharedSlot
 	powerbar[type] = bar
@@ -6203,7 +6224,7 @@ local function setPowerbars(opts)
 	for pType, wantVisible in pairs(desiredVisibility) do
 		local bar = powerbar[pType]
 		if bar then
-			bar._cfg = wantVisible and (bar._cfg or getBarSettings(pType)) or nil
+			bar._cfg = ResourceBars.GetFrameRuntimeConfig(pType, bar)
 			bar._rbDesiredVisible = wantVisible and true or false
 			if wantVisible then
 				if not bar:IsShown() then bar:Show() end
@@ -6215,8 +6236,7 @@ local function setPowerbars(opts)
 
 	-- Toggle Health visibility according to config
 	if healthBar then
-		local healthCfg = getBarSettings("HEALTH") or nil
-		healthBar._cfg = healthCfg
+		local healthCfg = ResourceBars.GetFrameRuntimeConfig("HEALTH", healthBar) or nil
 		local showHealth = healthEnabled and true or false
 		healthBar._rbDesiredVisible = showHealth and true or false
 		if showHealth then
@@ -6247,9 +6267,7 @@ local function forEachResourceBarFrame(callback)
 end
 
 local function resolveBarConfigForFrame(pType, frame)
-	local cfg = frame and frame._cfg
-	if not cfg then cfg = getBarSettings(pType) end
-	return cfg
+	return ResourceBars.GetFrameRuntimeConfig(pType, frame)
 end
 
 local visibilityLogic = {
@@ -6258,6 +6276,14 @@ local visibilityLogic = {
 	sortedRuleKeysCache = nil,
 	driverCache = setmetatable({}, { __mode = "k" }),
 }
+
+function ResourceBars.InvalidateRuntimeConfigCaches()
+	if healthBar then healthBar._rbCfgCacheToken = nil end
+	for _, bar in pairs(powerbar or {}) do
+		if bar then bar._rbCfgCacheToken = nil end
+	end
+	if visibilityLogic then visibilityLogic.driverCache = setmetatable({}, { __mode = "k" }) end
+end
 
 function visibilityLogic:CopySelectionMap(selection)
 	if type(selection) ~= "table" then return nil end
@@ -7385,6 +7411,7 @@ function ResourceBars.ReanchorDependentsOf(frameName)
 end
 
 function ResourceBars.Refresh()
+	if ResourceBars.InvalidateRuntimeConfigCaches then ResourceBars.InvalidateRuntimeConfigCaches() end
 	if ResourceBars.BeginRuntimeConfigBatch then ResourceBars.BeginRuntimeConfigBatch() end
 	if not isResourceFrameEnabled() then
 		if ResourceBars and ResourceBars.DisableResourceBars then ResourceBars.DisableResourceBars() end
@@ -7422,7 +7449,7 @@ function ResourceBars.Refresh()
 			rel = UIParent
 		end
 		-- Apply current texture selection to health bar
-		local hCfg2 = getBarSettings("HEALTH") or {}
+		local hCfg2 = ResourceBars.GetFrameRuntimeConfig("HEALTH", healthBar) or {}
 		local hTex = resolveTexture(hCfg2)
 		healthBar:SetStatusBarTexture(hTex)
 		configureSpecialTexture(healthBar, "HEALTH", hCfg2)
@@ -7471,11 +7498,10 @@ function ResourceBars.Refresh()
 			bar:SetPoint(a.point or "TOPLEFT", rel, a.relativePoint or a.point or "TOPLEFT", a.x or 0, a.y or 0)
 			-- Update movability based on anchor target (only movable when relative to UIParent)
 			local isUI = (a.relativeFrame or "UIParent") == "UIParent"
-			local cfg = getBarSettings(pType)
+			local cfg = ResourceBars.GetFrameRuntimeConfig(pType, bar)
 			bar:SetMovable(isUI)
 			bar:EnableMouse(shouldEnableBarMouse(cfg))
 
-			bar._cfg = cfg
 			local defaultStyle = (pType == "MANA" or pType == "STAGGER") and "PERCENT" or "CURMAX"
 			bar._style = (cfg and cfg.textStyle) or defaultStyle
 			applyBarFrameLayers(bar, cfg)
@@ -7490,21 +7516,20 @@ function ResourceBars.Refresh()
 			else
 				updatePowerBar(pType)
 			end
-			if ResourceBars.separatorEligible[pType] then updateBarSeparators(pType) end
-			updateBarThresholds(pType)
+			if ResourceBars.separatorEligible[pType] then updateBarSeparators(pType, cfg) end
+			updateBarThresholds(pType, cfg)
 		end
 	end
 	-- Apply styling updates without forcing a full rebuild
 	if healthBar then
-		local hCfg = getBarSettings("HEALTH") or {}
+		local hCfg = ResourceBars.GetFrameRuntimeConfig("HEALTH", healthBar) or {}
 		if hCfg.useMaxColor then
 			SetColorCurvePoints(hCfg.maxColor or RB.DEFAULT_MAX_COLOR)
 		else
 			SetColorCurvePoints()
 		end
 		wasMax = hCfg.useMaxColor == true
-		healthBar._cfg = hCfg
-		healthBar:SetStatusBarTexture(resolveTexture(hCfg))
+			healthBar:SetStatusBarTexture(resolveTexture(hCfg))
 		configureSpecialTexture(healthBar, "HEALTH", hCfg)
 		applyBarFrameLayers(healthBar, hCfg)
 		applyBackdrop(healthBar, hCfg)
@@ -7516,9 +7541,8 @@ function ResourceBars.Refresh()
 
 	for pType, bar in pairs(powerbar) do
 		if bar then
-			local cfg = getBarSettings(pType) or {}
-			bar._cfg = cfg
-			if pType == "RUNES" then
+				local cfg = ResourceBars.GetFrameRuntimeConfig(pType, bar) or {}
+				if pType == "RUNES" then
 				bar:SetStatusBarTexture(resolveTexture(cfg))
 				local tex = bar:GetStatusBarTexture()
 				if tex then tex:SetAlpha(0) end
