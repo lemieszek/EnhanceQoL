@@ -1033,9 +1033,7 @@ function ResourceBars.NormalizeSpecMode(mode)
 end
 
 function ResourceBars.GetDefaultSpecMode()
-	if addon and addon.db and addon.db.resourceBarsDefaultMode ~= nil then
-		return ResourceBars.NormalizeSpecMode(addon.db.resourceBarsDefaultMode)
-	end
+	if addon and addon.db and addon.db.resourceBarsDefaultMode ~= nil then return ResourceBars.NormalizeSpecMode(addon.db.resourceBarsDefaultMode) end
 	return "SHARED"
 end
 
@@ -1063,13 +1061,9 @@ function ResourceBars.SpecConfigHasConcreteData(specCfg)
 	return false
 end
 
-function ResourceBars.GetSharedSlotFrameName(slot)
-	return ResourceBars.SHARED_SLOT_FRAME_NAME[slot]
-end
+function ResourceBars.GetSharedSlotFrameName(slot) return ResourceBars.SHARED_SLOT_FRAME_NAME[slot] end
 
-function ResourceBars.GetSharedSlotFromFrameName(frameName)
-	return ResourceBars.SHARED_SLOT_BY_FRAME_NAME[frameName]
-end
+function ResourceBars.GetSharedSlotFromFrameName(frameName) return ResourceBars.SHARED_SLOT_BY_FRAME_NAME[frameName] end
 
 function ResourceBars.GetSpecMode(specIndex)
 	local class = addon.variables.unitClass
@@ -1090,9 +1084,7 @@ function ResourceBars.SetSpecMode(specIndex, mode)
 	return true
 end
 
-function ResourceBars.SpecUsesSharedMode(specIndex)
-	return ResourceBars.GetSpecMode(specIndex) == "SHARED"
-end
+function ResourceBars.SpecUsesSharedMode(specIndex) return ResourceBars.GetSpecMode(specIndex) == "SHARED" end
 
 local function getSpecInfo(specIndex)
 	local class = addon.variables.unitClass
@@ -1127,9 +1119,7 @@ function ResourceBars.IsRuntimeBarTypeSupported(barType, specIndex)
 	local specInfo = getSpecInfo(spec)
 	if ResourceBars.SpecUsesSharedMode and ResourceBars.SpecUsesSharedMode(spec) then
 		local sharedSlot = ResourceBars.GetSharedSlotForResolvedBar and ResourceBars.GetSharedSlotForResolvedBar(barType, spec)
-		if sharedSlot then
-			return ResourceBars.IsBarTypeSupportedForClass(barType, class, nil)
-		end
+		if sharedSlot then return ResourceBars.IsBarTypeSupportedForClass(barType, class, nil) end
 	end
 	if not ResourceBars.IsBarTypeSupportedForClass(barType, class, spec) then return false end
 	return ResourceBars.IsSpecBarTypeSupported(specInfo, barType)
@@ -2030,9 +2020,7 @@ end
 
 local function resolveFontStyleChoice(cfg)
 	local outline = cfg and cfg.fontOutline
-	if addon.functions and addon.functions.NormalizeFontStyleChoice then
-		return addon.functions.NormalizeFontStyleChoice(outline, "OUTLINE", true)
-	end
+	if addon.functions and addon.functions.NormalizeFontStyleChoice then return addon.functions.NormalizeFontStyleChoice(outline, "OUTLINE", true) end
 	if outline == nil or outline == "" then return "OUTLINE" end
 	return outline
 end
@@ -2181,9 +2169,7 @@ local function applyBarFrameLayers(bar, cfg)
 		if frame:GetFrameLevel() ~= level then frame:SetFrameLevel(level) end
 	end
 
-	if bar._rbBaseStrata == nil and bar.GetFrameStrata then
-		bar._rbBaseStrata = ResourceBars.NormalizeFrameStrataToken(bar:GetFrameStrata()) or RB.DEFAULT_FRAME_STRATA
-	end
+	if bar._rbBaseStrata == nil and bar.GetFrameStrata then bar._rbBaseStrata = ResourceBars.NormalizeFrameStrataToken(bar:GetFrameStrata()) or RB.DEFAULT_FRAME_STRATA end
 	if bar._rbBaseFrameLevel == nil and bar.GetFrameLevel then bar._rbBaseFrameLevel = bar:GetFrameLevel() or 0 end
 
 	local strata = ResourceBars.NormalizeFrameStrataToken(cfg and cfg.strata) or bar._rbBaseStrata or RB.DEFAULT_FRAME_STRATA
@@ -3038,9 +3024,7 @@ registerEditModeCallbacks = function()
 		end
 		if rb and rb.UpdateRuneEventRegistration then rb.UpdateRuneEventRegistration() end
 	end
-	lib:RegisterCallback("enter", function()
-		refreshForEditModeTransition()
-	end)
+	lib:RegisterCallback("enter", function() refreshForEditModeTransition() end)
 	lib:RegisterCallback("exit", function()
 		-- Re-evaluate active bars (e.g., druid forms) when leaving Edit Mode
 		refreshForEditModeTransition()
@@ -3220,6 +3204,48 @@ function ResourceBars.GetCurrentDruidFormKey()
 	return "HUMANOID"
 end
 
+function ResourceBars.GetRuntimeConfigBatchToken(specIndex)
+	local class = tostring(addon.variables.unitClass or "")
+	local spec = tonumber(specIndex or addon.variables.unitSpec) or 0
+	local mode = (ResourceBars.SpecUsesSharedMode and ResourceBars.SpecUsesSharedMode(spec)) and "SHARED" or "SPEC"
+	local form = (class == "DRUID" and ResourceBars.GetCurrentDruidFormKey and ResourceBars.GetCurrentDruidFormKey()) or ""
+	return class .. "|" .. tostring(spec) .. "|" .. mode .. "|" .. tostring(form or "")
+end
+
+function ResourceBars.BeginRuntimeConfigBatch()
+	local depth = (ResourceBars._runtimeConfigBatchDepth or 0) + 1
+	ResourceBars._runtimeConfigBatchDepth = depth
+	if depth > 1 then return end
+	ResourceBars._runtimeConfigBatch = {
+		barSettings = {},
+		sharedAssignments = {},
+	}
+end
+
+function ResourceBars.EndRuntimeConfigBatch()
+	local depth = (ResourceBars._runtimeConfigBatchDepth or 0) - 1
+	if depth <= 0 then
+		ResourceBars._runtimeConfigBatchDepth = nil
+		ResourceBars._runtimeConfigBatch = nil
+		return
+	end
+	ResourceBars._runtimeConfigBatchDepth = depth
+end
+
+function ResourceBars.GetRuntimeConfigBatchBucket(kind, specIndex)
+	local batch = ResourceBars._runtimeConfigBatch
+	if not batch then return nil end
+	local buckets = batch[kind]
+	if not buckets then return nil end
+	local token = ResourceBars.GetRuntimeConfigBatchToken(specIndex)
+	local bucket = buckets[token]
+	if not bucket then
+		bucket = {}
+		buckets[token] = bucket
+	end
+	return bucket
+end
+
 function ResourceBars.GetSharedVisibilityConfig(pType, specIndex, specInfo)
 	local class = addon.variables.unitClass
 	local spec = tonumber(specIndex or addon.variables.unitSpec)
@@ -3249,9 +3275,7 @@ local function resolveDruidSharedMainAndSecondary(specIndex)
 	if formID == DRUID_CAT_FORM then return "ENERGY", "COMBO_POINTS" end
 	if formID == DRUID_MOONKIN_FORM_1 or formID == DRUID_MOONKIN_FORM_2 then return "LUNAR_POWER", "MANA" end
 	if formID == DRUID_TREE_FORM or formID == 36 then return "MANA", nil end
-	if formID == DRUID_TRAVEL_FORM or formID == DRUID_ACQUATIC_FORM or formID == DRUID_FLIGHT_FORM or formID == DRUID_SWIFT_FLIGHT_FORM then
-		return "MANA", nil
-	end
+	if formID == DRUID_TRAVEL_FORM or formID == DRUID_ACQUATIC_FORM or formID == DRUID_FLIGHT_FORM or formID == DRUID_SWIFT_FLIGHT_FORM then return "MANA", nil end
 
 	if formKey == "STAG" or formKey == "TRAVEL" then return "MANA", nil end
 
@@ -3316,16 +3340,23 @@ function ResourceBars.GetSharedSlotPossibleTypes(slot, classTag)
 end
 
 function ResourceBars.ResolveSharedSlotAssignments(specIndex)
+	local spec = tonumber(specIndex or addon.variables.unitSpec)
+	local cache = ResourceBars.GetRuntimeConfigBatchBucket and ResourceBars.GetRuntimeConfigBatchBucket("sharedAssignments", spec)
+	if cache and cache.assignments then return cache.assignments end
+	local function cacheAndReturn(result)
+		if cache then cache.assignments = result end
+		return result
+	end
 	local resolved = {
 		HEALTH = "HEALTH",
 		byType = { HEALTH = "HEALTH" },
 		order = { "HEALTH" },
 	}
-	local specInfo = getSpecInfo(specIndex)
-	if not specInfo then return resolved end
+	local specInfo = getSpecInfo(spec)
+	if not specInfo then return cacheAndReturn(resolved) end
 
 	if addon.variables.unitClass == "DRUID" then
-		local mainType, secondaryType = resolveDruidSharedMainAndSecondary(specIndex)
+		local mainType, secondaryType = resolveDruidSharedMainAndSecondary(spec)
 		if mainType then
 			resolved.MAIN = mainType
 			resolved.byType[mainType] = "MAIN"
@@ -3337,10 +3368,10 @@ function ResourceBars.ResolveSharedSlotAssignments(specIndex)
 			resolved.byType[secondaryType] = "SECONDARY"
 			resolved.order[#resolved.order + 1] = "SECONDARY"
 		end
-		return resolved
+		return cacheAndReturn(resolved)
 	end
 
-	local fixed = ResourceBars.GetFixedSharedSlotAssignment and ResourceBars.GetFixedSharedSlotAssignment(specIndex)
+	local fixed = ResourceBars.GetFixedSharedSlotAssignment and ResourceBars.GetFixedSharedSlotAssignment(spec)
 	if type(fixed) == "table" then
 		local secondaryTypes = {}
 		local function assign(slot, pType)
@@ -3353,7 +3384,7 @@ function ResourceBars.ResolveSharedSlotAssignments(specIndex)
 		assign("MAIN", fixed.MAIN)
 		assign("SECONDARY", fixed.SECONDARY)
 		resolved.secondaryTypes = secondaryTypes
-		return resolved
+		return cacheAndReturn(resolved)
 	end
 
 	local mainType = specInfo.MAIN
@@ -3365,9 +3396,7 @@ function ResourceBars.ResolveSharedSlotAssignments(specIndex)
 
 	local secondaryTypes = {}
 	for _, pType in ipairs(classPowerTypes or {}) do
-		if pType ~= mainType and specInfo[pType] and ResourceBars.IsSharedSecondaryCurrentlyVisible(pType, specIndex, specInfo) then
-			secondaryTypes[#secondaryTypes + 1] = pType
-		end
+		if pType ~= mainType and specInfo[pType] and ResourceBars.IsSharedSecondaryCurrentlyVisible(pType, specIndex, specInfo) then secondaryTypes[#secondaryTypes + 1] = pType end
 	end
 	resolved.secondaryTypes = secondaryTypes
 
@@ -3378,7 +3407,7 @@ function ResourceBars.ResolveSharedSlotAssignments(specIndex)
 		resolved.order[#resolved.order + 1] = "SECONDARY"
 	end
 
-	return resolved
+	return cacheAndReturn(resolved)
 end
 
 function ResourceBars.GetResolvedBarTypeForSharedSlot(slot, specIndex)
@@ -3396,13 +3425,9 @@ function ResourceBars.ResolveConfigSourceForBar(pType, specIndex)
 	local spec = tonumber(specIndex or addon.variables.unitSpec)
 	local specInfo = getSpecInfo(spec)
 	if ResourceBars.SpecUsesSharedMode(spec) then
-		if ResourceBars.GetSharedSlotFrameName and ResourceBars.GetSharedSlotFrameName(pType) then
-			return ResourceBars.EnsureSharedSlotStore(pType), "SHARED", pType, specInfo
-		end
+		if ResourceBars.GetSharedSlotFrameName and ResourceBars.GetSharedSlotFrameName(pType) then return ResourceBars.EnsureSharedSlotStore(pType), "SHARED", pType, specInfo end
 		local slot = ResourceBars.GetSharedSlotForResolvedBar(pType, spec)
-		if slot then
-			return ResourceBars.EnsureSharedSlotStore(slot), "SHARED", slot, specInfo
-		end
+		if slot then return ResourceBars.EnsureSharedSlotStore(slot), "SHARED", slot, specInfo end
 	end
 	local specCfg = ensureSpecCfg(spec)
 	return specCfg and specCfg[pType] or nil, "SPEC", nil, specInfo
@@ -3850,9 +3875,11 @@ function ResourceBars.SyncSharedSlotProxyFrame(slot, specIndex)
 end
 
 function ResourceBars.SyncSharedSlotProxyFrames(specIndex)
+	if ResourceBars.BeginRuntimeConfigBatch then ResourceBars.BeginRuntimeConfigBatch() end
 	for _, slot in ipairs(ResourceBars.SHARED_SLOT_ORDER or {}) do
 		ResourceBars.SyncSharedSlotProxyFrame(slot, specIndex)
 	end
+	if ResourceBars.EndRuntimeConfigBatch then ResourceBars.EndRuntimeConfigBatch() end
 end
 
 function createHealthBar()
@@ -3861,9 +3888,7 @@ function createHealthBar()
 		if mainFrame:GetParent() ~= UIParent then mainFrame:SetParent(UIParent) end
 		if healthBar and healthBar.GetParent and healthBar:GetParent() ~= UIParent then healthBar:SetParent(UIParent) end
 		if mainFrame.SetClampedToScreen then mainFrame:SetClampedToScreen(true) end
-		if healthBar then
-			healthBar._rbSharedSlot = ResourceBars.SpecUsesSharedMode and ResourceBars.SpecUsesSharedMode(addon.variables.unitSpec) and "HEALTH" or nil
-		end
+		if healthBar then healthBar._rbSharedSlot = ResourceBars.SpecUsesSharedMode and ResourceBars.SpecUsesSharedMode(addon.variables.unitSpec) and "HEALTH" or nil end
 		local settings = getBarSettings("HEALTH") or {}
 		healthBar._cfg = settings
 		applyBarFrameLayers(healthBar, settings)
@@ -4089,6 +4114,8 @@ end
 function getBarSettings(pType)
 	local class = addon.variables.unitClass
 	local spec = addon.variables.unitSpec
+	local cache = ResourceBars.GetRuntimeConfigBatchBucket and ResourceBars.GetRuntimeConfigBatchBucket("barSettings", spec)
+	if cache and cache[pType] ~= nil then return cache[pType] end
 	local specInfo = getSpecInfo(spec)
 	if class and not ResourceBars.IsRuntimeBarTypeSupported(pType, spec) then return nil end
 	local sourceCfg, sourceMode, sharedSlot = ResourceBars.ResolveConfigSourceForBar(pType, spec)
@@ -4100,11 +4127,17 @@ function getBarSettings(pType)
 		if type(sourceCfg) == "table" and type(sourceCfg.defaultPowerColors) == "table" and type(sourceCfg.defaultPowerColors[pType]) == "table" then
 			runtimeCfg._resolvedDefaultPowerColor = CopyTable(sourceCfg.defaultPowerColors[pType])
 		end
-		return ResourceBars.PrepareBarConfigForRuntime(runtimeCfg, pType, specInfo)
+		runtimeCfg = ResourceBars.PrepareBarConfigForRuntime(runtimeCfg, pType, specInfo)
+		if cache and runtimeCfg ~= nil then cache[pType] = runtimeCfg end
+		return runtimeCfg
 	end
 	if addon.db.personalResourceBarSettings and addon.db.personalResourceBarSettings[class] and addon.db.personalResourceBarSettings[class][spec] then
 		local cfg = addon.db.personalResourceBarSettings[class][spec][pType]
-		if cfg then return ResourceBars.PrepareBarConfigForRuntime(cfg, pType, specInfo) end
+		if cfg then
+			cfg = ResourceBars.PrepareBarConfigForRuntime(cfg, pType, specInfo)
+			if cache and cfg ~= nil then cache[pType] = cfg end
+			return cfg
+		end
 	end
 	if class and spec then
 		local specCfg = ensureSpecCfg(spec)
@@ -4141,6 +4174,7 @@ function getBarSettings(pType)
 					local prevType = specSecondaries(specInfo)[secondaryIdx - 1]
 					if prevType then maybeChainSecondaryAnchor(specCfg[pType], prevType) end
 				end
+				if cache and specCfg[pType] ~= nil then cache[pType] = specCfg[pType] end
 				return specCfg[pType]
 			end
 		end
@@ -4150,8 +4184,8 @@ end
 
 local function wantsRelativeFrameWidthMatch(anchor) return anchor and (anchor.relativeFrame or "UIParent") ~= "UIParent" and anchor.matchRelativeWidth == true end
 
-local function getConfiguredBarWidth(pType)
-	local cfg = getBarSettings(pType)
+local function getConfiguredBarWidth(pType, frame)
+	local cfg = (frame and frame._cfg) or getBarSettings(pType)
 	local default = (pType == "HEALTH") and RB.DEFAULT_HEALTH_WIDTH or RB.DEFAULT_POWER_WIDTH
 	local width = (cfg and type(cfg.width) == "number" and cfg.width > 0 and cfg.width) or default or RB.MIN_RESOURCE_BAR_WIDTH
 	return max(RB.MIN_RESOURCE_BAR_WIDTH, width or RB.MIN_RESOURCE_BAR_WIDTH)
@@ -4161,7 +4195,7 @@ local function syncBarWidthWithAnchor(pType)
 	local frame = (pType == "HEALTH") and healthBar or powerbar[pType]
 	if not frame then return false end
 	local anchor = getAnchor(pType, addon.variables.unitSpec)
-	local baseWidth = max(1, getConfiguredBarWidth(pType) or 0)
+	local baseWidth = max(1, getConfiguredBarWidth(pType, frame) or 0)
 	if not wantsRelativeFrameWidthMatch(anchor) then
 		local current = frame:GetWidth() or 0
 		if abs(current - baseWidth) < 0.5 then return false end
@@ -4187,6 +4221,7 @@ local function syncBarWidthWithAnchor(pType)
 end
 
 local function syncRelativeFrameWidths()
+	if ResourceBars.BeginRuntimeConfigBatch then ResourceBars.BeginRuntimeConfigBatch() end
 	local changedAny = false
 	local passLimit = 1
 	for _ in pairs(powerbar or {}) do
@@ -4203,6 +4238,7 @@ local function syncRelativeFrameWidths()
 		if not changedThisPass then break end
 	end
 
+	if ResourceBars.EndRuntimeConfigBatch then ResourceBars.EndRuntimeConfigBatch() end
 	return changedAny
 end
 
@@ -5957,8 +5993,10 @@ local function isResourceFrameEnabled()
 end
 
 local function setPowerbars(opts)
+	if ResourceBars.BeginRuntimeConfigBatch then ResourceBars.BeginRuntimeConfigBatch() end
 	if not isResourceFrameEnabled() then
 		if ResourceBars and ResourceBars.DisableResourceBars then ResourceBars.DisableResourceBars() end
+		if ResourceBars.EndRuntimeConfigBatch then ResourceBars.EndRuntimeConfigBatch() end
 		return
 	end
 
@@ -5967,21 +6005,7 @@ local function setPowerbars(opts)
 	local editModeActive = addon.EditMode and addon.EditMode.IsInEditMode and addon.EditMode:IsInEditMode()
 	opts = opts or {}
 	local forceAllDruidBars = isDruid and ((opts.forceAllDruidBars == true) or editModeActive)
-	local function currentDruidForm()
-		if not isDruid then return nil end
-		if GetShapeshiftFormID then
-			local formID = GetShapeshiftFormID()
-			local key = formIDToKey[formID]
-			if key then return key end
-		end
-		local idx = GetShapeshiftForm() or 0
-		local key = resolveFormKeyFromShapeshiftIndex(idx)
-		if key then return key end
-		key = formIndexToKey[idx]
-		if key then return key end
-		return "HUMANOID"
-	end
-	local druidForm = currentDruidForm()
+	local druidForm = isDruid and ResourceBars.GetCurrentDruidFormKey and ResourceBars.GetCurrentDruidFormKey() or nil
 	local mainPowerBar
 	local lastBar
 	local specCfg = ensureSpecCfg(addon.variables.unitSpec)
@@ -6121,6 +6145,7 @@ local function setPowerbars(opts)
 	if addon and addon.Aura and addon.Aura.ResourceBars and addon.Aura.ResourceBars.ApplyVisibilityPreference then addon.Aura.ResourceBars.ApplyVisibilityPreference("fromSetPowerbars") end
 	if ResourceBars and ResourceBars.SyncRelativeFrameWidths then ResourceBars.SyncRelativeFrameWidths() end
 	if ensureEditModeRegistration then ensureEditModeRegistration() end
+	if ResourceBars.EndRuntimeConfigBatch then ResourceBars.EndRuntimeConfigBatch() end
 end
 addon.Aura.functions.setPowerBars = setPowerbars
 
@@ -6761,9 +6786,7 @@ local function scheduleSpecRefresh()
 		ResourceBars._suspendAnchors = true
 		setPowerbars()
 		ResourceBars._suspendAnchors = false
-		if addon.EditMode and addon.EditMode.IsInEditMode and addon.EditMode:IsInEditMode() and ResourceBars.RegisterEditModeFrames then
-			ResourceBars.RegisterEditModeFrames()
-		end
+		if addon.EditMode and addon.EditMode.IsInEditMode and addon.EditMode:IsInEditMode() and ResourceBars.RegisterEditModeFrames then ResourceBars.RegisterEditModeFrames() end
 		if addon and addon.Aura and addon.Aura.ResourceBars and addon.Aura.ResourceBars.ReanchorAll then addon.Aura.ResourceBars.ReanchorAll() end
 		if addon and addon.Aura and addon.Aura.ResourceBars and addon.Aura.ResourceBars.UpdateRuneEventRegistration then addon.Aura.ResourceBars.UpdateRuneEventRegistration() end
 		if addon and addon.Aura and addon.Aura.ResourceBars and addon.Aura.ResourceBars.ForceRuneRecolor then addon.Aura.ResourceBars.ForceRuneRecolor() end
@@ -6875,22 +6898,16 @@ local function eventHandler(self, event, unit, arg1)
 		if scheduleRelativeFrameWidthSync then scheduleRelativeFrameWidthSync() end
 	elseif event == "UPDATE_SHAPESHIFT_FORM" then
 		setPowerbars()
-		if addon.EditMode and addon.EditMode.IsInEditMode and addon.EditMode:IsInEditMode() and ResourceBars.RegisterEditModeFrames then
-			ResourceBars.RegisterEditModeFrames()
-		end
+		if addon.EditMode and addon.EditMode.IsInEditMode and addon.EditMode:IsInEditMode() and ResourceBars.RegisterEditModeFrames then ResourceBars.RegisterEditModeFrames() end
 		-- After initial creation, run a re-anchor pass to ensure all dependent anchors resolve
 		if After then
 			After(0.05, function()
-				if addon.EditMode and addon.EditMode.IsInEditMode and addon.EditMode:IsInEditMode() and ResourceBars.RegisterEditModeFrames then
-					ResourceBars.RegisterEditModeFrames()
-				end
+				if addon.EditMode and addon.EditMode.IsInEditMode and addon.EditMode:IsInEditMode() and ResourceBars.RegisterEditModeFrames then ResourceBars.RegisterEditModeFrames() end
 				if addon and addon.Aura and addon.Aura.ResourceBars and addon.Aura.ResourceBars.ReanchorAll then addon.Aura.ResourceBars.ReanchorAll() end
 				if addon and addon.Aura and addon.Aura.ResourceBars and addon.Aura.ResourceBars.UpdateRuneEventRegistration then addon.Aura.ResourceBars.UpdateRuneEventRegistration() end
 			end)
 		else
-			if addon.EditMode and addon.EditMode.IsInEditMode and addon.EditMode:IsInEditMode() and ResourceBars.RegisterEditModeFrames then
-				ResourceBars.RegisterEditModeFrames()
-			end
+			if addon.EditMode and addon.EditMode.IsInEditMode and addon.EditMode:IsInEditMode() and ResourceBars.RegisterEditModeFrames then ResourceBars.RegisterEditModeFrames() end
 			if addon and addon.Aura and addon.Aura.ResourceBars and addon.Aura.ResourceBars.ReanchorAll then addon.Aura.ResourceBars.ReanchorAll() end
 			if addon and addon.Aura and addon.Aura.ResourceBars and addon.Aura.ResourceBars.UpdateRuneEventRegistration then addon.Aura.ResourceBars.UpdateRuneEventRegistration() end
 		end
@@ -7155,9 +7172,7 @@ function ResourceBars.ResolveConfigTokenToBarType(token, specIndex)
 	return token
 end
 
-local function frameNameToBarType(fname)
-	return ResourceBars.ResolveBarTypeFromFrameToken(fname, addon.variables and addon.variables.unitSpec)
-end
+local function frameNameToBarType(fname) return ResourceBars.ResolveBarTypeFromFrameToken(fname, addon.variables and addon.variables.unitSpec) end
 
 function ResourceBars.DetachAnchorsFrom(disabledType, specIndex)
 	local spec = specIndex or addon.variables.unitSpec
@@ -7280,8 +7295,10 @@ function ResourceBars.ReanchorDependentsOf(frameName)
 end
 
 function ResourceBars.Refresh()
+	if ResourceBars.BeginRuntimeConfigBatch then ResourceBars.BeginRuntimeConfigBatch() end
 	if not isResourceFrameEnabled() then
 		if ResourceBars and ResourceBars.DisableResourceBars then ResourceBars.DisableResourceBars() end
+		if ResourceBars.EndRuntimeConfigBatch then ResourceBars.EndRuntimeConfigBatch() end
 		return
 	end
 
@@ -7452,6 +7469,7 @@ function ResourceBars.Refresh()
 	if ResourceBars.SpecUsesSharedMode and ResourceBars.SpecUsesSharedMode(addon.variables.unitSpec) and ResourceBars.SyncSharedSlotProxyFrames then
 		ResourceBars.SyncSharedSlotProxyFrames(addon.variables.unitSpec)
 	end
+	if ResourceBars.EndRuntimeConfigBatch then ResourceBars.EndRuntimeConfigBatch() end
 end
 
 ResourceBars._pendingRefresh = ResourceBars._pendingRefresh or {}
@@ -7522,6 +7540,7 @@ end
 -- Re-anchor pass only: reapplies anchor points without rebuilding bars
 function ResourceBars.ReanchorAll()
 	if ResourceBars._reanchoring then return end
+	if ResourceBars.BeginRuntimeConfigBatch then ResourceBars.BeginRuntimeConfigBatch() end
 	ResourceBars._reanchoring = true
 	-- Health first
 	if healthBar then
@@ -7661,6 +7680,7 @@ function ResourceBars.ReanchorAll()
 		ResourceBars.SyncSharedSlotProxyFrames(addon.variables.unitSpec)
 	end
 	ResourceBars._reanchoring = false
+	if ResourceBars.EndRuntimeConfigBatch then ResourceBars.EndRuntimeConfigBatch() end
 end
 
 ResourceBars.DEFAULT_HEALTH_WIDTH = RB.DEFAULT_HEALTH_WIDTH
