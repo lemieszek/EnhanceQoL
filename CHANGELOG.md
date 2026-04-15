@@ -1,14 +1,6 @@
 # Changelog
 
-## [10.3.0-beta5] - 2026-04-15
-
-### 🐛 Fixed
-
-- Performance fix
-
----
-
-## [10.3.0-beta4] - 2026-04-14
+## [10.3.0-beta4] - 2026-04-15
 
 ### 🔄 Changed
 
@@ -19,6 +11,7 @@
 
 - Party/Raid Frames / Status text: Fixed the font outline setting getting stuck on `Outline`.
 - Vendor / Baganator: Fixed missing sell and destroy markers, a missing destroy button, and lag spikes when opening the bank from the inventory button.
+- Performance fix
 
 ---
 
