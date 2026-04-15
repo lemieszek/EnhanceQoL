@@ -1,6 +1,6 @@
 # Changelog
 
-## [10.3.0-beta5] - 2026-04-15
+## [10.3.0-beta6] - 2026-04-15
 
 ### ✨ Added
 
@@ -19,9 +19,14 @@
 - Tooltip / Spells: Reduced repeated spell-tooltip refresh work, especially while bars and forms update.
 - Action Bars / Visibility: Reduced unnecessary visibility alpha refreshes for setups that do not depend on flight or shapeshift visibility rules.
 - Unit Frames: Reduced `UNIT_DISPLAYPOWER`, text refresh, and name/level update overhead, especially with `Target` and `Focus` active.
-- Data Panels: Fixed the new `Tooltip growth` dropdown showing up empty in Edit Mode.
-- Data Panels: Tooltip direction is now applied more consistently across the supported panel tooltips.
-- Locales: Added the missing translations for the `Tooltip growth` setting.
+
+---
+
+## [10.3.0-beta5] - 2026-04-15
+
+### 🐛 Fixed
+
+- Performance fix
 
 ---
 
