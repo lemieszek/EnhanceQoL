@@ -5213,7 +5213,7 @@ refreshDiscreteSegmentsForBar = function(pType, bar, cfg, value, maxValue, rawVa
 end
 
 -- Create/update separator ticks for a given bar type if enabled
-updateBarSeparators = function(pType)
+updateBarSeparators = function(pType, cfg)
 	local eligible = ResourceBars.separatorEligible
 	if pType ~= "RUNES" and (not eligible or not eligible[pType]) then return end
 	local bar = powerbar[pType]
@@ -5229,7 +5229,7 @@ updateBarSeparators = function(pType)
 		return
 	end
 	if pType == "ESSENCE" then
-		local cfg = getBarSettings("ESSENCE") or {}
+		cfg = cfg or bar._cfg or getBarSettings("ESSENCE") or {}
 		local separatedOffset = tonumber(cfg.separatedOffset) or 0
 		if separatedOffset > 0 then
 			if bar.separatorMarks then
@@ -5244,7 +5244,7 @@ updateBarSeparators = function(pType)
 			return
 		end
 	end
-	local cfg = getBarSettings(pType)
+	cfg = cfg or bar._cfg or getBarSettings(pType)
 	local useDiscrete = shouldUseDiscreteSeparatorSegments(pType, cfg)
 	if not (cfg and (cfg.showSeparator == true or useDiscrete)) then
 		if pType == "ESSENCE" then
@@ -5419,11 +5419,11 @@ local function getSafeThresholdMaxValue(bar, pType)
 	return maxValue
 end
 
-updateBarThresholds = function(pType)
+updateBarThresholds = function(pType, cfg)
 	if pType == "HEALTH" then return end
 	local bar = powerbar[pType]
 	if not bar then return end
-	local cfg = getBarSettings(pType)
+	cfg = cfg or bar._cfg or getBarSettings(pType)
 	if not (cfg and cfg.showThresholds) then
 		if bar.thresholdMarks then
 			for _, tx in ipairs(bar.thresholdMarks) do
@@ -5762,12 +5762,74 @@ function layoutRunes(bar)
 	end
 end
 
+function ResourceBars.RequestRelativeWidthSync()
+	ResourceBars._widthSyncRequested = true
+end
+
+function ResourceBars.RequestStructuralLayoutRefresh(needsReanchor)
+	ResourceBars.RequestRelativeWidthSync()
+	if needsReanchor then ResourceBars._reanchorRequested = true end
+end
+
+function ResourceBars.ReuseExistingPowerBar(type, sharedSlot)
+	local bar = powerbar[type] or _G["EQOL" .. type .. "Bar"]
+	if not bar or not bar._rbInitialized then return false end
+	if bar._rbSharedSlot ~= sharedSlot then return false end
+	if bar:GetParent() ~= UIParent then bar:SetParent(UIParent) end
+
+	local settings = getBarSettings(type) or bar._cfg or {}
+	local defaultStyle = (type == "MANA" or type == "STAGGER") and "PERCENT" or "CURMAX"
+	bar._cfg = settings
+	bar._rbType = type
+	bar._rbSharedSlot = sharedSlot
+	bar._style = settings and settings.textStyle or defaultStyle
+	bar:SetClampedToScreen(true)
+	bar:SetStatusBarTexture(resolveTexture(settings or {}))
+	configureSpecialTexture(bar, type, settings or {})
+
+	if type ~= "RUNES" then
+		applyBarFillColor(bar, settings, type)
+	end
+
+	if type == "RUNES" then
+		bar:SetStatusBarColor(getPowerBarColor(type))
+	elseif settings and settings._resolvedDefaultPowerColor and not (settings.useBarColor == true or settings.useClassColor == true) then
+		local c = settings._resolvedDefaultPowerColor
+		bar:SetStatusBarColor(c[1] or 1, c[2] or 1, c[3] or 1, c[4] or 1)
+	elseif not (settings and (settings.useBarColor == true or settings.useClassColor == true)) then
+		local dr, dg, db = getPowerBarColor(type)
+		local alpha = (settings and settings.barColor and settings.barColor[4]) or 1
+		bar:SetStatusBarColor(dr, dg, db, alpha)
+	end
+
+	if type ~= "RUNES" and bar.text then
+		applyFontToString(bar.text, settings)
+		applyTextPosition(bar, settings, 3, 0)
+		bar.text:Show()
+	end
+
+	configureBarBehavior(bar, settings, type)
+	bar:SetMovable(false)
+	bar:EnableMouse(shouldEnableBarMouse(settings))
+	powerbar[type] = bar
+	if not bar:IsShown() then bar:Show() end
+	if type == "RUNES" then ResourceBars.ForceRuneRecolor() end
+	updatePowerBar(type)
+	if type == "RUNES" then
+		updateBarSeparators("RUNES", settings)
+	elseif ResourceBars.separatorEligible[type] then
+		updateBarSeparators(type, settings)
+	end
+	updateBarThresholds(type, settings)
+	return true
+end
+
 local function createPowerBar(type, anchor, sharedSlot)
 	-- Reuse existing bar if present; avoid destroying frames to preserve anchors
 	local existingBar = powerbar[type] or _G["EQOL" .. type .. "Bar"]
 	local bar = existingBar
 	if not bar then bar = CreateFrame("StatusBar", "EQOL" .. type .. "Bar", UIParent, "BackdropTemplate") end
-	if not existingBar then ResourceBars._reanchorRequested = true end
+	if not existingBar then ResourceBars.RequestStructuralLayoutRefresh(true) end
 	-- Ensure a valid parent when reusing frames after disable
 	if bar:GetParent() ~= UIParent then bar:SetParent(UIParent) end
 
@@ -5786,7 +5848,10 @@ local function createPowerBar(type, anchor, sharedSlot)
 		bar._rbRefreshOnShow = true
 	end
 
-	local settings = ResourceBars.GetRuntimeBarConfig(type, bar)
+	local previousWidth = bar.GetWidth and bar:GetWidth() or 0
+	local previousHeight = bar.GetHeight and bar:GetHeight() or 0
+	local previousSharedSlot = bar._rbSharedSlot
+	local settings = getBarSettings(type) or bar._cfg or {}
 	local w = max(RB.MIN_RESOURCE_BAR_WIDTH, (settings and settings.width) or RB.DEFAULT_POWER_WIDTH)
 	local h = settings and settings.height or RB.DEFAULT_POWER_HEIGHT
 	bar._cfg = settings
@@ -5795,7 +5860,11 @@ local function createPowerBar(type, anchor, sharedSlot)
 	powerbar[type] = bar
 	local defaultStyle = (type == "MANA" or type == "STAGGER") and "PERCENT" or "CURMAX"
 	bar._style = settings and settings.textStyle or defaultStyle
-	bar:SetSize(w, h)
+	if previousSharedSlot ~= sharedSlot then ResourceBars.RequestRelativeWidthSync() end
+	if not existingBar or abs(previousWidth - w) >= 0.5 or abs(previousHeight - h) >= 0.5 then
+		bar:SetSize(w, h)
+		ResourceBars.RequestRelativeWidthSync()
+	end
 	bar:SetStatusBarTexture(resolveTexture(settings or {}))
 	configureSpecialTexture(bar, type, settings or {})
 	bar:SetClampedToScreen(true)
@@ -5827,7 +5896,7 @@ local function createPowerBar(type, anchor, sharedSlot)
 				a.x = (pw - w) / 2
 				a.y = (h - ph) / 2
 				a.autoSpacing = nil
-				ResourceBars._reanchorRequested = true
+				ResourceBars.RequestStructuralLayoutRefresh(true)
 				rel = UIParent
 			end
 			bar:ClearAllPoints()
@@ -5844,7 +5913,7 @@ local function createPowerBar(type, anchor, sharedSlot)
 			a.y = stackSpacing
 			a.autoSpacing = true
 			if a.matchRelativeWidth == nil then a.matchRelativeWidth = true end
-			ResourceBars._reanchorRequested = true
+			ResourceBars.RequestStructuralLayoutRefresh(true)
 		else
 			-- No anchor in DB and no previous anchor in code path; default: center on UIParent
 			bar:ClearAllPoints()
@@ -5858,7 +5927,7 @@ local function createPowerBar(type, anchor, sharedSlot)
 			a.relativePoint = "TOPLEFT"
 			a.x = cx
 			a.y = cy
-			ResourceBars._reanchorRequested = true
+			ResourceBars.RequestStructuralLayoutRefresh(true)
 		end
 	end
 
@@ -5929,11 +5998,11 @@ local function createPowerBar(type, anchor, sharedSlot)
 	if type == "RUNES" then ResourceBars.ForceRuneRecolor() end
 	updatePowerBar(type)
 	if type == "RUNES" then
-		updateBarSeparators("RUNES")
+		updateBarSeparators("RUNES", settings)
 	elseif ResourceBars.separatorEligible[type] then
-		updateBarSeparators(type)
+		updateBarSeparators(type, settings)
 	end
-	updateBarThresholds(type)
+	updateBarThresholds(type, settings)
 
 	-- Ensure dependents re-anchor when this bar changes size
 	if not bar._rbSizeChangedHooked then
@@ -5959,9 +6028,11 @@ local function createPowerBar(type, anchor, sharedSlot)
 	end
 
 	if not ((ResourceBars._barBuildBatchDepth or 0) > 0) then
-		if ResourceBars and ResourceBars.SyncRelativeFrameWidths then ResourceBars.SyncRelativeFrameWidths() end
-		if ensureEditModeRegistration then ensureEditModeRegistration() end
+		local editModeActive = addon.EditMode and addon.EditMode.IsInEditMode and addon.EditMode:IsInEditMode()
+		if ResourceBars and ResourceBars.SyncRelativeFrameWidths and ResourceBars._widthSyncRequested == true then ResourceBars.SyncRelativeFrameWidths() end
+		if editModeActive and ensureEditModeRegistration then ensureEditModeRegistration() end
 	end
+	bar._rbInitialized = true
 end
 
 RB.EVENTS_TO_REGISTER = {
@@ -6000,9 +6071,11 @@ end
 local function setPowerbars(opts)
 	if ResourceBars.BeginRuntimeConfigBatch then ResourceBars.BeginRuntimeConfigBatch() end
 	ResourceBars._reanchorRequested = false
+	ResourceBars._widthSyncRequested = false
 	if not isResourceFrameEnabled() then
 		if ResourceBars and ResourceBars.DisableResourceBars then ResourceBars.DisableResourceBars() end
 		ResourceBars._reanchorRequested = nil
+		ResourceBars._widthSyncRequested = nil
 		if ResourceBars.EndRuntimeConfigBatch then ResourceBars.EndRuntimeConfigBatch() end
 		return
 	end
@@ -6019,6 +6092,11 @@ local function setPowerbars(opts)
 	local specInfo = getSpecInfo(addon.variables.unitSpec)
 	local sharedMode = ResourceBars.SpecUsesSharedMode and ResourceBars.SpecUsesSharedMode(addon.variables.unitSpec)
 	local sharedAssignments = sharedMode and ResourceBars.ResolveSharedSlotAssignments(addon.variables.unitSpec) or nil
+	local fastReuseExisting = opts.fastReuseExisting == true and not editModeActive
+	local function activatePowerBar(pType, anchorFrame, sharedSlot)
+		if fastReuseExisting and ResourceBars.ReuseExistingPowerBar(pType, sharedSlot) then return end
+		createPowerBar(pType, anchorFrame, sharedSlot)
+	end
 
 	local desiredVisibility = {}
 	ResourceBars._barBuildBatchDepth = (ResourceBars._barBuildBatchDepth or 0) + 1
@@ -6038,7 +6116,7 @@ local function setPowerbars(opts)
 		local mainType = sharedAssignments and sharedAssignments.MAIN or nil
 		local enabledMain = mainType and sharedMainCfg and sharedMainCfg.enabled == true
 		if enabledMain then
-			createPowerBar(mainType, healthEnabled and healthBar or nil, "MAIN")
+			activatePowerBar(mainType, healthEnabled and healthBar or nil, "MAIN")
 			mainPowerBar = mainType
 			lastBar = mainPowerBar
 			if RB.FREQUENT_POWER_TYPES[mainType] then powerfrequent[mainType] = true end
@@ -6052,7 +6130,7 @@ local function setPowerbars(opts)
 			if pType then
 				if showBar then
 					if RB.FREQUENT_POWER_TYPES[pType] then powerfrequent[pType] = true end
-					createPowerBar(pType, powerbar[lastBar] or (healthEnabled and healthBar or nil), slot)
+					activatePowerBar(pType, powerbar[lastBar] or (healthEnabled and healthBar or nil), slot)
 					lastBar = pType
 				end
 				desiredVisibility[pType] = showBar and true or false
@@ -6063,7 +6141,7 @@ local function setPowerbars(opts)
 			local mType = specInfo.MAIN
 			local enabledMain = specCfg and specCfg[mType] and specCfg[mType].enabled == true
 			if enabledMain then
-				createPowerBar(mType, (healthEnabled and healthBar or nil))
+				activatePowerBar(mType, (healthEnabled and healthBar or nil))
 				mainPowerBar = mType
 				lastBar = mainPowerBar
 			end
@@ -6093,25 +6171,25 @@ local function setPowerbars(opts)
 					if RB.FREQUENT_POWER_TYPES[pType] then powerfrequent[pType] = true end
 					if forceAllDruidBars then
 						if mainPowerBar ~= pType then
-							createPowerBar(pType, powerbar[lastBar] or (healthEnabled and healthBar or nil))
+							activatePowerBar(pType, powerbar[lastBar] or (healthEnabled and healthBar or nil))
 							lastBar = pType
 						end
 						showBar = true
 					elseif pType == mainPowerBar then
 						showBar = true
 					elseif pType == "COMBO_POINTS" and druidForm == "CAT" then
-						createPowerBar(pType, powerbar[lastBar] or (healthEnabled and healthBar or nil))
+						activatePowerBar(pType, powerbar[lastBar] or (healthEnabled and healthBar or nil))
 						lastBar = pType
 						showBar = true
 					else
-						createPowerBar(pType, powerbar[lastBar] or (healthEnabled and healthBar or nil))
+						activatePowerBar(pType, powerbar[lastBar] or (healthEnabled and healthBar or nil))
 						lastBar = pType
 						showBar = true
 					end
 				elseif formAllowed then
 					if RB.FREQUENT_POWER_TYPES[pType] then powerfrequent[pType] = true end
 					if mainPowerBar ~= pType then
-						createPowerBar(pType, powerbar[lastBar] or (healthEnabled and healthBar or nil))
+						activatePowerBar(pType, powerbar[lastBar] or (healthEnabled and healthBar or nil))
 						lastBar = pType
 					end
 					showBar = true
@@ -6125,7 +6203,7 @@ local function setPowerbars(opts)
 	for pType, wantVisible in pairs(desiredVisibility) do
 		local bar = powerbar[pType]
 		if bar then
-			bar._cfg = wantVisible and getBarSettings(pType) or nil
+			bar._cfg = wantVisible and (bar._cfg or getBarSettings(pType)) or nil
 			bar._rbDesiredVisible = wantVisible and true or false
 			if wantVisible then
 				if not bar:IsShown() then bar:Show() end
@@ -6150,9 +6228,10 @@ local function setPowerbars(opts)
 
 	ResourceBars._barBuildBatchDepth = max(0, (ResourceBars._barBuildBatchDepth or 1) - 1)
 	if addon and addon.Aura and addon.Aura.ResourceBars and addon.Aura.ResourceBars.ApplyVisibilityPreference then addon.Aura.ResourceBars.ApplyVisibilityPreference("fromSetPowerbars") end
-	if ResourceBars and ResourceBars.SyncRelativeFrameWidths then ResourceBars.SyncRelativeFrameWidths() end
-	if ensureEditModeRegistration then ensureEditModeRegistration() end
+	if ResourceBars and ResourceBars.SyncRelativeFrameWidths and ResourceBars._widthSyncRequested == true then ResourceBars.SyncRelativeFrameWidths() end
+	if editModeActive and ensureEditModeRegistration then ensureEditModeRegistration() end
 	local needsPostReanchor = ResourceBars._reanchorRequested == true
+	ResourceBars._widthSyncRequested = nil
 	ResourceBars._reanchorRequested = nil
 	if ResourceBars.EndRuntimeConfigBatch then ResourceBars.EndRuntimeConfigBatch() end
 	return needsPostReanchor
@@ -6907,7 +6986,7 @@ local function eventHandler(self, event, unit, arg1)
 		end) end
 		if scheduleRelativeFrameWidthSync then scheduleRelativeFrameWidthSync() end
 	elseif event == "UPDATE_SHAPESHIFT_FORM" then
-		local needsPostReanchor = setPowerbars() == true
+		local needsPostReanchor = setPowerbars({ fastReuseExisting = true }) == true
 		local spec = addon.variables.unitSpec
 		local sharedMode = ResourceBars.SpecUsesSharedMode and ResourceBars.SpecUsesSharedMode(spec)
 		local function finalizeShapeshiftLayout()
