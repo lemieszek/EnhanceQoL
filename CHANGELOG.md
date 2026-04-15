@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.3.0-beta5] - 2026-04-15
+
+### 🐛 Fixed
+
+- Performance fix
+
+---
+
 ## [10.3.0-beta4] - 2026-04-14
 
 ### 🔄 Changed
