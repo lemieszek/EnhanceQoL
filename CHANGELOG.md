@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.3.0-beta7] - 2026-04-16
+
+### 🐛 Fixed
+
+- Unit Frames / Name & Level: Fixed a secret-taint Lua error introduced by the recent Target/Focus name-and-level performance optimization.
+
+---
+
 ## [10.3.0-beta6] - 2026-04-15
 
 ### 🔄 Changed

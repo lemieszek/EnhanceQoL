@@ -8756,41 +8756,11 @@ local function updateNameAndLevel(cfg, unit, levelOverride)
 			return
 		end
 	end
-	local def = defaultsFor(unit) or {}
-	local scfg = cfg.status or {}
-	local defStatus = def.status or {}
-	local nameText
-	local nameTextIsSecret = false
-	local nr, ng, nb, na
-	local levelShown = false
-	local levelText
-	local lr, lg, lb, la
-	local hideClassText
-	local classEnabled = false
-	local classToken = ""
-	local classSize, classOx, classOy
-	local classAnchor
-	local inEditMode = addon.EditModeLib and addon.EditModeLib:IsInEditMode()
-	local effectiveLevelOverride = tonumber(levelOverride)
-
-	-- PLAYER_LEVEL_UP carries the new level in the payload before UnitLevel() is always updated.
-	if unit == UNIT.PLAYER then
-		if effectiveLevelOverride then
-			st._nameLevelPendingLevel = effectiveLevelOverride
-		end
-		local pendingLevel = tonumber(st._nameLevelPendingLevel)
-		if pendingLevel then
-			local liveLevel = tonumber(UnitLevel and UnitLevel(unit) or nil)
-			if liveLevel and liveLevel >= pendingLevel then
-				st._nameLevelPendingLevel = nil
-			else
-				effectiveLevelOverride = pendingLevel
-			end
-		end
-	end
-
 	if st.nameText then
+		local scfg = cfg.status or {}
+		local defStatus = (defaultsFor(unit) and defaultsFor(unit).status) or {}
 		local nc
+		local nr, ng, nb, na
 		local isPlayerUnit = UnitIsPlayer and UnitIsPlayer(unit)
 		if scfg.nameColorMode == "CUSTOM" then
 			nc = scfg.nameColor or { 1, 1, 1, 1 }
@@ -8820,13 +8790,15 @@ local function updateNameAndLevel(cfg, unit, levelOverride)
 		if not nr then
 			nr, ng, nb, na = 1, 1, 1, 1
 		end
-		nameText = UnitName(unit) or ""
-		nameTextIsSecret = issecretvalue and issecretvalue(nameText) or false
+		st.nameText:SetText(UnitName(unit) or "")
+		st.nameText:SetTextColor(nr, ng, nb, na)
 	end
 	if st.levelText then
-		levelShown = shouldShowLevel(scfg, unit)
-		hideClassText = UF.ShouldHideClassificationText(cfg, unit)
-		if levelShown then
+		local scfg = cfg.status or {}
+		local enabled = shouldShowLevel(scfg, unit)
+		local hideClassText = UF.ShouldHideClassificationText(cfg, unit)
+		st.levelText:SetShown(enabled)
+		if enabled then
 			local lc
 			if scfg.levelColorMode == "CUSTOM" then
 				lc = scfg.levelColor or { 1, 0.85, 0, 1 }
@@ -8839,69 +8811,12 @@ local function updateNameAndLevel(cfg, unit, levelOverride)
 					lc = { 1, 0.85, 0, 1 }
 				end
 			end
-			levelText = UFHelper.getUnitLevelText(unit, effectiveLevelOverride, hideClassText)
-			lr, lg, lb, la = lc[1] or 1, lc[2] or 0.85, lc[3] or 0, lc[4] or 1
-		end
-	end
-	if st.classificationIcon and unit ~= UNIT.PLAYER then
-		local icfg = scfg.classificationIcon or defStatus.classificationIcon or {}
-		classEnabled = icfg.enabled == true and cfg.enabled ~= false
-		local sizeDef = defStatus.classificationIcon and defStatus.classificationIcon.size or 16
-		local offsetDef = (defStatus.classificationIcon and defStatus.classificationIcon.offset) or { x = -4, y = 0 }
-		classSize = math.max(8, math.min(40, icfg.size or sizeDef or 16))
-		classOx = (icfg.offset and icfg.offset.x) or offsetDef.x or 0
-		classOy = (icfg.offset and icfg.offset.y) or offsetDef.y or 0
-		classAnchor = st.statusTextLayer and "statusTextLayer" or (st.status and "status" or "")
-		classToken = UnitClassification and UnitClassification(unit) or ""
-		if classToken == "" and inEditMode then classToken = "rareelite" end
-	end
-
-	local nameChanged = st.nameText
-		and (
-			nameTextIsSecret or st._nameLevelNameText ~= nameText or st._nameLevelNameR ~= nr or st._nameLevelNameG ~= ng or st._nameLevelNameB ~= nb
-			or st._nameLevelNameA ~= na
-		)
-	local levelChanged = st.levelText
-		and (
-			st._nameLevelLevelShown ~= levelShown or st._nameLevelLevelText ~= levelText or st._nameLevelLevelR ~= lr or st._nameLevelLevelG ~= lg or st._nameLevelLevelB ~= lb
-			or st._nameLevelLevelA ~= la
-		)
-	local classChanged = st.classificationIcon
-		and (
-			st._nameLevelClassEnabled ~= classEnabled or st._nameLevelClassToken ~= classToken or st._nameLevelClassSize ~= classSize or st._nameLevelClassOx ~= classOx
-			or st._nameLevelClassOy ~= classOy or st._nameLevelClassAnchor ~= classAnchor
-		)
-	if not nameChanged and not levelChanged and not classChanged then
-		st._nameLevelRendered = true
-		return
-	end
-
-	if st.nameText and nameChanged then
-		st.nameText:SetText(nameText or "")
-		st.nameText:SetTextColor(nr, ng, nb, na)
-		st._nameLevelNameText = nameTextIsSecret and nil or nameText
-		st._nameLevelNameR, st._nameLevelNameG, st._nameLevelNameB, st._nameLevelNameA = nr, ng, nb, na
-	end
-	if st.levelText and levelChanged then
-		st.levelText:SetShown(levelShown)
-		if levelShown then
+			local levelText = UFHelper.getUnitLevelText(unit, levelOverride, hideClassText)
 			st.levelText:SetText(levelText)
-			st.levelText:SetTextColor(lr, lg, lb, la)
+			st.levelText:SetTextColor(lc[1] or 1, lc[2] or 0.85, lc[3] or 0, lc[4] or 1)
 		end
-		st._nameLevelLevelShown = levelShown
-		st._nameLevelLevelText = levelText
-		st._nameLevelLevelR, st._nameLevelLevelG, st._nameLevelLevelB, st._nameLevelLevelA = lr, lg, lb, la
 	end
-	if classChanged and UFHelper and UFHelper.updateClassificationIndicator then
-		UFHelper.updateClassificationIndicator(st, unit, cfg, def, false)
-		st._nameLevelClassEnabled = classEnabled
-		st._nameLevelClassToken = classToken
-		st._nameLevelClassSize = classSize
-		st._nameLevelClassOx = classOx
-		st._nameLevelClassOy = classOy
-		st._nameLevelClassAnchor = classAnchor
-	end
-	st._nameLevelRendered = true
+	if UFHelper and UFHelper.updateClassificationIndicator then UFHelper.updateClassificationIndicator(st, unit, cfg, defaultsFor(unit), false) end
 end
 
 refreshNameAndLevelSoon = function(unit)
@@ -9513,7 +9428,6 @@ local unitEvents = {
 	"UNIT_MAXPOWER",
 	"UNIT_DISPLAYPOWER",
 	"UNIT_NAME_UPDATE",
-	"UNIT_LEVEL",
 	"UNIT_CLASSIFICATION_CHANGED",
 	"UNIT_FLAGS",
 	"UNIT_CONNECTION",
@@ -10146,7 +10060,7 @@ local function updateFocusFrame(cfg, forceApply)
 			if st.status then st.status:Show() end
 			local pcfg = cfg.power or {}
 			local powerEnabled = pcfg.enabled ~= false
-			if forceApply or not st._nameLevelRendered then updateNameAndLevel(cfg, UNIT.FOCUS) end
+			updateNameAndLevel(cfg, UNIT.FOCUS)
 			updateHealth(cfg, UNIT.FOCUS)
 			if st.power and powerEnabled then
 				local powerEnum, powerToken = getMainPower(UNIT.FOCUS)
@@ -11049,7 +10963,7 @@ onEvent = function(self, event, unit, ...)
 			local bossCfg = getCfg(unit)
 			if bossCfg.enabled then updatePower(bossCfg, unit) end
 		end
-	elseif event == "UNIT_NAME_UPDATE" or event == "UNIT_LEVEL" or event == "PLAYER_LEVEL_UP" then
+	elseif event == "UNIT_NAME_UPDATE" or event == "PLAYER_LEVEL_UP" then
 		if event == "PLAYER_LEVEL_UP" then
 			updateNameAndLevel(getCfg(UNIT.PLAYER), UNIT.PLAYER, unit)
 		elseif unit == UNIT.PLAYER then
@@ -11063,18 +10977,7 @@ onEvent = function(self, event, unit, ...)
 			if bossCfg.enabled then updateNameAndLevel(bossCfg, unit) end
 		end
 	elseif event == "UNIT_CLASSIFICATION_CHANGED" then
-		if unit == UNIT.PLAYER then
-			updateNameAndLevel(getCfg(UNIT.PLAYER), UNIT.PLAYER)
-		elseif unit == UNIT.TARGET then
-			updateNameAndLevel(getCfg(UNIT.TARGET), UNIT.TARGET)
-		elseif unit == UNIT.FOCUS then
-			updateNameAndLevel(getCfg(UNIT.FOCUS), UNIT.FOCUS)
-		elseif unit == UNIT.PET then
-			updateNameAndLevel(getCfg(UNIT.PET), UNIT.PET)
-		elseif isBossUnit(unit) then
-			local bossCfg = getCfg(unit)
-			if bossCfg.enabled then updateNameAndLevel(bossCfg, unit) end
-		end
+		if unit and states[unit] then UFHelper.updateClassificationIndicator(states[unit], unit, getCfg(unit), defaultsFor(unit), true) end
 	elseif event == "UNIT_FLAGS" then
 		updateUnitStatusIndicator(getCfg(unit), unit)
 		UFHelper.updateLeaderIndicator(states[unit], unit, getCfg(unit), defaultsFor(unit), true)
