@@ -6323,7 +6323,11 @@ local function buildUnitSettings(unit)
 		list[#list + 1] = { name = "", kind = UF.ui.settingType.Divider, parentId = "cast" }
 
 		local function isCastClassColorEnabled() return getValue(unit, { "cast", "useClassColor" }, castDef.useClassColor == true) == true end
-		local function isCastColorEnabled() return isCastEnabled() and not isCastClassColorEnabled() end
+		local function isCastGradientEnabled()
+			if unit ~= "player" then return false end
+			return isCastEnabled() and not isCastClassColorEnabled() and getValue(unit, { "cast", "useGradient" }, castDef.useGradient == true) == true
+		end
+		local function isCastColorEnabled() return isCastEnabled() and not isCastClassColorEnabled() and not isCastGradientEnabled() end
 
 		list[#list + 1] = {
 			name = L["Cast color"] or "Cast color",
@@ -6358,7 +6362,6 @@ local function buildUnitSettings(unit)
 		end, castDef.useClassColor == true, "cast", isCastEnabled)
 
 		if unit == "player" then
-			local function isCastGradientEnabled() return isCastEnabled() and not isCastClassColorEnabled() and getValue(unit, { "cast", "useGradient" }, castDef.useGradient == true) == true end
 			list[#list + 1] = checkbox(L["Use gradient"] or "Use gradient", isCastGradientEnabled, function(val)
 				local useGradient = val and true or false
 				setValue(unit, { "cast", "useGradient" }, useGradient)
@@ -6440,7 +6443,7 @@ local function buildUnitSettings(unit)
 			name = L["Not interruptible color"] or "Not interruptible color",
 			kind = UF.ui.settingType.Color,
 			parentId = "cast",
-			isEnabled = isCastEnabled,
+			isEnabled = function() return isCastEnabled() and not isCastGradientEnabled() end,
 			get = function() return getValue(unit, { "cast", "notInterruptibleColor" }, castDef.notInterruptibleColor or { 204 / 255, 204 / 255, 204 / 255, 1 }) end,
 			set = function(_, color)
 				setColor(unit, { "cast", "notInterruptibleColor" }, color.r, color.g, color.b, color.a)

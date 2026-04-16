@@ -1912,16 +1912,13 @@ local function resolveCastbarGradientProgress(bar, progressOverride)
 	return H.clamp(progress, 0, 1)
 end
 
-local function applyCastbarGradient(bar, ccfg, baseR, baseG, baseB, baseA, progressOverride)
+local function applyCastbarGradient(bar, ccfg, _baseR, _baseG, _baseB, _baseA, progressOverride)
 	if not bar or not ccfg or ccfg.useGradient ~= true then return false end
 	local tex = bar.GetStatusBarTexture and bar:GetStatusBarTexture()
 	if not tex or not tex.SetGradient then return false end
 
 	local sr, sg, sb, sa = normalizeGradientColor(ccfg.gradientStartColor)
 	local er, eg, eb, ea = normalizeGradientColor(ccfg.gradientEndColor)
-	local br, bg, bb, ba = baseR or 1, baseG or 1, baseB or 1, baseA or 1
-	sr, sg, sb, sa = br * sr, bg * sg, bb * sb, ba * sa
-	er, eg, eb, ea = br * er, bg * eg, bb * eb, ba * ea
 
 	if normalizeCastbarGradientMode(ccfg.gradientMode) == "BAR_END" then
 		local progress = resolveCastbarGradientProgress(bar, progressOverride)
@@ -1965,11 +1962,26 @@ end
 function H.SetCastbarColorWithGradient(bar, ccfg, r, g, b, a, progressOverride)
 	if not bar then return end
 	local br, bg, bb, ba = r or 1, g or 1, b or 1, a or 1
+	local renderR, renderG, renderB, renderA = br, bg, bb, ba
+	if ccfg and ccfg.useGradient == true then
+		-- Keep the status bar neutral so the configured gradient colors render without a base tint.
+		renderR, renderG, renderB, renderA = 1, 1, 1, 1
+	end
 	local lastColor = bar._eqolLastColor
-	if not lastColor or lastColor[1] ~= br or lastColor[2] ~= bg or lastColor[3] ~= bb or lastColor[4] ~= ba then
-		bar:SetStatusBarColor(br, bg, bb, ba)
+	if
+		not lastColor
+		or lastColor[1] ~= renderR
+		or lastColor[2] ~= renderG
+		or lastColor[3] ~= renderB
+		or lastColor[4] ~= renderA
+	then
+		bar:SetStatusBarColor(renderR, renderG, renderB, renderA)
 		bar._eqolLastColor = bar._eqolLastColor or {}
-		bar._eqolLastColor[1], bar._eqolLastColor[2], bar._eqolLastColor[3], bar._eqolLastColor[4] = br, bg, bb, ba
+		bar._eqolLastColor[1], bar._eqolLastColor[2], bar._eqolLastColor[3], bar._eqolLastColor[4] =
+			renderR,
+			renderG,
+			renderB,
+			renderA
 	end
 	if ccfg and ccfg.useGradient == true then
 		if not applyCastbarGradient(bar, ccfg, br, bg, bb, ba, progressOverride) then clearCastbarGradientState(bar) end

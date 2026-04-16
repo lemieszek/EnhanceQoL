@@ -4,6 +4,7 @@
 
 ### 🐛 Fixed
 
+- Unit Frames / Player Castbar: Fixed castbar gradients being tinted by the base castbar color by forcing a neutral internal bar color while gradients are enabled.
 - Unit Frames / Player Frame: Added the missing `Hide in pet battles` Edit Mode option and applied the pet-battle visibility rule to the Player Frame.
 
 ---

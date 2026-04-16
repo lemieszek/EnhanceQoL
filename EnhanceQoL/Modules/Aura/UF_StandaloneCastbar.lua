@@ -780,11 +780,10 @@ local function normalizeGradientColor(value)
 	return 1, 1, 1, 1
 end
 
-local function resolveCastbarGradientColors(castCfg, baseR, baseG, baseB, baseA)
+local function resolveCastbarGradientColors(castCfg, _baseR, _baseG, _baseB, _baseA)
 	local sr, sg, sb, sa = normalizeGradientColor(castCfg and castCfg.gradientStartColor)
 	local er, eg, eb, ea = normalizeGradientColor(castCfg and castCfg.gradientEndColor)
-	local br, bg, bb, ba = baseR or 1, baseG or 1, baseB or 1, baseA or 1
-	return br * sr, bg * sg, bb * sb, ba * sa, br * er, bg * eg, bb * eb, ba * ea
+	return sr, sg, sb, sa, er, eg, eb, ea
 end
 
 local function normalizeCastbarGradientMode(value)
@@ -840,11 +839,11 @@ local function clearCastbarGradientState(bar)
 	bar._eqolGradEA = nil
 end
 
-local function applyCastbarGradient(bar, castCfg, baseR, baseG, baseB, baseA, progressOverride)
+local function applyCastbarGradient(bar, castCfg, _baseR, _baseG, _baseB, _baseA, progressOverride)
 	if not bar or not isCastbarGradientEnabled(castCfg) then return false end
 	local tex = bar.GetStatusBarTexture and bar:GetStatusBarTexture()
 	if not tex or not tex.SetGradient then return false end
-	local sr, sg, sb, sa, er, eg, eb, ea = resolveCastbarGradientColors(castCfg, baseR, baseG, baseB, baseA)
+	local sr, sg, sb, sa, er, eg, eb, ea = resolveCastbarGradientColors(castCfg, _baseR, _baseG, _baseB, _baseA)
 	if normalizeCastbarGradientMode(castCfg.gradientMode) == "BAR_END" then
 		local progress = resolveCastbarGradientProgress(bar, progressOverride)
 		if progress then
@@ -884,10 +883,27 @@ end
 local function setCastbarColorWithGradient(bar, castCfg, r, g, b, a, progressOverride)
 	if not bar then return end
 	local br, bg, bb, ba = r or 1, g or 1, b or 1, a or 1
+	local renderR, renderG, renderB, renderA = br, bg, bb, ba
+	if isCastbarGradientEnabled(castCfg) then
+		-- Keep the status bar neutral so the configured gradient colors render without a base tint.
+		renderR, renderG, renderB, renderA = 1, 1, 1, 1
+	end
 	local lastColor = bar._eqolLastColor
-	if not lastColor or lastColor[1] ~= br or lastColor[2] ~= bg or lastColor[3] ~= bb or lastColor[4] ~= ba then bar:SetStatusBarColor(br, bg, bb, ba) end
+	if
+		not lastColor
+		or lastColor[1] ~= renderR
+		or lastColor[2] ~= renderG
+		or lastColor[3] ~= renderB
+		or lastColor[4] ~= renderA
+	then
+		bar:SetStatusBarColor(renderR, renderG, renderB, renderA)
+	end
 	bar._eqolLastColor = bar._eqolLastColor or {}
-	bar._eqolLastColor[1], bar._eqolLastColor[2], bar._eqolLastColor[3], bar._eqolLastColor[4] = br, bg, bb, ba
+	bar._eqolLastColor[1], bar._eqolLastColor[2], bar._eqolLastColor[3], bar._eqolLastColor[4] =
+		renderR,
+		renderG,
+		renderB,
+		renderA
 	if isCastbarGradientEnabled(castCfg) then
 		if not applyCastbarGradient(bar, castCfg, br, bg, bb, ba, progressOverride) then clearCastbarGradientState(bar) end
 	elseif bar._eqolGradientEnabled then
