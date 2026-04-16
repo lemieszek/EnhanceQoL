@@ -3397,7 +3397,7 @@ local function buildUnitSettings(unit)
 		isTooltipEnabled
 	)
 	list[#list + 1] = checkbox(L["Hide in vehicles"] or "Hide in vehicles", isHideInVehicleEnabled, setHideInVehicleEnabled, def.hideInVehicle == true, "frame")
-	if not isPlayer then list[#list + 1] = checkbox(L["Hide in pet battles"] or "Hide in pet battles", isHideInPetBattleEnabled, setHideInPetBattleEnabled, def.hideInPetBattle == true, "frame") end
+	list[#list + 1] = checkbox(L["Hide in pet battles"] or "Hide in pet battles", isHideInPetBattleEnabled, setHideInPetBattleEnabled, def.hideInPetBattle == true, "frame")
 	list[#list + 1] = checkbox(L["Hide in client scenes"] or "Hide in client scenes", isHideInClientSceneEnabled, setHideInClientSceneEnabled, hideInClientSceneDefault(), "frame")
 
 	if #visibilityOptions > 0 then

@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.3.0-beta8] - 2026-04-16
+
+### 🐛 Fixed
+
+- Unit Frames / Player Frame: Added the missing `Hide in pet battles` Edit Mode option and applied the pet-battle visibility rule to the Player Frame.
+
+---
+
 ## [10.3.0-beta7] - 2026-04-16
 
 ### 🐛 Fixed

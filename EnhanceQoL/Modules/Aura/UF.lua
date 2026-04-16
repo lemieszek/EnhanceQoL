@@ -4697,7 +4697,7 @@ local function applyVisibilityDriver(unit, enabled)
 	end
 	if not RegisterStateDriver then return end
 	local hideInVehicle = enabled and shouldHideInVehicle(cfg, def)
-	local hideInPetBattle = enabled and unit ~= UNIT.PLAYER and shouldHideInPetBattle(cfg, def)
+	local hideInPetBattle = enabled and shouldHideInPetBattle(cfg, def)
 	local cond
 	local baseCond
 	local showPrefix
