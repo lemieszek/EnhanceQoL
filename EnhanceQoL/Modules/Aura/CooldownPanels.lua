@@ -15513,7 +15513,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				if fixedLayout then
 					fixedGroup = entry.fixedGroupId and fixedGroupById and fixedGroupById[entry.fixedGroupId] or nil
 					if fixedGroup then
-						if fixedGroup._eqolIsStatic == true then
+						if Helper.FixedGroupUsesStaticSlots and Helper.FixedGroupUsesStaticSlots(fixedGroup) == true then
 							targetIndex = fixedStaticTargetIndices and fixedStaticTargetIndices[entryId] or nil
 						else
 							local groupVisibleCount = (fixedGroupVisibleCounts[fixedGroup.id] or 0) + 1
@@ -15521,7 +15521,8 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 							fixedGroupDynamicRuntimeIndex = groupVisibleCount
 							fixedGroupCenterGrowth = Helper.IsFixedGroupCenterGrowth and Helper.IsFixedGroupCenterGrowth(fixedGroup) == true
 							if not fixedGroupCenterGrowth then
-								targetIndex = fixedGroup._eqolDynamicTargetIndices and fixedGroup._eqolDynamicTargetIndices[groupVisibleCount] or nil
+								local dynamicTargetIndices = Helper.GetFixedGroupDynamicTargetIndices and Helper.GetFixedGroupDynamicTargetIndices(fixedGroup) or nil
+								targetIndex = dynamicTargetIndices and dynamicTargetIndices[groupVisibleCount] or nil
 								if not (targetIndex and targetIndex <= fixedSlotCount) then targetIndex = nil end
 							else
 								targetIndex = nil
@@ -20383,50 +20384,6 @@ function CooldownPanels:HandleReadySoundSpellEvent(spellId, baseSpellId, fallbac
 	return played
 end
 
-CooldownPanels.TraceChargeSpellSnapshot = function(stage, spellId, extra)
-	local numericId = tonumber(spellId)
-	if not numericId then return end
-	local baseId = getBaseSpellId(numericId)
-	local effectiveId = getEffectiveSpellId(numericId)
-	local bars = CooldownPanels.Bars
-	if not (bars and bars.TraceChargeDebug and bars.ShouldTraceChargeSpell and bars.ShouldTraceChargeSpell(numericId, baseId, effectiveId)) then return end
-	local info = Api.GetSpellChargesInfo and Api.GetSpellChargesInfo(numericId) or nil
-	local chargeDurationObject = C_Spell and C_Spell.GetSpellChargeDuration and C_Spell.GetSpellChargeDuration(numericId) or nil
-	local cooldownDurationObject = getSpellCooldownDurationObject and getSpellCooldownDurationObject(numericId) or nil
-	local startTime, duration, enabled, modRate, isOnGCD, isActive = getSpellCooldownInfo(numericId)
-	local payload = {
-		spellId = numericId,
-		baseSpellId = baseId,
-		effectiveSpellId = effectiveId,
-		chargesIsActive = info and info.isActive,
-		currentCharges = info and info.currentCharges,
-		maxCharges = info and info.maxCharges,
-		chargeStartTime = info and info.cooldownStartTime,
-		chargeCooldownDuration = info and info.cooldownDuration,
-		chargeModRate = info and info.chargeModRate,
-		chargeDurationObject = chargeDurationObject ~= nil,
-		chargeDurationRemaining = chargeDurationObject and chargeDurationObject.GetRemainingDuration and chargeDurationObject.GetRemainingDuration(chargeDurationObject, Api.DurationModifierRealTime)
-			or nil,
-		cooldownStartTime = startTime,
-		cooldownDuration = duration,
-		cooldownEnabled = enabled,
-		cooldownModRate = modRate,
-		cooldownIsOnGCD = isOnGCD,
-		cooldownIsActive = isActive,
-		cooldownDurationObject = cooldownDurationObject ~= nil,
-		cooldownDurationRemaining = cooldownDurationObject and cooldownDurationObject.GetRemainingDuration and cooldownDurationObject.GetRemainingDuration(
-			cooldownDurationObject,
-			Api.DurationModifierRealTime
-		) or nil,
-	}
-	if type(extra) == "table" then
-		for key, value in pairs(extra) do
-			payload[key] = value
-		end
-	end
-	bars.TraceChargeDebug(stage, payload)
-end
-
 CooldownPanels.InvalidateChargeCachesForSpell = function(spellId)
 	local numericSpellId = tonumber(spellId)
 	local baseId = numericSpellId and getBaseSpellId(numericSpellId) or nil
@@ -20498,11 +20455,6 @@ refreshPanelsForCharges = function()
 		updateStateField("duration", duration, durationSecret)
 		updateStateField("rate", rate, rateSecret)
 		updateStateField("active", active, activeSecret)
-		CooldownPanels.TraceChargeSpellSnapshot("trace51505_coreRefreshPanelsForCharges", spellId, {
-			changed = changed == true,
-			hasPanels = panels ~= nil,
-		})
-
 		if changed and panels then
 			local refreshSpellId = getEffectiveSpellId(spellId) or tonumber(spellId)
 			if refreshSpellId then
@@ -21303,7 +21255,6 @@ local function ensureUpdateFrame()
 			local unit, _, spellId = ...
 			if unit ~= "player" then return end
 			if not spellId then return end
-			CooldownPanels.TraceChargeSpellSnapshot("trace51505_event_UNIT_SPELLCAST_SUCCEEDED", spellId, { event = event })
 			local runtime = CooldownPanels.runtime
 			local enabledPanels = runtime and runtime.enabledPanels
 			if enabledPanels and not next(enabledPanels) then return end
@@ -21316,7 +21267,6 @@ local function ensureUpdateFrame()
 		if event == "SPELL_UPDATE_COOLDOWN" then
 			local spellId, baseSpellId = ...
 			if spellId ~= nil or baseSpellId ~= nil then
-				CooldownPanels.TraceChargeSpellSnapshot("trace51505_event_SPELL_UPDATE_COOLDOWN_before", spellId, { event = event })
 				local function invalidateCooldownCachesForId(id)
 					if id == nil then return end
 					CooldownPanels:InvalidateSpellQueryCaches("duration", id)
@@ -21335,7 +21285,6 @@ local function ensureUpdateFrame()
 					CooldownPanels:InvalidateSpellQueryCaches("info")
 				end
 				CooldownPanels:HandleReadySoundSpellEvent(spellId, baseSpellId, true)
-				CooldownPanels.TraceChargeSpellSnapshot("trace51505_event_SPELL_UPDATE_COOLDOWN_after", spellId, { event = event })
 				if gcdChanged then
 					if not CooldownPanels.RequestEnabledPanelRefreshes() then CooldownPanels:RefreshAllPanels() end
 				elseif spellId ~= nil then
@@ -21359,10 +21308,8 @@ local function ensureUpdateFrame()
 		if event == "SPELL_UPDATE_CHARGES" then
 			local spellId, baseSpellId = ...
 			if spellId ~= nil then
-				CooldownPanels.TraceChargeSpellSnapshot("trace51505_event_SPELL_UPDATE_CHARGES_before", spellId, { event = event })
 				CooldownPanels.InvalidateChargeCachesForSpell(spellId)
 				CooldownPanels:HandleReadySoundSpellEvent(spellId, baseSpellId, true)
-				CooldownPanels.TraceChargeSpellSnapshot("trace51505_event_SPELL_UPDATE_CHARGES_after", spellId, { event = event })
 			else
 				CooldownPanels:InvalidateSpellQueryCaches("charges")
 				CooldownPanels:InvalidateSpellQueryCaches("chargeDuration")

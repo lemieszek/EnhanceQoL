@@ -11,6 +11,7 @@ addon.Aura = addon.Aura or {}
 local ResourceBars = {}
 addon.Aura.ResourceBars = ResourceBars
 ResourceBars.ui = ResourceBars.ui or {}
+ResourceBars._runtimeCfgState = ResourceBars._runtimeCfgState or setmetatable({}, { __mode = "k" })
 
 -- forward declarations to satisfy luacheck for early function
 local LSM = LibStub("LibSharedMedia-3.0")
@@ -147,6 +148,38 @@ local ResourcebarVars = {
 	POWER_LABELS = {},
 	AURA_POWER_CONFIG = {},
 }
+
+function ResourceBars.GetRuntimeCfgState(cfg, create)
+	if type(cfg) ~= "table" then return nil end
+	local runtimeCfgState = ResourceBars._runtimeCfgState
+	local state = runtimeCfgState[cfg]
+	if not state and create then
+		state = {}
+		runtimeCfgState[cfg] = state
+	end
+	return state
+end
+
+function ResourceBars.GetRuntimeCfgField(cfg, key)
+	local state = ResourceBars.GetRuntimeCfgState(cfg, false)
+	return state and state[key] or nil
+end
+
+function ResourceBars.SetRuntimeCfgField(cfg, key, value)
+	local state = ResourceBars.GetRuntimeCfgState(cfg, value ~= nil)
+	if not state then return end
+	state[key] = value
+end
+
+function ResourceBars.GetRuntimeCfgSubtable(cfg, key)
+	local state = ResourceBars.GetRuntimeCfgState(cfg, true)
+	local bucket = state[key]
+	if not bucket then
+		bucket = {}
+		state[key] = bucket
+	end
+	return bucket
+end
 local RB = ResourcebarVars
 ResourceBars._validFrameStrata = ResourceBars._validFrameStrata or {}
 for _, strata in ipairs(RB.STRATA_ORDER) do
@@ -1366,7 +1399,7 @@ local function saveGlobalProfile(barType, specIndex, targetKey)
 	end
 
 	local normalized = normalizeSize(cfg)
-	normalized._rbType = barType
+	ResourceBars.SetRuntimeCfgField(normalized, "rbType", barType)
 	local store = ensureGlobalStore()
 	local specInfo = getSpecInfo(specIndex)
 	local function assign(key)
@@ -1430,7 +1463,7 @@ local function applyGlobalProfile(barType, specIndex, cosmeticOnly, sourceKey)
 	if not globalCfg then return false, "NO_GLOBAL" end
 	local sourceBarType
 	do
-		local tagged = globalCfg._rbType
+		local tagged = ResourceBars.GetRuntimeCfgField(globalCfg, "rbType")
 		if type(tagged) == "string" and tagged ~= "" then
 			sourceBarType = tagged
 		elseif sourceKey == "MAIN" then
@@ -1462,7 +1495,7 @@ local function applyGlobalProfile(barType, specIndex, cosmeticOnly, sourceKey)
 		copyCosmeticBarSettings(globalCfg, specCfg[barType])
 	else
 		local copied = CopyTable(globalCfg or {})
-		copied._rbType = barType
+		ResourceBars.SetRuntimeCfgField(copied, "rbType", barType)
 		local relType
 		do
 			local anchor = copied.anchor
@@ -1485,7 +1518,7 @@ local function applyGlobalProfile(barType, specIndex, cosmeticOnly, sourceKey)
 			specCfg[barType].separatorColor = specCfg[barType].separatorColor or globalCfg.separatorColor or RB.SEP_DEFAULT
 		end
 	end
-	if specCfg[barType] and specCfg[barType]._rbType ~= barType then specCfg[barType]._rbType = barType end
+	if specCfg[barType] then ResourceBars.SetRuntimeCfgField(specCfg[barType], "rbType", barType) end
 	return true
 end
 
@@ -1538,11 +1571,11 @@ ensureSpecCfg = function(specIndex)
 		if not specInfo then return end
 		local selection = autoEnableSelection()
 		if not selection or not (selection.HEALTH or selection.MAIN or selection.SECONDARY) then return end
-		if specCfg._autoEnabledRuntime or specCfg._autoEnableInProgress then return end
+		if ResourceBars.GetRuntimeCfgField(specCfg, "autoEnabledRuntime") or ResourceBars.GetRuntimeCfgField(specCfg, "autoEnableInProgress") then return end
 		for _, cfg in pairs(specCfg) do
 			if type(cfg) == "table" and cfg.enabled ~= nil then return end
 		end
-		specCfg._autoEnableInProgress = true
+		ResourceBars.SetRuntimeCfgField(specCfg, "autoEnableInProgress", true)
 
 		local bars = {}
 		local mainType = specInfo.MAIN
@@ -1554,7 +1587,7 @@ ensureSpecCfg = function(specIndex)
 			end
 		end
 		if #bars == 0 then
-			specCfg._autoEnableInProgress = nil
+			ResourceBars.SetRuntimeCfgField(specCfg, "autoEnableInProgress", nil)
 			return
 		end
 
@@ -1573,7 +1606,7 @@ ensureSpecCfg = function(specIndex)
 				if ResourceBars.ApplyGlobalProfile then ok = ResourceBars.ApplyGlobalProfile(pType, specIndex or spec, false) end
 				-- Fallback for fresh profiles/new chars without any saved global template yet.
 				if not ok then
-					specCfg[pType]._rbType = pType
+					ResourceBars.SetRuntimeCfgField(specCfg[pType], "rbType", pType)
 					ok = true
 				end
 				if ok then
@@ -1645,8 +1678,8 @@ ensureSpecCfg = function(specIndex)
 			end
 		end
 
-		if applied > 0 then specCfg._autoEnabledRuntime = true end
-		specCfg._autoEnableInProgress = nil
+		if applied > 0 then ResourceBars.SetRuntimeCfgField(specCfg, "autoEnabledRuntime", true) end
+		ResourceBars.SetRuntimeCfgField(specCfg, "autoEnableInProgress", nil)
 	end
 
 	if ResourceBars.SpecUsesSharedMode(spec) then
@@ -2744,11 +2777,7 @@ end
 
 function ResourceBars.NormalizeAbsoluteThresholdColorPoints(cfg, pType)
 	if type(cfg) ~= "table" or cfg.useAbsoluteThresholdColors ~= true then return nil end
-	local cacheByType = cfg._eqolAbsoluteThresholdColorCache
-	if not cacheByType then
-		cacheByType = {}
-		cfg._eqolAbsoluteThresholdColorCache = cacheByType
-	end
+	local cacheByType = ResourceBars.GetRuntimeCfgSubtable(cfg, "absoluteThresholdColorCache")
 
 	local maxPoints = tonumber(RB.ABSOLUTE_THRESHOLD_COLOR_MAX_POINTS) or 10
 	local count = tonumber(cfg.absoluteThresholdColorPointCount) or tonumber(RB.ABSOLUTE_THRESHOLD_COLOR_DEFAULT_COUNT) or 2
@@ -2867,12 +2896,8 @@ function ResourceBars.ResolveAbsoluteThresholdColorForSecretPower(cfg, pType, po
 		ma = maxColor[4] or ma
 	end
 
-	local pointsCache = cfg._eqolAbsoluteThresholdColorCache and cfg._eqolAbsoluteThresholdColorCache[pType]
-	local curveCacheByType = cfg._eqolAbsoluteThresholdCurveCache
-	if not curveCacheByType then
-		curveCacheByType = {}
-		cfg._eqolAbsoluteThresholdCurveCache = curveCacheByType
-	end
+	local pointsCache = ResourceBars.GetRuntimeCfgSubtable(cfg, "absoluteThresholdColorCache")[pType]
+	local curveCacheByType = ResourceBars.GetRuntimeCfgSubtable(cfg, "absoluteThresholdCurveCache")
 	local signature = ResourceBars.HashCurveStep(17, pointsCache and pointsCache.signature or #points)
 	signature = ResourceBars.HashCurveColor(signature, { br, bg, bb, ba })
 	signature = ResourceBars.HashCurveStep(signature, useMaxColor and 1 or 0)
@@ -2974,8 +2999,8 @@ local function applyBarFillColor(bar, cfg, pType)
 		baseR, baseG, baseB, baseA = getPlayerClassColor()
 		baseA = baseA or (cfg.barColor and cfg.barColor[4]) or 1
 		if pType == "HEALTH" then shouldDesaturate = true end
-	elseif cfg._resolvedDefaultPowerColor then
-		local color = cfg._resolvedDefaultPowerColor
+	elseif ResourceBars.GetRuntimeCfgField(cfg, "resolvedDefaultPowerColor") then
+		local color = ResourceBars.GetRuntimeCfgField(cfg, "resolvedDefaultPowerColor")
 		baseR, baseG, baseB, baseA = color[1] or 1, color[2] or 1, color[3] or 1, color[4] or 1
 	else
 		baseR, baseG, baseB = getPowerBarColor(pType or "MANA")
@@ -3246,7 +3271,7 @@ local DRUID_FORM_SEQUENCE = { "HUMANOID", "BEAR", "CAT", "TRAVEL", "MOONKIN", "S
 local function shouldUseDruidFormDriver(cfg)
 	if addon.variables.unitClass ~= "DRUID" then return false end
 	if type(cfg) ~= "table" then return false end
-	if cfg._rbSourceMode == "SHARED" then return false end
+	if ResourceBars.GetRuntimeCfgField(cfg, "sourceMode") == "SHARED" then return false end
 	local showForms = cfg.showForms
 	if type(showForms) ~= "table" then return false end
 	for _, key in ipairs(DRUID_FORM_SEQUENCE) do
@@ -3636,7 +3661,7 @@ end
 ensureDruidShowFormsDefaults = function(cfg, pType, specInfo)
 	if addon.variables.unitClass ~= "DRUID" then return end
 	if not cfg or type(cfg) ~= "table" then return end
-	if cfg._rbSourceMode == "SHARED" then
+	if ResourceBars.GetRuntimeCfgField(cfg, "sourceMode") == "SHARED" then
 		cfg.showForms = nil
 		return
 	end
@@ -3677,16 +3702,16 @@ function ResourceBars.PrepareBarConfigForRuntime(cfg, pType, specInfo)
 	if type(cfg) ~= "table" then return cfg end
 
 	local stamp = tostring(addon.variables.unitClass or "") .. "|" .. tostring(addon.variables.unitSpec or "") .. "|" .. tostring(specInfo and specInfo.MAIN or "") .. "|" .. tostring(pType or "")
-	if cfg._eqolRuntimePrepareStamp == stamp then return cfg end
+	if ResourceBars.GetRuntimeCfgField(cfg, "runtimePrepareStamp") == stamp then return cfg end
 
-	if cfg._rbType ~= pType then cfg._rbType = pType end
+	ResourceBars.SetRuntimeCfgField(cfg, "rbType", pType)
 	cfg.strata = ResourceBars.NormalizeFrameStrataToken(cfg.strata)
 	cfg.frameLevelOffset = ResourceBars.NormalizeFrameLevelOffset(cfg.frameLevelOffset)
 	if isAuraPowerType and isAuraPowerType(pType) then ensureAuraPowerDefaults(pType, cfg) end
 	if ResourceBars.EnsureRogueChargedComboDefaults then ResourceBars.EnsureRogueChargedComboDefaults(cfg, pType) end
 	ensureDruidShowFormsDefaults(cfg, pType, specInfo)
 	ensureRelativeFrameFallback(cfg.anchor, pType, specInfo)
-	cfg._eqolRuntimePrepareStamp = stamp
+	ResourceBars.SetRuntimeCfgField(cfg, "runtimePrepareStamp", stamp)
 	return cfg
 end
 
@@ -4321,11 +4346,11 @@ function getBarSettings(pType)
 	local sourceCfg, sourceMode, sharedSlot = ResourceBars.ResolveConfigSourceForBar(pType, spec)
 	if sourceMode == "SHARED" then
 		local runtimeCfg = CopyTable(sourceCfg or {})
-		runtimeCfg._rbSourceMode = "SHARED"
-		runtimeCfg._rbSourceSlot = sharedSlot
+		ResourceBars.SetRuntimeCfgField(runtimeCfg, "sourceMode", "SHARED")
+		ResourceBars.SetRuntimeCfgField(runtimeCfg, "sourceSlot", sharedSlot)
 		if ResourceBars.ApplySharedPowerTypeOverride then ResourceBars.ApplySharedPowerTypeOverride(runtimeCfg, sourceCfg, pType) end
 		if type(sourceCfg) == "table" and type(sourceCfg.defaultPowerColors) == "table" and type(sourceCfg.defaultPowerColors[pType]) == "table" then
-			runtimeCfg._resolvedDefaultPowerColor = CopyTable(sourceCfg.defaultPowerColors[pType])
+			ResourceBars.SetRuntimeCfgField(runtimeCfg, "resolvedDefaultPowerColor", CopyTable(sourceCfg.defaultPowerColors[pType]))
 		end
 		runtimeCfg = ResourceBars.PrepareBarConfigForRuntime(runtimeCfg, pType, specInfo)
 		if cache and runtimeCfg ~= nil then cache[pType] = runtimeCfg end
@@ -4347,7 +4372,7 @@ function getBarSettings(pType)
 				local store = addon.db and addon.db.globalResourceBarSettings
 				local sourceBarType
 				do
-					local tagged = globalCfg._rbType
+					local tagged = ResourceBars.GetRuntimeCfgField(globalCfg, "rbType")
 					if type(tagged) == "string" and tagged ~= "" then
 						sourceBarType = tagged
 					elseif store and globalCfg == store[pType] then
@@ -4358,7 +4383,7 @@ function getBarSettings(pType)
 					end
 				end
 				local copied = CopyTable(globalCfg or {})
-				copied._rbType = pType
+				ResourceBars.SetRuntimeCfgField(copied, "rbType", pType)
 				local relType
 				do
 					local anchor = copied.anchor
@@ -5018,8 +5043,8 @@ function updatePowerBar(type, runeSlot)
 		elseif cfg.useClassColor == true then
 			local cr, cg, cb, ca = getPlayerClassColor()
 			bar._baseColor[1], bar._baseColor[2], bar._baseColor[3], bar._baseColor[4] = cr, cg, cb, ca or (cfg.barColor and cfg.barColor[4]) or 1
-		elseif cfg._resolvedDefaultPowerColor then
-			local c = cfg._resolvedDefaultPowerColor
+		elseif ResourceBars.GetRuntimeCfgField(cfg, "resolvedDefaultPowerColor") then
+			local c = ResourceBars.GetRuntimeCfgField(cfg, "resolvedDefaultPowerColor")
 			bar._baseColor[1], bar._baseColor[2], bar._baseColor[3], bar._baseColor[4] = c[1] or 1, c[2] or 1, c[3] or 1, c[4] or 1
 		elseif cfgDef and cfgDef.defaultColor then
 			local c = cfgDef.defaultColor
@@ -5174,8 +5199,8 @@ function updatePowerBar(type, runeSlot)
 	elseif cfg.useClassColor == true then
 		local cr, cg, cb, ca = getPlayerClassColor()
 		bar._baseColor[1], bar._baseColor[2], bar._baseColor[3], bar._baseColor[4] = cr, cg, cb, ca or (cfg.barColor and cfg.barColor[4]) or 1
-	elseif cfg._resolvedDefaultPowerColor then
-		local c = cfg._resolvedDefaultPowerColor
+	elseif ResourceBars.GetRuntimeCfgField(cfg, "resolvedDefaultPowerColor") then
+		local c = ResourceBars.GetRuntimeCfgField(cfg, "resolvedDefaultPowerColor")
 		bar._baseColor[1], bar._baseColor[2], bar._baseColor[3], bar._baseColor[4] = c[1] or 1, c[2] or 1, c[3] or 1, c[4] or 1
 	elseif cfgDef and cfgDef.defaultColor then
 		local c = cfgDef.defaultColor
@@ -6019,8 +6044,8 @@ function ResourceBars.ReuseExistingPowerBar(type, sharedSlot)
 
 	if type == "RUNES" then
 		bar:SetStatusBarColor(getPowerBarColor(type))
-	elseif settings and settings._resolvedDefaultPowerColor and not (settings.useBarColor == true or settings.useClassColor == true) then
-		local c = settings._resolvedDefaultPowerColor
+	elseif settings and ResourceBars.GetRuntimeCfgField(settings, "resolvedDefaultPowerColor") and not (settings.useBarColor == true or settings.useClassColor == true) then
+		local c = ResourceBars.GetRuntimeCfgField(settings, "resolvedDefaultPowerColor")
 		bar:SetStatusBarColor(c[1] or 1, c[2] or 1, c[3] or 1, c[4] or 1)
 	elseif not (settings and (settings.useBarColor == true or settings.useClassColor == true)) then
 		local dr, dg, db = getPowerBarColor(type)
@@ -6222,8 +6247,8 @@ local function createPowerBar(type, anchor, sharedSlot)
 	end
 	if type == "RUNES" then
 		bar:SetStatusBarColor(getPowerBarColor(type))
-	elseif settings and settings._resolvedDefaultPowerColor and not (settings.useBarColor == true or settings.useClassColor == true) then
-		local c = settings._resolvedDefaultPowerColor
+	elseif settings and ResourceBars.GetRuntimeCfgField(settings, "resolvedDefaultPowerColor") and not (settings.useBarColor == true or settings.useClassColor == true) then
+		local c = ResourceBars.GetRuntimeCfgField(settings, "resolvedDefaultPowerColor")
 		bar:SetStatusBarColor(c[1] or 1, c[2] or 1, c[3] or 1, c[4] or 1)
 	elseif not (settings and (settings.useBarColor == true or settings.useClassColor == true)) then
 		local dr, dg, db = getPowerBarColor(type)
