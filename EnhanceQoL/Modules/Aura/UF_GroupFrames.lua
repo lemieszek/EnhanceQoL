@@ -10134,6 +10134,7 @@ local function dispatchUnitHealth(btn, unit)
 	GF:UpdateHealthStyle(btn, unit, st)
 	GF:UpdateHealthValue(btn, unit, st)
 	GF:UpdateStatusText(btn, unit, st)
+	GF:UpdateName(btn, unit, st)
 end
 local function dispatchUnitAbsorb(btn, unit)
 	local st = getState(btn)
@@ -10148,11 +10149,13 @@ local function dispatchUnitPower(btn, unit)
 	GF:UpdatePowerValue(btn, unit, st)
 end
 local function dispatchUnitDisplayPower(btn) GF:UpdatePower(btn) end
-local function dispatchUnitName(btn)
+local function dispatchUnitName(btn, unit)
+	local st = getState(btn)
 	GF:CacheUnitStatic(btn)
-	GF:UpdateName(btn)
-	GF:UpdateHealthStyle(btn)
-	GF:UpdateLevel(btn)
+	GF:UpdateName(btn, unit, st)
+	GF:UpdateStatusText(btn, unit, st)
+	GF:UpdateHealthStyle(btn, unit, st)
+	GF:UpdateLevel(btn, unit, st)
 end
 local function dispatchUnitLevel(btn, unit)
 	local st = getState(btn)
@@ -10169,6 +10172,7 @@ local function dispatchUnitFlags(btn, unit)
 	GF:UpdateHealthStyle(btn, unit, st)
 	GF:UpdateHealthValue(btn, unit, st)
 	GF:UpdateStatusText(btn, unit, st)
+	GF:UpdateName(btn, unit, st)
 end
 local function dispatchUnitRange(btn, _, inRange) GF:UpdateRange(btn, inRange) end
 local function dispatchUnitAura(btn, _, updateInfo) GF:RequestAuraUpdate(btn, updateInfo) end
