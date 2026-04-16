@@ -6101,6 +6101,10 @@ local function createPowerBar(type, anchor, sharedSlot)
 			-- Force re-read of max (fixes “cap changed while hidden”)
 			self._lastMax = nil
 			self._lastMaxRaw = nil
+			local showCfg = ResourceBars.GetRuntimeBarConfig(self._rbType, self) or self._cfg or getBarSettings(self._rbType) or {}
+			self._cfg = showCfg
+			applyBarFrameLayers(self, showCfg)
+			applyBackdrop(self, showCfg)
 
 			updatePowerBar(self._rbType)
 
@@ -7340,7 +7344,14 @@ local function eventHandler(self, event, unit, arg1)
 		updatePowerBar(arg1)
 	elseif event == "UNIT_POWER_POINT_CHARGE" then
 		local comboBar = powerbar["COMBO_POINTS"]
-		if comboBar and comboBar:IsShown() then updatePowerBar("COMBO_POINTS") end
+		if comboBar and comboBar:IsShown() then
+			local comboCfg = ResourceBars.GetRuntimeBarConfig("COMBO_POINTS", comboBar) or comboBar._cfg or getBarSettings("COMBO_POINTS") or {}
+			comboBar._cfg = comboCfg
+			applyBackdrop(comboBar, comboCfg)
+			updatePowerBar("COMBO_POINTS")
+			updateBarSeparators("COMBO_POINTS", comboCfg)
+			updateBarThresholds("COMBO_POINTS", comboCfg)
+		end
 	elseif event == "UNIT_MAXPOWER" and powerbar[arg1] and powerbar[arg1]:IsShown() then
 		local enum = POWER_ENUM[arg1]
 		local bar = powerbar[arg1]

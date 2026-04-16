@@ -6,6 +6,8 @@
 
 - Unit Frames / Player Castbar: Fixed castbar gradients being tinted by the base castbar color by forcing a neutral internal bar color while gradients are enabled.
 - Unit Frames / Player Frame: Added the missing `Hide in pet battles` Edit Mode option and applied the pet-battle visibility rule to the Player Frame.
+- Unit Frames / Party Frames: Fixed party-frame names still shaking on the initial login until a reload or loading screen when using non-top/non-bottom name anchors.
+- Resource Bars / Shared Mode: Fixed Rogue shared Combo Points sometimes losing the configured backdrop appearance while entering or leaving Stealth.
 
 ---
 
