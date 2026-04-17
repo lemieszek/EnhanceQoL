@@ -2523,7 +2523,7 @@ function DataPanel.Create(id, name, existingOnly)
 				local rawText = payload.text or ""
 				local textChanged = false
 				if payload.textFormat and data.text.SetFormattedText then
-					local unpackFn = _G.unpack or table.unpack
+					local unpackFn = _G.unpack or unpack
 					if type(unpackFn) == "function" then
 						data.text:SetFormattedText(payload.textFormat, unpackFn(payload.textArgs or {}))
 						data.lastText = nil
