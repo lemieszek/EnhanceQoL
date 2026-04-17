@@ -4671,7 +4671,12 @@ local function buildSettings()
 	end
 	local resourceBarSettings = addon.functions.SettingsCreateCheckboxes(cat, data)
 	local resourceBarsParent = resourceBarSettings and resourceBarSettings.enableResourceFrame and resourceBarSettings.enableResourceFrame.element or nil
-	local registeredMode = currentClassMode()
+	local function sharedModeParentCheck()
+		return addon.db["enableResourceFrame"] == true and currentClassMode() == "SHARED"
+	end
+	local function specModeParentCheck()
+		return addon.db["enableResourceFrame"] == true and currentClassMode() ~= "SHARED"
+	end
 
 	do
 		local modeVar = "rb_mode_class"
@@ -4704,126 +4709,124 @@ local function buildSettings()
 		})
 	end
 
-	if registeredMode == "SHARED" then
-		addon.functions.SettingsCreateText(cat, "", {
-			parent = resourceBarsParent,
-			parentSection = expandable,
-			parentCheck = function() return addon.db["enableResourceFrame"] == true end,
-		})
+	addon.functions.SettingsCreateText(cat, "", {
+		parent = resourceBarsParent,
+		parentSection = expandable,
+		parentCheck = sharedModeParentCheck,
+	})
 
-		addon.functions.SettingsCreateText(cat, "|cff99e599" .. (L["ResourceBarsModeShared"] or "Shared") .. "|r", {
-			parent = resourceBarsParent,
-			parentSection = expandable,
-			parentCheck = function() return addon.db["enableResourceFrame"] == true end,
-		})
+	addon.functions.SettingsCreateText(cat, "|cff99e599" .. (L["ResourceBarsModeShared"] or "Shared") .. "|r", {
+		parent = resourceBarsParent,
+		parentSection = expandable,
+		parentCheck = sharedModeParentCheck,
+	})
 
-		addon.functions.SettingsCreateMultiDropdown(cat, {
-			var = "resourceBarsSharedEnabled",
-			text = L["ResourceBarsModeShared"] or "Shared",
-			options = AUTO_ENABLE_OPTIONS,
-			order = AUTO_ENABLE_ORDER,
-			isSelectedFunc = function(key)
-				return isSharedSlotEnabled(key)
-			end,
-			setSelectedFunc = function(key, shouldSelect)
-				setSharedSlotEnabled(key, shouldSelect)
-			end,
-			parent = resourceBarsParent,
-			parentCheck = function() return addon.db["enableResourceFrame"] == true end,
-			parentSection = expandable,
-		})
+	addon.functions.SettingsCreateMultiDropdown(cat, {
+		var = "resourceBarsSharedEnabled",
+		text = L["ResourceBarsModeShared"] or "Shared",
+		options = AUTO_ENABLE_OPTIONS,
+		order = AUTO_ENABLE_ORDER,
+		isSelectedFunc = function(key)
+			return isSharedSlotEnabled(key)
+		end,
+		setSelectedFunc = function(key, shouldSelect)
+			setSharedSlotEnabled(key, shouldSelect)
+		end,
+		parent = resourceBarsParent,
+		parentCheck = sharedModeParentCheck,
+		parentSection = expandable,
+	})
 
-		addon.functions.SettingsCreateButton(cat, {
-			var = "resourceBarsSharedAllClasses",
-			text = L["ResourceBarsEnableSharedAllClasses"] or "Enable Shared for all classes",
-			parent = resourceBarsParent,
-			parentSection = expandable,
-			parentCheck = function() return addon.db["enableResourceFrame"] == true end,
-			func = function()
-				local popupKey = "EQOL_RESOURCEBARS_ENABLE_SHARED_ALL_CLASSES"
-				StaticPopupDialogs[popupKey] = StaticPopupDialogs[popupKey]
-					or {
-						text = L["ResourceBarsEnableSharedAllClassesConfirm"] or "Enable Shared mode for all specs of all classes?",
-						button1 = OKAY,
-						button2 = CANCEL,
-						timeout = 0,
-						whileDead = true,
-						hideOnEscape = true,
-						preferredIndex = 3,
-					}
-				StaticPopupDialogs[popupKey].OnAccept = function()
-					for classKey, classSpecs in pairs((ResourceBars and ResourceBars.powertypeClasses) or {}) do
-						if type(classSpecs) == "table" then setSpecModeForClass(classKey, next(classSpecs), "SHARED") end
-					end
-					if ResourceBars and ResourceBars.EnsureSharedSlotStore then
-						for _, slot in ipairs(ResourceBars.SHARED_SLOT_ORDER or {}) do
-							ResourceBars.EnsureSharedSlotStore(slot)
-						end
-					end
-					if ReloadUI then
-						ReloadUI()
-						return
-					end
-					local activeSpec = getActiveSpecIndex()
-					if activeSpec then addon.Aura.functions.requestActiveRefresh(activeSpec) end
-					refreshSettingsUI()
-					registerEditModeBars()
+	addon.functions.SettingsCreateButton(cat, {
+		var = "resourceBarsSharedAllClasses",
+		text = L["ResourceBarsEnableSharedAllClasses"] or "Enable Shared for all classes",
+		parent = resourceBarsParent,
+		parentSection = expandable,
+		parentCheck = sharedModeParentCheck,
+		func = function()
+			local popupKey = "EQOL_RESOURCEBARS_ENABLE_SHARED_ALL_CLASSES"
+			StaticPopupDialogs[popupKey] = StaticPopupDialogs[popupKey]
+				or {
+					text = L["ResourceBarsEnableSharedAllClassesConfirm"] or "Enable Shared mode for all specs of all classes?",
+					button1 = OKAY,
+					button2 = CANCEL,
+					timeout = 0,
+					whileDead = true,
+					hideOnEscape = true,
+					preferredIndex = 3,
+				}
+			StaticPopupDialogs[popupKey].OnAccept = function()
+				for classKey, classSpecs in pairs((ResourceBars and ResourceBars.powertypeClasses) or {}) do
+					if type(classSpecs) == "table" then setSpecModeForClass(classKey, next(classSpecs), "SHARED") end
 				end
-				StaticPopup_Show(popupKey)
-			end,
-		})
-	else
-		addon.functions.SettingsCreateMultiDropdown(cat, {
-			var = "resourceBarsAutoEnable",
-			text = L["AutoEnableAllBars"] or "Auto-enable bars for new characters",
-			options = AUTO_ENABLE_OPTIONS,
-			order = AUTO_ENABLE_ORDER,
-			isSelectedFunc = function(key)
-				local selection = autoEnableSelection()
-				return selection and selection[key] == true
-			end,
-			setSelectedFunc = function(key, shouldSelect)
-				local selection = autoEnableSelection()
-				if shouldSelect then
-					selection[key] = true
-				else
-					selection[key] = nil
+				if ResourceBars and ResourceBars.EnsureSharedSlotStore then
+					for _, slot in ipairs(ResourceBars.SHARED_SLOT_ORDER or {}) do
+						ResourceBars.EnsureSharedSlotStore(slot)
+					end
 				end
-				local spec = addon.variables.unitSpec
-				if spec then
-					local cfg = ensureSpecCfg(spec)
-					if cfg then addon.Aura.functions.requestActiveRefresh(spec) end
+				if ReloadUI then
+					ReloadUI()
+					return
 				end
-			end,
-			parent = resourceBarsParent,
-			parentSection = expandable,
-			parentCheck = function() return addon.db["enableResourceFrame"] == true end,
-		})
-
-		addon.functions.SettingsCreateText(cat, "", {
-			parent = resourceBarsParent,
-			parentSection = expandable,
-			parentCheck = function() return addon.db["enableResourceFrame"] == true end,
-		})
-
-		addon.functions.SettingsCreateText(cat, "|cff99e599" .. (L["ResourceBarsModeSpec"] or "Classic") .. "|r", {
-			parent = resourceBarsParent,
-			parentSection = expandable,
-			parentCheck = function() return addon.db["enableResourceFrame"] == true end,
-		})
-
-		addon.functions.SettingsCreateText(cat, "|cff99e599" .. L["ResourceBarsSpecHint"] .. "|r", {
-			parent = resourceBarsParent,
-			parentSection = expandable,
-			parentCheck = function() return addon.db["enableResourceFrame"] == true end,
-		})
-
-		for _, row in ipairs(specRows) do
-			local entry = buildSpecToggles(row.index, row.name, row.available or {}, expandable)
-			if entry then
-				entry.parent = resourceBarsParent
-				addon.functions.SettingsCreateMultiDropdown(cat, entry)
+				local activeSpec = getActiveSpecIndex()
+				if activeSpec then addon.Aura.functions.requestActiveRefresh(activeSpec) end
+				refreshSettingsUI()
+				registerEditModeBars()
 			end
+			StaticPopup_Show(popupKey)
+		end,
+	})
+
+	addon.functions.SettingsCreateMultiDropdown(cat, {
+		var = "resourceBarsAutoEnable",
+		text = L["AutoEnableAllBars"] or "Auto-enable bars for new characters",
+		options = AUTO_ENABLE_OPTIONS,
+		order = AUTO_ENABLE_ORDER,
+		isSelectedFunc = function(key)
+			local selection = autoEnableSelection()
+			return selection and selection[key] == true
+		end,
+		setSelectedFunc = function(key, shouldSelect)
+			local selection = autoEnableSelection()
+			if shouldSelect then
+				selection[key] = true
+			else
+				selection[key] = nil
+			end
+			local spec = addon.variables.unitSpec
+			if spec then
+				local cfg = ensureSpecCfg(spec)
+				if cfg then addon.Aura.functions.requestActiveRefresh(spec) end
+			end
+		end,
+		parent = resourceBarsParent,
+		parentSection = expandable,
+		parentCheck = specModeParentCheck,
+	})
+
+	addon.functions.SettingsCreateText(cat, "", {
+		parent = resourceBarsParent,
+		parentSection = expandable,
+		parentCheck = specModeParentCheck,
+	})
+
+	addon.functions.SettingsCreateText(cat, "|cff99e599" .. (L["ResourceBarsModeSpec"] or "Classic") .. "|r", {
+		parent = resourceBarsParent,
+		parentSection = expandable,
+		parentCheck = specModeParentCheck,
+	})
+
+	addon.functions.SettingsCreateText(cat, "|cff99e599" .. L["ResourceBarsSpecHint"] .. "|r", {
+		parent = resourceBarsParent,
+		parentSection = expandable,
+		parentCheck = specModeParentCheck,
+	})
+
+	for _, row in ipairs(specRows) do
+		local entry = buildSpecToggles(row.index, row.name, row.available or {}, expandable)
+		if entry then
+			entry.parent = resourceBarsParent
+			addon.functions.SettingsCreateMultiDropdown(cat, entry)
 		end
 	end
 

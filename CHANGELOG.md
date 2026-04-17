@@ -5,6 +5,7 @@
 ### 🐛 Fixed
 
 - Resource Bars / Shared Mode: Fixed Rogue shared Combo Points with `Separator offset` getting the wrong segment background texture after Stealth state changes.
+- Resource Bars / Classic Mode: Fixed Classic settings not showing correctly after reload.
 
 ---
 
