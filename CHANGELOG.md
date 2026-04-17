@@ -5,6 +5,7 @@
 ### 🐛 Fixed
 
 - Data Panels / Stats: Fixed the stats stream for WoW `12.0.5` secret-value restrictions by removing unsafe stat comparisons and secret-value string assembly, while restoring the primary stat display through the specialization-based Blizzard lookup.
+- Cooldown Panels / Bars: Re-enabled cooldown-panel bar mode and added the current charge-bar implementation back as an experimental test path.
 
 ### ❌ Removed
 

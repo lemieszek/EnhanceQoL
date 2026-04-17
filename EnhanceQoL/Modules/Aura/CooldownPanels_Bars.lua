@@ -3334,7 +3334,6 @@ local function showBarModeMenu(owner, panelId, entryId)
 			function() return normalizeBarMode(entry.barMode, Bars.DEFAULTS.barMode) == Bars.BAR_MODE.COOLDOWN end,
 			function() setEntryBarMode(panelId, entryId, Bars.BAR_MODE.COOLDOWN) end
 		)
-		--@debug@
 		if supportsBarMode(entry, Bars.BAR_MODE.CHARGES) then
 			rootDescription:CreateRadio(
 				getEntryBarModeLabel(Bars.BAR_MODE.CHARGES),
@@ -3342,7 +3341,6 @@ local function showBarModeMenu(owner, panelId, entryId)
 				function() setEntryBarMode(panelId, entryId, Bars.BAR_MODE.CHARGES) end
 			)
 		end
-		--@end-debug@
 		if supportsBarMode(entry, Bars.BAR_MODE.STACKS) then
 			rootDescription:CreateRadio(
 				getEntryBarModeLabel(Bars.BAR_MODE.STACKS),
