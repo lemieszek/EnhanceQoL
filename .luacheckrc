@@ -550,6 +550,7 @@ globals = {
 	"BNSendFriendInviteByID",
 	"BNSendGameData",
 	"BNSendSoR",
+	"C_SpellActivationOverlay",
 	"BNSendVerifiedBattleTagInvite",
 	"BNSendWhisper",
 	"BNSetAFK",
