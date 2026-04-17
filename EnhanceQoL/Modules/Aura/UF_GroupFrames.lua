@@ -6142,10 +6142,18 @@ function GF:LayoutButton(self)
 	local portraitSpace = portraitEnabled and (portraitSize + separatorSpace) or 0
 	local contentOffsetLeft = 0
 	local contentOffsetRight = 0
+	local layoutOffsetLeft = 0
+	local layoutOffsetRight = 0
 	local layoutAnchor = GF.GetLayoutAnchorFrame(st, self) or self
 	if not portraitOutside then
 		contentOffsetLeft = (portraitEnabled and portraitSide == "LEFT") and portraitSpace or 0
 		contentOffsetRight = (portraitEnabled and portraitSide == "RIGHT") and portraitSpace or 0
+	elseif portraitEnabled and portraitSpace > 0 then
+		if portraitSide == "RIGHT" then
+			layoutOffsetRight = portraitSpace
+		else
+			layoutOffsetLeft = portraitSpace
+		end
 	end
 
 	local healthBottomOffset = roundToPixel(powerH, scale)
@@ -6164,7 +6172,12 @@ function GF:LayoutButton(self)
 	end
 	if st.layoutAnchor then
 		st.layoutAnchor:ClearAllPoints()
-		st.layoutAnchor:SetAllPoints(self)
+		if layoutOffsetLeft > 0 or layoutOffsetRight > 0 then
+			st.layoutAnchor:SetPoint("TOPLEFT", self, "TOPLEFT", -layoutOffsetLeft, 0)
+			st.layoutAnchor:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", layoutOffsetRight, 0)
+		else
+			st.layoutAnchor:SetAllPoints(self)
+		end
 		if st.layoutAnchor.SetFrameStrata and st.barGroup.GetFrameStrata then st.layoutAnchor:SetFrameStrata(st.barGroup:GetFrameStrata()) end
 		if st.layoutAnchor.SetFrameLevel and st.barGroup.GetFrameLevel then st.layoutAnchor:SetFrameLevel(st.barGroup:GetFrameLevel() or 0) end
 	end
@@ -6198,6 +6211,7 @@ function GF:LayoutButton(self)
 	st._portraitSize = portraitSize
 	st._portraitSquareBackground = portraitSquareBackground
 	st._portraitSpace = portraitSpace
+	st._portraitCenterOffset = layoutOffsetLeft > 0 and (layoutOffsetLeft * 0.5) or (layoutOffsetRight > 0 and -(layoutOffsetRight * 0.5) or 0)
 	if st.portraitHolder then
 		if portraitEnabled then
 			local holderParent = st.barGroup or self
@@ -6884,7 +6898,11 @@ end
 function GF.ResolveAuraContainerBoundaryPoint(anchorPoint, anchorOutside, primary, secondary, owner)
 	local anchor = tostring(anchorPoint or "TOPLEFT"):upper()
 	if anchorOutside ~= true then return anchor end
-	if owner and owner._eqolGroupKind == "party" and primary and secondary then return GF.GetAuraGridBasePoint(primary, secondary) end
+	if owner and owner._eqolGroupKind == "party" and primary and secondary then
+		if anchor == "TOPLEFT" or anchor == "TOPRIGHT" or anchor == "BOTTOMLEFT" or anchor == "BOTTOMRIGHT" then
+			return GF.GetAuraGridBasePoint(primary, secondary)
+		end
+	end
 	return (GF._oppositeAuraAnchorPoints and GF._oppositeAuraAnchorPoints[anchor]) or anchor
 end
 
