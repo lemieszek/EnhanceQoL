@@ -785,6 +785,7 @@ function ResourceBars.LayoutDiscreteSegments(bar, cfg, count, texturePath, separ
 	local segments = bar._rbDiscreteSegments
 	local nameBase = bar:GetName() or "EQOLDiscrete"
 	local texPath = texturePath or "Interface\\Buttons\\WHITE8x8"
+	local segmentBgPath, _, _, _, _, segmentBgVisible = resolveDiscreteSegmentBackground(cfg, texPath, 0, 0, 0, 0.8)
 
 	for i = 1, count do
 		local sb = segments[i]
@@ -802,9 +803,16 @@ function ResourceBars.LayoutDiscreteSegments(bar, cfg, count, texturePath, separ
 			sb._rbSegmentBg = sb:CreateTexture(nil, "BACKGROUND")
 			sb._rbSegmentBg:SetAllPoints(sb)
 		end
-		if sb._rbSegmentBgPath ~= texPath then
-			sb._rbSegmentBg:SetTexture(texPath)
-			sb._rbSegmentBgPath = texPath
+		if segmentBgVisible then
+			if sb._rbSegmentBgPath ~= segmentBgPath then
+				sb._rbSegmentBg:SetTexture(segmentBgPath)
+				sb._rbSegmentBgPath = segmentBgPath
+			end
+			if not sb._rbSegmentBg:IsShown() then sb._rbSegmentBg:Show() end
+		else
+			if sb._rbSegmentBg:IsShown() then sb._rbSegmentBg:Hide() end
+			sb._rbSegmentBgPath = nil
+			sb._rbSegmentBgColorKey = nil
 		end
 		sb:ClearAllPoints()
 		if vertical then

@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.3.0-beta11] - 2026-04-17
+
+### 🐛 Fixed
+
+- Resource Bars / Shared Mode: Fixed Rogue shared Combo Points with `Separator offset` getting the wrong segment background texture after Stealth state changes.
+
+---
+
 ## [10.3.0-beta10] - 2026-04-17
 
 ### 🐛 Fixed
