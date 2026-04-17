@@ -40,6 +40,7 @@ local UnitPowerMax = UnitPowerMax
 local UnitStagger = UnitStagger
 local C_UnitAuras = C_UnitAuras
 local UIParent = UIParent
+local DispelOverlayOrientation = EnumUtil and EnumUtil.MakeEnum("VerticalTopToBottom", "VerticalBottomToTop", "HorizontalLeftToRight")
 
 local atlasByPower = {
 	LUNAR_POWER = "Unit_Druid_AstralPower_Fill",
@@ -88,6 +89,79 @@ local function getDebuffColorFromName(name)
 end
 
 H.getDebuffColorFromName = getDebuffColorFromName
+
+local function getDispelOverlayOrientationToken(value)
+	if DispelOverlayOrientation then
+		if value == DispelOverlayOrientation.VerticalBottomToTop then return "VerticalBottomToTop" end
+		if value == DispelOverlayOrientation.HorizontalLeftToRight then return "HorizontalLeftToRight" end
+		if value == DispelOverlayOrientation.VerticalTopToBottom then return "VerticalTopToBottom" end
+	end
+	if type(value) == "string" then
+		local token = value:gsub("[%s_]", ""):lower()
+		if token == "verticalbottomtotop" then return "VerticalBottomToTop" end
+		if token == "horizontallefttoright" then return "HorizontalLeftToRight" end
+	end
+	return "VerticalTopToBottom"
+end
+
+local function setDispelOverlayAtlas(texture, atlas)
+	if not (texture and texture.SetAtlas and atlas) then return end
+	local currentAtlas = texture.GetAtlas and texture:GetAtlas()
+	if currentAtlas ~= atlas then texture:SetAtlas(atlas, false) end
+end
+
+function H.CreateDispelOverlay(parent)
+	if not parent then return nil end
+
+	local overlay = CreateFrame("Frame", nil, parent)
+	overlay:EnableMouse(false)
+
+	local background = overlay:CreateTexture(nil, "ARTWORK", nil, -6)
+	background:SetAllPoints(overlay)
+	setDispelOverlayAtlas(background, "RaidFrame-Dispel-Fill")
+	overlay.Background = background
+
+	local gradient = overlay:CreateTexture(nil, "ARTWORK", nil, -5)
+	gradient:SetAllPoints(overlay)
+	overlay.Gradient = gradient
+
+	local border = overlay:CreateTexture(nil, "ARTWORK", nil, -5)
+	border:SetAllPoints(overlay)
+	setDispelOverlayAtlas(border, "RaidFrame-DispelHighlight")
+	overlay.Border = border
+
+	function overlay:SetOrientation(orientationOrOwner, orientation, xOffset, yOffset)
+		local resolvedOrientation = orientationOrOwner
+		local resolvedX = orientation
+		local resolvedY = xOffset
+		if type(orientationOrOwner) == "table" and orientation ~= nil then
+			resolvedOrientation = orientation
+			resolvedX = xOffset
+			resolvedY = yOffset
+		end
+
+		local orientationToken = getDispelOverlayOrientationToken(resolvedOrientation)
+		if orientationToken == "HorizontalLeftToRight" then
+			setDispelOverlayAtlas(self.Gradient, "!RaidFrame-Dispel-Vertical")
+			self.Gradient:SetTexCoord(0, 1, 0, 1)
+		else
+			setDispelOverlayAtlas(self.Gradient, "_RaidFrame-Dispel-Highlight-Horizontal")
+			if orientationToken == "VerticalBottomToTop" then
+				self.Gradient:SetTexCoord(0, 1, 1, 0)
+			else
+				self.Gradient:SetTexCoord(0, 1, 0, 1)
+			end
+		end
+
+		self.Border:ClearAllPoints()
+		self.Border:SetPoint("TOPLEFT")
+		self.Border:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", resolvedX or 0, resolvedY or 0)
+	end
+
+	overlay:SetOrientation(DispelOverlayOrientation and DispelOverlayOrientation.VerticalTopToBottom or "VerticalTopToBottom", 0, 0)
+	overlay:Hide()
+	return overlay
+end
 
 local debuffColorCurve = C_CurveUtil and C_CurveUtil.CreateColorCurve() or nil
 if debuffColorCurve and Enum.LuaCurveType and Enum.LuaCurveType.Step then

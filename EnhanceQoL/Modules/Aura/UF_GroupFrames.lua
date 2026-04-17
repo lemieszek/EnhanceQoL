@@ -5848,11 +5848,9 @@ function GF:BuildButton(self)
 	if st.portraitHolder and st.portraitHolder:GetParent() ~= st.barGroup then st.portraitHolder:SetParent(st.barGroup) end
 	if st.portraitSeparator and st.portraitSeparator:GetParent() ~= st.barGroup then st.portraitSeparator:SetParent(st.barGroup) end
 	if not st.dispelTint then
-		st.dispelTint = CreateFrame("Frame", nil, st.barGroup, "CompactUnitFrameDispelOverlayTemplate")
+		st.dispelTint = UFHelper.CreateDispelOverlay(st.barGroup)
 		st.dispelTint:SetAllPoints(st.barGroup)
 		st.dispelTint:Hide()
-
-		if st.dispelTint.SetDispelType then st.dispelTint.SetDispelType = nil end
 	end
 
 	if not st.health then
@@ -6257,7 +6255,7 @@ function GF:LayoutButton(self)
 	self.powerBarUsedHeight = powerH > 0 and powerH or 0
 	if st.dispelTint then
 		st.dispelTint:SetAllPoints(st.health)
-		if st.dispelTint.SetOrientation and DispelOverlayOrientation then st.dispelTint:SetOrientation(self, DispelOverlayOrientation.VerticalTopToBottom, 0, 0) end
+		if st.dispelTint.SetOrientation and DispelOverlayOrientation then st.dispelTint:SetOrientation(DispelOverlayOrientation.VerticalTopToBottom, 0, 0) end
 	end
 
 	if UFHelper and UFHelper.applyFont then

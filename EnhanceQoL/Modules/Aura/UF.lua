@@ -8164,8 +8164,7 @@ local function layoutFrame(cfg, unit)
 		st.dispelTint:SetAllPoints(st.health)
 		local dispelOrientation = AuraUtil.GetSingleDispelOverlayOrientation()
 		if st.dispelTint.SetOrientation and dispelOrientation then
-			AuraUtil._singleDispelOverlaySetupFrame = AuraUtil._singleDispelOverlaySetupFrame or { powerBarUsedHeight = 0 }
-			st.dispelTint:SetOrientation(AuraUtil._singleDispelOverlaySetupFrame, dispelOrientation.VerticalTopToBottom, 0, 0)
+			st.dispelTint:SetOrientation(dispelOrientation.VerticalTopToBottom, 0, 0)
 		end
 	end
 
@@ -8451,10 +8450,9 @@ local function ensureFrames(unit)
 	st.levelTextLayer = st.levelTextLayer or CreateFrame("Frame", nil, st.status)
 	st.levelTextLayer:SetAllPoints(st.status)
 	if (unit == UNIT.PLAYER or unit == UNIT.TARGET or unit == UNIT.FOCUS) and not st.dispelTint then
-		st.dispelTint = CreateFrame("Frame", nil, st.healthTextLayer or st.health, "CompactUnitFrameDispelOverlayTemplate")
+		st.dispelTint = UFHelper.CreateDispelOverlay(st.healthTextLayer or st.health)
 		st.dispelTint:SetAllPoints(st.health)
 		st.dispelTint:Hide()
-		if st.dispelTint.SetDispelType then st.dispelTint.SetDispelType = nil end
 	end
 	if not st.privateAuras then
 		st.privateAuras = CreateFrame("Frame", nil, st.frame)
