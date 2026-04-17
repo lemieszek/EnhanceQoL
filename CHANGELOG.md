@@ -5,6 +5,7 @@
 ### 🐛 Fixed
 
 - Cooldown Panels / Proc Glow: Fixed action-button overlay glows getting stuck after spell-override swaps such as Demon Hunter `Metamorphosis`, by resyncing proc-glow state against Blizzard's current spell-overlay status during icon and spell-state changes.
+- Party Frames / Externals: Fixed external-aura `outside` anchoring and center alignment when portraits extend the visual frame width, so left, top, and center-based anchors now resolve against the full party-frame footprint instead of the health bar alone.
 
 ---
 
