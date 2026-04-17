@@ -49,6 +49,10 @@ CooldownPanels.CDM_AURA_ALWAYS_SHOW_MODE = CooldownPanels.CDM_AURA_ALWAYS_SHOW_M
 	SHOW = "SHOW",
 	DESATURATE = "DESATURATE",
 }
+if CooldownPanels._eqolSpellCooldownIgnoreGCDSupported == nil then
+	-- TODO: Remove this pre-12.0.5 compatibility gate once 12.0.5+ is the minimum supported client.
+	CooldownPanels._eqolSpellCooldownIgnoreGCDSupported = (tonumber(GetBuildInfo and select(4, GetBuildInfo())) or 0) >= 120005
+end
 
 CooldownPanels.POWER_TYPE_TOKEN_BY_ID = CooldownPanels.POWER_TYPE_TOKEN_BY_ID
 	or {
@@ -7036,7 +7040,8 @@ function CooldownPanels:GetCachedSpellCooldownInfo(spellId, ignoreGCD)
 	if not spellId then return 0, 0, false, 1, nil, false end
 	local runtime = self:EnsureSpellQueryCaches()
 	local cache = runtime.spellCooldownInfoCache
-	local mode = ignoreGCD == true and "ignoreGCD" or "default"
+	local useIgnoreGCD = ignoreGCD == true and CooldownPanels._eqolSpellCooldownIgnoreGCDSupported == true
+	local mode = useIgnoreGCD == true and "ignoreGCD" or "default"
 	local cachedByMode = cache[spellId]
 	if type(cachedByMode) ~= "table" then
 		cachedByMode = {}
@@ -7046,7 +7051,7 @@ function CooldownPanels:GetCachedSpellCooldownInfo(spellId, ignoreGCD)
 	if cached then return cached.startTime, cached.duration, cached.enabled, cached.modRate, cached.isOnGCD, cached.isActive end
 	cached = cached or {}
 	cachedByMode[mode] = cached
-	if ignoreGCD == true then
+	if useIgnoreGCD == true then
 		cached.startTime, cached.duration, cached.enabled, cached.modRate, cached.isOnGCD, cached.isActive =
 			self:GetCachedSpellCooldownInfo(spellId, false)
 		if cached.isOnGCD == true then
@@ -7158,7 +7163,7 @@ end
 
 getSpellCooldownDurationObject = function(spellID, ignoreGCD)
 	if not spellID or not Api.GetSpellCooldownDuration then return nil end
-	if ignoreGCD == true then return Api.GetSpellCooldownDuration(spellID, true) end
+	if ignoreGCD == true and CooldownPanels._eqolSpellCooldownIgnoreGCDSupported == true then return Api.GetSpellCooldownDuration(spellID, true) end
 	return Api.GetSpellCooldownDuration(spellID)
 end
 
@@ -20260,13 +20265,17 @@ local function invalidateSpellIconCacheForSpell(spellId)
 	return changed
 end
 
+local setOverlayGlowForSpell
+
 local function handleSpellUpdateIcon(spellId)
 	if spellId ~= nil then
 		invalidateSpellIconCacheForSpell(spellId)
+		if setOverlayGlowForSpell(spellId, true) then return true end
 		return refreshPanelsForSpell(spellId) == true
 	end
 
 	if CooldownPanels.runtime then CooldownPanels.runtime.iconCache = nil end
+	if CooldownPanels.RefreshAllOverlayGlowStates then CooldownPanels:RefreshAllOverlayGlowStates(true) end
 	CooldownPanels:RequestUpdate({
 		cause = "Event:SPELL_UPDATE_ICON",
 		fullRefresh = true,
@@ -20748,33 +20757,91 @@ local function triggerProcSoundForSpell(spellId)
 	end
 end
 
-local function setOverlayGlowForSpell(spellId, enabled)
+setOverlayGlowForSpell = function(spellId, enabled)
 	local id = tonumber(spellId)
 	if not id then return false end
 	CooldownPanels.runtime = CooldownPanels.runtime or {}
 	local runtime = CooldownPanels.runtime
 	runtime.overlayGlowSpells = runtime.overlayGlowSpells or {}
-	local baseId = getBaseSpellId(id)
-	local effectiveId = getEffectiveSpellId(id)
-	local wasEnabled = runtime.overlayGlowSpells[id] == true
-	if not wasEnabled and baseId then wasEnabled = runtime.overlayGlowSpells[baseId] == true end
-	if not wasEnabled and effectiveId then wasEnabled = runtime.overlayGlowSpells[effectiveId] == true end
-	local function setFlag(spellIdentifier, value)
-		if spellIdentifier then runtime.overlayGlowSpells[spellIdentifier] = value end
-	end
-	if enabled then
-		setFlag(id, true)
-		if baseId and baseId ~= id then setFlag(baseId, true) end
-		if effectiveId and effectiveId ~= id then setFlag(effectiveId, true) end
+	local overlayGlowSpells = runtime.overlayGlowSpells
+	if Api.IsSpellOverlayed then
+		local aliasIds = CooldownPanels:GetSpellAliasIDs(id, {}, {})
+		local wasEnabled = false
+		for i = 1, #aliasIds do
+			local aliasId = aliasIds[i]
+			if aliasId and overlayGlowSpells[aliasId] == true then
+				wasEnabled = true
+				break
+			end
+		end
+		local isEnabled = false
+		local changed = false
+		for i = 1, #aliasIds do
+			local aliasId = aliasIds[i]
+			local value = (aliasId and Api.IsSpellOverlayed(aliasId) == true) and true or nil
+			if value then isEnabled = true end
+			if aliasId and overlayGlowSpells[aliasId] ~= value then
+				overlayGlowSpells[aliasId] = value
+				changed = true
+			end
+		end
+		if enabled and isEnabled and not wasEnabled then triggerProcSoundForSpell(id) end
+		if not changed then return false end
 	else
-		setFlag(id, nil)
-		if baseId and baseId ~= id then setFlag(baseId, nil) end
-		if effectiveId and effectiveId ~= id then setFlag(effectiveId, nil) end
+		local baseId = getBaseSpellId(id)
+		local effectiveId = getEffectiveSpellId(id)
+		local wasEnabled = overlayGlowSpells[id] == true
+		if not wasEnabled and baseId then wasEnabled = overlayGlowSpells[baseId] == true end
+		if not wasEnabled and effectiveId then wasEnabled = overlayGlowSpells[effectiveId] == true end
+		local function setFlag(spellIdentifier, value)
+			if spellIdentifier then overlayGlowSpells[spellIdentifier] = value end
+		end
+		if enabled then
+			setFlag(id, true)
+			if baseId and baseId ~= id then setFlag(baseId, true) end
+			if effectiveId and effectiveId ~= id then setFlag(effectiveId, true) end
+		else
+			setFlag(id, nil)
+			if baseId and baseId ~= id then setFlag(baseId, nil) end
+			if effectiveId and effectiveId ~= id then setFlag(effectiveId, nil) end
+		end
+		-- Sound nur wenn es frisch "an" ging.
+		if enabled and not wasEnabled then triggerProcSoundForSpell(id) end
 	end
-	-- Sound nur wenn es frisch "an" ging.
-	if enabled and not wasEnabled then triggerProcSoundForSpell(id) end
 	if refreshPanelsForSpell and refreshPanelsForSpell(id) then return true end
 	if CooldownPanels and CooldownPanels.RequestUpdate then CooldownPanels:RequestUpdate("OverlayGlow") end
+	return true
+end
+
+function CooldownPanels:RefreshAllOverlayGlowStates(suppressRefresh)
+	if not Api.IsSpellOverlayed then return false end
+	local runtime = self.runtime
+	if not runtime then return false end
+	runtime.overlayGlowSpells = runtime.overlayGlowSpells or {}
+	local overlayGlowSpells = runtime.overlayGlowSpells
+	local candidateIds, candidateSeen = {}, {}
+	local spellIndex = runtime.spellIndex
+	if spellIndex then
+		for spellId in pairs(spellIndex) do
+			self:GetSpellAliasIDs(spellId, candidateIds, candidateSeen)
+		end
+	end
+	for spellId in pairs(overlayGlowSpells) do
+		self:GetSpellAliasIDs(spellId, candidateIds, candidateSeen)
+	end
+	local changed = false
+	for i = 1, #candidateIds do
+		local candidateId = candidateIds[i]
+		local value = (candidateId and Api.IsSpellOverlayed(candidateId) == true) and true or nil
+		if candidateId and overlayGlowSpells[candidateId] ~= value then
+			overlayGlowSpells[candidateId] = value
+			changed = true
+		end
+	end
+	if not changed then return false end
+	if suppressRefresh then return true end
+	if self.RequestEnabledPanelRefreshes and self:RequestEnabledPanelRefreshes() then return true end
+	if self.RequestUpdate then self:RequestUpdate("OverlayGlowSync") end
 	return true
 end
 
@@ -21237,6 +21304,7 @@ local function ensureUpdateFrame()
 		end
 		if event == "SPELLS_CHANGED" then
 			CooldownPanels:InvalidateSpellQueryCaches()
+			if CooldownPanels.RefreshAllOverlayGlowStates then CooldownPanels:RefreshAllOverlayGlowStates() end
 			scheduleSpecAwareRebuild(event, false)
 			return
 		end

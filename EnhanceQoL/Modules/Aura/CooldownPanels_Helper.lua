@@ -43,6 +43,7 @@ Api.GetSpellChargesInfo = C_Spell and C_Spell.GetSpellCharges
 Api.GetAuraDuration = C_UnitAuras and C_UnitAuras.GetAuraDuration
 Api.GetBaseSpell = C_Spell and C_Spell.GetBaseSpell
 Api.GetOverrideSpell = C_Spell and C_Spell.GetOverrideSpell
+Api.IsSpellOverlayed = C_SpellActivationOverlay and C_SpellActivationOverlay.IsSpellOverlayed
 Api.GetSpellPowerCost = C_Spell and C_Spell.GetSpellPowerCost
 Api.EnableSpellRangeCheck = C_Spell and C_Spell.EnableSpellRangeCheck
 Api.GetActiveTalentConfigID = C_ClassTalents and C_ClassTalents.GetActiveConfigID

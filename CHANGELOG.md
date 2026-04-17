@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.3.0-beta10] - 2026-04-17
+
+### 🐛 Fixed
+
+- Cooldown Panels / Proc Glow: Fixed action-button overlay glows getting stuck after spell-override swaps such as Demon Hunter `Metamorphosis`, by resyncing proc-glow state against Blizzard's current spell-overlay status during icon and spell-state changes.
+
+---
+
 ## [10.3.0-beta9] - 2026-04-17
 
 ### 🐛 Fixed
