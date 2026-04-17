@@ -12518,6 +12518,7 @@ function GF:DisableFeature()
 	end
 	cancelQueuedGroupIndicatorRefresh()
 	GF._pendingDisable = nil
+	GF:CancelPostRosterRefreshTicker()
 	GF:CancelPostEnterWorldRefreshTicker()
 	GF:CancelConnectionRefreshTicker()
 	unregisterFeatureEvents(GF._eventFrame)
@@ -26925,6 +26926,13 @@ function GF:CancelPostEnterWorldRefreshTicker()
 	self._postEnterWorldRefreshPasses = nil
 end
 
+function GF:CancelPostRosterRefreshTicker()
+	local ticker = self._postRosterRefreshTicker
+	if ticker and ticker.Cancel then ticker:Cancel() end
+	self._postRosterRefreshTicker = nil
+	self._postRosterRefreshPasses = nil
+end
+
 function GF:RunProfileChangeRefreshPass()
 	if not isFeatureEnabled() then return end
 	self:EnsureHeaders()
@@ -26943,6 +26951,26 @@ function GF:RunProfileChangeRefreshPass()
 	queueGroupIndicatorRefresh(0.05, 4)
 end
 
+function GF:RunPostRosterRefreshPass()
+	if not isFeatureEnabled() then return end
+	self:EnsureHeaders()
+	if InCombatLockdown and InCombatLockdown() then
+		GF:MarkPendingHeaderRefresh("party")
+		GF:MarkPendingHeaderRefresh("raid")
+		GF:MarkPendingHeaderRefresh("mt")
+		GF:MarkPendingHeaderRefresh("ma")
+		return
+	end
+	-- Secure group headers can settle a frame late after roster transitions.
+	-- Re-apply the live layout a few times so pixel-snapped points/sizes win consistently.
+	self:ApplyHeaderAttributes("party")
+	self:ApplyHeaderAttributes("raid")
+	self:ApplyHeaderAttributes("mt")
+	self:ApplyHeaderAttributes("ma")
+	self:RefreshChangedUnitButtons()
+	self:RefreshGroupIndicators()
+end
+
 function GF:RunPostEnterWorldRefreshPass()
 	if not isFeatureEnabled() then return end
 	self:EnsureHeaders()
@@ -26955,6 +26983,24 @@ function GF:RunPostEnterWorldRefreshPass()
 	self:RefreshStatusText()
 	self:RefreshGroupIndicators()
 	queueGroupIndicatorRefresh(0.05, 4)
+end
+
+function GF:SchedulePostRosterRefresh()
+	self:CancelPostRosterRefreshTicker()
+	if not (C_Timer and C_Timer.NewTicker) then
+		self:RunPostRosterRefreshPass()
+		return
+	end
+	self._postRosterRefreshPasses = 0
+	self._postRosterRefreshTicker = C_Timer.NewTicker(0.12, function()
+		GF._postRosterRefreshPasses = (GF._postRosterRefreshPasses or 0) + 1
+		if not isFeatureEnabled() then
+			GF:CancelPostRosterRefreshTicker()
+			return
+		end
+		GF:RunPostRosterRefreshPass()
+		if (GF._postRosterRefreshPasses or 0) >= 4 then GF:CancelPostRosterRefreshTicker() end
+	end)
 end
 
 function GF:SchedulePostEnterWorldRefresh()
@@ -27058,12 +27104,14 @@ do
 				queueGroupIndicatorRefresh(0, 4)
 			end
 			GF:ScheduleConnectionRefresh()
+			GF:SchedulePostRosterRefresh()
 			if custom and custom.separateMeleeRanged == true and sortMethod == "NAMELIST" and GFH and GFH.QueueInspectGroup then GFH.QueueInspectGroup() end
 		elseif event == "RAID_ROSTER_UPDATE" then
 			GF:RefreshConnectionState()
 			GF:RefreshGroupIcons()
 			GF:RefreshStatusIcons()
 			GF:ScheduleConnectionRefresh()
+			GF:SchedulePostRosterRefresh()
 		elseif event == "PLAYER_ROLES_ASSIGNED" then
 			GF:RefreshRoleIcons()
 			GF:RefreshTargetHighlights()

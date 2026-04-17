@@ -94,6 +94,8 @@ end
 
 local GetNumFriends = C_FriendList.GetNumFriends
 local GetFriendInfoByIndex = C_FriendList.GetFriendInfoByIndex
+local GetNumGuildMembers = GetNumGuildMembers
+local GetGuildRosterInfo = GetGuildRosterInfo
 
 local myGuid = UnitGUID("player")
 
@@ -117,8 +119,16 @@ local function normalizeRealmName(realm)
 	return realm:lower()
 end
 
+local function normalizeCompareText(text)
+	if type(text) ~= "string" then return nil end
+	text = text:gsub("[%s%-']", ""):lower()
+	if text == "" then return nil end
+	return text
+end
+
 local myRealm = GetRealmName and GetRealmName() or nil
 local myRealmKey = normalizeRealmName(myRealm)
+local myRealmCompareKey = normalizeCompareText(myRealm)
 
 local function splitNameRealm(name)
 	if not name then return nil, nil end
@@ -169,13 +179,189 @@ local function classDisplayAndColor(classTokenOrLocalized)
 	return nameLocalized, color
 end
 
+local function classDisplayAndColorFromClassID(classID)
+	if not classID or not C_CreatureInfo or not C_CreatureInfo.GetClassInfo then return nil, nil end
+	local classInfo = C_CreatureInfo.GetClassInfo(classID)
+	if not classInfo then return nil, nil end
+	return classDisplayAndColor(classInfo.classFile or classInfo.className)
+end
+
+local function cleanRealmName(realm)
+	if type(realm) ~= "string" then return nil end
+	local cleaned = realm:gsub("%(%*%)", "")
+	cleaned = cleaned:gsub("%*$", "")
+	cleaned = cleaned:gsub("^%s+", "")
+	cleaned = cleaned:gsub("%s+$", "")
+	if cleaned == "" then return nil end
+	return cleaned
+end
+
+local function getRealmDisplayText(realm)
+	local cleaned = cleanRealmName(realm)
+	if not cleaned then return nil end
+	local realmKey = normalizeCompareText(cleaned)
+	if realmKey and myRealmCompareKey and realmKey == myRealmCompareKey then return nil end
+	return cleaned
+end
+
+local function buildLocationText(areaText, realmText)
+	local area = (type(areaText) == "string" and areaText ~= "") and areaText or nil
+	local realm = getRealmDisplayText(realmText)
+	if area and realm then return ("%s - %s"):format(area, realm) end
+	return area or realm or nil
+end
+
+local function isSameZone(areaText)
+	local areaKey = normalizeCompareText(areaText)
+	if not areaKey then return false end
+
+	local zoneKey = normalizeCompareText(GetZoneText and GetZoneText() or nil)
+	local realZoneKey = normalizeCompareText(GetRealZoneText and GetRealZoneText() or nil)
+	local subZoneKey = normalizeCompareText(GetSubZoneText and GetSubZoneText() or nil)
+
+	return areaKey == zoneKey or areaKey == realZoneKey or areaKey == subZoneKey
+end
+
+local CLUB_PRESENCE = Enum and Enum.ClubMemberPresence or {}
+local CLUB_PRESENCE_OFFLINE = CLUB_PRESENCE.Offline or 3
+local CLUB_PRESENCE_AWAY = CLUB_PRESENCE.Away or 4
+local CLUB_PRESENCE_BUSY = CLUB_PRESENCE.Busy or 5
+
 -- Structured tooltip data: sections with lists
 local tooltipData = { bnet = {}, friends = {}, guild = {} }
+local tooltipMeta = {
+	guildMotd = nil,
+	guildName = nil,
+	guildOnlineCount = 0,
+	guildTotalCount = 0,
+}
 
 local function wipeTooltipSections()
 	wipe(tooltipData.bnet)
 	wipe(tooltipData.friends)
 	wipe(tooltipData.guild)
+	tooltipMeta.guildMotd = nil
+	tooltipMeta.guildName = nil
+	tooltipMeta.guildOnlineCount = 0
+	tooltipMeta.guildTotalCount = 0
+end
+
+local function resolveGuildName()
+	local guildName = GetGuildInfo and GetGuildInfo("player")
+	if guildName and guildName ~= "" then return guildName end
+	if not (C_Club and C_Club.GetGuildClubId and C_Club.GetClubInfo) then return nil end
+
+	local okClubId, clubId = pcall(C_Club.GetGuildClubId)
+	if not okClubId or not clubId then return nil end
+
+	local okClubInfo, clubInfo = pcall(C_Club.GetClubInfo, clubId)
+	if okClubInfo and clubInfo and clubInfo.name and clubInfo.name ~= "" then return clubInfo.name end
+	return nil
+end
+
+local function resolveGuildMotd()
+	if not (C_GuildInfo and C_GuildInfo.GetMOTD) then return nil end
+	local ok, motd = pcall(C_GuildInfo.GetMOTD)
+	if ok and motd and motd ~= "" then return motd end
+	return nil
+end
+
+local function requestGuildRosterIfNeeded(memberCount)
+	if not (IsInGuild and IsInGuild()) then return end
+	if memberCount and memberCount > 0 then return end
+	if C_GuildInfo and C_GuildInfo.GuildRoster then C_GuildInfo.GuildRoster() end
+end
+
+local function guildRosterStatusToStatus(status)
+	if status == 1 or status == "AFK" then return "AFK" end
+	if status == 2 or status == "DND" then return "DND" end
+	return nil
+end
+
+local function clubPresenceToStatus(presence)
+	if presence == CLUB_PRESENCE_AWAY then return "AFK" end
+	if presence == CLUB_PRESENCE_BUSY then return "DND" end
+	return nil
+end
+
+local function addGuildEntriesFromClub(seen)
+	if not (C_Club and C_Club.GetGuildClubId and C_Club.GetClubInfo and C_Club.GetClubMembers and C_Club.GetMemberInfo) then
+		return false
+	end
+
+	local okClubId, clubId = pcall(C_Club.GetGuildClubId)
+	if not okClubId or not clubId then return false end
+
+	local okClubInfo, clubInfo = pcall(C_Club.GetClubInfo, clubId)
+	local okMemberIds, memberIds = pcall(C_Club.GetClubMembers, clubId)
+	if not okMemberIds or type(memberIds) ~= "table" then return false end
+
+	if okClubInfo and clubInfo and clubInfo.name and clubInfo.name ~= "" then
+		tooltipMeta.guildName = clubInfo.name
+		tooltipMeta.guildTotalCount = clubInfo.memberCount or #memberIds
+	else
+		tooltipMeta.guildTotalCount = #memberIds
+	end
+
+	local sawGuildMember = false
+	for _, memberId in ipairs(memberIds) do
+		local okMemberInfo, memberInfo = pcall(C_Club.GetMemberInfo, clubId, memberId)
+		if okMemberInfo and memberInfo and memberInfo.name and memberInfo.presence ~= CLUB_PRESENCE_OFFLINE then
+			if not memberInfo.isSelf and memberInfo.guid ~= myGuid then
+				tooltipMeta.guildOnlineCount = tooltipMeta.guildOnlineCount + 1
+			end
+
+			if not memberInfo.isSelf and memberInfo.guid ~= myGuid then
+				sawGuildMember = true
+				local key = makeKey(memberInfo.name)
+				if not seen[key] then
+					seen[key] = true
+					local classDisp, color = classDisplayAndColorFromClassID(memberInfo.classID)
+					table.insert(tooltipData.guild, {
+						name = displayName(memberInfo.name),
+						level = memberInfo.level,
+						class = classDisp,
+						color = color,
+						status = clubPresenceToStatus(memberInfo.presence),
+						location = memberInfo.zone,
+						locationSameZone = isSameZone(memberInfo.zone),
+					})
+				end
+			end
+		end
+	end
+
+	return sawGuildMember or tooltipMeta.guildTotalCount > 0
+end
+
+local function addGuildEntriesFromRoster(seen)
+	local memberCount = GetNumGuildMembers and GetNumGuildMembers() or 0
+	tooltipMeta.guildTotalCount = memberCount or 0
+	requestGuildRosterIfNeeded(memberCount)
+	if not memberCount or memberCount <= 0 then return end
+
+	for i = 1, memberCount do
+		local name, _, _, level, _, zone, _, _, isOnline, status, classToken, _, _, _, _, _, guid = GetGuildRosterInfo(i)
+		if isOnline and guid ~= myGuid then
+			tooltipMeta.guildOnlineCount = tooltipMeta.guildOnlineCount + 1
+		end
+		if isOnline and guid ~= myGuid and name and level then
+			local key = makeKey(name)
+			if not seen[key] then
+				seen[key] = true
+				local classDisp, color = classDisplayAndColor(classToken)
+				table.insert(tooltipData.guild, {
+					name = displayName(name),
+					level = level,
+					class = classDisp,
+					color = color,
+					status = guildRosterStatusToStatus(status),
+					location = zone,
+					locationSameZone = isSameZone(zone),
+				})
+			end
+		end
+	end
 end
 
 local function getFriends(stream)
@@ -185,7 +371,9 @@ local function getFriends(stream)
 	local seen = {} -- key -> true (dedupe across sources)
 	local totalUnique = 0
 	local friendsCount = 0
-	local guildOnlineCount = 0
+
+	tooltipMeta.guildName = resolveGuildName()
+	tooltipMeta.guildMotd = resolveGuildMotd()
 
 	-- 1) Battle.net friends (prefer these when deduping)
 	local numBNetTotal, _ = BNGetNumFriends()
@@ -211,6 +399,7 @@ local function getFriends(stream)
 					elseif isAFK then
 						status = "AFK"
 					end
+					local location = buildLocationText(ga.areaName, ga.realmDisplayName or ga.realmName)
 					table.insert(tooltipData.bnet, {
 						name = displayName(ga.characterName, ga.realmName),
 						level = ga.characterLevel,
@@ -219,7 +408,9 @@ local function getFriends(stream)
 						bnName = bnName,
 						status = status,
 						client = ga.clientProgram,
-						presence = ga.richPresence or ga.gameText,
+						location = location or ga.richPresence or ga.gameText,
+						locationSameZone = ga.areaName and isSameZone(ga.areaName) or false,
+						note = info and info.note or nil,
 					})
 				end
 			end
@@ -243,36 +434,17 @@ local function getFriends(stream)
 					class = classDisp,
 					color = color,
 					status = (friendInfo.dnd and "DND") or (friendInfo.afk and "AFK") or nil,
-					presence = friendInfo.area,
+					location = friendInfo.area,
+					locationSameZone = isSameZone(friendInfo.area),
 					note = friendInfo.notes,
 				})
 			end
 		end
 	end
-	friendsCount = totalUnique
+	friendsCount = #tooltipData.bnet + #tooltipData.friends
 
 	-- 3) Guild members
-	local gMember = GetNumGuildMembers and GetNumGuildMembers()
-	if gMember and gMember > 0 then
-		for i = 1, gMember do
-			local name, _, _, level, _, _, _, _, isOnline, _, classToken, _, _, _, _, _, guid = GetGuildRosterInfo(i)
-			if isOnline and guid ~= myGuid and name and level then
-				guildOnlineCount = guildOnlineCount + 1
-				local key = makeKey(name)
-				if not seen[key] then
-					seen[key] = true
-					totalUnique = totalUnique + 1
-					local classDisp, color = classDisplayAndColor(classToken)
-					table.insert(tooltipData.guild, {
-						name = displayName(name),
-						level = level,
-						class = classDisp,
-						color = color,
-					})
-				end
-			end
-		end
-	end
+	if not addGuildEntriesFromClub(seen) then addGuildEntriesFromRoster(seen) end
 
 	-- Sort each section by name
 	local function byName(a, b) return (a.name or ""):lower() < (b.name or ""):lower() end
@@ -280,12 +452,20 @@ local function getFriends(stream)
 	table.sort(tooltipData.friends, byName)
 	table.sort(tooltipData.guild, byName)
 
+	totalUnique = friendsCount + #tooltipData.guild
+
 	stream.snapshot.fontSize = db and db.fontSize or 13
 	if db and db.splitDisplay then
-		if db.splitDisplayInline then
-			stream.snapshot.text = string.format("%s: %d  %s: %d", GUILD, guildOnlineCount, FRIENDS, friendsCount)
+		local guildText
+		if tooltipMeta.guildTotalCount and tooltipMeta.guildTotalCount > 0 then
+			guildText = string.format("%s: %d/%d", GUILD, tooltipMeta.guildOnlineCount, tooltipMeta.guildTotalCount)
 		else
-			stream.snapshot.text = string.format("%s: %d\n%s: %d", GUILD, guildOnlineCount, FRIENDS, friendsCount)
+			guildText = string.format("%s: %d", GUILD, tooltipMeta.guildOnlineCount)
+		end
+		if db.splitDisplayInline then
+			stream.snapshot.text = string.format("%s  %s: %d", guildText, FRIENDS, friendsCount)
+		else
+			stream.snapshot.text = string.format("%s\n%s: %d", guildText, FRIENDS, friendsCount)
 		end
 	else
 		stream.snapshot.text = totalUnique .. " " .. FRIENDS
@@ -312,10 +492,59 @@ local function ensureListWindow()
 	return frame
 end
 
+local function colorizeText(text, r, g, b)
+	if not text or text == "" then return text end
+	return string.format("|cff%02x%02x%02x%s|r", r * 255, g * 255, b * 255, text)
+end
+
 local function colorizedName(name, color)
 	if not color then return name end
-	local r, g, b = color.r or 1, color.g or 1, color.b or 1
-	return string.format("|cff%02x%02x%02x%s|r", r * 255, g * 255, b * 255, name)
+	return colorizeText(name, color.r or 1, color.g or 1, color.b or 1)
+end
+
+local function colorizedLocation(location, sameZone)
+	if not location or location == "" then return location end
+	if sameZone then return colorizeText(location, 0.25, 1.0, 0.4) end
+	return colorizeText(location, 0.62, 0.62, 0.62)
+end
+
+local function formatEntryName(entry)
+	local nameText = colorizedName(entry.name, entry.color)
+	if entry.bnName then nameText = nameText .. " |cff80bfff(" .. entry.bnName .. ")|r" end
+	if entry.status == "DND" then
+		nameText = nameText .. " |cffff5050[DND]|r"
+	elseif entry.status == "AFK" then
+		nameText = nameText .. " |cffffb84d[AFK]|r"
+	end
+	return nameText
+end
+
+local function buildClassLevelText(entry)
+	if entry.class and entry.level then return string.format("%s (%s)", entry.class, tostring(entry.level)) end
+	if entry.class then return entry.class end
+	if entry.level then return tostring(entry.level) end
+	if entry.note and entry.note ~= "" then return entry.note end
+	return ""
+end
+
+local function getEntryRightText(entry)
+	local rightText = entry.location or ""
+	if rightText == "" then rightText = buildClassLevelText(entry) end
+	return colorizedLocation(rightText, entry.location and entry.locationSameZone == true)
+end
+
+local function getTooltipEntryRight(entry)
+	local rightText = entry.location or ""
+	if rightText == "" then return buildClassLevelText(entry), false end
+	return rightText, entry.locationSameZone == true
+end
+
+local function getTooltipRightColor(entry, sameZone)
+	if not entry.location or entry.location == "" then
+		return HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b
+	end
+	if sameZone then return 0.25, 1.0, 0.4 end
+	return 0.62, 0.62, 0.62
 end
 
 local function addHeader(scroll, title)
@@ -326,17 +555,42 @@ local function addHeader(scroll, title)
 	scroll:AddChild(header)
 end
 
-local function addRow(scroll, cols)
-	-- cols: array of { text=..., width=relativeWidth }
+local function addTwoColumnRow(scroll, leftText, rightText, leftWidth, rightWidth)
 	local row = AceGUI:Create("SimpleGroup")
 	row:SetFullWidth(true)
 	row:SetLayout("Flow")
-	for i, col in ipairs(cols) do
-		local lbl = AceGUI:Create("Label")
-		lbl:SetRelativeWidth(col.width or (1 / #cols))
-		lbl:SetText(col.text or "")
-		scroll:AddChild(lbl)
+	local left = AceGUI:Create("Label")
+	left:SetRelativeWidth(leftWidth or 0.58)
+	left:SetText(leftText or "")
+	row:AddChild(left)
+
+	local right = AceGUI:Create("Label")
+	right:SetRelativeWidth(rightWidth or 0.42)
+	right:SetText(rightText or "")
+	row:AddChild(right)
+
+	scroll:AddChild(row)
+end
+
+local function addColumnHeader(scroll)
+	local rightHeader = _G.ZONE or _G.PRESENCE or L["Presence"] or "Presence"
+	addTwoColumnRow(scroll, "|cffcccccc" .. NAME .. "|r", "|cffcccccc" .. rightHeader .. "|r")
+end
+
+local function addSectionRows(scroll, title, items)
+	if #items == 0 then return end
+	addHeader(scroll, string.format("%s (%d)", title, #items))
+	addColumnHeader(scroll)
+	for _, entry in ipairs(items) do
+		addTwoColumnRow(scroll, formatEntryName(entry), getEntryRightText(entry))
 	end
+end
+
+local function addSpacer(scroll)
+	local spacer = AceGUI:Create("Label")
+	spacer:SetFullWidth(true)
+	spacer:SetText(" ")
+	scroll:AddChild(spacer)
 end
 
 function populateListWindow()
@@ -344,49 +598,32 @@ function populateListWindow()
 	local scroll = listWindow._scroll
 	scroll:ReleaseChildren()
 
-	-- Header row
-	local headerRow = AceGUI:Create("SimpleGroup")
-	headerRow:SetFullWidth(true)
-	headerRow:SetLayout("Flow")
-	local function headerLabel(text, width)
-		local lbl = AceGUI:Create("Label")
-		lbl:SetText("|cffcccccc" .. text .. "|r")
-		lbl:SetRelativeWidth(width)
-		headerRow:AddChild(lbl)
-	end
-	headerLabel(NAME, 0.30)
-	headerLabel("Client", 0.12)
-	headerLabel((_G.PRESENCE or L["Presence"] or "Presence"), 0.38)
-	headerLabel((_G.NOTES_LABEL or "Note"), 0.20)
-	scroll:AddChild(headerRow)
-
-	-- Battle.net section
-	addHeader(scroll, BATTLENET_OPTIONS_LABEL or "Battle.net")
-	for _, v in ipairs(tooltipData.bnet) do
-		local bnSuffix = v.bnName and (" |cff80bfff(" .. v.bnName .. ")|r") or ""
-		local status = v.status == "DND" and " |cffff5050[DND]|r" or (v.status == "AFK" and " |cffffb84d[AFK]|r" or "")
-		local nameText = colorizedName(v.name, v.color) .. bnSuffix .. status
-		addRow(scroll, {
-			{ text = nameText, width = 0.30 },
-			{ text = v.client or "WoW", width = 0.12 },
-			{ text = v.presence or "", width = 0.38 },
-			{ text = v.note or "", width = 0.20 },
-		})
+	if tooltipMeta.guildName or tooltipMeta.guildTotalCount > 0 or tooltipMeta.guildMotd or #tooltipData.guild > 0 then
+		addHeader(scroll, tooltipMeta.guildName or GUILD)
+		if tooltipMeta.guildTotalCount and tooltipMeta.guildTotalCount > 0 then
+			addTwoColumnRow(scroll, "|cffcccccc" .. GUILD .. "|r", string.format("%d/%d", tooltipMeta.guildOnlineCount, tooltipMeta.guildTotalCount), 0.24, 0.76)
+		elseif tooltipMeta.guildOnlineCount and tooltipMeta.guildOnlineCount > 0 then
+			addTwoColumnRow(scroll, "|cffcccccc" .. GUILD .. "|r", tostring(tooltipMeta.guildOnlineCount), 0.24, 0.76)
+		end
+		if tooltipMeta.guildMotd and tooltipMeta.guildMotd ~= "" then
+			addTwoColumnRow(scroll, "|cffccccccMOTD|r", tooltipMeta.guildMotd, 0.24, 0.76)
+		end
+		if #tooltipData.guild > 0 then
+			addSpacer(scroll)
+			addColumnHeader(scroll)
+			for _, entry in ipairs(tooltipData.guild) do
+				addTwoColumnRow(scroll, formatEntryName(entry), getEntryRightText(entry))
+			end
+		end
 	end
 
-	-- Regular WoW friends (excluding those already shown via BNet)
-	addHeader(scroll, FRIENDS)
-	for _, v in ipairs(tooltipData.friends) do
-		local status = v.status == "DND" and " |cffff5050[DND]|r" or (v.status == "AFK" and " |cffffb84d[AFK]|r" or "")
-		local nameText = colorizedName(v.name, v.color) .. status
-		local presence = v.presence or ((v.class and v.level) and (v.class .. " (" .. tostring(v.level) .. ")") or "")
-		addRow(scroll, {
-			{ text = nameText, width = 0.30 },
-			{ text = "WoW", width = 0.12 },
-			{ text = presence, width = 0.38 },
-			{ text = v.note or "", width = 0.20 },
-		})
+	if (tooltipMeta.guildName or tooltipMeta.guildTotalCount > 0 or tooltipMeta.guildMotd or #tooltipData.guild > 0) and (#tooltipData.friends > 0 or #tooltipData.bnet > 0) then
+		addSpacer(scroll)
 	end
+
+	addSectionRows(scroll, FRIENDS, tooltipData.friends)
+	if #tooltipData.friends > 0 and #tooltipData.bnet > 0 then addSpacer(scroll) end
+	addSectionRows(scroll, BATTLENET_OPTIONS_LABEL or "Battle.net", tooltipData.bnet)
 end
 
 local function toggleListWindow()
@@ -405,11 +642,27 @@ local provider = {
 	title = FRIENDS,
 	update = getFriends,
 	events = {
-		PLAYER_LOGIN = function(stream) addon.DataHub:RequestUpdate(stream) end,
+		PLAYER_LOGIN = function(stream)
+			requestGuildRosterIfNeeded(GetNumGuildMembers and GetNumGuildMembers() or 0)
+			addon.DataHub:RequestUpdate(stream)
+		end,
 		BN_FRIEND_ACCOUNT_ONLINE = function(stream) addon.DataHub:RequestUpdate(stream) end,
 		BN_FRIEND_ACCOUNT_OFFLINE = function(stream) addon.DataHub:RequestUpdate(stream) end,
 		BN_FRIEND_INFO_CHANGED = function(stream) addon.DataHub:RequestUpdate(stream) end,
 		FRIENDLIST_UPDATE = function(stream) addon.DataHub:RequestUpdate(stream) end,
+		GUILD_MOTD = function(stream) addon.DataHub:RequestUpdate(stream) end,
+		GUILD_ROSTER_UPDATE = function(stream) addon.DataHub:RequestUpdate(stream) end,
+		PLAYER_GUILD_UPDATE = function(stream)
+			requestGuildRosterIfNeeded(GetNumGuildMembers and GetNumGuildMembers() or 0)
+			addon.DataHub:RequestUpdate(stream)
+		end,
+		CLUB_MEMBER_ADDED = function(stream) addon.DataHub:RequestUpdate(stream) end,
+		CLUB_MEMBER_PRESENCE_UPDATED = function(stream) addon.DataHub:RequestUpdate(stream) end,
+		CLUB_MEMBER_REMOVED = function(stream) addon.DataHub:RequestUpdate(stream) end,
+		CLUB_MEMBER_UPDATED = function(stream) addon.DataHub:RequestUpdate(stream) end,
+		ZONE_CHANGED = function(stream) addon.DataHub:RequestUpdate(stream) end,
+		ZONE_CHANGED_INDOORS = function(stream) addon.DataHub:RequestUpdate(stream) end,
+		ZONE_CHANGED_NEW_AREA = function(stream) addon.DataHub:RequestUpdate(stream) end,
 	},
 	OnClick = function(_, btn)
 		if btn == "RightButton" then
@@ -431,30 +684,45 @@ local provider = {
 			if #items == 0 then return end
 			color = color or HIGHLIGHT_FONT_COLOR
 			tip:AddLine(string.format("%s (%d)", title, #items), color.r, color.g, color.b)
-			for _, v in ipairs(items) do
-				local right = v.level or ""
-				if v.class and v.level then right = string.format("%s (%s)", v.class, v.level) end
-				-- Append BN name and status for BNet entries; presence for others
-				local left = v.name
-				if v.bnName then left = string.format("%s |cff80bfff(%s)|r", left, v.bnName) end
-				if v.status == "DND" then
-					left = left .. " |cffff5050[DND]|r"
-				elseif v.status == "AFK" then
-					left = left .. " |cffffb84d[AFK]|r"
-				end
-				if (not v.bnName) and v.presence then right = v.presence end
-				if v.color then
-					tip:AddDoubleLine(left, right, NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b, v.color.r, v.color.g, v.color.b)
+			for _, entry in ipairs(items) do
+				local left = formatEntryName(entry)
+				local right, sameZone = getTooltipEntryRight(entry)
+				if right and right ~= "" then
+					local rr, rg, rb = getTooltipRightColor(entry, sameZone)
+					tip:AddDoubleLine(left, right, NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b, rr, rg, rb)
 				else
-					tip:AddDoubleLine(left, right)
+					tip:AddLine(left)
 				end
 			end
 			tip:AddLine(" ")
 		end
 
-		addSection(BATTLENET_OPTIONS_LABEL or "Battle.net", tooltipData.bnet, CreateColor(0.3, 0.7, 1.0))
-		addSection(FRIENDS, tooltipData.friends, CreateColor(0.8, 0.8, 1.0))
+		if tooltipMeta.guildName or tooltipMeta.guildTotalCount > 0 or tooltipMeta.guildMotd then
+			local guildCountText
+			if tooltipMeta.guildTotalCount and tooltipMeta.guildTotalCount > 0 then
+				guildCountText = string.format("%s: %d/%d", GUILD, tooltipMeta.guildOnlineCount, tooltipMeta.guildTotalCount)
+			else
+				guildCountText = string.format("%s: %d", GUILD, tooltipMeta.guildOnlineCount)
+			end
+			tip:AddDoubleLine(
+				tooltipMeta.guildName or GUILD,
+				guildCountText,
+				0.25,
+				1.0,
+				0.4,
+				NORMAL_FONT_COLOR.r,
+				NORMAL_FONT_COLOR.g,
+				NORMAL_FONT_COLOR.b
+			)
+			if tooltipMeta.guildMotd and tooltipMeta.guildMotd ~= "" then
+				tip:AddLine("MOTD - " .. tooltipMeta.guildMotd, NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b, true)
+			end
+			if #tooltipData.guild > 0 then tip:AddLine(" ") end
+		end
+
 		addSection(GUILD, tooltipData.guild, CreateColor(0.25, 1.0, 0.4))
+		addSection(FRIENDS, tooltipData.friends, CreateColor(0.8, 0.8, 1.0))
+		addSection(BATTLENET_OPTIONS_LABEL or "Battle.net", tooltipData.bnet, CreateColor(0.3, 0.7, 1.0))
 
 		local hint = getOptionsHint()
 		if hint then tip:AddLine(hint) end

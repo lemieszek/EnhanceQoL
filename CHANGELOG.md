@@ -1,5 +1,14 @@
 # Changelog
 
+## [10.3.0-beta12] - 2026-04-17
+
+### 🔄 Changed
+
+- Data Panels / Friends & Guild: Reworked the Friends/Guild stream so the guild block is shown first with guild name, online/total member count, and `MOTD`, followed by guild members and then friends.
+- Data Panels / Friends & Guild: Updated tooltip and click-window entries to use class-colored names and location-focused right columns, with same-zone locations highlighted in green and other locations dimmed in gray.
+
+---
+
 ## [10.3.0-beta11] - 2026-04-17
 
 ### 🐛 Fixed
