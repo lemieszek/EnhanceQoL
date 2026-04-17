@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.3.0-beta9] - 2026-04-17
+
+### ❌ Removed
+
+- Character Frame / Stats: Temporarily removed the custom `Movement Speed` stat and custom stat-row formatting on the character stats pane for WoW `12.0.5`, because Blizzard now treats parts of the PaperDoll stats flow as secret-value protected.
+
+---
+
 ## [10.3.0-beta8] - 2026-04-16
 
 ### 🐛 Fixed

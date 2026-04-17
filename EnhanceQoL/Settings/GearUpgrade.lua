@@ -45,8 +45,7 @@ local function isCharDisplaySelected(key)
 	if key == "gemtip" then return t.gemtip == true end
 	if key == "durability" then return addon.db["showDurabilityOnCharframe"] == true end
 	if key == "catalyst" then return addon.db["showCatalystChargesOnCharframe"] == true end
-	if key == "movementspeed" then return addon.db["movementSpeedStatEnabled"] == true end
-	if key == "statsformat" then return addon.db["characterStatsFormattingEnabled"] == true end
+	if key == "movementspeed" or key == "statsformat" then return false end
 	return false
 end
 
@@ -62,15 +61,11 @@ local function setCharDisplayOption(key, value)
 	elseif key == "catalyst" then
 		addon.db["showCatalystChargesOnCharframe"] = enabled
 	elseif key == "movementspeed" then
-		addon.db["movementSpeedStatEnabled"] = enabled
-		if enabled then
-			if addon.MovementSpeedStat and addon.MovementSpeedStat.Refresh then addon.MovementSpeedStat.Refresh() end
-		else
-			addon.MovementSpeedStat.Disable()
-		end
+		addon.db["movementSpeedStatEnabled"] = false
+		if addon.MovementSpeedStat and addon.MovementSpeedStat.Disable then addon.MovementSpeedStat.Disable() end
 	elseif key == "statsformat" then
-		addon.db["characterStatsFormattingEnabled"] = enabled
-		if addon.CharacterStatsFormatting and addon.CharacterStatsFormatting.Refresh then addon.CharacterStatsFormatting.Refresh() end
+		addon.db["characterStatsFormattingEnabled"] = false
+		if addon.CharacterStatsFormatting and addon.CharacterStatsFormatting.Disable then addon.CharacterStatsFormatting.Disable() end
 	end
 end
 
@@ -84,16 +79,12 @@ local function applyCharDisplaySelection(selection)
 	addon.db.charDisplayOptions.gemtip = selection.gemtip == true
 	addon.db["showDurabilityOnCharframe"] = selection.durability == true
 	addon.db["showCatalystChargesOnCharframe"] = selection.catalyst == true
-	addon.db["movementSpeedStatEnabled"] = selection.movementspeed == true
-	addon.db["characterStatsFormattingEnabled"] = selection.statsformat == true
+	addon.db["movementSpeedStatEnabled"] = false
+	addon.db["characterStatsFormattingEnabled"] = false
 	addon.functions.setCharFrame()
 	addon.functions.calculateDurability()
-	if addon.db["movementSpeedStatEnabled"] then
-		if addon.MovementSpeedStat and addon.MovementSpeedStat.Refresh then addon.MovementSpeedStat.Refresh() end
-	else
-		addon.MovementSpeedStat.Disable()
-	end
-	if addon.CharacterStatsFormatting and addon.CharacterStatsFormatting.Refresh then addon.CharacterStatsFormatting.Refresh() end
+	if addon.MovementSpeedStat and addon.MovementSpeedStat.Disable then addon.MovementSpeedStat.Disable() end
+	if addon.CharacterStatsFormatting and addon.CharacterStatsFormatting.Disable then addon.CharacterStatsFormatting.Disable() end
 end
 
 local ilvlFontOrder = {}
@@ -193,8 +184,6 @@ local charDisplayDropdown = addon.functions.SettingsCreateMultiDropdown(cGearUpg
 		{ value = "gemtip", text = L["Gem slot tooltip"], tooltip = L["gearDisplayOptionGemTooltipDesc"] },
 		{ value = "durability", text = DURABILITY, tooltip = L["gearDisplayOptionDurabilityDesc"] },
 		{ value = "catalyst", text = L["Catalyst Charges"], tooltip = L["gearDisplayOptionCatalystDesc"] },
-		{ value = "movementspeed", text = STAT_MOVEMENT_SPEED, tooltip = L["gearDisplayOptionMovementSpeedDesc"] },
-		{ value = "statsformat", text = L["gearDisplayOptionStatsFormat"] or "Stat formatting", tooltip = L["gearDisplayOptionStatsFormatDesc"] },
 	},
 	isSelectedFunc = function(key) return isCharDisplaySelected(key) end,
 	setSelectedFunc = function(key, selected) setCharDisplayOption(key, selected) end,
