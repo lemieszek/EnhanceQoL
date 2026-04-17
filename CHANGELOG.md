@@ -2,8 +2,13 @@
 
 ## [10.3.0-beta9] - 2026-04-17
 
+### 🐛 Fixed
+
+- Data Panels / Stats: Fixed the stats stream for WoW `12.0.5` secret-value restrictions by removing unsafe stat comparisons and secret-value string assembly, while restoring the primary stat display through the specialization-based Blizzard lookup.
+
 ### ❌ Removed
 
+- Data Panels / Stats: Removed `Versatility` from the stats stream for WoW `12.0.5`, because the updated stat APIs now require secret-protected arithmetic that addons can no longer safely perform.
 - Character Frame / Stats: Temporarily removed the custom `Movement Speed` stat and custom stat-row formatting on the character stats pane for WoW `12.0.5`, because Blizzard now treats parts of the PaperDoll stats flow as secret-value protected.
 
 ---

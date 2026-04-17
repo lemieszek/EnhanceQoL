@@ -458,6 +458,7 @@ function DataPanel.SetTooltipOwner(owner, tooltip, panel)
 end
 
 local function hasInlineTexture(text)
+	if isSecretValue(text) then return false end
 	if type(text) ~= "string" then return false end
 	return text:find("|T", 1, true) or text:find("|A", 1, true)
 end
@@ -1692,7 +1693,7 @@ function DataPanel.Create(id, name, existingOnly)
 	end
 
 	function panel:ApplyClassTextColor(text, skip)
-		if skip or type(text) ~= "string" or text == "" then return text end
+		if skip or isSecretValue(text) or type(text) ~= "string" or text == "" then return text end
 		local hex = self:GetClassTextColorHex()
 		if not hex then return text end
 		return "|cff" .. hex .. text .. "|r"
@@ -2460,10 +2461,11 @@ function DataPanel.Create(id, name, existingOnly)
 						end
 						local rawText = part.text or ""
 						local text = panel:ApplyClassTextColor(rawText, part.skipPanelClassColor == true or payload.skipPanelClassColor == true)
-						local textChanged = text ~= child.lastText
+						local secretText = isSecretValue(text)
+						local textChanged = secretText or text ~= child.lastText
 						if isNew or textChanged then
 							child.text:SetText(text)
-							child.lastText = text
+							child.lastText = secretText and nil or text
 						end
 						if isNew or textChanged or partsFontChanged then
 							local w = child.text:GetStringWidth()
@@ -2519,12 +2521,24 @@ function DataPanel.Create(id, name, existingOnly)
 				end
 				data.text:Show()
 				local rawText = payload.text or ""
-				local text = panel:ApplyClassTextColor(rawText, payload.skipPanelClassColor == true)
-				local textChanged = text ~= data.lastText
-				if textChanged or wasParts then
-					data.text:SetText(text)
-					data.lastText = text
-					textChanged = true
+				local textChanged = false
+				if payload.textFormat and data.text.SetFormattedText then
+					local unpackFn = _G.unpack or table.unpack
+					if type(unpackFn) == "function" then
+						data.text:SetFormattedText(payload.textFormat, unpackFn(payload.textArgs or {}))
+						data.lastText = nil
+						textChanged = true
+					end
+				end
+				if not textChanged then
+					local text = panel:ApplyClassTextColor(rawText, payload.skipPanelClassColor == true)
+					local secretText = isSecretValue(text)
+					textChanged = secretText or text ~= data.lastText
+					if textChanged or wasParts then
+						data.text:SetText(text)
+						data.lastText = secretText and nil or text
+						textChanged = true
+					end
 				end
 				local newSize = panel:ApplyStreamFontScale(payload.fontSize or data.fontSize or 14)
 				local fontChanged = newSize and (data.fontSize ~= newSize or data.fontFlags ~= fontFlags or data.fontShadow ~= fontShadow)
