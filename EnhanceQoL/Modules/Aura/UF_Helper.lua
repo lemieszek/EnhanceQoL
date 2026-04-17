@@ -730,6 +730,7 @@ local privateAuraArgs = {
 	auraIndex = 1,
 	showCountdownFrame = true,
 	showCountdownNumbers = true,
+	isContainer = false,
 	iconInfo = {
 		iconWidth = 32,
 		iconHeight = 32,
@@ -833,6 +834,7 @@ local function buildPrivateAuraAnchor(anchor, unit, index, size, borderScale, sh
 	privateAuraArgs.auraIndex = index
 	privateAuraArgs.showCountdownFrame = showFrame == true
 	privateAuraArgs.showCountdownNumbers = showNumbers == true
+	privateAuraArgs.isContainer = false
 
 	local icon = privateAuraArgs.iconInfo
 	icon.iconWidth = size
