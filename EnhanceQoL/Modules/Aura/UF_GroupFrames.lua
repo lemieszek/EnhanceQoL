@@ -9956,6 +9956,8 @@ function GF:UpdateAll(self)
 	GF:UpdateAuras(self)
 	GF:UpdateRange(self)
 	GF:UpdateHighlightState(self)
+	local unit = getUnit(self)
+	if unit then GF.RememberUnitConnectedState(getState(self), unit) end
 end
 
 GF._dropdown = GF._dropdown or nil
@@ -11379,6 +11381,18 @@ function GF:RefreshStatusText()
 	end
 end
 
+function GF.GetUnitConnectedState(unit)
+	if not unit or not UnitIsConnected then return nil end
+	return GFH.UnsecretBool(UnitIsConnected(unit))
+end
+
+function GF.RememberUnitConnectedState(st, unit)
+	if not st then return nil end
+	local connected = GF.GetUnitConnectedState(unit)
+	st._lastConnectedState = connected
+	return connected
+end
+
 function GF:RefreshConnectionDependentVisuals(frame, unit, st)
 	if not (frame and unit) then return end
 	st = st or getState(frame)
@@ -11392,6 +11406,7 @@ function GF:RefreshConnectionDependentVisuals(frame, unit, st)
 	GF:UpdateLevel(frame, unit, st)
 	GF:UpdateStatusIcons(frame)
 	GF:UpdateRange(frame, nil, unit, st)
+	GF.RememberUnitConnectedState(st, unit)
 end
 
 function GF:RefreshConnectionState(unit)
@@ -11422,11 +11437,74 @@ function GF:RefreshConnectionState(unit)
 	return refreshed
 end
 
+function GF:RefreshConnectionStateIfChanged(unit)
+	if not isFeatureEnabled() then return 0 end
+	local refreshed = 0
+	local unitToken = (type(unit) == "string") and unit or nil
+	local function refreshChild(child)
+		if not (child and child._eqolUFState) then return end
+		local childUnit = getUnit(child)
+		if not childUnit then return end
+		if unitToken and childUnit ~= unitToken then return end
+
+		local st = getState(child)
+		local connected = GF.GetUnitConnectedState(childUnit)
+		if st._lastConnectedState == connected then return end
+
+		GF:RefreshConnectionDependentVisuals(child, childUnit, st)
+		refreshed = refreshed + 1
+	end
+
+	for _, header in pairs(GF.headers or {}) do
+		forEachChild(header, function(child) refreshChild(child) end)
+	end
+
+	if GF._raidGroupHeaders then
+		for _, header in ipairs(GF._raidGroupHeaders) do
+			if header and not header._eqolSpecialHide then forEachChild(header, function(child) refreshChild(child) end) end
+		end
+	end
+
+	return refreshed
+end
+
 function GF:CancelConnectionRefreshTicker()
 	local ticker = self._connectionRefreshTicker
 	if ticker and ticker.Cancel then ticker:Cancel() end
 	self._connectionRefreshTicker = nil
 	self._connectionRefreshPasses = nil
+end
+
+function GF:CancelConnectionRecheckTimer(unit)
+	local timers = self._connectionRecheckTimers
+	if not timers then return end
+	local key = unit or "__all__"
+	local timer = timers[key]
+	if timer and timer.Cancel then timer:Cancel() end
+	timers[key] = nil
+	if not next(timers) then self._connectionRecheckTimers = nil end
+end
+
+function GF:CancelAllConnectionRecheckTimers()
+	local timers = self._connectionRecheckTimers
+	if not timers then return end
+	for key, timer in pairs(timers) do
+		if timer and timer.Cancel then timer:Cancel() end
+		timers[key] = nil
+	end
+	self._connectionRecheckTimers = nil
+end
+
+function GF:ScheduleConnectionRecheck(unit)
+	if not (C_Timer and C_Timer.NewTimer) then return end
+	local key = unit or "__all__"
+	self._connectionRecheckTimers = self._connectionRecheckTimers or {}
+	self:CancelConnectionRecheckTimer(unit)
+	self._connectionRecheckTimers[key] = C_Timer.NewTimer(1, function()
+		GF:CancelConnectionRecheckTimer(unit)
+		if not isFeatureEnabled() then return end
+		GF:RefreshConnectionStateIfChanged(unit)
+	end)
 end
 
 function GF:RunConnectionRefreshPass()
@@ -12535,6 +12613,7 @@ function GF:DisableFeature()
 	GF:CancelPostRosterRefreshTicker()
 	GF:CancelPostEnterWorldRefreshTicker()
 	GF:CancelConnectionRefreshTicker()
+	GF:CancelAllConnectionRecheckTimers()
 	unregisterFeatureEvents(GF._eventFrame)
 
 	if EditMode and EditMode.UnregisterFrame and type(EDITMODE_IDS) == "table" then
@@ -27172,6 +27251,7 @@ do
 			local unit = ...
 			GF:RefreshConnectionState(unit)
 			GF:ScheduleConnectionRefresh()
+			GF:ScheduleConnectionRecheck(unit)
 		elseif event == "PLAYER_FLAGS_CHANGED" then
 			local refreshed = GF:RefreshConnectionState(...)
 			if refreshed == 0 then GF:RefreshStatusText() end

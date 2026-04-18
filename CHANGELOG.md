@@ -12,6 +12,10 @@
 - Data Panels / Friends & Guild: Updated tooltip and click-window entries to use class-colored names and location-focused right columns, with same-zone locations highlighted in green and other locations dimmed in gray.
 - Mouse / Ring: Enabled opacity control across the mouse ring color settings.
 
+### 🐛 Fixed
+
+- Cooldown Panels / Stances: Added `Shadowform` for Priest stance tracking, so it now appears under `Add more -> Stance` and can be tracked through the stance driver like the other stance entries.
+
 ---
 
 ## [10.3.0-beta11] - 2026-04-17
