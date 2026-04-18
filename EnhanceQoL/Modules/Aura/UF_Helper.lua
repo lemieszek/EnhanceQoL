@@ -616,15 +616,15 @@ function H.ensureAuraBorderFrame(btn)
 	if not btn then return nil end
 	local border = btn._eqolAuraBorder
 	if not border then
-		border = CreateFrame("Frame", nil, btn.overlay or btn, "BackdropTemplate")
+		border = CreateFrame("Frame", nil, btn, "BackdropTemplate")
 		border:EnableMouse(false)
 		btn._eqolAuraBorder = border
 	end
-	local parent = btn.overlay or btn
-	border:SetParent(parent)
-	border:SetFrameStrata(parent:GetFrameStrata() or btn:GetFrameStrata())
-	local baseLevel = parent:GetFrameLevel() or btn:GetFrameLevel() or 0
-	border:SetFrameLevel(baseLevel + 1)
+	border:SetParent(btn)
+	local strata = (btn.cd and btn.cd.GetFrameStrata and btn.cd:GetFrameStrata()) or btn:GetFrameStrata()
+	if strata then border:SetFrameStrata(strata) end
+	local baseLevel = btn:GetFrameLevel() or 0
+	border:SetFrameLevel(baseLevel)
 	border:ClearAllPoints()
 	border:SetPoint("TOPLEFT", btn, "TOPLEFT", 0, 0)
 	border:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 0, 0)

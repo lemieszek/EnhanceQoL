@@ -2804,7 +2804,9 @@ local DEFAULTS = {
 					y = 0,
 				},
 				showAFK = false,
+				showDead = true,
 				showDND = false,
+				showGhost = true,
 				showGroup = false,
 				showOffline = true,
 			},
@@ -3553,7 +3555,9 @@ local DEFAULTS = {
 					y = 0,
 				},
 				showAFK = false,
+				showDead = true,
 				showDND = false,
+				showGhost = true,
 				showGroup = false,
 				showOffline = true,
 			},
@@ -4178,7 +4182,9 @@ local DEFAULTS = {
 					y = 0,
 				},
 				showAFK = false,
+				showDead = true,
 				showDND = false,
+				showGhost = true,
 				showGroup = false,
 				showOffline = true,
 			},
@@ -4802,7 +4808,9 @@ local DEFAULTS = {
 					y = 0,
 				},
 				showAFK = false,
+				showDead = true,
 				showDND = false,
+				showGhost = true,
 				showGroup = false,
 				showOffline = true,
 			},
@@ -8753,7 +8761,11 @@ function GF:UpdateStatusText(self)
 	local showOffline = us.showOffline
 	if showOffline == nil then showOffline = true end
 	local showAFK = us.showAFK == true
+	local showDead = us.showDead
+	if showDead == nil then showDead = true end
 	local showDND = us.showDND == true
+	local showGhost = us.showGhost
+	if showGhost == nil then showGhost = true end
 	local connected = unit and UnitIsConnected and GFH.UnsecretBool(UnitIsConnected(unit)) or nil
 	local isAFK = unit and UnitIsAFK and GFH.UnsecretBool(UnitIsAFK(unit)) or nil
 	local isDND = unit and UnitIsDND and GFH.UnsecretBool(UnitIsDND(unit)) or nil
@@ -8763,8 +8775,8 @@ function GF:UpdateStatusText(self)
 		if showOffline then statusTag = PLAYER_OFFLINE or "Offline" end
 	elseif isDead == true then
 		if isGhost == true then
-			statusTag = GHOST or "Ghost"
-		else
+			if showGhost then statusTag = GHOST or "Ghost" end
+		elseif showDead then
 			statusTag = DEAD or "Dead"
 		end
 	elseif isDND == true then
@@ -8782,6 +8794,8 @@ function GF:UpdateStatusText(self)
 	end
 	if not statusTag and allowSample then
 		if showOffline then statusTag = PLAYER_OFFLINE or "Offline" end
+		if not statusTag and showDead then statusTag = DEAD or "Dead" end
+		if not statusTag and showGhost then statusTag = GHOST or "Ghost" end
 		if not statusTag and showDND then statusTag = DEFAULT_DND_MESSAGE or "DND" end
 		if not statusTag and showAFK then statusTag = DEFAULT_AFK_MESSAGE or "AFK" end
 	end
@@ -18580,6 +18594,35 @@ local function buildEditModeSettings(kind, editModeId)
 			end,
 		},
 		{
+			name = L["Show dead"] or "Show dead",
+			kind = SettingType.Checkbox,
+			field = "statusTextShowDead",
+			parentId = "statustext",
+			get = function()
+				local cfg = getCfg(kind)
+				local sc = cfg and cfg.status or {}
+				local us = sc.unitStatus or {}
+				local def = DEFAULTS[kind] and DEFAULTS[kind].status and DEFAULTS[kind].status.unitStatus or {}
+				if us.showDead == nil then return def.showDead ~= false end
+				return us.showDead == true
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.status = cfg.status or {}
+				cfg.status.unitStatus = cfg.status.unitStatus or {}
+				cfg.status.unitStatus.showDead = value and true or false
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "statusTextShowDead", cfg.status.unitStatus.showDead, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			isEnabled = function()
+				local cfg = getCfg(kind)
+				local sc = cfg and cfg.status or {}
+				local us = sc.unitStatus or {}
+				return us.enabled ~= false
+			end,
+		},
+		{
 			name = L["Show DND"] or "Show DND",
 			kind = SettingType.Checkbox,
 			field = "statusTextShowDND",
@@ -18599,6 +18642,35 @@ local function buildEditModeSettings(kind, editModeId)
 				cfg.status.unitStatus = cfg.status.unitStatus or {}
 				cfg.status.unitStatus.showDND = value and true or false
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "statusTextShowDND", cfg.status.unitStatus.showDND, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			isEnabled = function()
+				local cfg = getCfg(kind)
+				local sc = cfg and cfg.status or {}
+				local us = sc.unitStatus or {}
+				return us.enabled ~= false
+			end,
+		},
+		{
+			name = L["Show ghost"] or "Show ghost",
+			kind = SettingType.Checkbox,
+			field = "statusTextShowGhost",
+			parentId = "statustext",
+			get = function()
+				local cfg = getCfg(kind)
+				local sc = cfg and cfg.status or {}
+				local us = sc.unitStatus or {}
+				local def = DEFAULTS[kind] and DEFAULTS[kind].status and DEFAULTS[kind].status.unitStatus or {}
+				if us.showGhost == nil then return def.showGhost ~= false end
+				return us.showGhost == true
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.status = cfg.status or {}
+				cfg.status.unitStatus = cfg.status.unitStatus or {}
+				cfg.status.unitStatus.showGhost = value and true or false
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "statusTextShowGhost", cfg.status.unitStatus.showGhost, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
 			isEnabled = function()
@@ -25528,7 +25600,9 @@ local function applyEditModeData(kind, data)
 		or data.statusTextOffsetY ~= nil
 		or data.statusTextShowOffline ~= nil
 		or data.statusTextShowAFK ~= nil
+		or data.statusTextShowDead ~= nil
 		or data.statusTextShowDND ~= nil
+		or data.statusTextShowGhost ~= nil
 		or data.statusTextShowGroup ~= nil
 		or data.statusTextGroupFormat ~= nil
 		or data.statusTextHideHealthTextOffline ~= nil
@@ -25547,7 +25621,9 @@ local function applyEditModeData(kind, data)
 		end
 		if data.statusTextShowOffline ~= nil then cfg.status.unitStatus.showOffline = data.statusTextShowOffline and true or false end
 		if data.statusTextShowAFK ~= nil then cfg.status.unitStatus.showAFK = data.statusTextShowAFK and true or false end
+		if data.statusTextShowDead ~= nil then cfg.status.unitStatus.showDead = data.statusTextShowDead and true or false end
 		if data.statusTextShowDND ~= nil then cfg.status.unitStatus.showDND = data.statusTextShowDND and true or false end
+		if data.statusTextShowGhost ~= nil then cfg.status.unitStatus.showGhost = data.statusTextShowGhost and true or false end
 		if data.statusTextShowGroup ~= nil then cfg.status.unitStatus.showGroup = data.statusTextShowGroup and true or false end
 		if data.statusTextGroupFormat ~= nil then cfg.status.unitStatus.groupFormat = data.statusTextGroupFormat end
 		if data.statusTextHideHealthTextOffline ~= nil then cfg.status.unitStatus.hideHealthTextWhenOffline = data.statusTextHideHealthTextOffline and true or false end
@@ -26402,9 +26478,36 @@ function GF:EnsureEditMode()
 				statusTextAnchor = (sc.unitStatus and sc.unitStatus.anchor) or (def.status and def.status.unitStatus and def.status.unitStatus.anchor) or "CENTER",
 				statusTextOffsetX = (sc.unitStatus and sc.unitStatus.offset and sc.unitStatus.offset.x) or 0,
 				statusTextOffsetY = (sc.unitStatus and sc.unitStatus.offset and sc.unitStatus.offset.y) or 0,
-				statusTextShowOffline = (sc.unitStatus and sc.unitStatus.showOffline) or (def.status and def.status.unitStatus and def.status.unitStatus.showOffline) or true,
-				statusTextShowAFK = (sc.unitStatus and sc.unitStatus.showAFK) or (def.status and def.status.unitStatus and def.status.unitStatus.showAFK) or false,
-				statusTextShowDND = (sc.unitStatus and sc.unitStatus.showDND) or (def.status and def.status.unitStatus and def.status.unitStatus.showDND) or false,
+				statusTextShowOffline = (function()
+					local value = sc.unitStatus and sc.unitStatus.showOffline
+					if value == nil then value = def.status and def.status.unitStatus and def.status.unitStatus.showOffline end
+					if value == nil then value = true end
+					return value
+				end)(),
+				statusTextShowAFK = (function()
+					local value = sc.unitStatus and sc.unitStatus.showAFK
+					if value == nil then value = def.status and def.status.unitStatus and def.status.unitStatus.showAFK end
+					if value == nil then value = false end
+					return value
+				end)(),
+				statusTextShowDead = (function()
+					local value = sc.unitStatus and sc.unitStatus.showDead
+					if value == nil then value = def.status and def.status.unitStatus and def.status.unitStatus.showDead end
+					if value == nil then value = true end
+					return value
+				end)(),
+				statusTextShowDND = (function()
+					local value = sc.unitStatus and sc.unitStatus.showDND
+					if value == nil then value = def.status and def.status.unitStatus and def.status.unitStatus.showDND end
+					if value == nil then value = false end
+					return value
+				end)(),
+				statusTextShowGhost = (function()
+					local value = sc.unitStatus and sc.unitStatus.showGhost
+					if value == nil then value = def.status and def.status.unitStatus and def.status.unitStatus.showGhost end
+					if value == nil then value = true end
+					return value
+				end)(),
 				statusTextShowGroup = (gn.enabled ~= nil and gn.enabled) or (sc.unitStatus and sc.unitStatus.showGroup) or (defGN.enabled ~= nil and defGN.enabled) or defUS.showGroup or false,
 				statusTextGroupFormat = gn.format or (sc.unitStatus and sc.unitStatus.groupFormat) or defGN.format or defUS.groupFormat or "GROUP",
 				groupNumberColor = gn.color or defGN.color or (sc.unitStatus and sc.unitStatus.color) or defUS.color or { 1, 1, 1, 1 },

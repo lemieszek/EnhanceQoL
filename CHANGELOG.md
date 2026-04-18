@@ -10,6 +10,7 @@
 
 - Data Panels / Friends & Guild: Reworked the Friends/Guild stream so the guild block is shown first with guild name, online/total member count, and `MOTD`, followed by guild members and then friends.
 - Data Panels / Friends & Guild: Updated tooltip and click-window entries to use class-colored names and location-focused right columns, with same-zone locations highlighted in green and other locations dimmed in gray.
+- Mouse / Ring: Enabled opacity control across the mouse ring color settings.
 
 ---
 
