@@ -2,6 +2,7 @@ local addonName, addon = ...
 
 local L = LibStub("AceLocale-3.0"):GetLocale(addonName)
 local issecretvalue = _G.issecretvalue
+local UnitThreatLeadSituation = _G.UnitThreatLeadSituation
 
 ---- REGION Functions
 local timeoutReleaseDifficultyLookup = {}

@@ -94,6 +94,8 @@ local GetNumFriends = C_FriendList.GetNumFriends
 local GetFriendInfoByIndex = C_FriendList.GetFriendInfoByIndex
 local GetNumGuildMembers = GetNumGuildMembers
 local GetGuildRosterInfo = GetGuildRosterInfo
+local C_GuildInfo = _G.C_GuildInfo
+local C_Club = _G.C_Club
 
 local myGuid = UnitGUID("player")
 local issecretvalue = _G.issecretvalue
