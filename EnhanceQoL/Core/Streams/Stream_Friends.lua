@@ -72,9 +72,7 @@ local function createAceWindow()
 	splitDisplay:SetValue(db.splitDisplay == true)
 	splitDisplay:SetCallback("OnValueChanged", function(_, _, val)
 		db.splitDisplay = val and true or false
-		if splitDisplayInline and splitDisplayInline.SetDisabled then
-			splitDisplayInline:SetDisabled(not db.splitDisplay)
-		end
+		if splitDisplayInline and splitDisplayInline.SetDisabled then splitDisplayInline:SetDisabled(not db.splitDisplay) end
 		addon.DataHub:RequestUpdate(stream)
 	end)
 	frame:AddChild(splitDisplay)
@@ -98,6 +96,36 @@ local GetNumGuildMembers = GetNumGuildMembers
 local GetGuildRosterInfo = GetGuildRosterInfo
 
 local myGuid = UnitGUID("player")
+local issecretvalue = _G.issecretvalue
+local issecrettable = _G.issecrettable
+
+local function isSecret(value)
+	if issecretvalue and issecretvalue(value) then return true end
+	if issecrettable and issecrettable(value) then return true end
+	return false
+end
+
+local function sanitizeValue(value)
+	if isSecret(value) then return nil end
+	return value
+end
+
+local function sanitizeString(value)
+	value = sanitizeValue(value)
+	if type(value) ~= "string" or value == "" then return nil end
+	return value
+end
+
+local function sanitizeNumber(value)
+	value = sanitizeValue(value)
+	if type(value) ~= "number" then return nil end
+	return value
+end
+
+local function isFriendsDataRestricted()
+	if C_ChatInfo and C_ChatInfo.InChatMessagingLockdown and C_ChatInfo.InChatMessagingLockdown() then return true end
+	return addon.functions and addon.functions.isRestrictedContent and addon.functions.isRestrictedContent(true) == true or false
+end
 
 -- Build reverse lookup for class tokens from localized names for coloring
 local CLASS_TOKEN_BY_LOCALIZED = {}
@@ -113,14 +141,16 @@ if LOCALIZED_CLASS_NAMES_FEMALE then
 end
 
 local function normalizeRealmName(realm)
-	if not realm or realm == "" then return "" end
+	realm = sanitizeString(realm)
+	if not realm then return "" end
 	-- remove spaces and apostrophes for stable keys, lowercase
 	realm = realm:gsub("%s+", ""):gsub("'", "")
 	return realm:lower()
 end
 
 local function normalizeCompareText(text)
-	if type(text) ~= "string" then return nil end
+	text = sanitizeString(text)
+	if not text then return nil end
 	text = text:gsub("[%s%-']", ""):lower()
 	if text == "" then return nil end
 	return text
@@ -131,6 +161,7 @@ local myRealmKey = normalizeRealmName(myRealm)
 local myRealmCompareKey = normalizeCompareText(myRealm)
 
 local function splitNameRealm(name)
+	name = sanitizeString(name)
 	if not name then return nil, nil end
 	-- Names coming from various APIs can sometimes end up with the realm
 	-- appended multiple times (e.g., "Name-Antonidas-Antonidas-...").
@@ -147,13 +178,31 @@ local function splitNameRealm(name)
 end
 
 local function makeKey(name, realm)
+	name = sanitizeString(name)
+	realm = sanitizeValue(realm)
 	local base, r = splitNameRealm(name)
 	base = base or name or ""
 	r = r or realm or myRealm
 	return (base:lower() .. "-" .. normalizeRealmName(r or ""))
 end
 
+local myPlayerName, myPlayerRealm
+if UnitFullName then
+	myPlayerName, myPlayerRealm = UnitFullName("player")
+end
+local myPlayerKey = makeKey(myPlayerName, myPlayerRealm or myRealm)
+
+local function isOwnGuildEntry(name, realm, guid)
+	guid = sanitizeString(guid)
+	if guid and myGuid and guid == myGuid then return true end
+	local key = makeKey(name, realm)
+	if key == "-" or myPlayerKey == "-" then return false end
+	return key == myPlayerKey
+end
+
 local function displayName(name, realm)
+	name = sanitizeString(name)
+	realm = sanitizeValue(realm)
 	local base, r = splitNameRealm(name)
 	base = base or name or ""
 	r = r or realm
@@ -165,7 +214,8 @@ local function displayName(name, realm)
 end
 
 local function classDisplayAndColor(classTokenOrLocalized)
-	if not classTokenOrLocalized or classTokenOrLocalized == "" then return nil, nil end
+	classTokenOrLocalized = sanitizeString(classTokenOrLocalized)
+	if not classTokenOrLocalized then return nil, nil end
 	local token = classTokenOrLocalized
 	if token:upper() == token then
 		-- Looks like a class file token (e.g., "MAGE")
@@ -180,14 +230,17 @@ local function classDisplayAndColor(classTokenOrLocalized)
 end
 
 local function classDisplayAndColorFromClassID(classID)
-	if not classID or not C_CreatureInfo or not C_CreatureInfo.GetClassInfo then return nil, nil end
+	classID = sanitizeNumber(classID)
+	if not classID or not (C_CreatureInfo and C_CreatureInfo.GetClassInfo) then return nil, nil end
 	local classInfo = C_CreatureInfo.GetClassInfo(classID)
-	if not classInfo then return nil, nil end
-	return classDisplayAndColor(classInfo.classFile or classInfo.className)
+	local classFile = classInfo and sanitizeString(classInfo.classFile)
+	if not classFile then return nil, nil end
+	return classDisplayAndColor(classFile)
 end
 
 local function cleanRealmName(realm)
-	if type(realm) ~= "string" then return nil end
+	realm = sanitizeString(realm)
+	if not realm then return nil end
 	local cleaned = realm:gsub("%(%*%)", "")
 	cleaned = cleaned:gsub("%*$", "")
 	cleaned = cleaned:gsub("^%s+", "")
@@ -205,7 +258,7 @@ local function getRealmDisplayText(realm)
 end
 
 local function buildLocationText(areaText, realmText)
-	local area = (type(areaText) == "string" and areaText ~= "") and areaText or nil
+	local area = sanitizeString(areaText)
 	local realm = getRealmDisplayText(realmText)
 	if area and realm then return ("%s - %s"):format(area, realm) end
 	return area or realm or nil
@@ -221,11 +274,6 @@ local function isSameZone(areaText)
 
 	return areaKey == zoneKey or areaKey == realZoneKey or areaKey == subZoneKey
 end
-
-local CLUB_PRESENCE = Enum and Enum.ClubMemberPresence or {}
-local CLUB_PRESENCE_OFFLINE = CLUB_PRESENCE.Offline or 3
-local CLUB_PRESENCE_AWAY = CLUB_PRESENCE.Away or 4
-local CLUB_PRESENCE_BUSY = CLUB_PRESENCE.Busy or 5
 
 -- Structured tooltip data: sections with lists
 local tooltipData = { bnet = {}, friends = {}, guild = {} }
@@ -247,22 +295,16 @@ local function wipeTooltipSections()
 end
 
 local function resolveGuildName()
-	local guildName = GetGuildInfo and GetGuildInfo("player")
-	if guildName and guildName ~= "" then return guildName end
-	if not (C_Club and C_Club.GetGuildClubId and C_Club.GetClubInfo) then return nil end
-
-	local okClubId, clubId = pcall(C_Club.GetGuildClubId)
-	if not okClubId or not clubId then return nil end
-
-	local okClubInfo, clubInfo = pcall(C_Club.GetClubInfo, clubId)
-	if okClubInfo and clubInfo and clubInfo.name and clubInfo.name ~= "" then return clubInfo.name end
+	local guildName = sanitizeString(GetGuildInfo and GetGuildInfo("player"))
+	if guildName then return guildName end
 	return nil
 end
 
 local function resolveGuildMotd()
 	if not (C_GuildInfo and C_GuildInfo.GetMOTD) then return nil end
 	local ok, motd = pcall(C_GuildInfo.GetMOTD)
-	if ok and motd and motd ~= "" then return motd end
+	motd = ok and sanitizeString(motd) or nil
+	if motd then return motd end
 	return nil
 end
 
@@ -273,79 +315,80 @@ local function requestGuildRosterIfNeeded(memberCount)
 end
 
 local function guildRosterStatusToStatus(status)
+	status = sanitizeValue(status)
 	if status == 1 or status == "AFK" then return "AFK" end
 	if status == 2 or status == "DND" then return "DND" end
 	return nil
 end
 
+local CLUB_PRESENCE = Enum and Enum.ClubMemberPresence or nil
+local CLUB_PRESENCE_OFFLINE = CLUB_PRESENCE and CLUB_PRESENCE.Offline or 3
+local CLUB_PRESENCE_AWAY = CLUB_PRESENCE and CLUB_PRESENCE.Away or 4
+local CLUB_PRESENCE_BUSY = CLUB_PRESENCE and CLUB_PRESENCE.Busy or 5
+
 local function clubPresenceToStatus(presence)
-	if presence == CLUB_PRESENCE_AWAY then return "AFK" end
+	presence = sanitizeNumber(presence)
+	if not presence then return nil end
 	if presence == CLUB_PRESENCE_BUSY then return "DND" end
+	if presence == CLUB_PRESENCE_AWAY then return "AFK" end
 	return nil
 end
 
 local function addGuildEntriesFromClub(seen)
-	if not (C_Club and C_Club.GetGuildClubId and C_Club.GetClubInfo and C_Club.GetClubMembers and C_Club.GetMemberInfo) then
-		return false
-	end
+	if isFriendsDataRestricted() then return end
+	if not (C_Club and C_Club.GetGuildClubId and C_Club.GetClubMembers and C_Club.GetMemberInfo) then return end
 
-	local okClubId, clubId = pcall(C_Club.GetGuildClubId)
-	if not okClubId or not clubId then return false end
+	local clubId = sanitizeNumber(C_Club.GetGuildClubId())
+	if not clubId then return end
 
-	local okClubInfo, clubInfo = pcall(C_Club.GetClubInfo, clubId)
-	local okMemberIds, memberIds = pcall(C_Club.GetClubMembers, clubId)
-	if not okMemberIds or type(memberIds) ~= "table" then return false end
+	local memberIds = C_Club.GetClubMembers(clubId)
+	if isSecret(memberIds) or type(memberIds) ~= "table" then return end
 
-	if okClubInfo and clubInfo and clubInfo.name and clubInfo.name ~= "" then
-		tooltipMeta.guildName = clubInfo.name
-		tooltipMeta.guildTotalCount = clubInfo.memberCount or #memberIds
-	else
-		tooltipMeta.guildTotalCount = #memberIds
-	end
-
-	local sawGuildMember = false
 	for _, memberId in ipairs(memberIds) do
-		local okMemberInfo, memberInfo = pcall(C_Club.GetMemberInfo, clubId, memberId)
-		if okMemberInfo and memberInfo and memberInfo.name and memberInfo.presence ~= CLUB_PRESENCE_OFFLINE then
-			if not memberInfo.isSelf and memberInfo.guid ~= myGuid then
-				tooltipMeta.guildOnlineCount = tooltipMeta.guildOnlineCount + 1
-			end
-
-			if not memberInfo.isSelf and memberInfo.guid ~= myGuid then
-				sawGuildMember = true
-				local key = makeKey(memberInfo.name)
-				if not seen[key] then
-					seen[key] = true
-					local classDisp, color = classDisplayAndColorFromClassID(memberInfo.classID)
-					table.insert(tooltipData.guild, {
-						name = displayName(memberInfo.name),
-						level = memberInfo.level,
-						class = classDisp,
-						color = color,
-						status = clubPresenceToStatus(memberInfo.presence),
-						location = memberInfo.zone,
-						locationSameZone = isSameZone(memberInfo.zone),
-					})
+		memberId = sanitizeNumber(memberId)
+		if memberId then
+			local memberInfo = C_Club.GetMemberInfo(clubId, memberId)
+			if not isSecret(memberInfo) and type(memberInfo) == "table" then
+				local name = sanitizeString(memberInfo.name)
+				local presence = sanitizeNumber(memberInfo.presence)
+				local zone = sanitizeString(memberInfo.zone)
+				local isSelf = memberInfo.isSelf == true or isOwnGuildEntry(name, nil, memberInfo.guid)
+				if not isSelf and name and presence and presence ~= CLUB_PRESENCE_OFFLINE then
+					local key = makeKey(name)
+					if not seen[key] then
+						seen[key] = true
+						local classDisp, color = classDisplayAndColorFromClassID(memberInfo.classID)
+						table.insert(tooltipData.guild, {
+							name = displayName(name),
+							level = sanitizeNumber(memberInfo.level),
+							class = classDisp,
+							color = color,
+							status = clubPresenceToStatus(presence),
+							location = zone,
+							locationSameZone = zone and isSameZone(zone) or false,
+						})
+					end
 				end
 			end
 		end
 	end
-
-	return sawGuildMember or tooltipMeta.guildTotalCount > 0
 end
 
 local function addGuildEntriesFromRoster(seen)
-	local memberCount = GetNumGuildMembers and GetNumGuildMembers() or 0
+	local memberCount = sanitizeNumber(GetNumGuildMembers and GetNumGuildMembers() or 0) or 0
 	tooltipMeta.guildTotalCount = memberCount or 0
 	requestGuildRosterIfNeeded(memberCount)
 	if not memberCount or memberCount <= 0 then return end
 
 	for i = 1, memberCount do
 		local name, _, _, level, _, zone, _, _, isOnline, status, classToken, _, _, _, _, _, guid = GetGuildRosterInfo(i)
-		if isOnline and guid ~= myGuid then
-			tooltipMeta.guildOnlineCount = tooltipMeta.guildOnlineCount + 1
-		end
-		if isOnline and guid ~= myGuid and name and level then
+		local isSelf = isOwnGuildEntry(name, nil, guid)
+		local online = sanitizeValue(isOnline) == true
+		if online and not isSelf then tooltipMeta.guildOnlineCount = tooltipMeta.guildOnlineCount + 1 end
+		name = sanitizeString(name)
+		zone = sanitizeString(zone)
+		level = sanitizeNumber(level)
+		if online and not isSelf and name then
 			local key = makeKey(name)
 			if not seen[key] then
 				seen[key] = true
@@ -368,6 +411,13 @@ local function getFriends(stream)
 	ensureDB()
 	wipeTooltipSections()
 
+	stream.snapshot.fontSize = db and db.fontSize or 13
+	if isFriendsDataRestricted() then
+		stream.snapshot.text = FRIENDS
+		if listWindow and listWindow.frame and listWindow.frame:IsShown() then populateListWindow() end
+		return
+	end
+
 	local seen = {} -- key -> true (dedupe across sources)
 	local totalUnique = 0
 	local friendsCount = 0
@@ -381,15 +431,19 @@ local function getFriends(stream)
 		for i = 1, numBNetTotal do
 			local info = C_BattleNet.GetFriendAccountInfo(i)
 			local ga = info and info.gameAccountInfo
-			if ga and ga.isOnline and ga.clientProgram == BNET_CLIENT_WOW and ga.characterName and ga.characterLevel then
-				local key = makeKey(ga.characterName, ga.realmName)
+			local gameOnline = ga and sanitizeValue(ga.isOnline) == true or false
+			local clientProgram = ga and sanitizeString(ga.clientProgram) or nil
+			local characterName = ga and sanitizeString(ga.characterName) or nil
+			local characterLevel = ga and sanitizeNumber(ga.characterLevel) or nil
+			if ga and gameOnline and clientProgram == BNET_CLIENT_WOW and characterName and characterLevel then
+				local key = makeKey(characterName, ga.realmName)
 				if not seen[key] then
 					seen[key] = true
 					totalUnique = totalUnique + 1
 					local classNameLocalized = ga.className
 					local classDisp, color = classDisplayAndColor(classNameLocalized)
 					-- BNet presence / status details
-					local bnName = info and (info.accountName or (info.battleTag and info.battleTag:match("^[^#]+"))) or nil
+					local bnName = sanitizeString(info and (info.accountName or (info.battleTag and info.battleTag:match("^[^#]+"))) or nil)
 					-- Prefer game-specific AFK/DND, fall back to account level
 					local isAFK = (ga.isGameAFK == true) or (info and info.isAFK == true)
 					local isDND = (ga.isGameBusy == true) or (info and info.isDND == true)
@@ -401,16 +455,16 @@ local function getFriends(stream)
 					end
 					local location = buildLocationText(ga.areaName, ga.realmDisplayName or ga.realmName)
 					table.insert(tooltipData.bnet, {
-						name = displayName(ga.characterName, ga.realmName),
-						level = ga.characterLevel,
+						name = displayName(characterName, ga.realmName),
+						level = characterLevel,
 						class = classDisp,
 						color = color,
 						bnName = bnName,
 						status = status,
-						client = ga.clientProgram,
-						location = location or ga.richPresence or ga.gameText,
+						client = clientProgram,
+						location = location or sanitizeString(ga.richPresence) or sanitizeString(ga.gameText),
 						locationSameZone = ga.areaName and isSameZone(ga.areaName) or false,
-						note = info and info.note or nil,
+						note = sanitizeString(info and info.note or nil),
 					})
 				end
 			end
@@ -421,22 +475,24 @@ local function getFriends(stream)
 	local numWoWFriends = C_FriendList.GetNumFriends()
 	for i = 1, numWoWFriends do
 		local friendInfo = C_FriendList.GetFriendInfoByIndex(i)
-		if friendInfo and friendInfo.connected then
-			local key = makeKey(friendInfo.name)
+		local friendName = friendInfo and sanitizeString(friendInfo.name) or nil
+		local friendConnected = friendInfo and sanitizeValue(friendInfo.connected) == true or false
+		if friendInfo and friendConnected and friendName then
+			local key = makeKey(friendName)
 			if not seen[key] then
 				seen[key] = true
 				totalUnique = totalUnique + 1
 				local classDisp, color = classDisplayAndColor(friendInfo.className or friendInfo.classNameFile or "")
-				local nameForDisp = displayName(friendInfo.name)
+				local nameForDisp = displayName(friendName)
 				table.insert(tooltipData.friends, {
 					name = nameForDisp,
-					level = friendInfo.level,
+					level = sanitizeNumber(friendInfo.level),
 					class = classDisp,
 					color = color,
-					status = (friendInfo.dnd and "DND") or (friendInfo.afk and "AFK") or nil,
-					location = friendInfo.area,
+					status = (friendInfo.dnd == true and "DND") or (friendInfo.afk == true and "AFK") or nil,
+					location = sanitizeString(friendInfo.area),
 					locationSameZone = isSameZone(friendInfo.area),
-					note = friendInfo.notes,
+					note = sanitizeString(friendInfo.notes),
 				})
 			end
 		end
@@ -444,17 +500,21 @@ local function getFriends(stream)
 	friendsCount = #tooltipData.bnet + #tooltipData.friends
 
 	-- 3) Guild members
-	if not addGuildEntriesFromClub(seen) then addGuildEntriesFromRoster(seen) end
+	addGuildEntriesFromClub(seen)
+	addGuildEntriesFromRoster(seen)
 
 	-- Sort each section by name
-	local function byName(a, b) return (a.name or ""):lower() < (b.name or ""):lower() end
+	local function byName(a, b)
+		local left = sanitizeString(a and a.name) or ""
+		local right = sanitizeString(b and b.name) or ""
+		return left:lower() < right:lower()
+	end
 	table.sort(tooltipData.bnet, byName)
 	table.sort(tooltipData.friends, byName)
 	table.sort(tooltipData.guild, byName)
 
 	totalUnique = friendsCount + #tooltipData.guild
 
-	stream.snapshot.fontSize = db and db.fontSize or 13
 	if db and db.splitDisplay then
 		local guildText
 		if tooltipMeta.guildTotalCount and tooltipMeta.guildTotalCount > 0 then
@@ -493,27 +553,33 @@ local function ensureListWindow()
 end
 
 local function colorizeText(text, r, g, b)
-	if not text or text == "" then return text end
+	text = sanitizeString(text)
+	if not text then return nil end
 	return string.format("|cff%02x%02x%02x%s|r", r * 255, g * 255, b * 255, text)
 end
 
 local function colorizedName(name, color)
+	name = sanitizeString(name)
+	if not name then return nil end
 	if not color then return name end
 	return colorizeText(name, color.r or 1, color.g or 1, color.b or 1)
 end
 
 local function colorizedLocation(location, sameZone)
-	if not location or location == "" then return location end
+	location = sanitizeString(location)
+	if not location then return nil end
 	if sameZone then return colorizeText(location, 0.25, 1.0, 0.4) end
 	return colorizeText(location, 0.62, 0.62, 0.62)
 end
 
 local function formatEntryName(entry)
-	local nameText = colorizedName(entry.name, entry.color)
-	if entry.bnName then nameText = nameText .. " |cff80bfff(" .. entry.bnName .. ")|r" end
-	if entry.status == "DND" then
+	local nameText = colorizedName(entry.name, entry.color) or (sanitizeString(entry.name) or "")
+	local bnName = sanitizeString(entry.bnName)
+	if bnName then nameText = nameText .. " |cff80bfff(" .. bnName .. ")|r" end
+	local status = sanitizeString(entry.status)
+	if status == "DND" then
 		nameText = nameText .. " |cffff5050[DND]|r"
-	elseif entry.status == "AFK" then
+	elseif status == "AFK" then
 		nameText = nameText .. " |cffffb84d[AFK]|r"
 	end
 	return nameText
@@ -523,26 +589,25 @@ local function buildClassLevelText(entry)
 	if entry.class and entry.level then return string.format("%s (%s)", entry.class, tostring(entry.level)) end
 	if entry.class then return entry.class end
 	if entry.level then return tostring(entry.level) end
-	if entry.note and entry.note ~= "" then return entry.note end
+	local note = sanitizeString(entry.note)
+	if note then return note end
 	return ""
 end
 
 local function getEntryRightText(entry)
-	local rightText = entry.location or ""
+	local rightText = sanitizeString(entry.location) or ""
 	if rightText == "" then rightText = buildClassLevelText(entry) end
-	return colorizedLocation(rightText, entry.location and entry.locationSameZone == true)
+	return colorizedLocation(rightText, rightText ~= "" and entry.locationSameZone == true)
 end
 
 local function getTooltipEntryRight(entry)
-	local rightText = entry.location or ""
+	local rightText = sanitizeString(entry.location) or ""
 	if rightText == "" then return buildClassLevelText(entry), false end
 	return rightText, entry.locationSameZone == true
 end
 
 local function getTooltipRightColor(entry, sameZone)
-	if not entry.location or entry.location == "" then
-		return HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b
-	end
+	if not sanitizeString(entry.location) then return HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b end
 	if sameZone then return 0.25, 1.0, 0.4 end
 	return 0.62, 0.62, 0.62
 end
@@ -605,9 +670,7 @@ function populateListWindow()
 		elseif tooltipMeta.guildOnlineCount and tooltipMeta.guildOnlineCount > 0 then
 			addTwoColumnRow(scroll, "|cffcccccc" .. GUILD .. "|r", tostring(tooltipMeta.guildOnlineCount), 0.24, 0.76)
 		end
-		if tooltipMeta.guildMotd and tooltipMeta.guildMotd ~= "" then
-			addTwoColumnRow(scroll, "|cffccccccMOTD|r", tooltipMeta.guildMotd, 0.24, 0.76)
-		end
+		if tooltipMeta.guildMotd and tooltipMeta.guildMotd ~= "" then addTwoColumnRow(scroll, "|cffccccccMOTD|r", tooltipMeta.guildMotd, 0.24, 0.76) end
 		if #tooltipData.guild > 0 then
 			addSpacer(scroll)
 			addColumnHeader(scroll)
@@ -617,9 +680,7 @@ function populateListWindow()
 		end
 	end
 
-	if (tooltipMeta.guildName or tooltipMeta.guildTotalCount > 0 or tooltipMeta.guildMotd or #tooltipData.guild > 0) and (#tooltipData.friends > 0 or #tooltipData.bnet > 0) then
-		addSpacer(scroll)
-	end
+	if (tooltipMeta.guildName or tooltipMeta.guildTotalCount > 0 or tooltipMeta.guildMotd or #tooltipData.guild > 0) and (#tooltipData.friends > 0 or #tooltipData.bnet > 0) then addSpacer(scroll) end
 
 	addSectionRows(scroll, FRIENDS, tooltipData.friends)
 	if #tooltipData.friends > 0 and #tooltipData.bnet > 0 then addSpacer(scroll) end
@@ -652,6 +713,8 @@ local provider = {
 		FRIENDLIST_UPDATE = function(stream) addon.DataHub:RequestUpdate(stream) end,
 		GUILD_MOTD = function(stream) addon.DataHub:RequestUpdate(stream) end,
 		GUILD_ROSTER_UPDATE = function(stream) addon.DataHub:RequestUpdate(stream) end,
+		PLAYER_REGEN_DISABLED = function(stream) addon.DataHub:RequestUpdate(stream) end,
+		PLAYER_REGEN_ENABLED = function(stream) addon.DataHub:RequestUpdate(stream) end,
 		PLAYER_GUILD_UPDATE = function(stream)
 			requestGuildRosterIfNeeded(GetNumGuildMembers and GetNumGuildMembers() or 0)
 			addon.DataHub:RequestUpdate(stream)
@@ -704,19 +767,8 @@ local provider = {
 			else
 				guildCountText = string.format("%s: %d", GUILD, tooltipMeta.guildOnlineCount)
 			end
-			tip:AddDoubleLine(
-				tooltipMeta.guildName or GUILD,
-				guildCountText,
-				0.25,
-				1.0,
-				0.4,
-				NORMAL_FONT_COLOR.r,
-				NORMAL_FONT_COLOR.g,
-				NORMAL_FONT_COLOR.b
-			)
-			if tooltipMeta.guildMotd and tooltipMeta.guildMotd ~= "" then
-				tip:AddLine("MOTD - " .. tooltipMeta.guildMotd, NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b, true)
-			end
+			tip:AddDoubleLine(tooltipMeta.guildName or GUILD, guildCountText, 0.25, 1.0, 0.4, NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b)
+			if tooltipMeta.guildMotd and tooltipMeta.guildMotd ~= "" then tip:AddLine("MOTD - " .. tooltipMeta.guildMotd, NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b, true) end
 			if #tooltipData.guild > 0 then tip:AddLine(" ") end
 		end
 

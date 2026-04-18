@@ -2,6 +2,10 @@
 
 ## [10.3.0-beta12] - 2026-04-17
 
+### ✨ Added
+
+- Nameplates / Default Nameplate Coloring: Added customizable `Threat warning` and `Threat lost` health-bar colors for tanks.
+
 ### 🔄 Changed
 
 - Data Panels / Friends & Guild: Reworked the Friends/Guild stream so the guild block is shown first with guild name, online/total member count, and `MOTD`, followed by guild members and then friends.
