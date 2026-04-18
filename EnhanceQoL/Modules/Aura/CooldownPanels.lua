@@ -9227,7 +9227,8 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 	local function getResolvedCooldownTextColor()
 		local layout = getLayout()
 		local _, currentEntry = getEntry()
-		local _, _, _, color = CooldownPanels:ResolveEntryCooldownTextStyle(layout, currentEntry, defaultCooldownFontPath, defaultCooldownFontSize, defaultCooldownFontStyle)
+		local _, _, _, _, color =
+			CooldownPanels:ResolveEntryCooldownTextStyle(layout, currentEntry, defaultCooldownFontPath, defaultCooldownFontSize, defaultCooldownFontStyle)
 		return color
 	end
 
@@ -9247,7 +9248,8 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 	local function getResolvedStaticTextColor()
 		local layout = getLayout()
 		local _, currentEntry = getEntry()
-		local _, _, _, color = CooldownPanels:ResolveEntryStaticTextStyle(layout, currentEntry, defaultStaticFontPath, defaultStaticFontSize, defaultStaticFontStyle)
+		local _, _, _, _, color =
+			CooldownPanels:ResolveEntryStaticTextStyle(layout, currentEntry, defaultStaticFontPath, defaultStaticFontSize, defaultStaticFontStyle)
 		return color
 	end
 
@@ -9267,7 +9269,8 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 	local function getResolvedStackColor()
 		local layout = getLayout()
 		local _, currentEntry = getEntry()
-		local _, _, _, color = CooldownPanels:ResolveEntryStackTextStyle(layout, currentEntry, defaultCountFontPath, defaultCountFontSize, defaultCountFontStyle)
+		local _, _, _, _, color =
+			CooldownPanels:ResolveEntryStackTextStyle(layout, currentEntry, defaultCountFontPath, defaultCountFontSize, defaultCountFontStyle)
 		return color
 	end
 
@@ -9287,7 +9290,8 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 	local function getResolvedChargesColor()
 		local layout = getLayout()
 		local _, currentEntry = getEntry()
-		local _, _, _, color = CooldownPanels:ResolveEntryChargesTextStyle(layout, currentEntry, defaultChargesFontPath, defaultChargesFontSize, defaultChargesFontStyle)
+		local _, _, _, _, color =
+			CooldownPanels:ResolveEntryChargesTextStyle(layout, currentEntry, defaultChargesFontPath, defaultChargesFontSize, defaultChargesFontStyle)
 		return color
 	end
 
@@ -9693,14 +9697,16 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 				return not (currentEntry and currentEntry.stackStyleUseGlobal == false)
 			end,
 			get = function()
-				local _, _, _, _, anchor = CooldownPanels:ResolveEntryStackTextStyle(getLayout(), select(2, getEntry()), defaultCountFontPath, defaultCountFontSize, defaultCountFontStyle)
+				local _, _, _, _, _, anchor =
+					CooldownPanels:ResolveEntryStackTextStyle(getLayout(), select(2, getEntry()), defaultCountFontPath, defaultCountFontSize, defaultCountFontStyle)
 				return anchor
 			end,
 			set = function(_, value) setEntryField("stackAnchor", Helper.NormalizeAnchor(value, Helper.PANEL_LAYOUT_DEFAULTS.stackAnchor or "BOTTOMRIGHT")) end,
 			generator = function(_, root)
 				for _, option in ipairs(Helper.AnchorOptions) do
 					root:CreateRadio(option.label, function()
-						local _, _, _, _, anchor = CooldownPanels:ResolveEntryStackTextStyle(getLayout(), select(2, getEntry()), defaultCountFontPath, defaultCountFontSize, defaultCountFontStyle)
+						local _, _, _, _, _, anchor =
+							CooldownPanels:ResolveEntryStackTextStyle(getLayout(), select(2, getEntry()), defaultCountFontPath, defaultCountFontSize, defaultCountFontStyle)
 						return anchor == option.value
 					end, function() setEntryField("stackAnchor", option.value) end)
 				end
@@ -9723,7 +9729,8 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 				return not (currentEntry and currentEntry.stackStyleUseGlobal == false)
 			end,
 			get = function()
-				local _, _, _, _, _, x = CooldownPanels:ResolveEntryStackTextStyle(getLayout(), select(2, getEntry()), defaultCountFontPath, defaultCountFontSize, defaultCountFontStyle)
+				local _, _, _, _, _, _, x =
+					CooldownPanels:ResolveEntryStackTextStyle(getLayout(), select(2, getEntry()), defaultCountFontPath, defaultCountFontSize, defaultCountFontStyle)
 				return x
 			end,
 			set = function(_, value) setEntryField("stackX", Helper.ClampInt(value, -Helper.OFFSET_RANGE, Helper.OFFSET_RANGE, 0)) end,
@@ -9746,7 +9753,8 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 				return not (currentEntry and currentEntry.stackStyleUseGlobal == false)
 			end,
 			get = function()
-				local _, _, _, _, _, _, y = CooldownPanels:ResolveEntryStackTextStyle(getLayout(), select(2, getEntry()), defaultCountFontPath, defaultCountFontSize, defaultCountFontStyle)
+				local _, _, _, _, _, _, _, y =
+					CooldownPanels:ResolveEntryStackTextStyle(getLayout(), select(2, getEntry()), defaultCountFontPath, defaultCountFontSize, defaultCountFontStyle)
 				return y
 			end,
 			set = function(_, value) setEntryField("stackY", Helper.ClampInt(value, -Helper.OFFSET_RANGE, Helper.OFFSET_RANGE, 0)) end,
@@ -9885,14 +9893,15 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 				return not (currentEntry and currentEntry.chargesStyleUseGlobal == false)
 			end,
 			get = function()
-				local _, _, _, _, anchor = CooldownPanels:ResolveEntryChargesTextStyle(getLayout(), select(2, getEntry()), defaultChargesFontPath, defaultChargesFontSize, defaultChargesFontStyle)
+				local _, _, _, _, _, anchor =
+					CooldownPanels:ResolveEntryChargesTextStyle(getLayout(), select(2, getEntry()), defaultChargesFontPath, defaultChargesFontSize, defaultChargesFontStyle)
 				return anchor
 			end,
 			set = function(_, value) setEntryField("chargesAnchor", Helper.NormalizeAnchor(value, Helper.PANEL_LAYOUT_DEFAULTS.chargesAnchor or "TOP")) end,
 			generator = function(_, root)
 				for _, option in ipairs(Helper.AnchorOptions) do
 					root:CreateRadio(option.label, function()
-						local _, _, _, _, anchor =
+						local _, _, _, _, _, anchor =
 							CooldownPanels:ResolveEntryChargesTextStyle(getLayout(), select(2, getEntry()), defaultChargesFontPath, defaultChargesFontSize, defaultChargesFontStyle)
 						return anchor == option.value
 					end, function() setEntryField("chargesAnchor", option.value) end)
@@ -9916,7 +9925,8 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 				return not (currentEntry and currentEntry.chargesStyleUseGlobal == false)
 			end,
 			get = function()
-				local _, _, _, _, _, x = CooldownPanels:ResolveEntryChargesTextStyle(getLayout(), select(2, getEntry()), defaultChargesFontPath, defaultChargesFontSize, defaultChargesFontStyle)
+				local _, _, _, _, _, _, x =
+					CooldownPanels:ResolveEntryChargesTextStyle(getLayout(), select(2, getEntry()), defaultChargesFontPath, defaultChargesFontSize, defaultChargesFontStyle)
 				return x
 			end,
 			set = function(_, value) setEntryField("chargesX", Helper.ClampInt(value, -Helper.OFFSET_RANGE, Helper.OFFSET_RANGE, 0)) end,
@@ -9939,7 +9949,8 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 				return not (currentEntry and currentEntry.chargesStyleUseGlobal == false)
 			end,
 			get = function()
-				local _, _, _, _, _, _, y = CooldownPanels:ResolveEntryChargesTextStyle(getLayout(), select(2, getEntry()), defaultChargesFontPath, defaultChargesFontSize, defaultChargesFontStyle)
+				local _, _, _, _, _, _, _, y =
+					CooldownPanels:ResolveEntryChargesTextStyle(getLayout(), select(2, getEntry()), defaultChargesFontPath, defaultChargesFontSize, defaultChargesFontStyle)
 				return y
 			end,
 			set = function(_, value) setEntryField("chargesY", Helper.ClampInt(value, -Helper.OFFSET_RANGE, Helper.OFFSET_RANGE, 0)) end,
@@ -10360,7 +10371,8 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 				return not (currentEntry and currentEntry.showCooldownText ~= false and currentEntry.cooldownTextUseGlobal == false)
 			end,
 			get = function()
-				local _, _, _, _, x = CooldownPanels:ResolveEntryCooldownTextStyle(getLayout(), select(2, getEntry()), defaultCooldownFontPath, defaultCooldownFontSize, defaultCooldownFontStyle)
+				local _, _, _, _, _, x =
+					CooldownPanels:ResolveEntryCooldownTextStyle(getLayout(), select(2, getEntry()), defaultCooldownFontPath, defaultCooldownFontSize, defaultCooldownFontStyle)
 				return x
 			end,
 			set = function(_, value) setEntryField("cooldownTextX", Helper.ClampInt(value, -Helper.OFFSET_RANGE, Helper.OFFSET_RANGE, 0)) end,
@@ -10380,7 +10392,8 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 				return not (currentEntry and currentEntry.showCooldownText ~= false and currentEntry.cooldownTextUseGlobal == false)
 			end,
 			get = function()
-				local _, _, _, _, _, y = CooldownPanels:ResolveEntryCooldownTextStyle(getLayout(), select(2, getEntry()), defaultCooldownFontPath, defaultCooldownFontSize, defaultCooldownFontStyle)
+				local _, _, _, _, _, _, y =
+					CooldownPanels:ResolveEntryCooldownTextStyle(getLayout(), select(2, getEntry()), defaultCooldownFontPath, defaultCooldownFontSize, defaultCooldownFontStyle)
 				return y
 			end,
 			set = function(_, value) setEntryField("cooldownTextY", Helper.ClampInt(value, -Helper.OFFSET_RANGE, Helper.OFFSET_RANGE, 0)) end,
@@ -10512,14 +10525,16 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 				return not (currentEntry and currentEntry.staticTextUseGlobal == false)
 			end,
 			get = function()
-				local _, _, _, _, anchor = CooldownPanels:ResolveEntryStaticTextStyle(getLayout(), select(2, getEntry()), defaultStaticFontPath, defaultStaticFontSize, defaultStaticFontStyle)
+				local _, _, _, _, _, anchor =
+					CooldownPanels:ResolveEntryStaticTextStyle(getLayout(), select(2, getEntry()), defaultStaticFontPath, defaultStaticFontSize, defaultStaticFontStyle)
 				return anchor
 			end,
 			set = function(_, value) setEntryField("staticTextAnchor", Helper.NormalizeAnchor(value, Helper.PANEL_LAYOUT_DEFAULTS.staticTextAnchor or "CENTER")) end,
 			generator = function(_, root)
 				for _, option in ipairs(Helper.AnchorOptions) do
 					root:CreateRadio(option.label, function()
-						local _, _, _, _, anchor = CooldownPanels:ResolveEntryStaticTextStyle(getLayout(), select(2, getEntry()), defaultStaticFontPath, defaultStaticFontSize, defaultStaticFontStyle)
+						local _, _, _, _, _, anchor =
+							CooldownPanels:ResolveEntryStaticTextStyle(getLayout(), select(2, getEntry()), defaultStaticFontPath, defaultStaticFontSize, defaultStaticFontStyle)
 						return anchor == option.value
 					end, function() setEntryField("staticTextAnchor", option.value) end)
 				end
@@ -10539,7 +10554,8 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 				return not (currentEntry and currentEntry.staticTextUseGlobal == false)
 			end,
 			get = function()
-				local _, _, _, _, _, x = CooldownPanels:ResolveEntryStaticTextStyle(getLayout(), select(2, getEntry()), defaultStaticFontPath, defaultStaticFontSize, defaultStaticFontStyle)
+				local _, _, _, _, _, _, x =
+					CooldownPanels:ResolveEntryStaticTextStyle(getLayout(), select(2, getEntry()), defaultStaticFontPath, defaultStaticFontSize, defaultStaticFontStyle)
 				return x
 			end,
 			set = function(_, value) setEntryField("staticTextX", Helper.ClampInt(value, -Helper.OFFSET_RANGE, Helper.OFFSET_RANGE, 0)) end,
@@ -10559,7 +10575,8 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 				return not (currentEntry and currentEntry.staticTextUseGlobal == false)
 			end,
 			get = function()
-				local _, _, _, _, _, _, y = CooldownPanels:ResolveEntryStaticTextStyle(getLayout(), select(2, getEntry()), defaultStaticFontPath, defaultStaticFontSize, defaultStaticFontStyle)
+				local _, _, _, _, _, _, _, y =
+					CooldownPanels:ResolveEntryStaticTextStyle(getLayout(), select(2, getEntry()), defaultStaticFontPath, defaultStaticFontSize, defaultStaticFontStyle)
 				return y
 			end,
 			set = function(_, value) setEntryField("staticTextY", Helper.ClampInt(value, -Helper.OFFSET_RANGE, Helper.OFFSET_RANGE, 0)) end,
