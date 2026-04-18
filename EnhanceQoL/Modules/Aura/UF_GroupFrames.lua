@@ -11498,8 +11498,8 @@ end
 function GF:ScheduleConnectionRecheck(unit)
 	if not (C_Timer and C_Timer.NewTimer) then return end
 	local key = unit or "__all__"
-	self._connectionRecheckTimers = self._connectionRecheckTimers or {}
 	self:CancelConnectionRecheckTimer(unit)
+	self._connectionRecheckTimers = self._connectionRecheckTimers or {}
 	self._connectionRecheckTimers[key] = C_Timer.NewTimer(1, function()
 		GF:CancelConnectionRecheckTimer(unit)
 		if not isFeatureEnabled() then return end
