@@ -4,7 +4,7 @@
 
 ### ✨ Added
 
-- Nameplates / Default Nameplate Coloring: Added customizable `Threat warning` and `Threat lost` health-bar colors for tanks.
+- Nameplates / Default Nameplate Coloring: Added customizable `Neutral`, `Threat warning`, and `Threat lost` health-bar colors, so EQOL nameplate coloring can cover yellow neutral mobs while preserving Blizzard's threat coloring for tanks.
 
 ### 🔄 Changed
 

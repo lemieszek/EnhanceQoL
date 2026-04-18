@@ -38,6 +38,7 @@ local NAMEPLATE_MOB_COLOR_BOSS_DB_KEY = "nameplateMobColorBoss"
 local NAMEPLATE_MOB_COLOR_MINIBOSS_DB_KEY = "nameplateMobColorMiniboss"
 local NAMEPLATE_MOB_COLOR_CASTER_DB_KEY = "nameplateMobColorCaster"
 local NAMEPLATE_MOB_COLOR_MELEE_DB_KEY = "nameplateMobColorMelee"
+local NAMEPLATE_MOB_COLOR_NEUTRAL_DB_KEY = "nameplateMobColorNeutral"
 local NAMEPLATE_MOB_COLOR_THREAT_LOST_DB_KEY = "nameplateMobColorThreatLost"
 local NAMEPLATE_MOB_COLOR_THREAT_WARNING_DB_KEY = "nameplateMobColorThreatWarning"
 local NAMEPLATE_MOB_COLOR_TRIVIAL_DB_KEY = "nameplateMobColorTrivial"
@@ -55,17 +56,17 @@ local nameplateMobColorState = {
 	referenceLevel = nil,
 	lieutenantLevel = nil,
 }
-local function buildNameplateThreatColorDefault(globalColor, fallbackR, fallbackG, fallbackB)
-	if type(globalColor) == "table" then
-		if type(globalColor.GetRGBA) == "function" then
-			local r, g, b, a = globalColor:GetRGBA()
+local function buildNameplateColorDefault(colorSource, fallbackR, fallbackG, fallbackB)
+	if type(colorSource) == "table" then
+		if type(colorSource.GetRGBA) == "function" then
+			local r, g, b, a = colorSource:GetRGBA()
 			if type(r) == "number" and type(g) == "number" and type(b) == "number" then return { r = r, g = g, b = b, a = type(a) == "number" and a or 1 } end
 		end
 
-		local r = issecretvalue(globalColor.r) and nil or globalColor.r
-		local g = issecretvalue(globalColor.g) and nil or globalColor.g
-		local b = issecretvalue(globalColor.b) and nil or globalColor.b
-		local a = issecretvalue(globalColor.a) and nil or globalColor.a
+		local r = issecretvalue(colorSource.r) and nil or colorSource.r
+		local g = issecretvalue(colorSource.g) and nil or colorSource.g
+		local b = issecretvalue(colorSource.b) and nil or colorSource.b
+		local a = issecretvalue(colorSource.a) and nil or colorSource.a
 		if type(r) == "number" and type(g) == "number" and type(b) == "number" then return { r = r, g = g, b = b, a = type(a) == "number" and a or 1 } end
 	end
 
@@ -77,8 +78,9 @@ local NAMEPLATE_MOB_COLOR_DEFAULTS = {
 	[NAMEPLATE_MOB_COLOR_MINIBOSS_DB_KEY] = { r = 144 / 255, g = 0 / 255, b = 188 / 255, a = 1 },
 	[NAMEPLATE_MOB_COLOR_CASTER_DB_KEY] = { r = 0 / 255, g = 116 / 255, b = 188 / 255, a = 1 },
 	[NAMEPLATE_MOB_COLOR_MELEE_DB_KEY] = { r = 252 / 255, g = 252 / 255, b = 252 / 255, a = 1 },
-	[NAMEPLATE_MOB_COLOR_THREAT_LOST_DB_KEY] = buildNameplateThreatColorDefault(_G.ORANGE_THREAT_COLOR, 1, 0.6, 0),
-	[NAMEPLATE_MOB_COLOR_THREAT_WARNING_DB_KEY] = buildNameplateThreatColorDefault(_G.YELLOW_THREAT_COLOR, 1, 1, 0),
+	[NAMEPLATE_MOB_COLOR_NEUTRAL_DB_KEY] = buildNameplateColorDefault(_G.FACTION_BAR_COLORS and _G.FACTION_BAR_COLORS[4], 1, 1, 0),
+	[NAMEPLATE_MOB_COLOR_THREAT_LOST_DB_KEY] = buildNameplateColorDefault(_G.ORANGE_THREAT_COLOR, 1, 0.6, 0),
+	[NAMEPLATE_MOB_COLOR_THREAT_WARNING_DB_KEY] = buildNameplateColorDefault(_G.YELLOW_THREAT_COLOR, 1, 1, 0),
 	[NAMEPLATE_MOB_COLOR_TRIVIAL_DB_KEY] = { r = 178 / 255, g = 142 / 255, b = 85 / 255, a = 1 },
 }
 addon.constants = addon.constants or {}
@@ -91,6 +93,7 @@ addon.constants.DEFAULT_NAMEPLATE_FEATURE_KEYS = {
 	mobColorMiniboss = NAMEPLATE_MOB_COLOR_MINIBOSS_DB_KEY,
 	mobColorCaster = NAMEPLATE_MOB_COLOR_CASTER_DB_KEY,
 	mobColorMelee = NAMEPLATE_MOB_COLOR_MELEE_DB_KEY,
+	mobColorNeutral = NAMEPLATE_MOB_COLOR_NEUTRAL_DB_KEY,
 	mobColorThreatLost = NAMEPLATE_MOB_COLOR_THREAT_LOST_DB_KEY,
 	mobColorThreatWarning = NAMEPLATE_MOB_COLOR_THREAT_WARNING_DB_KEY,
 	mobColorTrivial = NAMEPLATE_MOB_COLOR_TRIVIAL_DB_KEY,
@@ -477,7 +480,7 @@ local function computeNameplateMobColor(unit)
 	updateNameplateMobColorContext()
 	if not nameplateMobColorState.isActive then return nil end
 	if not isNameplateUnitToken(unit) then return nil end
-	if isNeutralUnit(unit) then return nil end
+	if isNeutralUnit(unit) then return getNameplateMobColor(NAMEPLATE_MOB_COLOR_NEUTRAL_DB_KEY) end
 	if isPlayerControlledNameplateUnit(unit) then return nil end
 
 	local canAttack = UnitCanAttack("player", unit)
@@ -890,6 +893,7 @@ function addon.functions.initDungeonFrame()
 	addon.functions.InitDBValue(NAMEPLATE_MOB_COLOR_MINIBOSS_DB_KEY, NAMEPLATE_MOB_COLOR_DEFAULTS[NAMEPLATE_MOB_COLOR_MINIBOSS_DB_KEY])
 	addon.functions.InitDBValue(NAMEPLATE_MOB_COLOR_CASTER_DB_KEY, NAMEPLATE_MOB_COLOR_DEFAULTS[NAMEPLATE_MOB_COLOR_CASTER_DB_KEY])
 	addon.functions.InitDBValue(NAMEPLATE_MOB_COLOR_MELEE_DB_KEY, NAMEPLATE_MOB_COLOR_DEFAULTS[NAMEPLATE_MOB_COLOR_MELEE_DB_KEY])
+	addon.functions.InitDBValue(NAMEPLATE_MOB_COLOR_NEUTRAL_DB_KEY, NAMEPLATE_MOB_COLOR_DEFAULTS[NAMEPLATE_MOB_COLOR_NEUTRAL_DB_KEY])
 	addon.functions.InitDBValue(NAMEPLATE_MOB_COLOR_THREAT_LOST_DB_KEY, NAMEPLATE_MOB_COLOR_DEFAULTS[NAMEPLATE_MOB_COLOR_THREAT_LOST_DB_KEY])
 	addon.functions.InitDBValue(NAMEPLATE_MOB_COLOR_THREAT_WARNING_DB_KEY, NAMEPLATE_MOB_COLOR_DEFAULTS[NAMEPLATE_MOB_COLOR_THREAT_WARNING_DB_KEY])
 	addon.functions.InitDBValue(NAMEPLATE_MOB_COLOR_TRIVIAL_DB_KEY, NAMEPLATE_MOB_COLOR_DEFAULTS[NAMEPLATE_MOB_COLOR_TRIVIAL_DB_KEY])
