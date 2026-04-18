@@ -2226,7 +2226,6 @@ L["showIlvlOnMerchantframeDesc"] = "Zeigt die Gegenstandsstufe bei Händleritems
 L["showInstanceDifficulty"] = "Instanzschwierigkeit anzeigen"
 L["showInstanceDifficultyDesc"] = "Ersetzt das Standardsymbol durch ein kurzes Text-Label (NM, HC, M, M+, LFR), das die aktuelle Instanzschwierigkeit anzeigt."
 L["showOnlyGoldOnMoney"] = "Nur Gold des Accounts anzeigen (Silber / Kupfer ausblenden)"
-L["ShowTargetCastbar"] = "Zauberleiste des Ziels anzeigen"
 L["showTrainAllButton"] = "Alles-lernen-Schaltfläche anzeigen"
 L["showTrainAllButtonDesc"] = "Fügt dem Trainerfenster eine Alles-lernen-Schaltfläche hinzu, um alle verfügbaren Fähigkeiten auf einmal zu erlernen."
 L["showTutorials"] = "Tutorials deaktivieren"

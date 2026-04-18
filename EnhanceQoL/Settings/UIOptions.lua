@@ -1984,14 +1984,6 @@ local function createCastbarCategory()
 		default = false,
 		parentSection = expandable,
 	})
-	addon.functions.SettingsCreateCheckbox(category, {
-		var = "ShowTargetCastbar",
-		text = L["ShowTargetCastbar"],
-		get = function() return getCVarOptionState("ShowTargetCastbar") end,
-		func = function(value) setCVarOptionState("ShowTargetCastbar", value) end,
-		default = false,
-		parentSection = expandable,
-	})
 
 	addon.functions.SettingsCreateMultiDropdown(category, {
 		var = "hiddenCastBars",

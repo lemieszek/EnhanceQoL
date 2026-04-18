@@ -2226,7 +2226,6 @@ L["showIlvlOnMerchantframeDesc"] = "Mostra il livello oggetto sugli oggetti del 
 L["showInstanceDifficulty"] = "Mostra la difficoltà dell'istanza"
 L["showInstanceDifficultyDesc"] = "Sostituisce l’icona predefinita con un'etichetta breve (NM, HC, M, M+, LFR) che indica la difficoltà attuale dell'istanza."
 L["showOnlyGoldOnMoney"] = "Mostra solo l’oro dell’account (nascondi argento e rame)"
-L["ShowTargetCastbar"] = "Mostra la barra di lancio del bersaglio"
 L["showTrainAllButton"] = "Mostra pulsante Impara tutto"
 L["showTrainAllButtonDesc"] = "Aggiunge un pulsante Impara tutto alla finestra dell'istruttore per imparare tutte le abilità disponibili in una volta."
 L["showTutorials"] = "Disattiva i tutorial"

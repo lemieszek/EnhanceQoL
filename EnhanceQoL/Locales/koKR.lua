@@ -2226,7 +2226,6 @@ L["showIlvlOnMerchantframeDesc"] = "상인 아이템에 아이템 레벨을 표�
 L["showInstanceDifficulty"] = "인스턴스 난이도 표시"
 L["showInstanceDifficultyDesc"] = "기본 아이콘을 짧은 텍스트(NM, HC, M, M+, LFR)로 대체하여 현재 인스턴스 난이도를 표시합니다."
 L["showOnlyGoldOnMoney"] = "계정 골드만 표시 (실버/코퍼 숨김)"
-L["ShowTargetCastbar"] = "대상 시전바 표시"
 L["showTrainAllButton"] = "모두 배우기 버튼 표시"
 L["showTrainAllButtonDesc"] = "기술 훈련 창에 모두 배우기 버튼을 추가하여 사용 가능한 모든 기술을 한 번에 배울 수 있습니다."
 L["showTutorials"] = "튜토리얼 비활성화"
