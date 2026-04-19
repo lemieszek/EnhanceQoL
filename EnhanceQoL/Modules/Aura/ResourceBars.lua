@@ -1176,6 +1176,7 @@ function ResourceBars.ClearSharedSlotRuntimeFrame(slot, hideFrame)
 	if previousType and sharedFrame and powerbar[previousType] == sharedFrame then powerbar[previousType] = nil end
 	ResourceBars._sharedSlotResolvedTypes[slot] = nil
 	if hideFrame and sharedFrame then
+		if ResourceBars.ResetReusedPowerBarVisualState then ResourceBars.ResetReusedPowerBarVisualState(sharedFrame, previousType, nil) end
 		if applyVisibilityDriverToFrame then applyVisibilityDriverToFrame(sharedFrame, nil) end
 		sharedFrame._rbManualVisibilityHidden = nil
 		sharedFrame._rbDesiredVisible = false
@@ -6017,6 +6018,53 @@ function ResourceBars.RequestStructuralLayoutRefresh(needsReanchor)
 	if needsReanchor then ResourceBars._reanchorRequested = true end
 end
 
+function ResourceBars.ResetReusedPowerBarVisualState(bar, previousType, nextType)
+	if not bar or previousType == nextType then return end
+
+	local function hideBarChildSegments(segments, clearCooldownText)
+		if not segments then return end
+		for i = 1, #segments do
+			local sb = segments[i]
+			if sb then
+				sb:Hide()
+				if sb._rbSegmentBg then sb._rbSegmentBg:Hide() end
+				if sb._rbSegmentBorder then sb._rbSegmentBorder:Hide() end
+				if clearCooldownText and sb.fs then
+					sb.fs:SetText("")
+					sb.fs:Hide()
+					sb._lastRemain = nil
+				end
+			end
+		end
+	end
+
+	-- Shared frames are reused across specs, so clear visuals from the old type
+	-- before the new type config is applied.
+	deactivateRuneTicker(bar)
+	if ResourceBars.DeactivateEssenceTicker then ResourceBars.DeactivateEssenceTicker(bar) end
+	if ResourceBars.InvalidateEssenceSegmentCaches then ResourceBars.InvalidateEssenceSegmentCaches(bar) end
+
+	hideBarChildSegments(bar.runes, true)
+	hideBarChildSegments(bar.essences, false)
+
+	if bar.runeGapMarks then
+		for i = 1, #bar.runeGapMarks do
+			local mark = bar.runeGapMarks[i]
+			if mark then mark:Hide() end
+		end
+	end
+
+	if bar.separatorMarks then
+		for i = 1, #bar.separatorMarks do
+			local mark = bar.separatorMarks[i]
+			if mark then mark:Hide() end
+		end
+	end
+
+	if ResourceBars.HideDiscreteSegments then ResourceBars.HideDiscreteSegments(bar) end
+	setParentBarTextureVisible(bar, true)
+end
+
 function ResourceBars.ReuseExistingPowerBar(type, sharedSlot)
 	local bar
 	if sharedSlot then
@@ -6027,6 +6075,7 @@ function ResourceBars.ReuseExistingPowerBar(type, sharedSlot)
 	if not bar or not bar._rbInitialized then return false end
 	if bar._rbSharedSlot ~= sharedSlot then return false end
 	if bar:GetParent() ~= UIParent then bar:SetParent(UIParent) end
+	ResourceBars.ResetReusedPowerBarVisualState(bar, bar._rbType, type)
 
 	local settings = ResourceBars.GetFrameRuntimeConfig(type, bar) or bar._cfg or {}
 	local defaultStyle = (type == "MANA" or type == "STAGGER") and "PERCENT" or "CURMAX"
@@ -6116,10 +6165,12 @@ local function createPowerBar(type, anchor, sharedSlot)
 
 	local previousWidth = bar.GetWidth and bar:GetWidth() or 0
 	local previousHeight = bar.GetHeight and bar:GetHeight() or 0
+	local previousType = bar._rbType
 	local previousSharedSlot = bar._rbSharedSlot
 	local settings = ResourceBars.GetFrameRuntimeConfig(type, bar) or bar._cfg or {}
 	local w = max(RB.MIN_RESOURCE_BAR_WIDTH, (settings and settings.width) or RB.DEFAULT_POWER_WIDTH)
 	local h = settings and settings.height or RB.DEFAULT_POWER_HEIGHT
+	ResourceBars.ResetReusedPowerBarVisualState(bar, previousType, type)
 	ResourceBars.AssignFrameRuntimeConfig(bar, settings)
 	bar._rbType = type
 	bar._rbSharedSlot = sharedSlot
