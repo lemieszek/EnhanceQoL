@@ -66,8 +66,8 @@ end
 
 addon.Drinks.drinkList = { -- Special Food
 	{ key = "ConjureRefreshment", id = 190336, requiredLevel = 5, mana = 0, isSpell = true }, -- set mana to zero, because we update it anyway
-	{ key = "CandyBar", id = 20390, requiredLevel = 1, mana = 18000 }, -- We don't know the right amount on level 41 it's 18000
-	{ key = "CandyCorn", id = 20389, requiredLevel = 1, mana = 18000 }, -- We don't know the right amount on level 41 it's 18000
+	{ key = "CandyBar", id = 20390, requiredLevel = 1, mana = 225000 }, -- We don't know the right amount on level 41 it's 18000
+	{ key = "CandyCorn", id = 20389, requiredLevel = 1, mana = 225000 }, -- We don't know the right amount on level 41 it's 18000
 	{ key = "ConjuredManaBun", id = 113509, requiredLevel = 40, mana = 0, isMageFood = true, isEarthenFood = true }, -- set mana to zero, because we update it anyway
 	{ key = "ConjuredManaFritter", id = 80618, requiredLevel = 35, mana = 0, isMageFood = true, isEarthenFood = true }, -- set mana to zero, because we update it anyway
 	{ key = "ConjuredManaPudding", id = 80610, requiredLevel = 35, mana = 0, isMageFood = true, isEarthenFood = true }, -- set mana to zero, because we update it anyway
