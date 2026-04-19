@@ -14552,8 +14552,14 @@ function CooldownPanels:EnsurePanelFrame(panelId)
 	local frame = createPanelFrame(panelId, panel)
 	runtime.frame = frame
 	self:ApplyPanelPosition(panelId)
-	self:ApplyLayout(panelId)
-	self:UpdatePreviewIcons(panelId)
+	local showPreviewLayout = self:IsInEditMode() == true or self:IsPanelLayoutEditActive(panelId) == true
+	if showPreviewLayout then
+		self:ApplyLayout(panelId)
+		self:UpdatePreviewIcons(panelId)
+	else
+		-- Normal startup/runtime will rebuild the real icon layout on demand in UpdateRuntimeIcons.
+		self:ApplyLayout(panelId, 1)
+	end
 	return frame
 end
 
