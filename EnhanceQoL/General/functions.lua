@@ -2099,12 +2099,24 @@ local function normalizeSlashCommand(command)
 	return command
 end
 
+local function updateSlashCommandRegistryCount(command, delta)
+	local normalized = normalizeSlashCommand(command)
+	if not (normalized and slashCommandRegistry) then return normalized end
+	local nextCount = (slashCommandRegistry[normalized] or 0) + (delta or 0)
+	if nextCount > 0 then
+		slashCommandRegistry[normalized] = nextCount
+	else
+		slashCommandRegistry[normalized] = nil
+	end
+	return normalized
+end
+
 local function rebuildSlashCommandRegistry()
 	local registry = {}
 	for key, value in pairs(_G) do
 		if type(key) == "string" and key:match("^SLASH_") and type(value) == "string" then
 			local normalized = normalizeSlashCommand(value)
-			if normalized then registry[normalized] = true end
+			if normalized then registry[normalized] = (registry[normalized] or 0) + 1 end
 		end
 	end
 	slashCommandRegistry = registry
@@ -2119,14 +2131,19 @@ end
 function addon.functions.IsSlashCommandRegistered(command)
 	local normalized = normalizeSlashCommand(command)
 	if not normalized then return false end
-	return getSlashCommandRegistry()[normalized] == true
+	return getSlashCommandRegistry()[normalized] ~= nil
 end
 
 function addon.functions.SetSlashCommandAlias(prefix, index, command)
 	if type(prefix) ~= "string" or prefix == "" then return nil end
+	local key = "SLASH_" .. prefix .. tostring(index)
+	local previous = normalizeSlashCommand(_G[key])
 	local normalized = normalizeSlashCommand(command)
-	_G["SLASH_" .. prefix .. tostring(index)] = normalized
-	slashCommandRegistry = nil
+	_G[key] = normalized
+	if previous ~= normalized then
+		updateSlashCommandRegistryCount(previous, -1)
+		updateSlashCommandRegistryCount(normalized, 1)
+	end
 	return normalized
 end
 

@@ -19279,7 +19279,7 @@ local function registerCooldownPanelsSlashCommand()
 		if isSlashCommandRegistered(lower) then
 			local owned = false
 			if SlashCmdList["EQOLCP"] then
-				for i = 1, 5 do
+				for i = 1, #commands do
 					local key = _G["SLASH_EQOLCP" .. i]
 					if type(key) == "string" and key:lower() == lower then
 						owned = true
