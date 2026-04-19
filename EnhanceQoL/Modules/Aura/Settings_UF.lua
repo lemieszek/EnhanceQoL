@@ -820,8 +820,8 @@ local function appendUnitAuraSettings(list, unit, def, refreshSelf)
 			list[#list].isEnabled = isSectionEnabled
 		end
 
-		list[#list + 1] = slider(labelPrefix .. " " .. (L["Size"] or "size"), 12, 48, 1, function() return getAuraSectionValue(sectionKey, { "size" }, auraDef.size or 24) end, function(val)
-			setAuraSectionValue(sectionKey, { "size" }, val or auraDef.size or 24)
+		list[#list + 1] = slider(labelPrefix .. " " .. (L["Size"] or "size"), 12, 120, 1, function() return getAuraSectionValue(sectionKey, { "size" }, auraDef.size or 24) end, function(val)
+			setAuraSectionValue(sectionKey, { "size" }, clampNumber(val, 12, 120, auraDef.size or 24))
 			refreshSelf()
 		end, auraDef.size or 24, parentId, true)
 		list[#list].isEnabled = isSectionEnabled
@@ -7726,11 +7726,11 @@ local function buildUnitSettings(unit)
 		list[#list + 1] = slider(
 			L["UFPrivateAurasSize"] or "Private aura size",
 			8,
-			100,
+			120,
 			1,
 			function() return getValue(unit, { "privateAuras", "icon", "size" }, (paDef.icon and paDef.icon.size) or 24) end,
 			function(val)
-				setValue(unit, { "privateAuras", "icon", "size" }, clampNumber(val or 24, 8, 100, 24))
+				setValue(unit, { "privateAuras", "icon", "size" }, clampNumber(val or 24, 8, 120, 24))
 				refresh()
 			end,
 			(paDef.icon and paDef.icon.size) or 24,

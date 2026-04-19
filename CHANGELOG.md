@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.3.0-beta13] - 2026-04-19
+
+### 🔄 Changed
+
+- Unit Frames / Aura Settings: Increased the configurable aura-icon size cap to `120` for player/target/focus/boss aura icons, unit-frame private auras, and party/raid frame buff, debuff, external, and private-aura icons.
+
+---
+
 ## [10.3.0-beta12] - 2026-04-17
 
 ### ✨ Added

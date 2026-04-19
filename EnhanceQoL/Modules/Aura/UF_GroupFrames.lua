@@ -21730,7 +21730,7 @@ local function buildEditModeSettings(kind, editModeId)
 			field = "buffSize",
 			parentId = "buffs",
 			minValue = 8,
-			maxValue = 60,
+			maxValue = 120,
 			valueStep = 1,
 			get = function()
 				local cfg = getCfg(kind)
@@ -21740,7 +21740,7 @@ local function buildEditModeSettings(kind, editModeId)
 			set = function(_, value)
 				local cfg = getCfg(kind)
 				local ac = ensureAuraConfig(cfg)
-				ac.buff.size = clampNumber(value, 8, 60, ac.buff.size or 16)
+				ac.buff.size = clampNumber(value, 8, 120, ac.buff.size or 16)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "buffSize", ac.buff.size, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
@@ -22458,7 +22458,7 @@ local function buildEditModeSettings(kind, editModeId)
 			field = "debuffSize",
 			parentId = "debuffs",
 			minValue = 8,
-			maxValue = 60,
+			maxValue = 120,
 			valueStep = 1,
 			get = function()
 				local cfg = getCfg(kind)
@@ -22468,7 +22468,7 @@ local function buildEditModeSettings(kind, editModeId)
 			set = function(_, value)
 				local cfg = getCfg(kind)
 				local ac = ensureAuraConfig(cfg)
-				ac.debuff.size = clampNumber(value, 8, 60, ac.debuff.size or 16)
+				ac.debuff.size = clampNumber(value, 8, 120, ac.debuff.size or 16)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "debuffSize", ac.debuff.size, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
@@ -23179,7 +23179,7 @@ local function buildEditModeSettings(kind, editModeId)
 			field = "externalSize",
 			parentId = "externals",
 			minValue = 8,
-			maxValue = 60,
+			maxValue = 120,
 			valueStep = 1,
 			get = function()
 				local cfg = getCfg(kind)
@@ -23189,7 +23189,7 @@ local function buildEditModeSettings(kind, editModeId)
 			set = function(_, value)
 				local cfg = getCfg(kind)
 				local ac = ensureAuraConfig(cfg)
-				ac.externals.size = clampNumber(value, 8, 60, ac.externals.size or 16)
+				ac.externals.size = clampNumber(value, 8, 120, ac.externals.size or 16)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "externalSize", ac.externals.size, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
@@ -24029,7 +24029,7 @@ local function buildEditModeSettings(kind, editModeId)
 			field = "privateAurasSize",
 			parentId = "privateAuras",
 			minValue = 8,
-			maxValue = 100,
+			maxValue = 120,
 			valueStep = 1,
 			get = function()
 				local cfg = getCfg(kind)
@@ -24042,7 +24042,7 @@ local function buildEditModeSettings(kind, editModeId)
 				local cfg = getCfg(kind)
 				local pcfg = ensurePrivateAuraConfig(cfg)
 				if not pcfg then return end
-				pcfg.icon.size = clampNumber(value, 8, 100, pcfg.icon.size or 20)
+				pcfg.icon.size = clampNumber(value, 8, 120, pcfg.icon.size or 20)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "privateAurasSize", pcfg.icon.size, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
