@@ -1688,9 +1688,15 @@ function Bars.OnBarValueTextUpdate(self, elapsed)
 	local text = Bars.GetLiveBarValueText(self._eqolBarState)
 	if hasTextValue(text) then
 		self.value:SetText(text)
+		self.value:SetWidth(0)
+		local stringWidth = safeNumber(self.value.GetStringWidth and self.value:GetStringWidth() or nil)
+		if stringWidth and stringWidth > 0 then
+			self.value:SetWidth(pixelSnap(max(1, stringWidth + 2), self.value.GetParent and self.value:GetParent() or nil))
+		end
 		if self.value.Show and self.value.IsShown and not self.value:IsShown() then self.value:Show() end
 	else
 		self.value:SetText("")
+		self.value:SetWidth(0)
 	end
 end
 
@@ -1708,9 +1714,15 @@ Bars.ConfigureBarValueTextUpdater = function(barFrame, state)
 	if barFrame.value then
 		if hasTextValue(initialText) then
 			barFrame.value:SetText(initialText)
+			barFrame.value:SetWidth(0)
+			local stringWidth = safeNumber(barFrame.value.GetStringWidth and barFrame.value:GetStringWidth() or nil)
+			if stringWidth and stringWidth > 0 then
+				barFrame.value:SetWidth(pixelSnap(max(1, stringWidth + 2), barFrame.value.GetParent and barFrame.value:GetParent() or nil))
+			end
 			barFrame.value:Show()
 		else
 			barFrame.value:SetText("")
+			barFrame.value:SetWidth(0)
 		end
 	end
 	barFrame:SetScript("OnUpdate", Bars.OnBarValueTextUpdate)
@@ -2809,22 +2821,20 @@ local function layoutBarTextElement(
 	local insetY = offsetY or 0
 	local justifyV = "MIDDLE"
 	local textValue = text or ""
-	local appliedWidth = textWidth
 	local textInset = 4
 
 	fontString:ClearAllPoints()
 	if fontString.SetWordWrap then fontString:SetWordWrap(false) end
+	if fontString.SetNonSpaceWrap then fontString:SetNonSpaceWrap(false) end
 	if fontString.SetMaxLines then fontString:SetMaxLines(1) end
 	fontString:SetWidth(0)
 	fontString:SetText(textValue)
-	if resolvedAnchor == Bars.TEXT_ANCHOR.LEFT or resolvedAnchor == Bars.TEXT_ANCHOR.RIGHT or resolvedAnchor == Bars.TEXT_ANCHOR.CENTER then
-		local stringWidth = safeNumber(fontString.GetStringWidth and fontString:GetStringWidth() or nil) or textWidth
-		appliedWidth = max(1, min(textWidth, stringWidth + 2))
-	end
-	appliedWidth = pixelSnap(appliedWidth, barFrame and barFrame.textOverlay or barFrame)
+	local stringWidth = safeNumber(fontString.GetStringWidth and fontString:GetStringWidth() or nil)
 	insetX = pixelSnap(insetX, barFrame and barFrame.textOverlay or barFrame)
 	insetY = pixelSnap(insetY, barFrame and barFrame.textOverlay or barFrame)
-	fontString:SetWidth(appliedWidth)
+	if stringWidth and stringWidth > 0 then
+		fontString:SetWidth(pixelSnap(max(1, stringWidth + 2), barFrame and barFrame.textOverlay or barFrame))
+	end
 	if resolvedAnchor == Bars.TEXT_ANCHOR.LEFT then
 		fontString:SetPoint("LEFT", barFrame.textOverlay, "LEFT", textInset + insetX, insetY)
 	elseif resolvedAnchor == Bars.TEXT_ANCHOR.RIGHT then
