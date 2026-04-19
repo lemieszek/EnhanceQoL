@@ -274,6 +274,38 @@ end
 
 local function IsCustomBorderStyle(style) return type(style) == "string" and style ~= "" and style ~= DEFAULT_BORDER_STYLE end
 
+local function BuildActionButtonBorderState()
+	local style = GetCustomBorderStyle()
+	local hasCustom = IsCustomBorderStyle(style)
+	local hide = addon.db and (addon.db.actionBarHideBorders or hasCustom) or hasCustom
+	local usesBackdrop = hasCustom and IsLSMBorderPath(style) or false
+	local padding = hasCustom and GetBorderPadding() or DEFAULT_BORDER_PADDING
+	local edgeSize = usesBackdrop and GetBorderEdgeSize() or DEFAULT_BORDER_EDGE_SIZE
+	local r, g, b, a = 1, 1, 1, 1
+	if hasCustom then r, g, b, a = GetBorderColor() end
+	return {
+		style = style,
+		hasCustom = hasCustom,
+		hide = hide == true,
+		usesBackdrop = usesBackdrop == true,
+		padding = padding,
+		edgeSize = edgeSize,
+		colorR = r,
+		colorG = g,
+		colorB = b,
+		colorA = a,
+		signature = table.concat({
+			hide == true and "1" or "0",
+			hasCustom == true and "1" or "0",
+			usesBackdrop == true and "1" or "0",
+			tostring(style or ""),
+			tostring(padding or ""),
+			tostring(edgeSize or ""),
+			string.format("%.3f,%.3f,%.3f,%.3f", r or 0, g or 0, b or 0, a or 0),
+		}, "|"),
+	}
+end
+
 local function EnsureCustomBorderTexture(button)
 	if not button then return nil end
 	local border = button.EQOL_CustomBorder
@@ -285,9 +317,9 @@ local function EnsureCustomBorderTexture(button)
 	return border
 end
 
-local function UpdateCustomBorderSizing(border, button)
+local function UpdateCustomBorderSizing(border, button, padding)
 	if not border or not button then return end
-	local padding = GetBorderPadding()
+	padding = tonumber(padding) or DEFAULT_BORDER_PADDING
 	border:ClearAllPoints()
 	border:SetPoint("CENTER", button, "CENTER", 0, 0)
 	local normalTexture = GetNormalTexture(button)
@@ -318,48 +350,51 @@ local function EnsureCustomBorderFrame(button)
 	return frame
 end
 
-local function UpdateCustomBorderFrame(frame, button)
+local function UpdateCustomBorderFrame(frame, button, padding)
 	if not frame or not button then return end
-	local padding = GetBorderPadding()
+	padding = tonumber(padding) or DEFAULT_BORDER_PADDING
 	frame:ClearAllPoints()
 	frame:SetPoint("TOPLEFT", button, "TOPLEFT", -padding, padding)
 	frame:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", padding, -padding)
 end
 
-local function ApplyBackdropBorder(button, style)
+local function ApplyBackdropBorder(button, borderState)
+	if not borderState then return end
 	local frame = EnsureCustomBorderFrame(button)
 	if not frame then return end
-	UpdateCustomBorderFrame(frame, button)
-	local edgeSize = GetBorderEdgeSize()
+	UpdateCustomBorderFrame(frame, button, borderState.padding)
+	local style = borderState.style
+	local edgeSize = borderState.edgeSize
 	if frame.EQOL_BorderStyle ~= style or frame.EQOL_BorderEdgeSize ~= edgeSize then
 		frame:SetBackdrop({ edgeFile = style, edgeSize = edgeSize })
 		frame.EQOL_BorderStyle = style
 		frame.EQOL_BorderEdgeSize = edgeSize
 	end
-	local r, g, b, a = GetBorderColor()
+	local r, g, b, a = borderState.colorR, borderState.colorG, borderState.colorB, borderState.colorA
 	frame:SetBackdropBorderColor(r, g, b, a)
 	frame:Show()
 end
 
-local function ApplyCustomBorder(button, style)
+local function ApplyCustomBorder(button, borderState)
 	local border = button and button.EQOL_CustomBorder
 	local borderFrame = button and button.EQOL_CustomBorderFrame
-	if not IsCustomBorderStyle(style) then
+	if not (borderState and borderState.hasCustom) then
 		if border then border:Hide() end
 		if borderFrame then borderFrame:Hide() end
 		return
 	end
 
-	if IsLSMBorderPath(style) then
+	local style = borderState.style
+	if borderState.usesBackdrop then
 		if border then border:Hide() end
-		ApplyBackdropBorder(button, style)
+		ApplyBackdropBorder(button, borderState)
 		return
 	end
 
 	if borderFrame then borderFrame:Hide() end
 	border = EnsureCustomBorderTexture(button)
 	if not border then return end
-	UpdateCustomBorderSizing(border, button)
+	UpdateCustomBorderSizing(border, button, borderState.padding)
 	if border.EQOL_BorderStyle ~= style then
 		border:SetTexture(style)
 		border.EQOL_BorderStyle = style
@@ -369,7 +404,7 @@ local function ApplyCustomBorder(button, style)
 	else
 		border:SetTexCoord(0, 1, 0, 1)
 	end
-	local r, g, b, a = GetBorderColor()
+	local r, g, b, a = borderState.colorR, borderState.colorG, borderState.colorB, borderState.colorA
 	border:SetVertexColor(r, g, b, a)
 	border:Show()
 end
@@ -399,25 +434,26 @@ local function ApplyBorderVisibility(button, hide)
 	end
 end
 
-local function RefreshButtonBorder(button)
+local function RefreshButtonBorder(button, borderState)
 	if not addon.db then return end
+	borderState = borderState or BuildActionButtonBorderState()
 	local isActionButton = DetermineButtonBarName(button) ~= nil
 	if not isActionButton then
 		ApplyBorderVisibility(button, false)
 		ApplyCustomBorder(button, nil)
 		return
 	end
-	local style = GetCustomBorderStyle()
-	local hasCustom = IsCustomBorderStyle(style)
-	local hide = addon.db.actionBarHideBorders or hasCustom
-	ApplyBorderVisibility(button, hide)
-	ApplyCustomBorder(button, hasCustom and style or nil)
+	ApplyBorderVisibility(button, borderState.hide)
+	ApplyCustomBorder(button, borderState)
 end
 
-function Labels.RefreshActionButtonBorders()
+function Labels.RefreshActionButtonBorders(reason)
 	if Labels.EnsureActionButtonArtHook then Labels.EnsureActionButtonArtHook() end
 	if Labels.EnsureZoneAbilityBorderHook then Labels.EnsureZoneAbilityBorderHook() end
-	ForEachActionButtonBorderTarget(function(button) RefreshButtonBorder(button) end)
+	local borderState = BuildActionButtonBorderState()
+	if reason == "PLAYER_LOGIN" and Labels._actionBarBorderFullRefreshSignature == borderState.signature then return end
+	ForEachActionButtonBorderTarget(function(button) RefreshButtonBorder(button, borderState) end)
+	Labels._actionBarBorderFullRefreshSignature = borderState.signature
 end
 
 function Labels.RefreshActionButtonBorder(button) RefreshButtonBorder(button) end
@@ -1197,7 +1233,7 @@ local function OnPlayerLogin(self, event)
 	if Labels.RefreshAllHotkeyStyles then Labels.RefreshAllHotkeyStyles() end
 	if Labels.RefreshAllCountStyles then Labels.RefreshAllCountStyles() end
 	if Labels.RefreshAllRangeOverlays then Labels.RefreshAllRangeOverlays() end
-	if Labels.RefreshActionButtonBorders then Labels.RefreshActionButtonBorders() end
+	if Labels.RefreshActionButtonBorders then Labels.RefreshActionButtonBorders("PLAYER_LOGIN") end
 	if Labels.UpdateRangeOverlayEvents then Labels.UpdateRangeOverlayEvents() end
 	if Labels.UpdateHotkeyRefreshEvents then Labels.UpdateHotkeyRefreshEvents() end
 	if self then
