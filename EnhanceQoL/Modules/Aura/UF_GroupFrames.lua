@@ -26997,7 +26997,7 @@ function GF:OnEnterEditMode(kind)
 	if not isFeatureEnabled() then return end
 	local cfg = getCfg(kind)
 	if not (cfg and cfg.enabled == true) then return end
-	if GF._editModeSampleAuras == nil then GF._editModeSampleAuras = true end
+	if GF._editModeSampleAuras == nil then GF._editModeSampleAuras = false end
 	if GF._editModeSampleStatusText == nil then GF._editModeSampleStatusText = true end
 	if GF._editModeSampleFrames == nil then GF._editModeSampleFrames = { party = false, raid = false, mt = false, ma = false } end
 	if GF._previewSampleSize == nil then GF._previewSampleSize = { raid = 10 } end

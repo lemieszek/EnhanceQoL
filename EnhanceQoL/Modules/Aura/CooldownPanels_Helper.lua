@@ -1876,6 +1876,177 @@ function Helper.CopyTableDeep(source, seen)
 	return result
 end
 
+local function isStorageEmptyTable(value) return type(value) == "table" and next(value) == nil end
+
+local function isStorageColorLikeTable(value)
+	if type(value) ~= "table" then return false end
+	return value.r ~= nil or value.g ~= nil or value.b ~= nil or value.a ~= nil or value[1] ~= nil or value[2] ~= nil or value[3] ~= nil or value[4] ~= nil
+end
+
+local function storageValuesEqual(left, right, seen)
+	if left == right then return true end
+	local leftType = type(left)
+	local rightType = type(right)
+	if leftType ~= rightType then return false end
+	if leftType ~= "table" then return false end
+	if isStorageColorLikeTable(left) and isStorageColorLikeTable(right) then
+		local leftColor = Helper.NormalizeColor(left, right)
+		local rightColor = Helper.NormalizeColor(right, right)
+		return leftColor[1] == rightColor[1] and leftColor[2] == rightColor[2] and leftColor[3] == rightColor[3] and leftColor[4] == rightColor[4]
+	end
+	seen = seen or {}
+	if seen[left] == right then return true end
+	seen[left] = right
+	for key, value in pairs(left) do
+		if not storageValuesEqual(value, right[key], seen) then return false end
+	end
+	for key in pairs(right) do
+		if left[key] == nil then return false end
+	end
+	return true
+end
+
+local function pruneStorageKeysMatchingDefaults(target, defaultResolver)
+	if type(target) ~= "table" or type(defaultResolver) ~= "function" then return end
+	for key, value in pairs(target) do
+		local defaultValue = defaultResolver(key, value)
+		if defaultValue ~= nil and storageValuesEqual(value, defaultValue) then target[key] = nil end
+	end
+end
+
+local function pruneInternalStorageKeys(root, seen)
+	if type(root) ~= "table" then return end
+	seen = seen or {}
+	if seen[root] then return end
+	seen[root] = true
+	for key, value in pairs(root) do
+		if type(key) == "string" and (key == "_orderDirty" or string.match(key, "^_eqol")) then
+			root[key] = nil
+		elseif type(value) == "table" then
+			pruneInternalStorageKeys(value, seen)
+		end
+	end
+end
+
+local function getStorageBarsDefaults()
+	local bars = CooldownPanels and CooldownPanels.Bars or nil
+	local defaults = type(bars) == "table" and type(bars.DEFAULTS) == "table" and bars.DEFAULTS or nil
+	local colors = type(bars) == "table" and type(bars.COLORS) == "table" and bars.COLORS or nil
+	return defaults, colors
+end
+
+local function getStorageBarColorDefault(mode, barsDefaults, barsColors)
+	local normalizedMode = type(mode) == "string" and string.upper(mode) or nil
+	if normalizedMode == "CHARGES" and type(barsColors) == "table" and type(barsColors.CHARGES) == "table" then return barsColors.CHARGES end
+	if normalizedMode == "STACKS" and type(barsColors) == "table" and type(barsColors.STACKS) == "table" then return barsColors.STACKS end
+	if type(barsColors) == "table" and type(barsColors.COOLDOWN) == "table" then return barsColors.COOLDOWN end
+	return barsDefaults and barsDefaults.barColor or nil
+end
+
+local function getStorageRootEntryDefault(rootEntryDefaults, key, barsDefaults, barsColors)
+	if key == "barColor" then
+		local mode = rootEntryDefaults and rootEntryDefaults.barMode or (barsDefaults and barsDefaults.barMode)
+		return getStorageBarColorDefault(mode, barsDefaults, barsColors)
+	end
+	if Helper.ENTRY_DEFAULTS[key] ~= nil then return Helper.ENTRY_DEFAULTS[key] end
+	if barsDefaults and barsDefaults[key] ~= nil then return barsDefaults[key] end
+	return nil
+end
+
+local function getStorageEntryDefault(entry, entryDefaults, key, barsDefaults, barsColors)
+	if key == "barColor" then
+		if entryDefaults and entryDefaults.barColor ~= nil then return entryDefaults.barColor end
+		local mode = entry and entry.barMode
+		if mode == nil and entryDefaults then mode = entryDefaults.barMode end
+		if mode == nil and barsDefaults then mode = barsDefaults.barMode end
+		return getStorageBarColorDefault(mode, barsDefaults, barsColors)
+	end
+	if entryDefaults and entryDefaults[key] ~= nil then return entryDefaults[key] end
+	if Helper.ENTRY_DEFAULTS[key] ~= nil then return Helper.ENTRY_DEFAULTS[key] end
+	if barsDefaults and barsDefaults[key] ~= nil then return barsDefaults[key] end
+	return nil
+end
+
+function Helper.PruneEntryForStorage(entry, defaults)
+	if type(entry) ~= "table" then return end
+	defaults = defaults or {}
+	local entryDefaults = type(defaults.entry) == "table" and defaults.entry or nil
+	local barsDefaults, barsColors = getStorageBarsDefaults()
+	entry.id = nil
+	entry.customIconID = nil
+	entry.ignoreMasque = nil
+	entry.glowDuration = nil
+	entry.stateTextureType = nil
+	entry.stateTextureAtlas = nil
+	entry.stateTextureFileID = nil
+	entry.fixedGroupIconSizeInherited = nil
+	entry.fixedGroupIconSizePrevUseGlobal = nil
+	entry.fixedGroupIconSizePrev = nil
+	if entry.fixedGroupId ~= nil and entry.slotColumn ~= nil and entry.slotRow ~= nil then entry.slotIndex = nil end
+	pruneStorageKeysMatchingDefaults(entry, function(key)
+		return getStorageEntryDefault(entry, entryDefaults, key, barsDefaults, barsColors)
+	end)
+end
+
+function Helper.PrunePanelForStorage(panel, defaults)
+	if type(panel) ~= "table" then return end
+	defaults = defaults or {}
+	local layoutDefaults = type(defaults.layout) == "table" and defaults.layout or nil
+	panel.id = nil
+	panel.editorGroup = nil
+	if type(panel.anchor) == "table" then
+		local anchor = panel.anchor
+		if anchor.point ~= nil and anchor.relativePoint ~= nil and anchor.x ~= nil and anchor.y ~= nil and type(anchor.relativeFrame) == "string" and anchor.relativeFrame ~= "" then
+			panel.point = nil
+			panel.x = nil
+			panel.y = nil
+		end
+	end
+	if type(panel.layout) == "table" then
+		panel.layout.readyGlowDuration = nil
+		if isStorageEmptyTable(panel.layout.fixedGroups) then panel.layout.fixedGroups = nil end
+		pruneStorageKeysMatchingDefaults(panel.layout, function(key)
+			if layoutDefaults and layoutDefaults[key] ~= nil then return layoutDefaults[key] end
+			return Helper.PANEL_LAYOUT_DEFAULTS[key]
+		end)
+	end
+	if type(panel.entries) == "table" then
+		for _, entry in pairs(panel.entries) do
+			Helper.PruneEntryForStorage(entry, defaults)
+		end
+	end
+end
+
+function Helper.PruneRootForStorage(root)
+	if type(root) ~= "table" then return end
+	pruneInternalStorageKeys(root)
+	local barsDefaults, barsColors = getStorageBarsDefaults()
+	if type(root.defaults) == "table" then
+		if type(root.defaults.layout) == "table" then
+			root.defaults.layout.readyGlowDuration = nil
+			pruneStorageKeysMatchingDefaults(root.defaults.layout, function(key) return Helper.PANEL_LAYOUT_DEFAULTS[key] end)
+			if not next(root.defaults.layout) then root.defaults.layout = nil end
+		end
+		if type(root.defaults.entry) == "table" then
+			root.defaults.entry.glowDuration = nil
+			pruneStorageKeysMatchingDefaults(root.defaults.entry, function(key)
+				return getStorageRootEntryDefault(root.defaults.entry, key, barsDefaults, barsColors)
+			end)
+			if not next(root.defaults.entry) then root.defaults.entry = nil end
+		end
+		if not next(root.defaults) then root.defaults = nil end
+	end
+	local defaults = {
+		layout = type(root.defaults) == "table" and type(root.defaults.layout) == "table" and root.defaults.layout or nil,
+		entry = type(root.defaults) == "table" and type(root.defaults.entry) == "table" and root.defaults.entry or nil,
+	}
+	if type(root.panels) == "table" then
+		for _, panel in pairs(root.panels) do
+			Helper.PrunePanelForStorage(panel, defaults)
+		end
+	end
+end
+
 function Helper.NormalizeBool(value, fallback)
 	if value == nil then return fallback end
 	return value and true or false

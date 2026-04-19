@@ -94,6 +94,14 @@ local function cleanupTransientProfileCaches(root, seen)
 	end
 end
 
+local function cleanupCooldownPanelsStorageProfile(profile)
+	if type(profile) ~= "table" then return end
+	local root = profile.cooldownPanels
+	if type(root) ~= "table" then return end
+	local helper = addon.Aura and addon.Aura.CooldownPanels and addon.Aura.CooldownPanels.helper or nil
+	if type(helper) == "table" and type(helper.PruneRootForStorage) == "function" then helper.PruneRootForStorage(root) end
+end
+
 function addon.functions.CleanupCombatMeterSettings()
 	local db = _G.EnhanceQoLDB
 	if type(db) == "table" and type(db.profiles) == "table" then
@@ -137,6 +145,25 @@ function addon.functions.CleanupTransientProfileCaches()
 	if addon.db and addon.db ~= db then cleanupTransientProfileCaches(addon.db, seen) end
 end
 
+function addon.functions.CleanupCooldownPanelsStorage()
+	local db = _G.EnhanceQoLDB
+	local seen = {}
+	local function prune(profile)
+		if type(profile) ~= "table" or seen[profile] then return end
+		seen[profile] = true
+		cleanupCooldownPanelsStorageProfile(profile)
+	end
+	if type(db) == "table" then
+		prune(db)
+		if type(db.profiles) == "table" then
+			for _, profile in pairs(db.profiles) do
+				prune(profile)
+			end
+		end
+	end
+	if addon.db and addon.db ~= db then prune(addon.db) end
+end
+
 function addon.functions.CleanupOldStuff()
 	addon.functions.CleanupCombatMeterSettings()
 	addon.functions.CleanupBuffTrackerSettings()
@@ -149,5 +176,6 @@ if cleanupFrame then
 	cleanupFrame:RegisterEvent("PLAYER_LOGOUT")
 	cleanupFrame:SetScript("OnEvent", function()
 		if addon.functions and addon.functions.CleanupTransientProfileCaches then addon.functions.CleanupTransientProfileCaches() end
+		if addon.functions and addon.functions.CleanupCooldownPanelsStorage then addon.functions.CleanupCooldownPanelsStorage() end
 	end)
 end

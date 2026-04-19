@@ -8184,13 +8184,22 @@ local function registerUnitFrame(unit, info)
 		showReset = false,
 	})
 	local editorContext = getGlobalAuraIgnoreEditorContext(unit)
-	if editorContext and EditMode and EditMode.RegisterButtons then
-		EditMode:RegisterButtons(info.frameId, {
+	if EditMode and EditMode.RegisterButtons then
+		local buttons = {
 			{
+				text = L["Toggle sample"] or "Toggle sample",
+				click = function()
+					if UF and UF.ToggleEditModeSample then UF.ToggleEditModeSample(unit) end
+				end,
+			},
+		}
+		if editorContext then
+			buttons[#buttons + 1] = {
 				text = L["UFGlobalAuraIgnoreEditModeButton"] or L["UFGroupGlobalAuraIgnoreEditModeButton"] or "Edit aura ignore",
 				click = function() toggleGlobalAuraIgnoreEditor(editorContext) end,
-			},
-		})
+			}
+		end
+		EditMode:RegisterButtons(info.frameId, buttons)
 	end
 	registeredUnitFrames[unit] = frame
 	applyFrameSettingsMaxHeight(frame)

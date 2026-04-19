@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.3.2] - 2026-04-19
+
+### 🐛 Fixed
+
+- Cooldown Panels / Performance: Reduced addon memory usage and improved overall performance by cleaning up oversized stored panel data.
+
+---
+
 ## [10.3.1] - 2026-04-19
 
 ### 🐛 Fixed

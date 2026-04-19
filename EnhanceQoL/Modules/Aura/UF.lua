@@ -21,6 +21,49 @@ local TotemFrameUtil = UF.TotemFrameUtil
 addon.variables = addon.variables or {}
 addon.variables.ufSampleAbsorb = addon.variables.ufSampleAbsorb or {}
 addon.variables.ufSampleHealAbsorb = addon.variables.ufSampleHealAbsorb or {}
+UF._editModeSample = UF._editModeSample or {}
+
+function UF.GetEditModeSampleKey(unit)
+	if type(unit) ~= "string" then return nil end
+	if unit == "boss" or unit:match("^boss%d+$") then return "boss" end
+	return unit
+end
+
+function UF.IsEditModeSampleEnabled(unit)
+	if not (addon.EditModeLib and addon.EditModeLib.IsInEditMode and addon.EditModeLib:IsInEditMode()) then return false end
+	unit = UF.GetEditModeSampleKey(unit)
+	return unit and UF._editModeSample and UF._editModeSample[unit] == true or false
+end
+
+function UF.SetEditModeSampleEnabled(unit, enabled)
+	unit = UF.GetEditModeSampleKey(unit)
+	if not unit then return end
+	UF._editModeSample = UF._editModeSample or {}
+	enabled = enabled == true
+	if (UF._editModeSample[unit] == true) == enabled then return end
+	if enabled then
+		UF._editModeSample[unit] = true
+	else
+		UF._editModeSample[unit] = nil
+	end
+	if unit == "boss" then
+		if UF.UpdateBossFrames then
+			UF.UpdateBossFrames(true)
+		elseif UF.Refresh then
+			UF.Refresh()
+		end
+	elseif UF.RefreshUnit then
+		UF.RefreshUnit(unit)
+	elseif UF.Refresh then
+		UF.Refresh()
+	end
+end
+
+function UF.ToggleEditModeSample(unit)
+	unit = UF.GetEditModeSampleKey(unit)
+	if not unit then return end
+	UF.SetEditModeSampleEnabled(unit, not (UF._editModeSample and UF._editModeSample[unit] == true))
+end
 local maxBossFrames = 8
 local UF_PROFILE_SHARE_KIND = "EQOL_UF_PROFILE"
 local smoothFill = Enum.StatusBarInterpolation.ExponentialEaseOut
@@ -4323,7 +4366,7 @@ function AuraUtil.updateTargetAuraIcons(startIndex, unit)
 	unit = unit or "target"
 	local st = states[unit]
 	if not st or not st.auraContainer or not st.frame then return end
-	local allowSample = addon.EditModeLib and addon.EditModeLib:IsInEditMode()
+	local allowSample = UF.IsEditModeSampleEnabled and UF.IsEditModeSampleEnabled(unit)
 	local cfg = st.cfg or ensureDB(unit)
 	local def = defaultsFor(unit)
 	local ac = cfg.auraIcons or (def and def.auraIcons) or defaults.target.auraIcons or { size = 24, padding = 2, max = 16, showCooldown = true }
@@ -4591,7 +4634,7 @@ function AuraUtil.fullScanTargetAuras(unit)
 		AuraUtil.updateTargetAuraIcons(nil, unit)
 		return
 	end
-	if addon.EditModeLib and addon.EditModeLib:IsInEditMode() then
+	if UF.IsEditModeSampleEnabled and UF.IsEditModeSampleEnabled(unit) then
 		if st then st._sampleAurasActive = true end
 		AuraUtil.fillSampleAuras(unit, ac)
 		AuraUtil.updateTargetAuraIcons(nil, unit)
@@ -6277,7 +6320,7 @@ function UF.OnCastInterruptAnimFinished(self)
 	if UF.ShouldShowSampleCast(unit) then UF.SetSampleCast(unit) end
 end
 
-function UF.ShouldShowSampleCast(unit) return addon.EditModeLib and addon.EditModeLib:IsInEditMode() end
+function UF.ShouldShowSampleCast(unit) return UF.IsEditModeSampleEnabled and UF.IsEditModeSampleEnabled(unit) end
 
 function UF.SetSampleCast(unit)
 	local key = isBossUnit(unit) and "boss" or unit
@@ -6296,6 +6339,17 @@ function UF.SetSampleCast(unit)
 	local resolvedCfg = ccfg or defc or {}
 	st.castCfg = resolvedCfg
 	local nowMs = GetTime() * 1000
+	if st.castInfo and st.castInfo.isSample == true and type(st.castInfo.endTime) == "number" and st.castInfo.endTime > nowMs then
+		applyCastLayout(cfg, unit)
+		configureCastStatic(unit, resolvedCfg, defc)
+		if not castOnUpdateHandlers[unit] then
+			st.castBar._eqolUFUnit = unit
+			st.castBar:SetScript("OnUpdate", UF.OnCastBarUpdate)
+			castOnUpdateHandlers[unit] = true
+		end
+		updateCastBar(unit)
+		return
+	end
 	st.castInfo = {
 		name = L["Sample Cast"] or "Sample Cast",
 		texture = 136235, -- lightning icon as placeholder
@@ -6303,6 +6357,7 @@ function UF.SetSampleCast(unit)
 		endTime = nowMs + 3000,
 		notInterruptible = false,
 		isChannel = false,
+		isSample = true,
 	}
 	applyCastLayout(cfg, unit)
 	configureCastStatic(unit, resolvedCfg, defc)
@@ -8959,15 +9014,14 @@ local function applyConfig(unit)
 		st._displayPowerStructureKey = sig and sig.key or nil
 	end
 	updatePortrait(cfg, unit)
-	AuraUtil.UpdateSingleDispelIndicator(unit, addon.EditModeLib and addon.EditModeLib:IsInEditMode())
+	AuraUtil.UpdateSingleDispelIndicator(unit, UF.IsEditModeSampleEnabled and UF.IsEditModeSampleEnabled(unit))
 	checkRaidTargetIcon(unit, st)
 	UFHelper.updateLeaderIndicator(st, unit, cfg, defaultsFor(unit), false)
 	UFHelper.updatePvPIndicator(st, unit, cfg, defaultsFor(unit), false)
 	UFHelper.updateRoleIndicator(st, unit, cfg, defaultsFor(unit), false)
 	if st.privateAuras and UFHelper and UFHelper.ApplyPrivateAuras then
 		local pcfg = cfg.privateAuras or (def and def.privateAuras)
-		local inEditMode = addon.EditModeLib and addon.EditModeLib.IsInEditMode and addon.EditModeLib:IsInEditMode()
-		UFHelper.ApplyPrivateAuras(st.privateAuras, unit, pcfg, st.frame, st.statusTextLayer or st.frame, inEditMode == true, true)
+		UFHelper.ApplyPrivateAuras(st.privateAuras, unit, pcfg, st.frame, st.statusTextLayer or st.frame, UF.IsEditModeSampleEnabled and UF.IsEditModeSampleEnabled(unit), true)
 	end
 	if unit == UNIT.PLAYER then
 		updateCombatIndicator(cfg)
@@ -9304,7 +9358,14 @@ applyBossEditSample = function(idx, cfg)
 		st.levelText:SetText(sampleLevelText ~= "" and sampleLevelText or "??")
 		st.levelText:Show()
 	end
-	if st.castBar and cdef.enabled ~= false then UF.SetSampleCast(unit) end
+	if st.castBar then
+		if cdef.enabled ~= false and UF.ShouldShowSampleCast(unit) then
+			UF.SetSampleCast(unit)
+		else
+			stopCast(unit)
+			st.castBar:Hide()
+		end
+	end
 end
 
 function UF._setBossFrameInactive(unit)
@@ -10721,7 +10782,7 @@ onEvent = function(self, event, unit, ...)
 				local function applyPrivate()
 					if not states[unitToken] or states[unitToken] ~= st then return end
 					if not UnitExists(unitToken) then return end
-					UFHelper.ApplyPrivateAuras(st.privateAuras, unitToken, pcfg, st.frame, st.statusTextLayer or st.frame, addon.EditModeLib and addon.EditModeLib:IsInEditMode(), true)
+					UFHelper.ApplyPrivateAuras(st.privateAuras, unitToken, pcfg, st.frame, st.statusTextLayer or st.frame, UF.IsEditModeSampleEnabled and UF.IsEditModeSampleEnabled(unitToken), true)
 				end
 				if After then
 					After(0, applyPrivate)
@@ -10755,7 +10816,7 @@ onEvent = function(self, event, unit, ...)
 	elseif event == "UNIT_AURA" and (unit == "target" or unit == UNIT.PLAYER or unit == UNIT.FOCUS or isBossUnit(unit)) then
 		local cfg = getCfg(unit)
 		if not cfg or cfg.enabled == false then return end
-		local allowSample = addon.EditModeLib and addon.EditModeLib:IsInEditMode()
+		local allowSample = UF.IsEditModeSampleEnabled and UF.IsEditModeSampleEnabled(unit)
 		local def = defaultsFor(unit)
 		if unit == UNIT.PLAYER then
 			local secondaryCfg = cfg.secondaryPower or {}
