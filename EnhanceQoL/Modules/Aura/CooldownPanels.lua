@@ -19243,6 +19243,7 @@ local function registerEditModeCallbacks()
 end
 
 local function isSlashCommandRegistered(command)
+	if addon.functions and addon.functions.IsSlashCommandRegistered then return addon.functions.IsSlashCommandRegistered(command) end
 	if not command then return false end
 	command = command:lower()
 	for key, value in pairs(_G) do
@@ -19251,6 +19252,15 @@ local function isSlashCommandRegistered(command)
 		end
 	end
 	return false
+end
+
+local function setSlashCommandAlias(slot, command)
+	if addon.functions and addon.functions.SetSlashCommandAlias then
+		return addon.functions.SetSlashCommandAlias("EQOLCP", slot, command)
+	end
+	command = type(command) == "string" and command:lower() or nil
+	_G["SLASH_EQOLCP" .. slot] = command
+	return command
 end
 
 local function registerCooldownPanelsSlashCommand()
@@ -19274,10 +19284,13 @@ local function registerCooldownPanelsSlashCommand()
 			if not owned then command = nil end
 		end
 		if command then
-			_G["SLASH_EQOLCP" .. slot] = lower
+			setSlashCommandAlias(slot, lower)
 			slot = slot + 1
 			assigned = true
 		end
+	end
+	for clearSlot = slot, #commands do
+		setSlashCommandAlias(clearSlot, nil)
 	end
 	if not assigned then return end
 	SlashCmdList["EQOLCP"] = function()
@@ -21025,7 +21038,7 @@ CooldownPanels.RequestEnabledPanelRefreshes = function()
 	return queued
 end
 
-local assistedHighlightHooked = false
+CooldownPanels.assistedHighlightHooked = false
 
 CooldownPanels.refreshAssistedHighlightCVarState = function(cause, suppressRefresh)
 	local enabled = false
@@ -21056,7 +21069,7 @@ CooldownPanels.ensureAssistedHighlightCVarListener = function()
 end
 
 ensureAssistedHighlightHook = function()
-	if assistedHighlightHooked then return true end
+	if CooldownPanels.assistedHighlightHooked then return true end
 	if not (hooksecurefunc and Api.GetAssistedCombatNextSpell) then return false end
 	local manager = _G.AssistedCombatManager
 	if not manager then return false end
@@ -21073,11 +21086,11 @@ ensureAssistedHighlightHook = function()
 		end
 		if not refreshed and CooldownPanels and CooldownPanels.RequestUpdate then CooldownPanels:RequestUpdate("AssistedCombatHighlight") end
 	end)
-	assistedHighlightHooked = true
+	CooldownPanels.assistedHighlightHooked = true
 	return true
 end
 
-local function setUpdateFrameEnabled(frame, enabled)
+function CooldownPanels.SetUpdateFrameEnabled(frame, enabled)
 	if not frame then return end
 	if enabled then
 		if frame._eqolEventsRegistered then return end
@@ -21103,7 +21116,7 @@ local function setUpdateFrameEnabled(frame, enabled)
 	end
 end
 
-local function isAssistedCombatActionSlot(slot)
+function CooldownPanels.IsAssistedCombatActionSlot(slot)
 	local actionSlot = tonumber(slot)
 	if not actionSlot or actionSlot <= 0 then return false end
 	if not Api.IsAssistedCombatAction then return false end
@@ -21113,16 +21126,16 @@ end
 function CooldownPanels:UpdateEventRegistration()
 	local frame = self.runtime and self.runtime.updateFrame
 	if not frame then return end
-	setUpdateFrameEnabled(frame, shouldEnableUpdateFrame())
+	CooldownPanels.SetUpdateFrameEnabled(frame, shouldEnableUpdateFrame())
 end
 
-local function ensureUpdateFrame()
+function CooldownPanels.EnsureUpdateFrame()
 	if CooldownPanels.runtime and CooldownPanels.runtime.updateFrame then return end
 	if ensureAssistedHighlightHook then ensureAssistedHighlightHook() end
 	if CooldownPanels.ensureAssistedHighlightCVarListener then CooldownPanels.ensureAssistedHighlightCVarListener() end
 	local frame = CreateFrame("Frame")
 	frame:SetScript("OnEvent", function(_, event, ...)
-		if not assistedHighlightHooked and ensureAssistedHighlightHook then ensureAssistedHighlightHook() end
+		if not CooldownPanels.assistedHighlightHooked and ensureAssistedHighlightHook then ensureAssistedHighlightHook() end
 		if CooldownPanels.ensureAssistedHighlightCVarListener then CooldownPanels.ensureAssistedHighlightCVarListener() end
 		if event == "ADDON_LOADED" then
 			local name = ...
@@ -21195,7 +21208,7 @@ local function ensureUpdateFrame()
 		if event == "ACTIONBAR_SLOT_CHANGED" then
 			local slot = tonumber((...))
 			-- The Single Button Assistant rotates the assisted-combat slot without changing its binding.
-			if isAssistedCombatActionSlot(slot) then return end
+			if CooldownPanels.IsAssistedCombatActionSlot(slot) then return end
 			local root = ensureRoot()
 			if not (root and root.panels) then
 				Keybinds.RequestRefresh("Event:" .. event)
@@ -21514,7 +21527,7 @@ function CooldownPanels:Init()
 	Keybinds.RebuildPanels()
 	self:RefreshAllPanels()
 	self:UpdateCursorAnchorState()
-	ensureUpdateFrame()
+	CooldownPanels.EnsureUpdateFrame()
 	registerEditModeCallbacks()
 	registerCooldownPanelsSlashCommand()
 end

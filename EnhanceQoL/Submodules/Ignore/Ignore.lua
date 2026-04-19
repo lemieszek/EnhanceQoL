@@ -897,7 +897,11 @@ local function updateRegistration()
 			Ignore.interactionBlocker:RegisterEvent(evt)
 		end
 		Ignore.groupCheckFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
-		_G["SLASH_" .. SLASH_NAME .. "1"] = SLASH_CMD
+		if addon.functions and addon.functions.SetSlashCommandAlias then
+			addon.functions.SetSlashCommandAlias(SLASH_NAME, 1, SLASH_CMD)
+		else
+			_G["SLASH_" .. SLASH_NAME .. "1"] = SLASH_CMD
+		end
 		SlashCmdList[SLASH_NAME] = function() Ignore:Toggle() end
 	else
 		for _, e in ipairs(CHAT_EVENTS) do
@@ -912,7 +916,11 @@ local function updateRegistration()
 		Ignore.groupCheckFrame:UnregisterEvent("GROUP_ROSTER_UPDATE")
 		if EQOLIgnoreFrame then EQOLIgnoreFrame:Hide() end
 		SlashCmdList[SLASH_NAME] = nil
-		_G["SLASH_" .. SLASH_NAME .. "1"] = nil
+		if addon.functions and addon.functions.SetSlashCommandAlias then
+			addon.functions.SetSlashCommandAlias(SLASH_NAME, 1, nil)
+		else
+			_G["SLASH_" .. SLASH_NAME .. "1"] = nil
+		end
 		unhookIgnoreApi()
 	end
 end

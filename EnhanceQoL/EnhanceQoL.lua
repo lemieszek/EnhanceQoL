@@ -6719,7 +6719,11 @@ function loadMain()
 	setAllHooks()
 
 	-- Slash-Command hinzufügen
-	SLASH_ENHANCEQOL1 = "/eqol"
+	if addon.functions and addon.functions.SetSlashCommandAlias then
+		addon.functions.SetSlashCommandAlias("ENHANCEQOL", 1, "/eqol")
+	else
+		SLASH_ENHANCEQOL1 = "/eqol"
+	end
 	SlashCmdList["ENHANCEQOL"] = function(msg)
 		msg = tostring(msg or "")
 		if msg:match("^aag%s*(%d+)$") then
