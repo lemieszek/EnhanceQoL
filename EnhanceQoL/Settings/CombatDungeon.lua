@@ -476,6 +476,29 @@ local function getNameplateThreatColor(unitFrame)
 	return getNameplateMobColor(NAMEPLATE_MOB_COLOR_THREAT_WARNING_DB_KEY)
 end
 
+local function getNameplateMobLevel(unit)
+	local mobLevel = UnitEffectiveLevel and UnitEffectiveLevel(unit)
+	if isSecretValue(mobLevel) then mobLevel = nil end
+	if type(mobLevel) ~= "number" and type(UnitLevel) == "function" then
+		mobLevel = UnitLevel(unit)
+		if isSecretValue(mobLevel) then mobLevel = nil end
+	end
+	return type(mobLevel) == "number" and mobLevel or nil
+end
+
+local function isManaUsingNameplateMob(unit)
+	if type(UnitPowerType) ~= "function" then return false end
+
+	local powerType, powerToken = UnitPowerType(unit)
+	if isSecretValue(powerType) then powerType = nil end
+	if isSecretValue(powerToken) then powerToken = nil end
+
+	if powerToken == "MANA" then return true end
+
+	local manaPowerType = Enum and Enum.PowerType and Enum.PowerType.Mana
+	return type(powerType) == "number" and type(manaPowerType) == "number" and powerType == manaPowerType
+end
+
 local function computeNameplateMobColor(unit)
 	updateNameplateMobColorContext()
 	if not nameplateMobColorState.isActive then return nil end
@@ -488,33 +511,30 @@ local function computeNameplateMobColor(unit)
 
 	local classification = UnitClassification and UnitClassification(unit)
 	if isSecretValue(classification) then classification = nil end
-	if classification == "elite" then
-		local mobLevel = UnitEffectiveLevel and UnitEffectiveLevel(unit)
-		if isSecretValue(mobLevel) then mobLevel = nil end
-		if type(mobLevel) ~= "number" and type(UnitLevel) == "function" then
-			mobLevel = UnitLevel(unit)
-			if isSecretValue(mobLevel) then mobLevel = nil end
-		end
+	if classification == "worldboss" then
+		return getNameplateMobColor(NAMEPLATE_MOB_COLOR_BOSS_DB_KEY)
+	elseif classification == "elite" or classification == "rare" or classification == "rareelite" then
+		local mobLevel = getNameplateMobLevel(unit)
 
 		local isLieutenant = type(_G.UnitIsLieutenant) == "function" and _G.UnitIsLieutenant(unit) or false
 		if isSecretValue(isLieutenant) then isLieutenant = false end
 
 		local referenceLevel = nameplateMobColorState.referenceLevel
 		local lieutenantLevel = nameplateMobColorState.lieutenantLevel
-		if type(mobLevel) == "number" and (mobLevel == (referenceLevel and referenceLevel + 1) or isLieutenant) then
+		local isMiniBoss = type(mobLevel) == "number" and referenceLevel and mobLevel == (referenceLevel + 1)
+		local isBoss = mobLevel == -1
+			or (type(mobLevel) == "number" and referenceLevel and mobLevel == (referenceLevel + 2))
+			or (type(mobLevel) == "number" and lieutenantLevel and mobLevel == (lieutenantLevel + 1))
+
+		if isMiniBoss or isLieutenant then
 			nameplateMobColorState.lieutenantLevel = mobLevel
 			return getNameplateMobColor(NAMEPLATE_MOB_COLOR_MINIBOSS_DB_KEY)
-		elseif mobLevel == -1 or (type(mobLevel) == "number" and ((referenceLevel and mobLevel == (referenceLevel + 2)) or (lieutenantLevel and mobLevel == (lieutenantLevel + 1)))) then
+		elseif isBoss then
 			return getNameplateMobColor(NAMEPLATE_MOB_COLOR_BOSS_DB_KEY)
 		end
 
-		local classToken = UnitClassBase and UnitClassBase(unit)
-		if isSecretValue(classToken) then classToken = nil end
-		if classToken == "PALADIN" then
-			return getNameplateMobColor(NAMEPLATE_MOB_COLOR_CASTER_DB_KEY)
-		else
-			return getNameplateMobColor(NAMEPLATE_MOB_COLOR_MELEE_DB_KEY)
-		end
+		if isManaUsingNameplateMob(unit) then return getNameplateMobColor(NAMEPLATE_MOB_COLOR_CASTER_DB_KEY) end
+		return getNameplateMobColor(NAMEPLATE_MOB_COLOR_MELEE_DB_KEY)
 	elseif classification == "normal" or classification == "trivial" or classification == "minus" then
 		return getNameplateMobColor(NAMEPLATE_MOB_COLOR_TRIVIAL_DB_KEY)
 	end
