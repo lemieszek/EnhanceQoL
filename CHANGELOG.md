@@ -1,6 +1,14 @@
 # Changelog
 
-## [10.3.2] - 2026-04-20
+## [10.3.2-beta2] - 2026-04-20
+
+### 🐛 Fixed
+
+- Cooldown Panels Strata issue of panel handle
+
+---
+
+## [10.3.2-beta1] - 2026-04-20
 
 ### 🐛 Fixed
 

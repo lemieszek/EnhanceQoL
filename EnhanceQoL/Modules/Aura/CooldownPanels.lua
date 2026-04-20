@@ -821,30 +821,44 @@ for index, strata in ipairs(Helper.STRATA_ORDER or {}) do
 	if type(strata) == "string" and strata ~= "" then STRATA_INDEX[strata] = index end
 end
 
+local function getLayoutEditPanelHandleStrata(strata)
+	local targetStrata = Helper.NormalizeStrata(strata, Helper.PANEL_LAYOUT_DEFAULTS.strata)
+	local overlayStrata = Helper.NormalizeStrata("TOOLTIP", targetStrata)
+	local targetIndex = STRATA_INDEX[targetStrata] or 0
+	local overlayIndex = STRATA_INDEX[overlayStrata] or targetIndex
+	if overlayIndex > targetIndex then return overlayStrata end
+	return targetStrata
+end
+
 local function syncEditModeSelectionStrata(frame)
 	if not (frame and frame.GetFrameStrata) then return end
 	local selection = frame.Selection
-	if not (selection and selection.SetFrameStrata) then return end
-	if not frame._eqolSelectionBaseStrata then
+	local supportsSelectionStrata = selection and selection.SetFrameStrata
+	if supportsSelectionStrata and not frame._eqolSelectionBaseStrata then
 		local baseStrata = Helper.NormalizeStrata((selection.GetFrameStrata and selection:GetFrameStrata()) or "MEDIUM", "MEDIUM")
 		frame._eqolSelectionBaseStrata = baseStrata
 		frame._eqolSelectionBaseStrataIndex = STRATA_INDEX[baseStrata] or STRATA_INDEX.MEDIUM or 3
 	end
-	local baseStrata = frame._eqolSelectionBaseStrata or "MEDIUM"
-	local baseIndex = frame._eqolSelectionBaseStrataIndex or STRATA_INDEX[baseStrata] or STRATA_INDEX.MEDIUM or 3
+	local baseStrata = frame._eqolSelectionBaseStrata
+	local baseIndex = frame._eqolSelectionBaseStrataIndex
+	if not (baseStrata and baseIndex) then
+		baseStrata = Helper.NormalizeStrata(frame:GetFrameStrata(), Helper.PANEL_LAYOUT_DEFAULTS.strata)
+		baseIndex = STRATA_INDEX[baseStrata] or STRATA_INDEX.MEDIUM or 3
+	end
 	local currentStrata = Helper.NormalizeStrata(frame:GetFrameStrata(), baseStrata)
 	local currentIndex = STRATA_INDEX[currentStrata]
 	local targetStrata = (currentIndex and currentIndex > baseIndex) and currentStrata or baseStrata
-	if selection.GetFrameStrata and selection:GetFrameStrata() ~= targetStrata then selection:SetFrameStrata(targetStrata) end
-	if frame.editMoveHandle then
+	local anchorLevel = (selection and selection.GetFrameLevel and selection:GetFrameLevel()) or frame:GetFrameLevel()
+	if supportsSelectionStrata and selection.GetFrameStrata and selection:GetFrameStrata() ~= targetStrata then selection:SetFrameStrata(targetStrata) end
+	if supportsSelectionStrata and frame.editMoveHandle then
 		frame.editMoveHandle:SetFrameStrata(targetStrata)
-		frame.editMoveHandle:SetFrameLevel((selection.GetFrameLevel and selection:GetFrameLevel() or frame:GetFrameLevel()) + 20)
+		frame.editMoveHandle:SetFrameLevel(anchorLevel + 20)
 	end
 	if frame.editPanelHandle then
-		frame.editPanelHandle:SetFrameStrata(targetStrata)
-		frame.editPanelHandle:SetFrameLevel((selection.GetFrameLevel and selection:GetFrameLevel() or frame:GetFrameLevel()) + 21)
+		frame.editPanelHandle:SetFrameStrata(getLayoutEditPanelHandleStrata(targetStrata))
+		frame.editPanelHandle:SetFrameLevel(anchorLevel + 21)
 	end
-	if frame.editDropZone then
+	if supportsSelectionStrata and frame.editDropZone then
 		frame.editDropZone:SetFrameStrata(frame:GetFrameStrata())
 		frame.editDropZone:SetFrameLevel(frame:GetFrameLevel())
 	end
