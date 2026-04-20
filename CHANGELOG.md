@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.3.2-beta3] - 2026-04-20
+
+### 🐛 Fixed
+
+- Mythic Plus / BR & Bloodlust Tracker: Fixed buggy tracker positions when anchored to Cooldown Panels by reapplying the tracker anchor after the target panel finishes positioning.
+
+---
+
 ## [10.3.2-beta2] - 2026-04-20
 
 ### 🐛 Fixed

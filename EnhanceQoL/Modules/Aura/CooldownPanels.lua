@@ -1476,14 +1476,31 @@ end
 
 local function anchorUsesUIParent(anchor) return not anchor or (anchor.relativeFrame or "UIParent") == "UIParent" end
 
+local function isMappedUnitFrameEnabled(ufKey)
+	if type(ufKey) ~= "string" or ufKey == "" then return false end
+	local ufCfg = addon.db and addon.db.ufFrames
+	local ufEntry = ufCfg and ufCfg[ufKey]
+	if ufEntry and ufEntry.enabled == true then return true end
+	local groupCfg = addon.db and addon.db.ufGroupFrames
+	local groupEntry = groupCfg and groupCfg[ufKey]
+	return groupEntry and groupEntry.enabled == true
+end
+
+local function maybeEnsureGroupAnchorFrame(ufKey)
+	if ufKey ~= "party" and ufKey ~= "raid" and ufKey ~= "mt" and ufKey ~= "ma" then return end
+	if InCombatLockdown and InCombatLockdown() then return end
+	local groupFrames = addon.Aura and addon.Aura.UF and addon.Aura.UF.GroupFrames
+	if groupFrames and groupFrames.EnsureHeaders then groupFrames:EnsureHeaders() end
+end
+
 local function resolveAnchorFrame(anchor)
 	local relativeName = Helper.NormalizeRelativeFrameName(anchor and anchor.relativeFrame)
 	if relativeName == "UIParent" then return UIParent end
 	if relativeName == cdp.FAKE_CURSOR.FRAME_NAME then return ensureFakeCursorFrame() end
 	local generic = Helper.GENERIC_ANCHORS[relativeName]
 	if generic then
-		local ufCfg = addon.db and addon.db.ufFrames
-		if ufCfg and generic.ufKey and ufCfg[generic.ufKey] and ufCfg[generic.ufKey].enabled then
+		if generic.ufKey and isMappedUnitFrameEnabled(generic.ufKey) then
+			maybeEnsureGroupAnchorFrame(generic.ufKey)
 			local ufFrame = _G[generic.uf]
 			if ufFrame then return ufFrame end
 		end
@@ -16483,6 +16500,10 @@ function CooldownPanels:ApplyPanelPosition(panelId)
 	runtime._eqolAnchorY = y
 	frame:ClearAllPoints()
 	frame:SetPoint(point, relativeFrame, relativePoint, x, y)
+
+	local mythicPlus = addon and addon.MythicPlus
+	local reapplyTrackerAnchorsForTarget = mythicPlus and mythicPlus.functions and mythicPlus.functions.ReapplyTrackerAnchorsForTarget
+	if reapplyTrackerAnchorsForTarget and frame.GetName then reapplyTrackerAnchorsForTarget(frame:GetName()) end
 end
 
 function CooldownPanels:HandlePositionChanged(panelId, data)

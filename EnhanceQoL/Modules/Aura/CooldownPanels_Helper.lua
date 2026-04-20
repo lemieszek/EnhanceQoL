@@ -488,6 +488,18 @@ Helper.GENERIC_ANCHORS = {
 		uf = "EQOLUFPetFrame",
 		ufKey = "pet",
 	},
+	EQOL_ANCHOR_PARTY = {
+		label = _G.PARTY or L["Party"] or "Party",
+		blizz = "CompactPartyFrame",
+		uf = "EQOLUFPartyAnchor",
+		ufKey = "party",
+	},
+	EQOL_ANCHOR_RAID = {
+		label = _G.RAID or L["Raid"] or "Raid",
+		blizz = "CompactRaidFrameContainer",
+		uf = "EQOLUFRaidAnchor",
+		ufKey = "raid",
+	},
 	EQOL_ANCHOR_BOSS = {
 		label = L["UFBossFrame"] or _G.HUD_EDIT_MODE_BOSS_FRAMES_LABEL or "Boss Frame",
 		blizz = "BossTargetFrameContainer",
@@ -501,6 +513,8 @@ Helper.GENERIC_ANCHOR_ORDER = {
 	"EQOL_ANCHOR_TARGETTARGET",
 	"EQOL_ANCHOR_FOCUS",
 	"EQOL_ANCHOR_PET",
+	"EQOL_ANCHOR_PARTY",
+	"EQOL_ANCHOR_RAID",
 	"EQOL_ANCHOR_BOSS",
 }
 Helper.GENERIC_ANCHOR_BY_FRAME = {
@@ -514,6 +528,10 @@ Helper.GENERIC_ANCHOR_BY_FRAME = {
 	EQOLUFFocusFrame = "EQOL_ANCHOR_FOCUS",
 	PetFrame = "EQOL_ANCHOR_PET",
 	EQOLUFPetFrame = "EQOL_ANCHOR_PET",
+	CompactPartyFrame = "EQOL_ANCHOR_PARTY",
+	EQOLUFPartyAnchor = "EQOL_ANCHOR_PARTY",
+	CompactRaidFrameContainer = "EQOL_ANCHOR_RAID",
+	EQOLUFRaidAnchor = "EQOL_ANCHOR_RAID",
 	BossTargetFrameContainer = "EQOL_ANCHOR_BOSS",
 	EQOLUFBossContainer = "EQOL_ANCHOR_BOSS",
 }

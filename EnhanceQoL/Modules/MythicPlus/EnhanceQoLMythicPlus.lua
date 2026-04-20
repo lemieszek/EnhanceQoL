@@ -188,6 +188,15 @@ local function trackersNeedAnchorReapply()
 	return false
 end
 
+local function trackerUsesAnchorTarget(dbKey, target)
+	if not (addon.db and type(target) == "string" and target ~= "") then return false end
+	local normalizeRelativeFrame = SharedAnchors and SharedAnchors.NormalizeRelativeFrame
+	local normalizedTarget = normalizeRelativeFrame and SharedAnchors:NormalizeRelativeFrame(target) or target
+	local currentTarget = addon.db[dbKey] or "UIParent"
+	local normalizedCurrent = normalizeRelativeFrame and SharedAnchors:NormalizeRelativeFrame(currentTarget) or currentTarget
+	return normalizedCurrent == normalizedTarget
+end
+
 local function cancelTrackerAnchorReapplyTicker()
 	local variables = addon.MythicPlus and addon.MythicPlus.variables
 	local ticker = variables and variables.trackerAnchorReapplyTicker or nil
@@ -3065,6 +3074,17 @@ end
 
 addon.MythicPlus.functions.ReapplyTrackerAnchors = reapplyTrackerAnchors
 addon.MythicPlus.functions.ScheduleTrackerAnchorReapply = scheduleTrackerAnchorReapply
+addon.MythicPlus.functions.ReapplyTrackerAnchorsForTarget = function(target)
+	if not addon.db then return false end
+	if type(target) ~= "string" or target == "" then return false end
+
+	local needsBR = addon.db["mythicPlusBRTrackerEnabled"] and trackerUsesAnchorTarget("mythicPlusBRTrackerRelativeFrame", target)
+	local needsBloodlust = addon.db["mythicPlusBloodlustTrackerEnabled"] and trackerUsesAnchorTarget("mythicPlusBloodlustTrackerRelativeFrame", target)
+	if not needsBR and not needsBloodlust then return false end
+
+	reapplyTrackerAnchors()
+	return true
+end
 
 local function setBRInfo(info)
 	if brButton and brButton.cooldownFrame and info then
