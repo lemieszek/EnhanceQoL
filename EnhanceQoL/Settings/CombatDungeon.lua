@@ -338,15 +338,15 @@ local function getNameplateMobColorContext()
 
 	local allowInDungeons = isNameplateMobColorScopeEnabled(NAMEPLATE_MOB_COLORS_DUNGEONS_DB_KEY, true)
 	local allowOutsideDungeons = isNameplateMobColorScopeEnabled(NAMEPLATE_MOB_COLORS_OUTSIDE_DUNGEONS_DB_KEY, false)
-	local isDungeon = instanceType == "party"
+	local isInstancedPve = instanceType == "party" or instanceType == "raid" or instanceType == "scenario"
 	local isPvp = isNameplateMobColorPvpContext(instanceType, zonePvpType)
-	local isAllowedByScope = (isDungeon and allowInDungeons) or ((not isDungeon) and allowOutsideDungeons)
+	local isAllowedByScope = (isInstancedPve and allowInDungeons) or ((not isInstancedPve) and allowOutsideDungeons)
 
 	return {
 		instanceType = instanceType,
 		lfgDungeonID = lfgDungeonID,
 		zonePvpType = zonePvpType,
-		isDungeon = isDungeon,
+		isInstancedPve = isInstancedPve,
 		isPvp = isPvp,
 		isAllowed = isAllowedByScope and not isPvp,
 	}
@@ -391,7 +391,7 @@ local function updateNameplateMobColorContext(forceRefresh)
 	nameplateMobColorState.lieutenantLevel = nil
 
 	local referenceLevel
-	if context.lfgDungeonID and context.isDungeon and type(_G.GetMaximumExpansionLevel) == "function" and type(_G.GetMaxLevelForExpansionLevel) == "function" then
+	if context.lfgDungeonID and context.isInstancedPve and type(_G.GetMaximumExpansionLevel) == "function" and type(_G.GetMaxLevelForExpansionLevel) == "function" then
 		local maximumExpansionLevel = _G.GetMaximumExpansionLevel()
 		if not isSecretValue(maximumExpansionLevel) then
 			referenceLevel = _G.GetMaxLevelForExpansionLevel(maximumExpansionLevel)
