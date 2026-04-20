@@ -27062,6 +27062,7 @@ registerFeatureEvents = function(frame)
 		frame:RegisterEvent("UNIT_NAME_UPDATE")
 		frame:RegisterEvent("PARTY_LEADER_CHANGED")
 		frame:RegisterEvent("PLAYER_ROLES_ASSIGNED")
+		frame:RegisterEvent("ACTIVE_PLAYER_SPECIALIZATION_CHANGED")
 		if frame.RegisterUnitEvent then
 			frame:RegisterUnitEvent("PLAYER_SPECIALIZATION_CHANGED", "player")
 		else
@@ -27094,6 +27095,7 @@ unregisterFeatureEvents = function(frame)
 		frame:UnregisterEvent("UNIT_NAME_UPDATE")
 		frame:UnregisterEvent("PARTY_LEADER_CHANGED")
 		frame:UnregisterEvent("PLAYER_ROLES_ASSIGNED")
+		frame:UnregisterEvent("ACTIVE_PLAYER_SPECIALIZATION_CHANGED")
 		frame:UnregisterEvent("PLAYER_SPECIALIZATION_CHANGED")
 		frame:UnregisterEvent("PLAYER_TALENT_UPDATE")
 		frame:UnregisterEvent("TRAIT_CONFIG_UPDATED")
@@ -27359,7 +27361,9 @@ do
 			GF:RefreshStatusText()
 		elseif event == "UNIT_NAME_UPDATE" then
 			GF:RefreshGroupIndicators()
-		elseif event == "PLAYER_SPECIALIZATION_CHANGED" then
+		elseif event == "PLAYER_SPECIALIZATION_CHANGED" or event == "ACTIVE_PLAYER_SPECIALIZATION_CHANGED" then
+			local unit = ...
+			if event == "PLAYER_SPECIALIZATION_CHANGED" and unit and unit ~= "player" then return end
 			GF:RefreshPowerVisibility()
 			GF:RefreshSplitRoleHeadersForViewerRoleChange()
 			GF:RefreshCustomSortNameList("raid")

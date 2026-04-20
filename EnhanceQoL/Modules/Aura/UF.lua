@@ -550,6 +550,28 @@ function UFProfileManager._getCurrentPlayerGUID()
 end
 
 function UFProfileManager._getCurrentSpecID()
+	if C_ClassTalents and C_ClassTalents.GetActiveConfigID and C_ClassTalents.GetConfigIDsBySpecID then
+		local activeConfigID = C_ClassTalents.GetActiveConfigID()
+		local classID = UnitClass and select(3, UnitClass("player")) or nil
+		if issecretvalue and issecretvalue(classID) then classID = nil end
+		if type(activeConfigID) == "number" and activeConfigID > 0 and type(classID) == "number" and classID > 0 and GetNumSpecializationsForClassID and GetSpecializationInfoForClassID then
+			local numSpecs = GetNumSpecializationsForClassID(classID)
+			if type(numSpecs) == "number" and numSpecs > 0 then
+				for index = 1, numSpecs do
+					local specID = select(1, GetSpecializationInfoForClassID(classID, index))
+					if type(specID) == "number" and specID > 0 then
+						local configIDs = C_ClassTalents.GetConfigIDsBySpecID(specID)
+						if type(configIDs) == "table" then
+							for _, configID in ipairs(configIDs) do
+								if configID == activeConfigID then return specID end
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+
 	if not (C_SpecializationInfo and C_SpecializationInfo.GetSpecialization and C_SpecializationInfo.GetSpecializationInfo) then return nil end
 	local specIndex = C_SpecializationInfo.GetSpecialization()
 	if type(specIndex) ~= "number" or specIndex <= 0 then return nil end
@@ -954,12 +976,26 @@ function UFProfileManager._isUFProfileBound(profileName)
 	return true
 end
 
+function UFProfileManager.ScheduleSpecMappingRetry(source, immediate)
+	UFProfileManager._specMappingRetrySource = tostring(source or "UNKNOWN")
+	if immediate ~= false then UFProfileManager.ApplySpecMapping(UFProfileManager._specMappingRetrySource .. ":Immediate") end
+	if UFProfileManager._specMappingRetryPending or not After then return end
+	UFProfileManager._specMappingRetryPending = true
+	After(1, function()
+		UFProfileManager._specMappingRetryPending = nil
+		local retrySource = UFProfileManager._specMappingRetrySource or tostring(source or "UNKNOWN")
+		UFProfileManager._specMappingRetrySource = nil
+		UFProfileManager.ApplySpecMapping(retrySource .. ":Delayed")
+	end)
+end
+
 function UFProfileManager._ensureUFProfileEvents()
 	if UFProfileManager._eventFrame then return end
 	local frame = CreateFrame("Frame")
 	frame:RegisterEvent("PLAYER_LOGIN")
 	frame:RegisterEvent("ACTIVE_PLAYER_SPECIALIZATION_CHANGED")
 	frame:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED")
+	frame:RegisterEvent("PLAYER_ROLES_ASSIGNED")
 	frame:RegisterEvent("PLAYER_REGEN_ENABLED")
 	if frame.RegisterUnitEvent then
 		frame:RegisterUnitEvent("PLAYER_SPECIALIZATION_CHANGED", "player")
@@ -974,8 +1010,8 @@ function UFProfileManager._ensureUFProfileEvents()
 		if event == "PLAYER_SPECIALIZATION_CHANGED" and unit and unit ~= "player" then return end
 		local ok = UFProfileManager.Initialize()
 		if not ok then return end
-		if event == "PLAYER_LOGIN" or event == "PLAYER_SPECIALIZATION_CHANGED" or event == "ACTIVE_PLAYER_SPECIALIZATION_CHANGED" or event == "ACTIVE_TALENT_GROUP_CHANGED" then
-			UFProfileManager.ApplySpecMapping(event)
+		if event == "PLAYER_LOGIN" or event == "PLAYER_SPECIALIZATION_CHANGED" or event == "ACTIVE_PLAYER_SPECIALIZATION_CHANGED" or event == "ACTIVE_TALENT_GROUP_CHANGED" or event == "PLAYER_ROLES_ASSIGNED" then
+			UFProfileManager.ScheduleSpecMappingRetry(event, true)
 		end
 	end)
 	UFProfileManager._eventFrame = frame
