@@ -5509,6 +5509,7 @@ GF._pendingSortKinds = GF._pendingSortKinds or {}
 GF._lightHeaderRefreshOptions = GF._lightHeaderRefreshOptions or { skipChildSync = true }
 GF._pendingDisable = GF._pendingDisable or false
 GF._clientSceneActive = GF._clientSceneActive or false
+GF._postRosterHeaderApplyPending = GF._postRosterHeaderApplyPending or false
 
 local registerFeatureEvents
 local unregisterFeatureEvents
@@ -6341,6 +6342,7 @@ function GF:LayoutButton(self)
 	local resolvedAbsorbHeight = GF._resolveRuntimeOverlayHeightSetting(hc.absorbOverlayHeight ~= nil and hc.absorbOverlayHeight or defH.absorbOverlayHeight, configuredOverlayFallback, healthHeight)
 	local resolvedHealAbsorbHeight =
 		GF._resolveRuntimeOverlayHeightSetting(hc.healAbsorbOverlayHeight ~= nil and hc.healAbsorbOverlayHeight or defH.healAbsorbOverlayHeight, configuredOverlayFallback, healthHeight)
+	local overlayClip = GF._ensureOverlayClipFrame(st.health, "_eqolDirectOverlayClip")
 	if st.incomingHeal then
 		local incomingHealTextureKey = hc.incomingHealTexture or healthTexKey
 		if st.incomingHeal.SetStatusBarTexture and UFHelper and UFHelper.resolveTexture then
@@ -6363,6 +6365,7 @@ function GF:LayoutButton(self)
 			UFHelper.setupAbsorbClamp(st.health, st.incomingHeal)
 			if UFHelper.applyStatusBarReverseFill then UFHelper.applyStatusBarReverseFill(st.incomingHeal, reverseHealth) end
 		end
+		if overlayClip and st.incomingHeal.GetParent and st.incomingHeal:GetParent() ~= overlayClip then st.incomingHeal:SetParent(overlayClip) end
 		if UFHelper and UFHelper.applyAbsorbClampLayout then
 			UFHelper.applyAbsorbClampLayout(st.incomingHeal, st.health, healthHeight, healthHeight, reverseHealth)
 		else
@@ -6393,11 +6396,11 @@ function GF:LayoutButton(self)
 			st.absorb2:Hide()
 		end
 		stabilizeStatusBarTexture(st.absorb)
-		local absorbClip = GF._ensureOverlayClipFrame(st.health, "_eqolDirectOverlayClip")
+		local absorbClip = overlayClip
 		if absorbClip and st.absorb.GetParent and st.absorb:GetParent() ~= absorbClip then st.absorb:SetParent(absorbClip) end
 		local absorbHeight = resolvedAbsorbHeight
 		GF._applyOverlayHeight(st.absorb, absorbClip or st.health, absorbHeight, healthHeight)
-		setFrameLevelAbove(st.absorb, st.incomingHeal or st.health, 1)
+		setFrameLevelAbove(st.absorb, st.health, 1)
 		if reverseAbsorb and st.absorb2 then
 			if st.absorb2.SetStatusBarTexture and UFHelper and UFHelper.resolveTexture then
 				if Pixel and Pixel.SetStatusBarTexture then
@@ -6418,15 +6421,19 @@ function GF:LayoutButton(self)
 					if UFHelper.setupAbsorbClamp then UFHelper.setupAbsorbClamp(st.health, st.absorb2) end
 					if UFHelper.setupAbsorbOverShift then UFHelper.setupAbsorbOverShift(st.health, st.absorb, absorbHeight, healthHeight) end
 				end
+				if overlayClip and st.absorb2.GetParent and st.absorb2:GetParent() ~= overlayClip then st.absorb2:SetParent(overlayClip) end
 				UFHelper.applyAbsorbClampLayout(st.absorb2, st.health, absorbHeight, healthHeight, reverseHealth)
 				syncTextFrameLevels(st)
 			end
 			stabilizeStatusBarTexture(st.absorb2)
-			setFrameLevelAbove(st.absorb2, st.incomingHeal or st.health, 1)
+			setFrameLevelAbove(st.absorb2, st.health, 1)
 			st.absorb2:SetMinMaxValues(0, 1)
 			GF.SetStatusBarValue(st.absorb2, 0, false, true)
 			st.absorb2:Hide()
 		end
+	end
+	if st.incomingHeal then
+		setFrameLevelAbove(st.incomingHeal, st.absorb2 or st.absorb or st.health, 1)
 	end
 	if st.healAbsorb then
 		local healAbsorbTextureKey = hc.healAbsorbTexture or healthTexKey
@@ -6441,11 +6448,11 @@ function GF:LayoutButton(self)
 		if st.healAbsorb.SetStatusBarDesaturated then st.healAbsorb:SetStatusBarDesaturated(false) end
 		if UFHelper and UFHelper.applyStatusBarReverseFill then UFHelper.applyStatusBarReverseFill(st.healAbsorb, hc.healAbsorbReverseFill == true) end
 		stabilizeStatusBarTexture(st.healAbsorb)
-		local healAbsorbClip = GF._ensureOverlayClipFrame(st.health, "_eqolDirectOverlayClip")
+		local healAbsorbClip = overlayClip
 		if healAbsorbClip and st.healAbsorb.GetParent and st.healAbsorb:GetParent() ~= healAbsorbClip then st.healAbsorb:SetParent(healAbsorbClip) end
 		local healAbsorbHeight = resolvedHealAbsorbHeight
 		GF._applyOverlayHeight(st.healAbsorb, healAbsorbClip or st.health, healAbsorbHeight, healthHeight)
-		setFrameLevelAbove(st.healAbsorb, st.absorb or st.incomingHeal or st.health, 1)
+		setFrameLevelAbove(st.healAbsorb, st.incomingHeal or st.absorb or st.health, 1)
 	end
 
 	local tc = cfg.text or {}
@@ -27137,19 +27144,42 @@ function GF:RunPostRosterRefreshPass()
 	if not isFeatureEnabled() then return end
 	self:EnsureHeaders()
 	if InCombatLockdown and InCombatLockdown() then
-		GF:MarkPendingHeaderRefresh("party")
-		GF:MarkPendingHeaderRefresh("raid")
-		GF:MarkPendingHeaderRefresh("mt")
-		GF:MarkPendingHeaderRefresh("ma")
+		if self._postRosterHeaderApplyPending then
+			GF:MarkPendingHeaderRefresh("party")
+			GF:MarkPendingHeaderRefresh("raid")
+			GF:MarkPendingHeaderRefresh("mt")
+			GF:MarkPendingHeaderRefresh("ma")
+		end
 		return
 	end
-	-- Secure group headers can settle a frame late after roster transitions.
-	-- Re-apply the live layout a few times so pixel-snapped points/sizes win consistently.
-	self:ApplyHeaderAttributes("party")
-	self:ApplyHeaderAttributes("raid")
-	self:ApplyHeaderAttributes("mt")
-	self:ApplyHeaderAttributes("ma")
+	if self._postRosterHeaderApplyPending then
+		self._postRosterHeaderApplyPending = false
+		-- Mirror the immediate structural refresh once after the secure header settles.
+		self:ApplyHeaderAttributes("party")
+		self:ApplyHeaderAttributes("raid")
+		self:ApplyHeaderAttributes("mt")
+		self:ApplyHeaderAttributes("ma")
+	else
+		-- oUF only refreshes the affected units after roster changes. Keep the delayed
+		-- pass lightweight so we don't churn secure header attributes on wipe/release
+		-- style roster events that did not actually change the frame structure.
+		local function nudgeVisible(header)
+			if not (header and header.IsShown and header:IsShown()) then return end
+			nudgeHeaderLayout(header)
+		end
+
+		nudgeVisible(self.headers and self.headers.party)
+		nudgeVisible(self.headers and self.headers.raid)
+		nudgeVisible(self.headers and self.headers.mt)
+		nudgeVisible(self.headers and self.headers.ma)
+		if self._raidGroupHeaders then
+			for _, header in ipairs(self._raidGroupHeaders) do
+				if header and not header._eqolSpecialHide then nudgeVisible(header) end
+			end
+		end
+	end
 	self:RefreshChangedUnitButtons()
+	self:RefreshNames()
 	self:RefreshGroupIndicators()
 end
 
@@ -27270,12 +27300,17 @@ do
 			local sortMethod = cfg and resolveSortMethod(cfg) or "INDEX"
 			local updatedCount = 0
 			if headerStateChanged then
+				GF._postRosterHeaderApplyPending = true
 				if InCombatLockdown and InCombatLockdown() then
 					GF:MarkPendingHeaderRefresh("party")
 					GF:MarkPendingHeaderRefresh("raid")
+					GF:MarkPendingHeaderRefresh("mt")
+					GF:MarkPendingHeaderRefresh("ma")
 				else
 					GF:ApplyHeaderAttributes("party")
 					GF:ApplyHeaderAttributes("raid")
+					GF:ApplyHeaderAttributes("mt")
+					GF:ApplyHeaderAttributes("ma")
 				end
 			end
 			updatedCount = updatedCount + (GF:RefreshChangedUnitButtons() or 0)
@@ -27287,14 +27322,29 @@ do
 				queueGroupIndicatorRefresh(0, 4)
 			end
 			GF:ScheduleConnectionRefresh()
-			GF:SchedulePostRosterRefresh()
+			if headerStateChanged or updatedCount > 0 then GF:SchedulePostRosterRefresh() end
 			if custom and custom.separateMeleeRanged == true and sortMethod == "NAMELIST" and GFH and GFH.QueueInspectGroup then GFH.QueueInspectGroup() end
 		elseif event == "RAID_ROSTER_UPDATE" then
+			local headerStateChanged = GF:DidRosterStateChange()
+			if headerStateChanged then
+				GF._postRosterHeaderApplyPending = true
+				if InCombatLockdown and InCombatLockdown() then
+					GF:MarkPendingHeaderRefresh("party")
+					GF:MarkPendingHeaderRefresh("raid")
+					GF:MarkPendingHeaderRefresh("mt")
+					GF:MarkPendingHeaderRefresh("ma")
+				else
+					GF:ApplyHeaderAttributes("party")
+					GF:ApplyHeaderAttributes("raid")
+					GF:ApplyHeaderAttributes("mt")
+					GF:ApplyHeaderAttributes("ma")
+				end
+			end
 			GF:RefreshConnectionState()
 			GF:RefreshGroupIcons()
 			GF:RefreshStatusIcons()
 			GF:ScheduleConnectionRefresh()
-			GF:SchedulePostRosterRefresh()
+			if headerStateChanged then GF:SchedulePostRosterRefresh() end
 		elseif event == "PLAYER_ROLES_ASSIGNED" then
 			GF:RefreshRoleIcons()
 			GF:RefreshTargetHighlights()
