@@ -99,6 +99,43 @@ local function getSmoothInterpolation(cfg, def)
 	return nil
 end
 
+function UF.SetStatusBarValue(bar, value, smooth, forceImmediate)
+	if not bar or value == nil then return end
+	local helper = UF.GroupFramesHelper
+	local pixelHelper = helper and helper.Pixel
+	if pixelHelper and pixelHelper.SetStatusBarValue then
+		pixelHelper.SetStatusBarValue(bar, value, smooth, forceImmediate)
+		return
+	end
+	if smooth and Enum and Enum.StatusBarInterpolation and Enum.StatusBarInterpolation.ExponentialEaseOut then
+		bar:SetValue(value, Enum.StatusBarInterpolation.ExponentialEaseOut)
+	else
+		bar:SetValue(value)
+	end
+end
+
+function UF.EnsureOverlayClipFrame(anchor, key)
+	if not anchor then return nil end
+	key = key or "_eqolOverlayClip"
+	local clip = anchor[key]
+	if not clip then
+		clip = CreateFrame("Frame", nil, anchor)
+		clip:SetClipsChildren(true)
+		anchor[key] = clip
+	end
+	clip:ClearAllPoints()
+	clip:SetAllPoints(anchor)
+	if clip.SetFrameStrata and anchor.GetFrameStrata then
+		local anchorStrata = anchor:GetFrameStrata()
+		if anchorStrata and clip:GetFrameStrata() ~= anchorStrata then clip:SetFrameStrata(anchorStrata) end
+	end
+	if clip.SetFrameLevel and anchor.GetFrameLevel then
+		local desiredLevel = (anchor:GetFrameLevel() or 0) + 1
+		if clip:GetFrameLevel() ~= desiredLevel then clip:SetFrameLevel(desiredLevel) end
+	end
+	return clip
+end
+
 local function resetBlizzBossParent(self, parent)
 	if parent == blizzBossKill.hiddenParent then return end
 	if InCombatLockdown() and self.IsProtected and self:IsProtected() then
@@ -5785,6 +5822,7 @@ end
 local function applyIncomingHealBar(st, hc, healthHeight, reverseHealth, interpolation)
 	if not (st and st.health and st.incomingHeal) then return end
 	local incomingHealTextureKey = hc.incomingHealTexture or hc.texture
+	local overlayClip = UF.EnsureOverlayClipFrame and UF.EnsureOverlayClipFrame(st.health, "_eqolDirectOverlayClip")
 	st.incomingHeal:SetStatusBarTexture(UFHelper.resolveTexture(incomingHealTextureKey))
 	if st.incomingHeal.SetStatusBarDesaturated then st.incomingHeal:SetStatusBarDesaturated(false) end
 	UFHelper.configureSpecialTexture(st.incomingHeal, "HEALTH", incomingHealTextureKey, hc)
@@ -5794,6 +5832,7 @@ local function applyIncomingHealBar(st, hc, healthHeight, reverseHealth, interpo
 		UFHelper.setupAbsorbClamp(st.health, st.incomingHeal)
 		if UFHelper.applyStatusBarReverseFill then UFHelper.applyStatusBarReverseFill(st.incomingHeal, reverseHealth) end
 	end
+	if overlayClip and st.incomingHeal.GetParent and st.incomingHeal:GetParent() ~= overlayClip then st.incomingHeal:SetParent(overlayClip) end
 	if UFHelper and UFHelper.applyAbsorbClampLayout then
 		UFHelper.applyAbsorbClampLayout(st.incomingHeal, st.health, healthHeight, healthHeight, reverseHealth)
 	else
@@ -5801,7 +5840,7 @@ local function applyIncomingHealBar(st, hc, healthHeight, reverseHealth, interpo
 	end
 	setFrameLevelAbove(st.incomingHeal, st.health, 1)
 	st.incomingHeal:SetMinMaxValues(0, 1)
-	st.incomingHeal:SetValue(0, interpolation)
+	UF.SetStatusBarValue(st.incomingHeal, 0, false, true)
 	st.incomingHeal:Hide()
 end
 
@@ -5856,7 +5895,7 @@ local function updateIncomingHeal(st, unit, hc, defH, cur, maxv, interpolation, 
 	end
 
 	bar:SetMinMaxValues(0, maxForValue or 1)
-	bar:SetValue(incomingHealValue or 0, interpolation)
+	UF.SetStatusBarValue(bar, incomingHealValue or 0, false, true)
 
 	local color = hc.incomingHealColor or defH.incomingHealColor or { 0.2, 0.85, 0.35, 0.45 }
 	bar:SetStatusBarColor(color.r or color[1] or 0.2, color.g or color[2] or 0.85, color.b or color[3] or 0.35, color.a or color[4] or 0.45)
@@ -7321,30 +7360,30 @@ function UF.syncAbsorbFrameLevels(st)
 	if not st or not st.health then return end
 	local health = st.health
 	local healthLevel = (health.GetFrameLevel and health:GetFrameLevel()) or 0
-	local overlayLevel = max(0, healthLevel + 1)
+	local overlayClipLevel = max(0, healthLevel + 1)
+	local absorbLevel = max(0, healthLevel + 1)
+	local incomingHealLevel = max(0, healthLevel + 2)
+	local healAbsorbLevel = max(0, healthLevel + 3)
 	local healthStrata = health.GetFrameStrata and health:GetFrameStrata()
 	local borderFrame = st.barGroup and st.barGroup._ufBorder
-	if borderFrame and borderFrame.GetFrameLevel then
-		local borderLevel = borderFrame:GetFrameLevel() or (overlayLevel + 1)
-		if overlayLevel >= borderLevel then overlayLevel = max(0, borderLevel - 1) end
-	end
-	local function apply(frame)
+	local function apply(frame, level)
 		if not frame then return end
 		if healthStrata and frame.SetFrameStrata and frame:GetFrameStrata() ~= healthStrata then frame:SetFrameStrata(healthStrata) end
-		if frame.SetFrameLevel and frame:GetFrameLevel() ~= overlayLevel then frame:SetFrameLevel(overlayLevel) end
+		if frame.SetFrameLevel and frame:GetFrameLevel() ~= level then frame:SetFrameLevel(level) end
 	end
-	apply(health.absorbClip)
-	apply(health._healthFillClip)
-	apply(st.incomingHeal)
-	apply(st.absorb)
-	apply(st.absorb2)
-	apply(st.healAbsorb)
+	apply(health.absorbClip, overlayClipLevel)
+	apply(health._healthFillClip, overlayClipLevel)
+	apply(health._eqolDirectOverlayClip, overlayClipLevel)
+	apply(st.absorb, absorbLevel)
+	apply(st.absorb2, absorbLevel)
+	apply(st.incomingHeal, incomingHealLevel)
+	apply(st.healAbsorb, healAbsorbLevel)
 	if borderFrame and st.barGroup and borderFrame.SetFrameStrata and st.barGroup.GetFrameStrata then
 		local borderStrata = st.barGroup:GetFrameStrata()
 		if borderStrata and borderFrame:GetFrameStrata() ~= borderStrata then borderFrame:SetFrameStrata(borderStrata) end
 	end
 	if borderFrame and borderFrame.SetFrameLevel then
-		local desiredBorderLevel = overlayLevel + 1
+		local desiredBorderLevel = max(absorbLevel, incomingHealLevel, healAbsorbLevel) + 1
 		if borderFrame:GetFrameLevel() < desiredBorderLevel then borderFrame:SetFrameLevel(desiredBorderLevel) end
 	end
 end
@@ -8686,6 +8725,7 @@ local function applyBars(cfg, unit)
 		end
 	end
 	if allowAbsorb and st.absorb then
+		local overlayClip = UF.EnsureOverlayClipFrame and UF.EnsureOverlayClipFrame(st.health, "_eqolDirectOverlayClip")
 		local absorbTextureKey = hc.absorbTexture or hc.texture
 		st.absorb:SetStatusBarTexture(UFHelper.resolveTexture(absorbTextureKey))
 		if st.absorb.SetStatusBarDesaturated then st.absorb:SetStatusBarDesaturated(false) end
@@ -8702,6 +8742,7 @@ local function applyBars(cfg, unit)
 		elseif st.absorb2 then
 			st.absorb2:Hide()
 		end
+		if overlayClip and st.absorb.GetParent and st.absorb:GetParent() ~= overlayClip then st.absorb:SetParent(overlayClip) end
 		local absorbHeight = hc.absorbOverlayHeight
 		if absorbHeight == nil then absorbHeight = defH.absorbOverlayHeight end
 		applyOverlayHeight(st.absorb, st.health, absorbHeight, healthHeight)
@@ -8717,6 +8758,7 @@ local function applyBars(cfg, unit)
 					if UFHelper.setupAbsorbClamp then UFHelper.setupAbsorbClamp(st.health, st.absorb2) end
 					if not absorbDontOverflow and UFHelper.setupAbsorbOverShift then UFHelper.setupAbsorbOverShift(st.health, st.absorb, absorbHeight, healthHeight) end
 				end
+				if overlayClip and st.absorb2.GetParent and st.absorb2:GetParent() ~= overlayClip then st.absorb2:SetParent(overlayClip) end
 				UFHelper.applyAbsorbClampLayout(st.absorb2, st.health, absorbHeight, healthHeight, reverseHealth)
 				syncTextFrameLevels(st)
 			end
@@ -8725,8 +8767,7 @@ local function applyBars(cfg, unit)
 			st.absorb2:SetValue(0, interpolation)
 			st.absorb2:Hide()
 		end
-		local borderFrame = st.barGroup and st.barGroup._ufBorder
-		setFrameLevelAbove(st.absorb, st.incomingHeal or st.health, 1)
+		setFrameLevelAbove(st.absorb, st.health, 1)
 		st.absorb:SetMinMaxValues(0, 1)
 		st.absorb:SetValue(0, interpolation)
 		if st.overAbsorbGlow then
@@ -8745,7 +8786,11 @@ local function applyBars(cfg, unit)
 	elseif st.overAbsorbGlow then
 		st.overAbsorbGlow:Hide()
 	end
+	if st.incomingHeal then
+		setFrameLevelAbove(st.incomingHeal, st.absorb2 or st.absorb or st.health, 1)
+	end
 	if allowAbsorb and st.healAbsorb then
+		local overlayClip = UF.EnsureOverlayClipFrame and UF.EnsureOverlayClipFrame(st.health, "_eqolDirectOverlayClip")
 		local healAbsorbTextureKey = hc.healAbsorbTexture or hc.texture
 		st.healAbsorb:SetStatusBarTexture(UFHelper.resolveTexture(healAbsorbTextureKey))
 		if st.healAbsorb.SetStatusBarDesaturated then st.healAbsorb:SetStatusBarDesaturated(false) end
@@ -8753,10 +8798,11 @@ local function applyBars(cfg, unit)
 		local reverseHealAbsorb = hc.healAbsorbReverseFill
 		if reverseHealAbsorb == nil then reverseHealAbsorb = defH.healAbsorbReverseFill == true end
 		UFHelper.applyStatusBarReverseFill(st.healAbsorb, reverseHealAbsorb)
+		if overlayClip and st.healAbsorb.GetParent and st.healAbsorb:GetParent() ~= overlayClip then st.healAbsorb:SetParent(overlayClip) end
 		local healAbsorbHeight = hc.healAbsorbOverlayHeight
 		if healAbsorbHeight == nil then healAbsorbHeight = defH.healAbsorbOverlayHeight end
 		applyOverlayHeight(st.healAbsorb, st.health, healAbsorbHeight, healthHeight)
-		local anchorBar = st.absorb or st.incomingHeal or st.health
+		local anchorBar = st.incomingHeal or st.absorb2 or st.absorb or st.health
 		setFrameLevelAbove(st.healAbsorb, anchorBar, 1)
 		st.healAbsorb:SetMinMaxValues(0, 1)
 		st.healAbsorb:SetValue(0, interpolation)
