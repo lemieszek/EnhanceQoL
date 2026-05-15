@@ -3895,7 +3895,8 @@ local function sortLayoutSections(layoutData)
 		quest = "quality",
 		misc = "quality",
 	}
-	local sortCache = {}
+	state.sortDataPass = (state.sortDataPass or 0) + 1
+	local sortDataPass = state.sortDataPass
 
 	local function getResolvedSectionSortMode(sectionDefinition)
 		if not sectionDefinition then
@@ -3913,14 +3914,13 @@ local function sortLayoutSections(layoutData)
 		return nil
 	end
 
-	local function getMappingSortData(mapping, sortMode)
+	local function prepareMappingSortData(mapping, sortMode)
 		if not mapping then
-			return nil
+			return
 		end
 
-		local cached = sortCache[mapping]
-		if cached then
-			return cached
+		if mapping._bagsSortDataPass == sortDataPass then
+			return
 		end
 
 		local info = mapping.itemInfo or C_Container.GetContainerItemInfo(mapping.bagID, mapping.slotID)
@@ -3931,34 +3931,33 @@ local function sortLayoutSections(layoutData)
 		local count = tonumber(mapping.itemCount) or tonumber(info and info.stackCount) or tonumber(mapping.freeSlotCount) or 0
 		local sellPrice = tonumber(ruleItemInfo and ruleItemInfo.sellPrice) or 0
 		local itemLink = info and info.hyperlink
-		local data = {
-			bagID = tonumber(mapping.bagID) or 0,
-			slotID = tonumber(mapping.slotID) or 0,
-			name = string.lower(tostring(itemName or "")),
-			quality = quality,
-			count = count,
-			totalSellPrice = sellPrice * math.max(1, count),
-			expansionID = tonumber(ruleItemInfo and ruleItemInfo.expansionID) or -1,
-			itemLevel = 0,
-			keystoneLevel = 0,
-		}
+		local itemLevel = 0
+		local keystoneLevel = 0
 
 		if sortMode == "itemLevel" then
 			local itemLocation = ItemLocation:CreateFromBagAndSlot(mapping.bagID, mapping.slotID)
 			if itemLocation and C_Item.DoesItemExist(itemLocation) and C_Item.GetCurrentItemLevel then
 				local currentItemLevel = C_Item.GetCurrentItemLevel(itemLocation)
-				data.itemLevel = tonumber(currentItemLevel) or 0
+				itemLevel = tonumber(currentItemLevel) or 0
 			end
-			if data.itemLevel <= 0 and itemRef and C_Item.GetDetailedItemLevelInfo then
+			if itemLevel <= 0 and itemRef and C_Item.GetDetailedItemLevelInfo then
 				local detailedItemLevel = C_Item.GetDetailedItemLevelInfo(itemRef)
-				data.itemLevel = tonumber(detailedItemLevel) or 0
+				itemLevel = tonumber(detailedItemLevel) or 0
 			end
 		elseif sortMode == "keystoneLevel" then
-			data.keystoneLevel = tonumber(getKeystoneLevelFromItemLink(itemLink)) or 0
+			keystoneLevel = tonumber(getKeystoneLevelFromItemLink(itemLink)) or 0
 		end
 
-		sortCache[mapping] = data
-		return data
+		mapping._bagsSortDataPass = sortDataPass
+		mapping._bagsSortBagID = tonumber(mapping.bagID) or 0
+		mapping._bagsSortSlotID = tonumber(mapping.slotID) or 0
+		mapping._bagsSortName = string.lower(tostring(itemName or ""))
+		mapping._bagsSortQuality = quality
+		mapping._bagsSortCount = count
+		mapping._bagsSortTotalSellPrice = sellPrice * math.max(1, count)
+		mapping._bagsSortExpansionID = tonumber(ruleItemInfo and ruleItemInfo.expansionID) or -1
+		mapping._bagsSortItemLevel = itemLevel
+		mapping._bagsSortKeystoneLevel = keystoneLevel
 	end
 
 	local function compareSectionMappingIndices(leftIndex, rightIndex, sortMode)
@@ -3968,41 +3967,41 @@ local function sortLayoutSections(layoutData)
 			return (leftIndex or 0) < (rightIndex or 0)
 		end
 
-		local leftData = getMappingSortData(leftMapping, sortMode) or {}
-		local rightData = getMappingSortData(rightMapping, sortMode) or {}
+		prepareMappingSortData(leftMapping, sortMode)
+		prepareMappingSortData(rightMapping, sortMode)
 
-		if sortMode == "itemLevel" and leftData.itemLevel ~= rightData.itemLevel then
-			return leftData.itemLevel > rightData.itemLevel
+		if sortMode == "itemLevel" and leftMapping._bagsSortItemLevel ~= rightMapping._bagsSortItemLevel then
+			return leftMapping._bagsSortItemLevel > rightMapping._bagsSortItemLevel
 		end
-		if sortMode == "quality" and leftData.quality ~= rightData.quality then
-			return leftData.quality > rightData.quality
+		if sortMode == "quality" and leftMapping._bagsSortQuality ~= rightMapping._bagsSortQuality then
+			return leftMapping._bagsSortQuality > rightMapping._bagsSortQuality
 		end
-		if sortMode == "name" and leftData.name ~= rightData.name then
-			return leftData.name < rightData.name
+		if sortMode == "name" and leftMapping._bagsSortName ~= rightMapping._bagsSortName then
+			return leftMapping._bagsSortName < rightMapping._bagsSortName
 		end
-		if sortMode == "count" and leftData.count ~= rightData.count then
-			return leftData.count > rightData.count
+		if sortMode == "count" and leftMapping._bagsSortCount ~= rightMapping._bagsSortCount then
+			return leftMapping._bagsSortCount > rightMapping._bagsSortCount
 		end
-		if sortMode == "sellPrice" and leftData.totalSellPrice ~= rightData.totalSellPrice then
-			return leftData.totalSellPrice > rightData.totalSellPrice
+		if sortMode == "sellPrice" and leftMapping._bagsSortTotalSellPrice ~= rightMapping._bagsSortTotalSellPrice then
+			return leftMapping._bagsSortTotalSellPrice > rightMapping._bagsSortTotalSellPrice
 		end
-		if sortMode == "expansion" and leftData.expansionID ~= rightData.expansionID then
-			return leftData.expansionID > rightData.expansionID
+		if sortMode == "expansion" and leftMapping._bagsSortExpansionID ~= rightMapping._bagsSortExpansionID then
+			return leftMapping._bagsSortExpansionID > rightMapping._bagsSortExpansionID
 		end
-		if sortMode == "keystoneLevel" and leftData.keystoneLevel ~= rightData.keystoneLevel then
-			return leftData.keystoneLevel > rightData.keystoneLevel
+		if sortMode == "keystoneLevel" and leftMapping._bagsSortKeystoneLevel ~= rightMapping._bagsSortKeystoneLevel then
+			return leftMapping._bagsSortKeystoneLevel > rightMapping._bagsSortKeystoneLevel
 		end
 
-		if leftData.quality ~= rightData.quality then
-			return leftData.quality > rightData.quality
+		if leftMapping._bagsSortQuality ~= rightMapping._bagsSortQuality then
+			return leftMapping._bagsSortQuality > rightMapping._bagsSortQuality
 		end
-		if leftData.name ~= rightData.name then
-			return leftData.name < rightData.name
+		if leftMapping._bagsSortName ~= rightMapping._bagsSortName then
+			return leftMapping._bagsSortName < rightMapping._bagsSortName
 		end
-		if leftData.bagID ~= rightData.bagID then
-			return leftData.bagID < rightData.bagID
+		if leftMapping._bagsSortBagID ~= rightMapping._bagsSortBagID then
+			return leftMapping._bagsSortBagID < rightMapping._bagsSortBagID
 		end
-		return leftData.slotID < rightData.slotID
+		return leftMapping._bagsSortSlotID < rightMapping._bagsSortSlotID
 	end
 
 	for _, definition in ipairs(layoutData.sectionDefinitions) do

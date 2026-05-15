@@ -138,6 +138,20 @@ function UF.EnsureOverlayClipFrame(anchor, key)
 	return clip
 end
 
+function UF.StabilizeStatusBarTexture(bar)
+	if not bar then return end
+	local helper = UF.GroupFramesHelper
+	local pixel = helper and helper.Pixel
+	if pixel and pixel.DisableSnap then pixel.DisableSnap(bar) end
+	if not bar.GetStatusBarTexture then return end
+	local tex = bar:GetStatusBarTexture()
+	if not tex then return end
+	if tex.SetHorizTile then tex:SetHorizTile(false) end
+	if tex.SetVertTile then tex:SetVertTile(false) end
+	if tex.SetTexCoord then tex:SetTexCoord(0, 1, 0, 1) end
+	if pixel and pixel.DisableSnap then pixel.DisableSnap(tex) end
+end
+
 local function resetBlizzBossParent(self, parent)
 	if parent == blizzBossKill.hiddenParent then return end
 	if InCombatLockdown() and self.IsProtected and self:IsProtected() then
@@ -5948,6 +5962,7 @@ local function applyIncomingHealBar(st, hc, healthHeight, reverseHealth, interpo
 	st.incomingHeal:SetStatusBarTexture(UFHelper.resolveTexture(incomingHealTextureKey))
 	if st.incomingHeal.SetStatusBarDesaturated then st.incomingHeal:SetStatusBarDesaturated(false) end
 	UFHelper.configureSpecialTexture(st.incomingHeal, "HEALTH", incomingHealTextureKey, hc)
+	UF.StabilizeStatusBarTexture(st.incomingHeal)
 	if UFHelper and UFHelper.setupAbsorbClampReverseAware then
 		UFHelper.setupAbsorbClampReverseAware(st.health, st.incomingHeal)
 	elseif UFHelper and UFHelper.setupAbsorbClamp then
@@ -8549,6 +8564,11 @@ local function layoutFrame(cfg, unit)
 	local healthSlot = st.healthContainer or st.health
 	healthSlot:SetPoint("TOPLEFT", st.barGroup or st.frame, "TOPLEFT", barInsetLeft, -borderOffset)
 	healthSlot:SetPoint("TOPRIGHT", st.barGroup or st.frame, "TOPRIGHT", -barInsetRight, -borderOffset)
+	if st.healthTextLayer then
+		if st.healthTextLayer.GetParent and st.healthTextLayer:GetParent() ~= healthSlot then st.healthTextLayer:SetParent(healthSlot) end
+		st.healthTextLayer:ClearAllPoints()
+		st.healthTextLayer:SetAllPoints(healthSlot)
+	end
 	st.health:ClearAllPoints()
 	if st.tempMaxHealthLoss then
 		st.tempMaxHealthLoss:ClearAllPoints()
@@ -8744,7 +8764,7 @@ local function layoutFrame(cfg, unit)
 		st.raidIcon:SetPoint("TOP", st.barGroup or st.frame, "TOP", barCenterOffset or 0, -2)
 	end
 
-	layoutTexts(st.health, st.healthTextLeft, st.healthTextCenter, st.healthTextRight, cfg.health, width)
+	layoutTexts(healthSlot, st.healthTextLeft, st.healthTextCenter, st.healthTextRight, cfg.health, width)
 	layoutTexts(st.power, st.powerTextLeft, st.powerTextCenter, st.powerTextRight, cfg.power, width)
 	if st.secondaryPower then layoutTexts(st.secondaryPower, st.secondaryPowerTextLeft, st.secondaryPowerTextCenter, st.secondaryPowerTextRight, cfg.secondaryPower, width) end
 	if st.dataBar then layoutTexts(st.dataBar, st.dataBarTextLeft, st.dataBarTextCenter, st.dataBarTextRight, cfg.dataBar, frameWidth) end
@@ -9005,8 +9025,10 @@ local function ensureFrames(unit)
 		st.castBar:Hide()
 	end
 
-	st.healthTextLayer = st.healthTextLayer or CreateFrame("Frame", nil, st.health)
-	st.healthTextLayer:SetAllPoints(st.health)
+	local healthTextParent = st.healthContainer or st.health
+	st.healthTextLayer = st.healthTextLayer or CreateFrame("Frame", nil, healthTextParent)
+	if st.healthTextLayer.GetParent and st.healthTextLayer:GetParent() ~= healthTextParent then st.healthTextLayer:SetParent(healthTextParent) end
+	st.healthTextLayer:SetAllPoints(healthTextParent)
 	st.powerTextLayer = st.powerTextLayer or CreateFrame("Frame", nil, st.power)
 	st.powerTextLayer:SetAllPoints(st.power)
 	st.dataBarTextLayer = st.dataBarTextLayer or CreateFrame("Frame", nil, st.dataBar)
@@ -9122,6 +9144,7 @@ local function applyBars(cfg, unit)
 	st.health:SetStatusBarTexture(UFHelper.resolveTexture(hc.texture))
 	if st.health.SetStatusBarDesaturated then st.health:SetStatusBarDesaturated(UF.ShouldDesaturateHealthTexture(hc)) end
 	UFHelper.configureSpecialTexture(st.health, "HEALTH", hc.texture, hc)
+	UF.StabilizeStatusBarTexture(st.health)
 	local reverseHealth = hc.reverseFill
 	if reverseHealth == nil then reverseHealth = defH.reverseFill == true end
 	UFHelper.applyStatusBarReverseFill(st.health, reverseHealth)
@@ -9221,6 +9244,7 @@ local function applyBars(cfg, unit)
 		st.absorb:SetStatusBarTexture(UFHelper.resolveTexture(absorbTextureKey))
 		if st.absorb.SetStatusBarDesaturated then st.absorb:SetStatusBarDesaturated(false) end
 		UFHelper.configureSpecialTexture(st.absorb, "HEALTH", absorbTextureKey, hc)
+		UF.StabilizeStatusBarTexture(st.absorb)
 		local reverseAbsorb = hc.absorbReverseFill
 		if reverseAbsorb == nil then reverseAbsorb = defH.absorbReverseFill == true end
 		local absorbDontOverflow = hc.absorbDontOverflowHealthBar
@@ -9238,11 +9262,12 @@ local function applyBars(cfg, unit)
 		if absorbHeight == nil then absorbHeight = defH.absorbOverlayHeight end
 		local absorbAnchorTop = hc.absorbOverlayAnchorTop
 		if absorbAnchorTop == nil then absorbAnchorTop = defH.absorbOverlayAnchorTop == true end
-		applyOverlayHeight(st.absorb, st.health, absorbHeight, healthHeight, absorbAnchorTop == true)
+		applyOverlayHeight(st.absorb, overlayClip or st.health, absorbHeight, healthHeight, absorbAnchorTop == true)
 		if reverseAbsorb and st.absorb2 then
 			st.absorb2:SetStatusBarTexture(UFHelper.resolveTexture(absorbTextureKey))
 			if st.absorb2.SetStatusBarDesaturated then st.absorb2:SetStatusBarDesaturated(false) end
 			UFHelper.configureSpecialTexture(st.absorb2, "HEALTH", absorbTextureKey, hc)
+			UF.StabilizeStatusBarTexture(st.absorb2)
 			if st.absorb2.SetOrientation then st.absorb2:SetOrientation("HORIZONTAL") end
 			if UFHelper and UFHelper.applyAbsorbClampLayout then
 				if reverseHealth then
@@ -9265,7 +9290,7 @@ local function applyBars(cfg, unit)
 		st.absorb:SetValue(0, interpolation)
 		if st.overAbsorbGlow then
 			st.overAbsorbGlow:ClearAllPoints()
-			local glowParent = (st.health and st.health.absorbClip) or st.health
+			local glowParent = overlayClip or st.health
 			if glowParent and st.overAbsorbGlow.GetParent and st.overAbsorbGlow:GetParent() ~= glowParent then st.overAbsorbGlow:SetParent(glowParent) end
 			if reverseHealth then
 				st.overAbsorbGlow:SetPoint("TOPRIGHT", st.health, "TOPLEFT", 7, 0)
@@ -9286,6 +9311,7 @@ local function applyBars(cfg, unit)
 		st.healAbsorb:SetStatusBarTexture(UFHelper.resolveTexture(healAbsorbTextureKey))
 		if st.healAbsorb.SetStatusBarDesaturated then st.healAbsorb:SetStatusBarDesaturated(false) end
 		UFHelper.configureSpecialTexture(st.healAbsorb, "HEALTH", healAbsorbTextureKey, hc)
+		UF.StabilizeStatusBarTexture(st.healAbsorb)
 		local reverseHealAbsorb = hc.healAbsorbReverseFill
 		if reverseHealAbsorb == nil then reverseHealAbsorb = defH.healAbsorbReverseFill == true end
 		UFHelper.applyStatusBarReverseFill(st.healAbsorb, reverseHealAbsorb)
@@ -9294,7 +9320,7 @@ local function applyBars(cfg, unit)
 		if healAbsorbHeight == nil then healAbsorbHeight = defH.healAbsorbOverlayHeight end
 		local healAbsorbAnchorTop = hc.healAbsorbOverlayAnchorTop
 		if healAbsorbAnchorTop == nil then healAbsorbAnchorTop = defH.healAbsorbOverlayAnchorTop == true end
-		applyOverlayHeight(st.healAbsorb, st.health, healAbsorbHeight, healthHeight, healAbsorbAnchorTop == true)
+		applyOverlayHeight(st.healAbsorb, overlayClip or st.health, healAbsorbHeight, healthHeight, healAbsorbAnchorTop == true)
 		local anchorBar = st.incomingHeal or st.absorb2 or st.absorb or st.health
 		setFrameLevelAbove(st.healAbsorb, anchorBar, 1)
 		st.healAbsorb:SetMinMaxValues(0, 1)

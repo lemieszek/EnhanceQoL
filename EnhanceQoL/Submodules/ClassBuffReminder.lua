@@ -293,7 +293,9 @@ Reminder.defaults = Reminder.defaults
 		trackPets = false,
 		trackPetsContent = Reminder.CreateDefaultTrackingContentSelection(),
 		trackPetsInstanceOnly = false,
-	hidePetReminderText = false,
+		ignorePetDefensive = false,
+		ignorePetPassive = false,
+		hidePetReminderText = false,
 		scale = 1,
 		iconSize = 64,
 		fontSize = 13,
@@ -337,6 +339,8 @@ if type(defaults.trackWeaponBuffsContent) ~= "table" then defaults.trackWeaponBu
 if defaults.trackPets == nil then defaults.trackPets = false end
 if defaults.trackPetsInstanceOnly == nil then defaults.trackPetsInstanceOnly = false end
 if type(defaults.trackPetsContent) ~= "table" then defaults.trackPetsContent = Reminder.CreateDefaultTrackingContentSelection() end
+if defaults.ignorePetDefensive == nil then defaults.ignorePetDefensive = false end
+if defaults.ignorePetPassive == nil then defaults.ignorePetPassive = false end
 if defaults.borderEnabled == nil then defaults.borderEnabled = false end
 if defaults.borderTexture == nil or defaults.borderTexture == "" then defaults.borderTexture = "DEFAULT" end
 if defaults.borderSize == nil then defaults.borderSize = 1 end
@@ -1306,6 +1310,14 @@ function Reminder:SetWeaponBuffTrackingContentSelection(selection)
 end
 
 function Reminder:IsPetTrackingEnabled() return getValue("classBuffReminderTrackPets", defaults.trackPets) == true end
+
+function Reminder:ShouldIgnorePetDefensiveReminder()
+	return getValue("classBuffReminderIgnorePetDefensive", defaults.ignorePetDefensive) == true
+end
+
+function Reminder:ShouldIgnorePetPassiveReminder()
+	return getValue("classBuffReminderIgnorePetPassive", defaults.ignorePetPassive) == true
+end
 
 function Reminder:GetPetTrackingContentSelection()
 	return Reminder.GetTrackingContentSelection(TRACKING_CONTENT.db.PETS, "classBuffReminderTrackPetsInstanceOnly", defaults.trackPetsContent)
@@ -2386,10 +2398,10 @@ function Reminder:GetPetMissingEntry()
 	end
 
 	local stance = self:GetPetStance()
-	if stance == Reminder.petTracking.stancePassive then
+	if stance == Reminder.petTracking.stancePassive and not self:ShouldIgnorePetPassiveReminder() then
 		return makeSelfMissingEntry(nil, L["ClassBuffReminderPetPassive"] or "Pet Passive", nil, nil, "PET", self:GetPetReminderIcon("passive"), self:GetPetReminderShortText("passive"))
 	end
-	if stance == Reminder.petTracking.stanceDefensive then
+	if stance == Reminder.petTracking.stanceDefensive and not self:ShouldIgnorePetDefensiveReminder() then
 		return makeSelfMissingEntry(nil, L["ClassBuffReminderPetDefensive"] or "Pet Defensive", nil, nil, "PET", self:GetPetReminderIcon("defensive"), self:GetPetReminderShortText("defensive"))
 	end
 	return nil
@@ -6363,6 +6375,30 @@ function editModeSettingsBuilders.buildConsumables()
 				if addon.db then addon.db["classBuffReminderTrackPets"] = value == true end
 				Reminder.EditModeRefreshRuntimeAfterTrackingChange()
 			end,
+		},
+		{
+			name = L["ClassBuffReminderIgnorePetPassive"] or "Ignore passive pet stance",
+			kind = SettingType.Checkbox,
+			parentId = "pets",
+			default = defaults.ignorePetPassive,
+			get = function() return getValue("classBuffReminderIgnorePetPassive", defaults.ignorePetPassive) == true end,
+			set = function(_, value)
+				if addon.db then addon.db["classBuffReminderIgnorePetPassive"] = value == true end
+				Reminder:RequestUpdate(true, 0, true)
+			end,
+			isShown = function() return getValue("classBuffReminderTrackPets", defaults.trackPets) == true end,
+		},
+		{
+			name = L["ClassBuffReminderIgnorePetDefensive"] or "Ignore defensive pet stance",
+			kind = SettingType.Checkbox,
+			parentId = "pets",
+			default = defaults.ignorePetDefensive,
+			get = function() return getValue("classBuffReminderIgnorePetDefensive", defaults.ignorePetDefensive) == true end,
+			set = function(_, value)
+				if addon.db then addon.db["classBuffReminderIgnorePetDefensive"] = value == true end
+				Reminder:RequestUpdate(true, 0, true)
+			end,
+			isShown = function() return getValue("classBuffReminderTrackPets", defaults.trackPets) == true end,
 		},
 		{
 			name = L["ClassBuffReminderHidePetReminderText"] or "Hide pet reminder text",

@@ -31,6 +31,7 @@ local CALL_PET_SPELL_ID = 883
 local RAISE_DEAD_SPELL_ID = 46584
 local SUMMON_IMP_SPELL_ID = 688
 local DEFAULT_PET_ICON = "Interface\\Icons\\Ability_Hunter_BeastCall"
+local DB_IGNORE_PET_STANCES = "classBuffReminderIgnorePetStances"
 
 local PET_CLASSES = {
 	HUNTER = true,
@@ -73,6 +74,12 @@ local function ensureDB()
 	db.blinkRate = db.blinkRate or 0.7
 end
 
+local function shouldIgnorePetStanceReminders()
+	local reminder = addon.ClassBuffReminder
+	if reminder and reminder.ShouldIgnorePetStanceReminders then return reminder:ShouldIgnorePetStanceReminders() end
+	return addon.db and addon.db[DB_IGNORE_PET_STANCES] == true
+end
+
 local function RestorePosition(frame)
 	if not db then return end
 	if db.point and db.x and db.y then
@@ -92,7 +99,7 @@ local function createAceWindow()
 	aceWindow = frame.frame
 	frame:SetTitle((addon.DataPanel and addon.DataPanel.GetStreamOptionsTitle and addon.DataPanel.GetStreamOptionsTitle(stream and stream.meta and stream.meta.title)) or GAMEMENU_OPTIONS)
 	frame:SetWidth(320)
-	frame:SetHeight(340)
+	frame:SetHeight(370)
 	frame:SetLayout("List")
 
 	frame.frame:SetScript("OnShow", function(self) RestorePosition(self) end)
@@ -146,6 +153,16 @@ local function createAceWindow()
 		addon.DataHub:RequestUpdate(stream)
 	end)
 	frame:AddChild(hideWhileRested)
+
+	local ignorePetStances = AceGUI:Create("CheckBox")
+	ignorePetStances:SetLabel(L["ClassBuffReminderIgnorePetStances"] or "Ignore passive and defensive pet stances")
+	ignorePetStances:SetValue(shouldIgnorePetStanceReminders())
+	ignorePetStances:SetCallback("OnValueChanged", function(_, _, val)
+		if addon.db then addon.db[DB_IGNORE_PET_STANCES] = val and true or false end
+		if addon.ClassBuffReminder and addon.ClassBuffReminder.RequestUpdate then addon.ClassBuffReminder:RequestUpdate(true, 0, true) end
+		addon.DataHub:RequestUpdate(stream)
+	end)
+	frame:AddChild(ignorePetStances)
 
 	local blinkToggle = AceGUI:Create("CheckBox")
 	blinkToggle:SetLabel(L["Blink"] or "Blink")
@@ -231,6 +248,7 @@ local function getPetReminderState()
 	end
 
 	if reminder and reminder.GetPetStance and reminder.petTracking then
+		if shouldIgnorePetStanceReminders() then return nil end
 		local stance = reminder:GetPetStance()
 		if stance == reminder.petTracking.stancePassive then
 			return "passive", L["ClassBuffReminderPetPassive"] or "Pet Passive", reminder:GetPetReminderIcon("passive")

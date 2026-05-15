@@ -40,6 +40,7 @@ local DB_TRACK_WEAPON_BUFFS_INSTANCE_ONLY = "classBuffReminderTrackWeaponBuffsIn
 local DB_TRACK_PETS = "classBuffReminderTrackPets"
 local DB_TRACK_PETS_CONTENT = "classBuffReminderTrackPetsContent"
 local DB_TRACK_PETS_INSTANCE_ONLY = "classBuffReminderTrackPetsInstanceOnly"
+local DB_IGNORE_PET_STANCES = "classBuffReminderIgnorePetStances"
 local DB_HIDE_PET_REMINDER_TEXT = "classBuffReminderHidePetReminderText"
 local DB_SCALE = "classBuffReminderScale"
 local DB_ICON_SIZE = "classBuffReminderIconSize"
@@ -114,7 +115,8 @@ local defaults = (Reminder and Reminder.defaults)
 		trackPets = false,
 		trackPetsContent = createDefaultTrackingContentSelection(),
 		trackPetsInstanceOnly = false,
-	hidePetReminderText = false,
+		ignorePetStances = false,
+		hidePetReminderText = false,
 		scale = 1,
 		iconSize = 64,
 		fontSize = 13,
@@ -150,6 +152,7 @@ if defaults.trackWeaponBuffs == nil then defaults.trackWeaponBuffs = false end
 if type(defaults.trackWeaponBuffsContent) ~= "table" then defaults.trackWeaponBuffsContent = createDefaultTrackingContentSelection() end
 if defaults.trackPets == nil then defaults.trackPets = false end
 if type(defaults.trackPetsContent) ~= "table" then defaults.trackPetsContent = createDefaultTrackingContentSelection() end
+if defaults.ignorePetStances == nil then defaults.ignorePetStances = false end
 if defaults.borderEnabled == nil then defaults.borderEnabled = false end
 if defaults.borderTexture == nil or defaults.borderTexture == "" then defaults.borderTexture = "DEFAULT" end
 if defaults.borderSize == nil then defaults.borderSize = 1 end
@@ -390,6 +393,17 @@ local petTracking = addon.functions.SettingsCreateCheckbox(cat, {
 })
 
 addon.functions.SettingsCreateCheckbox(cat, {
+	var = DB_IGNORE_PET_STANCES,
+	text = L["ClassBuffReminderIgnorePetStances"] or "Ignore passive and defensive pet stances",
+	func = function(value)
+		addon.db[DB_IGNORE_PET_STANCES] = value == true
+		refreshReminder()
+	end,
+	parentSection = expandable,
+	parentCheck = function() return addon.db and addon.db[DB_TRACK_PETS] == true end,
+})
+
+addon.functions.SettingsCreateCheckbox(cat, {
 	var = DB_HIDE_PET_REMINDER_TEXT,
 	text = L["ClassBuffReminderHidePetReminderText"] or "Hide pet reminder text",
 	desc = L["ClassBuffReminderHidePetReminderTextDesc"] or "Hides the small text shown on pet state reminder icons.",
@@ -447,6 +461,7 @@ function addon.functions.initClassBuffReminder()
 	init(DB_TRACK_FOOD, defaults.trackFood)
 	init(DB_TRACK_WEAPON_BUFFS, defaults.trackWeaponBuffs)
 	init(DB_TRACK_PETS, defaults.trackPets)
+	init(DB_IGNORE_PET_STANCES, defaults.ignorePetStances)
 	init(DB_SCALE, defaults.scale)
 	init(DB_ICON_SIZE, defaults.iconSize)
 	init(DB_FONT_SIZE, defaults.fontSize)
