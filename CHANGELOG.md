@@ -8,6 +8,10 @@
 - Combat Text: Added settings to customize the enter and leave combat messages.
 - Fonts: Added Slug font style options, including Slug Outline and Slug Shadow variants, to the shared font outline/style selectors.
 
+### 🐛 Fixed
+
+- Group Frames / Raid: Fixed raid auto-fit layout jitter by replacing fractional header scaling with pixel-snapped frame sizes and spacing, stabilizing names, auras, and group indicators in larger raids.
+
 ---
 
 ## [10.15.0] - 2026-05-10
