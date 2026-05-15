@@ -1566,6 +1566,8 @@ function addon.functions.initUIOptions()
 	local alwaysVisibleMode = combatDefaults.alwaysVisibleMode
 	if alwaysVisibleMode ~= combatAlwaysModeCombatOnly and alwaysVisibleMode ~= combatAlwaysModeStatus then alwaysVisibleMode = combatAlwaysModeStatus end
 	addon.functions.InitDBValue("combatTextAlwaysVisibleMode", alwaysVisibleMode)
+	addon.functions.InitDBValue("combatTextEnterText", combatDefaults.enterText or "")
+	addon.functions.InitDBValue("combatTextLeaveText", combatDefaults.leaveText or "")
 	addon.functions.InitDBValue("combatTextFont", combatFont)
 	addon.functions.InitDBValue("combatTextFontSize", combatDefaults.fontSize or 32)
 	addon.functions.InitDBValue("combatTextAnchorTarget", "UIParent")
@@ -1907,6 +1909,42 @@ local function createCastbarCategory()
 		parent = true,
 		element = combatAlwaysVisible and combatAlwaysVisible.element,
 		parentCheck = function() return combatAlwaysVisible and combatAlwaysVisible.setting and combatAlwaysVisible.setting:GetValue() == true end,
+		parentSection = expandable,
+	})
+	addon.functions.SettingsCreateInput(category, {
+		var = "combatTextEnterText",
+		text = L["combatTextEnterText"] or "Entering combat text",
+		desc = L["combatTextEnterTextDesc"] or "Custom text shown when entering combat. Leave empty to use the localized default.",
+		default = "",
+		get = function()
+			return addon.CombatText and addon.CombatText.GetEnterText and addon.CombatText:GetEnterText() or addon.db["combatTextEnterText"] or ""
+		end,
+		set = function(value)
+			addon.db["combatTextEnterText"] = type(value) == "string" and value or ""
+			if addon.CombatText and addon.CombatText.ApplyLayoutData then addon.CombatText:ApplyLayoutData({ enterText = addon.db["combatTextEnterText"] }) end
+		end,
+		maxChars = 64,
+		inputWidth = 180,
+		placeholder = addon.CombatText and addon.CombatText.GetDefaultEnterText and addon.CombatText:GetDefaultEnterText() or L["combatTextEnter"] or "+Combat",
+		selectAllOnFocus = true,
+		parentSection = expandable,
+	})
+	addon.functions.SettingsCreateInput(category, {
+		var = "combatTextLeaveText",
+		text = L["combatTextLeaveText"] or "Leaving combat text",
+		desc = L["combatTextLeaveTextDesc"] or "Custom text shown when leaving combat. Leave empty to use the localized default.",
+		default = "",
+		get = function()
+			return addon.CombatText and addon.CombatText.GetLeaveText and addon.CombatText:GetLeaveText() or addon.db["combatTextLeaveText"] or ""
+		end,
+		set = function(value)
+			addon.db["combatTextLeaveText"] = type(value) == "string" and value or ""
+			if addon.CombatText and addon.CombatText.ApplyLayoutData then addon.CombatText:ApplyLayoutData({ leaveText = addon.db["combatTextLeaveText"] }) end
+		end,
+		maxChars = 64,
+		inputWidth = 180,
+		placeholder = addon.CombatText and addon.CombatText.GetDefaultLeaveText and addon.CombatText:GetDefaultLeaveText() or L["combatTextLeave"] or "-Combat",
+		selectAllOnFocus = true,
 		parentSection = expandable,
 	})
 	addon.functions.SettingsCreateText(category, "|cffffd700" .. (L["combatTextEditModeHint"] or "Configure text size, font, color, and position in Edit Mode.") .. "|r", {

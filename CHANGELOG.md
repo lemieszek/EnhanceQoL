@@ -5,6 +5,7 @@
 ### ✨ Added
 
 - Class Buff Reminder / Pet Tracker: Added separate options to ignore passive and defensive pet stance reminders while still showing missing-pet reminders.
+- Combat Text: Added settings to customize the enter and leave combat messages.
 - Fonts: Added Slug font style options, including Slug Outline and Slug Shadow variants, to the shared font outline/style selectors.
 
 ---
