@@ -1,5 +1,14 @@
 # Changelog
 
+## [10.16.0] - 2026-05-15
+
+### ✨ Added
+
+- Class Buff Reminder / Pet Tracker: Added separate options to ignore passive and defensive pet stance reminders while still showing missing-pet reminders.
+- Fonts: Added Slug font style options, including Slug Outline and Slug Shadow variants, to the shared font outline/style selectors.
+
+---
+
 ## [10.15.0] - 2026-05-10
 
 ### ✨ Added

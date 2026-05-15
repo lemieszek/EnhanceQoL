@@ -31,7 +31,8 @@ local CALL_PET_SPELL_ID = 883
 local RAISE_DEAD_SPELL_ID = 46584
 local SUMMON_IMP_SPELL_ID = 688
 local DEFAULT_PET_ICON = "Interface\\Icons\\Ability_Hunter_BeastCall"
-local DB_IGNORE_PET_STANCES = "classBuffReminderIgnorePetStances"
+local DB_IGNORE_PET_DEFENSIVE = "classBuffReminderIgnorePetDefensive"
+local DB_IGNORE_PET_PASSIVE = "classBuffReminderIgnorePetPassive"
 
 local PET_CLASSES = {
 	HUNTER = true,
@@ -74,10 +75,16 @@ local function ensureDB()
 	db.blinkRate = db.blinkRate or 0.7
 end
 
-local function shouldIgnorePetStanceReminders()
+local function shouldIgnorePetDefensiveReminder()
 	local reminder = addon.ClassBuffReminder
-	if reminder and reminder.ShouldIgnorePetStanceReminders then return reminder:ShouldIgnorePetStanceReminders() end
-	return addon.db and addon.db[DB_IGNORE_PET_STANCES] == true
+	if reminder and reminder.ShouldIgnorePetDefensiveReminder then return reminder:ShouldIgnorePetDefensiveReminder() end
+	return addon.db and addon.db[DB_IGNORE_PET_DEFENSIVE] == true
+end
+
+local function shouldIgnorePetPassiveReminder()
+	local reminder = addon.ClassBuffReminder
+	if reminder and reminder.ShouldIgnorePetPassiveReminder then return reminder:ShouldIgnorePetPassiveReminder() end
+	return addon.db and addon.db[DB_IGNORE_PET_PASSIVE] == true
 end
 
 local function RestorePosition(frame)
@@ -154,15 +161,25 @@ local function createAceWindow()
 	end)
 	frame:AddChild(hideWhileRested)
 
-	local ignorePetStances = AceGUI:Create("CheckBox")
-	ignorePetStances:SetLabel(L["ClassBuffReminderIgnorePetStances"] or "Ignore passive and defensive pet stances")
-	ignorePetStances:SetValue(shouldIgnorePetStanceReminders())
-	ignorePetStances:SetCallback("OnValueChanged", function(_, _, val)
-		if addon.db then addon.db[DB_IGNORE_PET_STANCES] = val and true or false end
+	local ignorePetPassive = AceGUI:Create("CheckBox")
+	ignorePetPassive:SetLabel(L["ClassBuffReminderIgnorePetPassive"] or "Ignore passive pet stance")
+	ignorePetPassive:SetValue(shouldIgnorePetPassiveReminder())
+	ignorePetPassive:SetCallback("OnValueChanged", function(_, _, val)
+		if addon.db then addon.db[DB_IGNORE_PET_PASSIVE] = val and true or false end
 		if addon.ClassBuffReminder and addon.ClassBuffReminder.RequestUpdate then addon.ClassBuffReminder:RequestUpdate(true, 0, true) end
 		addon.DataHub:RequestUpdate(stream)
 	end)
-	frame:AddChild(ignorePetStances)
+	frame:AddChild(ignorePetPassive)
+
+	local ignorePetDefensive = AceGUI:Create("CheckBox")
+	ignorePetDefensive:SetLabel(L["ClassBuffReminderIgnorePetDefensive"] or "Ignore defensive pet stance")
+	ignorePetDefensive:SetValue(shouldIgnorePetDefensiveReminder())
+	ignorePetDefensive:SetCallback("OnValueChanged", function(_, _, val)
+		if addon.db then addon.db[DB_IGNORE_PET_DEFENSIVE] = val and true or false end
+		if addon.ClassBuffReminder and addon.ClassBuffReminder.RequestUpdate then addon.ClassBuffReminder:RequestUpdate(true, 0, true) end
+		addon.DataHub:RequestUpdate(stream)
+	end)
+	frame:AddChild(ignorePetDefensive)
 
 	local blinkToggle = AceGUI:Create("CheckBox")
 	blinkToggle:SetLabel(L["Blink"] or "Blink")
@@ -248,12 +265,11 @@ local function getPetReminderState()
 	end
 
 	if reminder and reminder.GetPetStance and reminder.petTracking then
-		if shouldIgnorePetStanceReminders() then return nil end
 		local stance = reminder:GetPetStance()
-		if stance == reminder.petTracking.stancePassive then
+		if stance == reminder.petTracking.stancePassive and not shouldIgnorePetPassiveReminder() then
 			return "passive", L["ClassBuffReminderPetPassive"] or "Pet Passive", reminder:GetPetReminderIcon("passive")
 		end
-		if stance == reminder.petTracking.stanceDefensive then
+		if stance == reminder.petTracking.stanceDefensive and not shouldIgnorePetDefensiveReminder() then
 			return "defensive", L["ClassBuffReminderPetDefensive"] or "Pet Defensive", reminder:GetPetReminderIcon("defensive")
 		end
 	end
