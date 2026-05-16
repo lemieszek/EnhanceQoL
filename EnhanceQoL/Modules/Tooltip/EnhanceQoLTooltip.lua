@@ -564,21 +564,12 @@ local function StripPreviousRealmFlagPrefix(entry, text)
 end
 
 local function UpdateLFGSearchEntryRealmFlag(entry)
+	if not addon.db or not addon.db["TooltipShowRealmInfo"] then return end
+	if not IsLFGRealmDisplayEnabled("listingFlag") then return end
 	if not entry or not entry.Name or not entry.Name.GetText or not entry.Name.SetText then return end
 	local text = entry.Name:GetText()
 	if isSecret(text) then return end
 	text = StripPreviousRealmFlagPrefix(entry, text)
-
-	if not addon.db or not addon.db["TooltipShowRealmInfo"] then
-		entry.__EnhanceQoLRealmFlagPrefix = nil
-		entry.Name:SetText(text)
-		return
-	end
-	if not IsLFGRealmDisplayEnabled("listingFlag") then
-		entry.__EnhanceQoLRealmFlagPrefix = nil
-		entry.Name:SetText(text)
-		return
-	end
 
 	local info = GetRealmInfoForLFGResult(entry.resultID)
 	local prefix = GetRealmFlagPlaceholder(info, not isTooltipRestricted())
@@ -595,6 +586,7 @@ end
 local function AddLFGSearchEntryRealmInfo(tooltip, resultID)
 	if not addon.db or not addon.db["TooltipShowRealmInfo"] then return end
 	if not IsLFGRealmDisplayEnabled("tooltip") then return end
+	if isTooltipRestricted() then return end
 	local _, realm = GetRealmInfoForLFGResult(resultID)
 	if not realm then return end
 	AddRealmInfo(tooltip, realm)
@@ -616,22 +608,13 @@ local function GetRealmInfoForLFGApplicant(appID, memberIdx)
 end
 
 local function UpdateLFGApplicantMemberRealmFlag(memberFrame, appID, memberIdx)
+	if not addon.db or not addon.db["TooltipShowRealmInfo"] then return end
+	if not IsLFGRealmDisplayEnabled("listingFlag") then return end
 	if isTooltipRestricted() then return end
 	if not memberFrame or not memberFrame.Name or not memberFrame.Name.GetText or not memberFrame.Name.SetText then return end
 	local text = memberFrame.Name:GetText()
 	if isSecret(text) then return end
 	text = StripPreviousRealmFlagPrefix(memberFrame, text)
-
-	if not addon.db or not addon.db["TooltipShowRealmInfo"] then
-		memberFrame.__EnhanceQoLRealmFlagPrefix = nil
-		memberFrame.Name:SetText(text)
-		return
-	end
-	if not IsLFGRealmDisplayEnabled("listingFlag") then
-		memberFrame.__EnhanceQoLRealmFlagPrefix = nil
-		memberFrame.Name:SetText(text)
-		return
-	end
 
 	local info = GetRealmInfoForLFGApplicant(appID, memberIdx)
 	local prefix = GetRealmFlagPlaceholder(info, not isTooltipRestricted())
