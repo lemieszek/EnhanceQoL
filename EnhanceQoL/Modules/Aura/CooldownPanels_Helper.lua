@@ -289,6 +289,8 @@ Helper.ENTRY_DEFAULTS = {
 	cooldownGcdDrawEdge = false,
 	cooldownGcdDrawBling = false,
 	cooldownGcdDrawSwipe = false,
+	customCooldownDurationEnabled = false,
+	customCooldownDuration = 0,
 	cooldownTextUseGlobal = true,
 	cooldownTextStyle = globalFontStyleKey(),
 	noDesaturationUseGlobal = true,
@@ -339,6 +341,7 @@ Helper.PREVIEW_COUNT_FONT_MIN = 12
 Helper.OFFSET_RANGE = 200
 Helper.SPACING_RANGE = 200
 Helper.STATE_TEXTURE_SPACING_RANGE = 2000
+Helper.CUSTOM_COOLDOWN_DURATION_MAX = 300
 Helper.GLOW_INSET_RANGE = 20
 Helper.RADIAL_RADIUS_RANGE = 600
 Helper.RADIAL_ROTATION_RANGE = 360
@@ -2355,6 +2358,14 @@ function Helper.NormalizeEntry(entry, defaults)
 	if type(entry.cooldownGcdDrawEdge) ~= "boolean" then entry.cooldownGcdDrawEdge = Helper.ENTRY_DEFAULTS.cooldownGcdDrawEdge end
 	if type(entry.cooldownGcdDrawBling) ~= "boolean" then entry.cooldownGcdDrawBling = Helper.ENTRY_DEFAULTS.cooldownGcdDrawBling end
 	if type(entry.cooldownGcdDrawSwipe) ~= "boolean" then entry.cooldownGcdDrawSwipe = Helper.ENTRY_DEFAULTS.cooldownGcdDrawSwipe end
+	if entry.type == "CDM_AURA" or entry.type == "STANCE" then
+		entry.customCooldownDurationEnabled = false
+		entry.customCooldownDuration = Helper.ENTRY_DEFAULTS.customCooldownDuration
+	else
+		if type(entry.customCooldownDurationEnabled) ~= "boolean" then entry.customCooldownDurationEnabled = Helper.ENTRY_DEFAULTS.customCooldownDurationEnabled end
+		entry.customCooldownDuration = Helper.ClampNumber(entry.customCooldownDuration, 0, Helper.CUSTOM_COOLDOWN_DURATION_MAX or 300, Helper.ENTRY_DEFAULTS.customCooldownDuration or 0)
+		if not (entry.customCooldownDuration and entry.customCooldownDuration > 0) then entry.customCooldownDurationEnabled = false end
+	end
 	if type(entry.cooldownTextUseGlobal) ~= "boolean" then entry.cooldownTextUseGlobal = true end
 	if type(entry.noDesaturationUseGlobal) ~= "boolean" then entry.noDesaturationUseGlobal = true end
 	if type(entry.noDesaturation) ~= "boolean" then entry.noDesaturation = Helper.ENTRY_DEFAULTS.noDesaturation end

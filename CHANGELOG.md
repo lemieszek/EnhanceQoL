@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.17.0-beta1] - 2026-05-16
+
+### ✨ Added
+
+- Cooldown Panels: Added optional custom activation durations for spell, item, slot, and matching macro entries, allowing uses such as potion or trinket tracking with an active-style reverse swipe.
+
+---
+
 ## [10.16.1] - 2026-05-16
 
 ### 🐛 Fixed

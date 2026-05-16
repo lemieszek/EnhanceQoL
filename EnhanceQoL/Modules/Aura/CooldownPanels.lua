@@ -4327,6 +4327,7 @@ function CooldownPanels:ReleaseDeletedPanelRuntime(panelId)
 						if icon.cooldown.Clear then icon.cooldown:Clear() end
 						icon.cooldown._eqolPanelId = nil
 						icon.cooldown._eqolEntryId = nil
+						icon.cooldown._eqolCustomCooldownKey = nil
 					end
 					if icon.count then icon.count:Hide() end
 					if icon.charges then icon.charges:Hide() end
@@ -4349,6 +4350,7 @@ function CooldownPanels:ReleaseDeletedPanelRuntime(panelId)
 		runtime.frame = nil
 	end
 
+	self:ClearPanelCustomCooldownDurations(panelId)
 	allRuntime[panelId] = nil
 end
 
@@ -4523,6 +4525,7 @@ function CooldownPanels:RemoveEntry(panelId, entryId)
 	panel.entries[entryId] = nil
 	local runtime = CooldownPanels.runtime
 	if runtime and runtime.actionDisplayCounts then runtime.actionDisplayCounts[Helper.GetEntryKey(panelId, entryId)] = nil end
+	self:ClearEntryCustomCooldownDuration(panelId, entryId, true)
 	Helper.SyncOrder(panel.order, panel.entries)
 	Helper.InvalidateFixedLayoutCache(panel)
 	self:RebuildSpellIndex()
@@ -7706,6 +7709,7 @@ local function updateCooldownDoneContext(cooldown, panelId, entryId, data)
 	cooldown._eqolSpellId = data.spellId
 	cooldown._eqolBaseSpellId = data.baseSpellId
 	cooldown._eqolEffectiveSpellId = data.effectiveSpellId
+	cooldown._eqolCustomCooldownKey = data.customCooldownDurationActive == true and data.customCooldownDurationKey or nil
 	cooldown._eqolSoundName = data.soundName
 	if armReadySound then
 		cooldown._eqolSoundReady = true
@@ -7726,6 +7730,7 @@ local function clearCooldownDoneState(cooldown)
 	cooldown._eqolSoundReady = nil
 	cooldown._eqolSoundReadyIgnoreGCD = nil
 	cooldown._eqolGlowReady = nil
+	cooldown._eqolCustomCooldownKey = nil
 	if cooldown.SetScript then cooldown:SetScript("OnCooldownDone", nil) end
 end
 
@@ -7757,6 +7762,11 @@ local function onCooldownDone(self)
 	end
 
 	if not isGCD then
+		if self._eqolCustomCooldownKey and CooldownPanels and CooldownPanels.ClearEntryCustomCooldownDuration then
+			CooldownPanels:ClearEntryCustomCooldownDuration(self._eqolPanelId, self._eqolEntryId, true)
+			self._eqolCustomCooldownKey = nil
+		end
+
 		if CooldownPanels and CooldownPanels.InvalidateSpellCooldownCachesForAliases then
 			CooldownPanels:InvalidateSpellCooldownCachesForAliases(self._eqolSpellId)
 			CooldownPanels:InvalidateSpellCooldownCachesForAliases(self._eqolBaseSpellId)
@@ -7797,6 +7807,245 @@ local function isCooldownActive(startTime, duration)
 	if duration <= 0 or startTime <= 0 then return false end
 	if not Api.GetTime then return false end
 	return (startTime + duration) > Api.GetTime()
+end
+
+function CooldownPanels:GetDurationNow()
+	if C_DurationUtil and C_DurationUtil.GetCurrentTime then return C_DurationUtil.GetCurrentTime() end
+	return (Api.GetTime and Api.GetTime()) or GetTime()
+end
+
+function CooldownPanels:SupportsEntryCustomCooldownDuration(entry, resolvedType)
+	if not entry then return false end
+	if entry.type == "CDM_AURA" or entry.type == "STANCE" then return false end
+	local typeKey = resolvedType
+	if not typeKey then
+		if entry.type == "MACRO" then
+			local macro = CooldownPanels.ResolveMacroEntry and CooldownPanels.ResolveMacroEntry(entry) or nil
+			typeKey = macro and macro.kind or entry.type
+		else
+			typeKey = entry.type
+		end
+	end
+	return typeKey == "SPELL" or typeKey == "ITEM" or typeKey == "SLOT"
+end
+
+function CooldownPanels:GetEntryCustomCooldownDuration(entry, resolvedType)
+	if not self:SupportsEntryCustomCooldownDuration(entry, resolvedType) then return nil end
+	if entry.customCooldownDurationEnabled ~= true then return nil end
+	local duration = tonumber(entry.customCooldownDuration)
+	if not duration or duration <= 0 then return nil end
+	local maxDuration = Helper.CUSTOM_COOLDOWN_DURATION_MAX or 300
+	if duration > maxDuration then duration = maxDuration end
+	return duration
+end
+
+function CooldownPanels:GetCustomCooldownDurationStore()
+	self.runtime = self.runtime or {}
+	local runtime = self.runtime
+	runtime.customCooldownDurations = runtime.customCooldownDurations or {}
+	runtime.customCooldownDurationTimers = runtime.customCooldownDurationTimers or {}
+	return runtime.customCooldownDurations, runtime.customCooldownDurationTimers
+end
+
+function CooldownPanels:ClearEntryCustomCooldownDuration(panelId, entryId, suppressRefresh)
+	panelId = normalizeId(panelId)
+	entryId = normalizeId(entryId)
+	if not (panelId and entryId and self.runtime) then return false end
+	local key = Helper.GetEntryKey(panelId, entryId)
+	local store = self.runtime.customCooldownDurations
+	local timers = self.runtime.customCooldownDurationTimers
+	local hadRecord = store and store[key] ~= nil
+	if store then store[key] = nil end
+	local timer = timers and timers[key] or nil
+	if timer and timer.Cancel then timer:Cancel() end
+	if timers then timers[key] = nil end
+	if hadRecord and not suppressRefresh then
+		if self.RequestPanelRefresh then
+			self:RequestPanelRefresh(panelId)
+		elseif self:GetPanel(panelId) then
+			self:RefreshPanel(panelId)
+		end
+	end
+	return hadRecord
+end
+
+function CooldownPanels:ClearPanelCustomCooldownDurations(panelId)
+	panelId = normalizeId(panelId)
+	if not (panelId and self.runtime) then return false end
+	local store = self.runtime.customCooldownDurations
+	local timers = self.runtime.customCooldownDurationTimers
+	if not store then return false end
+	local prefix = tostring(panelId) .. ":"
+	local changed = false
+	for key in pairs(store) do
+		if tostring(key):sub(1, #prefix) == prefix then
+			store[key] = nil
+			local timer = timers and timers[key] or nil
+			if timer and timer.Cancel then timer:Cancel() end
+			if timers then timers[key] = nil end
+			changed = true
+		end
+	end
+	return changed
+end
+
+function CooldownPanels:GetActiveEntryCustomCooldownDuration(panelId, entryId, entry, resolvedType)
+	local duration = self:GetEntryCustomCooldownDuration(entry, resolvedType)
+	if not duration then return nil end
+	panelId = normalizeId(panelId)
+	entryId = normalizeId(entryId)
+	if not (panelId and entryId and self.runtime) then return nil end
+	local store = self.runtime.customCooldownDurations
+	local key = Helper.GetEntryKey(panelId, entryId)
+	local record = store and store[key] or nil
+	if not record then return nil end
+	local now = self:GetDurationNow()
+	local startTime = tonumber(record.startTime)
+	local endTime = tonumber(record.endTime)
+	local recordDuration = tonumber(record.duration) or duration
+	if not (startTime and endTime and recordDuration and recordDuration > 0) or now >= endTime then
+		self:ClearEntryCustomCooldownDuration(panelId, entryId, true)
+		return nil
+	end
+	local durationObject = record.durationObject
+	if durationObject and durationObject.GetRemainingDuration then
+		local remaining = durationObject.GetRemainingDuration(durationObject, Api.DurationModifierRealTime)
+		if isSafeNumber(remaining) and remaining <= 0 then
+			self:ClearEntryCustomCooldownDuration(panelId, entryId, true)
+			return nil
+		end
+	end
+	return {
+		key = key,
+		durationObject = durationObject,
+		startTime = startTime,
+		duration = recordDuration,
+		endTime = endTime,
+		rate = 1,
+	}
+end
+
+function CooldownPanels:StartEntryCustomCooldownDuration(panelId, entryId, entry, resolvedType)
+	local duration = self:GetEntryCustomCooldownDuration(entry, resolvedType)
+	if not duration then return false end
+	panelId = normalizeId(panelId)
+	entryId = normalizeId(entryId)
+	if not (panelId and entryId) then return false end
+	local now = self:GetDurationNow()
+	local durationObject
+	if C_DurationUtil and C_DurationUtil.CreateDuration then
+		durationObject = C_DurationUtil.CreateDuration()
+		if durationObject and durationObject.SetTimeFromStart then durationObject:SetTimeFromStart(now, duration, 1) end
+	end
+	local store, timers = self:GetCustomCooldownDurationStore()
+	local key = Helper.GetEntryKey(panelId, entryId)
+	local oldTimer = timers[key]
+	if oldTimer and oldTimer.Cancel then oldTimer:Cancel() end
+	store[key] = {
+		durationObject = durationObject,
+		startTime = now,
+		duration = duration,
+		endTime = now + duration,
+	}
+	if C_Timer and C_Timer.NewTimer then
+		timers[key] = C_Timer.NewTimer(duration, function()
+			local currentStore = CooldownPanels.runtime and CooldownPanels.runtime.customCooldownDurations
+			local current = currentStore and currentStore[key] or nil
+			if current and current.startTime == now and current.duration == duration then CooldownPanels:ClearEntryCustomCooldownDuration(panelId, entryId) end
+		end)
+	end
+	return true
+end
+
+function CooldownPanels:ApplyCustomCooldownDurationState(data, customState)
+	if not data then return end
+	if not customState then
+		data.customCooldownDurationActive = false
+		data.customCooldownDurationKey = nil
+		data.customCooldownDurationObject = nil
+		data.customCooldownStart = nil
+		data.customCooldownDuration = nil
+		return
+	end
+	data.customCooldownDurationActive = true
+	data.customCooldownDurationKey = customState.key
+	data.customCooldownDurationObject = customState.durationObject
+	data.customCooldownStart = customState.startTime
+	data.customCooldownDuration = customState.duration
+	data.cooldownStart = customState.startTime or data.cooldownStart or 0
+	data.cooldownDuration = customState.duration or data.cooldownDuration or 0
+	data.cooldownEnabled = true
+	data.cooldownIsActive = true
+	data.cooldownRate = customState.rate or 1
+	data.cooldownGCD = false
+	data.cooldownDurationObject = customState.durationObject
+end
+
+function CooldownPanels:ShouldTriggerEntryCustomCooldownDuration(entry, castSpellId)
+	local castId = tonumber(castSpellId)
+	if not (entry and castId) then return false end
+	local macro = entry.type == "MACRO" and CooldownPanels.ResolveMacroEntry and CooldownPanels.ResolveMacroEntry(entry) or nil
+	local resolvedType = (macro and macro.kind) or entry.type
+	if not self:GetEntryCustomCooldownDuration(entry, resolvedType) then return false end
+	if resolvedType == "SPELL" then
+		local spellId = tonumber((macro and macro.spellID) or entry.spellID)
+		if not spellId then return false end
+		local aliases = self:GetSpellAliasIDs(spellId)
+		for i = 1, #aliases do
+			if aliases[i] == castId then return true end
+		end
+		return self:AreSpellVariantsEquivalent(spellId, castId)
+	elseif resolvedType == "ITEM" then
+		local itemId = tonumber((macro and macro.itemID) or entry.itemID)
+		if itemId and entry.type == "ITEM" then itemId = self.ResolveEntryItemID(entry, itemId) end
+		local itemSpellId = itemId and self:GetItemUseSpellID(itemId) or nil
+		return itemSpellId and self:AreSpellVariantsEquivalent(itemSpellId, castId) or false
+	elseif resolvedType == "SLOT" then
+		local slotId = tonumber(entry.slotID)
+		local itemId = slotId and Api.GetInventoryItemID and Api.GetInventoryItemID("player", slotId) or nil
+		local itemSpellId = itemId and self:GetItemUseSpellID(itemId) or nil
+		return itemSpellId and self:AreSpellVariantsEquivalent(itemSpellId, castId) or false
+	end
+	return false
+end
+
+function CooldownPanels:HandleCustomCooldownActivation(castSpellId)
+	local spellId = tonumber(castSpellId)
+	if not spellId then return false end
+	local root = ensureRoot()
+	local runtime = self.runtime
+	local enabledPanels = runtime and runtime.enabledPanels
+	if not (root and root.panels and enabledPanels and next(enabledPanels)) then return false end
+	local panelsToRefresh = {}
+	local started = false
+	local panelIds = runtime and runtime.enabledPanelIds
+	if panelIds and #panelIds > 0 then
+		for i = 1, #panelIds do
+			local panelId = panelIds[i]
+			local panel = enabledPanels[panelId] and root.panels[panelId] or nil
+			if panel and panel.entries then
+				for _, entryId in ipairs(panel.order or {}) do
+					local entry = panel.entries[entryId]
+					if self:ShouldTriggerEntryCustomCooldownDuration(entry, spellId) then
+						local macro = entry.type == "MACRO" and CooldownPanels.ResolveMacroEntry and CooldownPanels.ResolveMacroEntry(entry) or nil
+						local resolvedType = (macro and macro.kind) or entry.type
+						if self:StartEntryCustomCooldownDuration(panelId, entryId, entry, resolvedType) then
+							panelsToRefresh[panelId] = true
+							started = true
+						end
+					end
+				end
+			end
+		end
+	end
+	for panelId in pairs(panelsToRefresh) do
+		if self.RequestPanelRefresh then
+			self:RequestPanelRefresh(panelId)
+		elseif self:GetPanel(panelId) then
+			self:RefreshPanel(panelId)
+		end
+	end
+	return started
 end
 
 function CooldownPanels.IsSpellCooldownInfoActive(cooldownIsActive, cooldownEnabled, startTime, duration)
@@ -10199,6 +10448,37 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		refreshEntryViews()
 	end
 
+	local function setCustomCooldownDurationEnabled(value)
+		local _, currentEntry = getEntry()
+		if not currentEntry then return end
+		local normalized = value == true
+		if normalized and not ((tonumber(currentEntry.customCooldownDuration) or 0) > 0) then
+			currentEntry.customCooldownDuration = 60
+		end
+		if currentEntry.customCooldownDurationEnabled == normalized then return end
+		currentEntry.customCooldownDurationEnabled = normalized
+		CooldownPanels:ClearEntryCustomCooldownDuration(panelId, entryId, true)
+		refreshEntryViews()
+	end
+
+	local function setCustomCooldownDuration(value)
+		local _, currentEntry = getEntry()
+		if not currentEntry then return end
+		local duration = Helper.ClampNumber(value, 0, Helper.CUSTOM_COOLDOWN_DURATION_MAX or 300, currentEntry.customCooldownDuration or 0) or 0
+		local enabledChanged = false
+		if duration <= 0 then
+			duration = 0
+			if currentEntry.customCooldownDurationEnabled ~= false then
+				currentEntry.customCooldownDurationEnabled = false
+				enabledChanged = true
+			end
+		end
+		if currentEntry.customCooldownDuration == duration and not enabledChanged then return end
+		currentEntry.customCooldownDuration = duration
+		CooldownPanels:ClearEntryCustomCooldownDuration(panelId, entryId, true)
+		refreshEntryViews()
+	end
+
 	local function setCooldownVisibilityOverrideEnabled(value)
 		local layout = getLayout()
 		local _, currentEntry = getEntry()
@@ -11158,6 +11438,43 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			id = "cooldownPanelStandaloneCooldownVisuals",
 			defaultCollapsed = true,
 			isShown = function() return getEffectiveType() ~= "STANCE" end,
+		},
+		{
+			name = L["CooldownPanelCustomDuration"] or "Custom duration on activation",
+			kind = SettingType.Checkbox,
+			parentId = "cooldownPanelStandaloneCooldownVisuals",
+			isShown = function()
+				local _, currentEntry = getEntry()
+				return CooldownPanels:SupportsEntryCustomCooldownDuration(currentEntry, getEffectiveType())
+			end,
+			get = function()
+				local _, currentEntry = getEntry()
+				return currentEntry and currentEntry.customCooldownDurationEnabled == true or false
+			end,
+			set = function(_, value) setCustomCooldownDurationEnabled(value) end,
+		},
+		{
+			name = L["CooldownPanelCustomDurationSeconds"] or "Custom duration (sec)",
+			kind = SettingType.Slider,
+			parentId = "cooldownPanelStandaloneCooldownVisuals",
+			minValue = 1,
+			maxValue = Helper.CUSTOM_COOLDOWN_DURATION_MAX or 300,
+			valueStep = 1,
+			allowInput = true,
+			isShown = function()
+				local _, currentEntry = getEntry()
+				return CooldownPanels:SupportsEntryCustomCooldownDuration(currentEntry, getEffectiveType())
+			end,
+			disabled = function()
+				local _, currentEntry = getEntry()
+				return not (currentEntry and currentEntry.customCooldownDurationEnabled == true)
+			end,
+			get = function()
+				local _, currentEntry = getEntry()
+				return Helper.ClampNumber(currentEntry and currentEntry.customCooldownDuration, 1, Helper.CUSTOM_COOLDOWN_DURATION_MAX or 300, 60)
+			end,
+			set = function(_, value) setCustomCooldownDuration(value) end,
+			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 		},
 		{
 			name = L["CooldownPanelOverwriteGlobalDefault"] or "Overwrite global default",
@@ -13170,8 +13487,19 @@ local function ensureEditor()
 	local cbShowWhenNoCooldown = Helper.CreateCheck(rightContent, L["CooldownPanelShowWhenNoCooldown"] or "Show even without cooldown")
 	cbShowWhenNoCooldown:SetPoint("TOPLEFT", cbShowWhenEmpty, "BOTTOMLEFT", 0, -4)
 
+	local cbCustomDuration = Helper.CreateCheck(rightContent, L["CooldownPanelCustomDuration"] or "Custom duration on activation")
+	cbCustomDuration:SetPoint("TOPLEFT", cbShowWhenNoCooldown, "BOTTOMLEFT", 0, -4)
+
+	local customDurationBox = Helper.CreateEditBox(rightContent, 70, 20)
+	customDurationBox:SetPoint("TOPLEFT", cbCustomDuration, "BOTTOMLEFT", 18, -4)
+	customDurationBox:SetNumeric(true)
+
+	local customDurationLabel = Helper.CreateLabel(rightContent, L["CooldownPanelCustomDurationSeconds"] or "Custom duration (sec)", 10, "OUTLINE")
+	customDurationLabel:SetPoint("LEFT", customDurationBox, "RIGHT", 6, 0)
+	customDurationLabel:SetTextColor(0.9, 0.9, 0.9, 1)
+
 	local staticTextLabel = Helper.CreateLabel(rightContent, L["CooldownPanelStaticText"] or "Static text", 11, "OUTLINE")
-	staticTextLabel:SetPoint("TOPLEFT", cbShowWhenNoCooldown, "BOTTOMLEFT", 2, -8)
+	staticTextLabel:SetPoint("TOPLEFT", customDurationBox, "BOTTOMLEFT", -16, -8)
 	staticTextLabel:SetTextColor(0.9, 0.9, 0.9, 1)
 
 	local staticTextBox = Helper.CreateEditBox(rightContent, 180, 20)
@@ -13366,6 +13694,9 @@ local function ensureEditor()
 			cbUseHighestRank = cbUseHighestRank,
 			cbShowWhenEmpty = cbShowWhenEmpty,
 			cbShowWhenNoCooldown = cbShowWhenNoCooldown,
+			cbCustomDuration = cbCustomDuration,
+			customDurationBox = customDurationBox,
+			customDurationLabel = customDurationLabel,
 			staticTextLabel = staticTextLabel,
 			staticTextBox = staticTextBox,
 			cbStaticTextDuringCD = cbStaticTextDuringCD,
@@ -13551,6 +13882,7 @@ local function ensureEditor()
 			entry.macroName = CooldownPanels.NormalizeMacroName(macroName) or entry.macroName
 		end
 		self:ClearFocus()
+		CooldownPanels:ClearEntryCustomCooldownDuration(panelId, entryId, true)
 		CooldownPanels:RebuildSpellIndex()
 		CooldownPanels:RefreshPanel(panelId)
 		CooldownPanels:RefreshEditor()
@@ -13606,6 +13938,19 @@ local function ensureEditor()
 	bindEntryToggle(cbUseHighestRank, "useHighestRank")
 	bindEntryToggle(cbShowWhenEmpty, "showWhenEmpty")
 	bindEntryToggle(cbShowWhenNoCooldown, "showWhenNoCooldown")
+	cbCustomDuration:SetScript("OnClick", function(self)
+		local panelId = editor.selectedPanelId
+		local entryId = editor.selectedEntryId
+		local panel = panelId and CooldownPanels:GetPanel(panelId)
+		local entry = panel and panel.entries and panel.entries[entryId]
+		if not entry then return end
+		local enabled = self:GetChecked() == true
+		if enabled and not ((tonumber(entry.customCooldownDuration) or 0) > 0) then entry.customCooldownDuration = 60 end
+		entry.customCooldownDurationEnabled = enabled
+		CooldownPanels:ClearEntryCustomCooldownDuration(panelId, entryId, true)
+		CooldownPanels:RefreshPanel(panelId)
+		CooldownPanels:RefreshEditor()
+	end)
 	bindEntryToggle(cbStaticTextDuringCD, "staticTextShowOnCooldown")
 	bindEntryToggle(cbGlow, "glowReady")
 	bindEntryToggle(cbPandemicGlow, "pandemicGlow")
@@ -13644,6 +13989,34 @@ local function ensureEditor()
 	staticTextBox:SetScript("OnEnterPressed", applyStaticTextValue)
 	staticTextBox:SetScript("OnEditFocusLost", applyStaticTextValue)
 	staticTextBox:SetScript("OnEscapePressed", function(self)
+		self:ClearFocus()
+		CooldownPanels:RefreshEditor()
+	end)
+
+	local function applyCustomDurationValue(self)
+		local panelId = editor.selectedPanelId
+		local entryId = editor.selectedEntryId
+		local panel = panelId and CooldownPanels:GetPanel(panelId)
+		local entry = panel and panel.entries and panel.entries[entryId]
+		if not entry then
+			self:ClearFocus()
+			return
+		end
+		local duration = Helper.ClampNumber(tonumber(self:GetText()), 0, Helper.CUSTOM_COOLDOWN_DURATION_MAX or 300, entry.customCooldownDuration or 0) or 0
+		if duration <= 0 then
+			duration = 0
+			entry.customCooldownDurationEnabled = false
+		end
+		entry.customCooldownDuration = duration
+		CooldownPanels:ClearEntryCustomCooldownDuration(panelId, entryId, true)
+		self:ClearFocus()
+		CooldownPanels:RefreshPanel(panelId)
+		CooldownPanels:RefreshEditor()
+	end
+
+	customDurationBox:SetScript("OnEnterPressed", applyCustomDurationValue)
+	customDurationBox:SetScript("OnEditFocusLost", applyCustomDurationValue)
+	customDurationBox:SetScript("OnEscapePressed", function(self)
 		self:ClearFocus()
 		CooldownPanels:RefreshEditor()
 	end)
@@ -14994,6 +15367,9 @@ local function layoutInspectorToggles(inspector, entry)
 		hideToggle(inspector.cbUseHighestRank)
 		hideToggle(inspector.cbShowWhenEmpty)
 		hideToggle(inspector.cbShowWhenNoCooldown)
+		hideToggle(inspector.cbCustomDuration)
+		hideControl(inspector.customDurationBox)
+		hideControl(inspector.customDurationLabel)
 		hideControl(inspector.staticTextLabel)
 		hideControl(inspector.staticTextBox)
 		hideToggle(inspector.cbStaticTextDuringCD)
@@ -15097,6 +15473,25 @@ local function layoutInspectorToggles(inspector, entry)
 		place(inspector.cbUseHighestRank, false)
 		place(inspector.cbShowWhenEmpty, false)
 		place(inspector.cbShowWhenNoCooldown, false)
+	end
+	local showCustomDuration = CooldownPanels:SupportsEntryCustomCooldownDuration(entry, effectiveType)
+	place(inspector.cbCustomDuration, showCustomDuration)
+	if showCustomDuration and inspector.customDurationBox and inspector.customDurationLabel then
+		inspector.customDurationBox:ClearAllPoints()
+		inspector.customDurationBox:SetPoint("TOPLEFT", inspector.cbCustomDuration, "BOTTOMLEFT", 18, -4)
+		inspector.customDurationBox:Show()
+		if entry.customCooldownDurationEnabled == true then
+			inspector.customDurationBox:Enable()
+		else
+			inspector.customDurationBox:Disable()
+		end
+		inspector.customDurationLabel:ClearAllPoints()
+		inspector.customDurationLabel:SetPoint("LEFT", inspector.customDurationBox, "RIGHT", 6, 0)
+		inspector.customDurationLabel:Show()
+		prev = inspector.customDurationBox
+	else
+		hideControl(inspector.customDurationBox)
+		hideControl(inspector.customDurationLabel)
 	end
 	local allowStaticText = true
 	place(inspector.staticTextLabel, allowStaticText, 2, -8)
@@ -15253,6 +15648,8 @@ local function refreshInspector(editor, panel, entry)
 		if inspector.cbUseHighestRank then inspector.cbUseHighestRank:SetChecked(effectiveType == "ITEM" and entry.type == "ITEM" and entry.useHighestRank == true) end
 		inspector.cbShowWhenEmpty:SetChecked(effectiveType == "ITEM" and entry.showWhenEmpty == true)
 		inspector.cbShowWhenNoCooldown:SetChecked(effectiveType == "SLOT" and entry.showWhenNoCooldown == true)
+		if inspector.cbCustomDuration then inspector.cbCustomDuration:SetChecked(entry.customCooldownDurationEnabled == true) end
+		if inspector.customDurationBox then inspector.customDurationBox:SetText(tostring(math.floor((tonumber(entry.customCooldownDuration) or 0) + 0.5))) end
 		inspector.cbGlow:SetChecked(entry.type ~= "MACRO" and entry.glowReady and true or false)
 		if inspector.cbPandemicGlow then inspector.cbPandemicGlow:SetChecked(effectiveType == "CDM_AURA" and entry.pandemicGlow == true) end
 		do
@@ -15286,6 +15683,8 @@ local function refreshInspector(editor, panel, entry)
 		if inspector.cbSound and inspector.cbSound.Text then inspector.cbSound.Text:SetText(L["CooldownPanelSoundReady"] or "Sound when ready") end
 
 		if inspector.staticTextBox then inspector.staticTextBox:SetText("") end
+		if inspector.cbCustomDuration then inspector.cbCustomDuration:SetChecked(false) end
+		if inspector.customDurationBox then inspector.customDurationBox:SetText("") end
 		if inspector.cbTrackPassiveSpell then inspector.cbTrackPassiveSpell:SetChecked(false) end
 		if inspector.cbStaticTextDuringCD then inspector.cbStaticTextDuringCD:SetChecked(false) end
 
@@ -15844,8 +16243,9 @@ function CooldownPanels:UpdatePreviewIcons(panelId, countOverride)
 		icon.texture:SetTexture(entry and getEntryIcon(entry) or Helper.PREVIEW_ICON)
 		icon.texture:SetVertexColor(1, 1, 1)
 		icon.texture:SetShown(showEntryIconTexture or not entry)
-		if icon.cooldown.SetReverse then icon.cooldown:SetReverse(resolvedType == "CDM_AURA") end
-		if icon.cooldown.SetUseAuraDisplayTime then icon.cooldown:SetUseAuraDisplayTime(resolvedType == "CDM_AURA") end
+		local cooldownUsesAuraDisplay = resolvedType == "CDM_AURA" or CooldownPanels:GetEntryCustomCooldownDuration(entry, resolvedType) ~= nil
+		if icon.cooldown.SetReverse then icon.cooldown:SetReverse(cooldownUsesAuraDisplay) end
+		if icon.cooldown.SetUseAuraDisplayTime then icon.cooldown:SetUseAuraDisplayTime(cooldownUsesAuraDisplay) end
 		icon.cooldown:SetHideCountdownNumbers(not showCooldownText)
 		CooldownPanels:ApplyEntryCooldownTextStyle(icon, entryLayout, entry)
 		CooldownPanels:ApplyEntryStackTextStyle(icon, entryLayout, entry, defaultCountFontPath, defaultCountFontSize, defaultCountFontStyle)
@@ -16266,6 +16666,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 			local canTriggerReadyGlow = false
 			local spellId
 			local spellPassState
+			local customCooldownState = self:GetActiveEntryCustomCooldownDuration(panelId, entryId, entry, resolvedType)
 
 			if resolvedType == "SPELL" and baseSpellId then
 				spellId = effectiveSpellId or baseSpellId
@@ -16375,6 +16776,18 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 					show = cdmAuraData.show == true
 				end
 			end
+			if customCooldownState then
+				cooldownStart = customCooldownState.startTime
+				cooldownDuration = customCooldownState.duration
+				cooldownEnabled = true
+				cooldownRate = customCooldownState.rate or 1
+				cooldownGCD = false
+				cooldownIsActive = true
+				cooldownDurationObject = customCooldownState.durationObject
+				cooldownEnabledOk = true
+				if showCooldown then show = true end
+				canTriggerReadyGlow = canTriggerReadyGlow or showCooldown
+			end
 			if show and resolvedType == "SPELL" and baseSpellId and self:ResolveEntryHideWhenNoResource(entryLayout, entry) then
 				if isSpellFlagged(powerInsufficientSpells, baseSpellId, effectiveSpellId) then show = false end
 			end
@@ -16464,6 +16877,15 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 							spellReadyCondition = not cooldownIsActive
 						end
 					end
+				end
+				if customCooldownState then
+					cooldownStart = customCooldownState.startTime
+					cooldownDuration = customCooldownState.duration
+					cooldownEnabled = true
+					cooldownRate = customCooldownState.rate or 1
+					cooldownGCD = false
+					cooldownIsActive = true
+					cooldownDurationObject = customCooldownState.durationObject
 				end
 				if resolvedType == "ITEM" and resolvedItemId then
 					local itemCache = shared and shared.itemCountCache
@@ -16648,6 +17070,11 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				data.chargesInfo = chargesInfo
 				data.chargeDurationObject = chargeDurationObject
 				data.cooldownDurationObject = cooldownDurationObject
+				data.customCooldownDurationActive = customCooldownState ~= nil
+				data.customCooldownDurationKey = customCooldownState and customCooldownState.key or nil
+				data.customCooldownDurationObject = customCooldownState and customCooldownState.durationObject or nil
+				data.customCooldownStart = customCooldownState and customCooldownState.startTime or nil
+				data.customCooldownDuration = customCooldownState and customCooldownState.duration or nil
 				data.cooldownIgnoreGCD = resolvedType == "SPELL" and self:ShouldIgnoreEntryCooldownGCD(entryLayout, entry) or false
 				data.cooldownStart = cooldownStart or 0
 				data.cooldownDuration = cooldownDuration or 0
@@ -16775,6 +17202,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				icon.cooldown._eqolSpellId = nil
 				icon.cooldown._eqolBaseSpellId = nil
 				icon.cooldown._eqolEffectiveSpellId = nil
+				icon.cooldown._eqolCustomCooldownKey = nil
 				if icon.cooldown.SetScript then icon.cooldown:SetScript("OnCooldownDone", nil) end
 				if icon.cooldown.Resume then icon.cooldown:Resume() end
 				icon.count:Hide()
@@ -16863,7 +17291,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				icon.texture:SetShown(data.showIconTexture ~= false)
 				CooldownPanels.ApplyIconTooltip(icon, data.entry, showTooltips)
 			end
-			local cooldownUsesAuraDisplay = data.resolvedType == "CDM_AURA"
+			local cooldownUsesAuraDisplay = data.resolvedType == "CDM_AURA" or data.customCooldownDurationActive == true
 			if data._eqolRuntimePlacementDirty or cdp.RUNTIME.HasCooldownWidgetConfigChange(icon._eqolRuntimeSnapshot, data, cooldownUsesAuraDisplay) then
 				icon.cooldown:SetHideCountdownNumbers(not data.showCooldownText)
 				if icon.cooldown.SetReverse then icon.cooldown:SetReverse(cooldownUsesAuraDisplay) end
@@ -16980,7 +17408,22 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				end
 			end
 
-			if data.emptyItem then desaturate = true end
+			if data.customCooldownDurationActive == true then
+				usingCooldown = false
+				chargeCooldownHasAvailableCharge = false
+				chargeInfoActive = false
+				cooldownStart = data.customCooldownStart or cooldownStart
+				cooldownDuration = data.customCooldownDuration or cooldownDuration
+				cooldownRate = 1
+				cooldownEnabledOk = true
+				spellCooldownActive = true
+				durationActive = cooldownDurationObject ~= nil
+				cooldownActive = data.showCooldown == true
+				desaturate = false
+				if hideOnCooldown or showOnCooldown then hidden = true end
+			end
+
+			if data.emptyItem and data.customCooldownDurationActive ~= true then desaturate = true end
 			if data.resolvedType == "CDM_AURA" and data.cdmAuraInactiveDesaturate == true and not cdmAuraActive and not cdmAuraDurationActive then desaturate = true end
 			if data.resolvedType == "CDM_AURA" and data.cdmAuraActiveDesaturate == true and cdmAuraActive then desaturate = true end
 
@@ -17069,12 +17512,13 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 					else
 						setCooldownDrawState(icon.cooldown, entryDrawEdge, entryDrawBling, entryDrawSwipe)
 
-						local desat = cooldownDurationObject:EvaluateRemainingDuration(curveDesat)
+						local customDurationActive = data.customCooldownDurationActive == true
+						local desat = customDurationActive and 0 or cooldownDurationObject:EvaluateRemainingDuration(curveDesat)
 						CooldownPanels.SetIconDesaturationRuntime(icon.texture, desat, entryNoDesaturation)
 						if hideOnCooldown then
 							icon:SetAlpha(cooldownDurationObject:EvaluateRemainingDuration(curveAlpha))
 						elseif showOnCooldown then
-							icon:SetAlpha(cooldownDurationObject:EvaluateRemainingDuration(curveDesat))
+							icon:SetAlpha(customDurationActive and 1 or cooldownDurationObject:EvaluateRemainingDuration(curveDesat))
 						end
 					end
 					if data.cooldownGCD then
@@ -20174,8 +20618,8 @@ function cdp.ENTRY.ApplyVisibleSpellRuntime(panelId, runtime, icon, data, resolv
 	if icon.cooldown.Resume then icon.cooldown:Resume() end
 	if icon.cooldown.SetAlpha then icon.cooldown:SetAlpha(1) end
 	icon.cooldown:SetHideCountdownNumbers(not data.showCooldownText)
-	if icon.cooldown.SetReverse then icon.cooldown:SetReverse(false) end
-	if icon.cooldown.SetUseAuraDisplayTime then icon.cooldown:SetUseAuraDisplayTime(false) end
+	if icon.cooldown.SetReverse then icon.cooldown:SetReverse(data.customCooldownDurationActive == true) end
+	if icon.cooldown.SetUseAuraDisplayTime then icon.cooldown:SetUseAuraDisplayTime(data.customCooldownDurationActive == true) end
 
 	local cooldownStart = data.cooldownStart or 0
 	local cooldownDuration = data.cooldownDuration or 0
@@ -20230,6 +20674,21 @@ function cdp.ENTRY.ApplyVisibleSpellRuntime(panelId, runtime, icon, data, resolv
 	else
 		icon.charges:SetAlpha(1)
 		icon.charges:Hide()
+	end
+
+	if data.customCooldownDurationActive == true then
+		usingCooldown = false
+		chargeCooldownHasAvailableCharge = false
+		chargeInfoActive = false
+		cooldownStart = data.customCooldownStart or cooldownStart
+		cooldownDuration = data.customCooldownDuration or cooldownDuration
+		cooldownRate = 1
+		cooldownEnabledOk = true
+		spellCooldownActive = true
+		durationActive = cooldownDurationObject ~= nil
+		cooldownActive = data.showCooldown == true
+		desaturate = false
+		if hideOnCooldown or showOnCooldown then hidden = true end
 	end
 
 	CooldownPanels.SetIconDesaturatedRuntime(icon.texture, desaturate, entryNoDesaturation)
@@ -20308,12 +20767,13 @@ function cdp.ENTRY.ApplyVisibleSpellRuntime(panelId, runtime, icon, data, resolv
 				setCooldownDrawState(icon.cooldown, entryGcdDrawEdge, entryGcdDrawBling, entryGcdDrawSwipe)
 			else
 				setCooldownDrawState(icon.cooldown, entryDrawEdge, entryDrawBling, entryDrawSwipe)
-				local desat = cooldownDurationObject:EvaluateRemainingDuration(curveDesat)
+				local customDurationActive = data.customCooldownDurationActive == true
+				local desat = customDurationActive and 0 or cooldownDurationObject:EvaluateRemainingDuration(curveDesat)
 				CooldownPanels.SetIconDesaturationRuntime(icon.texture, desat, entryNoDesaturation)
 				if hideOnCooldown then
 					icon:SetAlpha(cooldownDurationObject:EvaluateRemainingDuration(curveAlpha))
 				elseif showOnCooldown then
-					icon:SetAlpha(cooldownDurationObject:EvaluateRemainingDuration(curveDesat))
+					icon:SetAlpha(customDurationActive and 1 or cooldownDurationObject:EvaluateRemainingDuration(curveDesat))
 				end
 				if icon.cooldown.SetScript then icon.cooldown:SetScript("OnCooldownDone", onCooldownDone) end
 			end
@@ -20439,7 +20899,15 @@ function cdp.ENTRY.ApplyVisibleItemRuntime(panelId, runtime, icon, data, resolve
 	local cooldownStart = data.cooldownStart or 0
 	local cooldownDuration = data.cooldownDuration or 0
 	local cooldownEnabledOk = data.cooldownEnabled ~= false and data.cooldownEnabled ~= 0
-	local cooldownActive = data.showCooldown and cooldownEnabledOk and isCooldownActive(cooldownStart, cooldownDuration)
+	local cooldownDurationObject = data.cooldownDurationObject
+	local customCooldownActive = data.customCooldownDurationActive == true
+	if customCooldownActive then
+		cooldownStart = data.customCooldownStart or cooldownStart
+		cooldownDuration = data.customCooldownDuration or cooldownDuration
+		cooldownEnabledOk = true
+	end
+	local cooldownRunning = (customCooldownActive and (cooldownDurationObject ~= nil or isCooldownActive(cooldownStart, cooldownDuration))) or (cooldownEnabledOk and isCooldownActive(cooldownStart, cooldownDuration))
+	local cooldownActive = data.showCooldown and cooldownRunning
 	local entryNoDesaturation = data.noDesaturation == true and data.emptyItem ~= true
 	local entryDrawEdge = data.cooldownDrawEdge ~= false
 	local entryDrawBling = data.cooldownDrawBling ~= false
@@ -20452,8 +20920,8 @@ function cdp.ENTRY.ApplyVisibleItemRuntime(panelId, runtime, icon, data, resolve
 	if icon.cooldown.Resume then icon.cooldown:Resume() end
 	if icon.cooldown.SetAlpha then icon.cooldown:SetAlpha(1) end
 	icon.cooldown:SetHideCountdownNumbers(not data.showCooldownText)
-	if icon.cooldown.SetReverse then icon.cooldown:SetReverse(false) end
-	if icon.cooldown.SetUseAuraDisplayTime then icon.cooldown:SetUseAuraDisplayTime(false) end
+	if icon.cooldown.SetReverse then icon.cooldown:SetReverse(customCooldownActive) end
+	if icon.cooldown.SetUseAuraDisplayTime then icon.cooldown:SetUseAuraDisplayTime(customCooldownActive) end
 
 	if data.showItemUses then
 		if data.itemUses ~= nil then
@@ -20470,10 +20938,15 @@ function cdp.ENTRY.ApplyVisibleItemRuntime(panelId, runtime, icon, data, resolve
 	end
 
 	if data.showCooldown and cooldownActive then
-		icon.cooldown:SetCooldown(cooldownStart, cooldownDuration, 1)
+		if cooldownDurationObject and icon.cooldown.SetCooldownFromDurationObject then
+			icon.cooldown:Clear()
+			icon.cooldown:SetCooldownFromDurationObject(cooldownDurationObject)
+		else
+			icon.cooldown:SetCooldown(cooldownStart, cooldownDuration, 1)
+		end
 		setCooldownDrawState(icon.cooldown, entryDrawEdge, entryDrawBling, entryDrawSwipe)
 		if icon.cooldown.SetScript then icon.cooldown:SetScript("OnCooldownDone", onCooldownDone) end
-		desaturate = true
+		desaturate = customCooldownActive ~= true
 		if data.hideOnCooldown == true then
 			icon:SetAlpha(0)
 			hidden = true
@@ -20511,11 +20984,11 @@ function cdp.ENTRY.ApplyVisibleItemRuntime(panelId, runtime, icon, data, resolve
 	end
 
 	local staticTextCooldown = false
-	if data.entry and data.entry.staticTextShowOnCooldown == true then staticTextCooldown = cooldownEnabledOk and isCooldownActive(cooldownStart, cooldownDuration) end
+	if data.entry and data.entry.staticTextShowOnCooldown == true then staticTextCooldown = cooldownRunning == true end
 	applyStaticText(icon, data.layout, data.entry, staticFontPath, staticFontSize, staticFontStyle, staticTextCooldown)
 
 	data.readyAt = runtime.readyAt and runtime.readyAt[data.entryId] or nil
-	local readyGlowCooldownRunning = cooldownEnabledOk and isCooldownActive(cooldownStart, cooldownDuration)
+	local readyGlowCooldownRunning = cooldownRunning == true
 	if data.canTriggerReadyGlow then
 		if readyGlowCooldownRunning then
 			CooldownPanels.ClearReadyGlowEntryState(panelId, data.entryId, true)
@@ -20644,6 +21117,12 @@ function cdp.ENTRY.TryRefreshVisibleSpellEntry(panelId, entryId, mode)
 	data.resolvedSpellId = resolvedSpellId
 	data.variantGroupKind = variantGroup and variantGroup.kind or nil
 	data.variantGroupKey = variantGroup and variantGroup.key or nil
+	local customCooldownState = CooldownPanels:GetActiveEntryCustomCooldownDuration(panelId, entryId, entry, "SPELL")
+	CooldownPanels:ApplyCustomCooldownDurationState(data, customCooldownState)
+	if customCooldownState then
+		cooldownGCD = false
+		cooldownIsActive = true
+	end
 	if data.glowReady and showCooldown then
 		if cooldownGCD then
 			data.spellReadyCondition = true
@@ -20716,6 +21195,14 @@ function cdp.ENTRY.TryRefreshVisibleItemEntry(panelId, entryId)
 		newVisible = alwaysShow or showWhenEmpty
 		if not newVisible and showCooldown and cooldownEnabledOk and isCooldownActive(cooldownStart, cooldownDuration) then newVisible = true end
 	end
+	local customCooldownState = CooldownPanels:GetActiveEntryCustomCooldownDuration(panelId, entryId, entry, "ITEM")
+	if customCooldownState then
+		cooldownStart = customCooldownState.startTime
+		cooldownDuration = customCooldownState.duration
+		cooldownEnabled = true
+		cooldownGCD = false
+		if showCooldown then newVisible = true end
+	end
 	if not icon then return newVisible ~= true end
 	if not (data and data.entryId == entryId and data.resolvedType == "ITEM") then return false end
 	if not newVisible then return false end
@@ -20765,6 +21252,13 @@ function cdp.ENTRY.TryRefreshVisibleItemEntry(panelId, entryId)
 	data.chargesInfo = nil
 	data.canTriggerReadyGlow = ownsItem == true
 	data.resolvedItemId = resolvedItemId
+	data.customCooldownDurationActive = customCooldownState ~= nil
+	data.customCooldownDurationKey = customCooldownState and customCooldownState.key or nil
+	data.customCooldownDurationObject = customCooldownState and customCooldownState.durationObject or nil
+	data.customCooldownStart = customCooldownState and customCooldownState.startTime or nil
+	data.customCooldownDuration = customCooldownState and customCooldownState.duration or nil
+	CooldownPanels:ApplyCustomCooldownDurationState(data, customCooldownState)
+	if customCooldownState then data.canTriggerReadyGlow = true end
 
 	local resolvedLayout = CooldownPanels.ResolveRuntimeLayout(runtime, runtime.frame, panel.layout)
 	return cdp.ENTRY.ApplyVisibleItemRuntime(panelId, runtime, icon, data, resolvedLayout)
@@ -20806,6 +21300,14 @@ function cdp.ENTRY.TryRefreshVisibleSlotEntry(panelId, entryId)
 	elseif showWhenNoCooldown then
 		newVisible = true
 	end
+	local customCooldownState = CooldownPanels:GetActiveEntryCustomCooldownDuration(panelId, entryId, entry, "SLOT")
+	if customCooldownState then
+		cooldownStart = customCooldownState.startTime
+		cooldownDuration = customCooldownState.duration
+		cooldownEnabled = true
+		cooldownGCD = false
+		if showCooldown then newVisible = true end
+	end
 	if not icon then return newVisible ~= true end
 	if not (data and data.entryId == entryId and data.resolvedType == "SLOT") then return false end
 	if not newVisible then return false end
@@ -20820,6 +21322,13 @@ function cdp.ENTRY.TryRefreshVisibleSlotEntry(panelId, entryId)
 	data.chargeDurationObject = nil
 	data.chargesInfo = nil
 	data.canTriggerReadyGlow = hasUsableItem == true
+	data.customCooldownDurationActive = customCooldownState ~= nil
+	data.customCooldownDurationKey = customCooldownState and customCooldownState.key or nil
+	data.customCooldownDurationObject = customCooldownState and customCooldownState.durationObject or nil
+	data.customCooldownStart = customCooldownState and customCooldownState.startTime or nil
+	data.customCooldownDuration = customCooldownState and customCooldownState.duration or nil
+	CooldownPanels:ApplyCustomCooldownDurationState(data, customCooldownState)
+	if customCooldownState then data.canTriggerReadyGlow = true end
 
 	local resolvedLayout = CooldownPanels.ResolveRuntimeLayout(runtime, runtime.frame, panel.layout)
 	return cdp.ENTRY.ApplyVisibleItemRuntime(panelId, runtime, icon, data, resolvedLayout)
@@ -22196,6 +22705,7 @@ function CooldownPanels.EnsureUpdateFrame()
 			local runtime = CooldownPanels.runtime
 			local enabledPanels = runtime and runtime.enabledPanels
 			if enabledPanels and not next(enabledPanels) then return end
+			CooldownPanels:HandleCustomCooldownActivation(spellId)
 			CooldownPanels:InvalidateSpellCooldownCachesForAliases(spellId)
 			clearReadyGlowForSpell(spellId)
 			refreshPanelsForSpell(spellId)

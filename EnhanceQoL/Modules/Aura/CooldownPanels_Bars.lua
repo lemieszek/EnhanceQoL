@@ -3238,7 +3238,9 @@ buildBarState = function(panelId, entryId, entry, icon, preview, runtimeDataOver
 		if resolvedType == "SPELL" then
 			local spellId = resolvedSpellId
 			if spellId and CooldownPanels.GetCachedSpellCooldownInfo then
-				local reusableCooldownRuntimeData = runtimeReuseUtil.HasCooldownRuntimeData(reusableRuntimeData, true) and reusableRuntimeData or nil
+				local reusableCooldownRuntimeData = reusableRuntimeData and reusableRuntimeData.customCooldownDurationActive == true and reusableRuntimeData
+					or runtimeReuseUtil.HasCooldownRuntimeData(reusableRuntimeData, true) and reusableRuntimeData
+					or nil
 				local durationObject = reusableCooldownRuntimeData and reusableCooldownRuntimeData.cooldownDurationObject or nil
 				local startTime = reusableCooldownRuntimeData and reusableCooldownRuntimeData.cooldownStart or nil
 				local duration = reusableCooldownRuntimeData and reusableCooldownRuntimeData.cooldownDuration or nil
@@ -3268,19 +3270,26 @@ buildBarState = function(panelId, entryId, entry, icon, preview, runtimeDataOver
 		elseif resolvedType == "ITEM" or resolvedType == "MACRO" then
 			local itemId = getResolvedItemId(entry, macro)
 			if itemId then
-				local startTime, duration, enabled
-				if Api.GetItemCooldownFn then
+				local reusableCooldownRuntimeData = reusableRuntimeData and reusableRuntimeData.customCooldownDurationActive == true and reusableRuntimeData or nil
+				local durationObject = reusableCooldownRuntimeData and reusableCooldownRuntimeData.cooldownDurationObject or nil
+				local startTime = reusableCooldownRuntimeData and reusableCooldownRuntimeData.cooldownStart or nil
+				local duration = reusableCooldownRuntimeData and reusableCooldownRuntimeData.cooldownDuration or nil
+				local enabled = reusableCooldownRuntimeData and reusableCooldownRuntimeData.cooldownEnabled or nil
+				local rate = reusableCooldownRuntimeData and reusableCooldownRuntimeData.cooldownRate or 1
+				if not reusableCooldownRuntimeData and Api.GetItemCooldownFn then
 					startTime, duration, enabled = Api.GetItemCooldownFn(itemId)
 				end
-				if enabled ~= false and enabled ~= 0 and safeNumber(duration) and safeNumber(duration) > 0 then
-					progress = getCooldownProgress(startTime, duration, 1) or 0
-					valueText = durationToText(max(0, (safeNumber(duration) or 0) - (((Api.GetTime and Api.GetTime()) or GetTime()) - (safeNumber(startTime) or 0))))
-					animate = progress < 1
-					cooldownValueVisible = true
+				local cooldownActive = enabled ~= false and enabled ~= 0 and ((durationObject ~= nil) or (safeNumber(duration) and safeNumber(duration) > 0))
+				if cooldownActive then
+					progress = getDurationObjectElapsedProgress(durationObject) or getCooldownProgress(startTime, duration, rate) or 0
+					valueText = Bars.GetCooldownValueText(icon, durationObject, startTime, duration, rate)
+					animate = progress < 1 or durationObject ~= nil
+					cooldownValueVisible = valueText ~= nil or durationObject ~= nil
 					cooldownVisibilityActive = true
 					state.startTime = safeNumber(startTime)
 					state.duration = safeNumber(duration)
-					state.rate = 1
+					state.rate = safeNumber(rate) or 1
+					state.fillDurationObject = durationObject
 				else
 					progress = 1
 				end
