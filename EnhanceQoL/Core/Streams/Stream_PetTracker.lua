@@ -1,4 +1,4 @@
--- luacheck: globals EnhanceQoL UnitClass UnitExists UnitIsDeadOrGhost C_SpecializationInfo GetSpecializationInfo NORMAL_FONT_COLOR GAMEMENU_OPTIONS FONT_SIZE UIParent GetTime UnitOnTaxi UnitInVehicle UnitHasVehicleUI IsMounted C_SpellBook C_Timer C_Spell GetSpellTexture IsResting IsFlying
+-- luacheck: globals EnhanceQoL UnitClass UnitExists UnitIsDeadOrGhost C_SpecializationInfo GetSpecializationInfo NORMAL_FONT_COLOR GAMEMENU_OPTIONS FONT_SIZE UIParent GetTime UnitOnTaxi UnitInVehicle UnitHasVehicleUI IsMounted C_SpellBook C_Timer C_Spell GetSpellTexture IsResting IsFlying IsPlayerSpell InCombatLockdown UnitAffectingCombat C_UnitAuras AuraUtil
 local addonName, addon = ...
 local L = addon.L
 
@@ -30,6 +30,8 @@ local MAGE_PET_TALENT_ID = 31687
 local CALL_PET_SPELL_ID = 883
 local RAISE_DEAD_SPELL_ID = 46584
 local SUMMON_IMP_SPELL_ID = 688
+local GRIMOIRE_OF_SACRIFICE_SPELL_ID = 108503
+local GRIMOIRE_OF_SACRIFICE_BUFF_ID = 196099
 local DEFAULT_PET_ICON = "Interface\\Icons\\Ability_Hunter_BeastCall"
 local DB_IGNORE_PET_DEFENSIVE = "classBuffReminderIgnorePetDefensive"
 local DB_IGNORE_PET_PASSIVE = "classBuffReminderIgnorePetPassive"
@@ -85,6 +87,21 @@ local function shouldIgnorePetPassiveReminder()
 	local reminder = addon.ClassBuffReminder
 	if reminder and reminder.ShouldIgnorePetPassiveReminder then return reminder:ShouldIgnorePetPassiveReminder() end
 	return addon.db and addon.db[DB_IGNORE_PET_PASSIVE] == true
+end
+
+local function isWarlockSacrificePetReminderSuppressed()
+	local reminder = addon.ClassBuffReminder
+	if reminder and reminder.IsWarlockSacrificePetReminderSuppressed then return reminder:IsWarlockSacrificePetReminderSuppressed() end
+
+	local class = UnitClass and select(2, UnitClass("player"))
+	if class ~= "WARLOCK" then return false end
+	if C_SpellBook and C_SpellBook.IsSpellKnown and C_SpellBook.IsSpellKnown(GRIMOIRE_OF_SACRIFICE_SPELL_ID) == true then return true end
+	if IsPlayerSpell and IsPlayerSpell(GRIMOIRE_OF_SACRIFICE_SPELL_ID) == true then return true end
+	if InCombatLockdown and InCombatLockdown() then return false end
+	if UnitAffectingCombat and UnitAffectingCombat("player") then return false end
+	if C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID and C_UnitAuras.GetPlayerAuraBySpellID(GRIMOIRE_OF_SACRIFICE_BUFF_ID) then return true end
+	if AuraUtil and AuraUtil.FindAuraBySpellID and AuraUtil.FindAuraBySpellID(GRIMOIRE_OF_SACRIFICE_BUFF_ID, "player", "HELPFUL") then return true end
+	return false
 end
 
 local function RestorePosition(frame)
@@ -218,18 +235,19 @@ local function isPetExpected()
 	local reminder = addon.ClassBuffReminder
 	if reminder and reminder.IsPetExpectedForPlayer then return reminder:IsPetExpectedForPlayer() end
 
+	local class = UnitClass and select(2, UnitClass("player"))
 	local specIndex = C_SpecializationInfo and C_SpecializationInfo.GetSpecialization and C_SpecializationInfo.GetSpecialization()
 	if specIndex and C_SpecializationInfo and C_SpecializationInfo.GetSpecializationInfo then
 		local specID = C_SpecializationInfo.GetSpecializationInfo(specIndex)
 		if specID == SPEC_FROST_MAGE then return C_SpellBook.IsSpellKnown(MAGE_PET_TALENT_ID) and true or false end
 		if specID == SPEC_MARKSMANSHIP then return C_SpellBook.IsSpellKnown(MARKS_PET_TALENT_ID) and true or false end
-		if PET_SPECS[specID] then return true end
+		if PET_SPECS[specID] then return class ~= "WARLOCK" or not isWarlockSacrificePetReminderSuppressed() end
 		return false
 	end
 
-	local class = UnitClass and select(2, UnitClass("player"))
 	if class == "MAGE" then return C_SpellBook.IsSpellKnown(MAGE_PET_TALENT_ID) and true or false end
 	if class == "HUNTER" then return C_SpellBook.IsSpellKnown(MARKS_PET_TALENT_ID) and true or false end
+	if class == "WARLOCK" then return not isWarlockSacrificePetReminderSuppressed() end
 	if class and PET_CLASSES[class] then return true end
 	return false
 end

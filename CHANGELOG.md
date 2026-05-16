@@ -5,6 +5,7 @@
 ### 🐛 Fixed
 
 - Class Buff Reminder / Pet Tracker: Fixed pet reminders being hidden while solo when `Show while solo` was disabled.
+- Data Panels / Pet Tracker: Fixed Warlocks with `Grimoire of Sacrifice` being shown as missing a pet.
 
 ---
 
