@@ -1,30 +1,20 @@
 # Changelog
 
-## [10.16.0-beta2] - 2026-05-16
-
-### ✨ Added
-
-- Tooltips: Added optional realm details for player tooltips and Dungeon Finder groups, including realm language flags, realm type, timezone, and connected realms.
-- Tooltips / Dungeon Finder: Added optional language flags to group listings and added separate controls for showing realm details in Dungeon Finder tooltips or directly in the listing.
-
-### 🐛 Fixed
-
-- Cooldown Panels: Fixed spell entries that are known through the spellbook but not reported by the stricter known-spell check, and added opt-in passive spell tracking for cooldown entries that need it (like "Call of the Elder Druid").
-- Tooltips: Realm details now stay hidden when a player identity is protected by the game, preventing incorrect fallback realm information.
-
----
-
-## [10.16.0-beta1] - 2026-05-15
+## [10.16.0] - 2026-05-16
 
 ### ✨ Added
 
 - Class Buff Reminder / Pet Tracker: Added separate options to ignore passive and defensive pet stance reminders while still showing missing-pet reminders.
 - Combat Text: Added settings to customize the enter and leave combat messages.
 - Fonts: Added Slug font style options, including Slug Outline and Slug Shadow variants, to the shared font outline/style selectors.
+- Tooltips: Added optional realm details for player tooltips and Dungeon Finder groups, including realm language flags, realm type, timezone, and connected realms.
+- Tooltips / Dungeon Finder: Added optional language flags to group listings and added separate controls for showing realm details in Dungeon Finder tooltips or directly in the listing.
 
 ### 🐛 Fixed
 
+- Cooldown Panels: Fixed spell entries that are known through the spellbook but not reported by the stricter known-spell check, and added opt-in passive spell tracking for cooldown entries that need it (like "Call of the Elder Druid").
 - Group Frames / Raid: Fixed raid auto-fit layout jitter by replacing fractional header scaling with pixel-snapped frame sizes and spacing, stabilizing names, auras, and group indicators in larger raids.
+- Tooltips: Realm details now stay hidden when a player identity is protected by the game, preventing incorrect fallback realm information.
 
 ---
 

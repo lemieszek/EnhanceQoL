@@ -558,6 +558,8 @@ local function StripPreviousRealmFlagPrefix(entry, text)
 	if type(prefix) ~= "string" or prefix == "" then return text end
 	if type(text) ~= "string" or text == "" then return text end
 	if text:sub(1, #prefix + 1) == prefix .. " " then return text:sub(#prefix + 2) end
+	local indent, rest = text:match("^(%s+)(.*)$")
+	if indent and rest and rest:sub(1, #prefix + 1) == prefix .. " " then return indent .. rest:sub(#prefix + 2) end
 	return text
 end
 
@@ -596,6 +598,52 @@ local function AddLFGSearchEntryRealmInfo(tooltip, resultID)
 	local _, realm = GetRealmInfoForLFGResult(resultID)
 	if not realm then return end
 	AddRealmInfo(tooltip, realm)
+end
+
+local function GetRealmInfoForLFGApplicant(appID, memberIdx)
+	if isTooltipRestricted() then return nil end
+	if isSecret(appID) or isSecret(memberIdx) then return nil end
+	if not C_LFGList or not C_LFGList.GetApplicantMemberInfo then return nil end
+	local name = C_LFGList.GetApplicantMemberInfo(appID, memberIdx or 1)
+	if isSecret(name) then return nil end
+	if type(name) ~= "string" or name == "" then return nil end
+	local realm = NormalizeRealmFromNameString(name)
+	if not realm then return nil end
+
+	local realmData = GetRealmDataProvider()
+	local info = realmData and realmData.GetRealmInfo(realm) or nil
+	return info, realm
+end
+
+local function UpdateLFGApplicantMemberRealmFlag(memberFrame, appID, memberIdx)
+	if isTooltipRestricted() then return end
+	if not memberFrame or not memberFrame.Name or not memberFrame.Name.GetText or not memberFrame.Name.SetText then return end
+	local text = memberFrame.Name:GetText()
+	if isSecret(text) then return end
+	text = StripPreviousRealmFlagPrefix(memberFrame, text)
+
+	if not addon.db or not addon.db["TooltipShowRealmInfo"] then
+		memberFrame.__EnhanceQoLRealmFlagPrefix = nil
+		memberFrame.Name:SetText(text)
+		return
+	end
+	if not IsLFGRealmDisplayEnabled("listingFlag") then
+		memberFrame.__EnhanceQoLRealmFlagPrefix = nil
+		memberFrame.Name:SetText(text)
+		return
+	end
+
+	local info = GetRealmInfoForLFGApplicant(appID, memberIdx)
+	local prefix = GetRealmFlagPlaceholder(info, not isTooltipRestricted())
+	if not prefix then
+		memberFrame.__EnhanceQoLRealmFlagPrefix = nil
+		memberFrame.Name:SetText(text)
+		return
+	end
+
+	local indent, rest = text:match("^(%s*)(.*)$")
+	memberFrame.__EnhanceQoLRealmFlagPrefix = prefix
+	memberFrame.Name:SetText((indent or "") .. prefix .. " " .. (rest or text or ""))
 end
 
 local function fmtNum(n)
@@ -1535,7 +1583,7 @@ end
 
 local function RegisterLFGTooltipHooks()
 	if addon.Tooltip.variables.lfgHooksInitialized then return end
-	if not _G.LFGListUtil_SetSearchEntryTooltip or not _G.LFGListSearchEntry_Update then return end
+	if not _G.LFGListUtil_SetSearchEntryTooltip or not _G.LFGListSearchEntry_Update or not _G.LFGListApplicationViewer_UpdateApplicantMember then return end
 	addon.Tooltip.variables.lfgHooksInitialized = true
 
 	hooksecurefunc("LFGListUtil_SetSearchEntryTooltip", function(tooltip, resultID)
@@ -1545,6 +1593,10 @@ local function RegisterLFGTooltipHooks()
 
 	hooksecurefunc("LFGListSearchEntry_Update", function(entry)
 		UpdateLFGSearchEntryRealmFlag(entry)
+	end)
+
+	hooksecurefunc("LFGListApplicationViewer_UpdateApplicantMember", function(memberFrame, appID, memberIdx)
+		UpdateLFGApplicantMemberRealmFlag(memberFrame, appID, memberIdx)
 	end)
 end
 
