@@ -3705,6 +3705,11 @@ local function buildUnitSettings(unit)
 		end
 		if working ~= nil and not next(working) then working = nil end
 		cfg.visibility = working
+		if UF and UF.ScheduleEqolVisibilityDriverAlphaRefresh then
+			UF.ScheduleEqolVisibilityDriverAlphaRefresh()
+		elseif UF and UF.RefreshEqolVisibilityDrivers then
+			UF.RefreshEqolVisibilityDrivers()
+		end
 		if UF and UF.ApplyVisibilityRules then UF.ApplyVisibilityRules(unit) end
 	end
 	local function setVisibilityRule(key, shouldSelect)

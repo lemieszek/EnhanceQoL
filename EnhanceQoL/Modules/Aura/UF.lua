@@ -1612,6 +1612,7 @@ local defaults = {
 		showTooltip = false,
 		tooltipUseEditMode = false,
 		smoothFill = false,
+		visibilityFadeStrength = 1,
 		width = 220,
 		healthHeight = 24,
 		powerHeight = 16,
@@ -2741,6 +2742,7 @@ local function copySettings(fromUnit, toUnit, opts)
 			{ "hideInPetBattle" },
 			{ "hideInClientScene" },
 			{ "visibility" },
+			{ "visibilityFadeStrength" },
 			{ "width" },
 			{ "anchor" },
 			{ "strata" },
@@ -4915,7 +4917,14 @@ function UF.ApplyEqolVisibilityDriver(st, cond, inactiveAlpha)
 	local controller = UF.EnsureEqolVisibilityController(st)
 	if not controller then return false end
 	controller:SetAttribute("eqol-fade-alpha", inactiveAlpha or 0)
-	if st._eqolVisibilityCond == cond then return true end
+	if st._eqolVisibilityCond == cond then
+		local currentState = controller.GetAttribute and controller:GetAttribute("state-eqolvisibility")
+		if currentState then
+			controller:SetAttribute("state-eqolvisibility", nil)
+			controller:SetAttribute("state-eqolvisibility", currentState)
+		end
+		return true
+	end
 	if _G.UnregisterAttributeDriver then pcall(_G.UnregisterAttributeDriver, controller, "state-eqolvisibility") end
 	local ok = pcall(_G.RegisterAttributeDriver, controller, "state-eqolvisibility", cond)
 	if ok then st._eqolVisibilityCond = cond end
@@ -4984,7 +4993,10 @@ local function applyVisibilityDriver(unit, enabled)
 		local hideInClientScene = UFHelper and UFHelper.shouldHideInClientScene and UFHelper.shouldHideInClientScene(cfg, def)
 		local forceClientSceneHide = enabled and not inEdit and hideInClientScene and UF._clientSceneActive == true
 		if UFHelper and UFHelper.applyClientSceneAlphaOverride then UFHelper.applyClientSceneAlphaOverride(st, forceClientSceneHide) end
-		if InCombatLockdown() then return end
+		if InCombatLockdown and InCombatLockdown() then
+			if UF.ScheduleEqolVisibilityDriverAlphaRefresh then UF.ScheduleEqolVisibilityDriverAlphaRefresh() end
+			return
+		end
 		local frame = st.frame
 		if frame.EQOL_VisibilityStateDriver or st._visibilityCond or (frame.GetAttribute and frame:GetAttribute("state-visibility") ~= nil) then
 			if UnregisterStateDriver then UnregisterStateDriver(frame, "visibility") end
@@ -5008,7 +5020,10 @@ local function applyVisibilityDriver(unit, enabled)
 	local hideInClientScene = UFHelper and UFHelper.shouldHideInClientScene and UFHelper.shouldHideInClientScene(cfg, def)
 	local forceClientSceneHide = enabled and not inEdit and hideInClientScene and UF._clientSceneActive == true
 	if UFHelper and UFHelper.applyClientSceneAlphaOverride then UFHelper.applyClientSceneAlphaOverride(st, forceClientSceneHide) end
-	if InCombatLockdown() then return end
+	if InCombatLockdown and InCombatLockdown() then
+		if UF.ScheduleEqolVisibilityDriverAlphaRefresh then UF.ScheduleEqolVisibilityDriverAlphaRefresh() end
+		return
+	end
 	if unit == UNIT.PET and _G.RegisterUnitWatch and _G.UnregisterUnitWatch then
 		local frame = st.frame
 		local registered = (_G.UnitWatchRegistered and _G.UnitWatchRegistered(frame)) or frame.EQOL_PetUnitWatchRegistered == true
@@ -5162,16 +5177,7 @@ local function applyVisibilityRules(unit)
 	local manualConfig = useConfig
 	local hideInClientScene = UFHelper and UFHelper.shouldHideInClientScene and UFHelper.shouldHideInClientScene(cfg, def)
 	local forceClientSceneHide = not inEdit and cfg and cfg.enabled and hideInClientScene and UF._clientSceneActive == true
-	if
-		unit ~= "boss"
-		and manualConfig
-		and not manualConfig.MOUSEOVER
-		and not manualConfig.PLAYER_CASTING
-		and not manualConfig.SKYRIDING_ACTIVE
-		and not manualConfig.SKYRIDING_INACTIVE
-		and not manualConfig.FLYING_ACTIVE
-		and not manualConfig.FLYING_INACTIVE
-	then
+	if unit ~= "boss" and manualConfig and not manualConfig.MOUSEOVER and not manualConfig.PLAYER_CASTING then
 		manualConfig = nil
 	end
 	local opts = { noStateDriver = true }
