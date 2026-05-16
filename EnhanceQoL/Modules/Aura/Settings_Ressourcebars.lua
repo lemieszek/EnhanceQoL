@@ -1197,6 +1197,38 @@ registerEditModeBars = function()
 					isEnabled = function() return visibilityRuleOptions and #visibilityRuleOptions > 0 end,
 				},
 				{
+					name = L["Fade amount"] or "Fade amount",
+					kind = settingType.Slider,
+					allowInput = true,
+					field = "visibilityFadeStrength",
+					minValue = 0,
+					maxValue = 100,
+					valueStep = 1,
+					default = 100,
+					parentId = "frame",
+					get = function()
+						local c = curSpecCfg()
+						local strength = c and c.visibilityFadeStrength
+						strength = tonumber(strength) or 1
+						if strength < 0 then strength = 0 end
+						if strength > 1 then strength = 1 end
+						return math.floor((strength * 100) + 0.5)
+					end,
+					set = function(_, value)
+						local c = curSpecCfg()
+						if not c then return end
+						local pct = tonumber(value) or 0
+						if pct < 0 then pct = 0 end
+						if pct > 100 then pct = 100 end
+						if not setIfChanged(c, "visibilityFadeStrength", pct / 100) then return end
+						queueRefresh()
+						if ResourceBars.ScheduleVisibilityDriverAlphaRefresh then ResourceBars.ScheduleVisibilityDriverAlphaRefresh() end
+					end,
+					formatter = function(value) return tostring(value) .. "%" end,
+					isShown = function() return visibilityRuleOptions and #visibilityRuleOptions > 0 end,
+					isEnabled = function() return visibilityRuleOptions and #visibilityRuleOptions > 0 end,
+				},
+				{
 					name = L["Hide in vehicles"],
 					kind = settingType.Checkbox,
 					parentId = "frame",

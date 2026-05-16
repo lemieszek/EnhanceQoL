@@ -4866,17 +4866,17 @@ elseif newstate == "hide" then
 end
 ]]
 
-function UF.GetFrameVisibilityInactiveAlpha()
-	local getFadedAlpha = addon.functions and addon.functions.GetFrameFadedAlpha
-	local alpha = getFadedAlpha and getFadedAlpha() or 0
-	alpha = tonumber(alpha) or 0
-	if alpha < 0 then alpha = 0 end
-	if alpha > 1 then alpha = 1 end
-	return alpha
+function UF.GetFrameVisibilityInactiveAlpha(unit)
+	local cfg = unit and ensureDB(unit) or nil
+	local strength = cfg and cfg.visibilityFadeStrength
+	strength = tonumber(strength) or 1
+	if strength < 0 then strength = 0 end
+	if strength > 1 then strength = 1 end
+	return 1 - strength
 end
 
-function UF.GetFrameVisibilityInactiveState()
-	local alpha = UF.GetFrameVisibilityInactiveAlpha()
+function UF.GetFrameVisibilityInactiveState(unit)
+	local alpha = UF.GetFrameVisibilityInactiveAlpha(unit)
 	if alpha <= 0 then return "hide", alpha end
 	if alpha >= 1 then return "show", alpha end
 	return "fade", alpha
@@ -4927,10 +4927,10 @@ function UF.RefreshEqolVisibilityDriverAlphas()
 		UF.ScheduleEqolVisibilityDriverAlphaRefresh()
 		return
 	end
-	local alpha = UF.GetFrameVisibilityInactiveAlpha()
-	for _, st in pairs(states) do
+	for unit, st in pairs(states) do
 		local controller = st and st._eqolVisibilityController
 		if controller and st._eqolVisibilityCond then
+			local alpha = UF.GetFrameVisibilityInactiveAlpha(unit)
 			controller:SetAttribute("eqol-fade-alpha", alpha)
 			local currentState = controller.GetAttribute and controller:GetAttribute("state-eqolvisibility")
 			if currentState then
@@ -5024,7 +5024,7 @@ local function applyVisibilityDriver(unit, enabled)
 	local baseCond
 	local showPrefix
 	local prependHideClauses = nil
-	local inactiveState, inactiveAlpha = UF.GetFrameVisibilityInactiveState()
+	local inactiveState, inactiveAlpha = UF.GetFrameVisibilityInactiveState(unit)
 	local supportsEqolFadeDriver = true
 	if not enabled then
 		cond = "hide"

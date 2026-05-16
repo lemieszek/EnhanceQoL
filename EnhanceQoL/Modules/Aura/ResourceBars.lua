@@ -7135,6 +7135,82 @@ local visibilityLogic = {
 	driverCache = setmetatable({}, { __mode = "k" }),
 }
 
+ResourceBars._eqolVisibilityHandler = [[
+local target = self:GetFrameRef("target")
+if not target then return end
+if newstate == "show" then
+	target:Show()
+	target:SetAlpha(1)
+elseif newstate == "fade" then
+	target:Show()
+	target:SetAlpha(self:GetAttribute("eqol-fade-alpha") or 0)
+elseif newstate == "hide" then
+	target:SetAlpha(0)
+	target:Hide()
+end
+]]
+
+function ResourceBars.GetVisibilityInactiveAlpha(cfg)
+	local strength = cfg and cfg.visibilityFadeStrength
+	strength = tonumber(strength) or 1
+	if strength < 0 then strength = 0 end
+	if strength > 1 then strength = 1 end
+	return 1 - strength
+end
+
+function ResourceBars.GetVisibilityInactiveState(cfg)
+	local alpha = ResourceBars.GetVisibilityInactiveAlpha(cfg)
+	if alpha <= 0 then return "hide", alpha end
+	if alpha >= 1 then return "show", alpha end
+	return "fade", alpha
+end
+
+function ResourceBars.EnsureEqolVisibilityController(frame)
+	if not frame then return nil end
+	local controller = frame._rbEqolVisibilityController
+	if not controller then
+		controller = CreateFrame("Frame", nil, frame, "SecureHandlerStateTemplate")
+		controller:SetFrameRef("target", frame)
+		controller:SetAttribute("_onstate-eqolvisibility", ResourceBars._eqolVisibilityHandler)
+		frame._rbEqolVisibilityController = controller
+	else
+		controller:SetFrameRef("target", frame)
+	end
+	return controller
+end
+
+function ResourceBars.ClearEqolVisibilityDriver(frame, resetAlpha)
+	if not frame then return end
+	local controller = frame._rbEqolVisibilityController
+	if controller then
+		if _G.UnregisterAttributeDriver then pcall(_G.UnregisterAttributeDriver, controller, "state-eqolvisibility") end
+		if controller.SetAttribute then controller:SetAttribute("state-eqolvisibility", nil) end
+	end
+	frame._rbEqolVisibilityDriver = nil
+	if resetAlpha ~= false and frame.SetAlpha then frame:SetAlpha(1) end
+end
+
+function ResourceBars.ApplyEqolVisibilityDriver(frame, expression)
+	if not frame or not expression or not _G.RegisterAttributeDriver then return false end
+	local controller = ResourceBars.EnsureEqolVisibilityController(frame)
+	if not controller then return false end
+	local cfg = ResourceBars.GetRuntimeBarConfig(frame._rbType, frame)
+	local alpha = ResourceBars.GetVisibilityInactiveAlpha(cfg)
+	controller:SetAttribute("eqol-fade-alpha", alpha)
+	if frame._rbEqolVisibilityDriver == expression then
+		local currentState = controller.GetAttribute and controller:GetAttribute("state-eqolvisibility")
+		if currentState then
+			controller:SetAttribute("state-eqolvisibility", nil)
+			controller:SetAttribute("state-eqolvisibility", currentState)
+		end
+		return true
+	end
+	if _G.UnregisterAttributeDriver then pcall(_G.UnregisterAttributeDriver, controller, "state-eqolvisibility") end
+	local ok = pcall(_G.RegisterAttributeDriver, controller, "state-eqolvisibility", expression)
+	if ok then frame._rbEqolVisibilityDriver = expression end
+	return ok
+end
+
 function ResourceBars.InvalidateRuntimeConfigCaches()
 	if healthBar then healthBar._rbCfgCacheToken = nil end
 	for _, bar in pairs(powerbar or {}) do
@@ -7422,6 +7498,7 @@ function visibilityLogic:BuildDriver(cfg)
 	local hideVehicle = ResourceBars.ShouldHideInVehicle and ResourceBars.ShouldHideInVehicle(cfg)
 	local hidePetBattle = ResourceBars.ShouldHideInPetBattle and ResourceBars.ShouldHideInPetBattle(cfg)
 	local useDruidFormDriver = shouldUseDruidFormDriver(cfg)
+	local inactiveState = ResourceBars.GetVisibilityInactiveState(cfg)
 
 	-- Cache driver generation by a compact signature of visibility-relevant config.
 	local function hashStep(hash, value) return ((hash * 131) + value) % 2147483647 end
@@ -7432,6 +7509,11 @@ function visibilityLogic:BuildDriver(cfg)
 	if shouldHideMounted then driverSignature = hashStep(driverSignature, 5) end
 	if cfg.visibilityExplicit == true then driverSignature = hashStep(driverSignature, 6) end
 	if useDruidFormDriver then driverSignature = hashStep(driverSignature, 7) end
+	if inactiveState == "fade" then
+		driverSignature = hashStep(driverSignature, 8)
+	elseif inactiveState == "show" then
+		driverSignature = hashStep(driverSignature, 9)
+	end
 	local unitClass = tostring(addon.variables and addon.variables.unitClass or "")
 	for i = 1, #unitClass do
 		driverSignature = hashStep(driverSignature, unitClass:byte(i))
@@ -7498,7 +7580,9 @@ function visibilityLogic:BuildDriver(cfg)
 
 	local expr
 	local buildVisibilityDriverExpression = addon.functions and addon.functions.BuildUnitFrameDriverExpression
-	if visibilityCfg and next(visibilityCfg) and buildVisibilityDriverExpression then expr = buildVisibilityDriverExpression(visibilityCfg, { prependHideClauses = prependHideClauses }) end
+	if visibilityCfg and next(visibilityCfg) and buildVisibilityDriverExpression then
+		expr = buildVisibilityDriverExpression(visibilityCfg, { prependHideClauses = prependHideClauses, inactiveState = inactiveState })
+	end
 	if not expr and #prependHideClauses > 0 then
 		local clauses = {}
 		local seen = {}
@@ -7610,6 +7694,21 @@ function visibilityLogic:CanApplyDriver()
 	return true
 end
 
+function ResourceBars.ScheduleVisibilityDriverAlphaRefresh()
+	if InCombatLockdown and InCombatLockdown() then
+		ResourceBars._pendingVisibilityDriver = true
+		visibilityLogic:EnsureWatcher()
+		return
+	end
+	if ResourceBars._visibilityDriverAlphaRefreshPending then return end
+	ResourceBars._visibilityDriverAlphaRefreshPending = true
+	RunNextFrame(function()
+		ResourceBars._visibilityDriverAlphaRefreshPending = nil
+		if visibilityLogic then visibilityLogic.driverCache = setmetatable({}, { __mode = "k" }) end
+		ResourceBars.ApplyVisibilityPreference("fadeAlpha")
+	end)
+end
+
 function applyVisibilityDriverToFrame(frame, expression)
 	if not frame then return end
 	if InCombatLockdown and InCombatLockdown() then
@@ -7623,8 +7722,19 @@ function applyVisibilityDriverToFrame(frame, expression)
 			if UnregisterStateDriver then pcall(UnregisterStateDriver, frame, "visibility") end
 			frame._rbVisibilityDriver = nil
 		end
+		ResourceBars.ClearEqolVisibilityDriver(frame)
 		return
 	end
+	if expression and expression:find("fade", 1, true) then
+		if frame._rbVisibilityDriver then
+			if UnregisterStateDriver then pcall(UnregisterStateDriver, frame, "visibility") end
+			frame._rbVisibilityDriver = nil
+		end
+		if frame.SetAttribute then frame:SetAttribute("state-visibility", nil) end
+		ResourceBars.ApplyEqolVisibilityDriver(frame, expression)
+		return
+	end
+	ResourceBars.ClearEqolVisibilityDriver(frame)
 	if frame._rbVisibilityDriver == expression then return end
 	if RegisterStateDriver then
 		if frame._rbVisibilityDriver and UnregisterStateDriver then

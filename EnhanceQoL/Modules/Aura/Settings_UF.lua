@@ -734,6 +734,12 @@ local function appendUnitAuraSettings(list, unit, def, refreshSelf)
 			return isSectionEnabled() and mode ~= "OVERLAY" and texture ~= "DEFAULT"
 		end
 		local function isShowCooldown() return getAuraSectionValue(sectionKey, { "showCooldown" }, auraDef.showCooldown ~= false) ~= false end
+		local function isShowCooldownText()
+			local value = getAuraSectionValue(sectionKey, { "showCooldownText" }, nil)
+			if value == nil then value = auraDef.showCooldownText end
+			if value == nil then value = isShowCooldown() end
+			return value ~= false
+		end
 
 		list[#list + 1] = checkbox((isDebuff and (L["Show debuffs"] or "Enable debuffs")) or (L["Show buffs"] or "Enable buffs"), isSectionEnabled, function(val)
 			setAuraSectionValue(sectionKey, { "enabled" }, val and true or false)
@@ -974,10 +980,17 @@ local function appendUnitAuraSettings(list, unit, def, refreshSelf)
 
 		list[#list + 1] = { name = "", kind = UF.ui.settingType.Divider, parentId = parentId }
 
-		list[#list + 1] = checkbox(L["Show cooldown text"] or "Show cooldown text", isShowCooldown, function(val)
+		list[#list + 1] = checkbox(L["CooldownPanelShowCooldown"] or "Show cooldown", isShowCooldown, function(val)
 			setAuraSectionValue(sectionKey, { "showCooldown" }, val and true or false)
+			refreshSelf()
+			refreshAuras()
+		end, auraDef.showCooldown ~= false, parentId)
+		list[#list].isEnabled = isSectionEnabled
+
+		list[#list + 1] = checkbox(L["Show cooldown text"] or "Show cooldown text", isShowCooldownText, function(val)
 			setAuraSectionValue(sectionKey, { "showCooldownText" }, val and true or false)
 			refreshSelf()
+			refreshAuras()
 		end, auraDef.showCooldown ~= false, parentId)
 		list[#list].isEnabled = isSectionEnabled
 
@@ -992,7 +1005,7 @@ local function appendUnitAuraSettings(list, unit, def, refreshSelf)
 			auraDef.cooldownAnchor or "CENTER",
 			parentId
 		)
-		list[#list].isEnabled = function() return isSectionEnabled() and isShowCooldown() end
+		list[#list].isEnabled = function() return isSectionEnabled() and isShowCooldownText() end
 
 		list[#list + 1] = slider(
 			L["Cooldown text offset X"] or "Cooldown text offset X",
@@ -1008,7 +1021,7 @@ local function appendUnitAuraSettings(list, unit, def, refreshSelf)
 			parentId,
 			true
 		)
-		list[#list].isEnabled = function() return isSectionEnabled() and isShowCooldown() end
+		list[#list].isEnabled = function() return isSectionEnabled() and isShowCooldownText() end
 
 		list[#list + 1] = slider(
 			L["Cooldown text offset Y"] or "Cooldown text offset Y",
@@ -1024,7 +1037,7 @@ local function appendUnitAuraSettings(list, unit, def, refreshSelf)
 			parentId,
 			true
 		)
-		list[#list].isEnabled = function() return isSectionEnabled() and isShowCooldown() end
+		list[#list].isEnabled = function() return isSectionEnabled() and isShowCooldownText() end
 
 		list[#list + 1] = slider(L["Cooldown text size"] or "Cooldown text size", 1, 32, 1, function()
 			local fallback = auraDef.cooldownFontSize or 14
@@ -1038,7 +1051,7 @@ local function appendUnitAuraSettings(list, unit, def, refreshSelf)
 			setAuraSectionValue(sectionKey, { "cooldownFontSize" }, val)
 			refreshSelf()
 		end, auraDef.cooldownFontSize or 14, parentId, true)
-		list[#list].isEnabled = function() return isSectionEnabled() and isShowCooldown() end
+		list[#list].isEnabled = function() return isSectionEnabled() and isShowCooldownText() end
 
 		if #fontOptions() > 0 then
 			list[#list + 1] = checkboxDropdown(
@@ -1052,7 +1065,7 @@ local function appendUnitAuraSettings(list, unit, def, refreshSelf)
 				auraDef.cooldownFont or globalFontConfigKey(),
 				parentId
 			)
-			list[#list].isEnabled = function() return isSectionEnabled() and isShowCooldown() end
+			list[#list].isEnabled = function() return isSectionEnabled() and isShowCooldownText() end
 		end
 
 		list[#list + 1] = checkboxDropdown(
@@ -1071,7 +1084,7 @@ local function appendUnitAuraSettings(list, unit, def, refreshSelf)
 			auraDef.cooldownFontOutline or "OUTLINE",
 			parentId
 		)
-		list[#list].isEnabled = function() return isSectionEnabled() and isShowCooldown() end
+		list[#list].isEnabled = function() return isSectionEnabled() and isShowCooldownText() end
 
 		list[#list + 1] = { name = "", kind = UF.ui.settingType.Divider, parentId = parentId }
 
@@ -3800,6 +3813,22 @@ local function buildUnitSettings(unit)
 			isSelected = function(_, value) return isVisibilityRuleSelected(value) end,
 			setSelected = function(_, value, state) setVisibilityRule(value, state) end,
 		}
+		if not isBoss then
+			list[#list + 1] = slider(L["Fade amount"] or "Fade amount", 0, 100, 1, function()
+				local strength = getValue(unit, { "visibilityFadeStrength" }, 1)
+				strength = tonumber(strength) or 1
+				if strength < 0 then strength = 0 end
+				if strength > 1 then strength = 1 end
+				return math.floor((strength * 100) + 0.5)
+			end, function(val)
+				local pct = tonumber(val) or 0
+				if pct < 0 then pct = 0 end
+				if pct > 100 then pct = 100 end
+				setValue(unit, { "visibilityFadeStrength" }, pct / 100)
+				if UF.ScheduleEqolVisibilityDriverAlphaRefresh then UF.ScheduleEqolVisibilityDriverAlphaRefresh() end
+				refreshSelf()
+			end, 100, "frame", true, function(v) return tostring(v) .. "%" end)
+		end
 	end
 	addDivider("frame")
 

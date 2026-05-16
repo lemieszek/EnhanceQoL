@@ -977,6 +977,7 @@ local function RefreshAllFrameVisibilities()
 		ApplyFrameVisibilityState(state)
 	end
 	if addon.Aura and addon.Aura.UF and addon.Aura.UF.ScheduleEqolVisibilityDriverAlphaRefresh then addon.Aura.UF.ScheduleEqolVisibilityDriverAlphaRefresh() end
+	if addon.Aura and addon.Aura.ResourceBars and addon.Aura.ResourceBars.ScheduleVisibilityDriverAlphaRefresh then addon.Aura.ResourceBars.ScheduleVisibilityDriverAlphaRefresh() end
 end
 addon.functions.RefreshAllFrameVisibilityAlpha = RefreshAllFrameVisibilities
 
