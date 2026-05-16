@@ -357,6 +357,37 @@ function PrivateAuras:Refresh()
 	frame:Show()
 end
 
+function PrivateAuras:RebuildAnchors()
+	if self.frame and UFHelper and UFHelper.RemovePrivateAuras then UFHelper.RemovePrivateAuras(self.frame.container) end
+	self:Refresh()
+end
+
+function PrivateAuras:RequestStartupRefresh()
+	if self.startupRefreshQueued then return end
+	self.startupRefreshQueued = true
+	if C_Timer and C_Timer.After then
+		C_Timer.After(0, function()
+			self.startupRefreshQueued = nil
+			if self:IsEnabled() then self:RebuildAnchors() end
+		end)
+	else
+		self.startupRefreshQueued = nil
+		if self:IsEnabled() then self:RebuildAnchors() end
+	end
+end
+
+function PrivateAuras:RegisterStartupEvents()
+	if self.startupEventsRegistered then return end
+	local frame = self.startupEventFrame or CreateFrame("Frame")
+	frame:RegisterEvent("PLAYER_LOGIN")
+	frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+	frame:SetScript("OnEvent", function()
+		if PrivateAuras:IsEnabled() then PrivateAuras:RequestStartupRefresh() end
+	end)
+	self.startupEventFrame = frame
+	self.startupEventsRegistered = true
+end
+
 function PrivateAuras:ApplyLayoutData(data)
 	if type(data) ~= "table" then
 		self:Refresh()
@@ -816,10 +847,11 @@ end
 function PrivateAuras:Initialize()
 	self:GetConfig()
 	self:RegisterSettings()
+	self:RegisterStartupEvents()
 	if self:IsEnabled() then
 		self:RegisterEditMode()
 		self:RegisterEditModeCallbacks()
-		self:Refresh()
+		self:RequestStartupRefresh()
 	else
 		self:UnregisterEditMode()
 	end
