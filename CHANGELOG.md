@@ -9,6 +9,7 @@
 
 ### 🐛 Fixed
 
+- Cooldown Panels: Fixed spell entries that are known through the spellbook but not reported by the stricter known-spell check, and added opt-in passive spell tracking for cooldown entries that need it (like "Call of the Elder Druid").
 - Tooltips: Realm details now stay hidden when a player identity is protected by the game, preventing incorrect fallback realm information.
 
 ---

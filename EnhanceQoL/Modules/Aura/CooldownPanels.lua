@@ -1052,6 +1052,10 @@ local function isSpellPassiveSafe(spellId, effectiveId)
 	return false
 end
 
+local function shouldTrackPassiveSpell(entry)
+	return entry and entry.trackPassiveSpell == true
+end
+
 local function setPowerInsufficient(runtime, spellId, isUsable, insufficientPower)
 	if not runtime or not spellId then return false end
 	runtime.powerInsufficient = runtime.powerInsufficient or {}
@@ -4708,7 +4712,7 @@ function CooldownPanels:RebuildSpellIndex()
 						local effectiveId, resolvedSpellId, _, variantGroup = self:ResolveTrackedSpellID(spellId)
 						effectiveId = effectiveId or getEffectiveSpellId(spellId) or spellId
 						resolvedSpellId = resolvedSpellId or spellId
-						if not isSpellPassiveSafe(resolvedSpellId, effectiveId) then
+						if shouldTrackPassiveSpell(entry) or not isSpellPassiveSafe(resolvedSpellId, effectiveId) then
 							local showCooldown = entry.showCooldown ~= false
 							local staticTextShowOnCooldown = entry.staticTextShowOnCooldown == true
 							local showCharges = entry.showCharges == true
@@ -4900,7 +4904,7 @@ function CooldownPanels:RebuildPowerIndex()
 								local effectiveId, resolvedSpellId = self:ResolveTrackedSpellID(baseId)
 								effectiveId = effectiveId or getEffectiveSpellId(baseId) or baseId
 								resolvedSpellId = resolvedSpellId or baseId
-								if not isSpellPassiveSafe(resolvedSpellId, effectiveId) then
+								if shouldTrackPassiveSpell(entry) or not isSpellPassiveSafe(resolvedSpellId, effectiveId) then
 									powerCheckSpells[effectiveId] = true
 									powerPanelsBySpell[effectiveId] = powerPanelsBySpell[effectiveId] or {}
 									powerPanelsBySpell[effectiveId][panelId] = true
@@ -4951,7 +4955,7 @@ function CooldownPanels:RebuildPowerIndex()
 								local effectiveId, resolvedSpellId = self:ResolveTrackedSpellID(baseId)
 								effectiveId = effectiveId or getEffectiveSpellId(baseId) or baseId
 								resolvedSpellId = resolvedSpellId or baseId
-								if not isSpellPassiveSafe(resolvedSpellId, effectiveId) then
+								if shouldTrackPassiveSpell(entry) or not isSpellPassiveSafe(resolvedSpellId, effectiveId) then
 									powerCheckSpells[effectiveId] = true
 									powerPanelsBySpell[effectiveId] = powerPanelsBySpell[effectiveId] or {}
 									powerPanelsBySpell[effectiveId][normalizedPanelId] = true
@@ -5026,7 +5030,7 @@ function CooldownPanels:RebuildChargesIndex()
 							local effectiveId, resolvedSpellId = self:ResolveTrackedSpellID(baseId)
 							effectiveId = effectiveId or getEffectiveSpellId(baseId) or baseId
 							resolvedSpellId = resolvedSpellId or baseId
-							if not isSpellPassiveSafe(resolvedSpellId, effectiveId) then
+							if shouldTrackPassiveSpell(entry) or not isSpellPassiveSafe(resolvedSpellId, effectiveId) then
 								chargesPanels[panelId] = true
 								if Api.GetSpellChargesInfo then
 									local info = Api.GetSpellChargesInfo(effectiveId)
@@ -5057,7 +5061,7 @@ function CooldownPanels:RebuildChargesIndex()
 							local effectiveId, resolvedSpellId = self:ResolveTrackedSpellID(baseId)
 							effectiveId = effectiveId or getEffectiveSpellId(baseId) or baseId
 							resolvedSpellId = resolvedSpellId or baseId
-							if not isSpellPassiveSafe(resolvedSpellId, effectiveId) then
+							if shouldTrackPassiveSpell(entry) or not isSpellPassiveSafe(resolvedSpellId, effectiveId) then
 								chargesPanels[panelId] = true
 								if Api.GetSpellChargesInfo then
 									local info = Api.GetSpellChargesInfo(effectiveId)
@@ -10595,6 +10599,17 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			set = function(_, value) setCooldownVisibility("showOnCooldown", value) end,
 		},
 		{
+			name = L["CooldownPanelTrackPassiveSpell"] or "Track passive spell",
+			kind = SettingType.Checkbox,
+			parentId = "cooldownPanelStandaloneDisplay",
+			isShown = function() return getEffectiveType() == "SPELL" end,
+			get = function()
+				local _, currentEntry = getEntry()
+				return currentEntry and currentEntry.trackPassiveSpell == true or false
+			end,
+			set = function(_, value) setEntryBoolean("trackPassiveSpell", value) end,
+		},
+		{
 			name = L["CooldownPanelShowItemCount"] or "Show item count",
 			kind = SettingType.Checkbox,
 			parentId = "cooldownPanelStandaloneDisplay",
@@ -13128,11 +13143,14 @@ local function ensureEditor()
 	local cbCooldownText = Helper.CreateCheck(rightContent, L["Show cooldown text"] or "Show cooldown text")
 	cbCooldownText:SetPoint("TOPLEFT", entryIdBox, "BOTTOMLEFT", -2, -6)
 
+	local cbTrackPassiveSpell = Helper.CreateCheck(rightContent, L["CooldownPanelTrackPassiveSpell"] or "Track passive spell")
+	cbTrackPassiveSpell:SetPoint("TOPLEFT", cbCooldownText, "BOTTOMLEFT", 0, -4)
+
 	local cbAlwaysShow = Helper.CreateCheck(rightContent, L["Always show"] or "Always show")
-	cbAlwaysShow:SetPoint("TOPLEFT", cbCooldownText, "BOTTOMLEFT", 0, -4)
+	cbAlwaysShow:SetPoint("TOPLEFT", cbTrackPassiveSpell, "BOTTOMLEFT", 0, -4)
 
 	local cbCharges = Helper.CreateCheck(rightContent, L["Show charges"] or "Show charges")
-	cbCharges:SetPoint("TOPLEFT", cbCooldownText, "BOTTOMLEFT", 0, -4)
+	cbCharges:SetPoint("TOPLEFT", cbTrackPassiveSpell, "BOTTOMLEFT", 0, -4)
 
 	local cbStacks = Helper.CreateCheck(rightContent, L["CooldownPanelShowStacks"] or "Show stack count")
 	cbStacks:SetPoint("TOPLEFT", cbCharges, "BOTTOMLEFT", 0, -4)
@@ -13339,6 +13357,7 @@ local function ensureEditor()
 			entryType = entryType,
 			entryId = entryIdBox,
 			cbCooldownText = cbCooldownText,
+			cbTrackPassiveSpell = cbTrackPassiveSpell,
 			cbAlwaysShow = cbAlwaysShow,
 			cbCharges = cbCharges,
 			cbStacks = cbStacks,
@@ -13558,6 +13577,7 @@ local function ensureEditor()
 	bindEntryToggle(cbCharges, "showCharges")
 	bindEntryToggle(cbStacks, "showStacks")
 	bindEntryToggle(cbCooldownText, "showCooldownText")
+	bindEntryToggle(cbTrackPassiveSpell, "trackPassiveSpell")
 	cbAlwaysShow:SetScript("OnClick", function(self)
 		local panelId = editor.selectedPanelId
 		local entryId = editor.selectedEntryId
@@ -14965,6 +14985,7 @@ local function layoutInspectorToggles(inspector, entry)
 	end
 	if not entry then
 		hideToggle(inspector.cbCooldownText)
+		hideToggle(inspector.cbTrackPassiveSpell)
 		hideToggle(inspector.cbAlwaysShow)
 		hideToggle(inspector.cbCharges)
 		hideToggle(inspector.cbStacks)
@@ -15018,6 +15039,7 @@ local function layoutInspectorToggles(inspector, entry)
 	end
 
 	place(inspector.cbCooldownText, effectiveType ~= "STANCE", -2)
+	place(inspector.cbTrackPassiveSpell, effectiveType == "SPELL")
 	if effectiveType == "SPELL" then
 		place(inspector.cbAlwaysShow, false)
 		place(inspector.cbCharges, true)
@@ -15214,6 +15236,7 @@ local function refreshInspector(editor, panel, entry)
 		end
 
 		inspector.cbCooldownText:SetChecked(entry.showCooldownText ~= false)
+		if inspector.cbTrackPassiveSpell then inspector.cbTrackPassiveSpell:SetChecked(entry.trackPassiveSpell == true) end
 		if effectiveType == "STANCE" then
 			inspector.cbAlwaysShow:SetChecked(entry.showWhenMissing == true)
 		else
@@ -15263,6 +15286,7 @@ local function refreshInspector(editor, panel, entry)
 		if inspector.cbSound and inspector.cbSound.Text then inspector.cbSound.Text:SetText(L["CooldownPanelSoundReady"] or "Sound when ready") end
 
 		if inspector.staticTextBox then inspector.staticTextBox:SetText("") end
+		if inspector.cbTrackPassiveSpell then inspector.cbTrackPassiveSpell:SetChecked(false) end
 		if inspector.cbStaticTextDuringCD then inspector.cbStaticTextDuringCD:SetChecked(false) end
 
 		inspector.entryId:Disable()
@@ -15997,6 +16021,7 @@ end
 function CooldownPanels:HandleEntryBooleanMutation(panelId, entryId, entry, field)
 	if not (panelId and entry and field) then return end
 	if field == "glowReady" then CooldownPanels.ClearReadyGlowEntryState(panelId, entryId, true) end
+	if field == "trackPassiveSpell" then self:RebuildSpellIndex() end
 	if field == "glowReady" or field == "checkPower" or field == "hideWhenNoResource" or field == "readyGlowCheckPower" then self:RebuildPowerIndex() end
 	if field == "showCharges" then self:RebuildChargesIndex() end
 	if field == "showItemUses" or field == "useHighestRank" then
@@ -16225,7 +16250,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 			local talentChoiceResolved = variantGroup and variantGroup.kind == "talentChoice"
 			local stanceRelevant = resolvedType == "STANCE" and CooldownPanels.IsStanceEntryRelevant and CooldownPanels:IsStanceEntryRelevant(entry) or false
 			local stanceActive = stanceRelevant and CooldownPanels.IsStanceEntryActive and CooldownPanels:IsStanceEntryActive(entry) or false
-			local spellPassive = resolvedSpellId and isSpellPassiveSafe(resolvedSpellId, effectiveSpellId) or false
+			local spellPassive = resolvedSpellId and not shouldTrackPassiveSpell(entry) and isSpellPassiveSafe(resolvedSpellId, effectiveSpellId) or false
 			local cdmAuraData
 			local stackCount
 			local itemCount
@@ -20563,7 +20588,7 @@ function cdp.ENTRY.TryRefreshVisibleSpellEntry(panelId, entryId, mode)
 	local effectiveSpellId, resolvedSpellId, _, variantGroup = CooldownPanels:ResolveTrackedSpellID(baseSpellId)
 	effectiveSpellId = effectiveSpellId or getEffectiveSpellId(baseSpellId) or baseSpellId
 	local spellId = effectiveSpellId or baseSpellId
-	local spellPassive = isSpellPassiveSafe(resolvedSpellId or baseSpellId, effectiveSpellId)
+	local spellPassive = not shouldTrackPassiveSpell(entry) and isSpellPassiveSafe(resolvedSpellId or baseSpellId, effectiveSpellId) or false
 	local talentChoiceResolved = variantGroup and variantGroup.kind == "talentChoice"
 	if spellPassive or (Api.IsSpellKnown and not talentChoiceResolved and not Api.IsSpellKnown(spellId)) then return false end
 
@@ -21376,7 +21401,7 @@ updateRangeCheckSpells = function(rangeCheckSpells)
 								local effectiveId, resolvedSpellId = CooldownPanels:ResolveTrackedSpellID(spellId)
 								effectiveId = effectiveId or getEffectiveSpellId(spellId) or spellId
 								resolvedSpellId = resolvedSpellId or spellId
-								if not isSpellPassiveSafe(resolvedSpellId, effectiveId) and effectiveId then wanted[effectiveId] = true end
+								if effectiveId and (shouldTrackPassiveSpell(entry) or not isSpellPassiveSafe(resolvedSpellId, effectiveId)) then wanted[effectiveId] = true end
 							end
 						end
 					end

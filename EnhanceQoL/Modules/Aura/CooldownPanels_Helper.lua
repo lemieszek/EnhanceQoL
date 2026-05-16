@@ -61,10 +61,16 @@ Api.GetAtlasInfo = C_Texture and C_Texture.GetAtlasInfo
 Api.GetFilenameFromFileDataID = C_Texture and C_Texture.GetFilenameFromFileDataID
 Api.IsSpellKnown = function(spellId, includeOverrides)
 	if not spellId then return false end
-	if not (C_SpellBook and C_SpellBook.IsSpellInSpellBook) then return true end
+	if not C_SpellBook then return true end
 	local spellBank = Enum and Enum.SpellBookSpellBank
 	local playerBank = (spellBank and spellBank.Player) or 0
 	local petBank = (spellBank and spellBank.Pet) or 1
+	if C_SpellBook.IsSpellKnownOrInSpellBook then
+		if C_SpellBook.IsSpellKnownOrInSpellBook(spellId, playerBank, includeOverrides) then return true end
+		if C_SpellBook.IsSpellKnownOrInSpellBook(spellId, petBank, includeOverrides) then return true end
+		return false
+	end
+	if not C_SpellBook.IsSpellInSpellBook then return true end
 	if C_SpellBook.IsSpellInSpellBook(spellId, playerBank, includeOverrides) then return true end
 	if C_SpellBook.IsSpellInSpellBook(spellId, petBank, includeOverrides) then return true end
 	return false
@@ -247,6 +253,7 @@ Helper.ENTRY_DEFAULTS = {
 	iconOffsetY = 0,
 	showCooldown = true,
 	showCooldownText = true,
+	trackPassiveSpell = false,
 	cooldownVisibilityUseGlobal = true,
 	hideOnCooldown = false,
 	showOnCooldown = false,
