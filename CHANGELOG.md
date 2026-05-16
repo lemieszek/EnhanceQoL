@@ -5,6 +5,7 @@
 ### 🐛 Fixed
 
 - Social / Friends List: Fixed favorite stars shifting briefly when opening the enhanced friends list with favorited offline Battle.net friends.
+- Visibility: Fixed fade handling for Unit Frames and Resource Bars so automatic visibility rules can fade correctly.
 
 ---
 
