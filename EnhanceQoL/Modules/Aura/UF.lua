@@ -4851,6 +4851,124 @@ local function shouldHideInPetBattle(cfg, def)
 	return value == true
 end
 
+UF._eqolVisibilityHandler = [[
+local target = self:GetFrameRef("target")
+if not target then return end
+if newstate == "show" then
+	target:Show()
+	target:SetAlpha(1)
+elseif newstate == "fade" then
+	target:Show()
+	target:SetAlpha(self:GetAttribute("eqol-fade-alpha") or 0)
+elseif newstate == "hide" then
+	target:SetAlpha(0)
+	target:Hide()
+end
+]]
+
+function UF.GetFrameVisibilityInactiveAlpha()
+	local getFadedAlpha = addon.functions and addon.functions.GetFrameFadedAlpha
+	local alpha = getFadedAlpha and getFadedAlpha() or 0
+	alpha = tonumber(alpha) or 0
+	if alpha < 0 then alpha = 0 end
+	if alpha > 1 then alpha = 1 end
+	return alpha
+end
+
+function UF.GetFrameVisibilityInactiveState()
+	local alpha = UF.GetFrameVisibilityInactiveAlpha()
+	if alpha <= 0 then return "hide", alpha end
+	if alpha >= 1 then return "show", alpha end
+	return "fade", alpha
+end
+
+function UF.EnsureEqolVisibilityController(st)
+	if not st or not st.frame then return nil end
+	local controller = st._eqolVisibilityController
+	if not controller then
+		controller = CreateFrame("Frame", nil, st.frame, "SecureHandlerStateTemplate")
+		controller:SetFrameRef("target", st.frame)
+		controller:SetAttribute("_onstate-eqolvisibility", UF._eqolVisibilityHandler)
+		st._eqolVisibilityController = controller
+	else
+		controller:SetFrameRef("target", st.frame)
+	end
+	return controller
+end
+
+function UF.ClearEqolVisibilityDriver(st, showWhenCleared)
+	if not st then return end
+	local controller = st._eqolVisibilityController
+	if controller then
+		if _G.UnregisterAttributeDriver then pcall(_G.UnregisterAttributeDriver, controller, "state-eqolvisibility") end
+		if controller.SetAttribute then controller:SetAttribute("state-eqolvisibility", nil) end
+	end
+	st._eqolVisibilityCond = nil
+	if st.frame then
+		if st.frame.SetAlpha then st.frame:SetAlpha(1) end
+		if showWhenCleared and st.frame.Show then st.frame:Show() end
+	end
+end
+
+function UF.ApplyEqolVisibilityDriver(st, cond, inactiveAlpha)
+	if not st or not st.frame or not cond or not _G.RegisterAttributeDriver then return false end
+	local controller = UF.EnsureEqolVisibilityController(st)
+	if not controller then return false end
+	controller:SetAttribute("eqol-fade-alpha", inactiveAlpha or 0)
+	if st._eqolVisibilityCond == cond then return true end
+	if _G.UnregisterAttributeDriver then pcall(_G.UnregisterAttributeDriver, controller, "state-eqolvisibility") end
+	local ok = pcall(_G.RegisterAttributeDriver, controller, "state-eqolvisibility", cond)
+	if ok then st._eqolVisibilityCond = cond end
+	return ok
+end
+
+function UF.RefreshEqolVisibilityDriverAlphas()
+	if InCombatLockdown and InCombatLockdown() then
+		UF.ScheduleEqolVisibilityDriverAlphaRefresh()
+		return
+	end
+	local alpha = UF.GetFrameVisibilityInactiveAlpha()
+	for _, st in pairs(states) do
+		local controller = st and st._eqolVisibilityController
+		if controller and st._eqolVisibilityCond then
+			controller:SetAttribute("eqol-fade-alpha", alpha)
+			local currentState = controller.GetAttribute and controller:GetAttribute("state-eqolvisibility")
+			if currentState then
+				controller:SetAttribute("state-eqolvisibility", nil)
+				controller:SetAttribute("state-eqolvisibility", currentState)
+			end
+		end
+	end
+end
+
+function UF.ScheduleEqolVisibilityDriverAlphaRefresh()
+	if InCombatLockdown and InCombatLockdown() then
+		UF._eqolVisibilityAlphaRefreshPending = true
+		if not UF._eqolVisibilityAlphaRefreshWatcher then
+			UF._eqolVisibilityAlphaRefreshWatcher = CreateFrame("Frame")
+			UF._eqolVisibilityAlphaRefreshWatcher:SetScript("OnEvent", function(self)
+				if InCombatLockdown and InCombatLockdown() then return end
+				self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+				UF._eqolVisibilityAlphaRefreshWatcher = nil
+				UF._eqolVisibilityAlphaRefreshPending = nil
+				UF.ScheduleEqolVisibilityDriverAlphaRefresh()
+			end)
+			UF._eqolVisibilityAlphaRefreshWatcher:RegisterEvent("PLAYER_REGEN_ENABLED")
+		end
+		return
+	end
+	if UF._eqolVisibilityAlphaRefreshPending then return end
+	UF._eqolVisibilityAlphaRefreshPending = true
+	RunNextFrame(function()
+		UF._eqolVisibilityAlphaRefreshPending = nil
+		if UF.RefreshEqolVisibilityDrivers then
+			UF.RefreshEqolVisibilityDrivers()
+		else
+			UF.RefreshEqolVisibilityDriverAlphas()
+		end
+	end)
+end
+
 local function applyVisibilityDriver(unit, enabled)
 	local st = states[unit]
 	if not st or not st.frame then return end
@@ -4894,24 +5012,20 @@ local function applyVisibilityDriver(unit, enabled)
 	if unit == UNIT.PET and _G.RegisterUnitWatch and _G.UnregisterUnitWatch then
 		local frame = st.frame
 		local registered = (_G.UnitWatchRegistered and _G.UnitWatchRegistered(frame)) or frame.EQOL_PetUnitWatchRegistered == true
-		local shouldWatch = enabled and not inEdit
-		if shouldWatch then
-			if not registered then
-				local ok = pcall(_G.RegisterUnitWatch, frame)
-				if ok then frame.EQOL_PetUnitWatchRegistered = true end
-			end
-		elseif registered then
+		if registered then
 			pcall(_G.UnregisterUnitWatch, frame)
 			frame.EQOL_PetUnitWatchRegistered = nil
 		end
 	end
-	if not RegisterStateDriver then return end
+	if not RegisterStateDriver and not _G.RegisterAttributeDriver then return end
 	local hideInVehicle = enabled and shouldHideInVehicle(cfg, def)
 	local hideInPetBattle = enabled and shouldHideInPetBattle(cfg, def)
 	local cond
 	local baseCond
 	local showPrefix
 	local prependHideClauses = nil
+	local inactiveState, inactiveAlpha = UF.GetFrameVisibilityInactiveState()
+	local supportsEqolFadeDriver = true
 	if not enabled then
 		cond = "hide"
 	elseif unit == UNIT.TARGET then
@@ -4926,7 +5040,10 @@ local function applyVisibilityDriver(unit, enabled)
 	elseif unit == UNIT.PET then
 		-- Keep pet frame configurable in Edit Mode even when no pet exists.
 		baseCond = inEdit and "show" or "[@pet,exists] show; hide"
-		if not inEdit then showPrefix = "@pet,exists" end
+		if not inEdit then
+			showPrefix = "@pet,exists"
+			prependHideClauses = { "@pet,noexists" }
+		end
 	elseif isBossUnit(unit) then
 		baseCond = ("[@%s,exists] show; hide"):format(unit)
 	end
@@ -4940,16 +5057,30 @@ local function applyVisibilityDriver(unit, enabled)
 				prependHideClauses = prependHideClauses or {}
 				prependHideClauses[#prependHideClauses + 1] = "vehicleui"
 			end
-			cond = BuildVisibilityDriverExpression(visibilityConfig, { prependHideClauses = prependHideClauses, showPrefix = showPrefix })
+			cond = BuildVisibilityDriverExpression(visibilityConfig, { prependHideClauses = prependHideClauses, showPrefix = showPrefix, inactiveState = supportsEqolFadeDriver and inactiveState or nil })
 		end
 		if not cond and (hideInPetBattle or hideInVehicle or baseCond) then
 			local clauses = {}
+			if prependHideClauses then
+				for _, clause in ipairs(prependHideClauses) do
+					clauses[#clauses + 1] = ("[%s] hide"):format(clause)
+				end
+			end
 			if hideInPetBattle then clauses[#clauses + 1] = "[petbattle] hide" end
 			if hideInVehicle then clauses[#clauses + 1] = "[vehicleui] hide" end
 			clauses[#clauses + 1] = baseCond or "show"
 			cond = table.concat(clauses, "; ")
 		end
 	end
+	local useEqolVisibilityDriver = supportsEqolFadeDriver and cond and cond:find("fade", 1, true) ~= nil
+	if useEqolVisibilityDriver then
+		if UnregisterStateDriver then UnregisterStateDriver(st.frame, "visibility") end
+		if st.frame.SetAttribute then st.frame:SetAttribute("state-visibility", nil) end
+		st._visibilityCond = nil
+		UF.ApplyEqolVisibilityDriver(st, cond, inactiveAlpha)
+		return
+	end
+	UF.ClearEqolVisibilityDriver(st, false)
 	if cond == st._visibilityCond then return end
 	if not cond then
 		if UnregisterStateDriver then UnregisterStateDriver(st.frame, "visibility") end
@@ -5049,13 +5180,21 @@ local function applyVisibilityRules(unit)
 		for i = 1, maxBossFrames do
 			local info = UNITS["boss" .. i]
 			local frameConfig = i <= bossCount and manualConfig or nil
-			if info and info.frameName then ApplyFrameVisibilityConfig(info.frameName, { unitToken = "boss" }, frameConfig, opts) end
+			local st = states["boss" .. i]
+			if info and info.frameName and (frameConfig or (st and st._eqolManualVisibilityActive)) then
+				ApplyFrameVisibilityConfig(info.frameName, { unitToken = "boss" }, frameConfig, opts)
+			end
+			if st then st._eqolManualVisibilityActive = frameConfig ~= nil or nil end
 			if UFHelper and UFHelper.applyClientSceneAlphaOverride then UFHelper.applyClientSceneAlphaOverride(states["boss" .. i], forceClientSceneHide) end
 		end
 		return
 	end
 	local info = UNITS[unit]
-	if info and info.frameName then ApplyFrameVisibilityConfig(info.frameName, { unitToken = info.unit }, manualConfig, opts) end
+	local st = states[unit]
+	if info and info.frameName and (manualConfig or (st and st._eqolManualVisibilityActive)) then
+		ApplyFrameVisibilityConfig(info.frameName, { unitToken = info.unit }, manualConfig, opts)
+	end
+	if st then st._eqolManualVisibilityActive = manualConfig ~= nil or nil end
 	if UFHelper and UFHelper.applyClientSceneAlphaOverride then UFHelper.applyClientSceneAlphaOverride(states[unit], forceClientSceneHide) end
 end
 
@@ -5080,6 +5219,15 @@ function UF.RefreshClientSceneVisibility()
 		applyVisibilityDriver("boss" .. i, bossEnabled and i <= bossCount)
 	end
 	applyVisibilityRulesAll()
+end
+
+function UF.RefreshEqolVisibilityDrivers()
+	if InCombatLockdown and InCombatLockdown() then
+		UF.ScheduleEqolVisibilityDriverAlphaRefresh()
+		return
+	end
+	UF.RefreshClientSceneVisibility()
+	UF.RefreshEqolVisibilityDriverAlphas()
 end
 
 local function hideBlizzardPlayerFrame()
@@ -10039,6 +10187,7 @@ local function updateBossFrames(force)
 			if st and st.frame then
 				if inEdit then
 					if not InCombatLockdown() then
+						UF.ClearEqolVisibilityDriver(st, true)
 						if UnregisterStateDriver then UnregisterStateDriver(st.frame, "visibility") end
 						if st.frame.SetAttribute then st.frame:SetAttribute("state-visibility", nil) end
 						if st.frame.SetAttribute then st.frame:SetAttribute("unit", "player") end
@@ -10365,6 +10514,7 @@ local function ensureBossFramesReady(cfg)
 			if addon.EditModeLib and addon.EditModeLib:IsInEditMode() then
 				local st = states[unit]
 				if st and st.frame then
+					UF.ClearEqolVisibilityDriver(st, true)
 					if UnregisterStateDriver then UnregisterStateDriver(st.frame, "visibility") end
 					st.frame:SetAttribute("state-visibility", nil)
 					st.frame:Show()

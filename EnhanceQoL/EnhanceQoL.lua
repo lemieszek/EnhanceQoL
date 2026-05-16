@@ -827,6 +827,8 @@ local function BuildUnitFrameDriverExpression(config, opts)
 
 	local hideClauses = {}
 	local hideSeen = {}
+	local inactiveClauses = {}
+	local inactiveSeen = {}
 	local showClauses = {}
 	local showSeen = {}
 
@@ -874,8 +876,8 @@ local function BuildUnitFrameDriverExpression(config, opts)
 	if config.ALWAYS_HIDE_IN_GROUP then addClause(hideClauses, hideSeen, "group") end
 	if config.ALWAYS_HIDE_IN_PARTY then addClause(hideClauses, hideSeen, "group:party") end
 	if config.ALWAYS_HIDE_IN_RAID then addClause(hideClauses, hideSeen, "group:raid") end
-	if config.SKYRIDING_INACTIVE then addSkyridingClauses(hideClauses, hideSeen) end
-	if config.FLYING_INACTIVE then addClause(hideClauses, hideSeen, "nodead,flying") end
+	if config.SKYRIDING_INACTIVE then addSkyridingClauses(inactiveClauses, inactiveSeen) end
+	if config.FLYING_INACTIVE then addClause(inactiveClauses, inactiveSeen, "nodead,flying") end
 
 	if config.ALWAYS_IN_COMBAT then addClause(showClauses, showSeen, "combat") end
 	if config.ALWAYS_OUT_OF_COMBAT then addClause(showClauses, showSeen, "nocombat") end
@@ -888,7 +890,7 @@ local function BuildUnitFrameDriverExpression(config, opts)
 	if config.PLAYER_IN_PARTY then addClause(showClauses, showSeen, "group:party") end
 	if config.PLAYER_IN_RAID then addClause(showClauses, showSeen, "group:raid") end
 
-	if #hideClauses == 0 and #showClauses == 0 then return nil end
+	if #hideClauses == 0 and #inactiveClauses == 0 and #showClauses == 0 then return nil end
 
 	local expressions = {}
 	local function appendConditionalClauses(clauses, action, prefix)
@@ -901,13 +903,19 @@ local function BuildUnitFrameDriverExpression(config, opts)
 
 	local showPrefix = nil
 	if opts and type(opts.showPrefix) == "string" and opts.showPrefix ~= "" then showPrefix = opts.showPrefix end
+	local inactiveState = "hide"
+	if opts and (opts.inactiveState == "fade" or opts.inactiveState == "show") then inactiveState = opts.inactiveState end
 	appendConditionalClauses(opts and opts.prependHideClauses or {}, "hide")
 	appendConditionalClauses(hideClauses, "hide")
+	appendConditionalClauses(inactiveClauses, inactiveState, showPrefix)
 	appendConditionalClauses(showClauses, "show", showPrefix)
 
-	local defaultState = (#showClauses == 0 and #hideClauses > 0) and "show" or "hide"
+	local defaultState = (#showClauses == 0 and (#hideClauses > 0 or #inactiveClauses > 0)) and "show" or inactiveState
 	if defaultState == "show" and showPrefix then
 		expressions[#expressions + 1] = ("[%s] show"):format(showPrefix)
+		expressions[#expressions + 1] = "hide"
+	elseif defaultState == "fade" and showPrefix then
+		expressions[#expressions + 1] = ("[%s] fade"):format(showPrefix)
 		expressions[#expressions + 1] = "hide"
 	else
 		expressions[#expressions + 1] = defaultState
@@ -968,6 +976,7 @@ local function RefreshAllFrameVisibilities()
 	for _, state in pairs(frameVisibilityStates) do
 		ApplyFrameVisibilityState(state)
 	end
+	if addon.Aura and addon.Aura.UF and addon.Aura.UF.ScheduleEqolVisibilityDriverAlphaRefresh then addon.Aura.UF.ScheduleEqolVisibilityDriverAlphaRefresh() end
 end
 addon.functions.RefreshAllFrameVisibilityAlpha = RefreshAllFrameVisibilities
 
