@@ -397,6 +397,207 @@ local function GetUnitMountInfo(unit)
 	return nil
 end
 
+local function GetRealmLanguageLabel(locale)
+	if type(locale) ~= "string" or locale == "" then return nil end
+	local localeKey = locale:upper()
+	return _G["LFG_LIST_LANGUAGE_" .. localeKey] or _G[localeKey] or locale
+end
+
+local function GetRealmDataProvider()
+	local realmData = addon.Tooltip and addon.Tooltip.variables and addon.Tooltip.variables.realmInfo
+	if not realmData or not realmData.GetRealmInfo then return nil end
+	return realmData
+end
+
+local realmLocaleFlagAssets = {
+	deDE = "flag_de.tga",
+	enGB = "flag_enGB.tga",
+	enUS = "flag_enUS.tga",
+	esES = "flag_esES.tga",
+	esMX = "flag_esMX.tga",
+	frFR = "flag_frFR.tga",
+	itIT = "flag_itIT.tga",
+	koKR = "flag_koKR.tga",
+	ptBR = "flag_ptBR.tga",
+	ptPT = "flag_ptPT.tga",
+	ruRU = "flag_ruRU.tga",
+	zhCN = "flag_zhCN.tga",
+	zhTW = "flag_zhTW.tga",
+}
+
+local function FormatRealmFlagTexture(fileName)
+	return ("|TInterface\\AddOns\\EnhanceQoL\\Assets\\%s:14:22:0:0|t"):format(fileName)
+end
+
+local function GetRealmFlagPlaceholder(info, allowTextures)
+	if type(info) ~= "table" then return nil end
+	local locale = info.locale
+	if info.region == "US" and type(info.timezone) == "string" and safeFind(info.timezone, "Australia/", true) then
+		return allowTextures and FormatRealmFlagTexture("flag_oce.tga") or "[enAU]"
+	end
+	local fileName = realmLocaleFlagAssets[info.locale]
+	if fileName and allowTextures then return FormatRealmFlagTexture(fileName) end
+	if type(locale) == "string" and locale ~= "" then return "[" .. locale .. "]" end
+	return nil
+end
+
+local function IsRealmInfoFieldEnabled(field, legacyKey)
+	local fields = addon.db and addon.db["TooltipRealmInfoFields"]
+	if type(fields) == "table" then return fields[field] == true end
+	return addon.db and addon.db[legacyKey] == true
+end
+
+local function IsLFGRealmDisplayEnabled(field)
+	local displays = addon.db and addon.db["TooltipRealmLFGDisplay"]
+	if type(displays) == "table" then return displays[field] == true end
+	return true
+end
+
+local function NormalizeRealmFromNameString(value)
+	local realmData = GetRealmDataProvider()
+	local realm = realmData and realmData.GetRealmFromNameString and realmData.GetRealmFromNameString(value) or nil
+	if type(realm) ~= "string" or realm == "" then return nil end
+	realm = realm:gsub("%s+%b()", "")
+	realm = realm:gsub("^%s+", ""):gsub("%s+$", "")
+	return realm ~= "" and realm or nil
+end
+
+local function AddRealmInfo(tooltip, realm)
+	if not addon.db["TooltipShowRealmInfo"] then return false end
+	if not IsTooltipMutable(tooltip) then return false end
+	if not realm or realm == "" then return end
+
+	local realmData = GetRealmDataProvider()
+	if not realmData then return false end
+
+	local info = realmData.GetRealmInfo(realm)
+	if not info then return false end
+
+	local printedHeader = false
+	local function ensureHeader()
+		if printedHeader then return end
+		tooltip:AddLine(" ")
+		printedHeader = true
+	end
+
+	if IsRealmInfoFieldEnabled("language", "TooltipRealmShowLanguage") then
+		local language = GetRealmLanguageLabel(info.locale)
+		if language then
+			local flag = GetRealmFlagPlaceholder(info, not isTooltipRestricted())
+			if flag then language = flag .. " " .. language end
+			ensureHeader()
+			tooltip:AddDoubleLine(L["TooltipRealmLanguage"], language)
+		end
+	end
+
+	if IsRealmInfoFieldEnabled("type", "TooltipRealmShowType") and realmData.FormatRealmType then
+		local realmType = realmData.FormatRealmType(info)
+		if realmType then
+			ensureHeader()
+			tooltip:AddDoubleLine(L["TooltipRealmType"], realmType)
+		end
+	end
+
+	if IsRealmInfoFieldEnabled("timezone", "TooltipRealmShowTimezone") and realmData.FormatRealmTimezone then
+		local timezone = realmData.FormatRealmTimezone(info)
+		if timezone then
+			ensureHeader()
+			tooltip:AddDoubleLine(L["TooltipRealmTimezone"], timezone)
+		end
+	end
+
+	if IsRealmInfoFieldEnabled("connected", "TooltipRealmShowConnected") and realmData.GetConnectionNames then
+		local names = realmData.GetConnectionNames(info)
+		if names and #names > 1 then
+			ensureHeader()
+			if #names <= 4 then
+				tooltip:AddDoubleLine(L["TooltipRealmConnected"], table.concat(names, ", "))
+			else
+				tooltip:AddLine(L["TooltipRealmConnected"] .. ":")
+				tooltip:AddLine(table.concat(names, ", "), 1, 1, 1, true)
+			end
+		end
+	end
+
+	if printedHeader then tooltip:Show() end
+	return printedHeader
+end
+
+local function AddUnitRealmInfo(tooltip, unit)
+	if not unit or not UnitIsPlayer(unit) then return end
+	if IsUnitIdentitySecret(unit) then return end
+
+	local _, realm = SafeUnitName(unit)
+	if not realm or realm == "" then realm = GetRealmName and GetRealmName() or nil end
+	AddRealmInfo(tooltip, realm)
+end
+
+local function GetLFGSearchResultInfo(resultID)
+	if not resultID or not C_LFGList or not C_LFGList.GetSearchResultInfo then return nil end
+	if C_LFGList.HasSearchResultInfo and not C_LFGList.HasSearchResultInfo(resultID) then return nil end
+	local searchResultInfo = C_LFGList.GetSearchResultInfo(resultID)
+	if type(searchResultInfo) ~= "table" then return nil end
+	return searchResultInfo
+end
+
+local function GetRealmInfoForLFGResult(resultID)
+	local searchResultInfo = GetLFGSearchResultInfo(resultID)
+	local leaderName = searchResultInfo and searchResultInfo.leaderName
+	if isSecret(leaderName) then return nil end
+	if type(leaderName) ~= "string" or leaderName == "" then return nil end
+	local realm = NormalizeRealmFromNameString(leaderName)
+	if not realm then return nil end
+
+	local realmData = GetRealmDataProvider()
+	local info = realmData and realmData.GetRealmInfo(realm) or nil
+	return info, realm
+end
+
+local function StripPreviousRealmFlagPrefix(entry, text)
+	local prefix = entry and entry.__EnhanceQoLRealmFlagPrefix
+	if type(prefix) ~= "string" or prefix == "" then return text end
+	if type(text) ~= "string" or text == "" then return text end
+	if text:sub(1, #prefix + 1) == prefix .. " " then return text:sub(#prefix + 2) end
+	return text
+end
+
+local function UpdateLFGSearchEntryRealmFlag(entry)
+	if not entry or not entry.Name or not entry.Name.GetText or not entry.Name.SetText then return end
+	local text = entry.Name:GetText()
+	if isSecret(text) then return end
+	text = StripPreviousRealmFlagPrefix(entry, text)
+
+	if not addon.db or not addon.db["TooltipShowRealmInfo"] then
+		entry.__EnhanceQoLRealmFlagPrefix = nil
+		entry.Name:SetText(text)
+		return
+	end
+	if not IsLFGRealmDisplayEnabled("listingFlag") then
+		entry.__EnhanceQoLRealmFlagPrefix = nil
+		entry.Name:SetText(text)
+		return
+	end
+
+	local info = GetRealmInfoForLFGResult(entry.resultID)
+	local prefix = GetRealmFlagPlaceholder(info, not isTooltipRestricted())
+	if not prefix then
+		entry.__EnhanceQoLRealmFlagPrefix = nil
+		entry.Name:SetText(text)
+		return
+	end
+
+	entry.__EnhanceQoLRealmFlagPrefix = prefix
+	entry.Name:SetText(prefix .. " " .. (text or ""))
+end
+
+local function AddLFGSearchEntryRealmInfo(tooltip, resultID)
+	if not addon.db or not addon.db["TooltipShowRealmInfo"] then return end
+	if not IsLFGRealmDisplayEnabled("tooltip") then return end
+	local _, realm = GetRealmInfoForLFGResult(resultID)
+	if not realm then return end
+	AddRealmInfo(tooltip, realm)
+end
+
 local function fmtNum(n)
 	if BreakUpLargeNumbers then
 		return BreakUpLargeNumbers(n or 0)
@@ -601,6 +802,7 @@ local function HasUnitTooltipOptions()
 	if db["TooltipShowGuildRank"] or db["TooltipColorGuildName"] then return true end
 	if db["TooltipUnitShowTargetOfTarget"] then return true end
 	if db["TooltipUnitShowMount"] then return true end
+	if db["TooltipShowRealmInfo"] then return true end
 	if db["TooltipUnitShowSpec"] or db["TooltipUnitShowItemLevel"] then return true end
 	return false
 end
@@ -616,6 +818,7 @@ local function ShouldRunAdditionalTooltip()
 		or db["TooltipColorGuildName"]
 		or db["TooltipUnitShowTargetOfTarget"]
 		or db["TooltipUnitShowMount"]
+		or db["TooltipShowRealmInfo"]
 		or db["TooltipShowMythicScore"]
 end
 
@@ -732,6 +935,8 @@ local function checkAdditionalTooltip(tooltip)
 			tooltip:AddDoubleLine(L["TooltipMount"] or "Mount", mountName)
 		end
 	end
+
+	if unit then AddUnitRealmInfo(tooltip, unit) end
 
 	local showMythic = addon.db["TooltipShowMythicScore"] and unit and UnitExists(unit) and UnitCanAttack("player", unit) == false and addon.Tooltip.variables.maxLevel == UnitLevel(unit)
 	if showMythic and addon.db["TooltipMythicScoreRequireModifier"] and not IsConfiguredModifierDown() then showMythic = false end
@@ -1219,6 +1424,7 @@ local function ShouldRunTooltipPostCall()
 		or db["TooltipUnitHideHealthBar"]
 		or db["TooltipUnitShowTargetOfTarget"]
 		or db["TooltipUnitShowMount"]
+		or db["TooltipShowRealmInfo"]
 		or db["TooltipUnitShowSpec"]
 		or db["TooltipUnitShowItemLevel"]
 		or db["TooltipShowMythicScore"]
@@ -1327,6 +1533,21 @@ local function UpdateQuestIDInQuestLogLabel(questID)
 	fs:Show()
 end
 
+local function RegisterLFGTooltipHooks()
+	if addon.Tooltip.variables.lfgHooksInitialized then return end
+	if not _G.LFGListUtil_SetSearchEntryTooltip or not _G.LFGListSearchEntry_Update then return end
+	addon.Tooltip.variables.lfgHooksInitialized = true
+
+	hooksecurefunc("LFGListUtil_SetSearchEntryTooltip", function(tooltip, resultID)
+		if not IsTooltipMutable(tooltip) then return end
+		AddLFGSearchEntryRealmInfo(tooltip, resultID)
+	end)
+
+	hooksecurefunc("LFGListSearchEntry_Update", function(entry)
+		UpdateLFGSearchEntryRealmFlag(entry)
+	end)
+end
+
 function addon.Tooltip.functions.UpdateQuestIDInQuestLog(questID)
 	if not QuestMapFrame or not QuestMapFrame.DetailsFrame then return end
 	local detailsFrame = QuestMapFrame.DetailsFrame
@@ -1407,6 +1628,12 @@ local function registerTooltipHooks()
 
 	hooksecurefunc("QuestMapFrame_CloseQuestDetails", function()
 		if addon.Tooltip and addon.Tooltip.functions and addon.Tooltip.functions.UpdateQuestIDInQuestLog then addon.Tooltip.functions.UpdateQuestIDInQuestLog() end
+	end)
+
+	RegisterLFGTooltipHooks()
+	frameLoad:RegisterEvent("ADDON_LOADED")
+	frameLoad:SetScript("OnEvent", function(_, _, loadedAddonName)
+		if loadedAddonName == "Blizzard_GroupFinder" then RegisterLFGTooltipHooks() end
 	end)
 
 	-- Optionally hide the default "Right-click for options" instruction on unit tooltips

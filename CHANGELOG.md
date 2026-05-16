@@ -1,5 +1,18 @@
 # Changelog
 
+## [10.16.0-beta2] - 2026-05-16
+
+### ✨ Added
+
+- Tooltips: Added optional realm details for player tooltips and Dungeon Finder groups, including realm language flags, realm type, timezone, and connected realms.
+- Tooltips / Dungeon Finder: Added optional language flags to group listings and added separate controls for showing realm details in Dungeon Finder tooltips or directly in the listing.
+
+### 🐛 Fixed
+
+- Tooltips: Realm details now stay hidden when a player identity is protected by the game, preventing incorrect fallback realm information.
+
+---
+
 ## [10.16.0-beta1] - 2026-05-15
 
 ### ✨ Added

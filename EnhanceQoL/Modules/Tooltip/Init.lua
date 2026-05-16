@@ -41,6 +41,13 @@ function addon.Tooltip.functions.InitDB()
 	init("TooltipUnitHideRightClickInstruction", false)
 	init("TooltipUnitShowTargetOfTarget", false)
 	init("TooltipUnitShowMount", false)
+	init("TooltipShowRealmInfo", false)
+	init("TooltipRealmShowLanguage", true)
+	init("TooltipRealmShowType", true)
+	init("TooltipRealmShowTimezone", false)
+	init("TooltipRealmShowConnected", true)
+	init("TooltipRealmInfoFields", { language = true, type = true, connected = true })
+	init("TooltipRealmLFGDisplay", { tooltip = true, listingFlag = true })
 
 	-- Spell
 	init("TooltipSpellHideType", 1)

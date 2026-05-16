@@ -417,6 +417,65 @@ data = {
 		parentSection = expandable,
 	},
 	{
+		var = "TooltipShowRealmInfo",
+		text = L["TooltipShowRealmInfo"],
+		desc = L["TooltipShowRealmInfoDesc"],
+		func = function(v) addon.db["TooltipShowRealmInfo"] = v end,
+		default = false,
+		type = Settings.VarType.Boolean,
+		parentSection = expandable,
+		children = {
+			{
+				var = "TooltipRealmInfoFields",
+				text = L["TooltipRealmFields"],
+				desc = L["TooltipRealmFieldsDesc"],
+				options = {
+					{ value = "connected", text = L["TooltipRealmShowConnected"] },
+					{ value = "language", text = L["TooltipRealmShowLanguage"] },
+					{ value = "timezone", text = L["TooltipRealmShowTimezone"] },
+					{ value = "type", text = L["TooltipRealmShowType"] },
+				},
+				getSelection = function()
+					if type(addon.db["TooltipRealmInfoFields"]) ~= "table" then addon.db["TooltipRealmInfoFields"] = { language = true, type = true, connected = true } end
+					return addon.db["TooltipRealmInfoFields"]
+				end,
+				setSelection = function(selection) addon.db["TooltipRealmInfoFields"] = type(selection) == "table" and selection or {} end,
+				sType = "multidropdown",
+				parent = true,
+				parentCheck = function()
+					return addon.SettingsLayout.elements["TooltipShowRealmInfo"]
+						and addon.SettingsLayout.elements["TooltipShowRealmInfo"].setting
+						and addon.SettingsLayout.elements["TooltipShowRealmInfo"].setting:GetValue() == true
+				end,
+				element = addon.SettingsLayout.elements["TooltipShowRealmInfo"] and addon.SettingsLayout.elements["TooltipShowRealmInfo"].element,
+				parentSection = expandable,
+			},
+			{
+				var = "TooltipRealmLFGDisplay",
+				text = L["TooltipRealmLFGDisplay"],
+				desc = L["TooltipRealmLFGDisplayDesc"],
+				options = {
+					{ value = "tooltip", text = L["TooltipRealmLFGTooltip"] },
+					{ value = "listingFlag", text = L["TooltipRealmLFGListingFlag"] },
+				},
+				getSelection = function()
+					if type(addon.db["TooltipRealmLFGDisplay"]) ~= "table" then addon.db["TooltipRealmLFGDisplay"] = { tooltip = true, listingFlag = true } end
+					return addon.db["TooltipRealmLFGDisplay"]
+				end,
+				setSelection = function(selection) addon.db["TooltipRealmLFGDisplay"] = type(selection) == "table" and selection or {} end,
+				sType = "multidropdown",
+				parent = true,
+				parentCheck = function()
+					return addon.SettingsLayout.elements["TooltipShowRealmInfo"]
+						and addon.SettingsLayout.elements["TooltipShowRealmInfo"].setting
+						and addon.SettingsLayout.elements["TooltipShowRealmInfo"].setting:GetValue() == true
+				end,
+				element = addon.SettingsLayout.elements["TooltipShowRealmInfo"] and addon.SettingsLayout.elements["TooltipShowRealmInfo"].element,
+				parentSection = expandable,
+			},
+		},
+	},
+	{
 		var = "TooltipShowGuildRank",
 		text = L["TooltipShowGuildRank"],
 		func = function(v) addon.db["TooltipShowGuildRank"] = v end,
