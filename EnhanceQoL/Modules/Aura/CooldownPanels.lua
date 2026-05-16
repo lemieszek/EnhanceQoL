@@ -7810,7 +7810,8 @@ local function isCooldownActive(startTime, duration)
 end
 
 function CooldownPanels:GetDurationNow()
-	if C_DurationUtil and C_DurationUtil.GetCurrentTime then return C_DurationUtil.GetCurrentTime() end
+	local durationUtil = _G.C_DurationUtil
+	if durationUtil and durationUtil.GetCurrentTime then return durationUtil.GetCurrentTime() end
 	return (Api.GetTime and Api.GetTime()) or GetTime()
 end
 
@@ -7933,8 +7934,9 @@ function CooldownPanels:StartEntryCustomCooldownDuration(panelId, entryId, entry
 	if not (panelId and entryId) then return false end
 	local now = self:GetDurationNow()
 	local durationObject
-	if C_DurationUtil and C_DurationUtil.CreateDuration then
-		durationObject = C_DurationUtil.CreateDuration()
+	local durationUtil = _G.C_DurationUtil
+	if durationUtil and durationUtil.CreateDuration then
+		durationObject = durationUtil.CreateDuration()
 		if durationObject and durationObject.SetTimeFromStart then durationObject:SetTimeFromStart(now, duration, 1) end
 	end
 	local store, timers = self:GetCustomCooldownDurationStore()
