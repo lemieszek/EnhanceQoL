@@ -207,23 +207,62 @@ local function getDruidMoveFormMacro()
 	local travel = travelName or catName
 	local cat = catName or travelName or ""
 	if cat == "" then cat = travel end
-	return "/cancelform\n/cast [swimming][outdoors] " .. travel .. "; [indoors] " .. cat .. "; " .. cat
+	return "/dismount [mounted,noflying]\n/stopmacro [mounted]\n/cancelform\n/cast [swimming][outdoors] " .. travel .. "; [indoors] " .. cat .. "; " .. cat
 end
 
 local function getShamanGhostWolfMacro()
 	local ghostName = getSpellNameByID(GHOST_WOLF_SPELL_ID)
 	if not ghostName or ghostName == "" then return nil end
-	return "/cancelform\n/cast " .. ghostName
+	return "/dismount [mounted,noflying]\n/stopmacro [mounted]\n/cancelform\n/cast " .. ghostName
+end
+
+local function appendRandomMountCombatMovementLines(lines)
+	local classTag = addon.variables and addon.variables.unitClass
+	if classTag == "SHAMAN" and isSpellKnown(GHOST_WOLF_SPELL_ID) then
+		local ghostName = getSpellNameByID(GHOST_WOLF_SPELL_ID)
+		if ghostName and ghostName ~= "" then
+			lines[#lines + 1] = "/dismount [combat,mounted,noflying]"
+			lines[#lines + 1] = "/stopmacro [combat,mounted]"
+			lines[#lines + 1] = "/cancelform [combat]"
+			lines[#lines + 1] = "/cast [combat,noflying] " .. ghostName
+			lines[#lines + 1] = "/leavevehicle [combat]"
+		end
+	elseif classTag == "DRUID" then
+		local travelName = getSpellNameByID(783)
+		local catName = getSpellNameByID(768)
+		if travelName or catName then
+			local travel = travelName or catName
+			local cat = catName or travelName or ""
+			if cat == "" then cat = travel end
+			lines[#lines + 1] = "/dismount [combat,mounted,noflying]"
+			lines[#lines + 1] = "/stopmacro [combat,mounted]"
+			lines[#lines + 1] = "/cancelform [combat]"
+			lines[#lines + 1] = "/cast [combat,noflying,swimming] " .. travel .. "; [combat,noflying,outdoors] " .. travel .. "; [combat,noflying,indoors] " .. cat .. "; [combat,noflying] " .. cat
+			lines[#lines + 1] = "/leavevehicle [combat]"
+		end
+	end
 end
 
 local function buildMountMacro(spellID)
 	local name = getSpellNameByID(spellID)
 	if not name or name == "" then return nil end
 	local lines = {}
-	if addon.variables.unitClass == "DRUID" then lines[#lines + 1] = "/cancelform" end
+	if addon.variables.unitClass == "DRUID" then lines[#lines + 1] = "/cancelform [nocombat]" end
 	local visageLine = getDracthyrVisageMacroLine()
 	if visageLine then lines[#lines + 1] = visageLine end
 	lines[#lines + 1] = "/cast " .. name
+	return table.concat(lines, "\n")
+end
+
+local function buildRandomMountMacro(spellID)
+	local name = getSpellNameByID(spellID)
+	if not name or name == "" then return nil end
+	local lines = {}
+	appendRandomMountCombatMovementLines(lines)
+	if addon.variables.unitClass == "DRUID" then lines[#lines + 1] = "/cancelform [nocombat]" end
+	local visageLine = getDracthyrVisageMacroLine()
+	if visageLine then lines[#lines + 1] = visageLine end
+	lines[#lines + 1] = "/cast [nocombat] " .. name
 	return table.concat(lines, "\n")
 end
 
@@ -375,7 +414,7 @@ function MountActions:PrepareActionButton(btn)
 		else
 			spellID = self:GetRandomMountSpell()
 		end
-		local macro = buildMountMacro(spellID or RANDOM_FAVORITE_SPELL_ID)
+		local macro = buildRandomMountMacro(spellID or RANDOM_FAVORITE_SPELL_ID)
 		btn:SetAttribute("macrotext1", macro)
 		btn:SetAttribute("macrotext", macro)
 	elseif btn._eqolAction == "repair" then
@@ -436,7 +475,7 @@ function MountActions:EnsureButton(name, action)
 	btn:SetAttribute("pressAndHoldAction", true)
 	btn._eqolAction = action
 	if action == "random" then
-		local macro = buildMountMacro(RANDOM_FAVORITE_SPELL_ID)
+		local macro = buildRandomMountMacro(RANDOM_FAVORITE_SPELL_ID)
 		btn:SetAttribute("macrotext1", macro)
 		btn:SetAttribute("macrotext", macro)
 	end

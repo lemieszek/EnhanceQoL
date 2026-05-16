@@ -4119,6 +4119,7 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 	local showCooldown = ac.showCooldown ~= false
 	local showCooldownText = ac.showCooldownText
 	if showCooldownText == nil then showCooldownText = showCooldown end
+	local needsCooldown = showCooldown or showCooldownText == true
 	local drawCooldownEdge = ac.showCooldownEdge ~= false
 	local drawCooldownSwipe = ac.showCooldownSwipe ~= false
 	local drawCooldownBling = ac.showCooldownBling ~= false
@@ -4126,13 +4127,13 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 	if btn.cd.SetDrawEdge then btn.cd:SetDrawEdge(false) end
 	if btn.cd.SetDrawSwipe then btn.cd:SetDrawSwipe(false) end
 	if btn.cd.SetDrawBling then btn.cd:SetDrawBling(false) end
-	if showCooldown and aura.auraInstanceID and aura.auraInstanceID > 0 then
+	if needsCooldown and aura.auraInstanceID and aura.auraInstanceID > 0 then
 		local durObj = C_UnitAuras.GetAuraDuration(unitToken, aura.auraInstanceID)
 		if durObj then
 			btn.cd:SetCooldownFromDurationObject(durObj)
 			hasCooldown = true
 		end
-	elseif showCooldown and aura.isSample and aura.duration and aura.expirationTime and aura.duration > 0 and aura.expirationTime > 0 then
+	elseif needsCooldown and aura.isSample and aura.duration and aura.expirationTime and aura.duration > 0 and aura.expirationTime > 0 then
 		local startTime = aura.expirationTime - aura.duration
 		if btn.cd.SetCooldown then
 			btn.cd:SetCooldown(startTime, aura.duration)
@@ -4142,9 +4143,9 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 			hasCooldown = true
 		end
 	end
-	if btn.cd.SetDrawEdge then btn.cd:SetDrawEdge(hasCooldown and drawCooldownEdge) end
-	if btn.cd.SetDrawSwipe then btn.cd:SetDrawSwipe(hasCooldown and drawCooldownSwipe) end
-	if btn.cd.SetDrawBling then btn.cd:SetDrawBling(hasCooldown and drawCooldownBling) end
+	if btn.cd.SetDrawEdge then btn.cd:SetDrawEdge(hasCooldown and showCooldown and drawCooldownEdge) end
+	if btn.cd.SetDrawSwipe then btn.cd:SetDrawSwipe(hasCooldown and showCooldown and drawCooldownSwipe) end
+	if btn.cd.SetDrawBling then btn.cd:SetDrawBling(hasCooldown and showCooldown and drawCooldownBling) end
 	local cooldownFontSize = ac.cooldownFontSize
 	if cooldownFontSize ~= nil and cooldownFontSize < 1 then cooldownFontSize = nil end
 	local countFontSize = ac.countFontSize

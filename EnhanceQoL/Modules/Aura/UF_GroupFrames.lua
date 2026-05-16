@@ -16406,6 +16406,25 @@ local function buildEditModeSettings(kind, editModeId)
 		if enabled == nil then enabled = def.glowEnabled == true end
 		return enabled == true
 	end
+	local function getAuraTypeConfig(typeKey)
+		local cfg = getCfg(kind)
+		local ac = ensureAuraConfig(cfg)
+		local typeCfg = ac and ac[typeKey] or EMPTY
+		local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras[typeKey]) or EMPTY
+		return typeCfg, def
+	end
+	local function isAuraCooldownTextEnabled(typeKey)
+		local typeCfg, def = getAuraTypeConfig(typeKey)
+		if not (typeCfg and typeCfg.enabled == true) then return false end
+		if typeCfg.showCooldownText == nil then return def.showCooldownText ~= false end
+		return typeCfg.showCooldownText ~= false
+	end
+	local function isAuraStackTextEnabled(typeKey)
+		local typeCfg, def = getAuraTypeConfig(typeKey)
+		if not (typeCfg and typeCfg.enabled == true) then return false end
+		if typeCfg.showStacks == nil then return def.showStacks ~= false end
+		return typeCfg.showStacks ~= false
+	end
 	local portraitSideOptions = {
 		{ value = "LEFT", label = "Left", text = "Left" },
 		{ value = "RIGHT", label = "Right", text = "Right" },
@@ -18951,9 +18970,9 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "nameFontOutline", cfg.text.fontOutline, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
-			generator = function(_, root)
-				for _, option in ipairs(GF._sharedEdit.outlineOpts) do
-					root:CreateRadio(option.label, function()
+				generator = function(_, root)
+					for _, option in ipairs(GF._sharedEdit.outlineOpts) do
+						root:CreateRadio(option.label, function()
 						local cfg = getCfg(kind)
 						local tc = cfg and cfg.text or {}
 						return normalizeFontStyleChoice(tc.fontOutline, (DEFAULTS[kind] and DEFAULTS[kind].text and DEFAULTS[kind].text.fontOutline) or "OUTLINE") == option.value
@@ -19145,10 +19164,10 @@ local function buildEditModeSettings(kind, editModeId)
 						cfg.health.textLeft = option.value
 						if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "healthTextLeft", option.value, nil, true) end
 						GF:ApplyHeaderAttributes(kind)
-					end)
-				end
-			end,
-		},
+						end)
+					end
+				end,
+				},
 		{
 			name = L["Center text"] or "Center text",
 			kind = SettingType.Dropdown,
@@ -24673,6 +24692,27 @@ local function buildEditModeSettings(kind, editModeId)
 			parentId = "buffs",
 		},
 		{
+			name = L["CooldownPanelShowCooldown"] or "Show cooldown",
+			kind = SettingType.Checkbox,
+			field = "buffCooldownEnabled",
+			parentId = "buffs",
+			get = function()
+				local cfg = getCfg(kind)
+				local ac = ensureAuraConfig(cfg)
+				local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.buff) or {}
+				if ac.buff.showCooldown == nil then return def.showCooldown ~= false end
+				return ac.buff.showCooldown ~= false
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				local ac = ensureAuraConfig(cfg)
+				ac.buff.showCooldown = value and true or false
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "buffCooldownEnabled", ac.buff.showCooldown, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+		},
+		{
 			name = L["Show cooldown text"] or "Show cooldown text",
 			kind = SettingType.Checkbox,
 			field = "buffCooldownTextEnabled",
@@ -24713,6 +24753,7 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "buffCooldownTextAnchor", value, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+			isEnabled = function() return isAuraCooldownTextEnabled("buff") end,
 		},
 		{
 			name = L["Cooldown text offset X"] or "Cooldown text offset X",
@@ -24737,6 +24778,7 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "buffCooldownTextOffsetX", ac.buff.cooldownOffset.x, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+			isEnabled = function() return isAuraCooldownTextEnabled("buff") end,
 		},
 		{
 			name = L["Cooldown text offset Y"] or "Cooldown text offset Y",
@@ -24761,6 +24803,7 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "buffCooldownTextOffsetY", ac.buff.cooldownOffset.y, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+			isEnabled = function() return isAuraCooldownTextEnabled("buff") end,
 		},
 		{
 			name = L["Cooldown text size"] or "Cooldown text size",
@@ -24784,6 +24827,7 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "buffCooldownTextSize", ac.buff.cooldownFontSize, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+			isEnabled = function() return isAuraCooldownTextEnabled("buff") end,
 		},
 		{
 			name = L["Cooldown text font"] or "Cooldown text font",
@@ -24820,6 +24864,7 @@ local function buildEditModeSettings(kind, editModeId)
 					end)
 				end
 			end,
+			isEnabled = function() return isAuraCooldownTextEnabled("buff") end,
 		},
 		{
 			name = L["Cooldown text outline"] or "Cooldown text outline",
@@ -24855,6 +24900,7 @@ local function buildEditModeSettings(kind, editModeId)
 					end)
 				end
 			end,
+			isEnabled = function() return isAuraCooldownTextEnabled("buff") end,
 		},
 		{
 			name = "",
@@ -24902,6 +24948,7 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "buffStackAnchor", value, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+			isEnabled = function() return isAuraStackTextEnabled("buff") end,
 		},
 		{
 			name = L["Stack offset X"] or "Stack offset X",
@@ -24926,6 +24973,7 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "buffStackOffsetX", ac.buff.countOffset.x, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+			isEnabled = function() return isAuraStackTextEnabled("buff") end,
 		},
 		{
 			name = L["Stack offset Y"] or "Stack offset Y",
@@ -24950,6 +24998,7 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "buffStackOffsetY", ac.buff.countOffset.y, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+			isEnabled = function() return isAuraStackTextEnabled("buff") end,
 		},
 		{
 			name = L["Stack size"] or "Stack size",
@@ -24973,6 +25022,7 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "buffStackSize", ac.buff.countFontSize, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+			isEnabled = function() return isAuraStackTextEnabled("buff") end,
 		},
 		{
 			name = L["Stack font"] or "Stack font",
@@ -25009,6 +25059,7 @@ local function buildEditModeSettings(kind, editModeId)
 					end)
 				end
 			end,
+			isEnabled = function() return isAuraStackTextEnabled("buff") end,
 		},
 		{
 			name = L["Stack outline"] or "Stack outline",
@@ -25044,6 +25095,7 @@ local function buildEditModeSettings(kind, editModeId)
 					end)
 				end
 			end,
+			isEnabled = function() return isAuraStackTextEnabled("buff") end,
 		},
 		{
 			name = L["Debuffs"] or "Debuffs",
@@ -25438,6 +25490,27 @@ local function buildEditModeSettings(kind, editModeId)
 			parentId = "debuffs",
 		},
 		{
+			name = L["CooldownPanelShowCooldown"] or "Show cooldown",
+			kind = SettingType.Checkbox,
+			field = "debuffCooldownEnabled",
+			parentId = "debuffs",
+			get = function()
+				local cfg = getCfg(kind)
+				local ac = ensureAuraConfig(cfg)
+				local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.debuff) or {}
+				if ac.debuff.showCooldown == nil then return def.showCooldown ~= false end
+				return ac.debuff.showCooldown ~= false
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				local ac = ensureAuraConfig(cfg)
+				ac.debuff.showCooldown = value and true or false
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "debuffCooldownEnabled", ac.debuff.showCooldown, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+		},
+		{
 			name = L["Show cooldown text"] or "Show cooldown text",
 			kind = SettingType.Checkbox,
 			field = "debuffCooldownTextEnabled",
@@ -25478,6 +25551,7 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "debuffCooldownTextAnchor", value, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+			isEnabled = function() return isAuraCooldownTextEnabled("debuff") end,
 		},
 		{
 			name = L["Cooldown text offset X"] or "Cooldown text offset X",
@@ -25502,6 +25576,7 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "debuffCooldownTextOffsetX", ac.debuff.cooldownOffset.x, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+			isEnabled = function() return isAuraCooldownTextEnabled("debuff") end,
 		},
 		{
 			name = L["Cooldown text offset Y"] or "Cooldown text offset Y",
@@ -25526,6 +25601,7 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "debuffCooldownTextOffsetY", ac.debuff.cooldownOffset.y, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+			isEnabled = function() return isAuraCooldownTextEnabled("debuff") end,
 		},
 		{
 			name = L["Cooldown text size"] or "Cooldown text size",
@@ -25549,6 +25625,7 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "debuffCooldownTextSize", ac.debuff.cooldownFontSize, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+			isEnabled = function() return isAuraCooldownTextEnabled("debuff") end,
 		},
 		{
 			name = L["Cooldown text font"] or "Cooldown text font",
@@ -25585,6 +25662,7 @@ local function buildEditModeSettings(kind, editModeId)
 					end)
 				end
 			end,
+			isEnabled = function() return isAuraCooldownTextEnabled("debuff") end,
 		},
 		{
 			name = L["Cooldown text outline"] or "Cooldown text outline",
@@ -25620,6 +25698,7 @@ local function buildEditModeSettings(kind, editModeId)
 					end)
 				end
 			end,
+			isEnabled = function() return isAuraCooldownTextEnabled("debuff") end,
 		},
 		{
 			name = "",
@@ -25667,6 +25746,7 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "debuffStackAnchor", value, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+			isEnabled = function() return isAuraStackTextEnabled("debuff") end,
 		},
 		{
 			name = L["Stack offset X"] or "Stack offset X",
@@ -25691,6 +25771,7 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "debuffStackOffsetX", ac.debuff.countOffset.x, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+			isEnabled = function() return isAuraStackTextEnabled("debuff") end,
 		},
 		{
 			name = L["Stack offset Y"] or "Stack offset Y",
@@ -25715,6 +25796,7 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "debuffStackOffsetY", ac.debuff.countOffset.y, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+			isEnabled = function() return isAuraStackTextEnabled("debuff") end,
 		},
 		{
 			name = L["Stack size"] or "Stack size",
@@ -25738,6 +25820,7 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "debuffStackSize", ac.debuff.countFontSize, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+			isEnabled = function() return isAuraStackTextEnabled("debuff") end,
 		},
 		{
 			name = L["Stack font"] or "Stack font",
@@ -25774,6 +25857,7 @@ local function buildEditModeSettings(kind, editModeId)
 					end)
 				end
 			end,
+			isEnabled = function() return isAuraStackTextEnabled("debuff") end,
 		},
 		{
 			name = L["Stack outline"] or "Stack outline",
@@ -25809,6 +25893,7 @@ local function buildEditModeSettings(kind, editModeId)
 					end)
 				end
 			end,
+			isEnabled = function() return isAuraStackTextEnabled("debuff") end,
 		},
 		{
 			name = L["Externals"] or "Externals",
@@ -26263,6 +26348,27 @@ local function buildEditModeSettings(kind, editModeId)
 			parentId = "externals",
 		},
 		{
+			name = L["CooldownPanelShowCooldown"] or "Show cooldown",
+			kind = SettingType.Checkbox,
+			field = "externalCooldownEnabled",
+			parentId = "externals",
+			get = function()
+				local cfg = getCfg(kind)
+				local ac = ensureAuraConfig(cfg)
+				local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.externals) or {}
+				if ac.externals.showCooldown == nil then return def.showCooldown ~= false end
+				return ac.externals.showCooldown ~= false
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				local ac = ensureAuraConfig(cfg)
+				ac.externals.showCooldown = value and true or false
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "externalCooldownEnabled", ac.externals.showCooldown, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+		},
+		{
 			name = L["Show cooldown text"] or "Show cooldown text",
 			kind = SettingType.Checkbox,
 			field = "externalCooldownTextEnabled",
@@ -26303,6 +26409,7 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "externalCooldownTextAnchor", value, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+			isEnabled = function() return isAuraCooldownTextEnabled("externals") end,
 		},
 		{
 			name = L["Cooldown text offset X"] or "Cooldown text offset X",
@@ -26327,6 +26434,7 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "externalCooldownTextOffsetX", ac.externals.cooldownOffset.x, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+			isEnabled = function() return isAuraCooldownTextEnabled("externals") end,
 		},
 		{
 			name = L["Cooldown text offset Y"] or "Cooldown text offset Y",
@@ -26351,6 +26459,7 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "externalCooldownTextOffsetY", ac.externals.cooldownOffset.y, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+			isEnabled = function() return isAuraCooldownTextEnabled("externals") end,
 		},
 		{
 			name = L["Cooldown text size"] or "Cooldown text size",
@@ -26374,6 +26483,7 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "externalCooldownTextSize", ac.externals.cooldownFontSize, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+			isEnabled = function() return isAuraCooldownTextEnabled("externals") end,
 		},
 		{
 			name = L["Cooldown text font"] or "Cooldown text font",
@@ -26410,6 +26520,7 @@ local function buildEditModeSettings(kind, editModeId)
 					end)
 				end
 			end,
+			isEnabled = function() return isAuraCooldownTextEnabled("externals") end,
 		},
 		{
 			name = L["Cooldown text outline"] or "Cooldown text outline",
@@ -26445,6 +26556,7 @@ local function buildEditModeSettings(kind, editModeId)
 					end)
 				end
 			end,
+			isEnabled = function() return isAuraCooldownTextEnabled("externals") end,
 		},
 		{
 			name = "",
@@ -26492,6 +26604,7 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "externalStackAnchor", value, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+			isEnabled = function() return isAuraStackTextEnabled("externals") end,
 		},
 		{
 			name = L["Stack offset X"] or "Stack offset X",
@@ -26516,6 +26629,7 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "externalStackOffsetX", ac.externals.countOffset.x, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+			isEnabled = function() return isAuraStackTextEnabled("externals") end,
 		},
 		{
 			name = L["Stack offset Y"] or "Stack offset Y",
@@ -26540,6 +26654,7 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "externalStackOffsetY", ac.externals.countOffset.y, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+			isEnabled = function() return isAuraStackTextEnabled("externals") end,
 		},
 		{
 			name = L["Stack size"] or "Stack size",
@@ -26563,6 +26678,7 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "externalStackSize", ac.externals.countFontSize, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+			isEnabled = function() return isAuraStackTextEnabled("externals") end,
 		},
 		{
 			name = L["Stack font"] or "Stack font",
@@ -26599,6 +26715,7 @@ local function buildEditModeSettings(kind, editModeId)
 					end)
 				end
 			end,
+			isEnabled = function() return isAuraStackTextEnabled("externals") end,
 		},
 		{
 			name = L["Stack outline"] or "Stack outline",
@@ -26634,6 +26751,7 @@ local function buildEditModeSettings(kind, editModeId)
 					end)
 				end
 			end,
+			isEnabled = function() return isAuraStackTextEnabled("externals") end,
 		},
 		{
 			name = L["Show DR %"] or "Show DR %",
@@ -28024,6 +28142,34 @@ local function buildEditModeSettings(kind, editModeId)
 		GF:AppendStatusIconSettings(settings, kind, editModeId, raidMarkerIndex)
 	end
 
+	do
+		local sectionByParent = {
+			buffs = "buff",
+			debuffs = "debuff",
+			externals = "externals",
+		}
+		local enableFieldByParent = {
+			buffs = "buffsEnabled",
+			debuffs = "debuffsEnabled",
+			externals = "externalsEnabled",
+		}
+		local function isAuraSectionEnabled(typeKey)
+			local typeCfg = getAuraTypeConfig(typeKey)
+			return typeCfg and typeCfg.enabled == true
+		end
+		for _, setting in ipairs(settings) do
+			local typeKey = setting and sectionByParent[setting.parentId]
+			if typeKey and setting.field ~= enableFieldByParent[setting.parentId] then
+				local previousIsEnabled = setting.isEnabled
+				setting.isEnabled = function()
+					if not isAuraSectionEnabled(typeKey) then return false end
+					if previousIsEnabled then return previousIsEnabled() ~= false end
+					return true
+				end
+			end
+		end
+	end
+
 	settings = GF.ReorderGroupEditModeSettings(settings)
 	GF.ApplyBlizzardAuraSettingVisibility(settings, kind)
 	return settings
@@ -29043,6 +29189,7 @@ local function applyEditModeData(kind, data)
 	if data.buffBorderSize ~= nil then ac.buff.borderSize = clampNumber(data.buffBorderSize, 1, 64, ac.buff.borderSize or 2) end
 	if data.buffBorderOffset ~= nil then ac.buff.borderOffset = clampNumber(data.buffBorderOffset, -64, 64, ac.buff.borderOffset or 0) end
 	if data.buffHelpfulFilterMode ~= nil then ac.buff.helpfulFilterMode = GF.NormalizeBuffHelpfulFilterMode(data.buffHelpfulFilterMode) end
+	if data.buffCooldownEnabled ~= nil then ac.buff.showCooldown = data.buffCooldownEnabled and true or false end
 	if data.buffCooldownTextEnabled ~= nil then ac.buff.showCooldownText = data.buffCooldownTextEnabled and true or false end
 	if data.buffCooldownTextAnchor ~= nil then ac.buff.cooldownAnchor = data.buffCooldownTextAnchor end
 	if data.buffCooldownTextOffsetX ~= nil or data.buffCooldownTextOffsetY ~= nil then
@@ -29085,6 +29232,7 @@ local function applyEditModeData(kind, data)
 	if data.debuffBorderSize ~= nil then ac.debuff.borderSize = clampNumber(data.debuffBorderSize, 1, 64, ac.debuff.borderSize or 2) end
 	if data.debuffBorderOffset ~= nil then ac.debuff.borderOffset = clampNumber(data.debuffBorderOffset, -64, 64, ac.debuff.borderOffset or 0) end
 	if data.debuffShowDispelIcon ~= nil then ac.debuff.showDispelIcon = data.debuffShowDispelIcon and true or false end
+	if data.debuffCooldownEnabled ~= nil then ac.debuff.showCooldown = data.debuffCooldownEnabled and true or false end
 	if data.debuffCooldownTextEnabled ~= nil then ac.debuff.showCooldownText = data.debuffCooldownTextEnabled and true or false end
 	if data.debuffCooldownTextAnchor ~= nil then ac.debuff.cooldownAnchor = data.debuffCooldownTextAnchor end
 	if data.debuffCooldownTextOffsetX ~= nil or data.debuffCooldownTextOffsetY ~= nil then
@@ -29129,6 +29277,7 @@ local function applyEditModeData(kind, data)
 	if data.externalBorderSize ~= nil then ac.externals.borderSize = clampNumber(data.externalBorderSize, 1, 64, ac.externals.borderSize or 2) end
 	if data.externalBorderColor ~= nil then ac.externals.borderColor = data.externalBorderColor end
 	if data.externalBorderOffset ~= nil then ac.externals.borderOffset = clampNumber(data.externalBorderOffset, -64, 64, ac.externals.borderOffset or 0) end
+	if data.externalCooldownEnabled ~= nil then ac.externals.showCooldown = data.externalCooldownEnabled and true or false end
 	if data.externalCooldownTextEnabled ~= nil then ac.externals.showCooldownText = data.externalCooldownTextEnabled and true or false end
 	if data.externalCooldownTextAnchor ~= nil then ac.externals.cooldownAnchor = data.externalCooldownTextAnchor end
 	if data.externalCooldownTextOffsetX ~= nil or data.externalCooldownTextOffsetY ~= nil then
@@ -29882,6 +30031,7 @@ function GF:EnsureEditMode()
 				buffBorderSize = ac.buff.borderSize or defBuff.borderSize or 2,
 				buffBorderOffset = ac.buff.borderOffset or defBuff.borderOffset or 0,
 				buffHelpfulFilterMode = GF.NormalizeBuffHelpfulFilterMode(ac.buff.helpfulFilterMode or defBuff.helpfulFilterMode),
+				buffCooldownEnabled = (ac.buff.showCooldown ~= nil and ac.buff.showCooldown ~= false) or (ac.buff.showCooldown == nil and defBuff.showCooldown ~= false),
 				buffCooldownTextEnabled = (ac.buff.showCooldownText ~= nil and ac.buff.showCooldownText ~= false) or (ac.buff.showCooldownText == nil and defBuff.showCooldownText ~= false),
 				buffCooldownTextAnchor = ac.buff.cooldownAnchor or defBuff.cooldownAnchor or "CENTER",
 				buffCooldownTextOffsetX = (ac.buff.cooldownOffset and ac.buff.cooldownOffset.x) or (defBuff.cooldownOffset and defBuff.cooldownOffset.x) or 0,
@@ -29912,6 +30062,7 @@ function GF:EnsureEditMode()
 				debuffBorderSize = ac.debuff.borderSize or defDebuff.borderSize or 2,
 				debuffBorderOffset = ac.debuff.borderOffset or defDebuff.borderOffset or 0,
 				debuffShowDispelIcon = (ac.debuff.showDispelIcon ~= nil and ac.debuff.showDispelIcon ~= false) or (ac.debuff.showDispelIcon == nil and defDebuff.showDispelIcon ~= false),
+				debuffCooldownEnabled = (ac.debuff.showCooldown ~= nil and ac.debuff.showCooldown ~= false) or (ac.debuff.showCooldown == nil and defDebuff.showCooldown ~= false),
 				debuffCooldownTextEnabled = (ac.debuff.showCooldownText ~= nil and ac.debuff.showCooldownText ~= false) or (ac.debuff.showCooldownText == nil and defDebuff.showCooldownText ~= false),
 				debuffCooldownTextAnchor = ac.debuff.cooldownAnchor or defDebuff.cooldownAnchor or "CENTER",
 				debuffCooldownTextOffsetX = (ac.debuff.cooldownOffset and ac.debuff.cooldownOffset.x) or (defDebuff.cooldownOffset and defDebuff.cooldownOffset.x) or 0,
@@ -29944,6 +30095,8 @@ function GF:EnsureEditMode()
 				externalBorderSize = ac.externals.borderSize or defExt.borderSize or 2,
 				externalBorderColor = ac.externals.borderColor or defExt.borderColor or { 1, 0.25, 0.25, 1 },
 				externalBorderOffset = ac.externals.borderOffset or defExt.borderOffset or 0,
+				externalCooldownEnabled = (ac.externals.showCooldown ~= nil and ac.externals.showCooldown ~= false)
+					or (ac.externals.showCooldown == nil and defExt.showCooldown ~= false),
 				externalCooldownTextEnabled = (ac.externals.showCooldownText ~= nil and ac.externals.showCooldownText ~= false)
 					or (ac.externals.showCooldownText == nil and defExt.showCooldownText ~= false),
 				externalCooldownTextAnchor = ac.externals.cooldownAnchor or defExt.cooldownAnchor or "CENTER",

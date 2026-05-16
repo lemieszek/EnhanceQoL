@@ -6,6 +6,11 @@
 
 - Cooldown Panels: Added optional custom activation durations for spell, item, slot, and matching macro entries, allowing uses such as potion or trinket tracking with an active-style reverse swipe.
 
+### 🐛 Fixed
+
+- Group Frames / Auras: Restored the Show cooldown controls for buffs, debuffs, and externals, fixed cooldown text showing independently from swipes, and disabled aura sub-options when their parent toggle is off.
+- Random Mount: Fixed Shaman Ghost Wolf and Druid travel/cat form fallback actions not working in combat by preparing combat-safe macro conditions before lockdown.
+
 ---
 
 ## [10.16.1] - 2026-05-16
