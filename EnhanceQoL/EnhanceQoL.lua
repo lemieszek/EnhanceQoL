@@ -660,16 +660,26 @@ local function ApplyAlphaToRegion(target, alpha, _useFade)
 	target:SetAlpha(alpha)
 end
 
+local function RestoreItemButtonIconAlpha(button)
+	if not button then return end
+	local icon
+	if _G.GetItemButtonIconTexture and button.GetName and button:GetName() then icon = _G.GetItemButtonIconTexture(button) end
+	icon = icon or button.Icon or button.icon
+	if icon and icon.SetAlpha then ApplyAlphaToRegion(icon, 1, false) end
+end
+
 local function RestoreUnitFrameVisibility(frame, cbData)
 	ApplyAlphaToRegion(frame, 1, false)
 	if cbData and cbData.children then
 		for _, child in pairs(cbData.children) do
 			ApplyAlphaToRegion(child, 1, false)
+			RestoreItemButtonIconAlpha(child)
 		end
 	end
 	if cbData and cbData.hideChildren then
 		for _, child in pairs(cbData.hideChildren) do
 			ApplyAlphaToRegion(child, 1, false)
+			RestoreItemButtonIconAlpha(child)
 		end
 	end
 end
@@ -973,11 +983,10 @@ local function ApplyUnitFrameStateDriver(frame, expression, showWhenCleared)
 end
 
 local function RefreshAllFrameVisibilities()
+	UpdateFrameVisibilityContext()
 	for _, state in pairs(frameVisibilityStates) do
 		ApplyFrameVisibilityState(state)
 	end
-	if addon.Aura and addon.Aura.UF and addon.Aura.UF.ScheduleEqolVisibilityDriverAlphaRefresh then addon.Aura.UF.ScheduleEqolVisibilityDriverAlphaRefresh() end
-	if addon.Aura and addon.Aura.ResourceBars and addon.Aura.ResourceBars.ScheduleVisibilityDriverAlphaRefresh then addon.Aura.ResourceBars.ScheduleVisibilityDriverAlphaRefresh() end
 end
 addon.functions.RefreshAllFrameVisibilityAlpha = RefreshAllFrameVisibilities
 
@@ -1016,6 +1025,14 @@ local function clampVisibilityAlpha(value)
 	if value < 0 then return 0 end
 	if value > 1 then return 1 end
 	return value
+end
+
+local function GetManualFrameVisibilityInactiveAlpha()
+	local strength = addon.db and tonumber(addon.db.frameVisibilityFadeStrength) or nil
+	if strength == nil then strength = 1 end
+	if strength < 0 then strength = 0 end
+	if strength > 1 then strength = 1 end
+	return 1 - strength
 end
 
 local function HasFrameVisibilityInactiveHideRule(cfg)
@@ -1103,17 +1120,26 @@ end
 
 local function ApplyToFrameAndChildren(state, alpha, useFade)
 	local frame = state.frame
+	local cbData = state.cbData
+	local hasChildren = cbData and (cbData.children or cbData.hideChildren)
+	local restoreChildAlpha = hasChildren and alpha > 0 and alpha < 1
+
+	-- Parent alpha already multiplies child alpha on container-style Blizzard frames.
+	-- During partial fade, keep children at 1 so the configured alpha is not squared.
 	if frame then ApplyAlphaToRegion(frame, alpha, useFade) end
 
-	if state.cbData and state.cbData.children then
-		for _, child in pairs(state.cbData.children) do
-			ApplyAlphaToRegion(child, alpha, useFade)
+	local childAlpha = restoreChildAlpha and 1 or alpha
+	if cbData and cbData.children then
+		for _, child in pairs(cbData.children) do
+			ApplyAlphaToRegion(child, childAlpha, useFade)
+			if restoreChildAlpha then RestoreItemButtonIconAlpha(child) end
 		end
 	end
 
-	if state.cbData and state.cbData.hideChildren then
-		for _, child in pairs(state.cbData.hideChildren) do
-			ApplyAlphaToRegion(child, alpha, useFade)
+	if cbData and cbData.hideChildren then
+		for _, child in pairs(cbData.hideChildren) do
+			ApplyAlphaToRegion(child, childAlpha, useFade)
+			if restoreChildAlpha then RestoreItemButtonIconAlpha(child) end
 		end
 	end
 end
@@ -1173,20 +1199,30 @@ ApplyFrameVisibilityState = function(state)
 	if state.driverActive then return end
 
 	EnsureFrameVisibilityWatcher()
+	UpdateFrameVisibilityContext()
 	local shouldShow, activeRule = EvaluateFrameVisibility(state)
 	local forcedHidden = activeRule == "ALWAYS_HIDDEN" or activeRule == "ALWAYS_HIDE_IN_GROUP" or activeRule == "ALWAYS_HIDE_IN_PARTY" or activeRule == "ALWAYS_HIDE_IN_RAID"
-	local targetAlpha = shouldShow and 1 or 0
-	if forcedHidden then targetAlpha = 0 end
+	local targetAlpha = 1
+	if forcedHidden then
+		targetAlpha = 0
+	elseif not shouldShow then
+		targetAlpha = GetManualFrameVisibilityInactiveAlpha()
+	end
+	targetAlpha = clampVisibilityAlpha(targetAlpha) or 0
 
 	local lastAlpha = state.lastAlpha
-	if shouldShow then
-		if state.visible == true then return end
-	else
-		if state.visible == false then return end
+	if
+		state.visible == shouldShow
+		and state.activeRule == activeRule
+		and lastAlpha ~= nil
+		and math.abs(lastAlpha - targetAlpha) <= 0.001
+	then
+		return
 	end
 
 	ApplyToFrameAndChildren(state, targetAlpha, true)
 	state.visible = shouldShow
+	state.activeRule = activeRule
 	state.lastAlpha = targetAlpha
 end
 
@@ -1260,7 +1296,8 @@ local function ClearUnitFrameState(frame, cbData, opts)
 		frameVisibilityStates[frame] = nil
 		return
 	end
-	if not (opts and opts.noStateDriver) then ApplyUnitFrameStateDriver(frame, nil, cbData and cbData.showWhenNoRule) end
+	local hasDriver = frame.EQOL_VisibilityStateDriver ~= nil or (frame.GetAttribute and frame:GetAttribute("state-visibility") ~= nil)
+	if not (opts and opts.noStateDriver) or hasDriver then ApplyUnitFrameStateDriver(frame, nil, cbData and cbData.showWhenNoRule) end
 	RestoreUnitFrameVisibility(frame, cbData)
 	frameVisibilityStates[frame] = nil
 end
@@ -1307,8 +1344,9 @@ local function ApplyVisibilityToUnitFrame(frameName, cbData, config, opts)
 		return true
 	end
 
+	local hadDriver = state.driverActive == true or frame.EQOL_VisibilityStateDriver ~= nil or (frame.GetAttribute and frame:GetAttribute("state-visibility") ~= nil)
 	state.driverActive = false
-	if not (opts and opts.noStateDriver) or state.isBossFrame then ApplyUnitFrameStateDriver(frame, nil, state.cbData and state.cbData.showWhenNoRule) end
+	if not (opts and opts.noStateDriver) or state.isBossFrame or hadDriver then ApplyUnitFrameStateDriver(frame, nil, state.cbData and state.cbData.showWhenNoRule) end
 
 	if config.MOUSEOVER then
 		state.isMouseOver = MouseIsOver(frame)
@@ -1323,6 +1361,7 @@ UpdateUnitFrameMouseover = function(barName, cbData)
 	if not cbData or not cbData.var then return end
 
 	local config = NormalizeUnitFrameVisibilityConfig(cbData.var)
+	local manualOpts = { noStateDriver = true }
 	-- local handled = false
 
 	if barName == BOSS_FRAME_CONTAINER_NAME then
@@ -1358,12 +1397,12 @@ UpdateUnitFrameMouseover = function(barName, cbData)
 			cbData.revealAllChilds = nil
 		end
 
-		ApplyVisibilityToUnitFrame(barName, cbData, config)
+		ApplyVisibilityToUnitFrame(barName, cbData, config, manualOpts)
 		return
 	end
 
 	local function processTarget(name)
-		if ApplyVisibilityToUnitFrame(name, cbData, config) then
+		if ApplyVisibilityToUnitFrame(name, cbData, config, manualOpts) then
 			-- handled = true
 		end
 	end

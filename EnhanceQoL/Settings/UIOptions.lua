@@ -1447,7 +1447,6 @@ local function createFrameCategory()
 			if pct > 100 then pct = 100 end
 			addon.db.frameVisibilityFadeStrength = pct / 100
 			RefreshAllFrameVisibilityAlpha()
-			if addon.functions.ApplyCooldownViewerVisibility then addon.functions.ApplyCooldownViewerVisibility() end
 		end,
 		parentSection = expandable,
 	})

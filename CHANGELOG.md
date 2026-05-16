@@ -1,5 +1,14 @@
 # Changelog
 
+## [10.17.0-beta3] - 2026-05-16
+
+### 🐛 Fixed
+
+- Visibility: Added fade support for the default Blizzard frame Visibility Hub, including Bags Bar, Buff Frame, Debuff Frame, Micro Menu, and Minimap visibility rules.
+- Visibility / Bags Bar: Fixed faded Bags Bar states leaving equipped bag icons invisible while the slot frames were still shown.
+
+---
+
 ## [10.17.0-beta2] - 2026-05-16
 
 ### 🐛 Fixed
