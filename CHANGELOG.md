@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.17.0-beta2] - 2026-05-16
+
+### 🐛 Fixed
+
+- Social / Friends List: Fixed favorite stars shifting briefly when opening the enhanced friends list with favorited offline Battle.net friends.
+
+---
+
 ## [10.17.0-beta1] - 2026-05-16
 
 ### ✨ Added
