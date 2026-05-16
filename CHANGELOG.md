@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.16.1] - 2026-05-16
+
+### 🐛 Fixed
+
+- Class Buff Reminder / Pet Tracker: Fixed pet reminders being hidden while solo when `Show while solo` was disabled.
+
+---
+
 ## [10.16.0] - 2026-05-16
 
 ### ✨ Added

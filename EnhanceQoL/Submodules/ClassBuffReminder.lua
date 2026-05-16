@@ -2412,19 +2412,19 @@ function Reminder:GetSupplementalMissingEntries(evalContext)
 
 	local context = type(evalContext) == "table" and evalContext or nil
 	local entries = {}
-	if self:CanEvaluateFlaskReminderNow() then
+	if not (context and context.onlyPetReminder == true) and self:CanEvaluateFlaskReminderNow() then
 		local flaskEntry = self:GetFlaskMissingEntry(context)
 		if flaskEntry then entries[#entries + 1] = flaskEntry end
 	end
-	if self:CanEvaluateFoodReminderNow() then
+	if not (context and context.onlyPetReminder == true) and self:CanEvaluateFoodReminderNow() then
 		local foodEntry = self:GetFoodMissingEntry(context)
 		if foodEntry then entries[#entries + 1] = foodEntry end
 	end
-	if self:CanEvaluateRuneReminderNow() then
+	if not (context and context.onlyPetReminder == true) and self:CanEvaluateRuneReminderNow() then
 		local runeEntry = self:GetRuneMissingEntry(context)
 		if runeEntry then entries[#entries + 1] = runeEntry end
 	end
-	if self:CanEvaluateWeaponBuffReminderNow() then
+	if not (context and context.onlyPetReminder == true) and self:CanEvaluateWeaponBuffReminderNow() then
 		local weaponBuffEntry = self:GetWeaponBuffMissingEntry(context)
 		if weaponBuffEntry then entries[#entries + 1] = weaponBuffEntry end
 	end
@@ -5560,7 +5560,9 @@ function Reminder:UpdateDisplay()
 		return
 	end
 
-	if not self:IsGroupModeAllowed() then
+	local groupModeAllowed = self:IsGroupModeAllowed()
+	local petSoloModeAllowed = groupModeAllowed ~= true and self:GetGroupContext() == GROUP_CONTEXT_SOLO and self:CanCheckPetReminder()
+	if groupModeAllowed ~= true and petSoloModeAllowed ~= true then
 		self:SetGlowShown(false)
 		self.missingActive = false
 		frame:Hide()
@@ -5589,11 +5591,14 @@ function Reminder:UpdateDisplay()
 	end
 
 	local classProvider = self:GetProvider()
+	if groupModeAllowed ~= true then classProvider = nil end
 	if classProvider and classProvider.scope == PROVIDER_SCOPE_GROUP and self:ShouldEvaluateGroupResponsibilities(classProvider) ~= true then classProvider = nil end
 
 	local provider = classProvider
 	if not provider then
-		if self:CanCheckFlaskReminder() then
+		if petSoloModeAllowed == true then
+			provider = self:GetPetOnlyProvider()
+		elseif self:CanCheckFlaskReminder() then
 			provider = self:GetFlaskOnlyProvider()
 		elseif self:CanCheckFoodReminder() then
 			provider = self:GetFoodOnlyProvider()
@@ -5615,7 +5620,7 @@ function Reminder:UpdateDisplay()
 	if classProvider then
 		missing, total = self:ComputeMissing(classProvider)
 	end
-	local supplementalContext = {}
+	local supplementalContext = { onlyPetReminder = petSoloModeAllowed == true }
 	local supplementalEntries = self:GetSupplementalMissingEntries(supplementalContext)
 	local supplementalMissing = type(supplementalEntries) == "table" and #supplementalEntries or 0
 	local primarySupplementalEntry = type(supplementalEntries) == "table" and supplementalEntries[1] or nil
