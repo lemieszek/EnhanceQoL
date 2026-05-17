@@ -37,6 +37,9 @@ local NAMEPLATE_MOB_COLORS_OUTSIDE_DUNGEONS_DB_KEY = "nameplateMobColorsOutsideD
 local NAMEPLATE_QUEST_MARKERS_DB_KEY = "nameplateQuestMarkers"
 local NAMEPLATE_QUEST_MARKER_ANCHOR_DB_KEY = "nameplateQuestMarkerAnchor"
 local NAMEPLATE_QUEST_MARKER_SIZE_DB_KEY = "nameplateQuestMarkerSize"
+local NAMEPLATE_TARGET_MARKERS_DB_KEY = "nameplateTargetMarkers"
+local NAMEPLATE_TARGET_MARKER_ATLAS_DB_KEY = "nameplateTargetMarkerAtlas"
+local NAMEPLATE_TARGET_MARKER_SIZE_DB_KEY = "nameplateTargetMarkerSize"
 local NAMEPLATE_MOB_COLOR_BOSS_DB_KEY = "nameplateMobColorBoss"
 local NAMEPLATE_MOB_COLOR_MINIBOSS_DB_KEY = "nameplateMobColorMiniboss"
 local NAMEPLATE_MOB_COLOR_CASTER_DB_KEY = "nameplateMobColorCaster"
@@ -53,6 +56,8 @@ local nameplateMobColorFrame
 local nameplateMobColorHooksInstalled = false
 local nameplateMobColorsActive = false
 local nameplateQuestMarkersActive = false
+local nameplateTargetMarkersActive = false
+local nameplateTargetMarkerLastUnit
 local nameplateQuestMarkerCache = {}
 local nameplateMobColorState = {
 	isActive = false,
@@ -98,6 +103,9 @@ addon.constants.DEFAULT_NAMEPLATE_FEATURE_KEYS = {
 	questMarkers = NAMEPLATE_QUEST_MARKERS_DB_KEY,
 	questMarkerAnchor = NAMEPLATE_QUEST_MARKER_ANCHOR_DB_KEY,
 	questMarkerSize = NAMEPLATE_QUEST_MARKER_SIZE_DB_KEY,
+	targetMarkers = NAMEPLATE_TARGET_MARKERS_DB_KEY,
+	targetMarkerAtlas = NAMEPLATE_TARGET_MARKER_ATLAS_DB_KEY,
+	targetMarkerSize = NAMEPLATE_TARGET_MARKER_SIZE_DB_KEY,
 	mobColorBoss = NAMEPLATE_MOB_COLOR_BOSS_DB_KEY,
 	mobColorMiniboss = NAMEPLATE_MOB_COLOR_MINIBOSS_DB_KEY,
 	mobColorCaster = NAMEPLATE_MOB_COLOR_CASTER_DB_KEY,
@@ -505,6 +513,8 @@ end
 
 local function isNameplateQuestMarkersActive() return nameplateQuestMarkersActive == true end
 
+local function isNameplateTargetMarkersActive() return nameplateTargetMarkersActive == true end
+
 local function getNameplateQuestMarkerAnchor(unitFrame)
 	if not unitFrame or isSecretValue(unitFrame) then return nil end
 	if unitFrame.IsForbidden and unitFrame:IsForbidden() then return nil end
@@ -649,6 +659,103 @@ local function hideAllNameplateQuestMarkers()
 		local marker = namePlate and namePlate.UnitFrame and namePlate.UnitFrame.eqolQuestMarker
 		if marker then marker:Hide() end
 	end
+end
+
+local TARGET_MARKER_DEFAULT_ATLAS = "shop-header-arrow-hover"
+local TARGET_MARKER_ATLASES = {
+	["shop-header-arrow-hover"] = true,
+	["CovenantSanctum-Renown-DoubleArrow-Hover"] = true,
+}
+local TARGET_MARKER_OFFSET = 2
+
+local function getNameplateTargetMarkerAtlas()
+	local atlas = addon.db and addon.db[NAMEPLATE_TARGET_MARKER_ATLAS_DB_KEY] or TARGET_MARKER_DEFAULT_ATLAS
+	if type(atlas) ~= "string" or not TARGET_MARKER_ATLASES[atlas] then atlas = TARGET_MARKER_DEFAULT_ATLAS end
+	return atlas
+end
+
+local function getNameplateTargetMarkerSize()
+	local size = addon.db and tonumber(addon.db[NAMEPLATE_TARGET_MARKER_SIZE_DB_KEY]) or 18
+	if size < 8 then size = 8 end
+	if size > 64 then size = 64 end
+	return size
+end
+
+local function getNameplateTargetMarkers(unitFrame)
+	if not isNameplateTargetMarkersActive() then return nil, nil end
+	local anchor = getNameplateQuestMarkerAnchor(unitFrame)
+	if not anchor then return nil, nil end
+
+	local left = unitFrame.eqolTargetMarkerLeft
+	if not left then
+		left = unitFrame:CreateTexture(nil, "OVERLAY")
+		if left.SetRotation then left:SetRotation(math.pi) end
+		left:Hide()
+		unitFrame.eqolTargetMarkerLeft = left
+	end
+
+	local right = unitFrame.eqolTargetMarkerRight
+	if not right then
+		right = unitFrame:CreateTexture(nil, "OVERLAY")
+		right:Hide()
+		unitFrame.eqolTargetMarkerRight = right
+	end
+
+	local atlas = getNameplateTargetMarkerAtlas()
+	local size = getNameplateTargetMarkerSize()
+	left:SetAtlas(atlas, true)
+	right:SetAtlas(atlas, true)
+	left:SetSize(size, size)
+	right:SetSize(size, size)
+	left:ClearAllPoints()
+	left:SetPoint("RIGHT", anchor, "LEFT", -TARGET_MARKER_OFFSET, 0)
+	right:ClearAllPoints()
+	right:SetPoint("LEFT", anchor, "RIGHT", TARGET_MARKER_OFFSET, 0)
+	return left, right
+end
+
+local function updateNameplateTargetMarkers(unitFrame, unit)
+	local left = unitFrame and unitFrame.eqolTargetMarkerLeft
+	local right = unitFrame and unitFrame.eqolTargetMarkerRight
+	if not isNameplateTargetMarkersActive() or not isNameplateUnitToken(unit) then
+		if left then left:Hide() end
+		if right then right:Hide() end
+		return
+	end
+
+	local isTarget = UnitIsUnit and UnitIsUnit(unit, "target") == true
+	left, right = getNameplateTargetMarkers(unitFrame)
+	if left then left:SetShown(isTarget) end
+	if right then right:SetShown(isTarget) end
+end
+
+local function refreshNameplateTargetMarkerForUnit(unit)
+	if not (unit and C_NamePlate and C_NamePlate.GetNamePlateForUnit) then return nil end
+	local namePlate = C_NamePlate.GetNamePlateForUnit(unit)
+	local unitFrame = namePlate and namePlate.UnitFrame
+	if not unitFrame then return nil end
+	local displayedUnit = unitFrame.unit
+	if not isNameplateUnitToken(displayedUnit) then displayedUnit = unit end
+	updateNameplateTargetMarkers(unitFrame, displayedUnit)
+	return displayedUnit
+end
+
+local function refreshCurrentAndPreviousNameplateTargetMarkers()
+	if nameplateTargetMarkerLastUnit then refreshNameplateTargetMarkerForUnit(nameplateTargetMarkerLastUnit) end
+	local currentUnit = refreshNameplateTargetMarkerForUnit("target")
+	nameplateTargetMarkerLastUnit = isNameplateUnitToken(currentUnit) and currentUnit or nil
+end
+
+local function hideAllNameplateTargetMarkers()
+	if not (C_NamePlate and C_NamePlate.GetNamePlates) then return end
+	for _, namePlate in pairs(C_NamePlate.GetNamePlates() or {}) do
+		local unitFrame = namePlate and namePlate.UnitFrame
+		local left = unitFrame and unitFrame.eqolTargetMarkerLeft
+		local right = unitFrame and unitFrame.eqolTargetMarkerRight
+		if left then left:Hide() end
+		if right then right:Hide() end
+	end
+	nameplateTargetMarkerLastUnit = nil
 end
 
 local function getNameplateMobColor(dbKey, unit)
@@ -812,6 +919,7 @@ local function refreshNameplateMobColorUnitFrame(unitFrame)
 	if not isNameplateUnitToken(unit) then return end
 
 	updateNameplateQuestMarker(unitFrame, unit)
+	updateNameplateTargetMarkers(unitFrame, unit)
 	if not isNameplateMobColorsActive() then return end
 
 	if type(_G.CompactUnitFrame_UpdateHealthColor) == "function" then
@@ -859,15 +967,20 @@ local function ensureNameplateMobColorWatcher()
 	nameplateMobColorFrame:RegisterEvent("INSTANCE_GROUP_SIZE_CHANGED")
 	nameplateMobColorFrame:RegisterEvent("NAME_PLATE_UNIT_ADDED")
 	nameplateMobColorFrame:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
+	nameplateMobColorFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
 	nameplateMobColorFrame:RegisterEvent("QUEST_LOG_UPDATE")
 	nameplateMobColorFrame:SetScript("OnEvent", function(_, event, unit)
 		ensureNameplateMobColorHooks()
 		if event == "NAME_PLATE_UNIT_REMOVED" then
 			if isNameplateUnitToken(unit) then nameplateQuestMarkerCache[unit] = nil end
+			if unit == nameplateTargetMarkerLastUnit then nameplateTargetMarkerLastUnit = nil end
 			return
 		elseif event == "QUEST_LOG_UPDATE" then
 			clearNameplateQuestMarkerCache()
 			refreshAllNameplateMobColors()
+			return
+		elseif event == "PLAYER_TARGET_CHANGED" then
+			refreshCurrentAndPreviousNameplateTargetMarkers()
 			return
 		end
 
@@ -895,6 +1008,12 @@ local function syncNameplateQuestMarkers()
 	if not isNameplateQuestMarkersActive() then return end
 	ensureNameplateMobColorWatcher()
 	clearNameplateQuestMarkerCache()
+	refreshAllNameplateMobColors()
+end
+
+local function syncNameplateTargetMarkers()
+	if not isNameplateTargetMarkersActive() then return end
+	ensureNameplateMobColorWatcher()
 	refreshAllNameplateMobColors()
 end
 
@@ -1049,6 +1168,21 @@ function addon.functions.RefreshDefaultNameplateQuestMarkers()
 	if isNameplateQuestMarkersActive() then syncNameplateQuestMarkers() end
 end
 
+function addon.functions.SetDefaultNameplateTargetMarkersEnabled(value)
+	local enabled = value and true or false
+	addon.db[NAMEPLATE_TARGET_MARKERS_DB_KEY] = enabled
+	nameplateTargetMarkersActive = enabled
+	if enabled then
+		syncNameplateTargetMarkers()
+	else
+		hideAllNameplateTargetMarkers()
+	end
+end
+
+function addon.functions.RefreshDefaultNameplateTargetMarkers()
+	if isNameplateTargetMarkersActive() then syncNameplateTargetMarkers() end
+end
+
 local function shouldUseTimeoutReleaseForCurrentContext()
 	if not addon.db or not addon.db["timeoutRelease"] then return false end
 
@@ -1192,6 +1326,9 @@ function addon.functions.initDungeonFrame()
 	addon.functions.InitDBValue(NAMEPLATE_QUEST_MARKERS_DB_KEY, false)
 	addon.functions.InitDBValue(NAMEPLATE_QUEST_MARKER_ANCHOR_DB_KEY, "RIGHT")
 	addon.functions.InitDBValue(NAMEPLATE_QUEST_MARKER_SIZE_DB_KEY, 18)
+	addon.functions.InitDBValue(NAMEPLATE_TARGET_MARKERS_DB_KEY, false)
+	addon.functions.InitDBValue(NAMEPLATE_TARGET_MARKER_ATLAS_DB_KEY, TARGET_MARKER_DEFAULT_ATLAS)
+	addon.functions.InitDBValue(NAMEPLATE_TARGET_MARKER_SIZE_DB_KEY, 18)
 	addon.functions.InitDBValue(NAMEPLATE_MOB_COLOR_BOSS_DB_KEY, getNameplateMobColorDefault(NAMEPLATE_MOB_COLOR_BOSS_DB_KEY))
 	addon.functions.InitDBValue(NAMEPLATE_MOB_COLOR_MINIBOSS_DB_KEY, getNameplateMobColorDefault(NAMEPLATE_MOB_COLOR_MINIBOSS_DB_KEY))
 	addon.functions.InitDBValue(NAMEPLATE_MOB_COLOR_CASTER_DB_KEY, getNameplateMobColorDefault(NAMEPLATE_MOB_COLOR_CASTER_DB_KEY))
@@ -1212,9 +1349,11 @@ function addon.functions.initDungeonFrame()
 	nameplateAuraClickthroughActive = addon.db and addon.db[NAMEPLATE_AURA_CLICKTHROUGH_DB_KEY] == true
 	nameplateMobColorsActive = addon.db and addon.db[NAMEPLATE_MOB_COLORS_DB_KEY] == true
 	nameplateQuestMarkersActive = addon.db and addon.db[NAMEPLATE_QUEST_MARKERS_DB_KEY] == true
+	nameplateTargetMarkersActive = addon.db and addon.db[NAMEPLATE_TARGET_MARKERS_DB_KEY] == true
 	if nameplateAuraClickthroughActive then syncNameplateAuraClickthrough() end
 	if nameplateMobColorsActive then syncNameplateMobColors() end
 	if nameplateQuestMarkersActive then syncNameplateQuestMarkers() end
+	if nameplateTargetMarkersActive then syncNameplateTargetMarkers() end
 
 	local combatLogSection = addon.functions.SettingsCreateExpandableSection(cChar, {
 		name = L["combatLogSection"] or "Combat logging",

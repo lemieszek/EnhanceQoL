@@ -55,6 +55,9 @@ local DEFAULT_NAMEPLATE_FEATURE_KEYS = constants.DEFAULT_NAMEPLATE_FEATURE_KEYS
 		questMarkers = "nameplateQuestMarkers",
 		questMarkerAnchor = "nameplateQuestMarkerAnchor",
 		questMarkerSize = "nameplateQuestMarkerSize",
+		targetMarkers = "nameplateTargetMarkers",
+		targetMarkerAtlas = "nameplateTargetMarkerAtlas",
+		targetMarkerSize = "nameplateTargetMarkerSize",
 		mobColorBoss = "nameplateMobColorBoss",
 		mobColorMiniboss = "nameplateMobColorMiniboss",
 		mobColorCaster = "nameplateMobColorCaster",
@@ -1630,6 +1633,74 @@ local function createNameplatesCategory()
 				addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.auraClickthrough] = value and true or false
 			end
 		end,
+		parentSection = expandable,
+	})
+
+	local targetMarkersToggle = addon.functions.SettingsCreateCheckbox(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.targetMarkers,
+		text = L["nameplateTargetMarkers"] or "Show target markers on default nameplates",
+		desc = L["nameplateTargetMarkersDesc"],
+		func = function(value)
+			if addon.functions.SetDefaultNameplateTargetMarkersEnabled then
+				addon.functions.SetDefaultNameplateTargetMarkersEnabled(value)
+			else
+				addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.targetMarkers] = value and true or false
+			end
+		end,
+		parentSection = expandable,
+	})
+
+	local function areTargetMarkersEnabled() return targetMarkersToggle and targetMarkersToggle.setting and targetMarkersToggle.setting:GetValue() == true end
+
+	local function formatTargetMarkerAtlasOption(atlas)
+		return ("|A:%s:18:18|a"):format(atlas)
+	end
+
+	local targetMarkerAtlasOptions = {
+		["shop-header-arrow-hover"] = formatTargetMarkerAtlasOption("shop-header-arrow-hover"),
+		["CovenantSanctum-Renown-DoubleArrow-Hover"] = formatTargetMarkerAtlasOption("CovenantSanctum-Renown-DoubleArrow-Hover"),
+	}
+	local targetMarkerAtlasOrder = { "shop-header-arrow-hover", "CovenantSanctum-Renown-DoubleArrow-Hover" }
+
+	addon.functions.SettingsCreateDropdown(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.targetMarkerAtlas,
+		text = L["nameplateTargetMarkerAtlas"] or "Target marker style",
+		desc = L["nameplateTargetMarkerAtlasDesc"],
+		list = targetMarkerAtlasOptions,
+		order = targetMarkerAtlasOrder,
+		default = "shop-header-arrow-hover",
+		get = function()
+			local current = addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.targetMarkerAtlas]
+			if type(current) ~= "string" or not targetMarkerAtlasOptions[current] then current = "shop-header-arrow-hover" end
+			return current
+		end,
+		set = function(value)
+			if type(value) ~= "string" or not targetMarkerAtlasOptions[value] then value = "shop-header-arrow-hover" end
+			addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.targetMarkerAtlas] = value
+			if addon.functions.RefreshDefaultNameplateTargetMarkers then addon.functions.RefreshDefaultNameplateTargetMarkers() end
+		end,
+		parent = true,
+		element = targetMarkersToggle.element,
+		parentCheck = areTargetMarkersEnabled,
+		parentSection = expandable,
+	})
+
+	addon.functions.SettingsCreateSlider(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.targetMarkerSize,
+		text = L["nameplateTargetMarkerSize"] or "Target marker size",
+		desc = L["nameplateTargetMarkerSizeDesc"],
+		min = 8,
+		max = 64,
+		step = 1,
+		default = 18,
+		get = function() return addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.targetMarkerSize] or 18 end,
+		set = function(value)
+			addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.targetMarkerSize] = value
+			if addon.functions.RefreshDefaultNameplateTargetMarkers then addon.functions.RefreshDefaultNameplateTargetMarkers() end
+		end,
+		parent = true,
+		element = targetMarkersToggle.element,
+		parentCheck = areTargetMarkersEnabled,
 		parentSection = expandable,
 	})
 
