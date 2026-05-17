@@ -2917,9 +2917,63 @@ local function applyRaidIconLayout(unit, cfg)
 	if not enabled then st.raidIcon:Hide() end
 end
 
+function UF.HardHideBlizzFrameObject(frame)
+	if not frame or frame._eqolUFHidden then return end
+
+	local function enforceHidden(target)
+		if not target then return end
+		local canHide = true
+		if InCombatLockdown and InCombatLockdown() then
+			if target.IsProtected and target:IsProtected() then canHide = false end
+		end
+		if canHide and target.Hide then
+			pcall(target.Hide, target)
+		elseif target.SetAlpha then
+			target:SetAlpha(0)
+			target._eqolAlphaHidden = true
+		end
+	end
+
+	local related = {
+		(frame.HealthBarsContainer and frame.HealthBarsContainer.healthBar) or nil,
+		frame.healthBar or frame.healthbar or frame.HealthBar or nil,
+		frame.manabar or frame.ManaBar or nil,
+		frame.castBar or frame.spellbar or nil,
+		frame.petFrame or frame.PetFrame or nil,
+		frame.powerBarAlt or frame.PowerBarAlt or nil,
+		frame.CastingBarFrame or nil,
+		frame.CcRemoverFrame or nil,
+		frame.DebuffFrame or nil,
+		frame.BuffFrame or frame.AurasFrame or nil,
+		frame.totFrame or nil,
+	}
+
+	if frame.UnregisterAllEvents then pcall(frame.UnregisterAllEvents, frame) end
+	for i = 1, #related do
+		local element = related[i]
+		if element and element.UnregisterAllEvents then pcall(element.UnregisterAllEvents, element) end
+	end
+	enforceHidden(frame)
+	frame._eqolUFHidden = true
+	if not UF._blizzHiddenParent then
+		UF._blizzHiddenParent = CreateFrame("Frame")
+		UF._blizzHiddenParent:Hide()
+	end
+	if frame.SetParent then pcall(frame.SetParent, frame, UF._blizzHiddenParent) end
+	if not frame._eqolUFHiddenHooks then
+		frame._eqolUFHiddenHooks = true
+		if frame.Show then hooksecurefunc(frame, "Show", function(f) enforceHidden(f) end) end
+		if frame.SetShown then hooksecurefunc(frame, "SetShown", function(f, shown)
+			if shown then enforceHidden(f) end
+		end) end
+	end
+end
+
 local function hardHideBlizzFrame(frameName)
 	local frame = frameName and _G[frameName]
-	if frame and frame.SetAlpha then frame:SetAlpha(0) end
+	UF.HardHideBlizzFrameObject(frame)
+	if frameName == BLIZZ_FRAME_NAMES.target then UF.HardHideBlizzFrameObject(_G.ComboFrame) end
+	if frameName == BLIZZ_FRAME_NAMES.focus then UF.HardHideBlizzFrameObject(_G.TargetofFocusFrame) end
 end
 
 local function checkRaidTargetIcon(unitToken, st)
