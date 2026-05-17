@@ -610,7 +610,8 @@ local function findRuntimeScanInfoBySpellID(scan, spellID)
 				return matched, resolvedCooldownID
 			end
 			local frame = info.iconFrame or info.barFrame
-			local sawAssociatedSpellID, sawSecretLinkedSpellID
+			local sawAssociatedSpellID = false
+			local sawSecretLinkedSpellID = false
 			local directMatched
 			directMatched, sawAssociatedSpellID, sawSecretLinkedSpellID = frameTrackedSpellMatchesCandidate(frame and frame.auraSpellID, "auraSpellID", spellID, sawAssociatedSpellID, sawSecretLinkedSpellID)
 			if not directMatched then directMatched = frameTrackedSpellMatchesCooldownInfo(frame and frame.cooldownInfo, spellID, sawAssociatedSpellID, sawSecretLinkedSpellID) end
