@@ -1,5 +1,11 @@
 # Changelog
 
+## [10.17.0-beta4] - 2026-05-17
+
+### ✨ Added
+
+- Cooldown Panels: Added automatic activation durations for supported item and equipment slot entries, using a generated item-duration table for potions, trinkets, and similar fixed-duration on-use effects.
+
 ## [10.17.0-beta3] - 2026-05-16
 
 ### 🐛 Fixed
