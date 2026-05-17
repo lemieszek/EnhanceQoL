@@ -425,18 +425,21 @@ local realmLocaleFlagAssets = {
 	zhTW = "flag_zhTW.tga",
 }
 
-local function FormatRealmFlagTexture(fileName)
+local function FormatRealmFlagTexture(fileName, variant)
+	if variant == "lfg" then
+		return ("|TInterface\\AddOns\\EnhanceQoL\\Assets\\%s:13:20:0:-1|t"):format(fileName)
+	end
 	return ("|TInterface\\AddOns\\EnhanceQoL\\Assets\\%s:14:22:0:0|t"):format(fileName)
 end
 
-local function GetRealmFlagPlaceholder(info, allowTextures)
+local function GetRealmFlagPlaceholder(info, allowTextures, variant)
 	if type(info) ~= "table" then return nil end
 	local locale = info.locale
 	if info.region == "US" and type(info.timezone) == "string" and safeFind(info.timezone, "Australia/", true) then
-		return allowTextures and FormatRealmFlagTexture("flag_oce.tga") or "[enAU]"
+		return allowTextures and FormatRealmFlagTexture("flag_oce.tga", variant) or "[enAU]"
 	end
 	local fileName = realmLocaleFlagAssets[info.locale]
-	if fileName and allowTextures then return FormatRealmFlagTexture(fileName) end
+	if fileName and allowTextures then return FormatRealmFlagTexture(fileName, variant) end
 	if type(locale) == "string" and locale ~= "" then return "[" .. locale .. "]" end
 	return nil
 end
@@ -572,7 +575,7 @@ local function UpdateLFGSearchEntryRealmFlag(entry)
 	text = StripPreviousRealmFlagPrefix(entry, text)
 
 	local info = GetRealmInfoForLFGResult(entry.resultID)
-	local prefix = GetRealmFlagPlaceholder(info, not isTooltipRestricted())
+	local prefix = GetRealmFlagPlaceholder(info, not isTooltipRestricted(), "lfg")
 	if not prefix then
 		entry.__EnhanceQoLRealmFlagPrefix = nil
 		entry.Name:SetText(text)
@@ -617,16 +620,16 @@ local function UpdateLFGApplicantMemberRealmFlag(memberFrame, appID, memberIdx)
 	text = StripPreviousRealmFlagPrefix(memberFrame, text)
 
 	local info = GetRealmInfoForLFGApplicant(appID, memberIdx)
-	local prefix = GetRealmFlagPlaceholder(info, not isTooltipRestricted())
+	local prefix = GetRealmFlagPlaceholder(info, not isTooltipRestricted(), "lfg")
 	if not prefix then
 		memberFrame.__EnhanceQoLRealmFlagPrefix = nil
 		memberFrame.Name:SetText(text)
 		return
 	end
 
-	local indent, rest = text:match("^(%s*)(.*)$")
+	local rest = text:match("^%s*(.*)$")
 	memberFrame.__EnhanceQoLRealmFlagPrefix = prefix
-	memberFrame.Name:SetText((indent or "") .. prefix .. " " .. (rest or text or ""))
+	memberFrame.Name:SetText(prefix .. " " .. (rest or text or ""))
 end
 
 local function fmtNum(n)

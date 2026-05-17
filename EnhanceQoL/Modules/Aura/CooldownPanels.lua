@@ -7830,8 +7830,44 @@ function CooldownPanels:SupportsEntryCustomCooldownDuration(entry, resolvedType)
 	return typeKey == "SPELL" or typeKey == "ITEM" or typeKey == "SLOT"
 end
 
+function CooldownPanels:GetAutoCooldownDurationInfoForItemID(itemID)
+	itemID = tonumber(itemID)
+	if not itemID then return nil end
+	local map = self.autoCooldownDurationByItemID
+	local info = map and map[itemID] or nil
+	local duration = info and tonumber(info.duration) or nil
+	if not (duration and duration > 0) then return nil end
+	local maxDuration = Helper.CUSTOM_COOLDOWN_DURATION_MAX or 300
+	if duration > maxDuration then duration = maxDuration end
+	return info, duration
+end
+
+function CooldownPanels:GetEntryAutoCooldownDurationInfo(entry, resolvedType)
+	if not entry then return nil end
+	local typeKey = resolvedType or entry.type
+	if typeKey == "ITEM" then
+		local itemID = tonumber(entry.itemID)
+		if itemID and entry.type == "ITEM" then itemID = self.ResolveEntryItemID(entry, itemID) end
+		return self:GetAutoCooldownDurationInfoForItemID(itemID)
+	elseif typeKey == "SLOT" then
+		local slotID = tonumber(entry.slotID)
+		local itemID = slotID and Api.GetInventoryItemID and Api.GetInventoryItemID("player", slotID) or nil
+		return self:GetAutoCooldownDurationInfoForItemID(itemID)
+	end
+	return nil
+end
+
+function CooldownPanels:SupportsEntryAutoCooldownDuration(entry, resolvedType)
+	local _, duration = self:GetEntryAutoCooldownDurationInfo(entry, resolvedType)
+	return duration ~= nil
+end
+
 function CooldownPanels:GetEntryCustomCooldownDuration(entry, resolvedType)
 	if not self:SupportsEntryCustomCooldownDuration(entry, resolvedType) then return nil end
+	if entry.autoCooldownDurationEnabled == true then
+		local _, autoDuration = self:GetEntryAutoCooldownDurationInfo(entry, resolvedType)
+		if autoDuration then return autoDuration end
+	end
 	if entry.customCooldownDurationEnabled ~= true then return nil end
 	local duration = tonumber(entry.customCooldownDuration)
 	if not duration or duration <= 0 then return nil end
@@ -10459,6 +10495,19 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		end
 		if currentEntry.customCooldownDurationEnabled == normalized then return end
 		currentEntry.customCooldownDurationEnabled = normalized
+		if normalized then currentEntry.autoCooldownDurationEnabled = false end
+		CooldownPanels:ClearEntryCustomCooldownDuration(panelId, entryId, true)
+		refreshEntryViews()
+	end
+
+	local function setAutoCooldownDurationEnabled(value)
+		local _, currentEntry = getEntry()
+		if not currentEntry then return end
+		local normalized = value == true
+		if normalized and not CooldownPanels:SupportsEntryAutoCooldownDuration(currentEntry, getEffectiveType()) then return end
+		if currentEntry.autoCooldownDurationEnabled == normalized then return end
+		currentEntry.autoCooldownDurationEnabled = normalized
+		if normalized then currentEntry.customCooldownDurationEnabled = false end
 		CooldownPanels:ClearEntryCustomCooldownDuration(panelId, entryId, true)
 		refreshEntryViews()
 	end
@@ -11440,6 +11489,20 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			id = "cooldownPanelStandaloneCooldownVisuals",
 			defaultCollapsed = true,
 			isShown = function() return getEffectiveType() ~= "STANCE" end,
+		},
+		{
+			name = L["CooldownPanelAutoDuration"] or "Automatic duration on activation",
+			kind = SettingType.Checkbox,
+			parentId = "cooldownPanelStandaloneCooldownVisuals",
+			isShown = function()
+				local _, currentEntry = getEntry()
+				return CooldownPanels:SupportsEntryAutoCooldownDuration(currentEntry, getEffectiveType())
+			end,
+			get = function()
+				local _, currentEntry = getEntry()
+				return currentEntry and currentEntry.autoCooldownDurationEnabled == true or false
+			end,
+			set = function(_, value) setAutoCooldownDurationEnabled(value) end,
 		},
 		{
 			name = L["CooldownPanelCustomDuration"] or "Custom duration on activation",
@@ -13489,8 +13552,11 @@ local function ensureEditor()
 	local cbShowWhenNoCooldown = Helper.CreateCheck(rightContent, L["CooldownPanelShowWhenNoCooldown"] or "Show even without cooldown")
 	cbShowWhenNoCooldown:SetPoint("TOPLEFT", cbShowWhenEmpty, "BOTTOMLEFT", 0, -4)
 
+	local cbAutoDuration = Helper.CreateCheck(rightContent, L["CooldownPanelAutoDuration"] or "Automatic duration on activation")
+	cbAutoDuration:SetPoint("TOPLEFT", cbShowWhenNoCooldown, "BOTTOMLEFT", 0, -4)
+
 	local cbCustomDuration = Helper.CreateCheck(rightContent, L["CooldownPanelCustomDuration"] or "Custom duration on activation")
-	cbCustomDuration:SetPoint("TOPLEFT", cbShowWhenNoCooldown, "BOTTOMLEFT", 0, -4)
+	cbCustomDuration:SetPoint("TOPLEFT", cbAutoDuration, "BOTTOMLEFT", 0, -4)
 
 	local customDurationBox = Helper.CreateEditBox(rightContent, 70, 20)
 	customDurationBox:SetPoint("TOPLEFT", cbCustomDuration, "BOTTOMLEFT", 18, -4)
@@ -13696,6 +13762,7 @@ local function ensureEditor()
 			cbUseHighestRank = cbUseHighestRank,
 			cbShowWhenEmpty = cbShowWhenEmpty,
 			cbShowWhenNoCooldown = cbShowWhenNoCooldown,
+			cbAutoDuration = cbAutoDuration,
 			cbCustomDuration = cbCustomDuration,
 			customDurationBox = customDurationBox,
 			customDurationLabel = customDurationLabel,
@@ -13940,6 +14007,23 @@ local function ensureEditor()
 	bindEntryToggle(cbUseHighestRank, "useHighestRank")
 	bindEntryToggle(cbShowWhenEmpty, "showWhenEmpty")
 	bindEntryToggle(cbShowWhenNoCooldown, "showWhenNoCooldown")
+	cbAutoDuration:SetScript("OnClick", function(self)
+		local panelId = editor.selectedPanelId
+		local entryId = editor.selectedEntryId
+		local panel = panelId and CooldownPanels:GetPanel(panelId)
+		local entry = panel and panel.entries and panel.entries[entryId]
+		if not entry then return end
+		local enabled = self:GetChecked() == true
+		if enabled and not CooldownPanels:SupportsEntryAutoCooldownDuration(entry, entry.type) then
+			self:SetChecked(false)
+			return
+		end
+		entry.autoCooldownDurationEnabled = enabled
+		if enabled then entry.customCooldownDurationEnabled = false end
+		CooldownPanels:ClearEntryCustomCooldownDuration(panelId, entryId, true)
+		CooldownPanels:RefreshPanel(panelId)
+		CooldownPanels:RefreshEditor()
+	end)
 	cbCustomDuration:SetScript("OnClick", function(self)
 		local panelId = editor.selectedPanelId
 		local entryId = editor.selectedEntryId
@@ -13949,6 +14033,7 @@ local function ensureEditor()
 		local enabled = self:GetChecked() == true
 		if enabled and not ((tonumber(entry.customCooldownDuration) or 0) > 0) then entry.customCooldownDuration = 60 end
 		entry.customCooldownDurationEnabled = enabled
+		if enabled then entry.autoCooldownDurationEnabled = false end
 		CooldownPanels:ClearEntryCustomCooldownDuration(panelId, entryId, true)
 		CooldownPanels:RefreshPanel(panelId)
 		CooldownPanels:RefreshEditor()
@@ -15369,6 +15454,7 @@ local function layoutInspectorToggles(inspector, entry)
 		hideToggle(inspector.cbUseHighestRank)
 		hideToggle(inspector.cbShowWhenEmpty)
 		hideToggle(inspector.cbShowWhenNoCooldown)
+		hideToggle(inspector.cbAutoDuration)
 		hideToggle(inspector.cbCustomDuration)
 		hideControl(inspector.customDurationBox)
 		hideControl(inspector.customDurationLabel)
@@ -15477,6 +15563,8 @@ local function layoutInspectorToggles(inspector, entry)
 		place(inspector.cbShowWhenNoCooldown, false)
 	end
 	local showCustomDuration = CooldownPanels:SupportsEntryCustomCooldownDuration(entry, effectiveType)
+	local showAutoDuration = CooldownPanels:SupportsEntryAutoCooldownDuration(entry, effectiveType)
+	place(inspector.cbAutoDuration, showAutoDuration)
 	place(inspector.cbCustomDuration, showCustomDuration)
 	if showCustomDuration and inspector.customDurationBox and inspector.customDurationLabel then
 		inspector.customDurationBox:ClearAllPoints()
@@ -15650,6 +15738,7 @@ local function refreshInspector(editor, panel, entry)
 		if inspector.cbUseHighestRank then inspector.cbUseHighestRank:SetChecked(effectiveType == "ITEM" and entry.type == "ITEM" and entry.useHighestRank == true) end
 		inspector.cbShowWhenEmpty:SetChecked(effectiveType == "ITEM" and entry.showWhenEmpty == true)
 		inspector.cbShowWhenNoCooldown:SetChecked(effectiveType == "SLOT" and entry.showWhenNoCooldown == true)
+		if inspector.cbAutoDuration then inspector.cbAutoDuration:SetChecked(entry.autoCooldownDurationEnabled == true and CooldownPanels:SupportsEntryAutoCooldownDuration(entry, effectiveType)) end
 		if inspector.cbCustomDuration then inspector.cbCustomDuration:SetChecked(entry.customCooldownDurationEnabled == true) end
 		if inspector.customDurationBox then inspector.customDurationBox:SetText(tostring(math.floor((tonumber(entry.customCooldownDuration) or 0) + 0.5))) end
 		inspector.cbGlow:SetChecked(entry.type ~= "MACRO" and entry.glowReady and true or false)
@@ -15685,6 +15774,7 @@ local function refreshInspector(editor, panel, entry)
 		if inspector.cbSound and inspector.cbSound.Text then inspector.cbSound.Text:SetText(L["CooldownPanelSoundReady"] or "Sound when ready") end
 
 		if inspector.staticTextBox then inspector.staticTextBox:SetText("") end
+		if inspector.cbAutoDuration then inspector.cbAutoDuration:SetChecked(false) end
 		if inspector.cbCustomDuration then inspector.cbCustomDuration:SetChecked(false) end
 		if inspector.customDurationBox then inspector.customDurationBox:SetText("") end
 		if inspector.cbTrackPassiveSpell then inspector.cbTrackPassiveSpell:SetChecked(false) end

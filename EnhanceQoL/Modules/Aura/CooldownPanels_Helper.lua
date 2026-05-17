@@ -289,6 +289,7 @@ Helper.ENTRY_DEFAULTS = {
 	cooldownGcdDrawEdge = false,
 	cooldownGcdDrawBling = false,
 	cooldownGcdDrawSwipe = false,
+	autoCooldownDurationEnabled = false,
 	customCooldownDurationEnabled = false,
 	customCooldownDuration = 0,
 	cooldownTextUseGlobal = true,
@@ -2359,9 +2360,12 @@ function Helper.NormalizeEntry(entry, defaults)
 	if type(entry.cooldownGcdDrawBling) ~= "boolean" then entry.cooldownGcdDrawBling = Helper.ENTRY_DEFAULTS.cooldownGcdDrawBling end
 	if type(entry.cooldownGcdDrawSwipe) ~= "boolean" then entry.cooldownGcdDrawSwipe = Helper.ENTRY_DEFAULTS.cooldownGcdDrawSwipe end
 	if entry.type == "CDM_AURA" or entry.type == "STANCE" then
+		entry.autoCooldownDurationEnabled = false
 		entry.customCooldownDurationEnabled = false
 		entry.customCooldownDuration = Helper.ENTRY_DEFAULTS.customCooldownDuration
 	else
+		if type(entry.autoCooldownDurationEnabled) ~= "boolean" then entry.autoCooldownDurationEnabled = Helper.ENTRY_DEFAULTS.autoCooldownDurationEnabled end
+		if entry.type ~= "ITEM" and entry.type ~= "SLOT" then entry.autoCooldownDurationEnabled = false end
 		if type(entry.customCooldownDurationEnabled) ~= "boolean" then entry.customCooldownDurationEnabled = Helper.ENTRY_DEFAULTS.customCooldownDurationEnabled end
 		entry.customCooldownDuration = Helper.ClampNumber(entry.customCooldownDuration, 0, Helper.CUSTOM_COOLDOWN_DURATION_MAX or 300, Helper.ENTRY_DEFAULTS.customCooldownDuration or 0)
 		if not (entry.customCooldownDuration and entry.customCooldownDuration > 0) then entry.customCooldownDurationEnabled = false end
