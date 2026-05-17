@@ -237,7 +237,7 @@ local function appendRandomMountCombatMovementLines(lines)
 			lines[#lines + 1] = "/dismount [combat,mounted,noflying]"
 			lines[#lines + 1] = "/stopmacro [combat,mounted]"
 			lines[#lines + 1] = "/cancelform [combat]"
-			lines[#lines + 1] = "/cast [combat,noflying,swimming] " .. travel .. "; [combat,noflying,outdoors] " .. travel .. "; [combat,noflying,indoors] " .. cat .. "; [combat,noflying] " .. cat
+			lines[#lines + 1] = "/cast [combat,noflying,indoors] " .. cat .. "; [combat,noflying] " .. travel
 			lines[#lines + 1] = "/leavevehicle [combat]"
 		end
 	end
@@ -355,7 +355,8 @@ function MountActions:PrepareActionButton(btn)
 	if not btn or not btn._eqolAction then return end
 	btn:SetAttribute("type1", "macro")
 	btn:SetAttribute("type", "macro")
-	if btn._eqolAction == "random" and addon.variables.unitClass == "DRUID" and IsMounted and IsMounted() and IsPlayerMoving() and (C_SpellBook.IsSpellKnown(783) or C_SpellBook.IsSpellKnown(768)) then
+	local isMoving = IsPlayerMoving and IsPlayerMoving()
+	if btn._eqolAction == "random" and addon.variables.unitClass == "DRUID" and IsMounted and IsMounted() and isMoving and (isSpellKnown(783) or isSpellKnown(768)) then
 		if not (IsFlying and IsFlying()) then
 			if not (addon.db and addon.db.randomMountDruidNoShiftWhileMounted) then
 				local macro = getDruidMoveFormMacro()
@@ -367,7 +368,7 @@ function MountActions:PrepareActionButton(btn)
 			end
 		end
 	end
-	if btn._eqolAction == "random" and addon.variables.unitClass == "SHAMAN" and IsMounted and IsMounted() and IsPlayerMoving() and C_SpellBook.IsSpellKnown(GHOST_WOLF_SPELL_ID) then
+	if btn._eqolAction == "random" and addon.variables.unitClass == "SHAMAN" and IsMounted and IsMounted() and isMoving and isSpellKnown(GHOST_WOLF_SPELL_ID) then
 		if not (IsFlying and IsFlying()) then
 			local macro = getShamanGhostWolfMacro()
 			if macro then
@@ -391,7 +392,7 @@ function MountActions:PrepareActionButton(btn)
 	end
 
 	if btn._eqolAction == "random" then
-		if addon.variables.unitClass == "SHAMAN" and IsPlayerMoving() and C_SpellBook.IsSpellKnown(GHOST_WOLF_SPELL_ID) then
+		if addon.variables.unitClass == "SHAMAN" and isMoving and isSpellKnown(GHOST_WOLF_SPELL_ID) then
 			local macro = getShamanGhostWolfMacro()
 			if macro then
 				btn:SetAttribute("macrotext1", macro)
@@ -399,7 +400,7 @@ function MountActions:PrepareActionButton(btn)
 				return
 			end
 		end
-		if addon.variables.unitClass == "DRUID" and IsPlayerMoving() and (C_SpellBook.IsSpellKnown(783) or C_SpellBook.IsSpellKnown(768)) then
+		if addon.variables.unitClass == "DRUID" and isMoving and (isSpellKnown(783) or isSpellKnown(768)) then
 			local macro = getDruidMoveFormMacro()
 			if macro then
 				btn:SetAttribute("macrotext1", macro)

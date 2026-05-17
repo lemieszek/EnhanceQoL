@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.17.0-beta5] - 2026-05-17
+
+### ✨ Added
+
+- Nameplates: Added optional quest icons for default nameplates, including configurable anchor position and icon size. Quest detection avoids units with secret identity data before reading tooltip objective info.
+
+---
+
 ## [10.17.0-beta4] - 2026-05-17
 
 ### ✨ Added
@@ -16,6 +24,8 @@
 ### 🐛 Fixed
 
 - Unit Frames: Fully disable the original Blizzard Player, Target, Focus, Pet, and Target-of-Target frames when Enhanced Unit Frames replace them.
+
+---
 
 ## [10.17.0-beta3] - 2026-05-16
 

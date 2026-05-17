@@ -52,6 +52,9 @@ local DEFAULT_NAMEPLATE_FEATURE_KEYS = constants.DEFAULT_NAMEPLATE_FEATURE_KEYS
 	or {
 		auraClickthrough = "nameplateAuraClickthrough",
 		mobColors = "nameplateMobColors",
+		questMarkers = "nameplateQuestMarkers",
+		questMarkerAnchor = "nameplateQuestMarkerAnchor",
+		questMarkerSize = "nameplateQuestMarkerSize",
 		mobColorBoss = "nameplateMobColorBoss",
 		mobColorMiniboss = "nameplateMobColorMiniboss",
 		mobColorCaster = "nameplateMobColorCaster",
@@ -1627,6 +1630,81 @@ local function createNameplatesCategory()
 				addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.auraClickthrough] = value and true or false
 			end
 		end,
+		parentSection = expandable,
+	})
+
+	local questMarkersToggle = addon.functions.SettingsCreateCheckbox(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.questMarkers,
+		text = L["nameplateQuestMarkers"] or "Show quest icons on default nameplates",
+		desc = L["nameplateQuestMarkersDesc"],
+		func = function(value)
+			if addon.functions.SetDefaultNameplateQuestMarkersEnabled then
+				addon.functions.SetDefaultNameplateQuestMarkersEnabled(value)
+			else
+				addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.questMarkers] = value and true or false
+			end
+		end,
+		parentSection = expandable,
+	})
+
+	local function areQuestMarkersEnabled() return questMarkersToggle and questMarkersToggle.setting and questMarkersToggle.setting:GetValue() == true end
+
+	local function refreshNameplateQuestMarkers()
+		if addon.functions.RefreshDefaultNameplateQuestMarkers then addon.functions.RefreshDefaultNameplateQuestMarkers() end
+	end
+
+	local questMarkerAnchorOptions = {
+		TOPLEFT = L["Top Left"] or "Top Left",
+		TOP = L["Top"] or "Top",
+		TOPRIGHT = L["Top Right"] or "Top Right",
+		LEFT = L["Left"] or "Left",
+		CENTER = _G.CENTER or "Center",
+		RIGHT = L["Right"] or "Right",
+		BOTTOMLEFT = L["Bottom Left"] or "Bottom Left",
+		BOTTOM = L["Bottom"] or "Bottom",
+		BOTTOMRIGHT = L["Bottom Right"] or "Bottom Right",
+	}
+	local questMarkerAnchorOrder = { "TOPLEFT", "TOP", "TOPRIGHT", "LEFT", "CENTER", "RIGHT", "BOTTOMLEFT", "BOTTOM", "BOTTOMRIGHT" }
+
+	addon.functions.SettingsCreateDropdown(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.questMarkerAnchor,
+		text = L["nameplateQuestMarkerAnchor"] or "Quest icon anchor",
+		desc = L["nameplateQuestMarkerAnchorDesc"],
+		list = questMarkerAnchorOptions,
+		order = questMarkerAnchorOrder,
+		default = "RIGHT",
+		get = function()
+			local current = addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.questMarkerAnchor]
+			if type(current) ~= "string" or not questMarkerAnchorOptions[current] then current = "RIGHT" end
+			return current
+		end,
+		set = function(value)
+			if type(value) ~= "string" or not questMarkerAnchorOptions[value] then value = "RIGHT" end
+			addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.questMarkerAnchor] = value
+			refreshNameplateQuestMarkers()
+		end,
+		parent = true,
+		element = questMarkersToggle.element,
+		parentCheck = areQuestMarkersEnabled,
+		parentSection = expandable,
+	})
+
+	addon.functions.SettingsCreateSlider(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.questMarkerSize,
+		text = L["nameplateQuestMarkerSize"] or "Quest icon size",
+		desc = L["nameplateQuestMarkerSizeDesc"],
+		min = 8,
+		max = 48,
+		step = 1,
+		default = 18,
+		get = function() return addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.questMarkerSize] or 18 end,
+		set = function(value)
+			addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.questMarkerSize] = value
+			refreshNameplateQuestMarkers()
+		end,
+		parent = true,
+		element = questMarkersToggle.element,
+		parentCheck = areQuestMarkersEnabled,
 		parentSection = expandable,
 	})
 
