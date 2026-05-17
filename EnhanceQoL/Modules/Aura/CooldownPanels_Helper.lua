@@ -231,6 +231,7 @@ Helper.PANEL_LAYOUT_DEFAULTS = {
 	cooldownGcdDrawEdge = false,
 	cooldownGcdDrawBling = false,
 	cooldownGcdDrawSwipe = false,
+	cdmAuraOverlayEnabled = false,
 	cooldownTextColor = { 1, 1, 1, 1 },
 	cooldownTextStyle = globalFontStyleKey(),
 	staticTextFont = "",
@@ -2232,6 +2233,7 @@ function Helper.NormalizePanel(panel, defaults)
 	panel.layout.hideWhenNoResource = panel.layout.hideWhenNoResource == true
 	panel.layout.cdmAuraAlwaysShowMode =
 		normalizeCDMAuraAlwaysShowMode(panel.layout.cdmAuraAlwaysShowMode, layoutDefaults.cdmAuraAlwaysShowMode or Helper.PANEL_LAYOUT_DEFAULTS.cdmAuraAlwaysShowMode or "HIDE")
+	panel.layout.cdmAuraOverlayEnabled = panel.layout.cdmAuraOverlayEnabled == true
 	panel.layout.stackColor = Helper.NormalizeColor(panel.layout.stackColor, layoutDefaults.stackColor or Helper.PANEL_LAYOUT_DEFAULTS.stackColor or { 1, 1, 1, 1 })
 	panel.layout.chargesColor = Helper.NormalizeColor(panel.layout.chargesColor, layoutDefaults.chargesColor or Helper.PANEL_LAYOUT_DEFAULTS.chargesColor or { 1, 1, 1, 1 })
 	panel.layout.chargesHideWhenZero = panel.layout.chargesHideWhenZero == true

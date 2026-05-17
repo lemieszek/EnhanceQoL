@@ -5,6 +5,11 @@
 ### ✨ Added
 
 - Cooldown Panels: Added automatic activation durations for supported item and equipment slot entries, using a generated item-duration table for potions, trinkets, and similar fixed-duration on-use effects.
+- Cooldown Panels: Added optional spell aura overlays for Cooldown Manager tracked auras, including per-entry controls, a panel-wide option for supported spells, configurable overlay swipe color, and reverse-swipe control.
+
+### 🐛 Fixed
+
+- Unit Frames: Fully disable the original Blizzard Player, Target, Focus, Pet, and Target-of-Target frames when Enhanced Unit Frames replace them.
 
 ## [10.17.0-beta3] - 2026-05-16
 

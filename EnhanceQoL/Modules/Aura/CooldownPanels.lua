@@ -4699,7 +4699,7 @@ function CooldownPanels:RebuildSpellIndex()
 						end
 					if entry and entry.type == "SPELL" and entry.spellID then
 						spellId = tonumber(entry.spellID)
-						if entry.cdmAuraOverlayEnabled == true and spellId and spellId > 0 then
+						if self:IsEntryCDMAuraOverlayEnabled(panel.layout, entry, "SPELL") and spellId and spellId > 0 then
 							if not cdmAuraEntryIdsByPanel[panelId] then
 								cdmAuraPanels[panelId] = true
 								cdmAuraPanelIds[#cdmAuraPanelIds + 1] = panelId
@@ -7903,6 +7903,14 @@ function CooldownPanels:SupportsEntryCDMAuraOverlay(entry, resolvedType)
 		if cdmAuras:SupportsSpellAuraOverlay(candidates[i]) then return true end
 	end
 	return false
+end
+
+function CooldownPanels:IsEntryCDMAuraOverlayEnabled(layout, entry, resolvedType)
+	if not entry then return false end
+	local typeKey = resolvedType or entry.type
+	if typeKey ~= "SPELL" or entry.type ~= "SPELL" then return false end
+	if entry.customCooldownDurationEnabled == true then return false end
+	return entry.cdmAuraOverlayEnabled == true or (layout and layout.cdmAuraOverlayEnabled == true)
 end
 
 function CooldownPanels:GetEntryCustomCooldownDuration(entry, resolvedType)
@@ -16526,8 +16534,9 @@ function CooldownPanels:UpdatePreviewIcons(panelId, countOverride)
 		icon.texture:SetTexture(entry and getEntryIcon(entry) or Helper.PREVIEW_ICON)
 		icon.texture:SetVertexColor(1, 1, 1)
 		icon.texture:SetShown(showEntryIconTexture or not entry)
-		local cooldownUsesAuraDisplay = resolvedType == "CDM_AURA" or CooldownPanels:GetEntryCustomCooldownDuration(entry, resolvedType) ~= nil or CooldownPanels:SupportsEntryCDMAuraOverlay(entry, resolvedType)
-		local cooldownReverse = resolvedType == "CDM_AURA" or CooldownPanels:GetEntryCustomCooldownDuration(entry, resolvedType) ~= nil or (CooldownPanels:SupportsEntryCDMAuraOverlay(entry, resolvedType) and (not entry or entry.cdmAuraOverlayReverse ~= false))
+		local entryAuraOverlayEnabled = CooldownPanels:IsEntryCDMAuraOverlayEnabled(entryLayout, entry, resolvedType) and CooldownPanels:SupportsEntryCDMAuraOverlay(entry, resolvedType)
+		local cooldownUsesAuraDisplay = resolvedType == "CDM_AURA" or CooldownPanels:GetEntryCustomCooldownDuration(entry, resolvedType) ~= nil or entryAuraOverlayEnabled
+		local cooldownReverse = resolvedType == "CDM_AURA" or CooldownPanels:GetEntryCustomCooldownDuration(entry, resolvedType) ~= nil or (entryAuraOverlayEnabled and (not entry or entry.cdmAuraOverlayReverse ~= false))
 		if icon.cooldown.SetReverse then icon.cooldown:SetReverse(cooldownReverse) end
 		if icon.cooldown.SetUseAuraDisplayTime then icon.cooldown:SetUseAuraDisplayTime(cooldownUsesAuraDisplay) end
 		icon.cooldown:SetHideCountdownNumbers(not showCooldownText)
@@ -16993,7 +17002,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 					if not show and showCooldown and cooldownIsActive then show = true end
 					if not show and showCharges and chargesInfoActive then show = true end
 					if not show and showStacks and Helper.HasDisplayCount(stackCount) then show = true end
-					if entry.cdmAuraOverlayEnabled == true and cdmAuras and cdmAuras.BuildSpellAuraOverlayData then
+					if self:IsEntryCDMAuraOverlayEnabled(entryLayout, entry, resolvedType) and cdmAuras and cdmAuras.BuildSpellAuraOverlayData then
 						spellAuraOverlayData = cdmAuras:BuildSpellAuraOverlayData(panelId, entryId, entry, spellId, entryLayout)
 						if spellAuraOverlayData and spellAuraOverlayData.active == true then
 							cooldownStart = spellAuraOverlayData.cooldownStart
@@ -18748,6 +18757,9 @@ applyEditLayout = function(panelId, field, value, skipRefresh)
 		CooldownPanels:RebuildPowerIndex()
 	elseif field == "cdmAuraAlwaysShowMode" then
 		layout.cdmAuraAlwaysShowMode = CooldownPanels:NormalizeCDMAuraAlwaysShowMode(value, layout.cdmAuraAlwaysShowMode or Helper.PANEL_LAYOUT_DEFAULTS.cdmAuraAlwaysShowMode)
+	elseif field == "cdmAuraOverlayEnabled" then
+		layout.cdmAuraOverlayEnabled = value == true
+		CooldownPanels:RebuildSpellIndex()
 	elseif field == "checkPower" then
 		layout.checkPower = value == true
 		CooldownPanels:RebuildPowerIndex()
@@ -20674,6 +20686,15 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				set = function(_, value) applyEditLayout(panelId, "showChargesCooldown", value) end,
 			},
 			{
+				name = L["CooldownPanelCDMAuraOverlayPanel"] or "Show aura overlay for supported spells",
+				kind = SettingType.Checkbox,
+				field = "cdmAuraOverlayEnabled",
+				parentId = "cooldownPanelCooldown",
+				default = layout.cdmAuraOverlayEnabled == true,
+				get = function() return layout.cdmAuraOverlayEnabled == true end,
+				set = function(_, value) applyEditLayout(panelId, "cdmAuraOverlayEnabled", value) end,
+			},
+			{
 				name = L["CooldownPanelDrawEdge"] or "Draw edge",
 				kind = SettingType.Checkbox,
 				field = "cooldownDrawEdge",
@@ -21394,7 +21415,7 @@ function cdp.ENTRY.TryRefreshVisibleSpellEntry(panelId, entryId, mode)
 	local entry = panel.entries and panel.entries[entryId] or nil
 	if not entry then return false end
 	if entry.displayMode == "BAR" then return false end
-	if entry.cdmAuraOverlayEnabled == true then return false end
+	if CooldownPanels:IsEntryCDMAuraOverlayEnabled(panel.layout, entry, "SPELL") then return false end
 	local macro = entry.type == "MACRO" and CooldownPanels.ResolveMacroEntry(entry) or nil
 	local baseSpellId = entry.type == "SPELL" and tonumber(entry.spellID) or (macro and macro.kind == "SPELL" and tonumber(macro.spellID)) or nil
 	if not baseSpellId then return false end
