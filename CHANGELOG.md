@@ -4,7 +4,7 @@
 
 ### ✨ Added
 
-- Nameplates: Added optional quest icons and target arrow markers for default nameplates, including configurable quest icon anchor position and size. Quest detection avoids units with secret identity data before reading tooltip objective info.
+- Nameplates: Added optional quest icons, elite and boss markers, and target arrow markers for default nameplates, including configurable marker anchors and sizes. Quest detection avoids units with secret identity data before reading tooltip objective info.
 
 ---
 

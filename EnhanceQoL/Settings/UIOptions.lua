@@ -51,6 +51,9 @@ local QUICK_SLOT_BORDER = "Interface\\Buttons\\UI-Quickslot2"
 local DEFAULT_NAMEPLATE_FEATURE_KEYS = constants.DEFAULT_NAMEPLATE_FEATURE_KEYS
 	or {
 		auraClickthrough = "nameplateAuraClickthrough",
+		eliteMarkers = "nameplateEliteMarkers",
+		eliteMarkerAnchor = "nameplateEliteMarkerAnchor",
+		eliteMarkerSize = "nameplateEliteMarkerSize",
 		mobColors = "nameplateMobColors",
 		questMarkers = "nameplateQuestMarkers",
 		questMarkerAnchor = "nameplateQuestMarkerAnchor",
@@ -1636,6 +1639,19 @@ local function createNameplatesCategory()
 		parentSection = expandable,
 	})
 
+	local nameplateMarkerAnchorOptions = {
+		TOPLEFT = L["Top Left"] or "Top Left",
+		TOP = L["Top"] or "Top",
+		TOPRIGHT = L["Top Right"] or "Top Right",
+		LEFT = L["Left"] or "Left",
+		CENTER = _G.CENTER or "Center",
+		RIGHT = L["Right"] or "Right",
+		BOTTOMLEFT = L["Bottom Left"] or "Bottom Left",
+		BOTTOM = L["Bottom"] or "Bottom",
+		BOTTOMRIGHT = L["Bottom Right"] or "Bottom Right",
+	}
+	local nameplateMarkerAnchorOrder = { "TOPLEFT", "TOP", "TOPRIGHT", "LEFT", "CENTER", "RIGHT", "BOTTOMLEFT", "BOTTOM", "BOTTOMRIGHT" }
+
 	local targetMarkersToggle = addon.functions.SettingsCreateCheckbox(category, {
 		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.targetMarkers,
 		text = L["nameplateTargetMarkers"] or "Show target markers on default nameplates",
@@ -1704,6 +1720,68 @@ local function createNameplatesCategory()
 		parentSection = expandable,
 	})
 
+	local eliteMarkersToggle = addon.functions.SettingsCreateCheckbox(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.eliteMarkers,
+		text = L["nameplateEliteMarkers"] or "Show elite markers on default nameplates",
+		desc = L["nameplateEliteMarkersDesc"],
+		func = function(value)
+			if addon.functions.SetDefaultNameplateEliteMarkersEnabled then
+				addon.functions.SetDefaultNameplateEliteMarkersEnabled(value)
+			else
+				addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.eliteMarkers] = value and true or false
+			end
+		end,
+		parentSection = expandable,
+	})
+
+	local function areEliteMarkersEnabled() return eliteMarkersToggle and eliteMarkersToggle.setting and eliteMarkersToggle.setting:GetValue() == true end
+
+	local function refreshNameplateEliteMarkers()
+		if addon.functions.RefreshDefaultNameplateEliteMarkers then addon.functions.RefreshDefaultNameplateEliteMarkers() end
+	end
+
+	addon.functions.SettingsCreateDropdown(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.eliteMarkerAnchor,
+		text = L["nameplateEliteMarkerAnchor"] or "Elite marker anchor",
+		desc = L["nameplateEliteMarkerAnchorDesc"],
+		list = nameplateMarkerAnchorOptions,
+		order = nameplateMarkerAnchorOrder,
+		default = "LEFT",
+		get = function()
+			local current = addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.eliteMarkerAnchor]
+			if type(current) ~= "string" or not nameplateMarkerAnchorOptions[current] then current = "LEFT" end
+			return current
+		end,
+		set = function(value)
+			if type(value) ~= "string" or not nameplateMarkerAnchorOptions[value] then value = "LEFT" end
+			addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.eliteMarkerAnchor] = value
+			refreshNameplateEliteMarkers()
+		end,
+		parent = true,
+		element = eliteMarkersToggle.element,
+		parentCheck = areEliteMarkersEnabled,
+		parentSection = expandable,
+	})
+
+	addon.functions.SettingsCreateSlider(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.eliteMarkerSize,
+		text = L["nameplateEliteMarkerSize"] or "Elite marker size",
+		desc = L["nameplateEliteMarkerSizeDesc"],
+		min = 8,
+		max = 48,
+		step = 1,
+		default = 18,
+		get = function() return addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.eliteMarkerSize] or 18 end,
+		set = function(value)
+			addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.eliteMarkerSize] = value
+			refreshNameplateEliteMarkers()
+		end,
+		parent = true,
+		element = eliteMarkersToggle.element,
+		parentCheck = areEliteMarkersEnabled,
+		parentSection = expandable,
+	})
+
 	local questMarkersToggle = addon.functions.SettingsCreateCheckbox(category, {
 		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.questMarkers,
 		text = L["nameplateQuestMarkers"] or "Show quest icons on default nameplates",
@@ -1724,33 +1802,20 @@ local function createNameplatesCategory()
 		if addon.functions.RefreshDefaultNameplateQuestMarkers then addon.functions.RefreshDefaultNameplateQuestMarkers() end
 	end
 
-	local questMarkerAnchorOptions = {
-		TOPLEFT = L["Top Left"] or "Top Left",
-		TOP = L["Top"] or "Top",
-		TOPRIGHT = L["Top Right"] or "Top Right",
-		LEFT = L["Left"] or "Left",
-		CENTER = _G.CENTER or "Center",
-		RIGHT = L["Right"] or "Right",
-		BOTTOMLEFT = L["Bottom Left"] or "Bottom Left",
-		BOTTOM = L["Bottom"] or "Bottom",
-		BOTTOMRIGHT = L["Bottom Right"] or "Bottom Right",
-	}
-	local questMarkerAnchorOrder = { "TOPLEFT", "TOP", "TOPRIGHT", "LEFT", "CENTER", "RIGHT", "BOTTOMLEFT", "BOTTOM", "BOTTOMRIGHT" }
-
 	addon.functions.SettingsCreateDropdown(category, {
 		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.questMarkerAnchor,
 		text = L["nameplateQuestMarkerAnchor"] or "Quest icon anchor",
 		desc = L["nameplateQuestMarkerAnchorDesc"],
-		list = questMarkerAnchorOptions,
-		order = questMarkerAnchorOrder,
+		list = nameplateMarkerAnchorOptions,
+		order = nameplateMarkerAnchorOrder,
 		default = "RIGHT",
 		get = function()
 			local current = addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.questMarkerAnchor]
-			if type(current) ~= "string" or not questMarkerAnchorOptions[current] then current = "RIGHT" end
+			if type(current) ~= "string" or not nameplateMarkerAnchorOptions[current] then current = "RIGHT" end
 			return current
 		end,
 		set = function(value)
-			if type(value) ~= "string" or not questMarkerAnchorOptions[value] then value = "RIGHT" end
+			if type(value) ~= "string" or not nameplateMarkerAnchorOptions[value] then value = "RIGHT" end
 			addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.questMarkerAnchor] = value
 			refreshNameplateQuestMarkers()
 		end,
