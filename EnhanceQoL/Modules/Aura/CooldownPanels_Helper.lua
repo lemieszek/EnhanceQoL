@@ -22,6 +22,8 @@ local DIRECTION_BOTTOM_LABEL = HUD_EDIT_MODE_SETTING_ENCOUNTER_EVENTS_ICON_DIREC
 Helper.Api = Helper.Api or {}
 local Api = Helper.Api
 
+Helper.CDM_AURA_OVERLAY_COLOR_DEFAULT = Helper.CDM_AURA_OVERLAY_COLOR_DEFAULT or { 1, 0.86, 0.25, 0.55 }
+
 Api.GetItemInfoInstantFn = C_Item and C_Item.GetItemInfoInstant
 Api.GetItemIconByID = C_Item and C_Item.GetItemIconByID
 Api.GetItemCooldownFn = C_Item and C_Item.GetItemCooldown
@@ -289,6 +291,9 @@ Helper.ENTRY_DEFAULTS = {
 	cooldownGcdDrawEdge = false,
 	cooldownGcdDrawBling = false,
 	cooldownGcdDrawSwipe = false,
+	cdmAuraOverlayEnabled = false,
+	cdmAuraOverlayReverse = true,
+	cdmAuraOverlayColor = Helper.CDM_AURA_OVERLAY_COLOR_DEFAULT,
 	autoCooldownDurationEnabled = false,
 	customCooldownDurationEnabled = false,
 	customCooldownDuration = 0,
@@ -2360,10 +2365,17 @@ function Helper.NormalizeEntry(entry, defaults)
 	if type(entry.cooldownGcdDrawBling) ~= "boolean" then entry.cooldownGcdDrawBling = Helper.ENTRY_DEFAULTS.cooldownGcdDrawBling end
 	if type(entry.cooldownGcdDrawSwipe) ~= "boolean" then entry.cooldownGcdDrawSwipe = Helper.ENTRY_DEFAULTS.cooldownGcdDrawSwipe end
 	if entry.type == "CDM_AURA" or entry.type == "STANCE" then
+		entry.cdmAuraOverlayEnabled = false
+		entry.cdmAuraOverlayReverse = Helper.ENTRY_DEFAULTS.cdmAuraOverlayReverse
+		entry.cdmAuraOverlayColor = Helper.NormalizeColor(entry.cdmAuraOverlayColor, Helper.ENTRY_DEFAULTS.cdmAuraOverlayColor)
 		entry.autoCooldownDurationEnabled = false
 		entry.customCooldownDurationEnabled = false
 		entry.customCooldownDuration = Helper.ENTRY_DEFAULTS.customCooldownDuration
 	else
+		if type(entry.cdmAuraOverlayEnabled) ~= "boolean" then entry.cdmAuraOverlayEnabled = Helper.ENTRY_DEFAULTS.cdmAuraOverlayEnabled end
+		if type(entry.cdmAuraOverlayReverse) ~= "boolean" then entry.cdmAuraOverlayReverse = Helper.ENTRY_DEFAULTS.cdmAuraOverlayReverse end
+		entry.cdmAuraOverlayColor = Helper.NormalizeColor(entry.cdmAuraOverlayColor, Helper.ENTRY_DEFAULTS.cdmAuraOverlayColor)
+		if entry.type ~= "SPELL" then entry.cdmAuraOverlayEnabled = false end
 		if type(entry.autoCooldownDurationEnabled) ~= "boolean" then entry.autoCooldownDurationEnabled = Helper.ENTRY_DEFAULTS.autoCooldownDurationEnabled end
 		if entry.type ~= "ITEM" and entry.type ~= "SLOT" then entry.autoCooldownDurationEnabled = false end
 		if type(entry.customCooldownDurationEnabled) ~= "boolean" then entry.customCooldownDurationEnabled = Helper.ENTRY_DEFAULTS.customCooldownDurationEnabled end
