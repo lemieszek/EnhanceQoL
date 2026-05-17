@@ -6,6 +6,8 @@
 
 - Cooldown Panels: Added automatic activation durations for supported item and equipment slot entries, using a generated item-duration table for potions, trinkets, and similar fixed-duration on-use effects.
 - Cooldown Panels: Added optional spell aura overlays for Cooldown Manager tracked auras, including per-entry controls, a panel-wide option for supported spells, configurable overlay swipe color, and reverse-swipe control.
+- Cooldown Panels: Added activation overlay controls for item and equipment slot entries, including custom overlay color, reverse swipe, only-show-during-activation, and glow-while-active options.
+- Cooldown Panels: Trinket slot entries can now keep Automatic duration enabled even when the currently equipped trinket has no known activation duration, so swapping to a supported trinket works immediately.
 
 ### 🐛 Fixed
 

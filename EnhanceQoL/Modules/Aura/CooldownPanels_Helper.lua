@@ -22,7 +22,8 @@ local DIRECTION_BOTTOM_LABEL = HUD_EDIT_MODE_SETTING_ENCOUNTER_EVENTS_ICON_DIREC
 Helper.Api = Helper.Api or {}
 local Api = Helper.Api
 
-Helper.CDM_AURA_OVERLAY_COLOR_DEFAULT = Helper.CDM_AURA_OVERLAY_COLOR_DEFAULT or { 1, 0.86, 0.25, 0.55 }
+Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT = Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT or { 1, 0.86, 0.25, 0.55 }
+Helper.CDM_AURA_OVERLAY_COLOR_DEFAULT = Helper.CDM_AURA_OVERLAY_COLOR_DEFAULT or Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT
 
 Api.GetItemInfoInstantFn = C_Item and C_Item.GetItemInfoInstant
 Api.GetItemIconByID = C_Item and C_Item.GetItemIconByID
@@ -294,7 +295,11 @@ Helper.ENTRY_DEFAULTS = {
 	cooldownGcdDrawSwipe = false,
 	cdmAuraOverlayEnabled = false,
 	cdmAuraOverlayReverse = true,
-	cdmAuraOverlayColor = Helper.CDM_AURA_OVERLAY_COLOR_DEFAULT,
+	cdmAuraOverlayColor = Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT,
+	activationOverlayReverse = true,
+	activationOverlayColor = Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT,
+	activationOverlayOnly = false,
+	activationOverlayGlow = false,
 	autoCooldownDurationEnabled = false,
 	customCooldownDurationEnabled = false,
 	customCooldownDuration = 0,
@@ -2370,6 +2375,10 @@ function Helper.NormalizeEntry(entry, defaults)
 		entry.cdmAuraOverlayEnabled = false
 		entry.cdmAuraOverlayReverse = Helper.ENTRY_DEFAULTS.cdmAuraOverlayReverse
 		entry.cdmAuraOverlayColor = Helper.NormalizeColor(entry.cdmAuraOverlayColor, Helper.ENTRY_DEFAULTS.cdmAuraOverlayColor)
+		entry.activationOverlayReverse = Helper.ENTRY_DEFAULTS.activationOverlayReverse
+		entry.activationOverlayColor = Helper.NormalizeColor(entry.activationOverlayColor, Helper.ENTRY_DEFAULTS.activationOverlayColor)
+		entry.activationOverlayOnly = false
+		entry.activationOverlayGlow = false
 		entry.autoCooldownDurationEnabled = false
 		entry.customCooldownDurationEnabled = false
 		entry.customCooldownDuration = Helper.ENTRY_DEFAULTS.customCooldownDuration
@@ -2377,6 +2386,11 @@ function Helper.NormalizeEntry(entry, defaults)
 		if type(entry.cdmAuraOverlayEnabled) ~= "boolean" then entry.cdmAuraOverlayEnabled = Helper.ENTRY_DEFAULTS.cdmAuraOverlayEnabled end
 		if type(entry.cdmAuraOverlayReverse) ~= "boolean" then entry.cdmAuraOverlayReverse = Helper.ENTRY_DEFAULTS.cdmAuraOverlayReverse end
 		entry.cdmAuraOverlayColor = Helper.NormalizeColor(entry.cdmAuraOverlayColor, Helper.ENTRY_DEFAULTS.cdmAuraOverlayColor)
+		if type(entry.activationOverlayReverse) ~= "boolean" then entry.activationOverlayReverse = entry.cdmAuraOverlayReverse ~= false end
+		if entry.activationOverlayColor == nil then entry.activationOverlayColor = entry.cdmAuraOverlayColor end
+		entry.activationOverlayColor = Helper.NormalizeColor(entry.activationOverlayColor, Helper.ENTRY_DEFAULTS.activationOverlayColor)
+		if type(entry.activationOverlayOnly) ~= "boolean" then entry.activationOverlayOnly = Helper.ENTRY_DEFAULTS.activationOverlayOnly end
+		if type(entry.activationOverlayGlow) ~= "boolean" then entry.activationOverlayGlow = Helper.ENTRY_DEFAULTS.activationOverlayGlow end
 		if entry.type ~= "SPELL" then entry.cdmAuraOverlayEnabled = false end
 		if type(entry.autoCooldownDurationEnabled) ~= "boolean" then entry.autoCooldownDurationEnabled = Helper.ENTRY_DEFAULTS.autoCooldownDurationEnabled end
 		if entry.type ~= "ITEM" and entry.type ~= "SLOT" then entry.autoCooldownDurationEnabled = false end
