@@ -51,6 +51,9 @@ local QUICK_SLOT_BORDER = "Interface\\Buttons\\UI-Quickslot2"
 local DEFAULT_NAMEPLATE_FEATURE_KEYS = constants.DEFAULT_NAMEPLATE_FEATURE_KEYS
 	or {
 		auraClickthrough = "nameplateAuraClickthrough",
+		slugOutline = "nameplateSlugOutline",
+		textOutline = "nameplateTextOutline",
+		textSize = "nameplateTextSize",
 		eliteMarkers = "nameplateEliteMarkers",
 		eliteMarkerAnchor = "nameplateEliteMarkerAnchor",
 		eliteMarkerSize = "nameplateEliteMarkerSize",
@@ -1636,6 +1639,80 @@ local function createNameplatesCategory()
 				addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.auraClickthrough] = value and true or false
 			end
 		end,
+		parentSection = expandable,
+	})
+
+	local nameplateTextToggle = addon.functions.SettingsCreateCheckbox(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.slugOutline,
+		text = L["nameplateSlugOutline"] or "Customize default nameplate text",
+		desc = L["nameplateSlugOutlineDesc"],
+		func = function(value)
+			if addon.functions.SetDefaultNameplateSlugOutlineEnabled then
+				addon.functions.SetDefaultNameplateSlugOutlineEnabled(value)
+			else
+				addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.slugOutline] = value and true or false
+			end
+		end,
+		parentSection = expandable,
+	})
+
+	local function isNameplateTextEnabled() return nameplateTextToggle and nameplateTextToggle.setting and nameplateTextToggle.setting:GetValue() == true end
+	local globalFontStyleKey = addon.functions.GetGlobalFontStyleConfigKey and addon.functions.GetGlobalFontStyleConfigKey() or "__EQOL_GLOBAL_FONT_STYLE__"
+		local nameplateTextOutlineOptions, nameplateTextOutlineOrder = addon.functions.GetFontStyleOptions and addon.functions.GetFontStyleOptions(true) or {
+			[globalFontStyleKey] = L["useGlobalFontStyleConfig"] or "Use global font styling",
+			OUTLINE = L["Outline"] or "Outline",
+		}, { globalFontStyleKey, "OUTLINE" }
+		nameplateTextOutlineOptions.NONE = nil
+		for i = #nameplateTextOutlineOrder, 1, -1 do
+			if nameplateTextOutlineOrder[i] == "NONE" then table.remove(nameplateTextOutlineOrder, i) end
+		end
+		local function normalizeNameplateTextOutline(value)
+			if value == "NONE" then return globalFontStyleKey end
+			if addon.functions.NormalizeFontStyleChoice then
+				local normalized = addon.functions.NormalizeFontStyleChoice(value, globalFontStyleKey, true)
+				if normalized == "NONE" then normalized = globalFontStyleKey end
+				return normalized
+			end
+			return value or globalFontStyleKey
+		end
+	local function refreshNameplateTextStyle()
+		if addon.functions.RefreshDefaultNameplateTextStyle then addon.functions.RefreshDefaultNameplateTextStyle() end
+	end
+
+	addon.functions.SettingsCreateDropdown(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.textOutline,
+		text = L["nameplateTextOutline"] or "Nameplate text outline",
+		desc = L["nameplateTextOutlineDesc"],
+		list = nameplateTextOutlineOptions,
+		order = nameplateTextOutlineOrder,
+		default = globalFontStyleKey,
+		get = function() return normalizeNameplateTextOutline(addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.textOutline]) end,
+		set = function(value)
+			addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.textOutline] = normalizeNameplateTextOutline(value)
+			refreshNameplateTextStyle()
+		end,
+		parent = true,
+		element = nameplateTextToggle.element,
+		parentCheck = isNameplateTextEnabled,
+		parentSection = expandable,
+	})
+
+	addon.functions.SettingsCreateSlider(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.textSize,
+		text = L["nameplateTextSize"] or "Nameplate text size",
+		desc = L["nameplateTextSizeDesc"],
+		min = 0,
+		max = 32,
+		step = 1,
+		default = 0,
+		get = function() return addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.textSize] or 0 end,
+		set = function(value)
+			addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.textSize] = value
+			refreshNameplateTextStyle()
+		end,
+		parent = true,
+		element = nameplateTextToggle.element,
+		parentCheck = isNameplateTextEnabled,
 		parentSection = expandable,
 	})
 

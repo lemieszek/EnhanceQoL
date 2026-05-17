@@ -34,6 +34,9 @@ local NAMEPLATE_AURA_CLICKTHROUGH_DB_KEY = "nameplateAuraClickthrough"
 local NAMEPLATE_MOB_COLORS_DB_KEY = "nameplateMobColors"
 local NAMEPLATE_MOB_COLORS_DUNGEONS_DB_KEY = "nameplateMobColorsInDungeons"
 local NAMEPLATE_MOB_COLORS_OUTSIDE_DUNGEONS_DB_KEY = "nameplateMobColorsOutsideDungeons"
+local NAMEPLATE_SLUG_OUTLINE_DB_KEY = "nameplateSlugOutline"
+local NAMEPLATE_TEXT_OUTLINE_DB_KEY = "nameplateTextOutline"
+local NAMEPLATE_TEXT_SIZE_DB_KEY = "nameplateTextSize"
 local NAMEPLATE_ELITE_MARKERS_DB_KEY = "nameplateEliteMarkers"
 local NAMEPLATE_ELITE_MARKER_ANCHOR_DB_KEY = "nameplateEliteMarkerAnchor"
 local NAMEPLATE_ELITE_MARKER_SIZE_DB_KEY = "nameplateEliteMarkerSize"
@@ -105,6 +108,9 @@ local NAMEPLATE_MOB_COLOR_DEFAULTS = {
 addon.constants = addon.constants or {}
 addon.constants.DEFAULT_NAMEPLATE_FEATURE_KEYS = {
 	auraClickthrough = NAMEPLATE_AURA_CLICKTHROUGH_DB_KEY,
+	slugOutline = NAMEPLATE_SLUG_OUTLINE_DB_KEY,
+	textOutline = NAMEPLATE_TEXT_OUTLINE_DB_KEY,
+	textSize = NAMEPLATE_TEXT_SIZE_DB_KEY,
 	eliteMarkers = NAMEPLATE_ELITE_MARKERS_DB_KEY,
 	eliteMarkerAnchor = NAMEPLATE_ELITE_MARKER_ANCHOR_DB_KEY,
 	eliteMarkerSize = NAMEPLATE_ELITE_MARKER_SIZE_DB_KEY,
@@ -409,6 +415,222 @@ local function isNameplateUnitOnThreatListWithPlayer(unitFrame)
 end
 
 local function isNameplateMobColorsActive() return nameplateMobColorsActive == true end
+
+do
+	local nameplateSlugOutlineFrame
+	local nameplateSlugOutlineActive = false
+	local nameplateSlugOutlineFontObjectDefaults = {}
+	local nameplateSlugOutlineFontStringDefaults = setmetatable({}, { __mode = "k" })
+
+local function isNameplateSlugOutlineActive() return nameplateSlugOutlineActive == true end
+
+local NAMEPLATE_SLUG_OUTLINE_FONT_OBJECTS = {
+	"SystemFont_NamePlate",
+	"SystemFont_NamePlateFixed",
+	"SystemFont_NamePlate_Outlined",
+	"SystemFont_LargeNamePlate",
+	"SystemFont_LargeNamePlateFixed",
+}
+
+local function getNameplateNameFontString(unitFrame)
+	if not unitFrame or isSecretValue(unitFrame) then return nil end
+	if unitFrame.IsForbidden and unitFrame:IsForbidden() then return nil end
+
+	local name = unitFrame.name or unitFrame.Name
+	if isSecretValue(name) then return nil end
+	if name and type(name.SetFont) == "function" and type(name.GetFont) == "function" then return name end
+	return nil
+end
+
+local function getNameplateTextSizeOverride(fallbackSize)
+	local size = addon.db and tonumber(addon.db[NAMEPLATE_TEXT_SIZE_DB_KEY]) or 0
+	if type(size) ~= "number" or size <= 0 then return fallbackSize end
+	if size < 8 then size = 8 end
+	if size > 32 then size = 32 end
+	return size
+end
+
+local function getNameplateTextStyleFlags()
+	local globalStyleKey = addon.functions.GetGlobalFontStyleConfigKey and addon.functions.GetGlobalFontStyleConfigKey() or "__EQOL_GLOBAL_FONT_STYLE__"
+	local style = addon.db and addon.db[NAMEPLATE_TEXT_OUTLINE_DB_KEY] or globalStyleKey
+	if addon.functions.NormalizeFontStyleChoice then style = addon.functions.NormalizeFontStyleChoice(style, globalStyleKey, true) end
+	if style == "NONE" then style = globalStyleKey end
+	local flags = addon.functions.GetFontFlagsForStyle and addon.functions.GetFontFlagsForStyle(style, globalStyleKey) or "OUTLINE,SLUG"
+	if not flags or flags == "" then return "OUTLINE" end
+	if flags == "SLUG" then return "OUTLINE,SLUG" end
+	return flags
+end
+
+local function getNameplateTextStyleChoice()
+	local globalStyleKey = addon.functions.GetGlobalFontStyleConfigKey and addon.functions.GetGlobalFontStyleConfigKey() or "__EQOL_GLOBAL_FONT_STYLE__"
+	local style = addon.db and addon.db[NAMEPLATE_TEXT_OUTLINE_DB_KEY] or globalStyleKey
+	if addon.functions.NormalizeFontStyleChoice then return addon.functions.NormalizeFontStyleChoice(style, globalStyleKey, true), globalStyleKey end
+	return style, globalStyleKey
+end
+
+local function cacheFontShadowDefaults(defaults, fontElement)
+	if not defaults or not fontElement then return end
+	if type(fontElement.GetShadowColor) == "function" then
+		local r, g, b, a = fontElement:GetShadowColor()
+		defaults.shadowColor = { r = r, g = g, b = b, a = a }
+	end
+	if type(fontElement.GetShadowOffset) == "function" then
+		local x, y = fontElement:GetShadowOffset()
+		defaults.shadowX = x
+		defaults.shadowY = y
+	end
+end
+
+local function applyNameplateTextStyleShadow(fontElement)
+	if not (fontElement and addon.functions.ApplyFontStyleShadow) then return end
+	local style, fallback = getNameplateTextStyleChoice()
+	addon.functions.ApplyFontStyleShadow(fontElement, style, fallback)
+end
+
+local function restoreFontShadowDefaults(fontElement, defaults)
+	if not (fontElement and defaults) then return end
+	if defaults.shadowColor and type(fontElement.SetShadowColor) == "function" then
+		local color = defaults.shadowColor
+		fontElement:SetShadowColor(color.r or 0, color.g or 0, color.b or 0, color.a or 0)
+	end
+	if defaults.shadowX ~= nil and defaults.shadowY ~= nil and type(fontElement.SetShadowOffset) == "function" then fontElement:SetShadowOffset(defaults.shadowX, defaults.shadowY) end
+end
+
+local function setNameplateTextFont(fontElement, font, size, flags)
+	if not (fontElement and font and size and type(fontElement.SetFont) == "function") then return end
+	if not flags or flags == "" then flags = "OUTLINE" end
+	if flags == "SLUG" then flags = "OUTLINE,SLUG" end
+	fontElement:SetFont(font, size, flags)
+end
+
+local function applySlugOutlineToFontObject(fontObject)
+	if not fontObject or type(fontObject.GetFont) ~= "function" or type(fontObject.SetFont) ~= "function" then return end
+	if not nameplateSlugOutlineFontObjectDefaults[fontObject] then
+		local font, size, flags = fontObject:GetFont()
+		nameplateSlugOutlineFontObjectDefaults[fontObject] = { font = font, size = size, flags = flags }
+		cacheFontShadowDefaults(nameplateSlugOutlineFontObjectDefaults[fontObject], fontObject)
+	end
+
+	local defaults = nameplateSlugOutlineFontObjectDefaults[fontObject]
+	local font = defaults and defaults.font
+	local size = getNameplateTextSizeOverride(defaults and defaults.size)
+	setNameplateTextFont(fontObject, font, size, getNameplateTextStyleFlags())
+	applyNameplateTextStyleShadow(fontObject)
+end
+
+local function restoreSlugOutlineFontObject(fontObject)
+	local defaults = nameplateSlugOutlineFontObjectDefaults[fontObject]
+	if not defaults or not fontObject or type(fontObject.SetFont) ~= "function" then return end
+	setNameplateTextFont(fontObject, defaults.font, defaults.size, defaults.flags)
+	restoreFontShadowDefaults(fontObject, defaults)
+end
+
+local function applySlugOutlineToFontString(fontString)
+	if not fontString or type(fontString.GetFont) ~= "function" or type(fontString.SetFont) ~= "function" then return end
+	if not nameplateSlugOutlineFontStringDefaults[fontString] then
+		local font, size, flags = fontString:GetFont()
+		nameplateSlugOutlineFontStringDefaults[fontString] = { font = font, size = size, flags = flags }
+		cacheFontShadowDefaults(nameplateSlugOutlineFontStringDefaults[fontString], fontString)
+	end
+
+	local defaults = nameplateSlugOutlineFontStringDefaults[fontString]
+	local font = defaults and defaults.font
+	local size = getNameplateTextSizeOverride(defaults and defaults.size)
+	setNameplateTextFont(fontString, font, size, getNameplateTextStyleFlags())
+	applyNameplateTextStyleShadow(fontString)
+end
+
+local function restoreSlugOutlineFontString(fontString)
+	local defaults = nameplateSlugOutlineFontStringDefaults[fontString]
+	if not defaults or not fontString or type(fontString.SetFont) ~= "function" then return end
+	setNameplateTextFont(fontString, defaults.font, defaults.size, defaults.flags)
+	restoreFontShadowDefaults(fontString, defaults)
+end
+
+local function applySlugOutlineToNameplate(namePlate)
+	local unitFrame = namePlate and namePlate.UnitFrame
+	local fontString = getNameplateNameFontString(unitFrame)
+	if fontString then applySlugOutlineToFontString(fontString) end
+end
+
+local function restoreSlugOutlineOnNameplate(namePlate)
+	local unitFrame = namePlate and namePlate.UnitFrame
+	local fontString = getNameplateNameFontString(unitFrame)
+	if fontString then restoreSlugOutlineFontString(fontString) end
+end
+
+local function applyNameplateSlugOutlineToFontObjects()
+	for _, fontObjectName in ipairs(NAMEPLATE_SLUG_OUTLINE_FONT_OBJECTS) do
+		applySlugOutlineToFontObject(_G[fontObjectName])
+	end
+end
+
+local function restoreNameplateSlugOutlineFontObjects()
+	for _, fontObjectName in ipairs(NAMEPLATE_SLUG_OUTLINE_FONT_OBJECTS) do
+		restoreSlugOutlineFontObject(_G[fontObjectName])
+	end
+end
+
+local function applyNameplateSlugOutlineToAllNameplates()
+	applyNameplateSlugOutlineToFontObjects()
+	if not (C_NamePlate and C_NamePlate.GetNamePlates) then return end
+	for _, namePlate in pairs(C_NamePlate.GetNamePlates() or {}) do
+		applySlugOutlineToNameplate(namePlate)
+	end
+end
+
+local function restoreNameplateSlugOutlineOnAllNameplates()
+	restoreNameplateSlugOutlineFontObjects()
+	if not (C_NamePlate and C_NamePlate.GetNamePlates) then return end
+	for _, namePlate in pairs(C_NamePlate.GetNamePlates() or {}) do
+		restoreSlugOutlineOnNameplate(namePlate)
+	end
+end
+
+local function ensureNameplateSlugOutlineWatcher()
+	if nameplateSlugOutlineFrame then return end
+
+	nameplateSlugOutlineFrame = CreateFrame("Frame")
+	nameplateSlugOutlineFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+	nameplateSlugOutlineFrame:RegisterEvent("NAME_PLATE_UNIT_ADDED")
+	nameplateSlugOutlineFrame:SetScript("OnEvent", function(_, event, unit)
+		if not isNameplateSlugOutlineActive() then return end
+		if event == "NAME_PLATE_UNIT_ADDED" and unit and C_NamePlate and C_NamePlate.GetNamePlateForUnit then
+			local namePlate = C_NamePlate.GetNamePlateForUnit(unit)
+			if namePlate then applySlugOutlineToNameplate(namePlate) end
+			return
+		end
+
+		applyNameplateSlugOutlineToAllNameplates()
+	end)
+end
+
+local function syncNameplateSlugOutline()
+	if not isNameplateSlugOutlineActive() then return end
+	ensureNameplateSlugOutlineWatcher()
+	applyNameplateSlugOutlineToAllNameplates()
+end
+
+	function addon.functions.SetDefaultNameplateSlugOutlineEnabled(value)
+		local enabled = value and true or false
+		addon.db[NAMEPLATE_SLUG_OUTLINE_DB_KEY] = enabled
+		nameplateSlugOutlineActive = enabled
+		if enabled then
+			syncNameplateSlugOutline()
+		else
+			restoreNameplateSlugOutlineOnAllNameplates()
+		end
+	end
+
+	function addon.functions.RefreshDefaultNameplateTextStyle()
+		if isNameplateSlugOutlineActive() then syncNameplateSlugOutline() end
+	end
+
+	function addon.functions.InitializeDefaultNameplateTextStyle()
+		nameplateSlugOutlineActive = addon.db and addon.db[NAMEPLATE_SLUG_OUTLINE_DB_KEY] == true
+		if nameplateSlugOutlineActive then syncNameplateSlugOutline() end
+	end
+end
 
 local function isNameplateMobColorScopeEnabled(dbKey, defaultValue)
 	if not addon.db then return defaultValue and true or false end
@@ -1479,6 +1701,9 @@ function addon.functions.initDungeonFrame()
 	addon.functions.InitDBValue(NAMEPLATE_MOB_COLORS_DB_KEY, false)
 	addon.functions.InitDBValue(NAMEPLATE_MOB_COLORS_DUNGEONS_DB_KEY, true)
 	addon.functions.InitDBValue(NAMEPLATE_MOB_COLORS_OUTSIDE_DUNGEONS_DB_KEY, false)
+	addon.functions.InitDBValue(NAMEPLATE_SLUG_OUTLINE_DB_KEY, false)
+	addon.functions.InitDBValue(NAMEPLATE_TEXT_OUTLINE_DB_KEY, addon.functions.GetGlobalFontStyleConfigKey and addon.functions.GetGlobalFontStyleConfigKey() or "__EQOL_GLOBAL_FONT_STYLE__")
+	addon.functions.InitDBValue(NAMEPLATE_TEXT_SIZE_DB_KEY, 0)
 	addon.functions.InitDBValue(NAMEPLATE_ELITE_MARKERS_DB_KEY, false)
 	addon.functions.InitDBValue(NAMEPLATE_ELITE_MARKER_ANCHOR_DB_KEY, "LEFT")
 	addon.functions.InitDBValue(NAMEPLATE_ELITE_MARKER_SIZE_DB_KEY, 18)
@@ -1512,6 +1737,7 @@ function addon.functions.initDungeonFrame()
 	nameplateTargetMarkersActive = addon.db and addon.db[NAMEPLATE_TARGET_MARKERS_DB_KEY] == true
 	if nameplateAuraClickthroughActive then syncNameplateAuraClickthrough() end
 	if nameplateMobColorsActive then syncNameplateMobColors() end
+	if addon.functions.InitializeDefaultNameplateTextStyle then addon.functions.InitializeDefaultNameplateTextStyle() end
 	if nameplateEliteMarkersActive then syncNameplateEliteMarkers() end
 	if nameplateQuestMarkersActive then syncNameplateQuestMarkers() end
 	if nameplateTargetMarkersActive then syncNameplateTargetMarkers() end
