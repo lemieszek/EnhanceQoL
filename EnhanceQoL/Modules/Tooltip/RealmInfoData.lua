@@ -796,7 +796,8 @@ end
 
 local function getNameForAPI(name)
 	if not name then return nil end
-	return (name:gsub("[%s%-]", ""))
+	name = tostring(name):lower()
+	return (name:gsub("[%s%-']", ""):gsub("`", ""):gsub("´", ""):gsub("’", ""))
 end
 
 local function cloneRealm(realm)
