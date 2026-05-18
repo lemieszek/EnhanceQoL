@@ -1,4 +1,4 @@
-## Interface: 120000, 120001, 120005
+## Interface: 120005, 120007
 ## Title: Query
 ## Notes: A simple addon to show item info
 ## Notes-deDE: Ein einfaches Addon, um Item-Infos anzuzeigen

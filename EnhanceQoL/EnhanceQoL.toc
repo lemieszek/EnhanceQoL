@@ -1,4 +1,4 @@
-## Interface: 120000, 120001, 120005
+## Interface: 120005, 120007
 ## Title: Enhance QoL Core
 ## Author: R41Z0R
 ## Version: @project-version@
