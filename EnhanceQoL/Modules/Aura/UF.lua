@@ -12402,7 +12402,77 @@ UF.EnsureSingleAuraConfig = AuraUtil.ensureSingleAuraConfig
 UF.CopySettings = copySettings
 
 -- TODO: Temporary diagnostics for the player-name disappearing report. Remove after root cause is confirmed.
+function UF.ShowDebugCopyBox(text)
+	if not UIParent then
+		print(text)
+		return
+	end
+	local frame = UF._debugCopyFrame
+	if not frame then
+		frame = CreateFrame("Frame", "EQOLUFDebugCopyFrame", UIParent, "BackdropTemplate")
+		frame:SetSize(720, 420)
+		frame:SetPoint("CENTER")
+		frame:SetFrameStrata("TOOLTIP")
+		frame:SetFrameLevel(100)
+		frame:SetMovable(true)
+		frame:EnableMouse(true)
+		frame:RegisterForDrag("LeftButton")
+		frame:SetScript("OnDragStart", frame.StartMoving)
+		frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+		if frame.SetBackdrop then
+			frame:SetBackdrop({
+				bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+				edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+				tile = true,
+				tileSize = 32,
+				edgeSize = 32,
+				insets = { left = 8, right = 8, top = 8, bottom = 8 },
+			})
+		end
+
+		local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		title:SetPoint("TOPLEFT", 16, -14)
+		title:SetText("EnhanceQoL UF Debug")
+		frame.title = title
+
+		local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
+		close:SetPoint("TOPRIGHT", -6, -6)
+		frame.close = close
+
+		local scroll = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
+		scroll:SetPoint("TOPLEFT", 16, -42)
+		scroll:SetPoint("BOTTOMRIGHT", -34, 16)
+		frame.scroll = scroll
+
+		local edit = CreateFrame("EditBox", nil, scroll)
+		edit:SetMultiLine(true)
+		edit:SetAutoFocus(false)
+		edit:SetFontObject(ChatFontNormal)
+		edit:SetWidth(650)
+		edit:SetScript("OnEscapePressed", function(self)
+			self:ClearFocus()
+			frame:Hide()
+		end)
+		scroll:SetScrollChild(edit)
+		frame.edit = edit
+
+		UF._debugCopyFrame = frame
+	end
+	frame.edit:SetText(text or "")
+	frame.edit:HighlightText()
+	frame.edit:SetFocus()
+	frame:Show()
+end
+
 function UF.DebugPlayerName()
+	local lines = {}
+	local function add(...)
+		local parts = {}
+		for i = 1, select("#", ...) do
+			parts[i] = tostring(select(i, ...))
+		end
+		lines[#lines + 1] = table.concat(parts, "\t")
+	end
 	local unit = UNIT.PLAYER
 	local st = states and states[unit]
 	local cfg = ensureDB(unit)
@@ -12415,12 +12485,13 @@ function UF.DebugPlayerName()
 	local lsmValid = lsm and lsm.IsValid and scfg.font and lsm:IsValid("font", scfg.font)
 	local lsmFetch = lsm and lsm.Fetch and scfg.font and lsm:Fetch("font", scfg.font, true)
 
-	print("EQOL UFDBG profile", tostring(activeProfile), "guid", tostring(guid), "mapped", tostring(mappedProfile), "global", tostring(addon.db and addon.db.ufProfileGlobal))
-	print("EQOL UFDBG cfg", "font", tostring(scfg.font), "resolved", tostring(resolvedFont), "outline", tostring(scfg.fontOutline), "lsmValid", tostring(lsmValid), "lsmFetch", tostring(lsmFetch))
-	print("EQOL UFDBG cfg2", "enabled", tostring(scfg.enabled), "nameStrata", tostring(scfg.nameStrata), "nameLevelOffset", tostring(scfg.nameFrameLevelOffset), "nameMax", tostring(scfg.nameMaxChars), "offset", tostring(scfg.nameOffset and scfg.nameOffset.x), tostring(scfg.nameOffset and scfg.nameOffset.y))
+	add("EQOL UFDBG profile", "profile", activeProfile, "guid", guid, "mapped", mappedProfile, "global", addon.db and addon.db.ufProfileGlobal)
+	add("EQOL UFDBG cfg", "font", scfg.font, "resolved", resolvedFont, "outline", scfg.fontOutline, "lsmValid", lsmValid, "lsmFetch", lsmFetch)
+	add("EQOL UFDBG cfg2", "enabled", scfg.enabled, "nameStrata", scfg.nameStrata, "nameLevelOffset", scfg.nameFrameLevelOffset, "nameMax", scfg.nameMaxChars, "offset", scfg.nameOffset and scfg.nameOffset.x, scfg.nameOffset and scfg.nameOffset.y)
 
 	if not st then
-		print("EQOL UFDBG state nil")
+		add("EQOL UFDBG state nil")
+		UF.ShowDebugCopyBox(table.concat(lines, "\n"))
 		return
 	end
 
@@ -12435,46 +12506,46 @@ function UF.DebugPlayerName()
 	local fs = st.nameText
 	if fs then
 		local fontFile, fontSize, fontFlags = call(fs, "GetFont")
-		print(
+		add(
 			"EQOL UFDBG name",
 			"text",
-			tostring(call(fs, "GetText")),
+			call(fs, "GetText"),
 			"shown",
-			tostring(call(fs, "IsShown")),
+			call(fs, "IsShown"),
 			"visible",
-			tostring(call(fs, "IsVisible")),
+			call(fs, "IsVisible"),
 			"alpha",
-			tostring(call(fs, "GetAlpha")),
+			call(fs, "GetAlpha"),
 			"eff",
-			tostring(call(fs, "GetEffectiveAlpha")),
+			call(fs, "GetEffectiveAlpha"),
 			"font",
-			tostring(fontFile),
-			tostring(fontSize),
-			tostring(fontFlags)
+			fontFile,
+			fontSize,
+			fontFlags
 		)
-		print("EQOL UFDBG name2", "width", tostring(call(fs, "GetWidth")), "stringWidth", tostring(call(fs, "GetStringWidth")), "rect", tostring(call(fs, "GetLeft")), tostring(call(fs, "GetTop")), tostring(call(fs, "GetRight")), tostring(call(fs, "GetBottom")))
+		add("EQOL UFDBG name2", "width", call(fs, "GetWidth"), "stringWidth", call(fs, "GetStringWidth"), "rect", call(fs, "GetLeft"), call(fs, "GetTop"), call(fs, "GetRight"), call(fs, "GetBottom"))
 	else
-		print("EQOL UFDBG name nil")
+		add("EQOL UFDBG name nil")
 	end
 
 	local function dumpFrame(label, frame)
 		if not frame then
-			print("EQOL UFDBG frame", label, "nil")
+			add("EQOL UFDBG frame", label, "nil")
 			return
 		end
-		print(
+		add(
 			"EQOL UFDBG frame",
 			label,
 			"shown",
-			tostring(call(frame, "IsShown")),
+			call(frame, "IsShown"),
 			"visible",
-			tostring(call(frame, "IsVisible")),
+			call(frame, "IsVisible"),
 			"strata",
-			tostring(call(frame, "GetFrameStrata")),
+			call(frame, "GetFrameStrata"),
 			"level",
-			tostring(call(frame, "GetFrameLevel")),
+			call(frame, "GetFrameLevel"),
 			"alpha",
-			tostring(call(frame, "GetAlpha"))
+			call(frame, "GetAlpha")
 		)
 	end
 
@@ -12488,6 +12559,7 @@ function UF.DebugPlayerName()
 	dumpFrame("powerGroup", st.powerGroup)
 	dumpFrame("dataBar", st.dataBar)
 	dumpFrame("dispelTint", st.dispelTint)
+	UF.ShowDebugCopyBox(table.concat(lines, "\n"))
 end
 
 if SlashCmdList then
