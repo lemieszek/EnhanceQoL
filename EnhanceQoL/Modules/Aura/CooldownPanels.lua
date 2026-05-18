@@ -4699,6 +4699,17 @@ function CooldownPanels:RebuildSpellIndex()
 						end
 					if entry and entry.type == "SPELL" and entry.spellID then
 						spellId = tonumber(entry.spellID)
+						if self:IsEntryCDMAuraOverlayEnabled(panel.layout, entry, "SPELL") and spellId and spellId > 0 then
+							if not cdmAuraEntryIdsByPanel[panelId] then
+								cdmAuraPanels[panelId] = true
+								cdmAuraPanelIds[#cdmAuraPanelIds + 1] = panelId
+								cdmAuraEntryIdsByPanel[panelId] = {}
+							end
+							for _, aliasId in ipairs(self:GetSpellAliasIDs(spellId)) do
+								cdmAuraSpellIds[aliasId] = true
+							end
+							cdmAuraEntryCount = cdmAuraEntryCount + 1
+						end
 					elseif entry and entry.type == "MACRO" then
 						local macro = CooldownPanels.ResolveMacroEntry(entry)
 						if macro and macro.kind == "SPELL" and macro.spellID then
@@ -6990,14 +7001,28 @@ end
 
 function cdp.RUNTIME.HasCooldownWidgetConfigChange(snapshot, data, cooldownUsesAuraDisplay)
 	if not (snapshot and data) then return true end
-	return snapshot.entryId ~= data.entryId or snapshot.cooldownHideCountdownNumbers ~= not data.showCooldownText or snapshot.cooldownUsesAuraDisplay ~= (cooldownUsesAuraDisplay == true)
+	local color = data.activationOverlayColor
+	return snapshot.entryId ~= data.entryId
+		or snapshot.cooldownHideCountdownNumbers ~= not data.showCooldownText
+		or snapshot.cooldownUsesAuraDisplay ~= (cooldownUsesAuraDisplay == true)
+		or snapshot.cooldownReverse ~= (data.cooldownReverse == true)
+		or snapshot.activationOverlayColorR ~= (color and color[1] or nil)
+		or snapshot.activationOverlayColorG ~= (color and color[2] or nil)
+		or snapshot.activationOverlayColorB ~= (color and color[3] or nil)
+		or snapshot.activationOverlayColorA ~= (color and color[4] or nil)
 end
 
 function cdp.RUNTIME.WriteCooldownWidgetConfigSnapshot(snapshot, data, cooldownUsesAuraDisplay)
 	if not (snapshot and data) then return end
+	local color = data.activationOverlayColor
 	snapshot.entryId = data.entryId
 	snapshot.cooldownHideCountdownNumbers = not data.showCooldownText
 	snapshot.cooldownUsesAuraDisplay = cooldownUsesAuraDisplay == true
+	snapshot.cooldownReverse = data.cooldownReverse == true
+	snapshot.activationOverlayColorR = color and color[1] or nil
+	snapshot.activationOverlayColorG = color and color[2] or nil
+	snapshot.activationOverlayColorB = color and color[3] or nil
+	snapshot.activationOverlayColorA = color and color[4] or nil
 end
 
 function cdp.RUNTIME.HasCooldownTextStyleChange(snapshot, data, defaultFontPath, defaultFontSize, defaultFontStyle)
@@ -7830,8 +7855,80 @@ function CooldownPanels:SupportsEntryCustomCooldownDuration(entry, resolvedType)
 	return typeKey == "SPELL" or typeKey == "ITEM" or typeKey == "SLOT"
 end
 
+function CooldownPanels:GetAutoCooldownDurationInfoForItemID(itemID)
+	itemID = tonumber(itemID)
+	if not itemID then return nil end
+	local map = self.autoCooldownDurationByItemID
+	local info = map and map[itemID] or nil
+	local duration = info and tonumber(info.duration) or nil
+	if not (duration and duration > 0) then return nil end
+	local maxDuration = Helper.CUSTOM_COOLDOWN_DURATION_MAX or 300
+	if duration > maxDuration then duration = maxDuration end
+	return info, duration
+end
+
+function CooldownPanels:GetEntryAutoCooldownDurationInfo(entry, resolvedType)
+	if not entry then return nil end
+	local typeKey = resolvedType or entry.type
+	if typeKey == "ITEM" then
+		local itemID = tonumber(entry.itemID)
+		if itemID and entry.type == "ITEM" then itemID = self.ResolveEntryItemID(entry, itemID) end
+		return self:GetAutoCooldownDurationInfoForItemID(itemID)
+	elseif typeKey == "SLOT" then
+		local slotID = tonumber(entry.slotID)
+		local itemID = slotID and Api.GetInventoryItemID and Api.GetInventoryItemID("player", slotID) or nil
+		return self:GetAutoCooldownDurationInfoForItemID(itemID)
+	end
+	return nil
+end
+
+function CooldownPanels:IsEntryTrinketSlot(entry, resolvedType)
+	if not entry then return false end
+	local typeKey = resolvedType or entry.type
+	if typeKey ~= "SLOT" then return false end
+	local slotID = tonumber(entry.slotID)
+	if not slotID then return false end
+	return slotID == 13 or slotID == 14
+end
+
+function CooldownPanels:SupportsEntryAutoCooldownDuration(entry, resolvedType)
+	if self:IsEntryTrinketSlot(entry, resolvedType) then return true end
+	local _, duration = self:GetEntryAutoCooldownDurationInfo(entry, resolvedType)
+	return duration ~= nil
+end
+
+function CooldownPanels:SupportsEntryCDMAuraOverlay(entry, resolvedType)
+	if not entry then return false end
+	local typeKey = resolvedType or entry.type
+	if typeKey ~= "SPELL" or entry.type ~= "SPELL" then return false end
+	local spellID = tonumber(entry.spellID)
+	local cdmAuras = self.CDMAuras
+	if not (spellID and cdmAuras and cdmAuras.SupportsSpellAuraOverlay) then return false end
+	local candidates, seen = {}, {}
+	candidates, seen = self:GetSpellAliasIDs(spellID, candidates, seen)
+	local effectiveSpellID, resolvedSpellID = self:ResolveTrackedSpellID(spellID)
+	if effectiveSpellID then candidates, seen = self:GetSpellAliasIDs(effectiveSpellID, candidates, seen) end
+	if resolvedSpellID then candidates, seen = self:GetSpellAliasIDs(resolvedSpellID, candidates, seen) end
+	for i = 1, #candidates do
+		if cdmAuras:SupportsSpellAuraOverlay(candidates[i]) then return true end
+	end
+	return false
+end
+
+function CooldownPanels:IsEntryCDMAuraOverlayEnabled(layout, entry, resolvedType)
+	if not entry then return false end
+	local typeKey = resolvedType or entry.type
+	if typeKey ~= "SPELL" or entry.type ~= "SPELL" then return false end
+	if entry.customCooldownDurationEnabled == true then return false end
+	return entry.cdmAuraOverlayEnabled == true or (layout and layout.cdmAuraOverlayEnabled == true)
+end
+
 function CooldownPanels:GetEntryCustomCooldownDuration(entry, resolvedType)
 	if not self:SupportsEntryCustomCooldownDuration(entry, resolvedType) then return nil end
+	if entry.autoCooldownDurationEnabled == true then
+		local _, autoDuration = self:GetEntryAutoCooldownDurationInfo(entry, resolvedType)
+		if autoDuration then return autoDuration end
+	end
 	if entry.customCooldownDurationEnabled ~= true then return nil end
 	local duration = tonumber(entry.customCooldownDuration)
 	if not duration or duration <= 0 then return nil end
@@ -7981,6 +8078,22 @@ function CooldownPanels:ApplyCustomCooldownDurationState(data, customState)
 	data.cooldownRate = customState.rate or 1
 	data.cooldownGCD = false
 	data.cooldownDurationObject = customState.durationObject
+end
+
+function CooldownPanels:ApplyActivationOverlayVisualState(data, entry)
+	if not data then return end
+	local active = data.customCooldownDurationActive == true or data.spellAuraOverlayActive == true
+	data.activationOverlayActive = active
+	data.activationOverlayReverse = entry and entry.activationOverlayReverse ~= false or true
+	data.activationOverlayColor = Helper.NormalizeColor(entry and entry.activationOverlayColor, Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT)
+	data.activationOverlayOnly = entry and entry.activationOverlayOnly == true or false
+	data.activationOverlayGlow = entry and entry.activationOverlayGlow == true or false
+	data.cooldownReverse = data.resolvedType == "CDM_AURA" or (active == true and data.activationOverlayReverse ~= false)
+end
+
+function CooldownPanels:EntryUsesActivationOverlay(entry, resolvedType)
+	if not entry then return false end
+	return self:SupportsEntryCustomCooldownDuration(entry, resolvedType) or self:SupportsEntryCDMAuraOverlay(entry, resolvedType)
 end
 
 function CooldownPanels:ShouldTriggerEntryCustomCooldownDuration(entry, castSpellId)
@@ -8934,6 +9047,45 @@ local function setCooldownDrawState(cooldown, drawEdge, drawBling, drawSwipe)
 	end
 end
 
+function cdp.ENTRY.GetCooldownSwipeColor(data)
+	if data and data.activationOverlayActive == true then
+		local color = Helper.NormalizeColor(data.activationOverlayColor, Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT)
+		return color[1], color[2], color[3], color[4]
+	end
+	if data and data.resolvedType == "CDM_AURA" then return 0, 0, 0, 0.7 end
+	return 1, 1, 1, 1
+end
+
+function cdp.ENTRY.ApplyCooldownSwipeVisual(icon, data)
+	if not (icon and icon.cooldown) then return end
+	local r, g, b, a = cdp.ENTRY.GetCooldownSwipeColor(data)
+	local needsCustomSwipeColor = data and (data.activationOverlayActive == true or data.resolvedType == "CDM_AURA") or false
+	if icon.cooldown.SetSwipeTexture and icon._eqolBlizzardSwipeTextureApplied then
+		if icon._eqolSwipeTextureR ~= r or icon._eqolSwipeTextureG ~= g or icon._eqolSwipeTextureB ~= b or icon._eqolSwipeTextureA ~= a then
+			local ok = pcall(icon.cooldown.SetSwipeTexture, icon.cooldown, cdp.ICON_BORDER.SWIPE_TEXTURE, r, g, b, a)
+			if ok then
+				icon._eqolSwipeTextureR, icon._eqolSwipeTextureG, icon._eqolSwipeTextureB, icon._eqolSwipeTextureA = r, g, b, a
+			end
+		end
+	end
+	if needsCustomSwipeColor and icon.cooldown.SetSwipeColor then
+		if icon._eqolSwipeColorR ~= r or icon._eqolSwipeColorG ~= g or icon._eqolSwipeColorB ~= b or icon._eqolSwipeColorA ~= a then
+			icon.cooldown:SetSwipeColor(r, g, b, a)
+			icon._eqolSwipeColorR, icon._eqolSwipeColorG, icon._eqolSwipeColorB, icon._eqolSwipeColorA = r, g, b, a
+		end
+	elseif not needsCustomSwipeColor then
+		if icon.cooldown.SetSwipeColor and icon._eqolSwipeColorR ~= nil then icon.cooldown:SetSwipeColor(0, 0, 0, 0.8) end
+		icon._eqolSwipeColorR, icon._eqolSwipeColorG, icon._eqolSwipeColorB, icon._eqolSwipeColorA = nil, nil, nil, nil
+	end
+	if needsCustomSwipeColor and icon.cooldown.SetSwipeTexture and not icon._eqolBlizzardSwipeTextureApplied then
+		local ok = pcall(icon.cooldown.SetSwipeTexture, icon.cooldown, cdp.ICON_BORDER.SWIPE_TEXTURE, r, g, b, a)
+		if ok then
+			icon._eqolBlizzardSwipeTextureApplied = true
+			icon._eqolSwipeTextureR, icon._eqolSwipeTextureG, icon._eqolSwipeTextureB, icon._eqolSwipeTextureA = r, g, b, a
+		end
+	end
+end
+
 function cdp.ENTRY.EnsureBlizzardIconOverlay(icon)
 	if not icon then return nil end
 	local overlay = icon.blizzardIconOverlay
@@ -9030,19 +9182,14 @@ function cdp.ENTRY.ApplyBlizzardIconSkin(icon)
 		end
 		if icon.cooldown.SetSwipeTexture then
 			local runtimeData = icon._eqolRuntimeData
-			local auraSwipe = runtimeData and runtimeData.resolvedType == "CDM_AURA"
-			local r, g, b, a = 1, 1, 1, 1
-			if auraSwipe then r, g, b, a = 0, 0, 0, 0.7 end
+			local r, g, b, a = cdp.ENTRY.GetCooldownSwipeColor(runtimeData)
 			local ok = pcall(icon.cooldown.SetSwipeTexture, icon.cooldown, cdp.ICON_BORDER.SWIPE_TEXTURE, r, g, b, a)
-			if ok then icon._eqolBlizzardSwipeTextureApplied = true end
-		elseif icon.cooldown.SetSwipeColor then
-			local runtimeData = icon._eqolRuntimeData
-			if runtimeData and runtimeData.resolvedType == "CDM_AURA" then
-				icon.cooldown:SetSwipeColor(0, 0, 0, 0.7)
-			else
-				icon.cooldown:SetSwipeColor(1, 1, 1, 1)
+			if ok then
+				icon._eqolBlizzardSwipeTextureApplied = true
+				icon._eqolSwipeTextureR, icon._eqolSwipeTextureG, icon._eqolSwipeTextureB, icon._eqolSwipeTextureA = r, g, b, a
 			end
 		end
+		cdp.ENTRY.ApplyCooldownSwipeVisual(icon, icon._eqolRuntimeData)
 	end
 end
 
@@ -10459,6 +10606,37 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		end
 		if currentEntry.customCooldownDurationEnabled == normalized then return end
 		currentEntry.customCooldownDurationEnabled = normalized
+		if normalized then currentEntry.autoCooldownDurationEnabled = false end
+		if normalized then currentEntry.cdmAuraOverlayEnabled = false end
+		CooldownPanels:ClearEntryCustomCooldownDuration(panelId, entryId, true)
+		refreshEntryViews()
+	end
+
+	local function setCDMAuraOverlayEnabled(value)
+		local _, currentEntry = getEntry()
+		if not currentEntry then return end
+		local normalized = value == true
+		if normalized and not CooldownPanels:SupportsEntryCDMAuraOverlay(currentEntry, getEffectiveType()) then return end
+		if currentEntry.cdmAuraOverlayEnabled == normalized then return end
+		currentEntry.cdmAuraOverlayEnabled = normalized
+		if normalized then
+			currentEntry.customCooldownDurationEnabled = false
+			currentEntry.autoCooldownDurationEnabled = false
+		end
+		CooldownPanels:ClearEntryCustomCooldownDuration(panelId, entryId, true)
+		CooldownPanels:RebuildSpellIndex()
+		refreshEntryViews()
+	end
+
+	local function setAutoCooldownDurationEnabled(value)
+		local _, currentEntry = getEntry()
+		if not currentEntry then return end
+		local normalized = value == true
+		if normalized and not CooldownPanels:SupportsEntryAutoCooldownDuration(currentEntry, getEffectiveType()) then return end
+		if currentEntry.autoCooldownDurationEnabled == normalized then return end
+		currentEntry.autoCooldownDurationEnabled = normalized
+		if normalized then currentEntry.customCooldownDurationEnabled = false end
+		if normalized then currentEntry.cdmAuraOverlayEnabled = false end
 		CooldownPanels:ClearEntryCustomCooldownDuration(panelId, entryId, true)
 		refreshEntryViews()
 	end
@@ -11440,6 +11618,113 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			id = "cooldownPanelStandaloneCooldownVisuals",
 			defaultCollapsed = true,
 			isShown = function() return getEffectiveType() ~= "STANCE" end,
+		},
+		{
+			name = L["CooldownPanelCDMAuraOverlay"] or "Show aura overlay",
+			kind = SettingType.Checkbox,
+			parentId = "cooldownPanelStandaloneCooldownVisuals",
+			isShown = function()
+				local _, currentEntry = getEntry()
+				return CooldownPanels:SupportsEntryCDMAuraOverlay(currentEntry, getEffectiveType())
+			end,
+			get = function()
+				local _, currentEntry = getEntry()
+				return currentEntry and currentEntry.cdmAuraOverlayEnabled == true or false
+			end,
+			set = function(_, value) setCDMAuraOverlayEnabled(value) end,
+		},
+		{
+			name = L["CooldownPanelActivationOverlayColor"] or "Activation overlay color",
+			kind = SettingType.Color,
+			parentId = "cooldownPanelStandaloneCooldownVisuals",
+			hasOpacity = true,
+			isShown = function()
+				local _, currentEntry = getEntry()
+				return CooldownPanels:SupportsEntryCustomCooldownDuration(currentEntry, getEffectiveType()) or CooldownPanels:SupportsEntryCDMAuraOverlay(currentEntry, getEffectiveType())
+			end,
+			disabled = function()
+				local _, currentEntry = getEntry()
+				local panelOverlay = getLayout() and getLayout().cdmAuraOverlayEnabled == true and CooldownPanels:SupportsEntryCDMAuraOverlay(currentEntry, getEffectiveType())
+				return not (currentEntry and (currentEntry.customCooldownDurationEnabled == true or currentEntry.autoCooldownDurationEnabled == true or currentEntry.cdmAuraOverlayEnabled == true or panelOverlay))
+			end,
+			default = Helper.NormalizeColor(Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT, Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT),
+			get = function()
+				local _, currentEntry = getEntry()
+				local color = Helper.NormalizeColor(currentEntry and currentEntry.activationOverlayColor, Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT)
+				return { r = color[1], g = color[2], b = color[3], a = color[4] }
+			end,
+			set = function(_, value) setEntryField("activationOverlayColor", Helper.NormalizeColor(value, Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT)) end,
+		},
+		{
+			name = L["CooldownPanelActivationOverlayReverse"] or "Reverse activation swipe",
+			kind = SettingType.Checkbox,
+			parentId = "cooldownPanelStandaloneCooldownVisuals",
+			isShown = function()
+				local _, currentEntry = getEntry()
+				return CooldownPanels:SupportsEntryCustomCooldownDuration(currentEntry, getEffectiveType()) or CooldownPanels:SupportsEntryCDMAuraOverlay(currentEntry, getEffectiveType())
+			end,
+			disabled = function()
+				local _, currentEntry = getEntry()
+				local panelOverlay = getLayout() and getLayout().cdmAuraOverlayEnabled == true and CooldownPanels:SupportsEntryCDMAuraOverlay(currentEntry, getEffectiveType())
+				return not (currentEntry and (currentEntry.customCooldownDurationEnabled == true or currentEntry.autoCooldownDurationEnabled == true or currentEntry.cdmAuraOverlayEnabled == true or panelOverlay))
+			end,
+			get = function()
+				local _, currentEntry = getEntry()
+				return not currentEntry or currentEntry.activationOverlayReverse ~= false
+			end,
+			set = function(_, value) setEntryField("activationOverlayReverse", value == true) end,
+		},
+		{
+			name = L["CooldownPanelActivationOverlayOnly"] or "Only show during activation",
+			kind = SettingType.Checkbox,
+			parentId = "cooldownPanelStandaloneCooldownVisuals",
+			isShown = function()
+				local _, currentEntry = getEntry()
+				return CooldownPanels:EntryUsesActivationOverlay(currentEntry, getEffectiveType())
+			end,
+			disabled = function()
+				local _, currentEntry = getEntry()
+				local panelOverlay = getLayout() and getLayout().cdmAuraOverlayEnabled == true and CooldownPanels:SupportsEntryCDMAuraOverlay(currentEntry, getEffectiveType())
+				return not (currentEntry and (currentEntry.customCooldownDurationEnabled == true or currentEntry.autoCooldownDurationEnabled == true or currentEntry.cdmAuraOverlayEnabled == true or panelOverlay))
+			end,
+			get = function()
+				local _, currentEntry = getEntry()
+				return currentEntry and currentEntry.activationOverlayOnly == true or false
+			end,
+			set = function(_, value) setEntryField("activationOverlayOnly", value == true) end,
+		},
+		{
+			name = L["CooldownPanelActivationOverlayGlow"] or "Glow during activation",
+			kind = SettingType.Checkbox,
+			parentId = "cooldownPanelStandaloneCooldownVisuals",
+			isShown = function()
+				local _, currentEntry = getEntry()
+				return CooldownPanels:EntryUsesActivationOverlay(currentEntry, getEffectiveType())
+			end,
+			disabled = function()
+				local _, currentEntry = getEntry()
+				local panelOverlay = getLayout() and getLayout().cdmAuraOverlayEnabled == true and CooldownPanels:SupportsEntryCDMAuraOverlay(currentEntry, getEffectiveType())
+				return not (currentEntry and (currentEntry.customCooldownDurationEnabled == true or currentEntry.autoCooldownDurationEnabled == true or currentEntry.cdmAuraOverlayEnabled == true or panelOverlay))
+			end,
+			get = function()
+				local _, currentEntry = getEntry()
+				return currentEntry and currentEntry.activationOverlayGlow == true or false
+			end,
+			set = function(_, value) setEntryField("activationOverlayGlow", value == true) end,
+		},
+		{
+			name = L["CooldownPanelAutoDuration"] or "Automatic duration on activation",
+			kind = SettingType.Checkbox,
+			parentId = "cooldownPanelStandaloneCooldownVisuals",
+			isShown = function()
+				local _, currentEntry = getEntry()
+				return CooldownPanels:SupportsEntryAutoCooldownDuration(currentEntry, getEffectiveType())
+			end,
+			get = function()
+				local _, currentEntry = getEntry()
+				return currentEntry and currentEntry.autoCooldownDurationEnabled == true or false
+			end,
+			set = function(_, value) setAutoCooldownDurationEnabled(value) end,
 		},
 		{
 			name = L["CooldownPanelCustomDuration"] or "Custom duration on activation",
@@ -13489,8 +13774,23 @@ local function ensureEditor()
 	local cbShowWhenNoCooldown = Helper.CreateCheck(rightContent, L["CooldownPanelShowWhenNoCooldown"] or "Show even without cooldown")
 	cbShowWhenNoCooldown:SetPoint("TOPLEFT", cbShowWhenEmpty, "BOTTOMLEFT", 0, -4)
 
+	local cbCDMAuraOverlay = Helper.CreateCheck(rightContent, L["CooldownPanelCDMAuraOverlay"] or "Show aura overlay")
+	cbCDMAuraOverlay:SetPoint("TOPLEFT", cbShowWhenNoCooldown, "BOTTOMLEFT", 0, -4)
+
+	local cbCDMAuraOverlayReverse = Helper.CreateCheck(rightContent, L["CooldownPanelActivationOverlayReverse"] or "Reverse activation swipe")
+	cbCDMAuraOverlayReverse:SetPoint("TOPLEFT", cbCDMAuraOverlay, "BOTTOMLEFT", 0, -4)
+
+	local cbActivationOverlayOnly = Helper.CreateCheck(rightContent, L["CooldownPanelActivationOverlayOnly"] or "Only show during activation")
+	cbActivationOverlayOnly:SetPoint("TOPLEFT", cbCDMAuraOverlayReverse, "BOTTOMLEFT", 0, -4)
+
+	local cbActivationOverlayGlow = Helper.CreateCheck(rightContent, L["CooldownPanelActivationOverlayGlow"] or "Glow during activation")
+	cbActivationOverlayGlow:SetPoint("TOPLEFT", cbActivationOverlayOnly, "BOTTOMLEFT", 0, -4)
+
+	local cbAutoDuration = Helper.CreateCheck(rightContent, L["CooldownPanelAutoDuration"] or "Automatic duration on activation")
+	cbAutoDuration:SetPoint("TOPLEFT", cbActivationOverlayGlow, "BOTTOMLEFT", 0, -4)
+
 	local cbCustomDuration = Helper.CreateCheck(rightContent, L["CooldownPanelCustomDuration"] or "Custom duration on activation")
-	cbCustomDuration:SetPoint("TOPLEFT", cbShowWhenNoCooldown, "BOTTOMLEFT", 0, -4)
+	cbCustomDuration:SetPoint("TOPLEFT", cbAutoDuration, "BOTTOMLEFT", 0, -4)
 
 	local customDurationBox = Helper.CreateEditBox(rightContent, 70, 20)
 	customDurationBox:SetPoint("TOPLEFT", cbCustomDuration, "BOTTOMLEFT", 18, -4)
@@ -13696,6 +13996,11 @@ local function ensureEditor()
 			cbUseHighestRank = cbUseHighestRank,
 			cbShowWhenEmpty = cbShowWhenEmpty,
 			cbShowWhenNoCooldown = cbShowWhenNoCooldown,
+			cbCDMAuraOverlay = cbCDMAuraOverlay,
+			cbCDMAuraOverlayReverse = cbCDMAuraOverlayReverse,
+			cbActivationOverlayOnly = cbActivationOverlayOnly,
+			cbActivationOverlayGlow = cbActivationOverlayGlow,
+			cbAutoDuration = cbAutoDuration,
 			cbCustomDuration = cbCustomDuration,
 			customDurationBox = customDurationBox,
 			customDurationLabel = customDurationLabel,
@@ -13940,6 +14245,75 @@ local function ensureEditor()
 	bindEntryToggle(cbUseHighestRank, "useHighestRank")
 	bindEntryToggle(cbShowWhenEmpty, "showWhenEmpty")
 	bindEntryToggle(cbShowWhenNoCooldown, "showWhenNoCooldown")
+	cbCDMAuraOverlay:SetScript("OnClick", function(self)
+		local panelId = editor.selectedPanelId
+		local entryId = editor.selectedEntryId
+		local panel = panelId and CooldownPanels:GetPanel(panelId)
+		local entry = panel and panel.entries and panel.entries[entryId]
+		if not entry then return end
+		local enabled = self:GetChecked() == true
+		if enabled and not CooldownPanels:SupportsEntryCDMAuraOverlay(entry, entry.type) then
+			self:SetChecked(false)
+			return
+		end
+		entry.cdmAuraOverlayEnabled = enabled
+		if enabled then
+			entry.customCooldownDurationEnabled = false
+			entry.autoCooldownDurationEnabled = false
+		end
+		CooldownPanels:ClearEntryCustomCooldownDuration(panelId, entryId, true)
+		CooldownPanels:RebuildSpellIndex()
+		CooldownPanels:RefreshPanel(panelId)
+		CooldownPanels:RefreshEditor()
+	end)
+	cbCDMAuraOverlayReverse:SetScript("OnClick", function(self)
+		local panelId = editor.selectedPanelId
+		local entryId = editor.selectedEntryId
+		local panel = panelId and CooldownPanels:GetPanel(panelId)
+		local entry = panel and panel.entries and panel.entries[entryId]
+		if not entry then return end
+		entry.activationOverlayReverse = self:GetChecked() == true
+		CooldownPanels:RefreshPanel(panelId)
+		CooldownPanels:RefreshEditor()
+	end)
+	cbActivationOverlayOnly:SetScript("OnClick", function(self)
+		local panelId = editor.selectedPanelId
+		local entryId = editor.selectedEntryId
+		local panel = panelId and CooldownPanels:GetPanel(panelId)
+		local entry = panel and panel.entries and panel.entries[entryId]
+		if not entry then return end
+		entry.activationOverlayOnly = self:GetChecked() == true
+		CooldownPanels:RefreshPanel(panelId)
+		CooldownPanels:RefreshEditor()
+	end)
+	cbActivationOverlayGlow:SetScript("OnClick", function(self)
+		local panelId = editor.selectedPanelId
+		local entryId = editor.selectedEntryId
+		local panel = panelId and CooldownPanels:GetPanel(panelId)
+		local entry = panel and panel.entries and panel.entries[entryId]
+		if not entry then return end
+		entry.activationOverlayGlow = self:GetChecked() == true
+		CooldownPanels:RefreshPanel(panelId)
+		CooldownPanels:RefreshEditor()
+	end)
+	cbAutoDuration:SetScript("OnClick", function(self)
+		local panelId = editor.selectedPanelId
+		local entryId = editor.selectedEntryId
+		local panel = panelId and CooldownPanels:GetPanel(panelId)
+		local entry = panel and panel.entries and panel.entries[entryId]
+		if not entry then return end
+		local enabled = self:GetChecked() == true
+		if enabled and not CooldownPanels:SupportsEntryAutoCooldownDuration(entry, entry.type) then
+			self:SetChecked(false)
+			return
+		end
+		entry.autoCooldownDurationEnabled = enabled
+		if enabled then entry.customCooldownDurationEnabled = false end
+		if enabled then entry.cdmAuraOverlayEnabled = false end
+		CooldownPanels:ClearEntryCustomCooldownDuration(panelId, entryId, true)
+		CooldownPanels:RefreshPanel(panelId)
+		CooldownPanels:RefreshEditor()
+	end)
 	cbCustomDuration:SetScript("OnClick", function(self)
 		local panelId = editor.selectedPanelId
 		local entryId = editor.selectedEntryId
@@ -13949,6 +14323,8 @@ local function ensureEditor()
 		local enabled = self:GetChecked() == true
 		if enabled and not ((tonumber(entry.customCooldownDuration) or 0) > 0) then entry.customCooldownDuration = 60 end
 		entry.customCooldownDurationEnabled = enabled
+		if enabled then entry.autoCooldownDurationEnabled = false end
+		if enabled then entry.cdmAuraOverlayEnabled = false end
 		CooldownPanels:ClearEntryCustomCooldownDuration(panelId, entryId, true)
 		CooldownPanels:RefreshPanel(panelId)
 		CooldownPanels:RefreshEditor()
@@ -15369,6 +15745,11 @@ local function layoutInspectorToggles(inspector, entry)
 		hideToggle(inspector.cbUseHighestRank)
 		hideToggle(inspector.cbShowWhenEmpty)
 		hideToggle(inspector.cbShowWhenNoCooldown)
+		hideToggle(inspector.cbCDMAuraOverlay)
+		hideToggle(inspector.cbCDMAuraOverlayReverse)
+		hideToggle(inspector.cbActivationOverlayOnly)
+		hideToggle(inspector.cbActivationOverlayGlow)
+		hideToggle(inspector.cbAutoDuration)
 		hideToggle(inspector.cbCustomDuration)
 		hideControl(inspector.customDurationBox)
 		hideControl(inspector.customDurationLabel)
@@ -15477,6 +15858,35 @@ local function layoutInspectorToggles(inspector, entry)
 		place(inspector.cbShowWhenNoCooldown, false)
 	end
 	local showCustomDuration = CooldownPanels:SupportsEntryCustomCooldownDuration(entry, effectiveType)
+	local showCDMAuraOverlay = CooldownPanels:SupportsEntryCDMAuraOverlay(entry, effectiveType)
+	local showAutoDuration = CooldownPanels:SupportsEntryAutoCooldownDuration(entry, effectiveType)
+	local showActivationOverlayVisuals = showCustomDuration or showCDMAuraOverlay
+	place(inspector.cbCDMAuraOverlay, showCDMAuraOverlay)
+	place(inspector.cbCDMAuraOverlayReverse, showActivationOverlayVisuals)
+	place(inspector.cbActivationOverlayOnly, showActivationOverlayVisuals)
+	place(inspector.cbActivationOverlayGlow, showActivationOverlayVisuals)
+	if inspector.cbCDMAuraOverlayReverse then
+		if entry.cdmAuraOverlayEnabled == true or entry.autoCooldownDurationEnabled == true or entry.customCooldownDurationEnabled == true then
+			inspector.cbCDMAuraOverlayReverse:Enable()
+		else
+			inspector.cbCDMAuraOverlayReverse:Disable()
+		end
+	end
+	if inspector.cbActivationOverlayOnly then
+		if entry.cdmAuraOverlayEnabled == true or entry.autoCooldownDurationEnabled == true or entry.customCooldownDurationEnabled == true then
+			inspector.cbActivationOverlayOnly:Enable()
+		else
+			inspector.cbActivationOverlayOnly:Disable()
+		end
+	end
+	if inspector.cbActivationOverlayGlow then
+		if entry.cdmAuraOverlayEnabled == true or entry.autoCooldownDurationEnabled == true or entry.customCooldownDurationEnabled == true then
+			inspector.cbActivationOverlayGlow:Enable()
+		else
+			inspector.cbActivationOverlayGlow:Disable()
+		end
+	end
+	place(inspector.cbAutoDuration, showAutoDuration)
 	place(inspector.cbCustomDuration, showCustomDuration)
 	if showCustomDuration and inspector.customDurationBox and inspector.customDurationLabel then
 		inspector.customDurationBox:ClearAllPoints()
@@ -15650,6 +16060,11 @@ local function refreshInspector(editor, panel, entry)
 		if inspector.cbUseHighestRank then inspector.cbUseHighestRank:SetChecked(effectiveType == "ITEM" and entry.type == "ITEM" and entry.useHighestRank == true) end
 		inspector.cbShowWhenEmpty:SetChecked(effectiveType == "ITEM" and entry.showWhenEmpty == true)
 		inspector.cbShowWhenNoCooldown:SetChecked(effectiveType == "SLOT" and entry.showWhenNoCooldown == true)
+		if inspector.cbCDMAuraOverlay then inspector.cbCDMAuraOverlay:SetChecked(entry.cdmAuraOverlayEnabled == true and CooldownPanels:SupportsEntryCDMAuraOverlay(entry, effectiveType)) end
+		if inspector.cbCDMAuraOverlayReverse then inspector.cbCDMAuraOverlayReverse:SetChecked(entry.activationOverlayReverse ~= false) end
+		if inspector.cbActivationOverlayOnly then inspector.cbActivationOverlayOnly:SetChecked(entry.activationOverlayOnly == true) end
+		if inspector.cbActivationOverlayGlow then inspector.cbActivationOverlayGlow:SetChecked(entry.activationOverlayGlow == true) end
+		if inspector.cbAutoDuration then inspector.cbAutoDuration:SetChecked(entry.autoCooldownDurationEnabled == true and CooldownPanels:SupportsEntryAutoCooldownDuration(entry, effectiveType)) end
 		if inspector.cbCustomDuration then inspector.cbCustomDuration:SetChecked(entry.customCooldownDurationEnabled == true) end
 		if inspector.customDurationBox then inspector.customDurationBox:SetText(tostring(math.floor((tonumber(entry.customCooldownDuration) or 0) + 0.5))) end
 		inspector.cbGlow:SetChecked(entry.type ~= "MACRO" and entry.glowReady and true or false)
@@ -15685,6 +16100,11 @@ local function refreshInspector(editor, panel, entry)
 		if inspector.cbSound and inspector.cbSound.Text then inspector.cbSound.Text:SetText(L["CooldownPanelSoundReady"] or "Sound when ready") end
 
 		if inspector.staticTextBox then inspector.staticTextBox:SetText("") end
+		if inspector.cbCDMAuraOverlay then inspector.cbCDMAuraOverlay:SetChecked(false) end
+		if inspector.cbCDMAuraOverlayReverse then inspector.cbCDMAuraOverlayReverse:SetChecked(false) end
+		if inspector.cbActivationOverlayOnly then inspector.cbActivationOverlayOnly:SetChecked(false) end
+		if inspector.cbActivationOverlayGlow then inspector.cbActivationOverlayGlow:SetChecked(false) end
+		if inspector.cbAutoDuration then inspector.cbAutoDuration:SetChecked(false) end
 		if inspector.cbCustomDuration then inspector.cbCustomDuration:SetChecked(false) end
 		if inspector.customDurationBox then inspector.customDurationBox:SetText("") end
 		if inspector.cbTrackPassiveSpell then inspector.cbTrackPassiveSpell:SetChecked(false) end
@@ -16245,8 +16665,10 @@ function CooldownPanels:UpdatePreviewIcons(panelId, countOverride)
 		icon.texture:SetTexture(entry and getEntryIcon(entry) or Helper.PREVIEW_ICON)
 		icon.texture:SetVertexColor(1, 1, 1)
 		icon.texture:SetShown(showEntryIconTexture or not entry)
-		local cooldownUsesAuraDisplay = resolvedType == "CDM_AURA" or CooldownPanels:GetEntryCustomCooldownDuration(entry, resolvedType) ~= nil
-		if icon.cooldown.SetReverse then icon.cooldown:SetReverse(cooldownUsesAuraDisplay) end
+		local entryAuraOverlayEnabled = CooldownPanels:IsEntryCDMAuraOverlayEnabled(entryLayout, entry, resolvedType) and CooldownPanels:SupportsEntryCDMAuraOverlay(entry, resolvedType)
+		local cooldownUsesAuraDisplay = resolvedType == "CDM_AURA" or CooldownPanels:GetEntryCustomCooldownDuration(entry, resolvedType) ~= nil or entryAuraOverlayEnabled
+		local cooldownReverse = resolvedType == "CDM_AURA" or CooldownPanels:GetEntryCustomCooldownDuration(entry, resolvedType) ~= nil or (entryAuraOverlayEnabled and (not entry or entry.activationOverlayReverse ~= false))
+		if icon.cooldown.SetReverse then icon.cooldown:SetReverse(cooldownReverse) end
 		if icon.cooldown.SetUseAuraDisplayTime then icon.cooldown:SetUseAuraDisplayTime(cooldownUsesAuraDisplay) end
 		icon.cooldown:SetHideCountdownNumbers(not showCooldownText)
 		CooldownPanels:ApplyEntryCooldownTextStyle(icon, entryLayout, entry)
@@ -16654,6 +17076,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 			local stanceActive = stanceRelevant and CooldownPanels.IsStanceEntryActive and CooldownPanels:IsStanceEntryActive(entry) or false
 			local spellPassive = resolvedSpellId and not shouldTrackPassiveSpell(entry) and isSpellPassiveSafe(resolvedSpellId, effectiveSpellId) or false
 			local cdmAuraData
+			local spellAuraOverlayData
 			local stackCount
 			local itemCount
 			local itemUses
@@ -16710,6 +17133,20 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 					if not show and showCooldown and cooldownIsActive then show = true end
 					if not show and showCharges and chargesInfoActive then show = true end
 					if not show and showStacks and Helper.HasDisplayCount(stackCount) then show = true end
+					if self:IsEntryCDMAuraOverlayEnabled(entryLayout, entry, resolvedType) and cdmAuras and cdmAuras.BuildSpellAuraOverlayData then
+						spellAuraOverlayData = cdmAuras:BuildSpellAuraOverlayData(panelId, entryId, entry, spellId, entryLayout)
+						if spellAuraOverlayData and spellAuraOverlayData.active == true then
+							cooldownStart = spellAuraOverlayData.cooldownStart
+							cooldownDuration = spellAuraOverlayData.cooldownDuration
+							cooldownEnabled = spellAuraOverlayData.cooldownEnabled
+							cooldownRate = spellAuraOverlayData.cooldownRate
+							cooldownGCD = false
+							cooldownIsActive = true
+							cooldownDurationObject = spellAuraOverlayData.cooldownDurationObject
+							cooldownEnabledOk = true
+							if showCooldown then show = true end
+						end
+					end
 				end
 			elseif resolvedType == "ITEM" and resolvedItemId then
 				local itemCache = shared and shared.itemCountCache
@@ -16789,6 +17226,9 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				cooldownEnabledOk = true
 				if showCooldown then show = true end
 				canTriggerReadyGlow = canTriggerReadyGlow or showCooldown
+			end
+			if entry.activationOverlayOnly == true and self:EntryUsesActivationOverlay(entry, resolvedType) then
+				show = customCooldownState ~= nil or (spellAuraOverlayData and spellAuraOverlayData.active == true) or false
 			end
 			if show and resolvedType == "SPELL" and baseSpellId and self:ResolveEntryHideWhenNoResource(entryLayout, entry) then
 				if isSpellFlagged(powerInsufficientSpells, baseSpellId, effectiveSpellId) then show = false end
@@ -16888,6 +17328,15 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 					cooldownGCD = false
 					cooldownIsActive = true
 					cooldownDurationObject = customCooldownState.durationObject
+				end
+				if not customCooldownState and spellAuraOverlayData and spellAuraOverlayData.active == true then
+					cooldownStart = spellAuraOverlayData.cooldownStart
+					cooldownDuration = spellAuraOverlayData.cooldownDuration
+					cooldownEnabled = spellAuraOverlayData.cooldownEnabled
+					cooldownRate = spellAuraOverlayData.cooldownRate or 1
+					cooldownGCD = false
+					cooldownIsActive = true
+					cooldownDurationObject = spellAuraOverlayData.cooldownDurationObject
 				end
 				if resolvedType == "ITEM" and resolvedItemId then
 					local itemCache = shared and shared.itemCountCache
@@ -17077,6 +17526,10 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				data.customCooldownDurationObject = customCooldownState and customCooldownState.durationObject or nil
 				data.customCooldownStart = customCooldownState and customCooldownState.startTime or nil
 				data.customCooldownDuration = customCooldownState and customCooldownState.duration or nil
+				data.spellAuraOverlayActive = spellAuraOverlayData and spellAuraOverlayData.active == true or false
+				data.spellAuraOverlayDurationObject = spellAuraOverlayData and spellAuraOverlayData.cooldownDurationObject or nil
+				data.spellAuraOverlayLabel = spellAuraOverlayData and spellAuraOverlayData.buffName or nil
+				self:ApplyActivationOverlayVisualState(data, entry)
 				data.cooldownIgnoreGCD = resolvedType == "SPELL" and self:ShouldIgnoreEntryCooldownGCD(entryLayout, entry) or false
 				data.cooldownStart = cooldownStart or 0
 				data.cooldownDuration = cooldownDuration or 0
@@ -17293,11 +17746,12 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				icon.texture:SetShown(data.showIconTexture ~= false)
 				CooldownPanels.ApplyIconTooltip(icon, data.entry, showTooltips)
 			end
-			local cooldownUsesAuraDisplay = data.resolvedType == "CDM_AURA" or data.customCooldownDurationActive == true
+			local cooldownUsesAuraDisplay = data.resolvedType == "CDM_AURA" or data.customCooldownDurationActive == true or data.spellAuraOverlayActive == true
 			if data._eqolRuntimePlacementDirty or cdp.RUNTIME.HasCooldownWidgetConfigChange(icon._eqolRuntimeSnapshot, data, cooldownUsesAuraDisplay) then
 				icon.cooldown:SetHideCountdownNumbers(not data.showCooldownText)
-				if icon.cooldown.SetReverse then icon.cooldown:SetReverse(cooldownUsesAuraDisplay) end
+				if icon.cooldown.SetReverse then icon.cooldown:SetReverse(data.cooldownReverse == true) end
 				if icon.cooldown.SetUseAuraDisplayTime then icon.cooldown:SetUseAuraDisplayTime(cooldownUsesAuraDisplay) end
+				cdp.ENTRY.ApplyCooldownSwipeVisual(icon, data)
 				cdp.RUNTIME.WriteCooldownWidgetConfigSnapshot(icon._eqolRuntimeSnapshot, data, cooldownUsesAuraDisplay)
 			end
 			if data._eqolRuntimePlacementDirty or cdp.RUNTIME.HasStackTextStyleChange(icon._eqolRuntimeSnapshot, data, defaultCountFontPath, defaultCountFontSize, defaultCountFontStyle) then
@@ -17424,6 +17878,17 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				desaturate = false
 				if hideOnCooldown or showOnCooldown then hidden = true end
 			end
+			if data.spellAuraOverlayActive == true then
+				usingCooldown = false
+				chargeCooldownHasAvailableCharge = false
+				chargeInfoActive = false
+				cooldownEnabledOk = true
+				spellCooldownActive = true
+				durationActive = cooldownDurationObject ~= nil
+				cooldownActive = data.showCooldown == true
+				desaturate = false
+				if hideOnCooldown or showOnCooldown then hidden = true end
+			end
 
 			if data.emptyItem and data.customCooldownDurationActive ~= true then desaturate = true end
 			if data.resolvedType == "CDM_AURA" and data.cdmAuraInactiveDesaturate == true and not cdmAuraActive and not cdmAuraDurationActive then desaturate = true end
@@ -17514,13 +17979,13 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 					else
 						setCooldownDrawState(icon.cooldown, entryDrawEdge, entryDrawBling, entryDrawSwipe)
 
-						local customDurationActive = data.customCooldownDurationActive == true
-						local desat = customDurationActive and 0 or cooldownDurationObject:EvaluateRemainingDuration(curveDesat)
+						local auraDisplayDurationActive = data.customCooldownDurationActive == true or data.spellAuraOverlayActive == true
+						local desat = auraDisplayDurationActive and 0 or cooldownDurationObject:EvaluateRemainingDuration(curveDesat)
 						CooldownPanels.SetIconDesaturationRuntime(icon.texture, desat, entryNoDesaturation)
 						if hideOnCooldown then
 							icon:SetAlpha(cooldownDurationObject:EvaluateRemainingDuration(curveAlpha))
 						elseif showOnCooldown then
-							icon:SetAlpha(customDurationActive and 1 or cooldownDurationObject:EvaluateRemainingDuration(curveDesat))
+							icon:SetAlpha(auraDisplayDurationActive and 1 or cooldownDurationObject:EvaluateRemainingDuration(curveDesat))
 						end
 					end
 					if data.cooldownGCD then
@@ -17707,7 +18172,13 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				simpleGlowStyle = ready and data.readyGlowStyle or (data.overlayGlowStyle or data.readyGlowStyle)
 				simpleGlowInset = ready and data.readyGlowInset or (data.overlayGlowInset or data.readyGlowInset)
 			end
-			if layoutEditActive and data.entry and data.entry.type ~= "MACRO" and (data.entry.glowReady == true or data.entry.pandemicGlow == true) then
+			if data.activationOverlayActive == true and data.activationOverlayGlow == true then
+				simpleGlowEnabled = true
+				simpleGlowColor = data.readyGlowColor or overlayGlowColor
+				simpleGlowStyle = data.readyGlowStyle or simpleGlowStyle
+				simpleGlowInset = data.readyGlowInset or simpleGlowInset
+			end
+			if layoutEditActive and data.entry and data.entry.type ~= "MACRO" and (data.entry.glowReady == true or data.entry.pandemicGlow == true or data.entry.activationOverlayGlow == true) then
 				simpleGlowEnabled = true
 				simpleGlowColor = (
 					data.entry.type == "CDM_AURA"
@@ -18424,6 +18895,9 @@ applyEditLayout = function(panelId, field, value, skipRefresh)
 		CooldownPanels:RebuildPowerIndex()
 	elseif field == "cdmAuraAlwaysShowMode" then
 		layout.cdmAuraAlwaysShowMode = CooldownPanels:NormalizeCDMAuraAlwaysShowMode(value, layout.cdmAuraAlwaysShowMode or Helper.PANEL_LAYOUT_DEFAULTS.cdmAuraAlwaysShowMode)
+	elseif field == "cdmAuraOverlayEnabled" then
+		layout.cdmAuraOverlayEnabled = value == true
+		CooldownPanels:RebuildSpellIndex()
 	elseif field == "checkPower" then
 		layout.checkPower = value == true
 		CooldownPanels:RebuildPowerIndex()
@@ -20350,6 +20824,15 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				set = function(_, value) applyEditLayout(panelId, "showChargesCooldown", value) end,
 			},
 			{
+				name = L["CooldownPanelCDMAuraOverlayPanel"] or "Show aura overlay for supported spells",
+				kind = SettingType.Checkbox,
+				field = "cdmAuraOverlayEnabled",
+				parentId = "cooldownPanelCooldown",
+				default = layout.cdmAuraOverlayEnabled == true,
+				get = function() return layout.cdmAuraOverlayEnabled == true end,
+				set = function(_, value) applyEditLayout(panelId, "cdmAuraOverlayEnabled", value) end,
+			},
+			{
 				name = L["CooldownPanelDrawEdge"] or "Draw edge",
 				kind = SettingType.Checkbox,
 				field = "cooldownDrawEdge",
@@ -20620,8 +21103,10 @@ function cdp.ENTRY.ApplyVisibleSpellRuntime(panelId, runtime, icon, data, resolv
 	if icon.cooldown.Resume then icon.cooldown:Resume() end
 	if icon.cooldown.SetAlpha then icon.cooldown:SetAlpha(1) end
 	icon.cooldown:SetHideCountdownNumbers(not data.showCooldownText)
-	if icon.cooldown.SetReverse then icon.cooldown:SetReverse(data.customCooldownDurationActive == true) end
-	if icon.cooldown.SetUseAuraDisplayTime then icon.cooldown:SetUseAuraDisplayTime(data.customCooldownDurationActive == true) end
+	local auraDisplayActive = data.customCooldownDurationActive == true or data.spellAuraOverlayActive == true
+	if icon.cooldown.SetReverse then icon.cooldown:SetReverse(data.cooldownReverse == true) end
+	if icon.cooldown.SetUseAuraDisplayTime then icon.cooldown:SetUseAuraDisplayTime(auraDisplayActive) end
+	cdp.ENTRY.ApplyCooldownSwipeVisual(icon, data)
 
 	local cooldownStart = data.cooldownStart or 0
 	local cooldownDuration = data.cooldownDuration or 0
@@ -20685,6 +21170,17 @@ function cdp.ENTRY.ApplyVisibleSpellRuntime(panelId, runtime, icon, data, resolv
 		cooldownStart = data.customCooldownStart or cooldownStart
 		cooldownDuration = data.customCooldownDuration or cooldownDuration
 		cooldownRate = 1
+		cooldownEnabledOk = true
+		spellCooldownActive = true
+		durationActive = cooldownDurationObject ~= nil
+		cooldownActive = data.showCooldown == true
+		desaturate = false
+		if hideOnCooldown or showOnCooldown then hidden = true end
+	end
+	if data.spellAuraOverlayActive == true then
+		usingCooldown = false
+		chargeCooldownHasAvailableCharge = false
+		chargeInfoActive = false
 		cooldownEnabledOk = true
 		spellCooldownActive = true
 		durationActive = cooldownDurationObject ~= nil
@@ -20769,13 +21265,13 @@ function cdp.ENTRY.ApplyVisibleSpellRuntime(panelId, runtime, icon, data, resolv
 				setCooldownDrawState(icon.cooldown, entryGcdDrawEdge, entryGcdDrawBling, entryGcdDrawSwipe)
 			else
 				setCooldownDrawState(icon.cooldown, entryDrawEdge, entryDrawBling, entryDrawSwipe)
-				local customDurationActive = data.customCooldownDurationActive == true
-				local desat = customDurationActive and 0 or cooldownDurationObject:EvaluateRemainingDuration(curveDesat)
+				local auraDisplayDurationActive = data.customCooldownDurationActive == true or data.spellAuraOverlayActive == true
+				local desat = auraDisplayDurationActive and 0 or cooldownDurationObject:EvaluateRemainingDuration(curveDesat)
 				CooldownPanels.SetIconDesaturationRuntime(icon.texture, desat, entryNoDesaturation)
 				if hideOnCooldown then
 					icon:SetAlpha(cooldownDurationObject:EvaluateRemainingDuration(curveAlpha))
 				elseif showOnCooldown then
-					icon:SetAlpha(customDurationActive and 1 or cooldownDurationObject:EvaluateRemainingDuration(curveDesat))
+					icon:SetAlpha(auraDisplayDurationActive and 1 or cooldownDurationObject:EvaluateRemainingDuration(curveDesat))
 				end
 				if icon.cooldown.SetScript then icon.cooldown:SetScript("OnCooldownDone", onCooldownDone) end
 			end
@@ -20922,8 +21418,9 @@ function cdp.ENTRY.ApplyVisibleItemRuntime(panelId, runtime, icon, data, resolve
 	if icon.cooldown.Resume then icon.cooldown:Resume() end
 	if icon.cooldown.SetAlpha then icon.cooldown:SetAlpha(1) end
 	icon.cooldown:SetHideCountdownNumbers(not data.showCooldownText)
-	if icon.cooldown.SetReverse then icon.cooldown:SetReverse(customCooldownActive) end
+	if icon.cooldown.SetReverse then icon.cooldown:SetReverse(data.cooldownReverse == true) end
 	if icon.cooldown.SetUseAuraDisplayTime then icon.cooldown:SetUseAuraDisplayTime(customCooldownActive) end
+	cdp.ENTRY.ApplyCooldownSwipeVisual(icon, data)
 
 	if data.showItemUses then
 		if data.itemUses ~= nil then
@@ -21021,6 +21518,12 @@ function cdp.ENTRY.ApplyVisibleItemRuntime(panelId, runtime, icon, data, resolve
 		simpleGlowStyle = ready and data.readyGlowStyle or (data.overlayGlowStyle or data.readyGlowStyle)
 		simpleGlowInset = ready and data.readyGlowInset or (data.overlayGlowInset or data.readyGlowInset)
 	end
+	if data.activationOverlayActive == true and data.activationOverlayGlow == true then
+		simpleGlowEnabled = true
+		simpleGlowColor = data.readyGlowColor or overlayGlowColor
+		simpleGlowStyle = data.readyGlowStyle or simpleGlowStyle
+		simpleGlowInset = data.readyGlowInset or simpleGlowInset
+	end
 	setPreviewGlow(icon, false)
 	if data.liveGlowAllowed == false then
 		setGlow(icon, false, nil, "EQOL_SIMPLE")
@@ -21057,6 +21560,8 @@ function cdp.ENTRY.TryRefreshVisibleSpellEntry(panelId, entryId, mode)
 	local entry = panel.entries and panel.entries[entryId] or nil
 	if not entry then return false end
 	if entry.displayMode == "BAR" then return false end
+	if CooldownPanels:IsEntryCDMAuraOverlayEnabled(panel.layout, entry, "SPELL") then return false end
+	if entry.activationOverlayOnly == true and CooldownPanels:EntryUsesActivationOverlay(entry, "SPELL") then return false end
 	local macro = entry.type == "MACRO" and CooldownPanels.ResolveMacroEntry(entry) or nil
 	local baseSpellId = entry.type == "SPELL" and tonumber(entry.spellID) or (macro and macro.kind == "SPELL" and tonumber(macro.spellID)) or nil
 	if not baseSpellId then return false end
@@ -21121,6 +21626,7 @@ function cdp.ENTRY.TryRefreshVisibleSpellEntry(panelId, entryId, mode)
 	data.variantGroupKey = variantGroup and variantGroup.key or nil
 	local customCooldownState = CooldownPanels:GetActiveEntryCustomCooldownDuration(panelId, entryId, entry, "SPELL")
 	CooldownPanels:ApplyCustomCooldownDurationState(data, customCooldownState)
+	CooldownPanels:ApplyActivationOverlayVisualState(data, entry)
 	if customCooldownState then
 		cooldownGCD = false
 		cooldownIsActive = true
@@ -21205,6 +21711,7 @@ function cdp.ENTRY.TryRefreshVisibleItemEntry(panelId, entryId)
 		cooldownGCD = false
 		if showCooldown then newVisible = true end
 	end
+	if entry.activationOverlayOnly == true and CooldownPanels:EntryUsesActivationOverlay(entry, "ITEM") then newVisible = customCooldownState ~= nil end
 	if not icon then return newVisible ~= true end
 	if not (data and data.entryId == entryId and data.resolvedType == "ITEM") then return false end
 	if not newVisible then return false end
@@ -21260,6 +21767,7 @@ function cdp.ENTRY.TryRefreshVisibleItemEntry(panelId, entryId)
 	data.customCooldownStart = customCooldownState and customCooldownState.startTime or nil
 	data.customCooldownDuration = customCooldownState and customCooldownState.duration or nil
 	CooldownPanels:ApplyCustomCooldownDurationState(data, customCooldownState)
+	CooldownPanels:ApplyActivationOverlayVisualState(data, entry)
 	if customCooldownState then data.canTriggerReadyGlow = true end
 
 	local resolvedLayout = CooldownPanels.ResolveRuntimeLayout(runtime, runtime.frame, panel.layout)
@@ -21310,6 +21818,7 @@ function cdp.ENTRY.TryRefreshVisibleSlotEntry(panelId, entryId)
 		cooldownGCD = false
 		if showCooldown then newVisible = true end
 	end
+	if entry.activationOverlayOnly == true and CooldownPanels:EntryUsesActivationOverlay(entry, "SLOT") then newVisible = customCooldownState ~= nil end
 	if not icon then return newVisible ~= true end
 	if not (data and data.entryId == entryId and data.resolvedType == "SLOT") then return false end
 	if not newVisible then return false end
@@ -21330,6 +21839,7 @@ function cdp.ENTRY.TryRefreshVisibleSlotEntry(panelId, entryId)
 	data.customCooldownStart = customCooldownState and customCooldownState.startTime or nil
 	data.customCooldownDuration = customCooldownState and customCooldownState.duration or nil
 	CooldownPanels:ApplyCustomCooldownDurationState(data, customCooldownState)
+	CooldownPanels:ApplyActivationOverlayVisualState(data, entry)
 	if customCooldownState then data.canTriggerReadyGlow = true end
 
 	local resolvedLayout = CooldownPanels.ResolveRuntimeLayout(runtime, runtime.frame, panel.layout)

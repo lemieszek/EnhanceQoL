@@ -22,6 +22,9 @@ local DIRECTION_BOTTOM_LABEL = HUD_EDIT_MODE_SETTING_ENCOUNTER_EVENTS_ICON_DIREC
 Helper.Api = Helper.Api or {}
 local Api = Helper.Api
 
+Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT = Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT or { 1, 0.86, 0.25, 0.55 }
+Helper.CDM_AURA_OVERLAY_COLOR_DEFAULT = Helper.CDM_AURA_OVERLAY_COLOR_DEFAULT or Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT
+
 Api.GetItemInfoInstantFn = C_Item and C_Item.GetItemInfoInstant
 Api.GetItemIconByID = C_Item and C_Item.GetItemIconByID
 Api.GetItemCooldownFn = C_Item and C_Item.GetItemCooldown
@@ -229,6 +232,7 @@ Helper.PANEL_LAYOUT_DEFAULTS = {
 	cooldownGcdDrawEdge = false,
 	cooldownGcdDrawBling = false,
 	cooldownGcdDrawSwipe = false,
+	cdmAuraOverlayEnabled = false,
 	cooldownTextColor = { 1, 1, 1, 1 },
 	cooldownTextStyle = globalFontStyleKey(),
 	staticTextFont = "",
@@ -289,6 +293,14 @@ Helper.ENTRY_DEFAULTS = {
 	cooldownGcdDrawEdge = false,
 	cooldownGcdDrawBling = false,
 	cooldownGcdDrawSwipe = false,
+	cdmAuraOverlayEnabled = false,
+	cdmAuraOverlayReverse = true,
+	cdmAuraOverlayColor = Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT,
+	activationOverlayReverse = true,
+	activationOverlayColor = Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT,
+	activationOverlayOnly = false,
+	activationOverlayGlow = false,
+	autoCooldownDurationEnabled = false,
 	customCooldownDurationEnabled = false,
 	customCooldownDuration = 0,
 	cooldownTextUseGlobal = true,
@@ -2226,6 +2238,7 @@ function Helper.NormalizePanel(panel, defaults)
 	panel.layout.hideWhenNoResource = panel.layout.hideWhenNoResource == true
 	panel.layout.cdmAuraAlwaysShowMode =
 		normalizeCDMAuraAlwaysShowMode(panel.layout.cdmAuraAlwaysShowMode, layoutDefaults.cdmAuraAlwaysShowMode or Helper.PANEL_LAYOUT_DEFAULTS.cdmAuraAlwaysShowMode or "HIDE")
+	panel.layout.cdmAuraOverlayEnabled = panel.layout.cdmAuraOverlayEnabled == true
 	panel.layout.stackColor = Helper.NormalizeColor(panel.layout.stackColor, layoutDefaults.stackColor or Helper.PANEL_LAYOUT_DEFAULTS.stackColor or { 1, 1, 1, 1 })
 	panel.layout.chargesColor = Helper.NormalizeColor(panel.layout.chargesColor, layoutDefaults.chargesColor or Helper.PANEL_LAYOUT_DEFAULTS.chargesColor or { 1, 1, 1, 1 })
 	panel.layout.chargesHideWhenZero = panel.layout.chargesHideWhenZero == true
@@ -2359,9 +2372,28 @@ function Helper.NormalizeEntry(entry, defaults)
 	if type(entry.cooldownGcdDrawBling) ~= "boolean" then entry.cooldownGcdDrawBling = Helper.ENTRY_DEFAULTS.cooldownGcdDrawBling end
 	if type(entry.cooldownGcdDrawSwipe) ~= "boolean" then entry.cooldownGcdDrawSwipe = Helper.ENTRY_DEFAULTS.cooldownGcdDrawSwipe end
 	if entry.type == "CDM_AURA" or entry.type == "STANCE" then
+		entry.cdmAuraOverlayEnabled = false
+		entry.cdmAuraOverlayReverse = Helper.ENTRY_DEFAULTS.cdmAuraOverlayReverse
+		entry.cdmAuraOverlayColor = Helper.NormalizeColor(entry.cdmAuraOverlayColor, Helper.ENTRY_DEFAULTS.cdmAuraOverlayColor)
+		entry.activationOverlayReverse = Helper.ENTRY_DEFAULTS.activationOverlayReverse
+		entry.activationOverlayColor = Helper.NormalizeColor(entry.activationOverlayColor, Helper.ENTRY_DEFAULTS.activationOverlayColor)
+		entry.activationOverlayOnly = false
+		entry.activationOverlayGlow = false
+		entry.autoCooldownDurationEnabled = false
 		entry.customCooldownDurationEnabled = false
 		entry.customCooldownDuration = Helper.ENTRY_DEFAULTS.customCooldownDuration
 	else
+		if type(entry.cdmAuraOverlayEnabled) ~= "boolean" then entry.cdmAuraOverlayEnabled = Helper.ENTRY_DEFAULTS.cdmAuraOverlayEnabled end
+		if type(entry.cdmAuraOverlayReverse) ~= "boolean" then entry.cdmAuraOverlayReverse = Helper.ENTRY_DEFAULTS.cdmAuraOverlayReverse end
+		entry.cdmAuraOverlayColor = Helper.NormalizeColor(entry.cdmAuraOverlayColor, Helper.ENTRY_DEFAULTS.cdmAuraOverlayColor)
+		if type(entry.activationOverlayReverse) ~= "boolean" then entry.activationOverlayReverse = entry.cdmAuraOverlayReverse ~= false end
+		if entry.activationOverlayColor == nil then entry.activationOverlayColor = entry.cdmAuraOverlayColor end
+		entry.activationOverlayColor = Helper.NormalizeColor(entry.activationOverlayColor, Helper.ENTRY_DEFAULTS.activationOverlayColor)
+		if type(entry.activationOverlayOnly) ~= "boolean" then entry.activationOverlayOnly = Helper.ENTRY_DEFAULTS.activationOverlayOnly end
+		if type(entry.activationOverlayGlow) ~= "boolean" then entry.activationOverlayGlow = Helper.ENTRY_DEFAULTS.activationOverlayGlow end
+		if entry.type ~= "SPELL" then entry.cdmAuraOverlayEnabled = false end
+		if type(entry.autoCooldownDurationEnabled) ~= "boolean" then entry.autoCooldownDurationEnabled = Helper.ENTRY_DEFAULTS.autoCooldownDurationEnabled end
+		if entry.type ~= "ITEM" and entry.type ~= "SLOT" then entry.autoCooldownDurationEnabled = false end
 		if type(entry.customCooldownDurationEnabled) ~= "boolean" then entry.customCooldownDurationEnabled = Helper.ENTRY_DEFAULTS.customCooldownDurationEnabled end
 		entry.customCooldownDuration = Helper.ClampNumber(entry.customCooldownDuration, 0, Helper.CUSTOM_COOLDOWN_DURATION_MAX or 300, Helper.ENTRY_DEFAULTS.customCooldownDuration or 0)
 		if not (entry.customCooldownDuration and entry.customCooldownDuration > 0) then entry.customCooldownDurationEnabled = false end

@@ -1,23 +1,31 @@
 # Changelog
 
-## [10.17.0-beta2] - 2026-05-16
-
-### 🐛 Fixed
-
-- Social / Friends List: Fixed favorite stars shifting briefly when opening the enhanced friends list with favorited offline Battle.net friends.
-
----
-
-## [10.17.0-beta1] - 2026-05-16
+## [10.17.0] - 2026-05-18
 
 ### ✨ Added
 
 - Cooldown Panels: Added optional custom activation durations for spell, item, slot, and matching macro entries, allowing uses such as potion or trinket tracking with an active-style reverse swipe.
+- Cooldown Panels: Added automatic activation durations for supported item and equipment slot entries, using a generated item-duration table for potions, trinkets, and similar fixed-duration on-use effects.
+- Cooldown Panels: Added optional spell aura overlays for Cooldown Manager tracked auras, including per-entry controls, a panel-wide option for supported spells, configurable overlay swipe color, and reverse-swipe control.
+- Cooldown Panels: Added activation overlay controls for item and equipment slot entries, including custom overlay color, reverse swipe, only-show-during-activation, and glow-while-active options.
+
+  ![Cooldown Panels activation overlay only](docs/media/changelog/10.17.0/activation-overlay-only.gif)
+  ![Cooldown Panels activation overlay glow](docs/media/changelog/10.17.0/activation-overlay-glow.gif)
+
+- Cooldown Panels: Trinket slot entries can now keep Automatic duration enabled even when the currently equipped trinket has no known activation duration, so swapping to a supported trinket works immediately.
+- Nameplates: Added optional quest icons, elite and boss markers, and target arrow markers for default nameplates, including configurable marker anchors and sizes. Quest detection avoids units with secret identity data before reading tooltip objective info.
+- Nameplates: Added font controls for default nameplate text, including LSM font selection, global font support, outline style selection, and optional text size override.
 
 ### 🐛 Fixed
 
+- On some servers the language flag wasn't correctly displayed
 - Group Frames / Auras: Restored the Show cooldown controls for buffs, debuffs, and externals, fixed cooldown text showing independently from swipes, and disabled aura sub-options when their parent toggle is off.
 - Random Mount: Fixed Shaman Ghost Wolf and Druid travel/cat form fallback actions not working in combat by preparing combat-safe macro conditions before lockdown.
+- Social / Friends List: Fixed favorite stars shifting briefly when opening the enhanced friends list with favorited offline Battle.net friends.
+- Unit Frames: Fully disable the original Blizzard Player, Target, Focus, Pet, and Target-of-Target frames when Enhanced Unit Frames replace them.
+- Visibility: Fixed fade support for the default Blizzard frame Visibility Hub, including Bags Bar, Buff Frame, Debuff Frame, Micro Menu, and Minimap visibility rules.
+- Visibility / Bags Bar: Fixed faded Bags Bar states leaving equipped bag icons invisible while the slot frames were still shown.
+- Visibility: Fixed fade handling for Unit Frames and Resource Bars so automatic visibility rules can fade correctly.
 
 ---
 

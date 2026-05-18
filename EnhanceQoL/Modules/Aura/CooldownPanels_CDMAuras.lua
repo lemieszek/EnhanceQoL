@@ -594,15 +594,12 @@ local function findRuntimeScanInfoBySpellID(scan, spellID)
 		local resolvedCooldownID = isValidCooldownID(cached.cooldownID) and cached.cooldownID or nil
 		return cached, resolvedCooldownID
 	end
-	if cached == false or scan.spellLookupComplete == true then
-		if bySpellID and cached == nil then bySpellID[spellID] = false end
-		return nil, nil
-	end
 	local list = scan.list
 	if type(list) ~= "table" then return nil, nil end
-	local startIndex = (tonumber(scan.spellLookupCursor) or 0) + 1
+	local startIndex = cached == false and 1 or ((tonumber(scan.spellLookupCursor) or 0) + 1)
+	if scan.spellLookupComplete == true then startIndex = 1 end
 	for i = startIndex, #list do
-		scan.spellLookupCursor = i
+		if scan.spellLookupComplete ~= true and cached ~= false then scan.spellLookupCursor = i end
 		local info = list[i]
 		local cooldownID = info and info.cooldownID or nil
 		if isValidCooldownID(cooldownID) then
@@ -612,9 +609,20 @@ local function findRuntimeScanInfoBySpellID(scan, spellID)
 				local resolvedCooldownID = isValidCooldownID(matched.cooldownID) and matched.cooldownID or cooldownID
 				return matched, resolvedCooldownID
 			end
+			local frame = info.iconFrame or info.barFrame
+			local sawAssociatedSpellID = false
+			local sawSecretLinkedSpellID = false
+			local directMatched
+			directMatched, sawAssociatedSpellID, sawSecretLinkedSpellID = frameTrackedSpellMatchesCandidate(frame and frame.auraSpellID, "auraSpellID", spellID, sawAssociatedSpellID, sawSecretLinkedSpellID)
+			if not directMatched then directMatched = frameTrackedSpellMatchesCooldownInfo(frame and frame.cooldownInfo, spellID, sawAssociatedSpellID, sawSecretLinkedSpellID) end
+			if not directMatched then directMatched = frameTrackedSpellMatchesCooldownInfo(getCooldownViewerInfo(cooldownID), spellID, sawAssociatedSpellID, sawSecretLinkedSpellID) end
+			if directMatched then
+				if bySpellID then bySpellID[spellID] = info end
+				return info, cooldownID
+			end
 		end
 	end
-	scan.spellLookupComplete = true
+	if cached ~= false then scan.spellLookupComplete = true end
 	if bySpellID and bySpellID[spellID] == nil then bySpellID[spellID] = false end
 	return nil, nil
 end
@@ -2367,6 +2375,44 @@ function CDMAuras:BuildRuntimeData(panelId, entryId, entry, entryLayout, alwaysS
 	if state.lastActive == true and not active then requestPanelRefresh(panelId) end
 	state.lastActive = active
 	return data
+end
+
+function CDMAuras:GetSpellAuraOverlayInfo(spellID)
+	spellID = tonumber(spellID)
+	if not isUsableSpellID(spellID) then return nil end
+	self:ScanTrackedBuffs(false)
+	local scan = getRuntime().scan
+	local info, resolvedCooldownID = findRuntimeScanInfoBySpellID(scan, spellID)
+	if not (info and isValidCooldownID(resolvedCooldownID or info.cooldownID)) then return nil end
+	return info, resolvedCooldownID or info.cooldownID
+end
+
+function CDMAuras:SupportsSpellAuraOverlay(spellID)
+	local info = self:GetSpellAuraOverlayInfo(spellID)
+	return info ~= nil
+end
+
+function CDMAuras:BuildSpellAuraOverlayData(panelId, entryId, sourceEntry, spellID, entryLayout)
+	local info, resolvedCooldownID = self:GetSpellAuraOverlayInfo(spellID)
+	if not (info and isValidCooldownID(resolvedCooldownID or info.cooldownID)) then return nil end
+	local entry = {
+		type = ENTRY_TYPE,
+		cooldownID = resolvedCooldownID or info.cooldownID,
+		spellID = tonumber(info.spellID) or tonumber(spellID),
+		buffName = info.buffName or (sourceEntry and sourceEntry.name) or getSpellName(spellID),
+		iconTextureID = info.iconTextureID or getSpellTexture(spellID),
+		sourceType = normalizeSourceType(info.sourceType),
+		sourceViewer = info.sourceViewer,
+		cdmAuraAlwaysShowMode = "HIDE",
+		cdmAuraAlwaysShowUseGlobal = false,
+		alwaysShow = false,
+		showCooldown = true,
+		showCooldownText = sourceEntry and sourceEntry.showCooldownText ~= false,
+		showStacks = sourceEntry and sourceEntry.showStacks == true,
+		glowReady = false,
+		pandemicGlow = false,
+	}
+	return self:BuildRuntimeData(panelId, entryId, entry, entryLayout, "HIDE")
 end
 
 refreshAllTrackedPanels = function(unit)

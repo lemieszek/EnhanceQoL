@@ -51,7 +51,20 @@ local QUICK_SLOT_BORDER = "Interface\\Buttons\\UI-Quickslot2"
 local DEFAULT_NAMEPLATE_FEATURE_KEYS = constants.DEFAULT_NAMEPLATE_FEATURE_KEYS
 	or {
 		auraClickthrough = "nameplateAuraClickthrough",
+		slugOutline = "nameplateSlugOutline",
+		textFont = "nameplateTextFont",
+		textOutline = "nameplateTextOutline",
+		textSize = "nameplateTextSize",
+		eliteMarkers = "nameplateEliteMarkers",
+		eliteMarkerAnchor = "nameplateEliteMarkerAnchor",
+		eliteMarkerSize = "nameplateEliteMarkerSize",
 		mobColors = "nameplateMobColors",
+		questMarkers = "nameplateQuestMarkers",
+		questMarkerAnchor = "nameplateQuestMarkerAnchor",
+		questMarkerSize = "nameplateQuestMarkerSize",
+		targetMarkers = "nameplateTargetMarkers",
+		targetMarkerAtlas = "nameplateTargetMarkerAtlas",
+		targetMarkerSize = "nameplateTargetMarkerSize",
 		mobColorBoss = "nameplateMobColorBoss",
 		mobColorMiniboss = "nameplateMobColorMiniboss",
 		mobColorCaster = "nameplateMobColorCaster",
@@ -1447,7 +1460,6 @@ local function createFrameCategory()
 			if pct > 100 then pct = 100 end
 			addon.db.frameVisibilityFadeStrength = pct / 100
 			RefreshAllFrameVisibilityAlpha()
-			if addon.functions.ApplyCooldownViewerVisibility then addon.functions.ApplyCooldownViewerVisibility() end
 		end,
 		parentSection = expandable,
 	})
@@ -1628,6 +1640,310 @@ local function createNameplatesCategory()
 				addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.auraClickthrough] = value and true or false
 			end
 		end,
+		parentSection = expandable,
+	})
+
+	local nameplateTextToggle = addon.functions.SettingsCreateCheckbox(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.slugOutline,
+		text = L["nameplateSlugOutline"] or "Customize default nameplate text",
+		desc = L["nameplateSlugOutlineDesc"],
+		func = function(value)
+			if addon.functions.SetDefaultNameplateSlugOutlineEnabled then
+				addon.functions.SetDefaultNameplateSlugOutlineEnabled(value)
+			else
+				addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.slugOutline] = value and true or false
+			end
+		end,
+		parentSection = expandable,
+	})
+
+	local function isNameplateTextEnabled() return nameplateTextToggle and nameplateTextToggle.setting and nameplateTextToggle.setting:GetValue() == true end
+	local globalFontStyleKey = addon.functions.GetGlobalFontStyleConfigKey and addon.functions.GetGlobalFontStyleConfigKey() or "__EQOL_GLOBAL_FONT_STYLE__"
+		local nameplateTextOutlineOptions, nameplateTextOutlineOrder = addon.functions.GetFontStyleOptions and addon.functions.GetFontStyleOptions(true) or {
+			[globalFontStyleKey] = L["useGlobalFontStyleConfig"] or "Use global font styling",
+			OUTLINE = L["Outline"] or "Outline",
+		}, { globalFontStyleKey, "OUTLINE" }
+		nameplateTextOutlineOptions.NONE = nil
+		for i = #nameplateTextOutlineOrder, 1, -1 do
+			if nameplateTextOutlineOrder[i] == "NONE" then table.remove(nameplateTextOutlineOrder, i) end
+		end
+		local function normalizeNameplateTextOutline(value)
+			if value == "NONE" then return globalFontStyleKey end
+			if addon.functions.NormalizeFontStyleChoice then
+				local normalized = addon.functions.NormalizeFontStyleChoice(value, globalFontStyleKey, true)
+				if normalized == "NONE" then normalized = globalFontStyleKey end
+				return normalized
+			end
+			return value or globalFontStyleKey
+		end
+		local function refreshNameplateTextStyle()
+			if addon.functions.RefreshDefaultNameplateTextStyle then addon.functions.RefreshDefaultNameplateTextStyle() end
+		end
+
+		addon.functions.SettingsCreateDropdown(category, {
+			var = DEFAULT_NAMEPLATE_FEATURE_KEYS.textFont,
+			text = L["nameplateTextFont"] or "Nameplate text font",
+			desc = L["nameplateTextFontDesc"],
+			listFunc = buildOverrideFontDropdown,
+			order = fontOrder,
+			default = getGlobalFontConfigKey(),
+			get = function()
+				local current = addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.textFont] or getGlobalFontConfigKey()
+				local list = buildOverrideFontDropdown()
+				if not list[current] then current = getGlobalFontConfigKey() end
+				return current
+			end,
+			set = function(value)
+				local list = buildOverrideFontDropdown()
+				if not list[value] then value = getGlobalFontConfigKey() end
+				addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.textFont] = value
+				refreshNameplateTextStyle()
+			end,
+			parent = true,
+			element = nameplateTextToggle.element,
+			parentCheck = isNameplateTextEnabled,
+			parentSection = expandable,
+		})
+
+		addon.functions.SettingsCreateDropdown(category, {
+			var = DEFAULT_NAMEPLATE_FEATURE_KEYS.textOutline,
+		text = L["nameplateTextOutline"] or "Nameplate text outline",
+		desc = L["nameplateTextOutlineDesc"],
+		list = nameplateTextOutlineOptions,
+		order = nameplateTextOutlineOrder,
+		default = globalFontStyleKey,
+		get = function() return normalizeNameplateTextOutline(addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.textOutline]) end,
+		set = function(value)
+			addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.textOutline] = normalizeNameplateTextOutline(value)
+			refreshNameplateTextStyle()
+		end,
+		parent = true,
+		element = nameplateTextToggle.element,
+		parentCheck = isNameplateTextEnabled,
+		parentSection = expandable,
+	})
+
+	addon.functions.SettingsCreateSlider(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.textSize,
+		text = L["nameplateTextSize"] or "Nameplate text size",
+		desc = L["nameplateTextSizeDesc"],
+		min = 0,
+		max = 32,
+		step = 1,
+		default = 0,
+		get = function() return addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.textSize] or 0 end,
+		set = function(value)
+			addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.textSize] = value
+			refreshNameplateTextStyle()
+		end,
+		parent = true,
+		element = nameplateTextToggle.element,
+		parentCheck = isNameplateTextEnabled,
+		parentSection = expandable,
+	})
+
+	local nameplateMarkerAnchorOptions = {
+		TOPLEFT = L["Top Left"] or "Top Left",
+		TOP = L["Top"] or "Top",
+		TOPRIGHT = L["Top Right"] or "Top Right",
+		LEFT = L["Left"] or "Left",
+		CENTER = _G.CENTER or "Center",
+		RIGHT = L["Right"] or "Right",
+		BOTTOMLEFT = L["Bottom Left"] or "Bottom Left",
+		BOTTOM = L["Bottom"] or "Bottom",
+		BOTTOMRIGHT = L["Bottom Right"] or "Bottom Right",
+	}
+	local nameplateMarkerAnchorOrder = { "TOPLEFT", "TOP", "TOPRIGHT", "LEFT", "CENTER", "RIGHT", "BOTTOMLEFT", "BOTTOM", "BOTTOMRIGHT" }
+
+	local targetMarkersToggle = addon.functions.SettingsCreateCheckbox(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.targetMarkers,
+		text = L["nameplateTargetMarkers"] or "Show target markers on default nameplates",
+		desc = L["nameplateTargetMarkersDesc"],
+		func = function(value)
+			if addon.functions.SetDefaultNameplateTargetMarkersEnabled then
+				addon.functions.SetDefaultNameplateTargetMarkersEnabled(value)
+			else
+				addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.targetMarkers] = value and true or false
+			end
+		end,
+		parentSection = expandable,
+	})
+
+	local function areTargetMarkersEnabled() return targetMarkersToggle and targetMarkersToggle.setting and targetMarkersToggle.setting:GetValue() == true end
+
+	local function formatTargetMarkerAtlasOption(atlas)
+		return ("|A:%s:18:18|a"):format(atlas)
+	end
+
+	local targetMarkerAtlasOptions = {
+		["shop-header-arrow-hover"] = formatTargetMarkerAtlasOption("shop-header-arrow-hover"),
+		["CovenantSanctum-Renown-DoubleArrow-Hover"] = formatTargetMarkerAtlasOption("CovenantSanctum-Renown-DoubleArrow-Hover"),
+	}
+	local targetMarkerAtlasOrder = { "shop-header-arrow-hover", "CovenantSanctum-Renown-DoubleArrow-Hover" }
+
+	addon.functions.SettingsCreateDropdown(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.targetMarkerAtlas,
+		text = L["nameplateTargetMarkerAtlas"] or "Target marker style",
+		desc = L["nameplateTargetMarkerAtlasDesc"],
+		list = targetMarkerAtlasOptions,
+		order = targetMarkerAtlasOrder,
+		default = "shop-header-arrow-hover",
+		get = function()
+			local current = addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.targetMarkerAtlas]
+			if type(current) ~= "string" or not targetMarkerAtlasOptions[current] then current = "shop-header-arrow-hover" end
+			return current
+		end,
+		set = function(value)
+			if type(value) ~= "string" or not targetMarkerAtlasOptions[value] then value = "shop-header-arrow-hover" end
+			addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.targetMarkerAtlas] = value
+			if addon.functions.RefreshDefaultNameplateTargetMarkers then addon.functions.RefreshDefaultNameplateTargetMarkers() end
+		end,
+		parent = true,
+		element = targetMarkersToggle.element,
+		parentCheck = areTargetMarkersEnabled,
+		parentSection = expandable,
+	})
+
+	addon.functions.SettingsCreateSlider(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.targetMarkerSize,
+		text = L["nameplateTargetMarkerSize"] or "Target marker size",
+		desc = L["nameplateTargetMarkerSizeDesc"],
+		min = 8,
+		max = 64,
+		step = 1,
+		default = 18,
+		get = function() return addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.targetMarkerSize] or 18 end,
+		set = function(value)
+			addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.targetMarkerSize] = value
+			if addon.functions.RefreshDefaultNameplateTargetMarkers then addon.functions.RefreshDefaultNameplateTargetMarkers() end
+		end,
+		parent = true,
+		element = targetMarkersToggle.element,
+		parentCheck = areTargetMarkersEnabled,
+		parentSection = expandable,
+	})
+
+	local eliteMarkersToggle = addon.functions.SettingsCreateCheckbox(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.eliteMarkers,
+		text = L["nameplateEliteMarkers"] or "Show elite markers on default nameplates",
+		desc = L["nameplateEliteMarkersDesc"],
+		func = function(value)
+			if addon.functions.SetDefaultNameplateEliteMarkersEnabled then
+				addon.functions.SetDefaultNameplateEliteMarkersEnabled(value)
+			else
+				addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.eliteMarkers] = value and true or false
+			end
+		end,
+		parentSection = expandable,
+	})
+
+	local function areEliteMarkersEnabled() return eliteMarkersToggle and eliteMarkersToggle.setting and eliteMarkersToggle.setting:GetValue() == true end
+
+	local function refreshNameplateEliteMarkers()
+		if addon.functions.RefreshDefaultNameplateEliteMarkers then addon.functions.RefreshDefaultNameplateEliteMarkers() end
+	end
+
+	addon.functions.SettingsCreateDropdown(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.eliteMarkerAnchor,
+		text = L["nameplateEliteMarkerAnchor"] or "Elite marker anchor",
+		desc = L["nameplateEliteMarkerAnchorDesc"],
+		list = nameplateMarkerAnchorOptions,
+		order = nameplateMarkerAnchorOrder,
+		default = "LEFT",
+		get = function()
+			local current = addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.eliteMarkerAnchor]
+			if type(current) ~= "string" or not nameplateMarkerAnchorOptions[current] then current = "LEFT" end
+			return current
+		end,
+		set = function(value)
+			if type(value) ~= "string" or not nameplateMarkerAnchorOptions[value] then value = "LEFT" end
+			addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.eliteMarkerAnchor] = value
+			refreshNameplateEliteMarkers()
+		end,
+		parent = true,
+		element = eliteMarkersToggle.element,
+		parentCheck = areEliteMarkersEnabled,
+		parentSection = expandable,
+	})
+
+	addon.functions.SettingsCreateSlider(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.eliteMarkerSize,
+		text = L["nameplateEliteMarkerSize"] or "Elite marker size",
+		desc = L["nameplateEliteMarkerSizeDesc"],
+		min = 8,
+		max = 48,
+		step = 1,
+		default = 18,
+		get = function() return addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.eliteMarkerSize] or 18 end,
+		set = function(value)
+			addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.eliteMarkerSize] = value
+			refreshNameplateEliteMarkers()
+		end,
+		parent = true,
+		element = eliteMarkersToggle.element,
+		parentCheck = areEliteMarkersEnabled,
+		parentSection = expandable,
+	})
+
+	local questMarkersToggle = addon.functions.SettingsCreateCheckbox(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.questMarkers,
+		text = L["nameplateQuestMarkers"] or "Show quest icons on default nameplates",
+		desc = L["nameplateQuestMarkersDesc"],
+		func = function(value)
+			if addon.functions.SetDefaultNameplateQuestMarkersEnabled then
+				addon.functions.SetDefaultNameplateQuestMarkersEnabled(value)
+			else
+				addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.questMarkers] = value and true or false
+			end
+		end,
+		parentSection = expandable,
+	})
+
+	local function areQuestMarkersEnabled() return questMarkersToggle and questMarkersToggle.setting and questMarkersToggle.setting:GetValue() == true end
+
+	local function refreshNameplateQuestMarkers()
+		if addon.functions.RefreshDefaultNameplateQuestMarkers then addon.functions.RefreshDefaultNameplateQuestMarkers() end
+	end
+
+	addon.functions.SettingsCreateDropdown(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.questMarkerAnchor,
+		text = L["nameplateQuestMarkerAnchor"] or "Quest icon anchor",
+		desc = L["nameplateQuestMarkerAnchorDesc"],
+		list = nameplateMarkerAnchorOptions,
+		order = nameplateMarkerAnchorOrder,
+		default = "RIGHT",
+		get = function()
+			local current = addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.questMarkerAnchor]
+			if type(current) ~= "string" or not nameplateMarkerAnchorOptions[current] then current = "RIGHT" end
+			return current
+		end,
+		set = function(value)
+			if type(value) ~= "string" or not nameplateMarkerAnchorOptions[value] then value = "RIGHT" end
+			addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.questMarkerAnchor] = value
+			refreshNameplateQuestMarkers()
+		end,
+		parent = true,
+		element = questMarkersToggle.element,
+		parentCheck = areQuestMarkersEnabled,
+		parentSection = expandable,
+	})
+
+	addon.functions.SettingsCreateSlider(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.questMarkerSize,
+		text = L["nameplateQuestMarkerSize"] or "Quest icon size",
+		desc = L["nameplateQuestMarkerSizeDesc"],
+		min = 8,
+		max = 48,
+		step = 1,
+		default = 18,
+		get = function() return addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.questMarkerSize] or 18 end,
+		set = function(value)
+			addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.questMarkerSize] = value
+			refreshNameplateQuestMarkers()
+		end,
+		parent = true,
+		element = questMarkersToggle.element,
+		parentCheck = areQuestMarkersEnabled,
 		parentSection = expandable,
 	})
 
