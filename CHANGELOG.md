@@ -1,10 +1,18 @@
 # Changelog
 
+## [10.17.0-beta6] - 2026-05-18
+
+### ✨ Added
+
+- Nameplates: Added font controls for default nameplate text, including LSM font selection, global font support, outline style selection, and optional text size override.
+
+---
+
 ## [10.17.0-beta5] - 2026-05-17
 
 ### ✨ Added
 
-- Nameplates: Added optional quest icons, elite and boss markers, target arrow markers, and text style controls for default nameplates, including configurable marker anchors and sizes. Quest detection avoids units with secret identity data before reading tooltip objective info.
+- Nameplates: Added optional quest icons, elite and boss markers, and target arrow markers for default nameplates, including configurable marker anchors and sizes. Quest detection avoids units with secret identity data before reading tooltip objective info.
 
 ---
 

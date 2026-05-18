@@ -52,6 +52,7 @@ local DEFAULT_NAMEPLATE_FEATURE_KEYS = constants.DEFAULT_NAMEPLATE_FEATURE_KEYS
 	or {
 		auraClickthrough = "nameplateAuraClickthrough",
 		slugOutline = "nameplateSlugOutline",
+		textFont = "nameplateTextFont",
 		textOutline = "nameplateTextOutline",
 		textSize = "nameplateTextSize",
 		eliteMarkers = "nameplateEliteMarkers",
@@ -1675,12 +1676,37 @@ local function createNameplatesCategory()
 			end
 			return value or globalFontStyleKey
 		end
-	local function refreshNameplateTextStyle()
-		if addon.functions.RefreshDefaultNameplateTextStyle then addon.functions.RefreshDefaultNameplateTextStyle() end
-	end
+		local function refreshNameplateTextStyle()
+			if addon.functions.RefreshDefaultNameplateTextStyle then addon.functions.RefreshDefaultNameplateTextStyle() end
+		end
 
-	addon.functions.SettingsCreateDropdown(category, {
-		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.textOutline,
+		addon.functions.SettingsCreateDropdown(category, {
+			var = DEFAULT_NAMEPLATE_FEATURE_KEYS.textFont,
+			text = L["nameplateTextFont"] or "Nameplate text font",
+			desc = L["nameplateTextFontDesc"],
+			listFunc = buildOverrideFontDropdown,
+			order = fontOrder,
+			default = getGlobalFontConfigKey(),
+			get = function()
+				local current = addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.textFont] or getGlobalFontConfigKey()
+				local list = buildOverrideFontDropdown()
+				if not list[current] then current = getGlobalFontConfigKey() end
+				return current
+			end,
+			set = function(value)
+				local list = buildOverrideFontDropdown()
+				if not list[value] then value = getGlobalFontConfigKey() end
+				addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.textFont] = value
+				refreshNameplateTextStyle()
+			end,
+			parent = true,
+			element = nameplateTextToggle.element,
+			parentCheck = isNameplateTextEnabled,
+			parentSection = expandable,
+		})
+
+		addon.functions.SettingsCreateDropdown(category, {
+			var = DEFAULT_NAMEPLATE_FEATURE_KEYS.textOutline,
 		text = L["nameplateTextOutline"] or "Nameplate text outline",
 		desc = L["nameplateTextOutlineDesc"],
 		list = nameplateTextOutlineOptions,

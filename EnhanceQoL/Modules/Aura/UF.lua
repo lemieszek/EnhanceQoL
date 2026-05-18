@@ -12400,6 +12400,100 @@ UF.FullScanTargetAuras = AuraUtil.fullScanTargetAuras
 UF.ResolveSingleAuraConfig = AuraUtil.resolveSingleAuraConfig
 UF.EnsureSingleAuraConfig = AuraUtil.ensureSingleAuraConfig
 UF.CopySettings = copySettings
+
+-- TODO: Temporary diagnostics for the player-name disappearing report. Remove after root cause is confirmed.
+function UF.DebugPlayerName()
+	local unit = UNIT.PLAYER
+	local st = states and states[unit]
+	local cfg = ensureDB(unit)
+	local scfg = cfg and cfg.status or {}
+	local guid = UnitGUID and UnitGUID(unit)
+	local activeProfile = UFProfileManager and UFProfileManager.GetActiveName and UFProfileManager.GetActiveName()
+	local mappedProfile = guid and addon.db and addon.db.ufProfileKeys and addon.db.ufProfileKeys[guid]
+	local resolvedFont = UFHelper and UFHelper.getFont and UFHelper.getFont(scfg.font) or nil
+	local lsm = LibStub and LibStub("LibSharedMedia-3.0", true)
+	local lsmValid = lsm and lsm.IsValid and scfg.font and lsm:IsValid("font", scfg.font)
+	local lsmFetch = lsm and lsm.Fetch and scfg.font and lsm:Fetch("font", scfg.font, true)
+
+	print("EQOL UFDBG profile", tostring(activeProfile), "guid", tostring(guid), "mapped", tostring(mappedProfile), "global", tostring(addon.db and addon.db.ufProfileGlobal))
+	print("EQOL UFDBG cfg", "font", tostring(scfg.font), "resolved", tostring(resolvedFont), "outline", tostring(scfg.fontOutline), "lsmValid", tostring(lsmValid), "lsmFetch", tostring(lsmFetch))
+	print("EQOL UFDBG cfg2", "enabled", tostring(scfg.enabled), "nameStrata", tostring(scfg.nameStrata), "nameLevelOffset", tostring(scfg.nameFrameLevelOffset), "nameMax", tostring(scfg.nameMaxChars), "offset", tostring(scfg.nameOffset and scfg.nameOffset.x), tostring(scfg.nameOffset and scfg.nameOffset.y))
+
+	if not st then
+		print("EQOL UFDBG state nil")
+		return
+	end
+
+	local function call(frame, method)
+		local fn = frame and frame[method]
+		if type(fn) ~= "function" then return nil end
+		local ok, a, b, c = pcall(fn, frame)
+		if ok then return a, b, c end
+		return nil
+	end
+
+	local fs = st.nameText
+	if fs then
+		local fontFile, fontSize, fontFlags = call(fs, "GetFont")
+		print(
+			"EQOL UFDBG name",
+			"text",
+			tostring(call(fs, "GetText")),
+			"shown",
+			tostring(call(fs, "IsShown")),
+			"visible",
+			tostring(call(fs, "IsVisible")),
+			"alpha",
+			tostring(call(fs, "GetAlpha")),
+			"eff",
+			tostring(call(fs, "GetEffectiveAlpha")),
+			"font",
+			tostring(fontFile),
+			tostring(fontSize),
+			tostring(fontFlags)
+		)
+		print("EQOL UFDBG name2", "width", tostring(call(fs, "GetWidth")), "stringWidth", tostring(call(fs, "GetStringWidth")), "rect", tostring(call(fs, "GetLeft")), tostring(call(fs, "GetTop")), tostring(call(fs, "GetRight")), tostring(call(fs, "GetBottom")))
+	else
+		print("EQOL UFDBG name nil")
+	end
+
+	local function dumpFrame(label, frame)
+		if not frame then
+			print("EQOL UFDBG frame", label, "nil")
+			return
+		end
+		print(
+			"EQOL UFDBG frame",
+			label,
+			"shown",
+			tostring(call(frame, "IsShown")),
+			"visible",
+			tostring(call(frame, "IsVisible")),
+			"strata",
+			tostring(call(frame, "GetFrameStrata")),
+			"level",
+			tostring(call(frame, "GetFrameLevel")),
+			"alpha",
+			tostring(call(frame, "GetAlpha"))
+		)
+	end
+
+	dumpFrame("frame", st.frame)
+	dumpFrame("status", st.status)
+	dumpFrame("nameLayer", st.nameTextLayer)
+	dumpFrame("statusText", st.statusTextLayer)
+	dumpFrame("health", st.health)
+	dumpFrame("healthText", st.healthTextLayer)
+	dumpFrame("power", st.power)
+	dumpFrame("powerGroup", st.powerGroup)
+	dumpFrame("dataBar", st.dataBar)
+	dumpFrame("dispelTint", st.dispelTint)
+end
+
+if SlashCmdList then
+	_G.SLASH_EQOLUFDEBUG1 = "/eqolufdebug"
+	SlashCmdList.EQOLUFDEBUG = function() UF.DebugPlayerName() end
+end
 addon.Aura.functions = addon.Aura.functions or {}
 addon.Aura.functions.importUFProfile = UF.ImportProfile
 addon.Aura.functions.exportUFProfile = UF.ExportProfile

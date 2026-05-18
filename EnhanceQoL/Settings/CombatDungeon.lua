@@ -35,6 +35,7 @@ local NAMEPLATE_MOB_COLORS_DB_KEY = "nameplateMobColors"
 local NAMEPLATE_MOB_COLORS_DUNGEONS_DB_KEY = "nameplateMobColorsInDungeons"
 local NAMEPLATE_MOB_COLORS_OUTSIDE_DUNGEONS_DB_KEY = "nameplateMobColorsOutsideDungeons"
 local NAMEPLATE_SLUG_OUTLINE_DB_KEY = "nameplateSlugOutline"
+local NAMEPLATE_TEXT_FONT_DB_KEY = "nameplateTextFont"
 local NAMEPLATE_TEXT_OUTLINE_DB_KEY = "nameplateTextOutline"
 local NAMEPLATE_TEXT_SIZE_DB_KEY = "nameplateTextSize"
 local NAMEPLATE_ELITE_MARKERS_DB_KEY = "nameplateEliteMarkers"
@@ -109,6 +110,7 @@ addon.constants = addon.constants or {}
 addon.constants.DEFAULT_NAMEPLATE_FEATURE_KEYS = {
 	auraClickthrough = NAMEPLATE_AURA_CLICKTHROUGH_DB_KEY,
 	slugOutline = NAMEPLATE_SLUG_OUTLINE_DB_KEY,
+	textFont = NAMEPLATE_TEXT_FONT_DB_KEY,
 	textOutline = NAMEPLATE_TEXT_OUTLINE_DB_KEY,
 	textSize = NAMEPLATE_TEXT_SIZE_DB_KEY,
 	eliteMarkers = NAMEPLATE_ELITE_MARKERS_DB_KEY,
@@ -450,6 +452,13 @@ local function getNameplateTextSizeOverride(fallbackSize)
 	return size
 end
 
+local function getNameplateTextFontFace(fallbackFont)
+	local globalFontKey = addon.functions.GetGlobalFontConfigKey and addon.functions.GetGlobalFontConfigKey() or "__EQOL_GLOBAL_FONT__"
+	local configured = addon.db and addon.db[NAMEPLATE_TEXT_FONT_DB_KEY] or globalFontKey
+	if addon.functions.ResolveFontFace then return addon.functions.ResolveFontFace(configured, fallbackFont) end
+	return fallbackFont
+end
+
 local function getNameplateTextStyleFlags()
 	local globalStyleKey = addon.functions.GetGlobalFontStyleConfigKey and addon.functions.GetGlobalFontStyleConfigKey() or "__EQOL_GLOBAL_FONT_STYLE__"
 	local style = addon.db and addon.db[NAMEPLATE_TEXT_OUTLINE_DB_KEY] or globalStyleKey
@@ -512,7 +521,7 @@ local function applySlugOutlineToFontObject(fontObject)
 	end
 
 	local defaults = nameplateSlugOutlineFontObjectDefaults[fontObject]
-	local font = defaults and defaults.font
+	local font = getNameplateTextFontFace(defaults and defaults.font)
 	local size = getNameplateTextSizeOverride(defaults and defaults.size)
 	setNameplateTextFont(fontObject, font, size, getNameplateTextStyleFlags())
 	applyNameplateTextStyleShadow(fontObject)
@@ -534,7 +543,7 @@ local function applySlugOutlineToFontString(fontString)
 	end
 
 	local defaults = nameplateSlugOutlineFontStringDefaults[fontString]
-	local font = defaults and defaults.font
+	local font = getNameplateTextFontFace(defaults and defaults.font)
 	local size = getNameplateTextSizeOverride(defaults and defaults.size)
 	setNameplateTextFont(fontString, font, size, getNameplateTextStyleFlags())
 	applyNameplateTextStyleShadow(fontString)
@@ -1702,6 +1711,7 @@ function addon.functions.initDungeonFrame()
 	addon.functions.InitDBValue(NAMEPLATE_MOB_COLORS_DUNGEONS_DB_KEY, true)
 	addon.functions.InitDBValue(NAMEPLATE_MOB_COLORS_OUTSIDE_DUNGEONS_DB_KEY, false)
 	addon.functions.InitDBValue(NAMEPLATE_SLUG_OUTLINE_DB_KEY, false)
+	addon.functions.InitDBValue(NAMEPLATE_TEXT_FONT_DB_KEY, addon.functions.GetGlobalFontConfigKey and addon.functions.GetGlobalFontConfigKey() or "__EQOL_GLOBAL_FONT__")
 	addon.functions.InitDBValue(NAMEPLATE_TEXT_OUTLINE_DB_KEY, addon.functions.GetGlobalFontStyleConfigKey and addon.functions.GetGlobalFontStyleConfigKey() or "__EQOL_GLOBAL_FONT_STYLE__")
 	addon.functions.InitDBValue(NAMEPLATE_TEXT_SIZE_DB_KEY, 0)
 	addon.functions.InitDBValue(NAMEPLATE_ELITE_MARKERS_DB_KEY, false)
