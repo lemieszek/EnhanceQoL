@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.17.0-beta7] - 2026-05-18
+
+### 🐛 Fixed
+
+- On some servers the language flag wasn't correctly displayed
+
+---
+
 ## [10.17.0-beta6] - 2026-05-18
 
 ### ✨ Added
