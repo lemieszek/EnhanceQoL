@@ -496,6 +496,7 @@ local function resolveCastbarWidth(castCfg, castDefaults, barHeight)
 	if not relFrame or relFrame == UIParent or not relFrame.GetWidth then return width end
 	local relWidth = relFrame:GetWidth() or 0
 	if relWidth <= 0 then return width end
+	relWidth = math.max(MIN_CASTBAR_WIDTH, relWidth + (tonumber(anchor.matchRelativeWidthOffset) or 0))
 	local relScale = getEffectiveScale(relFrame)
 	local castScale = getEffectiveScale(state.castBar)
 	local visualWidth = relWidth * relScale

@@ -67,6 +67,7 @@ ExperienceBar.defaults = ExperienceBar.defaults
 		fillDirection = "LEFT",
 		anchorRelativeFrame = ANCHOR_TARGET_UI,
 		anchorMatchRelativeWidth = false,
+		anchorMatchRelativeWidthOffset = 0,
 		anchorPoint = "CENTER",
 		anchorRelativePoint = "CENTER",
 		anchorOffsetX = 0,
@@ -105,6 +106,7 @@ local DB_BORDER_OFFSET = "xpBarBorderOffset"
 local DB_FILL_DIRECTION = "xpBarFillDirection"
 local DB_ANCHOR_RELATIVE_FRAME = "xpBarAnchorTarget"
 local DB_ANCHOR_MATCH_WIDTH = "xpBarAnchorMatchWidth"
+local DB_ANCHOR_MATCH_WIDTH_OFFSET = "xpBarAnchorMatchWidthOffset"
 local DB_ANCHOR_POINT = "xpBarAnchorPoint"
 local DB_ANCHOR_RELATIVE_POINT = "xpBarAnchorRelativePoint"
 local DB_ANCHOR_OFFSET_X = "xpBarAnchorOffsetX"
@@ -784,6 +786,8 @@ end
 
 function ExperienceBar:GetAnchorMatchWidth() return getValue(DB_ANCHOR_MATCH_WIDTH, defaults.anchorMatchRelativeWidth == true) == true end
 
+function ExperienceBar:GetAnchorMatchWidthOffset() return clamp(getValue(DB_ANCHOR_MATCH_WIDTH_OFFSET, defaults.anchorMatchRelativeWidthOffset or 0), -200, 200) end
+
 function ExperienceBar:GetAnchorPoint() return normalizeAnchorPoint(getValue(DB_ANCHOR_POINT, defaults.anchorPoint), defaults.anchorPoint) end
 
 function ExperienceBar:GetAnchorRelativePoint()
@@ -1000,7 +1004,7 @@ function ExperienceBar:GetResolvedWidth()
 	if not (relativeFrame and relativeFrame.GetWidth) then return width end
 	local relativeWidth = tonumber(relativeFrame:GetWidth()) or 0
 	if relativeWidth <= 0 then return width end
-	return math.max(BAR_SIZE_MIN, relativeWidth)
+	return math.max(BAR_SIZE_MIN, relativeWidth + self:GetAnchorMatchWidthOffset())
 end
 
 function ExperienceBar:ApplyCurrentFillColor(hasRested)
@@ -1517,6 +1521,7 @@ function ExperienceBar:BuildLayoutRecordFromProfile()
 	record.fillDirection = self:GetFillDirection()
 	record.anchorRelativeFrame = self:GetAnchorRelativeFrame()
 	record.anchorMatchWidth = self:GetAnchorMatchWidth()
+	record.anchorMatchWidthOffset = self:GetAnchorMatchWidthOffset()
 	record.textEnabled = self:GetTextEnabled()
 	record.textLeftMode = self:GetTextLeftMode()
 	record.textCenterMode = self:GetTextCenterMode()
@@ -1588,6 +1593,7 @@ function ExperienceBar:ApplyLayoutData(data)
 	elseif data.anchorMatchRelativeWidth ~= nil then
 		anchorMatchWidth = data.anchorMatchRelativeWidth == true
 	end
+	local anchorMatchWidthOffset = clamp(data.anchorMatchWidthOffset or data.anchorMatchRelativeWidthOffset or addon.db[DB_ANCHOR_MATCH_WIDTH_OFFSET] or defaults.anchorMatchRelativeWidthOffset or 0, -200, 200)
 	local anchorPoint = normalizeAnchorPoint(data.point or addon.db[DB_ANCHOR_POINT], defaults.anchorPoint)
 	local anchorRelativePoint = normalizeAnchorPoint(data.relativePoint or addon.db[DB_ANCHOR_RELATIVE_POINT], anchorPoint)
 	local anchorOffsetX = normalizeAnchorOffset(data.x ~= nil and data.x or addon.db[DB_ANCHOR_OFFSET_X], defaults.anchorOffsetX)
@@ -1627,6 +1633,7 @@ function ExperienceBar:ApplyLayoutData(data)
 	local prevAnchorRelativeFrame = addon.db[DB_ANCHOR_RELATIVE_FRAME]
 	addon.db[DB_ANCHOR_RELATIVE_FRAME] = anchorRelativeFrame
 	addon.db[DB_ANCHOR_MATCH_WIDTH] = anchorMatchWidth and true or false
+	addon.db[DB_ANCHOR_MATCH_WIDTH_OFFSET] = anchorMatchWidthOffset
 	addon.db[DB_ANCHOR_POINT] = anchorPoint
 	addon.db[DB_ANCHOR_RELATIVE_POINT] = anchorRelativePoint
 	addon.db[DB_ANCHOR_OFFSET_X] = anchorOffsetX
@@ -1747,6 +1754,10 @@ local function applySetting(field, value)
 		addon.db[DB_ANCHOR_MATCH_WIDTH] = enabled and true or false
 		value = enabled
 		refreshSettingsUI()
+	elseif field == "anchorMatchWidthOffset" then
+		local offset = clamp(value, -200, 200)
+		addon.db[DB_ANCHOR_MATCH_WIDTH_OFFSET] = offset
+		value = offset
 	elseif field == "anchorPoint" then
 		local point = normalizeAnchorPoint(value, defaults.anchorPoint)
 		addon.db[DB_ANCHOR_POINT] = point
@@ -1991,6 +2002,20 @@ function ExperienceBar:RegisterEditMode(frame)
 				get = function() return ExperienceBar:GetAnchorMatchWidth() end,
 				set = function(_, value) applySetting("anchorMatchWidth", value) end,
 				isEnabled = function() return not ExperienceBar:AnchorUsesUIParent() end,
+			},
+			{
+				name = L["Offset"] or "Offset",
+				kind = SettingType.Slider,
+				field = "anchorMatchWidthOffset",
+				parentId = "xpBarAnchor",
+				minValue = -200,
+				maxValue = 200,
+				valueStep = 1,
+				allowInput = true,
+				default = defaults.anchorMatchRelativeWidthOffset or 0,
+				get = function() return ExperienceBar:GetAnchorMatchWidthOffset() end,
+				set = function(_, value) applySetting("anchorMatchWidthOffset", value) end,
+				isEnabled = function() return ExperienceBar:AnchorUsesMatchedWidth() end,
 			},
 			{
 				name = L["Visibility"] or "Visibility",
@@ -2402,6 +2427,7 @@ function ExperienceBar:RegisterEditMode(frame)
 			fillDirection = self:GetFillDirection(),
 			anchorRelativeFrame = self:GetAnchorRelativeFrame(),
 			anchorMatchWidth = self:GetAnchorMatchWidth(),
+			anchorMatchWidthOffset = self:GetAnchorMatchWidthOffset(),
 			textEnabled = self:GetTextEnabled(),
 			textLeftMode = self:GetTextLeftMode(),
 			textCenterMode = self:GetTextCenterMode(),

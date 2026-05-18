@@ -389,6 +389,21 @@ function CastbarSettings.BuildStandaloneCastbarSettings(ctx)
 		refreshSettingsUI()
 	end, false, section.anchor, function() return isCastEnabled() and not anchorUsesUIParent() end)
 
+	local castMatchWidthOffset = slider(L["Offset"] or "Offset", -200, 200, 1, function()
+		local anchor = ensureCastAnchor()
+		return tonumber(anchor.matchRelativeWidthOffset) or 0
+	end, function(val)
+		local anchor = ensureCastAnchor()
+		local newValue = tonumber(val) or 0
+		anchor.matchRelativeWidthOffset = newValue ~= 0 and newValue or nil
+		refreshCastbar()
+	end, 0, section.anchor, true)
+	castMatchWidthOffset.isEnabled = function()
+		local anchor = ensureCastAnchor()
+		return isCastEnabled() and not anchorUsesUIParent() and anchor.matchRelativeWidth == true
+	end
+	list[#list + 1] = castMatchWidthOffset
+
 	list[#list + 1] = { name = L["Icon"] or "Icon", kind = settingType.Collapsible, id = section.icon, defaultCollapsed = true }
 
 	list[#list + 1] = checkbox(L["Show spell icon"] or "Show spell icon", function() return getCast({ "cast", "showIcon" }, castDef.showIcon ~= false) ~= false end, function(val)

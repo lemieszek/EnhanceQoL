@@ -4587,7 +4587,9 @@ function ResourceBars.SyncSharedSlotProxyFrame(slot, specIndex)
 
 	local width = cfg.width or widthDefault
 	local height = cfg.height or heightDefault
-	if anchor.matchRelativeWidth == true and relative and relative ~= UIParent and relative.GetWidth then width = relative:GetWidth() or width end
+	if anchor.matchRelativeWidth == true and relative and relative ~= UIParent and relative.GetWidth then
+		width = max(RB.MIN_RESOURCE_BAR_WIDTH, (relative:GetWidth() or width) + (tonumber(anchor.matchRelativeWidthOffset) or 0))
+	end
 	frame:SetSize(width, height)
 	frame:SetPoint(anchor.point or "TOPLEFT", relative or UIParent, anchor.relativePoint or anchor.point or "TOPLEFT", anchor.x or 0, anchor.y or 0)
 	frame:Show()
@@ -4977,7 +4979,7 @@ local function syncBarWidthWithAnchor(pType)
 		return true
 	end
 	local relWidth = relFrame:GetWidth() or 0
-	local desired = max(RB.MIN_RESOURCE_BAR_WIDTH, relWidth or 0)
+	local desired = max(RB.MIN_RESOURCE_BAR_WIDTH, (relWidth or 0) + (tonumber(anchor.matchRelativeWidthOffset) or 0))
 	desired = max(desired, 1)
 	local current = frame:GetWidth() or 0
 	if abs(current - desired) < 0.5 then return false end

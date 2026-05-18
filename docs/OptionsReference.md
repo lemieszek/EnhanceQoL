@@ -61,7 +61,7 @@ Each action bar can be set to appear only on mouseover:
 - **Enable frame scale adjustment** with a slider to change the size of compact unit frames.
 
 ## Resource Bars
-- In the next release, Resource Bars can anchor to supported external UI frames from the **Relative frame** dropdown. This also works with **Match Relative Frame width**.
+- In the next release, Resource Bars can anchor to supported external UI frames from the **Relative frame** dropdown. Resource Bars, the standalone Castbar, the XP Bar, and the GCD Bar also support a positive or negative **Match Relative Frame width** offset for border and spacing adjustments.
 
 ## Minimap & Micro Menu
 - **Enable quick switching for loot and active specializations** (Enable quick switching for loot and active specializations on the Minimap).

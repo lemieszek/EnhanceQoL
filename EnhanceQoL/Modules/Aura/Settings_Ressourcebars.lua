@@ -1602,6 +1602,33 @@ registerEditModeBars = function()
 				}
 
 				settingsList[#settingsList + 1] = {
+					name = L["Offset"] or "Offset",
+					kind = settingType.Slider,
+					allowInput = true,
+					field = "matchRelativeWidthOffset",
+					minValue = -200,
+					maxValue = 200,
+					valueStep = 1,
+					get = function()
+						local a = ensureAnchorTable()
+						return a and tonumber(a.matchRelativeWidthOffset) or 0
+					end,
+					set = function(_, value)
+						local a = ensureAnchorTable()
+						if not a then return end
+						local newValue = tonumber(value) or 0
+						a.matchRelativeWidthOffset = newValue ~= 0 and newValue or nil
+						queueRefresh()
+					end,
+					isEnabled = function()
+						local a = ensureAnchorTable()
+						return not anchorUsesUIParent() and a and a.matchRelativeWidth == true
+					end,
+					default = 0,
+					parentId = "frame",
+				}
+
+				settingsList[#settingsList + 1] = {
 					name = "X Offset",
 					kind = settingType.Slider,
 					allowInput = true,
