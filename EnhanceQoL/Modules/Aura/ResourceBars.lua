@@ -194,6 +194,11 @@ ResourceBars._validFrameStrata = ResourceBars._validFrameStrata or {}
 for _, strata in ipairs(RB.STRATA_ORDER) do
 	ResourceBars._validFrameStrata[strata] = true
 end
+
+function ResourceBars.GetAnchorHelper()
+	return addon.Aura and addon.Aura.CooldownPanels and addon.Aura.CooldownPanels.AnchorHelper
+end
+
 RB.UNITFRAME_ANCHOR_MAP = {
 	PlayerFrame = { uf = "EQOLUFPlayerFrame", blizz = "PlayerFrame", ufKey = "player" },
 	EQOLUFPlayerFrame = { uf = "EQOLUFPlayerFrame", blizz = "PlayerFrame", ufKey = "player" },
@@ -217,6 +222,11 @@ end
 
 function ResourceBars.ResolveRelativeFrameByName(relativeName)
 	if type(relativeName) ~= "string" or relativeName == "" or relativeName == "UIParent" then return UIParent end
+	local anchorHelper = ResourceBars.GetAnchorHelper and ResourceBars.GetAnchorHelper()
+	if anchorHelper and anchorHelper.ResolveExternalFrame then
+		local externalFrame = anchorHelper:ResolveExternalFrame(relativeName)
+		if externalFrame then return externalFrame end
+	end
 	local sharedSlot = ResourceBars.GetSharedSlotFromFrameName and ResourceBars.GetSharedSlotFromFrameName(relativeName)
 	if sharedSlot then
 		local proxy = _G[relativeName]
@@ -277,6 +287,11 @@ function ResourceBars.GetRelativeFrameHookTargets(relativeName)
 	if mapped then
 		add(mapped.blizz)
 		add(mapped.uf)
+	end
+	local anchorHelper = ResourceBars.GetAnchorHelper and ResourceBars.GetAnchorHelper()
+	if anchorHelper and anchorHelper.ResolveExternalFrame then
+		local externalFrame = anchorHelper:ResolveExternalFrame(relativeName)
+		if externalFrame and externalFrame.GetName then add(externalFrame:GetName()) end
 	end
 	add(relativeName)
 	ResourceBars._relativeFrameHookTargetsCache[relativeName] = targets
@@ -7926,7 +7941,13 @@ function ResourceBars.RefreshBarsAfterPlayerStateChange(reason)
 end
 
 local function eventHandler(self, event, unit, arg1)
-	if event == "UNIT_DISPLAYPOWER" and unit == "player" then
+	if event == "ADDON_LOADED" then
+		local anchorHelper = ResourceBars.GetAnchorHelper and ResourceBars.GetAnchorHelper()
+		if anchorHelper and anchorHelper.HandleAddonLoaded then anchorHelper:HandleAddonLoaded(unit) end
+		ResourceBars._relativeFrameHookTargetsCache = {}
+		if ResourceBars.ReanchorAll then ResourceBars.ReanchorAll() end
+		if scheduleRelativeFrameWidthSync then scheduleRelativeFrameWidthSync() end
+	elseif event == "UNIT_DISPLAYPOWER" and unit == "player" then
 		setPowerbars()
 		if ResourceBars.ScheduleDelayedSharedShapeshiftRefresh then ResourceBars.ScheduleDelayedSharedShapeshiftRefresh() end
 	elseif event == "PLAYER_SPECIALIZATION_CHANGED" then
@@ -8111,6 +8132,7 @@ function ResourceBars.EnableResourceBars()
 	frameAnchor:RegisterEvent("PLAYER_IS_GLIDING_CHANGED")
 	frameAnchor:RegisterEvent("PET_BATTLE_OPENING_START")
 	frameAnchor:RegisterEvent("PET_BATTLE_CLOSE")
+	frameAnchor:RegisterEvent("ADDON_LOADED")
 	if frameAnchor.RegisterUnitEvent then
 		frameAnchor:RegisterUnitEvent("UNIT_SPELLCAST_START", "player")
 		frameAnchor:RegisterUnitEvent("UNIT_SPELLCAST_STOP", "player")

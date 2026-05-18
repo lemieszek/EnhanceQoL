@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.18.0] - 2026-05-18
+
+### ✨ Added
+
+- Resource Bars: Added external frame anchors to the Relative frame dropdown, so Resource Bars can attach to supported external UI frames.
+
+---
+
 ## [10.17.0] - 2026-05-18
 
 ### ✨ Added

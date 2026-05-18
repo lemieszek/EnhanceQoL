@@ -60,6 +60,9 @@ Each action bar can be set to appear only on mouseover:
 - **Truncate unit names** and set a **maximum name length**.
 - **Enable frame scale adjustment** with a slider to change the size of compact unit frames.
 
+## Resource Bars
+- In the next release, Resource Bars can anchor to supported external UI frames from the **Relative frame** dropdown. This also works with **Match Relative Frame width**.
+
 ## Minimap & Micro Menu
 - **Enable quick switching for loot and active specializations** (Enable quick switching for loot and active specializations on the Minimap).
 - **Enable Minimap Button Sink** (Enable Minimap Button Sink): gather minimap buttons in a single frame. When enabled additional options appear:

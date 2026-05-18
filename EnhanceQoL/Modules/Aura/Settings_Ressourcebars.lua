@@ -1367,6 +1367,15 @@ registerEditModeBars = function()
 					add("BuffBarCooldownViewer", "BuffBarCooldownViewer")
 					add("BuffIconCooldownViewer", "BuffIconCooldownViewer")
 
+					local anchorHelper = ResourceBars.GetAnchorHelper and ResourceBars.GetAnchorHelper()
+					if anchorHelper and anchorHelper.CollectAnchorEntries then
+						local externalEntries = {}
+						anchorHelper:CollectAnchorEntries(externalEntries, {})
+						for _, entry in ipairs(externalEntries) do
+							add(entry.key, entry.label)
+						end
+					end
+
 					local cooldownPanels = addon.Aura and addon.Aura.CooldownPanels
 					if cooldownPanels and cooldownPanels.GetRoot then
 						local root = cooldownPanels:GetRoot()
@@ -1427,6 +1436,10 @@ registerEditModeBars = function()
 							ok = true
 							break
 						end
+					end
+					if not ok then
+						local anchorHelper = ResourceBars.GetAnchorHelper and ResourceBars.GetAnchorHelper()
+						ok = anchorHelper and anchorHelper.IsExternalAnchorKey and anchorHelper:IsExternalAnchorKey(cur)
 					end
 					if not ok then
 						cur = "UIParent"
