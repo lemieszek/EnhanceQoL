@@ -1721,6 +1721,7 @@ end
 
 function Helper.SetFont(fontString, fontPath, fontSize, fontStyle, fallbackPath)
 	if not (fontString and fontString.SetFont and fontPath) then return false end
+	if addon.functions and addon.functions.SetFontWithFallback then return addon.functions.SetFontWithFallback(fontString, fontPath, fontSize, fontStyle, fallbackPath) end
 	local ok, applied = pcall(fontString.SetFont, fontString, fontPath, fontSize, fontStyle)
 	if ok and applied ~= false then return true end
 

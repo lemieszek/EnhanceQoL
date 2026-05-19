@@ -391,8 +391,18 @@ function H._looksLikeFontFile(path)
 	return false
 end
 
+function H.isKnownFontAsset(fontFile)
+	if addon.functions and addon.functions.IsKnownFontAsset then return addon.functions.IsKnownFontAsset(fontFile) end
+	if not H._looksLikeFontFile(fontFile) then return true end
+	local fileAssetAPI = _G.C_UIFileAsset
+	if not (fileAssetAPI and fileAssetAPI.IsKnownFile) then return true end
+	local ok, known = pcall(fileAssetAPI.IsKnownFile, fontFile)
+	return ok and known == true
+end
+
 function H.getAlphabetAwareFontFamily(fontFile, size, flags)
 	if not (_G.Font and _G.Font.CreateFontFamily and H._looksLikeFontFile(fontFile)) then return nil end
+	if not H.isKnownFontAsset(fontFile) then return nil end
 	size = tonumber(size) or 14
 	if size <= 0 then size = 1 end
 	flags = flags or ""
@@ -422,12 +432,14 @@ end
 
 function H.setFontWithFallback(target, fontFile, size, flags)
 	if not target then return nil end
+	if not H.isKnownFontAsset(fontFile) then return false end
 	local family = H.getAlphabetAwareFontFamily(fontFile, size, flags)
 	if family and target.SetFontObject then
 		target:SetFontObject(family)
 		return true
 	end
 	if target.SetFont then
+		if addon.functions and addon.functions.SetFontWithFallback then return addon.functions.SetFontWithFallback(target, fontFile, size, flags, H.getFont(nil)) end
 		local ok, applied = pcall(target.SetFont, target, fontFile, size, flags)
 		return ok and applied ~= false
 	end

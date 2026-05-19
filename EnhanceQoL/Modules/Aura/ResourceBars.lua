@@ -2541,6 +2541,10 @@ end
 local function setFontWithFallback(fs, face, size, outline)
 	if not fs or not face then return end
 	if outline == "" then outline = nil end
+	if addon.functions and addon.functions.SetFontWithFallback then
+		addon.functions.SetFontWithFallback(fs, face, size, outline, defaultFontPath())
+		return
+	end
 	if not fs:SetFont(face, size, outline) then
 		local fallbackOutline = outline or "OUTLINE"
 		fs:SetFont(defaultFontPath(), size, fallbackOutline)

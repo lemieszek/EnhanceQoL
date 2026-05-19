@@ -314,6 +314,7 @@ end
 
 local function setFontWithFallback(fontString, fontPath, size, outline)
 	if not (fontString and fontString.SetFont and fontPath) then return false end
+	if addon.functions and addon.functions.SetFontWithFallback then return addon.functions.SetFontWithFallback(fontString, fontPath, size, outline, defaultFontFace()) end
 	local ok, applied = pcall(fontString.SetFont, fontString, fontPath, size, outline)
 	if ok and applied ~= false then return true end
 	local fallback = defaultFontFace()

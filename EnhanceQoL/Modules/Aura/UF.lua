@@ -12481,12 +12481,13 @@ function UF.DebugPlayerName()
 	local activeProfile = UFProfileManager and UFProfileManager.GetActiveName and UFProfileManager.GetActiveName()
 	local mappedProfile = guid and addon.db and addon.db.ufProfileKeys and addon.db.ufProfileKeys[guid]
 	local resolvedFont = UFHelper and UFHelper.getFont and UFHelper.getFont(scfg.font) or nil
+	local assetKnown = UFHelper and UFHelper.isKnownFontAsset and UFHelper.isKnownFontAsset(resolvedFont)
 	local lsm = LibStub and LibStub("LibSharedMedia-3.0", true)
 	local lsmValid = lsm and lsm.IsValid and scfg.font and lsm:IsValid("font", scfg.font)
 	local lsmFetch = lsm and lsm.Fetch and scfg.font and lsm:Fetch("font", scfg.font, true)
 
 	add("EQOL UFDBG profile", "profile", activeProfile, "guid", guid, "mapped", mappedProfile, "global", addon.db and addon.db.ufProfileGlobal)
-	add("EQOL UFDBG cfg", "font", scfg.font, "resolved", resolvedFont, "outline", scfg.fontOutline, "lsmValid", lsmValid, "lsmFetch", lsmFetch)
+	add("EQOL UFDBG cfg", "font", scfg.font, "resolved", resolvedFont, "outline", scfg.fontOutline, "assetKnown", assetKnown, "lsmValid", lsmValid, "lsmFetch", lsmFetch)
 	add("EQOL UFDBG cfg2", "enabled", scfg.enabled, "nameStrata", scfg.nameStrata, "nameLevelOffset", scfg.nameFrameLevelOffset, "nameMax", scfg.nameMaxChars, "offset", scfg.nameOffset and scfg.nameOffset.x, scfg.nameOffset and scfg.nameOffset.y)
 
 	if not st then

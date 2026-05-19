@@ -10,6 +10,7 @@ addon.SharedMedia = addon.SharedMedia or {}
 
 local effectPath = "Interface\\AddOns\\" .. addonName .. "\\Sounds\\Effects\\"
 local voiceoverPath = "Interface\\AddOns\\" .. addonName .. "\\Sounds\\Voiceovers\\"
+local neutralVoiceoverPath = voiceoverPath .. "Neutral\\"
 
 addon.SharedMedia.sounds = {
 	-- Soundeffects
@@ -21,16 +22,16 @@ addon.SharedMedia.sounds = {
 
 
 	-- Voiceovers
-	{ key = "1", label = "EQOL: 1", path = voiceoverPath .. "1.ogg" },
-	{ key = "2", label = "EQOL: 2", path = voiceoverPath .. "2.ogg" },
-	{ key = "3", label = "EQOL: 3", path = voiceoverPath .. "3.ogg" },
-	{ key = "4", label = "EQOL: 4", path = voiceoverPath .. "4.ogg" },
-	{ key = "5", label = "EQOL: 5", path = voiceoverPath .. "5.ogg" },
-	{ key = "6", label = "EQOL: 6", path = voiceoverPath .. "6.ogg" },
-	{ key = "7", label = "EQOL: 7", path = voiceoverPath .. "7.ogg" },
-	{ key = "8", label = "EQOL: 8", path = voiceoverPath .. "8.ogg" },
-	{ key = "9", label = "EQOL: 9", path = voiceoverPath .. "9.ogg" },
-	{ key = "10", label = "EQOL: 10", path = voiceoverPath .. "10.ogg" },
+	{ key = "1", label = "EQOL: 1", path = neutralVoiceoverPath .. "1.ogg" },
+	{ key = "2", label = "EQOL: 2", path = neutralVoiceoverPath .. "2.ogg" },
+	{ key = "3", label = "EQOL: 3", path = neutralVoiceoverPath .. "3.ogg" },
+	{ key = "4", label = "EQOL: 4", path = neutralVoiceoverPath .. "4.ogg" },
+	{ key = "5", label = "EQOL: 5", path = neutralVoiceoverPath .. "5.ogg" },
+	{ key = "6", label = "EQOL: 6", path = neutralVoiceoverPath .. "6.ogg" },
+	{ key = "7", label = "EQOL: 7", path = neutralVoiceoverPath .. "7.ogg" },
+	{ key = "8", label = "EQOL: 8", path = neutralVoiceoverPath .. "8.ogg" },
+	{ key = "9", label = "EQOL: 9", path = neutralVoiceoverPath .. "9.ogg" },
+	{ key = "10", label = "EQOL: 10", path = neutralVoiceoverPath .. "10.ogg" },
 	{ key = "First", label = "EQOL: First", path = voiceoverPath .. "First.ogg" },
 	{ key = "Second", label = "EQOL: Second", path = voiceoverPath .. "Second.ogg" },
 	{ key = "Third", label = "EQOL: Third", path = voiceoverPath .. "Third.ogg" },

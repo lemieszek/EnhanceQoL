@@ -353,6 +353,14 @@ local function isMediaPath(value)
 	return type(value) == "string" and (value:find("\\", 1, true) or value:find("/", 1, true)) ~= nil
 end
 
+local function isKnownFontAsset(value)
+	if type(value) ~= "string" or value == "" then return false end
+	local fileAssetAPI = _G.C_UIFileAsset
+	if not (fileAssetAPI and fileAssetAPI.IsKnownFile) then return true end
+	local ok, known = pcall(fileAssetAPI.IsKnownFile, value)
+	return ok and known == true
+end
+
 local function isGlobalFontConfigValue(value) return normalizeMediaValue(value) == GLOBAL_FONT_CONFIG_KEY end
 local function isGlobalFontStyleConfigValue(value) return normalizeMediaValue(value) == GLOBAL_FONT_STYLE_CONFIG_KEY end
 local function normalizeFontStyleValue(value)
@@ -370,6 +378,8 @@ function addon.functions.GetGlobalFontConfigLabel()
 end
 
 function addon.functions.IsGlobalFontConfigValue(value) return isGlobalFontConfigValue(value) end
+
+function addon.functions.IsKnownFontAsset(value) return isKnownFontAsset(value) end
 
 function addon.functions.GetLocaleDefaultFontFace() return (addon.variables and addon.variables.defaultFont) or STANDARD_TEXT_FONT end
 
@@ -418,15 +428,23 @@ function addon.functions.ResolveLSMMedia(mediaType, configured, fallback, allowP
 	if lsm then
 		if lsm.IsValid and lsm:IsValid(mediaKind, configuredValue) then
 			local fetched = lsm.Fetch and lsm:Fetch(mediaKind, configuredValue, true)
-			if type(fetched) == "string" and fetched ~= "" then return fetched end
+			if type(fetched) == "string" and fetched ~= "" then
+				if mediaKind ~= "font" or isKnownFontAsset(fetched) then return fetched end
+			end
 			return fallbackValue
 		end
 		if lsm.HashTable then
 			local hash = lsm:HashTable(mediaKind) or {}
 			local byName = hash[configuredValue]
-			if type(byName) == "string" and byName ~= "" then return byName end
+			if type(byName) == "string" and byName ~= "" then
+				if mediaKind ~= "font" or isKnownFontAsset(byName) then return byName end
+				return fallbackValue
+			end
 			for _, path in pairs(hash) do
-				if path == configuredValue then return configuredValue end
+				if path == configuredValue then
+					if mediaKind ~= "font" or isKnownFontAsset(configuredValue) then return configuredValue end
+					return fallbackValue
+				end
 			end
 		end
 	end
@@ -549,8 +567,19 @@ end
 
 local function setFontStringFont(fontString, fontFace, size, flags)
 	if not (fontString and fontString.SetFont and fontFace) then return false end
+	if not isKnownFontAsset(fontFace) then return false end
 	local ok, applied = pcall(fontString.SetFont, fontString, fontFace, size, flags)
 	return ok and applied ~= false
+end
+
+function addon.functions.SetFontWithFallback(fontString, fontFace, size, flags, fallbackFace)
+	if not (fontString and fontString.SetFont) then return false end
+	local resolvedFallback = addon.functions.ResolveFontFace(fallbackFace, defaultFontFace())
+	local resolvedFace = addon.functions.ResolveFontFace(fontFace, resolvedFallback)
+	local fontSize = tonumber(size) or 12
+	local ok = setFontStringFont(fontString, resolvedFace, fontSize, flags)
+	if not ok and resolvedFallback ~= resolvedFace then ok = setFontStringFont(fontString, resolvedFallback, fontSize, flags) end
+	return ok
 end
 
 function addon.functions.ApplyFontString(fontString, fontFace, size, style, fallbackFace, fallbackStyle)
