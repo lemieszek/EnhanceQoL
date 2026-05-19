@@ -68,6 +68,7 @@ local DEFAULT_NAMEPLATE_FEATURE_KEYS = constants.DEFAULT_NAMEPLATE_FEATURE_KEYS
 		targetMarkers = "nameplateTargetMarkers",
 		targetMarkerAtlas = "nameplateTargetMarkerAtlas",
 		targetMarkerSize = "nameplateTargetMarkerSize",
+		focusHealthbarTexture = "nameplateFocusHealthbarTexture",
 		mobColorBoss = "nameplateMobColorBoss",
 		mobColorMiniboss = "nameplateMobColorMiniboss",
 		mobColorCaster = "nameplateMobColorCaster",
@@ -1827,6 +1828,26 @@ local function createNameplatesCategory()
 		["CovenantSanctum-Renown-DoubleArrow-Hover"] = formatTargetMarkerAtlasOption("CovenantSanctum-Renown-DoubleArrow-Hover"),
 	}
 	local targetMarkerAtlasOrder = { "shop-header-arrow-hover", "CovenantSanctum-Renown-DoubleArrow-Hover" }
+		local function buildNameplateStatusbarDropdown()
+			local list, order = addon.Aura and addon.Aura.functions and addon.Aura.functions.getStatusbarDropdownLists and addon.Aura.functions.getStatusbarDropdownLists(true)
+			if not list and addon.functions.GetLSMMediaDropdown then list, order = addon.functions.GetLSMMediaDropdown("statusbar", true, _G.NONE or "None") end
+			list = list or {}
+		order = order or {}
+		list[""] = _G.NONE or "None"
+		for i = #order, 1, -1 do
+			if order[i] == "" then table.remove(order, i) end
+		end
+		table.insert(order, 1, "")
+		if not list["Interface\\TargetingFrame\\UI-StatusBar"] then
+			list["Interface\\TargetingFrame\\UI-StatusBar"] = "Blizzard Unit Frame"
+			order[#order + 1] = "Interface\\TargetingFrame\\UI-StatusBar"
+		end
+		if not list["Interface\\Buttons\\WHITE8x8"] then
+			list["Interface\\Buttons\\WHITE8x8"] = "Solid"
+			order[#order + 1] = "Interface\\Buttons\\WHITE8x8"
+		end
+		return list, order
+	end
 
 	addon.functions.SettingsCreateDropdown(category, {
 		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.targetMarkerAtlas,
@@ -1867,6 +1888,30 @@ local function createNameplatesCategory()
 		parent = true,
 		element = targetMarkersToggle.element,
 		parentCheck = areTargetMarkersEnabled,
+		parentSection = expandable,
+	})
+
+	addon.functions.SettingsCreateDropdown(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.focusHealthbarTexture,
+		text = L["nameplateFocusHealthbarTexture"] or "Focus healthbar texture",
+		desc = L["nameplateFocusHealthbarTextureDesc"],
+		listFunc = buildNameplateStatusbarDropdown,
+		default = "",
+		get = function()
+			local current = addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.focusHealthbarTexture] or ""
+			local list = buildNameplateStatusbarDropdown()
+			if not list[current] then current = "" end
+			return current
+		end,
+		set = function(value)
+			local list = buildNameplateStatusbarDropdown()
+			if not list[value] then value = "" end
+			if addon.functions.SetDefaultNameplateFocusHealthbarTexture then
+				addon.functions.SetDefaultNameplateFocusHealthbarTexture(value)
+			else
+				addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.focusHealthbarTexture] = value
+			end
+		end,
 		parentSection = expandable,
 	})
 

@@ -11,6 +11,7 @@ addon.variables.NewVersionTableEQOL = {
 	EQOL_nameplateEliteMarkerAnchor = true,
 	EQOL_nameplateEliteMarkerSize = true,
 	EQOL_nameplateEliteMarkers = true,
+	EQOL_nameplateFocusHealthbarTexture = true,
 	EQOL_nameplateFriendlyPlayerClassColorNames = true,
 	EQOL_nameplateFriendlyPlayerNamesOnly = true,
 	EQOL_nameplateHideFriendlyPlayerRealms = true,

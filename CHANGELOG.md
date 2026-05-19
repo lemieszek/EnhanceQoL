@@ -5,6 +5,7 @@
 
 ### ✨ Added
 
+- Nameplates: Added an optional focus healthbar texture for default nameplates.
 - SharedMedia: Added a new `IncomingMail` chat notification sound for ChatIM and other LibSharedMedia sound consumers.
 
 ### 🔄 Changed
