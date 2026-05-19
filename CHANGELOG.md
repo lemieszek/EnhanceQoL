@@ -1,6 +1,18 @@
 # Changelog
 
 <!--@eqol-beta@-->
+## [10.18.0-beta3] - 2026-05-19
+
+### ✨ Added
+
+- SharedMedia: Added a new `IncomingMail` chat notification sound for ChatIM and other LibSharedMedia sound consumers.
+
+### 🔄 Changed
+
+- SharedMedia: Added the new Neutral voiceover set and migrated most EQOL voiceover registrations to it while keeping known abbreviation and multi-word exceptions on the previous files for now.
+
+---
+
 ## [10.18.0-beta2] - 2026-05-19
 
 ### ✨ Added
