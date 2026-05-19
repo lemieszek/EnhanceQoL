@@ -38,6 +38,9 @@ local NAMEPLATE_SLUG_OUTLINE_DB_KEY = "nameplateSlugOutline"
 local NAMEPLATE_TEXT_FONT_DB_KEY = "nameplateTextFont"
 local NAMEPLATE_TEXT_OUTLINE_DB_KEY = "nameplateTextOutline"
 local NAMEPLATE_TEXT_SIZE_DB_KEY = "nameplateTextSize"
+local NAMEPLATE_FRIENDLY_PLAYER_NAMES_ONLY_DB_KEY = "nameplateFriendlyPlayerNamesOnly"
+local NAMEPLATE_FRIENDLY_PLAYER_CLASS_COLOR_NAMES_DB_KEY = "nameplateFriendlyPlayerClassColorNames"
+local NAMEPLATE_HIDE_FRIENDLY_PLAYER_REALMS_DB_KEY = "nameplateHideFriendlyPlayerRealms"
 local NAMEPLATE_ELITE_MARKERS_DB_KEY = "nameplateEliteMarkers"
 local NAMEPLATE_ELITE_MARKER_ANCHOR_DB_KEY = "nameplateEliteMarkerAnchor"
 local NAMEPLATE_ELITE_MARKER_SIZE_DB_KEY = "nameplateEliteMarkerSize"
@@ -113,6 +116,9 @@ addon.constants.DEFAULT_NAMEPLATE_FEATURE_KEYS = {
 	textFont = NAMEPLATE_TEXT_FONT_DB_KEY,
 	textOutline = NAMEPLATE_TEXT_OUTLINE_DB_KEY,
 	textSize = NAMEPLATE_TEXT_SIZE_DB_KEY,
+	friendlyPlayerNamesOnly = NAMEPLATE_FRIENDLY_PLAYER_NAMES_ONLY_DB_KEY,
+	friendlyPlayerClassColorNames = NAMEPLATE_FRIENDLY_PLAYER_CLASS_COLOR_NAMES_DB_KEY,
+	hideFriendlyPlayerRealms = NAMEPLATE_HIDE_FRIENDLY_PLAYER_REALMS_DB_KEY,
 	eliteMarkers = NAMEPLATE_ELITE_MARKERS_DB_KEY,
 	eliteMarkerAnchor = NAMEPLATE_ELITE_MARKER_ANCHOR_DB_KEY,
 	eliteMarkerSize = NAMEPLATE_ELITE_MARKER_SIZE_DB_KEY,
@@ -417,6 +423,93 @@ local function isNameplateUnitOnThreatListWithPlayer(unitFrame)
 end
 
 local function isNameplateMobColorsActive() return nameplateMobColorsActive == true end
+
+do
+	local friendlyNameplateOptionsFrame
+
+	local FRIENDLY_NAMEPLATE_CVARS = {
+		[NAMEPLATE_FRIENDLY_PLAYER_NAMES_ONLY_DB_KEY] = "nameplateShowOnlyNameForFriendlyPlayerUnits",
+		[NAMEPLATE_FRIENDLY_PLAYER_CLASS_COLOR_NAMES_DB_KEY] = "nameplateUseClassColorForFriendlyPlayerUnitNames",
+	}
+
+	local function setCVarBool(cvarName, enabled)
+		if not (C_CVar and C_CVar.SetCVar) then return end
+		C_CVar.SetCVar(cvarName, enabled and "1" or "0")
+	end
+
+	local function refreshFriendlyNameplateNames()
+		if not (C_NamePlate and C_NamePlate.GetNamePlates and _G.CompactUnitFrame_UpdateName) then return end
+		for _, namePlate in pairs(C_NamePlate.GetNamePlates() or {}) do
+			local unitFrame = namePlate and namePlate.UnitFrame
+			local unit = unitFrame and unitFrame.unit
+			if unit and UnitIsPlayer(unit) and UnitIsFriend("player", unit) then _G.CompactUnitFrame_UpdateName(unitFrame) end
+		end
+	end
+
+	local function setFriendlyRealmTextureEnabled(enabled)
+		if not (_G.TextureLoadingGroupMixin and _G.NamePlateFriendlyFrameOptions) then return end
+		local updateKey = "updateNameUsesGetUnitName"
+		local textureGroup = { textures = _G.NamePlateFriendlyFrameOptions }
+		if enabled and _G.TextureLoadingGroupMixin.RemoveTexture then
+			_G.TextureLoadingGroupMixin.RemoveTexture(textureGroup, updateKey)
+		elseif not enabled and _G.TextureLoadingGroupMixin.AddTexture then
+			_G.TextureLoadingGroupMixin.AddTexture(textureGroup, updateKey)
+		end
+		refreshFriendlyNameplateNames()
+	end
+
+	local function applyFriendlyNameplateOptions()
+		if not addon.db then return end
+		for dbKey, cvarName in pairs(FRIENDLY_NAMEPLATE_CVARS) do
+			if addon.db[dbKey] == true then setCVarBool(cvarName, true) end
+		end
+		if addon.db[NAMEPLATE_HIDE_FRIENDLY_PLAYER_REALMS_DB_KEY] == true then setFriendlyRealmTextureEnabled(true) end
+	end
+
+	local function ensureFriendlyNameplateOptionsWatcher()
+		if friendlyNameplateOptionsFrame then return end
+		friendlyNameplateOptionsFrame = CreateFrame("Frame")
+		friendlyNameplateOptionsFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+		friendlyNameplateOptionsFrame:RegisterEvent("NAME_PLATE_UNIT_ADDED")
+		friendlyNameplateOptionsFrame:SetScript("OnEvent", function(_, event, unit)
+			if event == "NAME_PLATE_UNIT_ADDED" then
+				if unit and UnitIsPlayer(unit) and UnitIsFriend("player", unit) and addon.db and addon.db[NAMEPLATE_HIDE_FRIENDLY_PLAYER_REALMS_DB_KEY] == true then
+					local namePlate = C_NamePlate and C_NamePlate.GetNamePlateForUnit and C_NamePlate.GetNamePlateForUnit(unit)
+					local unitFrame = namePlate and namePlate.UnitFrame
+					if unitFrame and _G.CompactUnitFrame_UpdateName then _G.CompactUnitFrame_UpdateName(unitFrame) end
+				end
+				return
+			end
+			applyFriendlyNameplateOptions()
+		end)
+	end
+
+	function addon.functions.SetDefaultNameplateFriendlyPlayerNamesOnlyEnabled(value)
+		local enabled = value and true or false
+		addon.db[NAMEPLATE_FRIENDLY_PLAYER_NAMES_ONLY_DB_KEY] = enabled
+		setCVarBool(FRIENDLY_NAMEPLATE_CVARS[NAMEPLATE_FRIENDLY_PLAYER_NAMES_ONLY_DB_KEY], enabled)
+		ensureFriendlyNameplateOptionsWatcher()
+	end
+
+	function addon.functions.SetDefaultNameplateFriendlyPlayerClassColorNamesEnabled(value)
+		local enabled = value and true or false
+		addon.db[NAMEPLATE_FRIENDLY_PLAYER_CLASS_COLOR_NAMES_DB_KEY] = enabled
+		setCVarBool(FRIENDLY_NAMEPLATE_CVARS[NAMEPLATE_FRIENDLY_PLAYER_CLASS_COLOR_NAMES_DB_KEY], enabled)
+		ensureFriendlyNameplateOptionsWatcher()
+	end
+
+	function addon.functions.SetDefaultNameplateHideFriendlyPlayerRealmsEnabled(value)
+		local enabled = value and true or false
+		addon.db[NAMEPLATE_HIDE_FRIENDLY_PLAYER_REALMS_DB_KEY] = enabled
+		setFriendlyRealmTextureEnabled(enabled)
+		ensureFriendlyNameplateOptionsWatcher()
+	end
+
+	function addon.functions.InitializeDefaultNameplateFriendlyPlayerOptions()
+		ensureFriendlyNameplateOptionsWatcher()
+		applyFriendlyNameplateOptions()
+	end
+end
 
 do
 	local nameplateSlugOutlineFrame
@@ -1714,6 +1807,9 @@ function addon.functions.initDungeonFrame()
 	addon.functions.InitDBValue(NAMEPLATE_TEXT_FONT_DB_KEY, addon.functions.GetGlobalFontConfigKey and addon.functions.GetGlobalFontConfigKey() or "__EQOL_GLOBAL_FONT__")
 	addon.functions.InitDBValue(NAMEPLATE_TEXT_OUTLINE_DB_KEY, addon.functions.GetGlobalFontStyleConfigKey and addon.functions.GetGlobalFontStyleConfigKey() or "__EQOL_GLOBAL_FONT_STYLE__")
 	addon.functions.InitDBValue(NAMEPLATE_TEXT_SIZE_DB_KEY, 0)
+	addon.functions.InitDBValue(NAMEPLATE_FRIENDLY_PLAYER_NAMES_ONLY_DB_KEY, false)
+	addon.functions.InitDBValue(NAMEPLATE_FRIENDLY_PLAYER_CLASS_COLOR_NAMES_DB_KEY, false)
+	addon.functions.InitDBValue(NAMEPLATE_HIDE_FRIENDLY_PLAYER_REALMS_DB_KEY, false)
 	addon.functions.InitDBValue(NAMEPLATE_ELITE_MARKERS_DB_KEY, false)
 	addon.functions.InitDBValue(NAMEPLATE_ELITE_MARKER_ANCHOR_DB_KEY, "LEFT")
 	addon.functions.InitDBValue(NAMEPLATE_ELITE_MARKER_SIZE_DB_KEY, 18)
@@ -1747,6 +1843,7 @@ function addon.functions.initDungeonFrame()
 	nameplateTargetMarkersActive = addon.db and addon.db[NAMEPLATE_TARGET_MARKERS_DB_KEY] == true
 	if nameplateAuraClickthroughActive then syncNameplateAuraClickthrough() end
 	if nameplateMobColorsActive then syncNameplateMobColors() end
+	if addon.functions.InitializeDefaultNameplateFriendlyPlayerOptions then addon.functions.InitializeDefaultNameplateFriendlyPlayerOptions() end
 	if addon.functions.InitializeDefaultNameplateTextStyle then addon.functions.InitializeDefaultNameplateTextStyle() end
 	if nameplateEliteMarkersActive then syncNameplateEliteMarkers() end
 	if nameplateQuestMarkersActive then syncNameplateQuestMarkers() end

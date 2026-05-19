@@ -7,6 +7,7 @@
 
 - Anchors: Added EllesmereUI Unit Frames and Cooldown Manager bars as supported external anchor targets.
 - Cooldown Panels: Added a Spell State texture option to show the configured texture even when no proc is active.
+- Nameplates: Added friendly player nameplate options to show names only, class-color friendly player names, and hide realm names.
 - Tooltips: Added an option to show tooltip ID lines only while holding a selected modifier key.
 
 ---

@@ -55,6 +55,9 @@ local DEFAULT_NAMEPLATE_FEATURE_KEYS = constants.DEFAULT_NAMEPLATE_FEATURE_KEYS
 		textFont = "nameplateTextFont",
 		textOutline = "nameplateTextOutline",
 		textSize = "nameplateTextSize",
+		friendlyPlayerNamesOnly = "nameplateFriendlyPlayerNamesOnly",
+		friendlyPlayerClassColorNames = "nameplateFriendlyPlayerClassColorNames",
+		hideFriendlyPlayerRealms = "nameplateHideFriendlyPlayerRealms",
 		eliteMarkers = "nameplateEliteMarkers",
 		eliteMarkerAnchor = "nameplateEliteMarkerAnchor",
 		eliteMarkerSize = "nameplateEliteMarkerSize",
@@ -1626,6 +1629,48 @@ local function createNameplatesCategory()
 
 	table.sort(nameplateData, function(a, b) return a.text < b.text end)
 	addon.functions.SettingsCreateCheckboxes(category, nameplateData)
+
+	addon.functions.SettingsCreateCheckbox(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.friendlyPlayerNamesOnly,
+		text = L["nameplateFriendlyPlayerNamesOnly"] or "Show only names for friendly player nameplates",
+		desc = L["nameplateFriendlyPlayerNamesOnlyDesc"],
+		func = function(value)
+			if addon.functions.SetDefaultNameplateFriendlyPlayerNamesOnlyEnabled then
+				addon.functions.SetDefaultNameplateFriendlyPlayerNamesOnlyEnabled(value)
+			else
+				addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.friendlyPlayerNamesOnly] = value and true or false
+			end
+		end,
+		parentSection = expandable,
+	})
+
+	addon.functions.SettingsCreateCheckbox(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.friendlyPlayerClassColorNames,
+		text = L["nameplateFriendlyPlayerClassColorNames"] or "Use class colors for friendly player names",
+		desc = L["nameplateFriendlyPlayerClassColorNamesDesc"],
+		func = function(value)
+			if addon.functions.SetDefaultNameplateFriendlyPlayerClassColorNamesEnabled then
+				addon.functions.SetDefaultNameplateFriendlyPlayerClassColorNamesEnabled(value)
+			else
+				addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.friendlyPlayerClassColorNames] = value and true or false
+			end
+		end,
+		parentSection = expandable,
+	})
+
+	addon.functions.SettingsCreateCheckbox(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.hideFriendlyPlayerRealms,
+		text = L["nameplateHideFriendlyPlayerRealms"] or "Hide realms on friendly player nameplates",
+		desc = L["nameplateHideFriendlyPlayerRealmsDesc"],
+		func = function(value)
+			if addon.functions.SetDefaultNameplateHideFriendlyPlayerRealmsEnabled then
+				addon.functions.SetDefaultNameplateHideFriendlyPlayerRealmsEnabled(value)
+			else
+				addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.hideFriendlyPlayerRealms] = value and true or false
+			end
+		end,
+		parentSection = expandable,
+	})
 
 	addon.functions.SettingsCreateHeadline(category, _G.STAT_CATEGORY_ENHANCEMENTS, {
 		parentSection = expandable,
