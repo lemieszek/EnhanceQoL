@@ -69,6 +69,19 @@ local function IsUnitIdentitySecret(unit)
 	return secret == true or isSecret(secret)
 end
 
+local function IsSafeUnitToken(unit)
+	return type(unit) == "string" and unit ~= "" and not IsUnitIdentitySecret(unit)
+end
+
+local function SafeUnitExists(unit)
+	return IsSafeUnitToken(unit) and UnitExists(unit) and true or false
+end
+
+local function SafeUnitPlayerControlled(unit)
+	if not IsSafeUnitToken(unit) or not UnitPlayerControlled then return nil end
+	return UnitPlayerControlled(unit)
+end
+
 local function SafeUnitName(unit)
 	if IsUnitIdentitySecret(unit) or not UnitName then return nil end
 	local name, realm = UnitName(unit)
@@ -263,7 +276,7 @@ fInspect:SetScript("OnEvent", function(_, ev, arg1, arg2)
 		end
 		local unit = (unitGuid == guid) and pendingUnit or nil
 		FinishTooltipInspectRequest()
-		if not unit or not UnitExists(unit) then return end
+		if not SafeUnitExists(unit) then return end
 
 		local ilvl
 		if C_PaperDollInfo and C_PaperDollInfo.GetInspectItemLevel then
@@ -812,10 +825,17 @@ end
 
 ResolveTooltipUnit = function(tooltip)
 	local unit, hadTooltipUnit = GetUnitTokenFromTooltip(tooltip)
-	if unit and UnitExists(unit) then return unit end
+	if SafeUnitExists(unit) then return unit end
 	if hadTooltipUnit then return nil end
-	if UnitExists("mouseover") then return "mouseover" end
+	if SafeUnitExists("mouseover") then return "mouseover" end
 	return nil
+end
+
+local function GetTooltipDataKind(tooltip)
+	if not (tooltip and tooltip.GetPrimaryTooltipInfo) then return nil end
+	local info = tooltip:GetPrimaryTooltipInfo()
+	if not info or isSecret(info.type) then return nil end
+	return addon.Tooltip and addon.Tooltip.variables and addon.Tooltip.variables.kindsByID and addon.Tooltip.variables.kindsByID[tonumber(info.type)]
 end
 
 local function IsModifierTooltipRefreshNeeded()
@@ -834,10 +854,17 @@ local function RefreshVisibleTooltipForModifier()
 	if not GameTooltip or not GameTooltip.IsShown or not GameTooltip:IsShown() then return end
 	if GameTooltip.IsForbidden and GameTooltip:IsForbidden() then return end
 
-	if GameTooltip.RefreshData and safeSecureCall(GameTooltip.RefreshData, GameTooltip) then return end
-
 	local unit, hadTooltipUnit = GetUnitTokenFromTooltip(GameTooltip)
-	if not hadTooltipUnit or not unit or isSecret(unit) or not UnitExists(unit) then return end
+	local kind = GetTooltipDataKind(GameTooltip)
+	if kind == "unit" or hadTooltipUnit then
+		if not SafeUnitExists(unit) then return end
+		if GameTooltip.SetUnit and safeSecureCall(GameTooltip.SetUnit, GameTooltip, unit) then GameTooltip:Show() end
+		return
+	end
+
+	if not kind then return end
+	if GameTooltip.RefreshData and safeSecureCall(GameTooltip.RefreshData, GameTooltip) then return end
+	if not SafeUnitExists(unit) then return end
 	if GameTooltip.SetUnit and safeSecureCall(GameTooltip.SetUnit, GameTooltip, unit) then GameTooltip:Show() end
 end
 
@@ -896,7 +923,7 @@ local function checkAdditionalTooltip(tooltip)
 		if mapId then return "ID " .. tostring(mapId) end
 		return "UNKNOWN"
 	end
-	if addon.db["TooltipShowNPCID"] and ShouldShowTooltipIDDetails() and unit and UnitExists(unit) and not UnitPlayerControlled(unit) then
+	if addon.db["TooltipShowNPCID"] and ShouldShowTooltipIDDetails() and SafeUnitExists(unit) and not SafeUnitPlayerControlled(unit) then
 		local uGuid = UnitGUID(unit)
 		local id = GetNPCIDFromGUID(uGuid)
 		if id then
@@ -1000,7 +1027,7 @@ local function checkAdditionalTooltip(tooltip)
 
 	if unit then AddUnitRealmInfo(tooltip, unit) end
 
-	local showMythic = addon.db["TooltipShowMythicScore"] and unit and UnitExists(unit) and UnitCanAttack("player", unit) == false and addon.Tooltip.variables.maxLevel == UnitLevel(unit)
+	local showMythic = addon.db["TooltipShowMythicScore"] and SafeUnitExists(unit) and UnitCanAttack("player", unit) == false and addon.Tooltip.variables.maxLevel == UnitLevel(unit)
 	if showMythic and addon.db["TooltipMythicScoreRequireModifier"] and not IsConfiguredModifierDown() then showMythic = false end
 	if showMythic then
 		local timeLimit
@@ -1659,7 +1686,7 @@ local function registerTooltipHooks()
 	if Menu and Menu.ModifyMenu then
 		local function AddTargetWowheadEntry(owner, root)
 			if not addon.db or not addon.db["TooltipShowNPCWowheadLink"] then return end
-			if not UnitExists("target") or UnitPlayerControlled("target") then return end
+			if not SafeUnitExists("target") or SafeUnitPlayerControlled("target") then return end
 			local guid = UnitGUID("target")
 			if issecretvalue and issecretvalue(guid) then return end
 			local npcID = GetNPCIDFromGUID()
