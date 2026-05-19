@@ -131,6 +131,16 @@ local function IsConfiguredModifierDown()
 	return (mod == "SHIFT" and IsShiftKeyDown()) or (mod == "ALT" and IsAltKeyDown()) or (mod == "CTRL" and IsControlKeyDown())
 end
 
+local function IsTooltipIDModifierDown()
+	local mod = addon.db and addon.db["TooltipIDModifier"] or "ALT"
+	return (mod == "SHIFT" and IsShiftKeyDown()) or (mod == "ALT" and IsAltKeyDown()) or (mod == "CTRL" and IsControlKeyDown())
+end
+
+local function ShouldShowTooltipIDDetails()
+	if not addon.db or not addon.db["TooltipIDRequireModifier"] then return true end
+	return IsTooltipIDModifierDown() == true
+end
+
 local function IsTooltipHideOverrideActive()
 	if not addon.db or not addon.db["TooltipHideOverrideEnabled"] then return false end
 	local mod = addon.db["TooltipHideOverrideModifier"] or "CTRL"
@@ -147,6 +157,19 @@ local function DoesKeyMatchConfiguredModifier(key)
 	if mod == "ALT" then return key == "LALT" or key == "RALT" end
 	if mod == "CTRL" then return key == "LCTRL" or key == "RCTRL" end
 	return false
+end
+
+local function HasTooltipIDOptions()
+	local db = addon.db
+	if not db then return false end
+	return db["TooltipShowSpellID"]
+		or db["TooltipShowSpellIcon"]
+		or db["TooltipShowItemID"]
+		or db["TooltipShowTempEnchant"]
+		or db["TooltipShowCurrencyID"]
+		or db["TooltipShowNPCID"]
+		or db["TooltipShowQuestID"]
+		or db["TooltipShowQuestIDInQuestLog"]
 end
 
 local function UpdateInspectEventRegistration()
@@ -644,7 +667,7 @@ local function checkCurrency(tooltip, id)
 	if not IsTooltipMutable(tooltip) then return end
 	if not id then return end
 
-	if addon.db["TooltipShowCurrencyID"] then
+	if addon.db["TooltipShowCurrencyID"] and ShouldShowTooltipIDDetails() then
 		tooltip:AddLine(" ")
 		tooltip:AddDoubleLine(L["CurrencyID"], id)
 	end
@@ -737,10 +760,11 @@ local function checkSpell(tooltip, id, name, isSpell)
 	if not db then return end
 
 	local first = true
-	local showSpellID = db["TooltipShowSpellID"] and not isSecret(id)
+	local showIDDetails = ShouldShowTooltipIDDetails()
+	local showSpellID = showIDDetails and db["TooltipShowSpellID"] and not isSecret(id)
 	local canResolveSpellIcon = isSpell and IsValidSpellIdentifier(id)
 	local showSpellIconInline = canResolveSpellIcon and db["TooltipShowSpellIconInline"]
-	local showSpellIcon = canResolveSpellIcon and db["TooltipShowSpellIcon"]
+	local showSpellIcon = showIDDetails and canResolveSpellIcon and db["TooltipShowSpellIcon"]
 	local spellIconID
 	if showSpellIconInline or showSpellIcon then spellIconID = GetTooltipSpellIconID(id) end
 
@@ -800,19 +824,20 @@ local function IsModifierTooltipRefreshNeeded()
 	if db["TooltipHideOverrideEnabled"] then return true end
 	if db["TooltipShowMythicScore"] and db["TooltipMythicScoreRequireModifier"] then return true end
 	if db["TooltipUnitInspectRequireModifier"] and (db["TooltipUnitShowSpec"] or db["TooltipUnitShowItemLevel"]) then return true end
+	if db["TooltipIDRequireModifier"] and HasTooltipIDOptions() then return true end
 	return false
 end
 
-local function RefreshVisibleUnitTooltipForModifier()
+local function RefreshVisibleTooltipForModifier()
 	if not IsModifierTooltipRefreshNeeded() then return end
 	if isTooltipRestricted() then return end
 	if not GameTooltip or not GameTooltip.IsShown or not GameTooltip:IsShown() then return end
 	if GameTooltip.IsForbidden and GameTooltip:IsForbidden() then return end
-	local unit, hadTooltipUnit = GetUnitTokenFromTooltip(GameTooltip)
-	if not hadTooltipUnit or not unit or isSecret(unit) or not UnitExists(unit) then return end
 
 	if GameTooltip.RefreshData and safeSecureCall(GameTooltip.RefreshData, GameTooltip) then return end
 
+	local unit, hadTooltipUnit = GetUnitTokenFromTooltip(GameTooltip)
+	if not hadTooltipUnit or not unit or isSecret(unit) or not UnitExists(unit) then return end
 	if GameTooltip.SetUnit and safeSecureCall(GameTooltip.SetUnit, GameTooltip, unit) then GameTooltip:Show() end
 end
 
@@ -820,7 +845,10 @@ local fModifierTooltipRefresh = CreateFrame("Frame")
 fModifierTooltipRefresh:RegisterEvent("MODIFIER_STATE_CHANGED")
 fModifierTooltipRefresh:SetScript("OnEvent", function(_, _, key)
 	if key ~= "LSHIFT" and key ~= "RSHIFT" and key ~= "LCTRL" and key ~= "RCTRL" and key ~= "LALT" and key ~= "RALT" then return end
-	RefreshVisibleUnitTooltipForModifier()
+	RefreshVisibleTooltipForModifier()
+	if addon.db and addon.db["TooltipIDRequireModifier"] and addon.Tooltip and addon.Tooltip.functions and addon.Tooltip.functions.UpdateQuestIDInQuestLog then
+		addon.Tooltip.functions.UpdateQuestIDInQuestLog()
+	end
 end)
 
 local function HasUnitTooltipOptions()
@@ -868,7 +896,7 @@ local function checkAdditionalTooltip(tooltip)
 		if mapId then return "ID " .. tostring(mapId) end
 		return "UNKNOWN"
 	end
-	if addon.db["TooltipShowNPCID"] and unit and UnitExists(unit) and not UnitPlayerControlled(unit) then
+	if addon.db["TooltipShowNPCID"] and ShouldShowTooltipIDDetails() and unit and UnitExists(unit) and not UnitPlayerControlled(unit) then
 		local uGuid = UnitGUID(unit)
 		local id = GetNPCIDFromGUID(uGuid)
 		if id then
@@ -1265,7 +1293,7 @@ local function checkItem(tooltip, id, name, guid)
 		end
 	end
 
-	local showItemID = addon.db["TooltipShowItemID"]
+	local showItemID = addon.db["TooltipShowItemID"] and ShouldShowTooltipIDDetails()
 
 	if showItemID and id then
 		if first then
@@ -1295,7 +1323,7 @@ local function checkItem(tooltip, id, name, guid)
 		end
 	end
 
-	if addon.db["TooltipShowTempEnchant"] and guid then
+	if addon.db["TooltipShowTempEnchant"] and ShouldShowTooltipIDDetails() and guid then
 		local mhHas, mhExp, _, mhID, ohHas, ohExp, _, ohID, rhHas, rhExp = GetWeaponEnchantInfo()
 		if mhHas and guid == Item:CreateFromEquipmentSlot(16):GetItemGUID() then
 			if mhID then
@@ -1361,7 +1389,8 @@ end
 local function checkAura(tooltip, id, name)
 	if not IsTooltipMutable(tooltip) then return end
 	local first = true
-	if addon.db["TooltipShowSpellID"] then
+	local showIDDetails = ShouldShowTooltipIDDetails()
+	if addon.db["TooltipShowSpellID"] and showIDDetails then
 		if id then
 			if first then
 				tooltip:AddLine(" ")
@@ -1391,7 +1420,7 @@ local function checkAura(tooltip, id, name)
 		end
 	end
 
-	if addon.db["TooltipShowSpellIcon"] and IsValidSpellIdentifier(id) then
+	if addon.db["TooltipShowSpellIcon"] and showIDDetails and IsValidSpellIdentifier(id) then
 		local spellInfo = C_Spell.GetSpellInfo(id)
 		if spellInfo and spellInfo.iconID then
 			if first then
@@ -1556,7 +1585,7 @@ end
 local function UpdateQuestIDInQuestLogLabel(questID)
 	local fs = EnsureQuestIDInQuestLogLabel()
 	if not fs then return end
-	if not addon.db or not addon.db["TooltipShowQuestIDInQuestLog"] or not questID or questID == 0 then
+	if not addon.db or not addon.db["TooltipShowQuestIDInQuestLog"] or not ShouldShowTooltipIDDetails() or not questID or questID == 0 then
 		fs:SetText("")
 		fs:Hide()
 		return
@@ -1651,7 +1680,7 @@ local function registerTooltipHooks()
 	end
 
 	hooksecurefunc("QuestMapLogTitleButton_OnEnter", function(self)
-		if not addon.db or not addon.db["TooltipShowQuestID"] then return end
+		if not addon.db or not addon.db["TooltipShowQuestID"] or not ShouldShowTooltipIDDetails() then return end
 		if self then
 			if self.questID and GameTooltip:IsShown() then
 				GameTooltip:AddDoubleLine(ID, self.questID)

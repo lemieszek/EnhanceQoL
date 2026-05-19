@@ -13,8 +13,43 @@ local cTooltip = addon.SettingsLayout.rootUI
 
 local expandable = addon.functions.SettingsCreateExpandableSection(cTooltip, {
 	name = L["Tooltip"],
+	newTagID = "Tooltip",
 	expanded = false,
 	colorizeTitle = false,
+})
+
+local modifierList = {
+	SHIFT = SHIFT_KEY_TEXT,
+	ALT = ALT_KEY_TEXT,
+	CTRL = CTRL_KEY_TEXT,
+}
+local modifierListOrder = { "SHIFT", "ALT", "CTRL" }
+
+addon.functions.SettingsCreateCheckbox(cTooltip, {
+	var = "TooltipIDRequireModifier",
+	text = L["TooltipIDRequireModifier"],
+	desc = L["TooltipIDRequireModifierDesc"],
+	func = function(value) addon.db["TooltipIDRequireModifier"] = value and true or false end,
+	default = false,
+	parentSection = expandable,
+})
+
+addon.functions.SettingsCreateDropdown(cTooltip, {
+	var = "TooltipIDModifier",
+	text = L["TooltipIDModifier"],
+	list = modifierList,
+	order = modifierListOrder,
+	get = function() return addon.db["TooltipIDModifier"] or "ALT" end,
+	set = function(value) addon.db["TooltipIDModifier"] = value end,
+	default = "ALT",
+	parent = true,
+	element = addon.SettingsLayout.elements["TooltipIDRequireModifier"] and addon.SettingsLayout.elements["TooltipIDRequireModifier"].element,
+	parentCheck = function()
+		return addon.SettingsLayout.elements["TooltipIDRequireModifier"]
+			and addon.SettingsLayout.elements["TooltipIDRequireModifier"].setting
+			and addon.SettingsLayout.elements["TooltipIDRequireModifier"].setting:GetValue() == true
+	end,
+	parentSection = expandable,
 })
 
 addon.functions.SettingsCreateHeadline(cTooltip, {
@@ -638,13 +673,6 @@ addon.functions.SettingsCreateCheckbox(cTooltip, {
 	notify = "TooltipPlayerDetailsLabel",
 	parentSection = expandable,
 })
-
-local modifierList = {
-	SHIFT = SHIFT_KEY_TEXT,
-	ALT = ALT_KEY_TEXT,
-	CTRL = CTRL_KEY_TEXT,
-}
-local modifierListOrder = { "SHIFT", "ALT", "CTRL" }
 
 addon.functions.SettingsCreateDropdown(cTooltip, {
 	var = "TooltipMythicScoreModifier",

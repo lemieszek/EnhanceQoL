@@ -21,4 +21,9 @@ addon.variables.NewVersionTableEQOL = {
 	EQOL_nameplateTextFont = true,
 	EQOL_nameplateTextOutline = true,
 	EQOL_nameplateTextSize = true,
+
+	-- 10.18.0-beta2 tooltip ID modifier controls
+	EQOL_Tooltip = true,
+	EQOL_TooltipIDModifier = true,
+	EQOL_TooltipIDRequireModifier = true,
 }
