@@ -1,11 +1,22 @@
 # Changelog
 
+<!--@eqol-beta@-->
+## [10.18.0-beta2] - 2026-05-19
+
+### ✨ Added
+
+- Anchors: Added EllesmereUI Unit Frames and Cooldown Manager bars as supported external anchor targets.
+
+---
+
 ## [10.18.0-beta1] - 2026-05-18
 
 ### ✨ Added
 
 - Resource Bars: Added external frame anchors to the Relative frame dropdown, so Resource Bars can attach to supported external UI frames.
 - Resource Bars, Castbar, XP Bar, and GCD Bar: Added a positive or negative offset for Match Relative Frame width, allowing matched bars to compensate for borders or extra spacing.
+
+<!--@end-eqol-beta@-->
 
 ---
 
