@@ -12320,6 +12320,18 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			maxChars = 128,
 		},
 		{
+			name = L["CooldownPanelStateTextureShowWithoutProc"] or "Show without proc",
+			kind = SettingType.Checkbox,
+			parentId = "cooldownPanelStandaloneStateTexture",
+			tooltip = L["CooldownPanelStateTextureShowWithoutProcTooltip"] or "Shows the configured Spell State texture even when the spell has no active proc overlay. Leave this disabled to keep the texture proc-only.",
+			isShown = function() return getEffectiveType() == "SPELL" end,
+			get = function()
+				local _, currentEntry = getEntry()
+				return currentEntry and currentEntry.stateTextureShowWithoutProc == true or false
+			end,
+			set = function(_, value) setStateTextureField("stateTextureShowWithoutProc", value == true) end,
+		},
+		{
 			name = L["CooldownPanelStateTextureDouble"] or "Double texture",
 			kind = SettingType.Checkbox,
 			parentId = "cooldownPanelStandaloneStateTexture",
@@ -17484,7 +17496,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 					if layoutEditActive then
 						data.stateTextureShown = true
 					elseif resolvedType == "SPELL" then
-						data.stateTextureShown = procActive == true
+						data.stateTextureShown = procActive == true or entry.stateTextureShowWithoutProc == true
 					elseif resolvedType == "CDM_AURA" then
 						data.stateTextureShown = cdmAuraData and cdmAuraData.show == true or false
 					end
@@ -21624,6 +21636,10 @@ function cdp.ENTRY.TryRefreshVisibleSpellEntry(panelId, entryId, mode)
 	data.resolvedSpellId = resolvedSpellId
 	data.variantGroupKind = variantGroup and variantGroup.kind or nil
 	data.variantGroupKey = variantGroup and variantGroup.key or nil
+	if data.stateTextureType then
+		local overlayGlowSpells = CooldownPanels.runtime and CooldownPanels.runtime.overlayGlowSpells
+		data.stateTextureShown = entry.stateTextureShowWithoutProc == true or isSpellFlagged(overlayGlowSpells, baseSpellId, effectiveSpellId) == true
+	end
 	local customCooldownState = CooldownPanels:GetActiveEntryCustomCooldownDuration(panelId, entryId, entry, "SPELL")
 	CooldownPanels:ApplyCustomCooldownDurationState(data, customCooldownState)
 	CooldownPanels:ApplyActivationOverlayVisualState(data, entry)

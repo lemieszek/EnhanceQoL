@@ -6,6 +6,7 @@
 ### ✨ Added
 
 - Anchors: Added EllesmereUI Unit Frames and Cooldown Manager bars as supported external anchor targets.
+- Cooldown Panels: Added a Spell State texture option to show the configured texture even when no proc is active.
 
 ---
 
