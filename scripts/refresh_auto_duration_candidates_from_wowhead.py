@@ -66,7 +66,7 @@ MANUAL_IGNORED_ITEMS = {
 LISTVIEW_ITEMS_RE = re.compile(r"listviewitems\s*=\s*(?P<items>\[.*?\]);\s*new Listview", re.DOTALL)
 LISTVIEW_ITEM_ID_RE = re.compile(r'"id":(\d+)')
 USE_RE = re.compile(
-    r"\bUse:\s*(?P<text>.*?)(?=(?:\s+(?:Equip:|Use:|Requires\b|Sell Price:|Max Stack:|Classes:|Races:))|$)",
+    r"\bUse:\s*(?P<text>.*?)(?=(?:\s+(?:Equip:|Use:|Requires\b|Sell Price:|Max Stack:|Classes:|Races:|Dropped by:|Drop Chance:))|$)",
     re.IGNORECASE,
 )
 DURATION_RE = re.compile(r"\b(?:for|lasts|lasting)\s+(?P<duration>\d+(?:\.\d+)?)\s*sec(?:onds?)?\b", re.IGNORECASE)
@@ -92,6 +92,13 @@ AREA_POOL_DURATION_RE = re.compile(
     r"\bpools?\s+at\s+your\s+feet\s+for\s+(?P<duration>\d+(?:\.\d+)?)\s*sec(?:onds?)?\b",
     re.IGNORECASE,
 )
+STAT_DECAY_OVER_DURATION_RE = re.compile(
+    r"\b(?:grant(?:s|ing)?|gain(?:s|ing)?|increas(?:e|es|ing)|provid(?:e|es|ing))\b"
+    r"(?P<effect>[^.]*?\b(?:stat|strength|agility|intellect|haste|mastery|critical strike|versatility|speed|leech)\b[^.]*?)"
+    r"\b(?:decays?|decaying|diminish(?:es|ing)?)\s+over\s+(?P<duration>\d+(?:\.\d+)?)\s*sec(?:onds?)?\b",
+    re.IGNORECASE,
+)
+UNSTABLE_DECAY_DURATION_RE = re.compile(r"\bor\s+(?:when|until)\b|\buntil cancelled\b|\bwhile\b", re.IGNORECASE)
 SINGLE_FRIENDLY_TARGET_RE = re.compile(
     r"\b(?:a|single)\s+friendly target\b"
     r"|\b(?:an|a|single)\s+ally\b"
@@ -293,6 +300,13 @@ def classify_tooltip(tooltip: TooltipInfo) -> Classification:
     area_pool_duration = AREA_POOL_DURATION_RE.search(use_text)
     if area_pool_duration:
         return Classification("accepted", float(area_pool_duration.group("duration")), "area_pool_duration")
+
+    stat_decay_duration = STAT_DECAY_OVER_DURATION_RE.search(use_text)
+    if stat_decay_duration:
+        effect_text = stat_decay_duration.group("effect") or ""
+        trailing_text = use_text[stat_decay_duration.end():]
+        if not (UNSTABLE_DECAY_DURATION_RE.search(effect_text) or UNSTABLE_DECAY_DURATION_RE.search(trailing_text)):
+            return Classification("accepted", float(stat_decay_duration.group("duration")), "stat_decay_over_duration")
 
     duration_matches = list(DURATION_RE.finditer(use_text))
     if not duration_matches:
@@ -773,6 +787,21 @@ def self_test() -> int:
     assert gives_invisibility_class.status == "accepted"
     assert gives_invisibility_class.duration == 10
 
+    dropped_by_metadata = parse_tooltip_payload(
+        92784,
+        {
+            "name": "SI:7 Operative's Manual",
+            "tooltip": (
+                "Use: Increases Primary Stat by 86 for 30 sec. Only usable in Pandaria. "
+                '(1 Min Cooldown) "A stolen manual." Dropped by: Ubunti the Shade Drop Chance: 23.80%'
+            ),
+        },
+    )
+    dropped_by_metadata_class = classify_tooltip(dropped_by_metadata)
+    assert dropped_by_metadata.use_text == 'Increases Primary Stat by 86 for 30 sec. Only usable in Pandaria. (1 Min Cooldown) "A stolen manual."'
+    assert dropped_by_metadata_class.status == "accepted"
+    assert dropped_by_metadata_class.duration == 30
+
     limited = parse_tooltip_payload(
         3,
         {
@@ -950,6 +979,32 @@ def self_test() -> int:
     area_pool_class = classify_tooltip(area_pool)
     assert area_pool_class.status == "accepted"
     assert area_pool_class.duration == 10
+
+    stat_decay_over_duration = parse_tooltip_payload(
+        249346,
+        {
+            "name": "Vaelgor's Final Stare",
+            "tooltip": (
+                "Use: Seize the eye's draconic power, granting you 1354 Mastery diminishing "
+                "over 15 sec and allowing you to see hidden enemies. (1 Min, 30 Sec Cooldown)"
+            ),
+        },
+    )
+    stat_decay_over_duration_class = classify_tooltip(stat_decay_over_duration)
+    assert stat_decay_over_duration_class.status == "accepted"
+    assert stat_decay_over_duration_class.duration == 15
+    assert stat_decay_over_duration_class.reason == "stat_decay_over_duration"
+
+    unstable_stat_decay = parse_tooltip_payload(
+        159630,
+        {
+            "name": "Balefire Branch",
+            "tooltip": "Use: Kindle your soul, gaining 100 Intellect, which decays over 20 sec or when taking damage.",
+        },
+    )
+    unstable_stat_decay_class = classify_tooltip(unstable_stat_decay)
+    assert unstable_stat_decay_class.status == "rejected"
+    assert unstable_stat_decay_class.reason == "over_time_not_duration_window"
 
     primary_with_followup_cc = parse_tooltip_payload(
         251787,
