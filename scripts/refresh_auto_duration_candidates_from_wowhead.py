@@ -30,6 +30,8 @@ OVER_DURATION_RE = re.compile(r"\bover\s+\d+(?:\.\d+)?\s*sec(?:onds?)?\b", re.IG
 NEXT_LIMIT_RE = re.compile(r"\bnext\b", re.IGNORECASE)
 
 SAFE_DURATION_VERBS = (
+    "give",
+    "gives",
     "gain",
     "gains",
     "grant",
@@ -344,6 +346,43 @@ def apply_review_memory(results: list[ProbeResult], memory: dict[int, dict]) -> 
         result.review_note = str(note) if note else None
 
 
+def parse_runtime_lua_entries(path: pathlib.Path | None) -> dict[int, tuple[float, str | None]]:
+    if path is None or not path.exists():
+        return {}
+
+    entries: dict[int, tuple[float, str | None]] = {}
+    pattern = re.compile(
+        r"\[(?P<item_id>\d+)\]\s*=\s*\{\s*duration\s*=\s*(?P<duration>\d+(?:\.\d+)?)\s*,\s*name\s*=\s*(?P<name>\"(?:\\.|[^\"])*\")",
+    )
+    for match in pattern.finditer(path.read_text(encoding="utf-8")):
+        item_id = int(match.group("item_id"))
+        duration = float(match.group("duration"))
+        try:
+            name = json.loads(match.group("name"))
+        except json.JSONDecodeError:
+            name = None
+        entries[item_id] = (duration, name)
+    return entries
+
+
+def preserve_revalidated_runtime_entries(results: list[ProbeResult], previous_entries: dict[int, tuple[float, str | None]]) -> None:
+    for result in results:
+        if not result.ok or not result.tooltip or not result.classification:
+            continue
+        if result.classification.status != "needs_review":
+            continue
+        previous = previous_entries.get(result.item_id)
+        if previous is None:
+            continue
+        previous_duration, _ = previous
+        current_duration = result.classification.duration
+        if current_duration is None or current_duration != previous_duration:
+            continue
+        result.classification = Classification("accepted", current_duration, "previous_runtime_revalidated")
+        result.review_source = "previous_runtime"
+        result.review_note = "Current tooltip still has the same single duration; preserving existing runtime entry."
+
+
 def lua_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
@@ -524,6 +563,17 @@ def self_test() -> int:
     assert invisible_class.status == "accepted"
     assert invisible_class.duration == 18
 
+    gives_invisibility = parse_tooltip_payload(
+        22,
+        {
+            "name": "Gnomish Cloaking Device",
+            "tooltip": "Use: Gives invisibility for 10 sec. (1 Hour Cooldown)",
+        },
+    )
+    gives_invisibility_class = classify_tooltip(gives_invisibility)
+    assert gives_invisibility_class.status == "accepted"
+    assert gives_invisibility_class.duration == 10
+
     limited = parse_tooltip_payload(
         3,
         {
@@ -579,6 +629,23 @@ def self_test() -> int:
     assert memory_result.classification.status == "accepted"
     assert memory_result.classification.duration == 10
     assert memory_result.review_source == "wowhead_reviewed"
+
+    previous_runtime = {5: (10.0, "Reviewed Legacy Item")}
+    reviewed_result = ProbeResult(
+        item_id=5,
+        ok=True,
+        tooltip=parse_tooltip_payload(
+            5,
+            {
+                "name": "Reviewed Legacy Item",
+                "tooltip": "Use: Unusual wording for 10 sec.",
+            },
+        ),
+        classification=Classification("needs_review", 10.0, "duration_found_but_unrecognized_effect"),
+    )
+    preserve_revalidated_runtime_entries([reviewed_result], previous_runtime)
+    assert reviewed_result.classification.status == "accepted"
+    assert reviewed_result.classification.reason == "previous_runtime_revalidated"
     return 0
 
 
@@ -633,8 +700,13 @@ def main(argv: list[str]) -> int:
         print("No item ids provided. Use --discover, --ids, or --ids-file.", file=sys.stderr)
         return 2
 
+    previous_runtime_entries = parse_runtime_lua_entries(args.output_runtime_lua)
+    if previous_runtime_entries:
+        item_ids = append_missing_ids(item_ids, sorted(previous_runtime_entries))
+
     results = probe_items(item_ids, locale=args.locale, data_env=args.data_env, timeout=args.timeout, workers=args.workers, retries=args.retries)
     apply_review_memory(results, review_memory)
+    preserve_revalidated_runtime_entries(results, previous_runtime_entries)
     write_outputs(results, args)
 
     counts = {"accepted": 0, "needs_review": 0, "rejected": 0, "errors": 0}
