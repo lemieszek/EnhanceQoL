@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.18.5] - 2026-05-20
+
+### 🐛 Fixed
+
+- Class Buff Reminder: Fixed Restoration Druid Symbiotic Relationship reminders not showing in raid groups.
+
+---
+
 ## [10.18.4] - 2026-05-20
 
 ### 🐛 Fixed

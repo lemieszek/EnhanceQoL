@@ -2880,7 +2880,7 @@ local function druidRestorationGetSelfStatus(provider, reminder)
 	end
 
 	local trackSymbiotic = hasKnownSpellInList(provider.symbioticKnownSpellIds or provider.symbioticSpellIds)
-	if trackSymbiotic and reminder:GetGroupContext() == GROUP_CONTEXT_PARTY then
+	if trackSymbiotic and reminder:GetGroupContext() ~= GROUP_CONTEXT_SOLO then
 		reminder.runtimeEligibleUnits = reminder.runtimeEligibleUnits or {}
 		local eligibleUnits = reminder:CollectOtherEligibleUnits(reminder.runtimeEligibleUnits, true)
 		if #eligibleUnits > 0 then
