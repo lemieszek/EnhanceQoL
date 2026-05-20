@@ -29,16 +29,53 @@ DURATION_RE = re.compile(r"\b(?:for|lasts|lasting)\s+(?P<duration>\d+(?:\.\d+)?)
 OVER_DURATION_RE = re.compile(r"\bover\s+\d+(?:\.\d+)?\s*sec(?:onds?)?\b", re.IGNORECASE)
 NEXT_LIMIT_RE = re.compile(r"\bnext\b", re.IGNORECASE)
 SECONDARY_PROC_DURATION_RE = re.compile(r"\b(?:giving|granting|causing|allowing)\b.*\bchance\b", re.IGNORECASE)
+TOTAL_BUILD_AND_PERSIST_RE = re.compile(
+    r"\bincreasing\b.*\bevery\s+\d+(?:\.\d+)?\s*sec(?:onds?)?\s+for\s+"
+    r"(?P<build>\d+(?:\.\d+)?)\s*sec(?:onds?)?\s+and\s+then\s+persisting\s+"
+    r"for\s+an\s+additional\s+(?P<persist>\d+(?:\.\d+)?)\s*sec(?:onds?)?",
+    re.IGNORECASE,
+)
+FIXED_GAIN_WHILE_LOSING_RE = re.compile(
+    r"\bgain\b.+\bwhile\s+losing\b.+\bfor\s+(?P<duration>\d+(?:\.\d+)?)\s*sec(?:onds?)?\b",
+    re.IGNORECASE,
+)
+MANA_RESTORE_FOCUS_RE = re.compile(
+    r"\brestore\b.+\bmana\s+over\s+(?P<duration>\d+(?:\.\d+)?)\s*sec(?:onds?)?,\s+"
+    r"but\s+you\s+are\s+defenseless\s+until\s+your\s+focus\s+is\s+broken\b",
+    re.IGNORECASE,
+)
+AREA_POOL_DURATION_RE = re.compile(
+    r"\bpools?\s+at\s+your\s+feet\s+for\s+(?P<duration>\d+(?:\.\d+)?)\s*sec(?:onds?)?\b",
+    re.IGNORECASE,
+)
+REVIEW_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
+    (
+        "absorb_limited_manual_review",
+        re.compile(
+            r"\babsorbing\s+[\d\[\]\s\*\+\-/().,%A-Za-z]+\s+damage\s+for\s+\d+(?:\.\d+)?\s*sec(?:onds?)?\b"
+            r"|\babsorb(?:ing|s)?\b.*\bfor\s+\d+(?:\.\d+)?\s*sec(?:onds?)?\b"
+            r"|\bgranting\s+them\b.*\babsorb\b.*\bfor\s+\d+(?:\.\d+)?\s*sec(?:onds?)?\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "friendly_target_effect_manual_review",
+        re.compile(r"\bfriendly target\b|\bupon an ally\b|\bgranting them\b", re.IGNORECASE),
+    ),
+]
 
 SAFE_DURATION_VERBS = (
     "give",
     "gives",
     "gain",
     "gains",
+    "gaining",
     "grant",
     "grants",
+    "granting",
     "increase",
     "increases",
+    "increasing",
     "provides",
     "provide",
     "sheathe",
@@ -53,6 +90,8 @@ SAFE_DURATION_VERBS = (
     "empowers",
     "cloak",
     "cloaks",
+    "engulf",
+    "engulfs",
 )
 
 REJECT_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
@@ -134,10 +173,10 @@ def has_safe_duration_verb(text: str) -> bool:
 
 
 def classify_multiple_duration_tooltip(use_text: str, duration_matches: list[re.Match[str]]) -> Classification | None:
-    if len(duration_matches) != 2:
+    if len(duration_matches) < 2:
         return None
 
-    primary_match, secondary_match = duration_matches
+    primary_match, secondary_match = duration_matches[0], duration_matches[1]
     before_primary = use_text[:primary_match.start()]
     between_durations = use_text[primary_match.end():secondary_match.start()]
     if has_safe_duration_verb(before_primary) and SECONDARY_PROC_DURATION_RE.search(between_durations):
@@ -147,6 +186,34 @@ def classify_multiple_duration_tooltip(use_text: str, duration_matches: list[re.
             "primary_duration_with_secondary_proc_duration",
         )
 
+    secondary_effect_cues = (
+        r"\bonce this effect ends\b",
+        r"\bafter the effect ends\b",
+        r"\bif the paradox arrives\b",
+        r"\bthe first ally\b",
+        r"\ball\b.+\balso gain\b",
+        r"\byou have a low chance\b",
+        r"\bas the void dissipates\b",
+        r"\bsuffer\b.+\bevery\s+\d+(?:\.\d+)?\s*sec(?:onds?)?\b",
+    )
+    if has_safe_duration_verb(before_primary) and any(
+        re.search(pattern, between_durations, re.IGNORECASE) for pattern in secondary_effect_cues
+    ):
+        return Classification(
+            "accepted",
+            float(primary_match.group("duration")),
+            "primary_duration_with_secondary_effect_duration",
+        )
+
+    if re.search(r"^\s*channel\s+for\s+\d+(?:\.\d+)?\s*sec(?:onds?)?\s+to\b", use_text, re.IGNORECASE):
+        second_before = use_text[:secondary_match.start()]
+        if has_safe_duration_verb(second_before):
+            return Classification(
+                "accepted",
+                float(secondary_match.group("duration")),
+                "channel_into_primary_duration",
+            )
+
     return None
 
 
@@ -154,6 +221,30 @@ def classify_tooltip(tooltip: TooltipInfo) -> Classification:
     use_text = tooltip.use_text
     if not use_text:
         return Classification("rejected", None, "no_use_effect")
+
+    review_match = list(DURATION_RE.finditer(use_text))
+    if review_match:
+        review_duration = float(review_match[0].group("duration"))
+        for reason, pattern in REVIEW_PATTERNS:
+            if pattern.search(use_text):
+                return Classification("needs_review", review_duration, reason)
+
+    build_and_persist = TOTAL_BUILD_AND_PERSIST_RE.search(use_text)
+    if build_and_persist:
+        duration = float(build_and_persist.group("build")) + float(build_and_persist.group("persist"))
+        return Classification("accepted", duration, "build_and_persist_total_duration")
+
+    fixed_gain_while_losing = FIXED_GAIN_WHILE_LOSING_RE.search(use_text)
+    if fixed_gain_while_losing:
+        return Classification("accepted", float(fixed_gain_while_losing.group("duration")), "fixed_gain_while_losing_duration")
+
+    mana_restore_focus = MANA_RESTORE_FOCUS_RE.search(use_text)
+    if mana_restore_focus:
+        return Classification("accepted", float(mana_restore_focus.group("duration")), "focused_mana_restore_duration")
+
+    area_pool_duration = AREA_POOL_DURATION_RE.search(use_text)
+    if area_pool_duration:
+        return Classification("accepted", float(area_pool_duration.group("duration")), "area_pool_duration")
 
     duration_matches = list(DURATION_RE.finditer(use_text))
     if not duration_matches:
@@ -636,6 +727,152 @@ def self_test() -> int:
     assert secondary_proc_duration_class.status == "accepted"
     assert secondary_proc_duration_class.duration == 30
     assert secondary_proc_duration_class.reason == "primary_duration_with_secondary_proc_duration"
+
+    build_and_persist = parse_tooltip_payload(
+        161462,
+        {
+            "name": "Doom's Wake",
+            "tooltip": (
+                "Use: Release the Doom's Wake increasing your Agility by 16 every 2 sec "
+                "for 10 sec and then persisting for an additional 6 sec. (2 Min Cooldown)"
+            ),
+        },
+    )
+    build_and_persist_class = classify_tooltip(build_and_persist)
+    assert build_and_persist_class.status == "accepted"
+    assert build_and_persist_class.duration == 16
+    assert build_and_persist_class.reason == "build_and_persist_total_duration"
+
+    primary_with_penalty = parse_tooltip_payload(
+        207167,
+        {
+            "name": "Ashes of the Embersoul",
+            "tooltip": (
+                "Use: Draw power from the remnants of the Embersoul, gaining 130 Primary Stat "
+                "for 20 sec, decaying every 2 sec. Once this effect ends, become Burned Out, "
+                "losing 24 Haste for 60 sec before recovering."
+            ),
+        },
+    )
+    primary_with_penalty_class = classify_tooltip(primary_with_penalty)
+    assert primary_with_penalty_class.status == "accepted"
+    assert primary_with_penalty_class.duration == 20
+    assert primary_with_penalty_class.reason == "primary_duration_with_secondary_effect_duration"
+
+    primary_with_ally_effect = parse_tooltip_payload(
+        235373,
+        {
+            "name": "Abyssal Volt",
+            "tooltip": (
+                "Use: Supercharge yourself and increase your Haste by 108 for 15 sec. "
+                "The first ally you heal directly is also charged, increasing their Haste by 32 for 10 sec."
+            ),
+        },
+    )
+    primary_with_ally_effect_class = classify_tooltip(primary_with_ally_effect)
+    assert primary_with_ally_effect_class.status == "accepted"
+    assert primary_with_ally_effect_class.duration == 15
+
+    friendly_target_effect = parse_tooltip_payload(
+        155567,
+        {
+            "name": "Mr. Munchykins",
+            "tooltip": "Use: Mr. Munchykins serves a friendly target tea, granting 131 Haste for 15 sec.",
+        },
+    )
+    friendly_target_effect_class = classify_tooltip(friendly_target_effect)
+    assert friendly_target_effect_class.status == "needs_review"
+    assert friendly_target_effect_class.reason == "friendly_target_effect_manual_review"
+
+    channel_into_primary = parse_tooltip_payload(
+        246344,
+        {
+            "name": "Cursed Stone Idol",
+            "tooltip": (
+                "Use: Channel for 1 sec to invoke the wrath of the idol, increasing your Critical Strike "
+                "by 90 for 15 sec. The force slams the earth, dealing 845 Nature damage."
+            ),
+        },
+    )
+    channel_into_primary_class = classify_tooltip(channel_into_primary)
+    assert channel_into_primary_class.status == "accepted"
+    assert channel_into_primary_class.duration == 15
+    assert channel_into_primary_class.reason == "channel_into_primary_duration"
+
+    fixed_gain_while_losing = parse_tooltip_payload(
+        241288,
+        {
+            "name": "Potion of Recklessness",
+            "tooltip": "Use: Gain 1725 of your highest secondary stat while losing 232 of your lowest secondary stat for 30 sec.",
+        },
+    )
+    fixed_gain_while_losing_class = classify_tooltip(fixed_gain_while_losing)
+    assert fixed_gain_while_losing_class.status == "accepted"
+    assert fixed_gain_while_losing_class.duration == 30
+
+    focused_mana_restore = parse_tooltip_payload(
+        241294,
+        {
+            "name": "Potion of Devoured Dreams",
+            "tooltip": "Use: Elevate your focus to restore ( 3930 * 10) mana over 10 sec, but you are defenseless until your focus is broken.",
+        },
+    )
+    focused_mana_restore_class = classify_tooltip(focused_mana_restore)
+    assert focused_mana_restore_class.status == "accepted"
+    assert focused_mana_restore_class.duration == 10
+
+    area_pool = parse_tooltip_payload(
+        151312,
+        {
+            "name": "Ampoule of Pure Void",
+            "tooltip": (
+                "Use: Void energy pools at your feet for 10 sec, dealing ( 131 * 10) Shadow damage "
+                "to targets standing within the area."
+            ),
+        },
+    )
+    area_pool_class = classify_tooltip(area_pool)
+    assert area_pool_class.status == "accepted"
+    assert area_pool_class.duration == 10
+
+    primary_with_followup_cc = parse_tooltip_payload(
+        251787,
+        {
+            "name": "Sealed Chaos Urn",
+            "tooltip": (
+                "Use: Unseal the urn causing the void within to pour out and engulf you for 20 sec, "
+                "increasing all secondary stats by 190. As the void dissipates, you become horrified for 5 sec."
+            ),
+        },
+    )
+    primary_with_followup_cc_class = classify_tooltip(primary_with_followup_cc)
+    assert primary_with_followup_cc_class.status == "accepted"
+    assert primary_with_followup_cc_class.duration == 20
+
+    absorb_limited = parse_tooltip_payload(
+        207174,
+        {
+            "name": "Fyrakk's Tainted Rageheart",
+            "tooltip": (
+                "Use: Give in to the Rageheart, absorbing 33138 damage for 20 sec. "
+                "Suffer 2982 Shadowflame damage and lash out at a nearby enemy every 2 sec for 10 sec."
+            ),
+        },
+    )
+    absorb_limited_class = classify_tooltip(absorb_limited)
+    assert absorb_limited_class.status == "needs_review"
+    assert absorb_limited_class.reason == "absorb_limited_manual_review"
+
+    ally_absorb = parse_tooltip_payload(
+        251789,
+        {
+            "name": "Consecrated Chalice",
+            "tooltip": "Use: Empty the chalice upon an ally granting them ( 1 * 11270 ) absorb for each drop spilled for 20 sec.",
+        },
+    )
+    ally_absorb_class = classify_tooltip(ally_absorb)
+    assert ally_absorb_class.status == "needs_review"
+    assert ally_absorb_class.reason == "absorb_limited_manual_review"
 
     page = """
         <script>
