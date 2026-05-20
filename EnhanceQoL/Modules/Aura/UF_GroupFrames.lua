@@ -6874,7 +6874,7 @@ function GF:LayoutButton(self)
 	end
 	GF.ApplyGroupPortraitSeparator(cfg, kind, st, portraitEnabled and not portraitDetached)
 
-	self.powerBarUsedHeight = powerH > 0 and powerH or 0
+	self.powerBarUsedHeight = (not powerDetached and powerH > 0 and not st._powerHidden) and healthBottomOffset or 0
 	if st.dispelTint then
 		GF.SyncDispelTintLayer(st)
 		if st.dispelTint.SetOrientation and DispelOverlayOrientation then st.dispelTint:SetOrientation(DispelOverlayOrientation.VerticalTopToBottom, 0, 0) end
@@ -9090,7 +9090,7 @@ function GF:UpdateBlizzardAuraContainer(self)
 		GF:ClearBlizzardAuraContainer(self)
 		return
 	end
-	local privateAuraParent = GF.GetLayoutAnchorFrame(st, st.health or self) or self
+	local privateAuraParent = st.health or GF.GetLayoutAnchorFrame(st, self) or self
 	local privateAuraLevelParent = st.statusIconLayer or st.healthTextLayer or privateAuraParent or st.health or st.barGroup or self
 	if not st.blizzardAuras then
 		st.blizzardAuras = CreateFrame("Frame", nil, privateAuraParent)
@@ -9111,7 +9111,7 @@ function GF:UpdateBlizzardAuraContainer(self)
 		bigDefensiveSize = (showBigDefensive and (externals.size or defExternals.size or iconSize)) or iconSize,
 		organizationType = GF.GetBlizzardAuraOrganization(cfg, def),
 		dispelIndicatorOption = GF.GetBlizzardDispelIndicatorOption(cfg, def),
-		powerBarUsedHeight = cfg and cfg.powerHeight or 0,
+		powerBarUsedHeight = 0,
 		groupType = (kind == "party") and 4 or 5,
 		displayLargerRoleSpecificDebuffs = GF.IsBlizzardLargerRoleDebuffEnabled(cfg, def),
 		showCountdownFrame = true,

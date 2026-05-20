@@ -50,6 +50,7 @@ local NAMEPLATE_QUEST_MARKER_SIZE_DB_KEY = "nameplateQuestMarkerSize"
 local NAMEPLATE_TARGET_MARKERS_DB_KEY = "nameplateTargetMarkers"
 local NAMEPLATE_TARGET_MARKER_ATLAS_DB_KEY = "nameplateTargetMarkerAtlas"
 local NAMEPLATE_TARGET_MARKER_SIZE_DB_KEY = "nameplateTargetMarkerSize"
+local NAMEPLATE_FOCUS_HEALTHBAR_TEXTURE_DB_KEY = "nameplateFocusHealthbarTexture"
 local NAMEPLATE_MOB_COLOR_BOSS_DB_KEY = "nameplateMobColorBoss"
 local NAMEPLATE_MOB_COLOR_MINIBOSS_DB_KEY = "nameplateMobColorMiniboss"
 local NAMEPLATE_MOB_COLOR_CASTER_DB_KEY = "nameplateMobColorCaster"
@@ -69,10 +70,13 @@ local nameplateEliteMarkersActive = false
 local nameplateQuestMarkersActive = false
 local nameplateTargetMarkersActive = false
 local nameplateTargetMarkerLastUnit
+local nameplateFocusHealthbarTextureActive = false
+local nameplateFocusHealthbarTextureLastUnit
 local nameplateQuestMarkersByUnitFrame = setmetatable({}, { __mode = "k" })
 local nameplateEliteMarkersByUnitFrame = setmetatable({}, { __mode = "k" })
 local nameplateTargetLeftMarkersByUnitFrame = setmetatable({}, { __mode = "k" })
 local nameplateTargetRightMarkersByUnitFrame = setmetatable({}, { __mode = "k" })
+local nameplateFocusHealthbarDefaults = setmetatable({}, { __mode = "k" })
 local nameplateQuestMarkerCache = {}
 local nameplateMobColorState = {
 	isActive = false,
@@ -131,6 +135,7 @@ addon.constants.DEFAULT_NAMEPLATE_FEATURE_KEYS = {
 	targetMarkers = NAMEPLATE_TARGET_MARKERS_DB_KEY,
 	targetMarkerAtlas = NAMEPLATE_TARGET_MARKER_ATLAS_DB_KEY,
 	targetMarkerSize = NAMEPLATE_TARGET_MARKER_SIZE_DB_KEY,
+	focusHealthbarTexture = NAMEPLATE_FOCUS_HEALTHBAR_TEXTURE_DB_KEY,
 	mobColorBoss = NAMEPLATE_MOB_COLOR_BOSS_DB_KEY,
 	mobColorMiniboss = NAMEPLATE_MOB_COLOR_MINIBOSS_DB_KEY,
 	mobColorCaster = NAMEPLATE_MOB_COLOR_CASTER_DB_KEY,
@@ -1216,6 +1221,77 @@ local function hideAllNameplateTargetMarkers()
 	nameplateTargetMarkerLastUnit = nil
 end
 
+addon.variables.nameplateFocusHealthbarDefaultTexture = "Interface\\TargetingFrame\\UI-StatusBar"
+
+function addon.functions.GetNameplateFocusHealthbarTexture()
+	local fallback = addon.variables.nameplateFocusHealthbarDefaultTexture
+	local configured = addon.db and addon.db[NAMEPLATE_FOCUS_HEALTHBAR_TEXTURE_DB_KEY] or fallback
+	if addon.functions.ResolveLSMMedia then return addon.functions.ResolveLSMMedia("statusbar", configured, fallback, true) or fallback end
+	return configured or fallback
+end
+
+function addon.functions.RestoreNameplateHealthbarTexture(healthBar)
+	if not (healthBar and healthBar.SetStatusBarTexture) then return end
+	local defaults = nameplateFocusHealthbarDefaults[healthBar]
+	if not defaults then return end
+	if defaults.atlas then
+		healthBar:SetStatusBarTexture(defaults.atlas)
+	elseif defaults.texture then
+		healthBar:SetStatusBarTexture(defaults.texture)
+	end
+	local texture = healthBar.GetStatusBarTexture and healthBar:GetStatusBarTexture()
+	if texture and defaults.texCoord then texture:SetTexCoord(unpack(defaults.texCoord)) end
+	nameplateFocusHealthbarDefaults[healthBar] = nil
+end
+
+function addon.functions.ApplyNameplateFocusHealthbarTexture(unitFrame, unit)
+	local healthBar = getNameplateHealthBar(unitFrame)
+	if not healthBar then return end
+
+	local isFocus = nameplateFocusHealthbarTextureActive == true and isNameplateUnitToken(unit) and UnitIsUnit and UnitIsUnit(unit, "focus") == true
+	if not isFocus then
+		addon.functions.RestoreNameplateHealthbarTexture(healthBar)
+		return
+	end
+
+	if not nameplateFocusHealthbarDefaults[healthBar] then
+		local texture = healthBar.GetStatusBarTexture and healthBar:GetStatusBarTexture()
+		local texCoord
+		if texture and texture.GetTexCoord then texCoord = { texture:GetTexCoord() } end
+		nameplateFocusHealthbarDefaults[healthBar] = {
+			texture = texture and texture.GetTexture and texture:GetTexture() or nil,
+			atlas = texture and texture.GetAtlas and texture:GetAtlas() or nil,
+			texCoord = texCoord,
+		}
+	end
+
+	healthBar:SetStatusBarTexture(addon.functions.GetNameplateFocusHealthbarTexture())
+end
+
+function addon.functions.RefreshNameplateFocusHealthbarTextureForUnit(unit)
+	if not (unit and C_NamePlate and C_NamePlate.GetNamePlateForUnit) then return nil end
+	local namePlate = C_NamePlate.GetNamePlateForUnit(unit)
+	local unitFrame = namePlate and namePlate.UnitFrame
+	if not unitFrame then return nil end
+	local displayedUnit = unitFrame.unit
+	if not isNameplateUnitToken(displayedUnit) then displayedUnit = unit end
+	addon.functions.ApplyNameplateFocusHealthbarTexture(unitFrame, displayedUnit)
+	return displayedUnit
+end
+
+function addon.functions.RefreshCurrentAndPreviousNameplateFocusHealthbarTextures()
+	if nameplateFocusHealthbarTextureLastUnit then addon.functions.RefreshNameplateFocusHealthbarTextureForUnit(nameplateFocusHealthbarTextureLastUnit) end
+	local currentUnit = addon.functions.RefreshNameplateFocusHealthbarTextureForUnit("focus")
+	nameplateFocusHealthbarTextureLastUnit = isNameplateUnitToken(currentUnit) and currentUnit or nil
+end
+
+function addon.functions.RestoreAllNameplateFocusHealthbarTextures()
+	for healthBar in pairs(nameplateFocusHealthbarDefaults) do
+		addon.functions.RestoreNameplateHealthbarTexture(healthBar)
+	end
+	nameplateFocusHealthbarTextureLastUnit = nil
+end
+
 local function getNameplateMobColor(dbKey, unit)
 	local color = addon.db and addon.db[dbKey]
 	local defaultColor = getNameplateMobColorDefault(dbKey, unit)
@@ -1379,6 +1455,7 @@ local function refreshNameplateMobColorUnitFrame(unitFrame)
 	updateNameplateEliteMarker(unitFrame, unit)
 	updateNameplateQuestMarker(unitFrame, unit)
 	updateNameplateTargetMarkers(unitFrame, unit)
+	addon.functions.ApplyNameplateFocusHealthbarTexture(unitFrame, unit)
 	if not isNameplateMobColorsActive() then return end
 
 	if type(_G.CompactUnitFrame_UpdateHealthColor) == "function" then
@@ -1427,12 +1504,14 @@ local function ensureNameplateMobColorWatcher()
 	nameplateMobColorFrame:RegisterEvent("NAME_PLATE_UNIT_ADDED")
 	nameplateMobColorFrame:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
 	nameplateMobColorFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
+	nameplateMobColorFrame:RegisterEvent("PLAYER_FOCUS_CHANGED")
 	nameplateMobColorFrame:RegisterEvent("QUEST_LOG_UPDATE")
 	nameplateMobColorFrame:SetScript("OnEvent", function(_, event, unit)
 		ensureNameplateMobColorHooks()
 		if event == "NAME_PLATE_UNIT_REMOVED" then
 			if isNameplateUnitToken(unit) then nameplateQuestMarkerCache[unit] = nil end
 			if unit == nameplateTargetMarkerLastUnit then nameplateTargetMarkerLastUnit = nil end
+			if unit == nameplateFocusHealthbarTextureLastUnit then nameplateFocusHealthbarTextureLastUnit = nil end
 			return
 		elseif event == "QUEST_LOG_UPDATE" then
 			clearNameplateQuestMarkerCache()
@@ -1440,6 +1519,9 @@ local function ensureNameplateMobColorWatcher()
 			return
 		elseif event == "PLAYER_TARGET_CHANGED" then
 			refreshCurrentAndPreviousNameplateTargetMarkers()
+			return
+		elseif event == "PLAYER_FOCUS_CHANGED" then
+			addon.functions.RefreshCurrentAndPreviousNameplateFocusHealthbarTextures()
 			return
 		end
 
@@ -1478,6 +1560,12 @@ end
 
 local function syncNameplateTargetMarkers()
 	if not isNameplateTargetMarkersActive() then return end
+	ensureNameplateMobColorWatcher()
+	refreshAllNameplateMobColors()
+end
+
+function addon.functions.SyncNameplateFocusHealthbarTextures()
+	if nameplateFocusHealthbarTextureActive ~= true then return end
 	ensureNameplateMobColorWatcher()
 	refreshAllNameplateMobColors()
 end
@@ -1663,6 +1751,24 @@ function addon.functions.RefreshDefaultNameplateTargetMarkers()
 	if isNameplateTargetMarkersActive() then syncNameplateTargetMarkers() end
 end
 
+function addon.functions.SetDefaultNameplateFocusHealthbarTexture(value)
+	addon.db[NAMEPLATE_FOCUS_HEALTHBAR_TEXTURE_DB_KEY] = value
+	nameplateFocusHealthbarTextureActive = type(value) == "string" and value ~= ""
+	if nameplateFocusHealthbarTextureActive then
+		addon.functions.SyncNameplateFocusHealthbarTextures()
+	else
+		addon.functions.RestoreAllNameplateFocusHealthbarTextures()
+	end
+end
+
+function addon.functions.RefreshDefaultNameplateFocusHealthbarTexture()
+	if nameplateFocusHealthbarTextureActive == true then
+		addon.functions.SyncNameplateFocusHealthbarTextures()
+	else
+		addon.functions.RestoreAllNameplateFocusHealthbarTextures()
+	end
+end
+
 local function shouldUseTimeoutReleaseForCurrentContext()
 	if not addon.db or not addon.db["timeoutRelease"] then return false end
 
@@ -1819,6 +1925,7 @@ function addon.functions.initDungeonFrame()
 	addon.functions.InitDBValue(NAMEPLATE_TARGET_MARKERS_DB_KEY, false)
 	addon.functions.InitDBValue(NAMEPLATE_TARGET_MARKER_ATLAS_DB_KEY, TARGET_MARKER_DEFAULT_ATLAS)
 	addon.functions.InitDBValue(NAMEPLATE_TARGET_MARKER_SIZE_DB_KEY, 18)
+	addon.functions.InitDBValue(NAMEPLATE_FOCUS_HEALTHBAR_TEXTURE_DB_KEY, "")
 	addon.functions.InitDBValue(NAMEPLATE_MOB_COLOR_BOSS_DB_KEY, getNameplateMobColorDefault(NAMEPLATE_MOB_COLOR_BOSS_DB_KEY))
 	addon.functions.InitDBValue(NAMEPLATE_MOB_COLOR_MINIBOSS_DB_KEY, getNameplateMobColorDefault(NAMEPLATE_MOB_COLOR_MINIBOSS_DB_KEY))
 	addon.functions.InitDBValue(NAMEPLATE_MOB_COLOR_CASTER_DB_KEY, getNameplateMobColorDefault(NAMEPLATE_MOB_COLOR_CASTER_DB_KEY))
@@ -1841,6 +1948,7 @@ function addon.functions.initDungeonFrame()
 	nameplateEliteMarkersActive = addon.db and addon.db[NAMEPLATE_ELITE_MARKERS_DB_KEY] == true
 	nameplateQuestMarkersActive = addon.db and addon.db[NAMEPLATE_QUEST_MARKERS_DB_KEY] == true
 	nameplateTargetMarkersActive = addon.db and addon.db[NAMEPLATE_TARGET_MARKERS_DB_KEY] == true
+	nameplateFocusHealthbarTextureActive = type(addon.db and addon.db[NAMEPLATE_FOCUS_HEALTHBAR_TEXTURE_DB_KEY]) == "string" and addon.db[NAMEPLATE_FOCUS_HEALTHBAR_TEXTURE_DB_KEY] ~= ""
 	if nameplateAuraClickthroughActive then syncNameplateAuraClickthrough() end
 	if nameplateMobColorsActive then syncNameplateMobColors() end
 	if addon.functions.InitializeDefaultNameplateFriendlyPlayerOptions then addon.functions.InitializeDefaultNameplateFriendlyPlayerOptions() end
@@ -1848,6 +1956,7 @@ function addon.functions.initDungeonFrame()
 	if nameplateEliteMarkersActive then syncNameplateEliteMarkers() end
 	if nameplateQuestMarkersActive then syncNameplateQuestMarkers() end
 	if nameplateTargetMarkersActive then syncNameplateTargetMarkers() end
+	if nameplateFocusHealthbarTextureActive then addon.functions.SyncNameplateFocusHealthbarTextures() end
 
 	local combatLogSection = addon.functions.SettingsCreateExpandableSection(cChar, {
 		name = L["combatLogSection"] or "Combat logging",
