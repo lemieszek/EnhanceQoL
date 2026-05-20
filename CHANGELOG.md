@@ -1,5 +1,14 @@
 # Changelog
 
+## [10.18.3] - 2026-05-20
+
+### 🐛 Fixed
+
+- Cooldown Panels: The Cooldown Manager setup reminder no longer comes back every login after using Quick Setup.
+- Resource Bars: Fixed a Lua error when protected Power color values were cached while showing the bar after mounted portal transitions.
+
+---
+
 ## [10.18.2] - 2026-05-20
 
 ### 🐛 Fixed

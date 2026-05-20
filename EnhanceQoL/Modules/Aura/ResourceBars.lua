@@ -5802,7 +5802,8 @@ function updatePowerBar(type, runeSlot)
 			flag = "holy3"
 		end
 		local lc = bar._lastColor or {}
-		if lc[1] ~= targetR or lc[2] ~= targetG or lc[3] ~= targetB or lc[4] ~= targetA then
+		local lcHasSecret = issecretvalue and (issecretvalue(lc[1]) or issecretvalue(lc[2]) or issecretvalue(lc[3]) or issecretvalue(lc[4]))
+		if lcHasSecret or lc[1] ~= targetR or lc[2] ~= targetG or lc[3] ~= targetB or lc[4] ~= targetA then
 			lc[1], lc[2], lc[3], lc[4] = targetR, targetG, targetB, targetA
 			bar._lastColor = lc
 			if ResourceBars.SetStatusBarColorWithGradient then
