@@ -18,6 +18,50 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 TOOLTIP_URL = "https://nether.wowhead.com/tooltip/item/{item_id}?dataEnv={data_env}&locale={locale}"
 TRINKETS_URL = "https://www.wowhead.com/items/armor/trinkets?filter=62;1;0"
 DEFAULT_REVIEW_MEMORY_FILE = REPO_ROOT / "docs/CooldownPanelAutoDurationReview.json"
+MANUAL_IGNORED_ITEMS = {
+    237494: {
+        "name": "Hallowed Tome",
+        "icon": "inv_artifact_tome01",
+        "reason": "ignored_too_complex",
+        "note": "On-use rotates sections and the meaningful effects are multiple equip/proc variants.",
+        "use_text": "Flip to the next section.",
+    },
+    204728: {
+        "name": "Friendship Censer",
+        "icon": "inv_1115_jewelcrafting_trinket_color2",
+        "reason": "ignored_too_complex",
+        "note": "On-use can randomly damage, control, heal, buff, or bring food; there is no stable player activation duration.",
+        "use_text": "Call a friend to come help you!",
+    },
+    140807: {
+        "name": "Infernal Contract",
+        "icon": "inv_misc_paperbundle04a",
+        "reason": "ignored_too_complex",
+        "note": "On-use has a damage-reduction cap and a delayed penalty duration; the practical duration can differ from the tooltip window.",
+        "use_text": "Reduce all damage taken, then suffer a delayed penalty when the effect expires.",
+    },
+    188266: {
+        "name": "Pulsating Riftshard",
+        "icon": "inv_7xp_inscription_talenttome01",
+        "reason": "ignored_too_complex",
+        "note": "On-use combines portal charge, damage, scaling shield, and absorb limits; there is no stable player activation duration.",
+        "use_text": "Place a Rift Portal that charges, damages enemies, and grants a shield.",
+    },
+    207170: {
+        "name": "Smoldering Seedling",
+        "icon": "inv_10_herb_seed_smolderingseedling_color1",
+        "reason": "ignored_too_complex",
+        "note": "On-use creates an external seedling/healing sequence with conditional follow-up mastery.",
+        "use_text": "Replant the Seedling and attempt to put out its flames.",
+    },
+    215174: {
+        "name": "Concoction: Kiss of Death",
+        "icon": "inv_alchemy_80_potion01purple",
+        "reason": "ignored_too_complex",
+        "note": "On-use can be manually ended by jumping and has a penalty if not ended.",
+        "use_text": "Drink from the vial and let the toxins course through your veins.",
+    },
+}
 
 LISTVIEW_ITEMS_RE = re.compile(r"listviewitems\s*=\s*(?P<items>\[.*?\]);\s*new Listview", re.DOTALL)
 LISTVIEW_ITEM_ID_RE = re.compile(r'"id":(\d+)')
@@ -48,21 +92,26 @@ AREA_POOL_DURATION_RE = re.compile(
     r"\bpools?\s+at\s+your\s+feet\s+for\s+(?P<duration>\d+(?:\.\d+)?)\s*sec(?:onds?)?\b",
     re.IGNORECASE,
 )
-REVIEW_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
-    (
-        "absorb_limited_manual_review",
-        re.compile(
-            r"\babsorbing\s+[\d\[\]\s\*\+\-/().,%A-Za-z]+\s+damage\s+for\s+\d+(?:\.\d+)?\s*sec(?:onds?)?\b"
-            r"|\babsorb(?:ing|s)?\b.*\bfor\s+\d+(?:\.\d+)?\s*sec(?:onds?)?\b"
-            r"|\bgranting\s+them\b.*\babsorb\b.*\bfor\s+\d+(?:\.\d+)?\s*sec(?:onds?)?\b",
-            re.IGNORECASE,
-        ),
-    ),
-    (
-        "friendly_target_effect_manual_review",
-        re.compile(r"\bfriendly target\b|\bupon an ally\b|\bgranting them\b", re.IGNORECASE),
-    ),
-]
+SINGLE_FRIENDLY_TARGET_RE = re.compile(
+    r"\b(?:a|single)\s+friendly target\b"
+    r"|\b(?:an|a|single)\s+ally\b"
+    r"|\bupon\s+an\s+ally\b"
+    r"|\bon\s+an\s+ally\b",
+    re.IGNORECASE,
+)
+TARGET_CONTROL_EFFECT_RE = re.compile(
+    r"\b(?:captures?|turns?)\s+(?:the\s+)?target\b.*\bfor\s+\d+(?:\.\d+)?\s*sec(?:onds?)?\b"
+    r"|\bslow\s+your\s+current\s+enemy\s+target\b"
+    r"|\b(?:target|enemy|enemies|virmen|current enemy target)\b.*\b(?:slow|movement speed|prevent(?:s)?\s+them\s+from\s+moving|run\s+away\s+in\s+fear|fear|stun|snare)\b",
+    re.IGNORECASE,
+)
+ABSORB_SHIELD_EFFECT_RE = re.compile(
+    r"\babsorbing\s+[\d\[\]\s\*\+\-/().,%A-Za-z]+\s+damage\s+for\s+\d+(?:\.\d+)?\s*sec(?:onds?)?\b"
+    r"|\babsorb(?:ing|s)?\b.*\bfor\s+\d+(?:\.\d+)?\s*sec(?:onds?)?\b"
+    r"|\bgranting\s+them\b.*\babsorb\b.*\bfor\s+\d+(?:\.\d+)?\s*sec(?:onds?)?\b"
+    r"|\bAbsorb Shield\b.*\bfor\s+\d+(?:\.\d+)?\s*sec(?:onds?)?\b",
+    re.IGNORECASE,
+)
 
 SAFE_DURATION_VERBS = (
     "give",
@@ -222,12 +271,11 @@ def classify_tooltip(tooltip: TooltipInfo) -> Classification:
     if not use_text:
         return Classification("rejected", None, "no_use_effect")
 
-    review_match = list(DURATION_RE.finditer(use_text))
-    if review_match:
-        review_duration = float(review_match[0].group("duration"))
-        for reason, pattern in REVIEW_PATTERNS:
-            if pattern.search(use_text):
-                return Classification("needs_review", review_duration, reason)
+    if SINGLE_FRIENDLY_TARGET_RE.search(use_text):
+        return Classification("rejected", None, "single_friendly_target_ignored")
+
+    if ABSORB_SHIELD_EFFECT_RE.search(use_text):
+        return Classification("rejected", None, "absorb_shield_ignored")
 
     build_and_persist = TOTAL_BUILD_AND_PERSIST_RE.search(use_text)
     if build_and_persist:
@@ -257,7 +305,12 @@ def classify_tooltip(tooltip: TooltipInfo) -> Classification:
         multiple_duration_classification = classify_multiple_duration_tooltip(use_text, duration_matches)
         if multiple_duration_classification:
             return multiple_duration_classification
+        if TARGET_CONTROL_EFFECT_RE.search(use_text):
+            return Classification("rejected", None, "target_control_effect_ignored")
         return Classification("needs_review", None, "multiple_durations")
+
+    if TARGET_CONTROL_EFFECT_RE.search(use_text):
+        return Classification("rejected", None, "target_control_effect_ignored")
 
     for reason, pattern in REJECT_PATTERNS:
         if pattern.search(use_text):
@@ -352,7 +405,35 @@ def fetch_tooltip(item_id: int, *, locale: int, data_env: int, timeout: float) -
     return parse_tooltip_payload(item_id, payload)
 
 
+def manual_ignored_result(item_id: int, entry: dict) -> ProbeResult:
+    use_text = str(entry.get("use_text") or "")
+    note = str(entry.get("note") or "")
+    text = f"{entry.get('name') or f'item {item_id}'} Use: {use_text}".strip()
+    if note:
+        text = f"{text} {note}".strip()
+    tooltip = TooltipInfo(
+        item_id=item_id,
+        name=str(entry.get("name") or f"item {item_id}"),
+        icon=str(entry.get("icon") or ""),
+        raw_tooltip=text,
+        text=text,
+        use_text=use_text or note or None,
+    )
+    return ProbeResult(
+        item_id=item_id,
+        ok=True,
+        tooltip=tooltip,
+        classification=Classification("rejected", None, str(entry.get("reason") or "ignored")),
+        review_source="manual_ignore",
+        review_note=note or None,
+    )
+
+
 def probe_single_item(item_id: int, *, locale: int, data_env: int, timeout: float, retries: int) -> ProbeResult:
+    ignored = MANUAL_IGNORED_ITEMS.get(item_id)
+    if ignored:
+        return manual_ignored_result(item_id, ignored)
+
     for attempt in range(max(0, retries) + 1):
         try:
             tooltip = fetch_tooltip(item_id, locale=locale, data_env=data_env, timeout=timeout)
@@ -781,8 +862,43 @@ def self_test() -> int:
         },
     )
     friendly_target_effect_class = classify_tooltip(friendly_target_effect)
-    assert friendly_target_effect_class.status == "needs_review"
-    assert friendly_target_effect_class.reason == "friendly_target_effect_manual_review"
+    assert friendly_target_effect_class.status == "rejected"
+    assert friendly_target_effect_class.reason == "single_friendly_target_ignored"
+
+    party_members_effect = parse_tooltip_payload(
+        205262,
+        {
+            "name": "Magmaclaw Lure",
+            "tooltip": (
+                "Use: Lure out magmaclaws to attach themselves to you and your surrounding party members "
+                "granting up to 2219 Absorb Shield for 10 sec."
+            ),
+        },
+    )
+    party_members_effect_class = classify_tooltip(party_members_effect)
+    assert party_members_effect_class.reason != "single_friendly_target_ignored"
+
+    target_control_effect = parse_tooltip_payload(
+        10720,
+        {
+            "name": "Gnomish Net-o-Matic Projector",
+            "tooltip": "Use: Captures the target in a net for 20 sec. (10 Min Cooldown)",
+        },
+    )
+    target_control_effect_class = classify_tooltip(target_control_effect)
+    assert target_control_effect_class.status == "rejected"
+    assert target_control_effect_class.reason == "target_control_effect_ignored"
+
+    enemy_slow_effect = parse_tooltip_payload(
+        160833,
+        {
+            "name": "Fetish of the Tormented Mind",
+            "tooltip": "Use: Slow your current enemy target's attack and casting speed by 15% for 5 sec.",
+        },
+    )
+    enemy_slow_effect_class = classify_tooltip(enemy_slow_effect)
+    assert enemy_slow_effect_class.status == "rejected"
+    assert enemy_slow_effect_class.reason == "target_control_effect_ignored"
 
     channel_into_primary = parse_tooltip_payload(
         246344,
@@ -860,8 +976,8 @@ def self_test() -> int:
         },
     )
     absorb_limited_class = classify_tooltip(absorb_limited)
-    assert absorb_limited_class.status == "needs_review"
-    assert absorb_limited_class.reason == "absorb_limited_manual_review"
+    assert absorb_limited_class.status == "rejected"
+    assert absorb_limited_class.reason == "absorb_shield_ignored"
 
     ally_absorb = parse_tooltip_payload(
         251789,
@@ -871,8 +987,8 @@ def self_test() -> int:
         },
     )
     ally_absorb_class = classify_tooltip(ally_absorb)
-    assert ally_absorb_class.status == "needs_review"
-    assert ally_absorb_class.reason == "absorb_limited_manual_review"
+    assert ally_absorb_class.status == "rejected"
+    assert ally_absorb_class.reason == "single_friendly_target_ignored"
 
     page = """
         <script>
@@ -925,6 +1041,13 @@ def self_test() -> int:
     preserve_revalidated_runtime_entries([reviewed_result], previous_runtime)
     assert reviewed_result.classification.status == "accepted"
     assert reviewed_result.classification.reason == "previous_runtime_revalidated"
+
+    ignored_result = probe_single_item(237494, locale=0, data_env=1, timeout=0.1, retries=0)
+    assert ignored_result.ok
+    assert ignored_result.classification is not None
+    assert ignored_result.classification.status == "rejected"
+    assert ignored_result.classification.reason == "ignored_too_complex"
+    assert ignored_result.review_source == "manual_ignore"
     return 0
 
 

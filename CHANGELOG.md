@@ -1,38 +1,22 @@
 # Changelog
 
-<!--@eqol-beta@-->
-## [10.18.0-beta3] - 2026-05-19
+## [10.18.0] - 2026-05-20
 
 ### ✨ Added
 
+- Cooldown Panels: Added Racial entries to the Add more menu, including reusable Racial 1 / Racial 2 placeholders that resolve to the current character's relevant racial cooldowns.
 - Nameplates: Added an optional focus healthbar texture for default nameplates.
 - SharedMedia: Added a new `IncomingMail` chat notification sound for ChatIM and other LibSharedMedia sound consumers.
-
-### 🔄 Changed
-
-- SharedMedia: Added the new Neutral voiceover set and migrated most EQOL voiceover registrations to it while keeping known abbreviation and multi-word exceptions on the previous files for now.
-
----
-
-## [10.18.0-beta2] - 2026-05-19
-
-### ✨ Added
-
 - Anchors: Added EllesmereUI Unit Frames and Cooldown Manager bars as supported external anchor targets.
 - Cooldown Panels: Added a Spell State texture option to show the configured texture even when no proc is active.
 - Nameplates: Added friendly player nameplate options to show names only, class-color friendly player names, and hide realm names.
 - Tooltips: Added an option to show tooltip ID lines only while holding a selected modifier key.
-
----
-
-## [10.18.0-beta1] - 2026-05-18
-
-### ✨ Added
-
 - Resource Bars: Added external frame anchors to the Relative frame dropdown, so Resource Bars can attach to supported external UI frames.
 - Resource Bars, Castbar, XP Bar, and GCD Bar: Added a positive or negative offset for Match Relative Frame width, allowing matched bars to compensate for borders or extra spacing.
 
-<!--@end-eqol-beta@-->
+### 🔄 Changed
+
+- SharedMedia: Added the new Neutral voiceover set and migrated most EQOL voiceover registrations to it while keeping known abbreviation and multi-word exceptions on the previous files for now.
 
 ---
 

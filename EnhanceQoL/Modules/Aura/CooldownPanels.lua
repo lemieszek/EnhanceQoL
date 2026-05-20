@@ -105,6 +105,15 @@ CooldownPanels.staticSpellVariantGroups = CooldownPanels.staticSpellVariantGroup
 		{ 20572, 33697, 33702 },
 		-- Draenei racial with class-specific spellIDs.
 		{ 59545, 59543, 59548, 121093, 59542, 59544, 59547, 28880, 370626, 416250 },
+		-- Primary racial cooldowns. Stored entries resolve to the current player's known racial variant.
+		{
+			20572, 26297, 7744, 20549,
+			202719, 50613, 80483, 28730, 129597, 155145, 232633, 25046, 69179,
+			69070, 59752, 20594, 58984, 20589,
+			59545, 59543, 59548, 121093, 59542, 59544, 59547, 28880, 370626, 416250,
+			68992, 107079, 357214, 260364, 255654, 274738, 291944, 312411, 256948,
+			255647, 265221, 287712, 312924, 436344, 1237885,
+		},
 	}
 
 function CooldownPanels:RegisterItemRankGroup(rankList)
@@ -3451,6 +3460,152 @@ local function spellExistsSafe(spellId)
 	if C_Spell and C_Spell.GetSpellInfo then return C_Spell.GetSpellInfo(spellId) ~= nil end
 	if Api.GetSpellInfoFn then return Api.GetSpellInfoFn(spellId) ~= nil end
 	return true
+end
+
+function CooldownPanels:GetPlayerRacialSpellEntries()
+	local entries = {}
+	local _, raceTag = UnitRace("player")
+	local _, classTag = UnitClass("player")
+	raceTag = (addon.variables and addon.variables.unitRace) or raceTag
+	if not raceTag then return entries end
+	local racialCooldowns = {
+		Orc = 20572,
+		Troll = 26297,
+		Scourge = 7744,
+		Tauren = 20549,
+		BloodElf = {
+			DEATHKNIGHT = 50613,
+			DEMONHUNTER = 202719,
+			HUNTER = 80483,
+			MAGE = 28730,
+			MONK = 129597,
+			PALADIN = 155145,
+			PRIEST = 232633,
+			ROGUE = 25046,
+			WARLOCK = 28730,
+			WARRIOR = 69179,
+		},
+		Goblin = 69070,
+		Human = 59752,
+		Dwarf = 20594,
+		NightElf = 58984,
+		Gnome = 20589,
+		Draenei = {
+			DEATHKNIGHT = 59545,
+			HUNTER = 59543,
+			MAGE = 59548,
+			MONK = 121093,
+			PALADIN = 59542,
+			PRIEST = 59544,
+			ROGUE = 370626,
+			SHAMAN = 59547,
+			WARLOCK = 416250,
+			WARRIOR = 28880,
+		},
+		Worgen = 68992,
+		Pandaren = 107079,
+		Dracthyr = { 357214, 368970 },
+		Nightborne = 260364,
+		HighmountainTauren = 255654,
+		MagharOrc = 274738,
+		ZandalariTroll = 291944,
+		Vulpera = 312411,
+		VoidElf = 256948,
+		LightforgedDraenei = 255647,
+		DarkIronDwarf = 265221,
+		KulTiran = 287712,
+		Mechagnome = 312924,
+		EarthenDwarf = 436344,
+		Haranir = 1237885,
+		Harronir = 1237885,
+	}
+	local seen = {}
+	local function addSpell(spellId)
+		local numericSpellId = tonumber(spellId)
+		if not numericSpellId then return end
+		local canonicalSpellId = self:NormalizePersistentSpellID(numericSpellId, { allowTalentChoiceCanonical = true }) or getBaseSpellId(numericSpellId) or numericSpellId
+		if canonicalSpellId and not seen[canonicalSpellId] and spellExistsSafe(canonicalSpellId) and isSpellKnownSafe(canonicalSpellId) then
+			seen[canonicalSpellId] = true
+			entries[#entries + 1] = {
+				spellID = canonicalSpellId,
+				name = getSpellName(canonicalSpellId) or tostring(canonicalSpellId),
+				icon = (C_Spell and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(canonicalSpellId)) or nil,
+				order = #entries + 1,
+			}
+		end
+	end
+	local candidates = racialCooldowns[raceTag]
+	if type(candidates) == "table" then
+		if classTag and candidates[classTag] then addSpell(candidates[classTag]) end
+		if candidates.default then addSpell(candidates.default) end
+		for _, spellId in ipairs(candidates) do
+			addSpell(spellId)
+		end
+	else
+		addSpell(candidates)
+	end
+	table.sort(entries, function(a, b)
+		return (a.order or 0) < (b.order or 0)
+	end)
+	if #entries == 0 then
+		entries[1] = {
+			spellID = 20572,
+			name = L["CooldownPanelAddRacial"] or "Racial",
+			icon = Helper.PREVIEW_ICON,
+			isFallback = true,
+			order = 1,
+		}
+	end
+	if #entries == 1 then
+		entries[2] = {
+			spellID = 368970,
+			name = (L["CooldownPanelAddRacial"] or "Racial") .. " 2",
+			icon = (C_Spell and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(368970)) or Helper.PREVIEW_ICON,
+			isFallback = true,
+			order = 2,
+		}
+	end
+	return entries
+end
+
+function CooldownPanels:FindEquivalentSpellEntry(panelId, spellId)
+	panelId = normalizeId(panelId)
+	local panel = self:GetPanel(panelId)
+	local numericSpellId = tonumber(spellId)
+	if not (panel and numericSpellId) then return nil end
+	for entryId, entry in pairs(panel.entries or {}) do
+		if entry and entry.type == "SPELL" and entry.spellID and self:AreSpellVariantsEquivalent(entry.spellID, numericSpellId) then return entryId, entry end
+	end
+	return nil
+end
+
+function CooldownPanels:AddPlayerRacialEntry(panelId, spellId)
+	panelId = normalizeId(panelId)
+	local numericSpellId = tonumber(spellId)
+	if not (panelId and numericSpellId) then return nil, "INVALID" end
+	if self:FindEntryByValue(panelId, "SPELL", numericSpellId) or self:FindEquivalentSpellEntry(panelId, numericSpellId) then return nil, "DUPLICATE" end
+	return self:AddEntrySafe(panelId, "SPELL", numericSpellId)
+end
+
+function CooldownPanels:AddPlayerRacialEntries(panelId)
+	panelId = normalizeId(panelId)
+	if not panelId then return nil end
+	local entries = self:GetPlayerRacialSpellEntries()
+	if #entries == 0 then return { added = 0, duplicates = 0, total = 0 } end
+	local stats = { added = 0, duplicates = 0, total = #entries }
+	for _, racial in ipairs(entries) do
+		local spellId = tonumber(racial and racial.spellID)
+		if spellId then
+			local entryId, reason = self:AddPlayerRacialEntry(panelId, spellId)
+			if entryId then
+				stats.added = stats.added + 1
+			elseif reason == "DUPLICATE" then
+				stats.duplicates = stats.duplicates + 1
+			end
+		end
+	end
+	if stats.added > 0 then self:RefreshEditor() end
+	return stats
 end
 
 local function showErrorMessage(msg)
@@ -9839,9 +9994,10 @@ local function showSlotMenu(owner, panelId)
 	if not panelId or not Api.MenuUtil or not Api.MenuUtil.CreateContextMenu then return end
 	local slotEntries = getSlotMenuEntries()
 	local stanceEntries = CooldownPanels.GetStanceMenuEntries and CooldownPanels:GetStanceMenuEntries() or nil
+	local racialEntries = CooldownPanels.GetPlayerRacialSpellEntries and CooldownPanels:GetPlayerRacialSpellEntries() or nil
 	local cdmAuras = CooldownPanels.CDMAuras
 	local hasCDMMenu = cdmAuras and cdmAuras.AppendAddMenu
-	if ((not slotEntries) or #slotEntries == 0) and ((not stanceEntries) or #stanceEntries == 0) and not hasCDMMenu then return end
+	if ((not slotEntries) or #slotEntries == 0) and ((not stanceEntries) or #stanceEntries == 0) and ((not racialEntries) or #racialEntries == 0) and not hasCDMMenu then return end
 	Api.MenuUtil.CreateContextMenu(owner, function(_, rootDescription)
 		rootDescription:SetTag("MENU_EQOL_COOLDOWN_PANEL_ENTRY_ADD")
 		rootDescription:CreateTitle(L["CooldownPanelAddSlot"] or "Add more")
@@ -9869,6 +10025,26 @@ local function showSlotMenu(owner, panelId)
 						CooldownPanels:RefreshEditor()
 					end)
 				end
+			end
+		end
+		if racialEntries and #racialEntries > 0 then
+			local racialMenu = rootDescription:CreateButton(L["CooldownPanelAddRacials"] or "Racials")
+			if #racialEntries > 1 then
+				racialMenu:CreateButton(string.format("%s: %s", _G.ADD or "Add", _G.ALL or "All"), function()
+					CooldownPanels:AddPlayerRacialEntries(panelId)
+				end)
+				racialMenu:CreateDivider()
+			end
+			for _, racial in ipairs(racialEntries) do
+				local label = L["CooldownPanelAddRacial"] or "Racial"
+				if #racialEntries > 1 then label = string.format("%s %d", label, _) end
+				local iconToken = racial.icon or Helper.PREVIEW_ICON
+				local iconType = type(iconToken)
+				if (iconType == "string" and iconToken ~= "") or iconType == "number" then label = string.format("|T%s:14:14:0:0:64:64:4:60:4:60|t %s", tostring(iconToken), label) end
+				racialMenu:CreateButton(label, function()
+					CooldownPanels:AddPlayerRacialEntry(panelId, racial.spellID)
+					CooldownPanels:RefreshEditor()
+				end)
 			end
 		end
 		if hasCDMMenu then cdmAuras:AppendAddMenu(rootDescription, panelId) end
