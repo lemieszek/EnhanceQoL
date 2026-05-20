@@ -28,6 +28,7 @@ USE_RE = re.compile(
 DURATION_RE = re.compile(r"\b(?:for|lasts|lasting)\s+(?P<duration>\d+(?:\.\d+)?)\s*sec(?:onds?)?\b", re.IGNORECASE)
 OVER_DURATION_RE = re.compile(r"\bover\s+\d+(?:\.\d+)?\s*sec(?:onds?)?\b", re.IGNORECASE)
 NEXT_LIMIT_RE = re.compile(r"\bnext\b", re.IGNORECASE)
+SECONDARY_PROC_DURATION_RE = re.compile(r"\b(?:giving|granting|causing|allowing)\b.*\bchance\b", re.IGNORECASE)
 
 SAFE_DURATION_VERBS = (
     "give",
@@ -40,6 +41,8 @@ SAFE_DURATION_VERBS = (
     "increases",
     "provides",
     "provide",
+    "sheathe",
+    "sheathes",
     "become",
     "becomes",
     "enter",
@@ -125,6 +128,28 @@ def parse_tooltip_payload(item_id: int, payload: dict) -> TooltipInfo:
     )
 
 
+def has_safe_duration_verb(text: str) -> bool:
+    lowered = text.lower()
+    return any(re.search(rf"\b{re.escape(verb)}\b", lowered) for verb in SAFE_DURATION_VERBS)
+
+
+def classify_multiple_duration_tooltip(use_text: str, duration_matches: list[re.Match[str]]) -> Classification | None:
+    if len(duration_matches) != 2:
+        return None
+
+    primary_match, secondary_match = duration_matches
+    before_primary = use_text[:primary_match.start()]
+    between_durations = use_text[primary_match.end():secondary_match.start()]
+    if has_safe_duration_verb(before_primary) and SECONDARY_PROC_DURATION_RE.search(between_durations):
+        return Classification(
+            "accepted",
+            float(primary_match.group("duration")),
+            "primary_duration_with_secondary_proc_duration",
+        )
+
+    return None
+
+
 def classify_tooltip(tooltip: TooltipInfo) -> Classification:
     use_text = tooltip.use_text
     if not use_text:
@@ -138,14 +163,16 @@ def classify_tooltip(tooltip: TooltipInfo) -> Classification:
 
     durations = {float(match.group("duration")) for match in duration_matches}
     if len(durations) != 1:
+        multiple_duration_classification = classify_multiple_duration_tooltip(use_text, duration_matches)
+        if multiple_duration_classification:
+            return multiple_duration_classification
         return Classification("needs_review", None, "multiple_durations")
 
     for reason, pattern in REJECT_PATTERNS:
         if pattern.search(use_text):
             return Classification("rejected", next(iter(durations)), reason)
 
-    lowered = use_text.lower()
-    if not any(re.search(rf"\b{re.escape(verb)}\b", lowered) for verb in SAFE_DURATION_VERBS):
+    if not has_safe_duration_verb(use_text):
         return Classification("needs_review", next(iter(durations)), "duration_found_but_unrecognized_effect")
 
     return Classification("accepted", next(iter(durations)), "simple_fixed_duration")
@@ -594,6 +621,21 @@ def self_test() -> int:
     )
     over_time_class = classify_tooltip(over_time)
     assert over_time_class.status == "rejected"
+
+    secondary_proc_duration = parse_tooltip_payload(
+        137539,
+        {
+            "name": "Faulty Countermeasure",
+            "tooltip": (
+                "Use: Sheathe your weapons in ice for 30 sec, giving your melee attacks a chance "
+                "to cause 907 additional Frost damage and slow the target's movement speed by 20% for 8 sec."
+            ),
+        },
+    )
+    secondary_proc_duration_class = classify_tooltip(secondary_proc_duration)
+    assert secondary_proc_duration_class.status == "accepted"
+    assert secondary_proc_duration_class.duration == 30
+    assert secondary_proc_duration_class.reason == "primary_duration_with_secondary_proc_duration"
 
     page = """
         <script>
