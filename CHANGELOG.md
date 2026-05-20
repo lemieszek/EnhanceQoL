@@ -1,6 +1,7 @@
 # Changelog
 
-## [10.19.0] - 2026-05-20
+<!--@eqol-beta@-->
+## [10.19.0-beta1] - 2026-05-20
 
 ### ✨ Added
 
@@ -8,6 +9,7 @@
 - Nameplates: Added Tank mode coloring for default enemy nameplates, with a dedicated color for mobs currently in combat with you while tanking.
 
 ---
+<!--@end-eqol-beta@-->
 
 ## [10.18.0] - 2026-05-20
 
