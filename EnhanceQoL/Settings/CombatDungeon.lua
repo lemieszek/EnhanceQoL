@@ -56,9 +56,11 @@ local NAMEPLATE_MOB_COLOR_MINIBOSS_DB_KEY = "nameplateMobColorMiniboss"
 local NAMEPLATE_MOB_COLOR_CASTER_DB_KEY = "nameplateMobColorCaster"
 local NAMEPLATE_MOB_COLOR_MELEE_DB_KEY = "nameplateMobColorMelee"
 local NAMEPLATE_MOB_COLOR_NEUTRAL_DB_KEY = "nameplateMobColorNeutral"
+local NAMEPLATE_MOB_COLOR_TANK_MODE_DB_KEY = "nameplateMobColorTankMode"
 local NAMEPLATE_MOB_COLOR_THREAT_LOST_DB_KEY = "nameplateMobColorThreatLost"
 local NAMEPLATE_MOB_COLOR_THREAT_WARNING_DB_KEY = "nameplateMobColorThreatWarning"
 local NAMEPLATE_MOB_COLOR_TRIVIAL_DB_KEY = "nameplateMobColorTrivial"
+local NAMEPLATE_MOB_TANK_MODE_DB_KEY = "nameplateMobTankMode"
 local nameplateAuraClickthroughFrame
 local nameplateAuraClickthroughHookedBuffPools = setmetatable({}, { __mode = "k" })
 local nameplateAuraClickthroughHookedAuraFrames = setmetatable({}, { __mode = "k" })
@@ -109,6 +111,7 @@ local NAMEPLATE_MOB_COLOR_DEFAULTS = {
 	[NAMEPLATE_MOB_COLOR_CASTER_DB_KEY] = { r = 0 / 255, g = 116 / 255, b = 188 / 255, a = 1 },
 	[NAMEPLATE_MOB_COLOR_MELEE_DB_KEY] = { r = 252 / 255, g = 252 / 255, b = 252 / 255, a = 1 },
 	[NAMEPLATE_MOB_COLOR_NEUTRAL_DB_KEY] = buildNameplateColorDefault(_G.FACTION_BAR_COLORS and _G.FACTION_BAR_COLORS[4], 1, 1, 0),
+	[NAMEPLATE_MOB_COLOR_TANK_MODE_DB_KEY] = { r = 0.15, g = 0.85, b = 1, a = 1 },
 	[NAMEPLATE_MOB_COLOR_THREAT_LOST_DB_KEY] = buildNameplateColorDefault(_G.ORANGE_THREAT_COLOR, 1, 0.6, 0),
 	[NAMEPLATE_MOB_COLOR_THREAT_WARNING_DB_KEY] = buildNameplateColorDefault(_G.YELLOW_THREAT_COLOR, 1, 1, 0),
 	[NAMEPLATE_MOB_COLOR_TRIVIAL_DB_KEY] = { r = 178 / 255, g = 142 / 255, b = 85 / 255, a = 1 },
@@ -141,9 +144,11 @@ addon.constants.DEFAULT_NAMEPLATE_FEATURE_KEYS = {
 	mobColorCaster = NAMEPLATE_MOB_COLOR_CASTER_DB_KEY,
 	mobColorMelee = NAMEPLATE_MOB_COLOR_MELEE_DB_KEY,
 	mobColorNeutral = NAMEPLATE_MOB_COLOR_NEUTRAL_DB_KEY,
+	mobColorTankMode = NAMEPLATE_MOB_COLOR_TANK_MODE_DB_KEY,
 	mobColorThreatLost = NAMEPLATE_MOB_COLOR_THREAT_LOST_DB_KEY,
 	mobColorThreatWarning = NAMEPLATE_MOB_COLOR_THREAT_WARNING_DB_KEY,
 	mobColorTrivial = NAMEPLATE_MOB_COLOR_TRIVIAL_DB_KEY,
+	mobTankMode = NAMEPLATE_MOB_TANK_MODE_DB_KEY,
 }
 local DIFFICULTY_IDS = (_G.DifficultyUtil and _G.DifficultyUtil.ID) or {}
 local COMBAT_LOG_DIFFICULTY_GROUPS = {
@@ -404,6 +409,12 @@ local function getNameplateMobColorDefault(dbKey, unit)
 	if dbKey == NAMEPLATE_MOB_COLOR_THREAT_LOST_DB_KEY then return buildNameplateColorDefault(_G.ORANGE_THREAT_COLOR, 1, 0.6, 0) end
 	if dbKey == NAMEPLATE_MOB_COLOR_THREAT_WARNING_DB_KEY then return buildNameplateColorDefault(_G.YELLOW_THREAT_COLOR, 1, 1, 0) end
 	return NAMEPLATE_MOB_COLOR_DEFAULTS[dbKey]
+end
+
+local function isPlayerEffectivelyTank()
+	local isTank = PlayerUtil and type(PlayerUtil.IsPlayerEffectivelyTank) == "function" and PlayerUtil.IsPlayerEffectivelyTank() or false
+	if isSecretValue(isTank) then isTank = false end
+	return isTank == true
 end
 
 local function isNameplateUnitOnThreatListWithPlayer(unitFrame)
@@ -1344,11 +1355,21 @@ local function getNameplateThreatStatus(unitFrame)
 	return threatStatus
 end
 
-local function getNameplateThreatColor(unitFrame)
-	local threatStatus = getNameplateThreatStatus(unitFrame)
+local function getNameplateThreatColor(unitFrame, threatStatus)
+	if type(threatStatus) ~= "number" then threatStatus = getNameplateThreatStatus(unitFrame) end
 	if type(threatStatus) ~= "number" then return nil end
 	if threatStatus >= 3 then return getNameplateMobColor(NAMEPLATE_MOB_COLOR_THREAT_LOST_DB_KEY) end
 	return getNameplateMobColor(NAMEPLATE_MOB_COLOR_THREAT_WARNING_DB_KEY)
+end
+
+local function getNameplateTankModeColor(unitFrame, threatStatus)
+	updateNameplateMobColorContext()
+	if not nameplateMobColorState.isActive then return nil end
+	if not (addon.db and addon.db[NAMEPLATE_MOB_TANK_MODE_DB_KEY] == true) then return nil end
+	if not isPlayerEffectivelyTank() then return nil end
+	if not isNameplateUnitOnThreatListWithPlayer(unitFrame) then return nil end
+	if type(threatStatus) == "number" and threatStatus >= 3 then return nil end
+	return getNameplateMobColor(NAMEPLATE_MOB_COLOR_TANK_MODE_DB_KEY)
 end
 
 local function getNameplateMobLevel(unit)
@@ -1431,7 +1452,9 @@ local function applyNameplateMobColor(unitFrame)
 	local unit = unitFrame.unit
 	if not isNameplateUnitToken(unit) then return end
 
-	local color = getNameplateThreatColor(unitFrame)
+	local threatStatus = getNameplateThreatStatus(unitFrame)
+	local color = getNameplateTankModeColor(unitFrame, threatStatus)
+	if not color then color = getNameplateThreatColor(unitFrame, threatStatus) end
 	if not color then color = computeNameplateMobColor(unit, unitFrame) end
 	if not color then return end
 
@@ -1506,6 +1529,8 @@ local function ensureNameplateMobColorWatcher()
 	nameplateMobColorFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
 	nameplateMobColorFrame:RegisterEvent("PLAYER_FOCUS_CHANGED")
 	nameplateMobColorFrame:RegisterEvent("QUEST_LOG_UPDATE")
+	nameplateMobColorFrame:RegisterEvent("UNIT_THREAT_LIST_UPDATE")
+	nameplateMobColorFrame:RegisterEvent("UNIT_THREAT_SITUATION_UPDATE")
 	nameplateMobColorFrame:SetScript("OnEvent", function(_, event, unit)
 		ensureNameplateMobColorHooks()
 		if event == "NAME_PLATE_UNIT_REMOVED" then
@@ -1522,6 +1547,15 @@ local function ensureNameplateMobColorWatcher()
 			return
 		elseif event == "PLAYER_FOCUS_CHANGED" then
 			addon.functions.RefreshCurrentAndPreviousNameplateFocusHealthbarTextures()
+			return
+		elseif event == "UNIT_THREAT_LIST_UPDATE" or event == "UNIT_THREAT_SITUATION_UPDATE" then
+			if isNameplateUnitToken(unit) and C_NamePlate and C_NamePlate.GetNamePlateForUnit then
+				local namePlate = C_NamePlate.GetNamePlateForUnit(unit)
+				local unitFrame = namePlate and namePlate.UnitFrame
+				if unitFrame then refreshNameplateMobColorUnitFrame(unitFrame) end
+			else
+				refreshAllNameplateMobColors()
+			end
 			return
 		end
 
@@ -1931,9 +1965,11 @@ function addon.functions.initDungeonFrame()
 	addon.functions.InitDBValue(NAMEPLATE_MOB_COLOR_CASTER_DB_KEY, getNameplateMobColorDefault(NAMEPLATE_MOB_COLOR_CASTER_DB_KEY))
 	addon.functions.InitDBValue(NAMEPLATE_MOB_COLOR_MELEE_DB_KEY, getNameplateMobColorDefault(NAMEPLATE_MOB_COLOR_MELEE_DB_KEY))
 	addon.functions.InitDBValue(NAMEPLATE_MOB_COLOR_NEUTRAL_DB_KEY, getNameplateMobColorDefault(NAMEPLATE_MOB_COLOR_NEUTRAL_DB_KEY))
+	addon.functions.InitDBValue(NAMEPLATE_MOB_COLOR_TANK_MODE_DB_KEY, getNameplateMobColorDefault(NAMEPLATE_MOB_COLOR_TANK_MODE_DB_KEY))
 	addon.functions.InitDBValue(NAMEPLATE_MOB_COLOR_THREAT_LOST_DB_KEY, getNameplateMobColorDefault(NAMEPLATE_MOB_COLOR_THREAT_LOST_DB_KEY))
 	addon.functions.InitDBValue(NAMEPLATE_MOB_COLOR_THREAT_WARNING_DB_KEY, getNameplateMobColorDefault(NAMEPLATE_MOB_COLOR_THREAT_WARNING_DB_KEY))
 	addon.functions.InitDBValue(NAMEPLATE_MOB_COLOR_TRIVIAL_DB_KEY, getNameplateMobColorDefault(NAMEPLATE_MOB_COLOR_TRIVIAL_DB_KEY))
+	addon.functions.InitDBValue(NAMEPLATE_MOB_TANK_MODE_DB_KEY, false)
 	addon.functions.InitDBValue("timeoutReleaseDifficulties", {})
 	addon.functions.InitDBValue("autoCombatLog", false)
 	addon.functions.InitDBValue("combatLogDungeonDifficulties", {})

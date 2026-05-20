@@ -1,5 +1,14 @@
 # Changelog
 
+## [10.19.0] - 2026-05-20
+
+### ✨ Added
+
+- Cooldown Panels: Added per-entry exclusions for Racial entries, allowing selected racials to stay hidden in shared panels.
+- Nameplates: Added Tank mode coloring for default enemy nameplates, with a dedicated color for mobs currently in combat with you while tanking.
+
+---
+
 ## [10.18.0] - 2026-05-20
 
 ### ✨ Added

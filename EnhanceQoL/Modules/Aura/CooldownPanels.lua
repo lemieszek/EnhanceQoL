@@ -3608,6 +3608,74 @@ function CooldownPanels:AddPlayerRacialEntries(panelId)
 	return stats
 end
 
+function CooldownPanels:GetRacialExclusionDefinitions()
+	return {
+		{ spellID = 20572 },
+		{ spellID = 26297 },
+		{ spellID = 7744 },
+		{ spellID = 20549 },
+		{ spellID = 28730 },
+		{ spellID = 69070 },
+		{ spellID = 59752 },
+		{ spellID = 20594 },
+		{ spellID = 58984 },
+		{ spellID = 20589 },
+		{ spellID = 28880 },
+		{ spellID = 68992 },
+		{ spellID = 107079 },
+		{ spellID = 357214 },
+		{ spellID = 368970 },
+		{ spellID = 260364 },
+		{ spellID = 255654 },
+		{ spellID = 274738 },
+		{ spellID = 291944 },
+		{ spellID = 312411 },
+		{ spellID = 256948 },
+		{ spellID = 255647 },
+		{ spellID = 265221 },
+		{ spellID = 287712 },
+		{ spellID = 312924 },
+		{ spellID = 436344 },
+		{ spellID = 1237885 },
+	}
+end
+
+function CooldownPanels:IsRacialSpellID(spellId)
+	local numericSpellId = tonumber(spellId)
+	if not numericSpellId then return false end
+	for _, definition in ipairs(self:GetRacialExclusionDefinitions()) do
+		local definitionSpellId = tonumber(definition and definition.spellID)
+		if definitionSpellId and self:AreSpellVariantsEquivalent(numericSpellId, definitionSpellId) then return true end
+	end
+	return false
+end
+
+function CooldownPanels:IsRacialSpellEntry(entry)
+	return entry and entry.type == "SPELL" and self:IsRacialSpellID(entry.spellID) or false
+end
+
+function CooldownPanels:IsEntryRacialVariantExcluded(entry, spellId)
+	local exclusions = entry and entry.racialVariantExclusions
+	local numericSpellId = tonumber(spellId)
+	if type(exclusions) ~= "table" or not numericSpellId then return false end
+	for excludedSpellId, excluded in pairs(exclusions) do
+		if excluded == true and self:AreSpellVariantsEquivalent(numericSpellId, excludedSpellId) then return true end
+	end
+	return false
+end
+
+function CooldownPanels:GetRacialExclusionsButtonText(entry)
+	local count = 0
+	if type(entry and entry.racialVariantExclusions) == "table" then
+		for _, excluded in pairs(entry.racialVariantExclusions) do
+			if excluded == true then count = count + 1 end
+		end
+	end
+	local label = L["CooldownPanelRacialExclusions"] or "Excluded racials"
+	if count > 0 then return string.format("%s (%d)", label, count) end
+	return label
+end
+
 local function showErrorMessage(msg)
 	if UIErrorsFrame and msg then UIErrorsFrame:AddMessage(msg, 1, 0.2, 0.2, 1) end
 end
@@ -10051,6 +10119,40 @@ local function showSlotMenu(owner, panelId)
 	end)
 end
 
+function CooldownPanels:ShowRacialExclusionsMenu(owner, panelId, entryId)
+	if not (owner and panelId and entryId and Api.MenuUtil and Api.MenuUtil.CreateContextMenu) then return end
+	local panel = CooldownPanels:GetPanel(panelId)
+	local entry = panel and panel.entries and panel.entries[entryId] or nil
+	if not CooldownPanels:IsRacialSpellEntry(entry) then return end
+	Api.MenuUtil.CreateContextMenu(owner, function(_, rootDescription)
+		rootDescription:SetTag("MENU_EQOL_COOLDOWN_PANEL_RACIAL_EXCLUSIONS")
+		rootDescription:CreateTitle(L["CooldownPanelRacialExclusions"] or "Excluded racials")
+		for _, definition in ipairs(CooldownPanels:GetRacialExclusionDefinitions()) do
+			local spellId = tonumber(definition and definition.spellID)
+			if spellId then
+				local label = getSpellName(spellId) or tostring(spellId)
+				local iconToken = C_Spell and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(spellId) or nil
+				local iconType = type(iconToken)
+				if (iconType == "string" and iconToken ~= "") or iconType == "number" then label = string.format("|T%s:14:14:0:0:64:64:4:60:4:60|t %s", tostring(iconToken), label) end
+				rootDescription:CreateCheckbox(label, function()
+					return type(entry.racialVariantExclusions) == "table" and entry.racialVariantExclusions[spellId] == true or false
+				end, function()
+					entry.racialVariantExclusions = entry.racialVariantExclusions or {}
+					if entry.racialVariantExclusions[spellId] == true then
+						entry.racialVariantExclusions[spellId] = nil
+					else
+						entry.racialVariantExclusions[spellId] = true
+					end
+					if not next(entry.racialVariantExclusions) then entry.racialVariantExclusions = nil end
+					CooldownPanels:RebuildSpellIndex()
+					CooldownPanels:RefreshPanel(panelId)
+					CooldownPanels:RefreshEditor()
+				end)
+			end
+		end
+	end)
+end
+
 local function getSpellIdFromCooldownManagerChild(child)
 	if not child then return nil end
 	local spellId
@@ -11136,6 +11238,50 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		return CooldownPanels:ResolveEntryCDMAuraAlwaysShowMode(layout, currentEntry)
 	end
 
+	local function getRacialExclusionOptions()
+		local options = {}
+		for _, definition in ipairs(CooldownPanels:GetRacialExclusionDefinitions()) do
+			local spellId = tonumber(definition and definition.spellID)
+			if spellId then
+				local sortLabel = getSpellName(spellId) or tostring(spellId)
+				local label = sortLabel
+				local iconToken = C_Spell and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(spellId) or nil
+				local iconType = type(iconToken)
+				if (iconType == "string" and iconToken ~= "") or iconType == "number" then label = string.format("|T%s:14:14:0:0:64:64:4:60:4:60|t %s", tostring(iconToken), label) end
+				options[#options + 1] = { value = spellId, label = label, sortLabel = sortLabel }
+			end
+		end
+		table.sort(options, function(a, b)
+			local left = string.lower(tostring(a and a.sortLabel or ""))
+			local right = string.lower(tostring(b and b.sortLabel or ""))
+			if left == right then return (tonumber(a and a.value) or 0) < (tonumber(b and b.value) or 0) end
+			return left < right
+		end)
+		return options
+	end
+
+	local function isRacialEntrySelected()
+		local _, currentEntry = getEntry()
+		return CooldownPanels:IsRacialSpellEntry(currentEntry)
+	end
+
+	local function isRacialVariantExcluded(_, spellId)
+		local _, currentEntry = getEntry()
+		spellId = tonumber(spellId)
+		return spellId and type(currentEntry and currentEntry.racialVariantExclusions) == "table" and currentEntry.racialVariantExclusions[spellId] == true or false
+	end
+
+	local function setRacialVariantExcluded(_, spellId, selected)
+		local _, currentEntry = getEntry()
+		spellId = tonumber(spellId)
+		if not (currentEntry and spellId) then return end
+		currentEntry.racialVariantExclusions = currentEntry.racialVariantExclusions or {}
+		currentEntry.racialVariantExclusions[spellId] = selected and true or nil
+		if not next(currentEntry.racialVariantExclusions) then currentEntry.racialVariantExclusions = nil end
+		CooldownPanels:RebuildSpellIndex()
+		refreshEntryPreview()
+	end
+
 	local function getResolvedIconSize()
 		local layout = getLayout()
 		local runtimeState = getRuntime(panelId)
@@ -11244,6 +11390,17 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 				return currentEntry and currentEntry.trackPassiveSpell == true or false
 			end,
 			set = function(_, value) setEntryBoolean("trackPassiveSpell", value) end,
+		},
+		{
+			name = L["CooldownPanelRacialExclusions"] or "Excluded racials",
+			kind = SettingType.MultiDropdown,
+			field = "racialVariantExclusions",
+			parentId = "cooldownPanelStandaloneDisplay",
+			height = 260,
+			values = getRacialExclusionOptions(),
+			isShown = isRacialEntrySelected,
+			isSelected = isRacialVariantExcluded,
+			setSelected = setRacialVariantExcluded,
 		},
 		{
 			name = L["CooldownPanelShowItemCount"] or "Show item count",
@@ -13938,8 +14095,11 @@ local function ensureEditor()
 	local cbTrackPassiveSpell = Helper.CreateCheck(rightContent, L["CooldownPanelTrackPassiveSpell"] or "Track passive spell")
 	cbTrackPassiveSpell:SetPoint("TOPLEFT", cbCooldownText, "BOTTOMLEFT", 0, -4)
 
+	local racialExclusionsButton = Helper.CreateButton(rightContent, L["CooldownPanelRacialExclusions"] or "Excluded racials", 180, 20)
+	racialExclusionsButton:SetPoint("TOPLEFT", cbTrackPassiveSpell, "BOTTOMLEFT", 18, -4)
+
 	local cbAlwaysShow = Helper.CreateCheck(rightContent, L["Always show"] or "Always show")
-	cbAlwaysShow:SetPoint("TOPLEFT", cbTrackPassiveSpell, "BOTTOMLEFT", 0, -4)
+	cbAlwaysShow:SetPoint("TOPLEFT", racialExclusionsButton, "BOTTOMLEFT", -18, -4)
 
 	local cbCharges = Helper.CreateCheck(rightContent, L["Show charges"] or "Show charges")
 	cbCharges:SetPoint("TOPLEFT", cbTrackPassiveSpell, "BOTTOMLEFT", 0, -4)
@@ -14176,6 +14336,7 @@ local function ensureEditor()
 			entryId = entryIdBox,
 			cbCooldownText = cbCooldownText,
 			cbTrackPassiveSpell = cbTrackPassiveSpell,
+			racialExclusionsButton = racialExclusionsButton,
 			cbAlwaysShow = cbAlwaysShow,
 			cbCharges = cbCharges,
 			cbStacks = cbStacks,
@@ -14273,6 +14434,7 @@ local function ensureEditor()
 	layoutEditButton:SetScript("OnClick", function() CooldownPanels:SetEditorLayoutEditEnabled(editor.layoutEditActive ~= true) end)
 
 	slotButton:SetScript("OnClick", function(self) showSlotMenu(self, editor.selectedPanelId) end)
+	racialExclusionsButton:SetScript("OnClick", function(self) CooldownPanels:ShowRacialExclusionsMenu(self, editor.selectedPanelId, editor.selectedEntryId) end)
 	importCDMButton:SetScript("OnClick", function(self)
 		local panelId = editor.selectedPanelId
 		if not panelId then return end
@@ -15786,6 +15948,8 @@ local function entryIsAvailableForPreview(entry)
 	end
 	if entry.type == "SPELL" then
 		if not entry.spellID then return false end
+		local _, resolvedSpellId = CooldownPanels:ResolveTrackedSpellID(entry.spellID)
+		if CooldownPanels:IsEntryRacialVariantExcluded(entry, resolvedSpellId or entry.spellID) then return false end
 		return true
 	elseif entry.type == "ITEM" then
 		local itemID = CooldownPanels.ResolveEntryItemID(entry, entry.itemID)
@@ -15925,6 +16089,7 @@ local function layoutInspectorToggles(inspector, entry)
 	if not entry then
 		hideToggle(inspector.cbCooldownText)
 		hideToggle(inspector.cbTrackPassiveSpell)
+		hideControl(inspector.racialExclusionsButton)
 		hideToggle(inspector.cbAlwaysShow)
 		hideToggle(inspector.cbCharges)
 		hideToggle(inspector.cbStacks)
@@ -15987,6 +16152,10 @@ local function layoutInspectorToggles(inspector, entry)
 
 	place(inspector.cbCooldownText, effectiveType ~= "STANCE", -2)
 	place(inspector.cbTrackPassiveSpell, effectiveType == "SPELL")
+	if inspector.racialExclusionsButton then
+		inspector.racialExclusionsButton:SetText(CooldownPanels:GetRacialExclusionsButtonText(entry))
+	end
+	place(inspector.racialExclusionsButton, effectiveType == "SPELL" and CooldownPanels:IsRacialSpellEntry(entry), 18, -4)
 	if effectiveType == "SPELL" then
 		place(inspector.cbAlwaysShow, false)
 		place(inspector.cbCharges, true)
@@ -16232,6 +16401,7 @@ local function refreshInspector(editor, panel, entry)
 
 		inspector.cbCooldownText:SetChecked(entry.showCooldownText ~= false)
 		if inspector.cbTrackPassiveSpell then inspector.cbTrackPassiveSpell:SetChecked(entry.trackPassiveSpell == true) end
+		if inspector.racialExclusionsButton then inspector.racialExclusionsButton:SetText(CooldownPanels:GetRacialExclusionsButtonText(entry)) end
 		if effectiveType == "STANCE" then
 			inspector.cbAlwaysShow:SetChecked(entry.showWhenMissing == true)
 		else
@@ -16296,6 +16466,7 @@ local function refreshInspector(editor, panel, entry)
 		if inspector.cbCustomDuration then inspector.cbCustomDuration:SetChecked(false) end
 		if inspector.customDurationBox then inspector.customDurationBox:SetText("") end
 		if inspector.cbTrackPassiveSpell then inspector.cbTrackPassiveSpell:SetChecked(false) end
+		if inspector.racialExclusionsButton then inspector.racialExclusionsButton:SetText(L["CooldownPanelRacialExclusions"] or "Excluded racials") end
 		if inspector.cbStaticTextDuringCD then inspector.cbStaticTextDuringCD:SetChecked(false) end
 
 		inspector.entryId:Disable()
@@ -17284,7 +17455,10 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 			if resolvedType == "SPELL" and baseSpellId then
 				spellId = effectiveSpellId or baseSpellId
 				spellPassState = self:GetSpellPassState(spellId)
-				if spellPassive then
+				if self:IsEntryRacialVariantExcluded(entry, resolvedSpellId or spellId) then
+					show = false
+					CooldownPanels.ClearReadyGlowEntryState(panelId, entryId, true)
+				elseif spellPassive then
 					show = false
 				elseif Api.IsSpellKnown and not talentChoiceResolved and not Api.IsSpellKnown(spellId) then
 					show = false

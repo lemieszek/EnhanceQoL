@@ -63,3 +63,10 @@
 - If the user asks to prepare a release changelog while a beta changelog should remain available, keep the beta-gated section separate and place the release section below it, outside the beta gate.
 - Do not merge beta-only changelog entries into a release section unless the user explicitly says those beta items are shipping in that release.
 - After changing packaging gates, verify `scripts/prepare_packager_gates.sh` with at least `bash -n`, and make sure the release workflow still runs Luacheck after the gate step.
+
+## EditMode MultiDropdowns
+
+- `SettingType.MultiDropdown` callbacks must not rebuild or refresh the open EditMode settings dialog while the dropdown menu is open.
+- In `setSelected` handlers, update the underlying config and any affected preview/runtime frames only. Avoid calls that recreate the dialog or pooled settings rows, such as direct `UpdateSettings()` calls or helper paths that rebuild the standalone settings UI.
+- Let the EditMode settings library handle its own deferred refresh after selection changes. Rebuilding the dialog from inside a dropdown selection can corrupt the dropdown button text, causing the clicked checkbox label to appear as the dropdown's selected value.
+- For concrete patterns, follow the `SettingType.MultiDropdown` entries in `EnhanceQoL/Modules/Aura/UF_GroupFrames.lua`: use `values`, `isSelected`, and `setSelected`, and keep UI rebuilds outside the selection callback.

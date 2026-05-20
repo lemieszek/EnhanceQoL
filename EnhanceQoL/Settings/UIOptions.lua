@@ -47,6 +47,7 @@ local wipe = wipe
 local fontOrder = {}
 local borderOrder = {}
 local focusInterruptSoundOrder = {}
+local nameplateStatusbarOrder = {}
 local QUICK_SLOT_BORDER = "Interface\\Buttons\\UI-Quickslot2"
 local DEFAULT_NAMEPLATE_FEATURE_KEYS = constants.DEFAULT_NAMEPLATE_FEATURE_KEYS
 	or {
@@ -73,7 +74,14 @@ local DEFAULT_NAMEPLATE_FEATURE_KEYS = constants.DEFAULT_NAMEPLATE_FEATURE_KEYS
 		mobColorMiniboss = "nameplateMobColorMiniboss",
 		mobColorCaster = "nameplateMobColorCaster",
 		mobColorMelee = "nameplateMobColorMelee",
+		mobColorNeutral = "nameplateMobColorNeutral",
+		mobColorTankMode = "nameplateMobColorTankMode",
+		mobColorThreatLost = "nameplateMobColorThreatLost",
+		mobColorThreatWarning = "nameplateMobColorThreatWarning",
 		mobColorTrivial = "nameplateMobColorTrivial",
+		mobColorsInDungeons = "nameplateMobColorsInDungeons",
+		mobColorsOutsideDungeons = "nameplateMobColorsOutsideDungeons",
+		mobTankMode = "nameplateMobTankMode",
 	}
 
 local function getCachedLSMMedia(mediaType)
@@ -1728,7 +1736,7 @@ local function createNameplatesCategory()
 			if addon.functions.RefreshDefaultNameplateTextStyle then addon.functions.RefreshDefaultNameplateTextStyle() end
 		end
 
-		addon.functions.SettingsCreateDropdown(category, {
+		addon.functions.SettingsCreateScrollDropdown(category, {
 			var = DEFAULT_NAMEPLATE_FEATURE_KEYS.textFont,
 			text = L["nameplateTextFont"] or "Nameplate text font",
 			desc = L["nameplateTextFontDesc"],
@@ -1829,24 +1837,27 @@ local function createNameplatesCategory()
 	}
 	local targetMarkerAtlasOrder = { "shop-header-arrow-hover", "CovenantSanctum-Renown-DoubleArrow-Hover" }
 		local function buildNameplateStatusbarDropdown()
-			local list, order = addon.Aura and addon.Aura.functions and addon.Aura.functions.getStatusbarDropdownLists and addon.Aura.functions.getStatusbarDropdownLists(true)
-			if not list and addon.functions.GetLSMMediaDropdown then list, order = addon.functions.GetLSMMediaDropdown("statusbar", true, _G.NONE or "None") end
-			list = list or {}
-		order = order or {}
-		list[""] = _G.NONE or "None"
-		for i = #order, 1, -1 do
-			if order[i] == "" then table.remove(order, i) end
-		end
-		table.insert(order, 1, "")
-		if not list["Interface\\TargetingFrame\\UI-StatusBar"] then
-			list["Interface\\TargetingFrame\\UI-StatusBar"] = "Blizzard Unit Frame"
-			order[#order + 1] = "Interface\\TargetingFrame\\UI-StatusBar"
-		end
-		if not list["Interface\\Buttons\\WHITE8x8"] then
-			list["Interface\\Buttons\\WHITE8x8"] = "Solid"
-			order[#order + 1] = "Interface\\Buttons\\WHITE8x8"
-		end
-		return list, order
+			local map = {
+				[addon.variables.nameplateFocusHealthbarDefaultTexture or "Interface\\TargetingFrame\\UI-StatusBar"] = "Blizzard Unit Frame",
+				["Interface\\Buttons\\WHITE8x8"] = "Solid",
+			}
+			local names, hash = getCachedLSMMedia("statusbar")
+			for i = 1, #names do
+				local name = names[i]
+				local path = hash[name]
+				if type(path) == "string" and path ~= "" then map[path] = tostring(name) end
+			end
+
+			local list, order = addon.functions.prepareListForDropdown(map)
+			list[""] = _G.NONE or "None"
+
+			wipe(nameplateStatusbarOrder)
+			nameplateStatusbarOrder[1] = ""
+			for i = 1, #order do
+				nameplateStatusbarOrder[#nameplateStatusbarOrder + 1] = order[i]
+			end
+
+			return list
 	end
 
 	addon.functions.SettingsCreateDropdown(category, {
@@ -1891,11 +1902,13 @@ local function createNameplatesCategory()
 		parentSection = expandable,
 	})
 
-	addon.functions.SettingsCreateDropdown(category, {
+	addon.functions.SettingsCreateScrollDropdown(category, {
 		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.focusHealthbarTexture,
 		text = L["nameplateFocusHealthbarTexture"] or "Focus healthbar texture",
 		desc = L["nameplateFocusHealthbarTextureDesc"],
 		listFunc = buildNameplateStatusbarDropdown,
+		order = nameplateStatusbarOrder,
+		height = 240,
 		default = "",
 		get = function()
 			local current = addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.focusHealthbarTexture] or ""
@@ -2107,6 +2120,36 @@ local function createNameplatesCategory()
 	createNameplateMobColorPicker(DEFAULT_NAMEPLATE_FEATURE_KEYS.mobColorCaster, L["nameplateMobColorCaster"] or "Caster color")
 	createNameplateMobColorPicker(DEFAULT_NAMEPLATE_FEATURE_KEYS.mobColorMelee, L["nameplateMobColorMelee"] or "Melee color")
 	createNameplateMobColorPicker(DEFAULT_NAMEPLATE_FEATURE_KEYS.mobColorNeutral, L["nameplateMobColorNeutral"] or "Neutral color")
+
+	local tankModeToggle = addon.functions.SettingsCreateCheckbox(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.mobTankMode,
+		text = L["nameplateMobTankMode"] or "Tank mode color",
+		desc = L["nameplateMobTankModeDesc"] or "When you are tanking, colors enemies currently in combat with you using a dedicated color instead of the normal mob coloring.",
+		func = function(value)
+			addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.mobTankMode] = value and true or false
+			refreshNameplateMobColorScope()
+		end,
+		parent = true,
+		element = mobColorsToggle.element,
+		parentCheck = areMobColorsEnabled,
+		parentSection = expandable,
+	})
+	local function isTankModeColorEnabled()
+		return areMobColorsEnabled() and tankModeToggle and tankModeToggle.setting and tankModeToggle.setting:GetValue() == true
+	end
+	addon.functions.SettingsCreateColorPicker(category, {
+		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.mobColorTankMode,
+		text = L["nameplateMobColorTankMode"] or "Tank mode color",
+		callback = function()
+			if addon.functions.RefreshDefaultNameplateMobColors then addon.functions.RefreshDefaultNameplateMobColors() end
+		end,
+		parent = true,
+		element = tankModeToggle.element,
+		parentCheck = isTankModeColorEnabled,
+		colorizeLabel = false,
+		parentSection = expandable,
+	})
+
 	createNameplateMobColorPicker(DEFAULT_NAMEPLATE_FEATURE_KEYS.mobColorThreatWarning, L["nameplateMobColorThreatWarning"] or "Threat warning color")
 	createNameplateMobColorPicker(DEFAULT_NAMEPLATE_FEATURE_KEYS.mobColorThreatLost, L["nameplateMobColorThreatLost"] or "Threat lost color")
 	createNameplateMobColorPicker(DEFAULT_NAMEPLATE_FEATURE_KEYS.mobColorTrivial, L["nameplateMobColorTrivial"] or "Trivial color")
