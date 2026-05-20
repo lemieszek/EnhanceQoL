@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.18.2-beta1] - 2026-05-20
+
+### 🐛 Fixed
+
+- Nameplates: Tank mode coloring now preserves Blizzard's threat warning and threat lost states, using the existing Threat warning and Threat lost colors before applying the Tank mode color.
+
+---
+
 ## [10.18.1] - 2026-05-20
 
 ### 🐛 Fixed

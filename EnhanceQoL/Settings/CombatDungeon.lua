@@ -1368,7 +1368,7 @@ local function getNameplateTankModeColor(unitFrame, threatStatus)
 	if not (addon.db and addon.db[NAMEPLATE_MOB_TANK_MODE_DB_KEY] == true) then return nil end
 	if not isPlayerEffectivelyTank() then return nil end
 	if not isNameplateUnitOnThreatListWithPlayer(unitFrame) then return nil end
-	if type(threatStatus) == "number" and threatStatus >= 3 then return nil end
+	if type(threatStatus) == "number" and threatStatus > 0 then return nil end
 	return getNameplateMobColor(NAMEPLATE_MOB_COLOR_TANK_MODE_DB_KEY)
 end
 
