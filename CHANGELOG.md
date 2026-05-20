@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.18.4] - 2026-05-20
+
+### 🐛 Fixed
+
+- Cooldown Panels: The Cooldown Manager setup reminder now checks only the tracked buff icons setting, avoiding repeated prompts when tracked buff bars are hidden.
+
+---
+
 ## [10.18.3] - 2026-05-20
 
 ### 🐛 Fixed

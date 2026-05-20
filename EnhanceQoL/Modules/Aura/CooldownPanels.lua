@@ -23276,7 +23276,6 @@ cdp.RUNTIME.CDM_SETUP_VISIBLE_SETTING = Enum and Enum.EditModeCooldownViewerSett
 cdp.RUNTIME.CDM_SETUP_VISIBLE_ALWAYS = Enum and Enum.CooldownViewerVisibleSetting and Enum.CooldownViewerVisibleSetting.Always or 0
 cdp.RUNTIME.CDM_SETUP_BUFF_VIEWERS = {
 	"BuffIconCooldownViewer",
-	"BuffBarCooldownViewer",
 }
 cdp.RUNTIME.CDM_SETUP_POPUP = "EQOL_COOLDOWN_PANELS_CDM_QUICK_SETUP"
 cdp.RUNTIME.CDM_SETUP_PROMPT_DELAY = 1.5
