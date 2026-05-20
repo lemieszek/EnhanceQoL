@@ -1,10 +1,11 @@
 # Changelog
 
-## [10.18.2-beta1] - 2026-05-20
+## [10.18.2-beta2] - 2026-05-20
 
 ### 🐛 Fixed
 
 - Nameplates: Tank mode coloring now preserves Blizzard's threat warning and threat lost states, using the existing Threat warning and Threat lost colors before applying the Tank mode color.
+- Nameplates: Avoided a taint-prone direct Blizzard health color refresh when updating default nameplate mob colors, preventing secret health values from erroring during Blizzard heal prediction updates.
 
 ---
 

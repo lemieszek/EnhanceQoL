@@ -1470,6 +1470,98 @@ local function applyNameplateMobColor(unitFrame)
 	healthBar:SetStatusBarColor(targetR, targetG, targetB)
 end
 
+local function applyNameplateBaseHealthColor(unitFrame)
+	if not unitFrame or isSecretValue(unitFrame) then return false end
+	local unit = unitFrame.unit
+	if not isNameplateUnitToken(unit) then return false end
+	local displayedUnit = unitFrame.displayedUnit
+	if isSecretValue(displayedUnit) then displayedUnit = unit end
+
+	local healthBar = getNameplateHealthBar(unitFrame)
+	if not healthBar then return false end
+
+	local connected = UnitIsConnected and UnitIsConnected(unit)
+	if isSecretValue(connected) then return false end
+	local isDead = connected and UnitIsDead and UnitIsDead(unit)
+	if isSecretValue(isDead) then return false end
+	local unitIsPlayer = UnitIsPlayer and UnitIsPlayer(unit)
+	if isSecretValue(unitIsPlayer) then unitIsPlayer = false end
+	local displayedUnitIsPlayer = UnitIsPlayer and UnitIsPlayer(displayedUnit)
+	if isSecretValue(displayedUnitIsPlayer) then displayedUnitIsPlayer = false end
+	local isPlayer = unitIsPlayer or displayedUnitIsPlayer
+	if isSecretValue(isPlayer) then return false end
+
+	local r, g, b
+	if not connected or (isDead and not isPlayer) then
+		r, g, b = 0.5, 0.5, 0.5
+	else
+		local optionTable = unitFrame.optionTable
+		if type(optionTable) == "table" and type(optionTable.healthBarColorOverride) == "table" then
+			local color = optionTable.healthBarColorOverride
+			r, g, b = color.r, color.g, color.b
+		else
+			local localizedClass, englishClass = UnitClass(unit)
+			if isSecretValue(localizedClass) then localizedClass = nil end
+			if isSecretValue(englishClass) then englishClass = nil end
+			local classColor = englishClass and RAID_CLASS_COLORS and RAID_CLASS_COLORS[englishClass]
+			local useClassColors = false
+			if type(_G.CompactUnitFrame_GetOptionUseClassColors) == "function" and type(optionTable) == "table" then
+				useClassColors = _G.CompactUnitFrame_GetOptionUseClassColors(unitFrame, optionTable)
+				if isSecretValue(useClassColors) then useClassColors = false end
+			end
+
+			local treatAsPlayer = UnitTreatAsPlayerForDisplay and UnitTreatAsPlayerForDisplay(unit)
+			if isSecretValue(treatAsPlayer) then treatAsPlayer = false end
+			if type(optionTable) == "table" and (optionTable.allowClassColorsForNPCs or isPlayer or treatAsPlayer) and classColor and useClassColors then
+				r, g, b = classColor.r, classColor.g, classColor.b
+			else
+				local tapDenied = UnitIsTapDenied and UnitIsTapDenied(unit)
+				if isSecretValue(tapDenied) then tapDenied = false end
+				if tapDenied then
+					r, g, b = 0.9, 0.9, 0.9
+				elseif type(optionTable) == "table" and optionTable.colorHealthBySelection and type(UnitSelectionColor) == "function" then
+					local onThreatList = type(_G.CompactUnitFrame_IsOnThreatListWithPlayer) == "function" and _G.CompactUnitFrame_IsOnThreatListWithPlayer(displayedUnit)
+					if isSecretValue(onThreatList) then onThreatList = false end
+					local isFriend = UnitIsFriend and UnitIsFriend("player", unit)
+					if isSecretValue(isFriend) then isFriend = false end
+					if optionTable.considerSelectionInCombatAsHostile and onThreatList and not isFriend then
+						r, g, b = 1, 0, 0
+					else
+						local displayedUnitIsFriend = UnitIsFriend and UnitIsFriend("player", displayedUnit)
+						if isSecretValue(displayedUnitIsFriend) then displayedUnitIsFriend = false end
+						if displayedUnitIsPlayer and displayedUnitIsFriend then
+							r, g, b = 0.667, 0.667, 1
+						else
+							r, g, b = UnitSelectionColor(unit, optionTable.colorHealthWithExtendedColors)
+							if isSecretValue(r) or isSecretValue(g) or isSecretValue(b) then return false end
+						end
+					end
+				else
+					local isFriend = UnitIsFriend and UnitIsFriend("player", unit)
+					if isSecretValue(isFriend) then isFriend = false end
+					if isFriend then
+						r, g, b = 0, 1, 0
+					else
+						r, g, b = 1, 0, 0
+					end
+				end
+			end
+		end
+	end
+
+	if type(r) ~= "number" or type(g) ~= "number" or type(b) ~= "number" then return false end
+	healthBar:SetStatusBarColor(r, g, b)
+	if unitFrame.selectionHighlight then
+		local optionTable = unitFrame.optionTable
+		if type(optionTable) == "table" and optionTable.colorHealthWithExtendedColors then
+			unitFrame.selectionHighlight:SetVertexColor(r, g, b)
+		else
+			unitFrame.selectionHighlight:SetVertexColor(1, 1, 1)
+		end
+	end
+	return true
+end
+
 local function refreshNameplateMobColorUnitFrame(unitFrame)
 	if not unitFrame or isSecretValue(unitFrame) then return end
 	local unit = unitFrame.unit
@@ -1481,11 +1573,7 @@ local function refreshNameplateMobColorUnitFrame(unitFrame)
 	addon.functions.ApplyNameplateFocusHealthbarTexture(unitFrame, unit)
 	if not isNameplateMobColorsActive() then return end
 
-	if type(_G.CompactUnitFrame_UpdateHealthColor) == "function" then
-		_G.CompactUnitFrame_UpdateHealthColor(unitFrame)
-		return
-	end
-
+	applyNameplateBaseHealthColor(unitFrame)
 	applyNameplateMobColor(unitFrame)
 end
 
