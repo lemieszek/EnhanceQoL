@@ -5099,6 +5099,7 @@ function CooldownPanels:RebuildSpellIndex()
 		cdmAuras:UpdateEventRegistration()
 	end
 	if self.UpdateEventRegistration then self:UpdateEventRegistration() end
+	if self.CheckCDMAuraQuickSetup then self:CheckCDMAuraQuickSetup("RebuildSpellIndex") end
 	return index
 end
 
@@ -23241,6 +23242,201 @@ CooldownPanels.RequestEnabledPanelRefreshes = function()
 	end
 	CooldownPanels:EndRuntimeQueryBatch()
 	return queued
+end
+
+cdp.RUNTIME.CDM_SETUP_VISIBLE_SETTING = Enum and Enum.EditModeCooldownViewerSetting and Enum.EditModeCooldownViewerSetting.VisibleSetting or 6
+cdp.RUNTIME.CDM_SETUP_VISIBLE_ALWAYS = Enum and Enum.CooldownViewerVisibleSetting and Enum.CooldownViewerVisibleSetting.Always or 0
+cdp.RUNTIME.CDM_SETUP_BUFF_VIEWERS = {
+	"BuffIconCooldownViewer",
+	"BuffBarCooldownViewer",
+}
+cdp.RUNTIME.CDM_SETUP_POPUP = "EQOL_COOLDOWN_PANELS_CDM_QUICK_SETUP"
+
+cdp.RUNTIME.CooldownPanelsHasActiveCDMAuraEntries = function()
+	local root = ensureRoot()
+	local runtime = CooldownPanels and CooldownPanels.runtime
+	local enabledPanels = runtime and runtime.enabledPanels
+	if not (root and root.panels and enabledPanels and next(enabledPanels)) then return false end
+	for panelId in pairs(enabledPanels) do
+		local panel = root.panels[panelId]
+		for _, entry in pairs((panel and panel.entries) or {}) do
+			if entry and entry.type == "CDM_AURA" then return true end
+		end
+	end
+	return false
+end
+
+cdp.RUNTIME.GetCDMSetupIssues = function()
+	if not cdp.RUNTIME.CooldownPanelsHasActiveCDMAuraEntries() then return nil end
+	local issues = nil
+	if GetCVarBool and GetCVarBool("cooldownViewerEnabled") ~= true then
+		issues = issues or {}
+		issues.cdmDisabled = true
+	elseif C_CVar and C_CVar.GetCVar and C_CVar.GetCVar("cooldownViewerEnabled") ~= "1" then
+		issues = issues or {}
+		issues.cdmDisabled = true
+	end
+	for _, viewerName in ipairs(cdp.RUNTIME.CDM_SETUP_BUFF_VIEWERS) do
+		local viewer = _G[viewerName]
+		if viewer and viewer.visibleSetting ~= nil and viewer.visibleSetting ~= cdp.RUNTIME.CDM_SETUP_VISIBLE_ALWAYS then
+			issues = issues or {}
+			issues.buffViewerNotAlwaysVisible = true
+			break
+		end
+	end
+	local root = ensureRoot()
+	local enabledPanels = CooldownPanels.runtime and CooldownPanels.runtime.enabledPanels
+	for panelId in pairs(enabledPanels or {}) do
+		local panel = root and root.panels and root.panels[panelId] or nil
+		local hasCDMAuraEntry = false
+		for _, entry in pairs((panel and panel.entries) or {}) do
+			if entry and entry.type == "CDM_AURA" then
+				hasCDMAuraEntry = true
+				if entry.cdmAuraAlwaysShowUseGlobal == false or entry.cdmAuraAlwaysShowMode ~= "HIDE" or entry.alwaysShow == true then
+					issues = issues or {}
+					issues.eqolAuraDisplayNotHidden = true
+					break
+				end
+			end
+		end
+		local layout = panel and panel.layout
+		if hasCDMAuraEntry and layout and layout.cdmAuraAlwaysShowMode ~= "HIDE" then
+			issues = issues or {}
+			issues.eqolAuraDisplayNotHidden = true
+		end
+		if issues and issues.eqolAuraDisplayNotHidden then break end
+	end
+	return issues
+end
+
+cdp.RUNTIME.SetCDMSetupViewerSetting = function(viewer, setting, value)
+	if not viewer then return false end
+	local manager = EditModeManagerFrame
+	if manager and manager.OnSystemSettingChange then
+		local ok = pcall(manager.OnSystemSettingChange, manager, viewer, setting, value)
+		if ok then return true end
+	end
+	return false
+end
+
+cdp.RUNTIME.SetTrackedAuraEntriesToTrackedBuffs = function(root, enabledPanels)
+	if InCombatLockdown and InCombatLockdown() then return false end
+	local cooldownViewerSettings = _G.CooldownViewerSettings
+	if not (root and enabledPanels and cooldownViewerSettings and cooldownViewerSettings.GetDataProvider) then return false end
+	local dataProvider = cooldownViewerSettings:GetDataProvider()
+	if not dataProvider or not dataProvider.SetCooldownToCategory then return false end
+	local category = Enum and Enum.CooldownViewerCategory and Enum.CooldownViewerCategory.TrackedBuff
+	if not category then return false end
+	local layoutManager = cooldownViewerSettings.GetLayoutManager and cooldownViewerSettings:GetLayoutManager() or nil
+	if layoutManager and layoutManager.LockNotifications then pcall(layoutManager.LockNotifications, layoutManager) end
+	local changed = false
+	for panelId in pairs(enabledPanels or {}) do
+		local panel = root.panels and root.panels[panelId] or nil
+		for _, entry in pairs((panel and panel.entries) or {}) do
+			local cooldownID = entry and entry.type == "CDM_AURA" and entry.cooldownID or nil
+			if cooldownID ~= nil then
+				local ok, status = pcall(dataProvider.SetCooldownToCategory, dataProvider, cooldownID, category)
+				if ok and (not Enum or not Enum.CooldownLayoutStatus or status == Enum.CooldownLayoutStatus.Success) then changed = true end
+			end
+		end
+	end
+	if changed then
+		if dataProvider.MarkDirty then pcall(dataProvider.MarkDirty, dataProvider) end
+		if cooldownViewerSettings.SaveCurrentLayout then pcall(cooldownViewerSettings.SaveCurrentLayout, cooldownViewerSettings) end
+	end
+	if layoutManager and layoutManager.UnlockNotifications then pcall(layoutManager.UnlockNotifications, layoutManager, false) end
+	return changed
+end
+
+function CooldownPanels:ApplyCDMAuraQuickSetup()
+	if InCombatLockdown and InCombatLockdown() then
+		showErrorMessage(L["CooldownPanelCDMQuickSetupCombat"] or "Cooldown Manager Quick Setup cannot run in combat.")
+		return false
+	end
+	if SetCVar then SetCVar("cooldownViewerEnabled", "1") end
+	local viewerChanged = false
+	for _, viewerName in ipairs(cdp.RUNTIME.CDM_SETUP_BUFF_VIEWERS) do
+		local viewer = _G[viewerName]
+		if viewer and viewer.visibleSetting ~= cdp.RUNTIME.CDM_SETUP_VISIBLE_ALWAYS then
+			viewerChanged = cdp.RUNTIME.SetCDMSetupViewerSetting(viewer, cdp.RUNTIME.CDM_SETUP_VISIBLE_SETTING, cdp.RUNTIME.CDM_SETUP_VISIBLE_ALWAYS) or viewerChanged
+		end
+	end
+	if viewerChanged and EditModeManagerFrame and EditModeManagerFrame.SaveLayouts then pcall(EditModeManagerFrame.SaveLayouts, EditModeManagerFrame) end
+
+	local root = ensureRoot()
+	local enabledPanels = self.runtime and self.runtime.enabledPanels
+	cdp.RUNTIME.SetTrackedAuraEntriesToTrackedBuffs(root, enabledPanels)
+	local panelChanged = false
+	for panelId in pairs(enabledPanels or {}) do
+		local panel = root and root.panels and root.panels[panelId] or nil
+		local hasCDMAuraEntry = false
+		for _, entry in pairs((panel and panel.entries) or {}) do
+			if entry and entry.type == "CDM_AURA" then
+				hasCDMAuraEntry = true
+				if entry.cdmAuraAlwaysShowUseGlobal ~= true or entry.cdmAuraAlwaysShowMode ~= "HIDE" or entry.alwaysShow ~= false then
+					entry.cdmAuraAlwaysShowUseGlobal = true
+					entry.cdmAuraAlwaysShowMode = "HIDE"
+					entry.alwaysShow = false
+					panelChanged = true
+				end
+			end
+		end
+		if hasCDMAuraEntry then
+			panel.layout = panel.layout or Helper.CopyTableShallow(Helper.PANEL_LAYOUT_DEFAULTS)
+			if panel.layout.cdmAuraAlwaysShowMode ~= "HIDE" then
+				panel.layout.cdmAuraAlwaysShowMode = "HIDE"
+				panelChanged = true
+			end
+		end
+	end
+	if panelChanged then
+		self:RebuildSpellIndex()
+		self:RequestUpdate({ cause = "CDMQuickSetup", fullRefresh = true })
+		if self.IsEditorOpen and self:IsEditorOpen() then self:RefreshEditor() end
+	end
+	showErrorMessage(L["CooldownPanelCDMQuickSetupApplied"] or "Cooldown Manager Quick Setup applied.")
+	ReloadUI()
+	return true
+end
+
+function CooldownPanels:IgnoreCDMAuraQuickSetup()
+	local root = ensureRoot()
+	if root then root.cdmAuraQuickSetupIgnored = true end
+end
+
+StaticPopupDialogs[cdp.RUNTIME.CDM_SETUP_POPUP] = StaticPopupDialogs[cdp.RUNTIME.CDM_SETUP_POPUP]
+	or {
+		text = L["CooldownPanelCDMQuickSetupPopup"]
+			or "EnhanceQoL needs WoW's Cooldown Manager for tracked auras.\n\nQuick Setup will adjust the required settings and reload the UI.",
+		button1 = L["CooldownPanelCDMQuickSetupAccept"] or "Quick Setup & Reload",
+		button2 = L["CooldownPanelCDMQuickSetupLater"] or "Later",
+		button3 = L["CooldownPanelCDMQuickSetupIgnore"] or IGNORE or "Ignore",
+		OnAccept = function() CooldownPanels:ApplyCDMAuraQuickSetup() end,
+		OnAlt = function() CooldownPanels:IgnoreCDMAuraQuickSetup() end,
+		timeout = 0,
+		whileDead = true,
+		hideOnEscape = true,
+		preferredIndex = 3,
+	}
+
+function CooldownPanels:CheckCDMAuraQuickSetup(cause)
+	local root = ensureRoot()
+	if not root then return false end
+	local issues = cdp.RUNTIME.GetCDMSetupIssues()
+	if not issues then
+		root.cdmAuraQuickSetupIgnored = nil
+		return false
+	end
+	if root.cdmAuraQuickSetupIgnored == true then return false end
+	self.runtime = self.runtime or {}
+	local runtime = self.runtime
+	runtime.cdmAuraQuickSetupPromptShown = runtime.cdmAuraQuickSetupPromptShown or {}
+	local specKey = tostring(getPlayerSpecId() or "nospec")
+	if runtime.cdmAuraQuickSetupPromptShown[specKey] then return false end
+	if StaticPopup_Visible and StaticPopup_Visible(cdp.RUNTIME.CDM_SETUP_POPUP) then return false end
+	runtime.cdmAuraQuickSetupPromptShown[specKey] = cause or true
+	StaticPopup_Show(cdp.RUNTIME.CDM_SETUP_POPUP)
+	return true
 end
 
 CooldownPanels.assistedHighlightHooked = false
