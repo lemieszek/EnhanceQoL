@@ -1,15 +1,14 @@
 # Changelog
 
-<!--@eqol-beta@-->
-## [10.19.0-beta1] - 2026-05-20
+## [10.18.1] - 2026-05-20
 
-### ✨ Added
+### 🐛 Fixed
 
-- Cooldown Panels: Added per-entry exclusions for Racial entries, allowing selected racials to stay hidden in shared panels.
-- Nameplates: Added Tank mode coloring for default enemy nameplates, with a dedicated color for mobs currently in combat with you while tanking.
+- Cooldown Panels: Added 17 missing automatic activation-duration lookup entries for supported on-use trinkets and similar items.
+- Cooldown Panels: Added missing per-entry exclusions for Racial entries, allowing selected racials to stay hidden in shared panels.
+- Nameplates: Added missing Tank mode coloring for default enemy nameplates, with a dedicated color for mobs currently in combat with you while tanking.
 
 ---
-<!--@end-eqol-beta@-->
 
 ## [10.18.0] - 2026-05-20
 
