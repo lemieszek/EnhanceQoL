@@ -5793,6 +5793,31 @@ function CooldownPanels.HideIconTooltip()
 	if GameTooltip then GameTooltip:Hide() end
 end
 
+cdp.RUNTIME.CreateCDMAuraHelpButton = function(parent)
+	if not parent then return nil end
+	local button = CreateFrame("Button", nil, parent)
+	button:SetSize(32, 32)
+	button:SetNormalTexture("Interface\\common\\help-i")
+	button:SetHighlightTexture("Interface\\common\\help-i")
+	if button:GetHighlightTexture() then button:GetHighlightTexture():SetAlpha(0.7) end
+	button.ring = button:CreateTexture(nil, "BORDER")
+	button.ring:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+	button.ring:SetSize(44, 44)
+	button.ring:SetPoint("CENTER", button, "CENTER", 8, -9)
+	button:SetScript("OnEnter", function(self)
+		if not GameTooltip then return end
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT", 6, 0)
+		GameTooltip:ClearLines()
+		GameTooltip:SetText(L["CooldownPanelCDMAuraHelpTitle"] or "Tracked Auras")
+		GameTooltip:AddLine(L["CooldownPanelCDMAuraHelpTooltip"] or "Auras must be enabled in WoW's Cooldown Manager before EnhanceQoL can display them.", 1, 1, 1, true)
+		GameTooltip:Show()
+	end)
+	button:SetScript("OnLeave", function()
+		if GameTooltip then GameTooltip:Hide() end
+	end)
+	return button
+end
+
 function CooldownPanels.SetIconTooltipMouseState(icon, enabled)
 	if not icon then return end
 	local mouseEnabled = enabled == true
@@ -13959,6 +13984,9 @@ local function ensureEditor()
 	frame.title:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -12)
 	frame.title:SetText(L["CooldownPanelEditor"] or "Cooldown Panel Editor")
 	frame.title:SetFont((addon.variables and addon.variables.defaultFont) or frame.title:GetFont(), 16, "OUTLINE")
+
+	frame.cdmAuraHelp = cdp.RUNTIME.CreateCDMAuraHelpButton(frame)
+	if frame.cdmAuraHelp then frame.cdmAuraHelp:SetPoint("TOPLEFT", frame, "TOPLEFT", -13, 13) end
 
 	frame.close = CreateFrame("Button", nil, frame, "UIPanelCloseButtonNoScripts")
 	frame.close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 20, 13)
