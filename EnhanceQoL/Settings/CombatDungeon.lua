@@ -1510,7 +1510,7 @@ local function applyNameplateBaseHealthColor(unitFrame)
 				if isSecretValue(useClassColors) then useClassColors = false end
 			end
 
-			local treatAsPlayer = UnitTreatAsPlayerForDisplay and UnitTreatAsPlayerForDisplay(unit)
+			local treatAsPlayer = _G.UnitTreatAsPlayerForDisplay and _G.UnitTreatAsPlayerForDisplay(unit)
 			if isSecretValue(treatAsPlayer) then treatAsPlayer = false end
 			if type(optionTable) == "table" and (optionTable.allowClassColorsForNPCs or isPlayer or treatAsPlayer) and classColor and useClassColors then
 				r, g, b = classColor.r, classColor.g, classColor.b
