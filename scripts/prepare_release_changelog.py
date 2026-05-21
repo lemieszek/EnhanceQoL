@@ -6,7 +6,6 @@ from pathlib import Path
 
 
 HEADING = re.compile(r"^## \[(?P<tag>[^\]]+)\].*$")
-PATCH_RELEASE = re.compile(r"^\d+\.\d+\.(?P<patch>\d+)$")
 
 
 def parse_sections(changelog):
@@ -33,21 +32,13 @@ def parse_sections(changelog):
     return lines, sections
 
 
-def is_patch_release(tag):
-    match = PATCH_RELEASE.match(tag)
-    return bool(match and int(match.group("patch")) > 0)
-
-
 def release_sections(changelog, tag):
     lines, sections = parse_sections(changelog)
-    for index, section in enumerate(sections):
+    for section in sections:
         if section["tag"] != tag:
             continue
 
-        selected = [section]
-        if is_patch_release(tag) and index + 1 < len(sections):
-            selected.append(sections[index + 1])
-        return lines, selected
+        return lines, [section]
 
     return lines, []
 

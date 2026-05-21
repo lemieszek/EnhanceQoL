@@ -28,9 +28,6 @@ jobs:
         run: |
           git fetch --tags --force
 
-      # - name: Generate Changelog
-      #   run: ./generate_changelog.sh
-
       - name: Install LibEQOL
         uses: R41z0r/LibEQOL@v1.0.0
         with:
