@@ -1211,11 +1211,13 @@ ApplyFrameVisibilityState = function(state)
 	targetAlpha = clampVisibilityAlpha(targetAlpha) or 0
 
 	local lastAlpha = state.lastAlpha
+	local actualAlpha
+	if state.frame and state.frame.GetAlpha then actualAlpha = state.frame:GetAlpha() end
+	local alphaAlreadyApplied = lastAlpha ~= nil and math.abs(lastAlpha - targetAlpha) <= 0.001 and (actualAlpha == nil or math.abs(actualAlpha - targetAlpha) <= 0.001)
 	if
 		state.visible == shouldShow
 		and state.activeRule == activeRule
-		and lastAlpha ~= nil
-		and math.abs(lastAlpha - targetAlpha) <= 0.001
+		and alphaAlreadyApplied
 	then
 		return
 	end

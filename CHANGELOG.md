@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.18.6] - 2026-05-21
+
+### 🐛 Fixed
+
+- Unit Frames / Visibility: Fixed the custom player frame health bar staying visible after loading screens or zone changes when visibility rules should keep it hidden.
+
+---
+
 ## [10.18.5] - 2026-05-21
 
 ### 🐛 Fixed
