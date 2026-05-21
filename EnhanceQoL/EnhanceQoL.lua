@@ -5149,6 +5149,9 @@ local function initUI()
 
 	local ICON_SIZE = 32
 	local PADDING = 4
+	local BUTTON_SINK_FRAME_STRATA = "MEDIUM"
+	local BUTTON_SINK_FRAME_LEVEL = 7
+	local BUTTON_SINK_BUTTON_LEVEL = BUTTON_SINK_FRAME_LEVEL + 1
 	local BUTTON_SINK_ANCHORS = {
 		TOPLEFT = { bag = "BOTTOMRIGHT", button = "TOPLEFT" },
 		TOPRIGHT = { bag = "BOTTOMLEFT", button = "TOPRIGHT" },
@@ -5561,6 +5564,8 @@ local function initUI()
 			end)
 			local buttonBag = CreateFrame("Frame", addonName .. "_ButtonSink", UIParent, "BackdropTemplate")
 			buttonBag:SetSize(150, 150)
+			buttonBag:SetFrameStrata(BUTTON_SINK_FRAME_STRATA)
+			buttonBag:SetFrameLevel(BUTTON_SINK_FRAME_LEVEL)
 
 			if useLauncherToggle then
 				buttonBag:SetScript("OnLeave", function()
@@ -5780,8 +5785,8 @@ local function initUI()
 						local row = math.floor((index - 1) / columns)
 
 						button:SetParent(addon.variables.buttonSink)
-						button:SetFrameStrata("DIALOG")
-						button:SetFrameLevel(100)
+						button:SetFrameStrata(BUTTON_SINK_FRAME_STRATA)
+						button:SetFrameLevel(BUTTON_SINK_BUTTON_LEVEL)
 						button:SetSize(ICON_SIZE, ICON_SIZE)
 						button:SetPoint("TOPLEFT", addon.variables.buttonSink, "TOPLEFT", col * (ICON_SIZE + PADDING) + PADDING, -row * (ICON_SIZE + PADDING) - PADDING)
 						button:Show()

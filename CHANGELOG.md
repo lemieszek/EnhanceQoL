@@ -6,6 +6,7 @@
 
 - Class Buff Reminder: Fixed Restoration Druid Symbiotic Relationship reminders not showing in raid groups.
 - Cooldown Panels: Logical fix to prevent the changing of panel or entry display modes.
+- Minimap Button Bin: Fixed collected buttons like AllTheThings and Narcissus appearing above other UI windows when opening the sink.
 
 ---
 
