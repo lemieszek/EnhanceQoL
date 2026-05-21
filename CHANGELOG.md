@@ -1,10 +1,11 @@
 # Changelog
 
-## [10.18.5] - 2026-05-20
+## [10.18.5] - 2026-05-21
 
 ### 🐛 Fixed
 
 - Class Buff Reminder: Fixed Restoration Druid Symbiotic Relationship reminders not showing in raid groups.
+- Cooldown Panels: Logical fix to prevent the changing of panel or entry display modes.
 
 ---
 
