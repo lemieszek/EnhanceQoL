@@ -506,6 +506,7 @@ local CHAT_FILTER_OPTIONS = {
 	{ key = "YELL", label = makeFilterLabel("YELL", "892447", YELL) },
 	{ key = "WHISPER", label = makeFilterLabel("WHISPER", "133458", WHISPER) },
 	{ key = "BN_WHISPER", label = makeFilterLabel("BN_WHISPER", "Interface\\FriendsFrame\\UI-Toast-ChatInviteIcon", BN_WHISPER) },
+	{ key = "EMOTE", label = makeFilterLabel("EMOTE", "132161", EMOTE) },
 	{ key = "PARTY", label = makeFilterLabel("PARTY", "134149", PARTY) },
 	{ key = "INSTANCE", label = makeFilterLabel("INSTANCE", "Interface\\AddOns\\EnhanceQoL\\Icons\\Dungeon.tga", INSTANCE) },
 	{ key = "RAID", label = makeFilterLabel("RAID", "Interface\\AddOns\\EnhanceQoL\\Icons\\Raid.tga", RAID) },

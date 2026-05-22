@@ -5,6 +5,7 @@
 ### ✨ Added
 
 - Combat Logging: Added a default-enabled option to limit automatic raid combat logging to raids from the current expansion, preventing old raid transmog runs from being logged while leaving Mythic+ dungeon logging unrestricted.
+- Chat History: Added Emote as a loggable channel filter option.
 - Unit Frames / Healer Buff Placement: Added Strata and Level controls for HBP border indicators, allowing border layering to be adjusted when it overlaps other effects such as the dispel glow.
 
 ### 🐛 Fixed

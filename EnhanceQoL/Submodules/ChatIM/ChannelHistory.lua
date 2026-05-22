@@ -30,6 +30,8 @@ ChannelHistory.EVENT_FILTER_KEY = ChannelHistory.EVENT_FILTER_KEY
 		CHAT_MSG_WHISPER_INFORM = "WHISPER",
 		CHAT_MSG_BN_WHISPER = "BN_WHISPER",
 		CHAT_MSG_BN_WHISPER_INFORM = "BN_WHISPER",
+		CHAT_MSG_EMOTE = "EMOTE",
+		CHAT_MSG_TEXT_EMOTE = "EMOTE",
 		CHAT_MSG_PARTY = "PARTY",
 		CHAT_MSG_PARTY_LEADER = "PARTY",
 		CHAT_MSG_INSTANCE_CHAT = "INSTANCE",
@@ -66,6 +68,7 @@ ChannelHistory.defaultFilters = {
 	YELL = true,
 	WHISPER = true,
 	BN_WHISPER = true,
+	EMOTE = true,
 	GENERAL = true,
 	MONEY = true,
 	CURRENCY = true,
@@ -183,6 +186,7 @@ local function buildFilterOptions()
 		{ key = "YELL", label = string.format("|T892447:14:14:0:0|t %s", YELL) },
 		{ key = "WHISPER", label = string.format("|T133458:14:14:0:0|t %s", WHISPER) },
 		{ key = "BN_WHISPER", label = string.format("|TInterface\\FriendsFrame\\UI-Toast-ChatInviteIcon:14:14:0:0|t %s", BN_WHISPER) },
+		{ key = "EMOTE", label = string.format("|T132161:14:14:0:0|t %s", EMOTE) },
 		{ key = "PARTY", label = string.format("|T134149:14:14:0:0|t %s", PARTY) },
 		{ key = "INSTANCE", label = string.format("|TInterface\\AddOns\\EnhanceQoL\\Icons\\Dungeon.tga:14:14:0:0|t %s", INSTANCE) },
 		{ key = "RAID", label = string.format("|TInterface\\AddOns\\EnhanceQoL\\Icons\\Raid.tga:14:14:0:0|t %s", RAID) },
@@ -1212,6 +1216,7 @@ local CHAT_COLOR_KEYS = {
 	YELL = "YELL",
 	WHISPER = "WHISPER",
 	BN_WHISPER = "BN_WHISPER",
+	EMOTE = "EMOTE",
 	PARTY = "PARTY",
 	INSTANCE = "INSTANCE_CHAT",
 	RAID = "RAID",
@@ -1233,6 +1238,7 @@ local CHAT_COLOR_FALLBACK = {
 	YELL = { r = 1, g = 0.25, b = 0.25 },
 	WHISPER = { r = 1, g = 0.5, b = 1 },
 	BN_WHISPER = { r = 0, g = 1, b = 0.96 },
+	EMOTE = { r = 1, g = 128 / 255, b = 64 / 255 },
 	PARTY = { r = 170 / 255, g = 170 / 255, b = 1 },
 	INSTANCE = { r = 170 / 255, g = 170 / 255, b = 1 },
 	RAID = { r = 1, g = 127 / 255, b = 0 },
@@ -3019,7 +3025,7 @@ function ChannelHistory:CreateFilterUI()
 	end
 
 	local filterGroups = {
-		{ title = L["Chat"] or CHAT or "Chat", keys = { "SAY", "YELL", "WHISPER", "BN_WHISPER", "PARTY", "INSTANCE", "RAID", "GUILD", "OFFICER", "GENERAL" } },
+		{ title = L["Chat"] or CHAT or "Chat", keys = { "SAY", "YELL", "WHISPER", "BN_WHISPER", "EMOTE", "PARTY", "INSTANCE", "RAID", "GUILD", "OFFICER", "GENERAL" } },
 		{ title = L["CH_FILTER_CAT_SYSTEM"] or SYSTEM_MESSAGES or "System", keys = { "LOOT", "MONEY", "CURRENCY", "ACHIEVEMENT", "SYSTEM", "OPENING" } },
 		{ title = L["Other"] or OTHER or "Other", keys = { "MONSTER", "TRADE", "MAIL" } },
 	}
