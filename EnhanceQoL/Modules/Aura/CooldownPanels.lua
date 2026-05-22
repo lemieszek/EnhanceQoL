@@ -10250,6 +10250,11 @@ function CooldownPanels:ShowEntryQuickSetupMenu(owner, panelId, entryId)
 	Api.MenuUtil.CreateContextMenu(owner, function(_, rootDescription)
 		rootDescription:SetTag("MENU_EQOL_COOLDOWN_PANEL_ENTRY_QUICK_SETUP")
 		rootDescription:CreateTitle(L["CooldownPanelQuickSetups"] or "Quick setups")
+		local bars = self.Bars
+		if bars and bars.IsBarDisplayModeValue and bars.IsBarDisplayModeValue(entry.displayMode) then
+			if bars.AppendQuickSetupMenu then bars.AppendQuickSetupMenu(rootDescription, panelId, entryId) end
+			return
+		end
 		local textInfoMenu = rootDescription:CreateButton(L["CooldownPanelQuickSetupTextInfoOnCooldown"] or "Text info on cooldown")
 		for _, layoutKey in ipairs(cdp.ENTRY.TEXT_INFO_LAYOUT_ORDER) do
 			local layout = cdp.ENTRY.TEXT_INFO_LAYOUTS[layoutKey]
@@ -13343,7 +13348,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 	local buttons = {}
 	local bars = self.Bars
 	local isBarEntry = bars and bars.IsBarDisplayModeValue and bars.IsBarDisplayModeValue(entry.displayMode) or false
-	if not isBarEntry then
+	if not isBarEntry or (bars and bars.EntryHasQuickSetups and bars.EntryHasQuickSetups(panelId, entryId)) then
 		buttons[#buttons + 1] = {
 			text = L["CooldownPanelQuickSetups"] or "Quick setups",
 			layout = "compact",

@@ -5,6 +5,7 @@
 ### ✨ Added
 
 - Cooldown Panels / Layout Edit: Added entry Quick Setups and entry style copy/paste buttons.
+- Cooldown Panels / Bars: Added a Segment charges Quick Setup preset.
 
 ### 🐛 Fixed
 

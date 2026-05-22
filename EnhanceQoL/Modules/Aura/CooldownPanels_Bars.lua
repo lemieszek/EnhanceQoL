@@ -828,6 +828,42 @@ local function supportsBarMode(entry, mode)
 	return resolvedType == "SPELL" or resolvedType == "ITEM" or entry.type == "MACRO" or resolvedType == "CDM_AURA"
 end
 
+Bars.EntryHasQuickSetups = function(panelId, entryId)
+	local _, entry = getBarEntry(panelId, entryId)
+	return Bars.IsBarDisplayModeValue(entry and entry.displayMode) and supportsBarMode(entry, Bars.BAR_MODE.CHARGES)
+end
+
+Bars.ApplySegmentChargesQuickSetup = function(panelId, entryId)
+	local _, entry = getBarEntry(panelId, entryId)
+	if not supportsBarMode(entry, Bars.BAR_MODE.CHARGES) then return false end
+	mutateBarEntry(panelId, entryId, function(target)
+		target.displayMode = Bars.DISPLAY_MODE.BAR
+		target.barMode = Bars.BAR_MODE.CHARGES
+		Bars.ApplyNewBarStyleDefaults(target)
+		if type(target.barColor) ~= "table" then target.barColor = getDefaultBarColorForMode(target.barMode) end
+		target.barWidth = 200
+		target.barShowIcon = false
+		target.barShowLabel = false
+		target.barChargesSegmented = true
+		target.barChargesGap = 2
+		target.barShowValueText = false
+		target.barShowChargeDuration = true
+		target.barValueAnchor = Bars.TEXT_ANCHOR.CENTER
+		target.barValueOffsetX = 0
+		target.barValueOffsetY = 0
+		target.barValueSize = 14
+	end, true)
+	return true
+end
+
+Bars.AppendQuickSetupMenu = function(rootDescription, panelId, entryId)
+	if not rootDescription or not Bars.EntryHasQuickSetups(panelId, entryId) then return false end
+	rootDescription:CreateButton(L["CooldownPanelBarChargesSegmented"] or "Segment charges", function()
+		Bars.ApplySegmentChargesQuickSetup(panelId, entryId)
+	end)
+	return true
+end
+
 local function shouldAutoEnableShowStacks(entry)
 	return supportsBarMode(entry, Bars.BAR_MODE.STACKS)
 		and normalizeDisplayMode(entry and entry.displayMode, Bars.DEFAULTS.displayMode) == Bars.DISPLAY_MODE.BAR
