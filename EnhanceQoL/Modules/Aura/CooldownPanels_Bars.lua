@@ -726,6 +726,21 @@ local function mutateBarEntry(panelId, entryId, mutator, reopenDialog)
 	return panel, entry
 end
 
+Bars.HandleEntryStylePaste = function(panelId, entryId, entry, wasBar)
+	panelId = normalizeId(panelId)
+	entryId = normalizeId(entryId)
+	local panel = panelId and CooldownPanels.GetPanel and CooldownPanels:GetPanel(panelId) or nil
+	if not (panel and entry) then return false end
+	normalizeBarEntry(entry)
+	local isBar = Bars.IsBarDisplayModeValue(entry.displayMode)
+	if type(entry._eqolBarsStaticVersion) ~= "number" then entry._eqolBarsStaticVersion = 0 end
+	entry._eqolBarsStaticVersion = entry._eqolBarsStaticVersion + 1
+	if Bars._eqolBarColorCache then Bars._eqolBarColorCache[entry] = nil end
+	Bars.MarkReservationCacheDirty(panel)
+	if wasBar ~= isBar and CooldownPanels.RebuildSpellIndex then CooldownPanels:RebuildSpellIndex() end
+	return true
+end
+
 Bars._eqolBarColorCache = Bars._eqolBarColorCache or setmetatable({}, { __mode = "k" })
 
 function Bars.GetCachedEntryColor(entry, field, fallback)
@@ -6349,9 +6364,18 @@ Bars.BuildStandaloneDialogButtons = function(panelId, entryId, existingButtons)
 	if not (panel and entry and Helper.IsFixedLayout and Helper.IsFixedLayout(panel.layout)) then return existingButtons end
 
 	local buttons = {}
+	local removeButton
 	local displayMode = normalizeDisplayMode(entry.displayMode, Bars.DEFAULTS.displayMode)
+	for _, button in ipairs(existingButtons or {}) do
+		if type(button) == "table" and button.id == "removeEntry" then
+			removeButton = button
+		else
+			buttons[#buttons + 1] = button
+		end
+	end
 	buttons[#buttons + 1] = {
 		text = displayMode == Bars.DISPLAY_MODE.BAR and (L["CooldownPanelSwitchToButton"] or "Switch to Button") or (L["CooldownPanelSwitchToBar"] or "Switch to Bar"),
+		layout = "compact",
 		click = function()
 			if normalizeDisplayMode(entry.displayMode, Bars.DEFAULTS.displayMode) == Bars.DISPLAY_MODE.BAR then
 				setEntryDisplayMode(panelId, entryId, Bars.DISPLAY_MODE.BUTTON)
@@ -6360,8 +6384,8 @@ Bars.BuildStandaloneDialogButtons = function(panelId, entryId, existingButtons)
 			end
 		end,
 	}
-	for _, button in ipairs(existingButtons or {}) do
-		buttons[#buttons + 1] = button
+	if removeButton then
+		buttons[#buttons + 1] = removeButton
 	end
 	return buttons
 end

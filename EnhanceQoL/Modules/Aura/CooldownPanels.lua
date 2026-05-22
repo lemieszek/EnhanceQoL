@@ -3276,6 +3276,162 @@ function CooldownPanels:GetEntryStandaloneTitle(entry)
 	return name or typeLabel or ""
 end
 
+cdp.ENTRY.STYLE_CLIPBOARD = {
+	SKIP_KEYS = {
+		id = true,
+		type = true,
+		spellID = true,
+		itemID = true,
+		slotID = true,
+		macroID = true,
+		macroName = true,
+		slotIndex = true,
+		slotColumn = true,
+		slotRow = true,
+		fixedGroupId = true,
+		iconOffsetX = true,
+		iconOffsetY = true,
+		customIconID = true,
+		ignoreMasque = true,
+		stateTextureType = true,
+		stateTextureAtlas = true,
+		stateTextureFileID = true,
+		fixedGroupIconSizeInherited = true,
+		fixedGroupIconSizePrevUseGlobal = true,
+		fixedGroupIconSizePrev = true,
+	},
+	SPELL_ONLY_KEYS = {
+		showCharges = true,
+		showChargesCooldown = true,
+		trackPassiveSpell = true,
+		readyGlowCheckPower = true,
+		checkPower = true,
+		checkPowerUseGlobal = true,
+		hideWhenNoResource = true,
+		hideWhenNoResourceUseGlobal = true,
+		procGlowEnabled = true,
+		procGlowUseGlobal = true,
+		procGlowStyle = true,
+		procGlowInset = true,
+	},
+	ITEM_ONLY_KEYS = {
+		showItemCount = true,
+		showItemUses = true,
+		showWhenEmpty = true,
+		useHighestRank = true,
+	},
+	SLOT_ONLY_KEYS = {
+		showWhenNoCooldown = true,
+	},
+	CDM_AURA_ONLY_KEYS = {
+		pandemicGlow = true,
+		pandemicGlowColor = true,
+		pandemicGlowStyle = true,
+		pandemicGlowInset = true,
+		cdmAuraAlwaysShowUseGlobal = true,
+		cdmAuraAlwaysShowMode = true,
+		cdmAuraOverlayEnabled = true,
+		cdmAuraOverlayReverse = true,
+		cdmAuraOverlayColor = true,
+	},
+	STATE_TEXTURE_KEYS = {
+		stateTextureInput = true,
+		stateTextureShowWithoutProc = true,
+		stateTextureScale = true,
+		stateTextureWidth = true,
+		stateTextureHeight = true,
+		stateTextureAngle = true,
+		stateTextureDouble = true,
+		stateTextureMirror = true,
+		stateTextureMirrorSecond = true,
+		stateTextureMirrorVertical = true,
+		stateTextureMirrorVerticalSecond = true,
+		stateTextureSpacingX = true,
+		stateTextureSpacingY = true,
+	},
+}
+
+cdp.ENTRY.STANDALONE_COLLAPSIBLE_IDS = {
+	"cooldownPanelStandaloneDisplay",
+	"cooldownPanelStandaloneStacks",
+	"cooldownPanelStandaloneCharges",
+	"cooldownPanelStandaloneCooldownVisuals",
+	"cooldownPanelStandaloneOverlays",
+	"cooldownPanelStandaloneCooldownText",
+	"cooldownPanelStandaloneStaticText",
+	"cooldownPanelStandaloneStateTexture",
+	"cooldownPanelStandaloneGlow",
+	"cooldownPanelStandaloneSound",
+}
+
+cdp.ENTRY.TEXT_INFO_LAYOUTS = {
+	COOLDOWN_ABOVE_TEXT_BELOW = {
+		labelKey = "CooldownPanelQuickSetupCooldownAboveTextBelow",
+		fallback = "Cooldown above, text below",
+		cooldownTextX = 0,
+		cooldownTextY = 12,
+		staticTextAnchor = "CENTER",
+		staticTextX = 0,
+		staticTextY = -8,
+	},
+	TEXT_ABOVE_COOLDOWN_BELOW = {
+		labelKey = "CooldownPanelQuickSetupTextAboveCooldownBelow",
+		fallback = "Text above, cooldown below",
+		cooldownTextX = 0,
+		cooldownTextY = -8,
+		staticTextAnchor = "CENTER",
+		staticTextX = 0,
+		staticTextY = 12,
+	},
+	TEXT_LEFT_COOLDOWN_RIGHT = {
+		labelKey = "CooldownPanelQuickSetupTextLeftCooldownRight",
+		fallback = "Text left, cooldown right",
+		cooldownTextX = 28,
+		cooldownTextY = 0,
+		staticTextAnchor = "CENTER",
+		staticTextX = -28,
+		staticTextY = 0,
+	},
+	COOLDOWN_LEFT_TEXT_RIGHT = {
+		labelKey = "CooldownPanelQuickSetupCooldownLeftTextRight",
+		fallback = "Cooldown left, text right",
+		cooldownTextX = -28,
+		cooldownTextY = 0,
+		staticTextAnchor = "CENTER",
+		staticTextX = 28,
+		staticTextY = 0,
+	},
+}
+
+cdp.ENTRY.TEXT_INFO_LAYOUT_ORDER = {
+	"COOLDOWN_ABOVE_TEXT_BELOW",
+	"TEXT_ABOVE_COOLDOWN_BELOW",
+	"TEXT_LEFT_COOLDOWN_RIGHT",
+	"COOLDOWN_LEFT_TEXT_RIGHT",
+}
+
+function cdp.ENTRY.IsStyleClipboardKeyAllowedForEntry(key, entry)
+	local style = cdp.ENTRY.STYLE_CLIPBOARD
+	if type(key) ~= "string" or key:match("^_") then return false end
+	if key:match("^cdmAura") and not style.CDM_AURA_ONLY_KEYS[key] then return false end
+	if style.SKIP_KEYS[key] then return false end
+	local entryType = entry and entry.type
+	if style.SPELL_ONLY_KEYS[key] and entryType ~= "SPELL" then return false end
+	if style.ITEM_ONLY_KEYS[key] and entryType ~= "ITEM" then return false end
+	if style.SLOT_ONLY_KEYS[key] and entryType ~= "SLOT" then return false end
+	if style.CDM_AURA_ONLY_KEYS[key] and entryType ~= "CDM_AURA" then return false end
+	if style.STATE_TEXTURE_KEYS[key] then return entryType == "SPELL" or entryType == "CDM_AURA" end
+	if key == "showStacks" then return entryType == "SPELL" or entryType == "CDM_AURA" end
+	if key == "activationOverlayOnly" or key == "activationOverlayGlow" or key == "activationOverlayReverse" or key == "activationOverlayColor" then
+		return entryType == "SPELL" or entryType == "ITEM" or entryType == "MACRO"
+	end
+	if key == "autoCooldownDurationEnabled" then return entryType == "SPELL" or entryType == "MACRO" end
+	if key == "customCooldownDurationEnabled" or key == "customCooldownDuration" then return entryType == "SPELL" or entryType == "ITEM" or entryType == "SLOT" or entryType == "MACRO" end
+	return true
+end
+
+function cdp.ENTRY.CopyStyleValue(value) return Helper.CopyTableDeep(value) end
+
 getPlayerSpecId = queryPlayerSpecId
 
 local function getPlayerClassSpecMap()
@@ -10084,6 +10240,43 @@ function CooldownPanels:ShowLayoutEntryChooserMenu(owner, panelId, candidates)
 	return true
 end
 
+function CooldownPanels:ShowEntryQuickSetupMenu(owner, panelId, entryId)
+	panelId = normalizeId(panelId)
+	entryId = normalizeId(entryId)
+	if not (owner and panelId and entryId and Api.MenuUtil and Api.MenuUtil.CreateContextMenu) then return false end
+	local panel = self:GetPanel(panelId)
+	local entry = panel and panel.entries and panel.entries[entryId] or nil
+	if not entry then return false end
+	Api.MenuUtil.CreateContextMenu(owner, function(_, rootDescription)
+		rootDescription:SetTag("MENU_EQOL_COOLDOWN_PANEL_ENTRY_QUICK_SETUP")
+		rootDescription:CreateTitle(L["CooldownPanelQuickSetups"] or "Quick setups")
+		local textInfoMenu = rootDescription:CreateButton(L["CooldownPanelQuickSetupTextInfoOnCooldown"] or "Text info on cooldown")
+		for _, layoutKey in ipairs(cdp.ENTRY.TEXT_INFO_LAYOUT_ORDER) do
+			local layout = cdp.ENTRY.TEXT_INFO_LAYOUTS[layoutKey]
+			if layout then
+				textInfoMenu:CreateButton(L[layout.labelKey] or layout.fallback, function()
+					CooldownPanels:ApplyTextInfoOnCooldownQuickSetup(panelId, entryId, true, layoutKey)
+				end)
+			end
+		end
+		local textAlwaysMenu = rootDescription:CreateButton(L["CooldownPanelQuickSetupTextAlwaysWithCooldown"] or "Text always with cooldown")
+		for _, layoutKey in ipairs(cdp.ENTRY.TEXT_INFO_LAYOUT_ORDER) do
+			local layout = cdp.ENTRY.TEXT_INFO_LAYOUTS[layoutKey]
+			if layout then
+				textAlwaysMenu:CreateButton(L[layout.labelKey] or layout.fallback, function()
+					CooldownPanels:ApplyTextAlwaysWithCooldownQuickSetup(panelId, entryId, true, layoutKey)
+				end)
+			end
+		end
+		if entry.type ~= "CDM_AURA" then
+			rootDescription:CreateButton(L["CooldownPanelQuickSetupTextInfoWhenReady"] or "Text info when ready", function()
+				CooldownPanels:ApplyTextInfoWhenReadyQuickSetup(panelId, entryId, true)
+			end)
+		end
+	end)
+	return true
+end
+
 local function showSlotMenu(owner, panelId)
 	if not panelId or not Api.MenuUtil or not Api.MenuUtil.CreateContextMenu then return end
 	local slotEntries = getSlotMenuEntries()
@@ -10497,7 +10690,7 @@ function CooldownPanels:HideLayoutEntryStandaloneMenu(panelId)
 	return hidden
 end
 
-function CooldownPanels:RefreshLayoutEntryStandaloneMenu()
+function CooldownPanels:RefreshLayoutEntryStandaloneMenu(rebuild)
 	local lib = addon.EditModeLib
 	local state = self:GetLayoutEntryStandaloneMenuState(false)
 	if not state or not state.hostFrame then return end
@@ -10511,7 +10704,23 @@ function CooldownPanels:RefreshLayoutEntryStandaloneMenu()
 	local editor = getEditor()
 	local selectedPanelId = normalizeId(editor and editor.selectedPanelId)
 	local selectedEntryId = normalizeId(editor and editor.selectedEntryId)
-	if not panel or not entry or not self:IsPanelLayoutEditActive(panelId) or selectedPanelId ~= panelId or selectedEntryId ~= entryId then self:HideLayoutEntryStandaloneMenu(panelId) end
+	if not panel or not entry or not self:IsPanelLayoutEditActive(panelId) or selectedPanelId ~= panelId or selectedEntryId ~= entryId then
+		self:HideLayoutEntryStandaloneMenu(panelId)
+		return
+	end
+	if rebuild == true then self:OpenLayoutEntryStandaloneMenu(panelId, entryId, state.anchorFrame or state.dialog or state.hostFrame) end
+end
+
+function CooldownPanels:FocusEntryStaticTextStandaloneSettings(panelId)
+	panelId = normalizeId(panelId)
+	local lib = addon.EditModeLib
+	local setter = lib and lib.internal and lib.internal.SetCollapseState or nil
+	local state = self:GetLayoutEntryStandaloneMenuState(false)
+	if not (panelId and setter and state and normalizeId(state.panelId) == panelId and state.hostFrame) then return false end
+	for _, groupId in ipairs(cdp.ENTRY.STANDALONE_COLLAPSIBLE_IDS) do
+		setter(lib.internal, state.hostFrame, groupId, groupId ~= "cooldownPanelStandaloneStaticText")
+	end
+	return true
 end
 
 function CooldownPanels:GetEditorStandaloneDialogAnchor()
@@ -13131,17 +13340,37 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		},
 	}
 
-	local buttons = {
-		{
-			text = L["CooldownPanelRemoveEntry"] or "Remove entry",
-			click = function()
-				CooldownPanels:HideLayoutEntryStandaloneMenu(panelId)
-				CooldownPanels:RemoveEntry(panelId, entryId)
-				local editor = getEditor()
-				if editor and normalizeId(editor.selectedPanelId) == panelId and normalizeId(editor.selectedEntryId) == entryId then editor.selectedEntryId = nil end
-				CooldownPanels:RefreshEditor()
-			end,
-		},
+	local buttons = {}
+	local bars = self.Bars
+	local isBarEntry = bars and bars.IsBarDisplayModeValue and bars.IsBarDisplayModeValue(entry.displayMode) or false
+	if not isBarEntry then
+		buttons[#buttons + 1] = {
+			text = L["CooldownPanelQuickSetups"] or "Quick setups",
+			layout = "compact",
+			click = function(button) CooldownPanels:ShowEntryQuickSetupMenu(button or hostFrame, panelId, entryId) end,
+		}
+	end
+	buttons[#buttons + 1] = {
+		text = L["CooldownPanelCopyEntryStyle"] or "Copy entry style",
+		layout = "compact",
+		click = function() CooldownPanels:CopyEntryStyle(panelId, entryId) end,
+	}
+	buttons[#buttons + 1] = {
+		text = L["CooldownPanelPasteEntryStyle"] or "Paste entry style",
+		layout = "compact",
+		click = function() CooldownPanels:PasteEntryStyle(panelId, entryId) end,
+	}
+	buttons[#buttons + 1] = {
+		id = "removeEntry",
+		text = L["CooldownPanelRemoveEntry"] or "Remove entry",
+		layout = "compact",
+		click = function()
+			CooldownPanels:HideLayoutEntryStandaloneMenu(panelId)
+			CooldownPanels:RemoveEntry(panelId, entryId)
+			local editor = getEditor()
+			if editor and normalizeId(editor.selectedPanelId) == panelId and normalizeId(editor.selectedEntryId) == entryId then editor.selectedEntryId = nil end
+			CooldownPanels:RefreshEditor()
+		end,
 	}
 
 	local dialog = lib:ShowStandaloneSettingsDialog(hostFrame, {
@@ -13164,6 +13393,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		state.panelId = panelId
 		state.entryId = entryId
 		state.hostFrame = hostFrame
+		state.anchorFrame = anchorFrame
 		state.dialog = dialog
 	end
 end
@@ -17249,6 +17479,189 @@ function CooldownPanels:HandleEntryBooleanMutation(panelId, entryId, entry, fiel
 	end
 end
 
+function CooldownPanels:RefreshEntryStyleMutation(panelId, entryId, entry, refreshDialog)
+	panelId = normalizeId(panelId)
+	entryId = normalizeId(entryId)
+	if not (panelId and entry) then return end
+	local root = ensureRoot()
+	if root and Helper.NormalizeEntry then Helper.NormalizeEntry(entry, root.defaults) end
+	self:ClearEntryCustomCooldownDuration(panelId, entryId, true)
+	self:RebuildSpellIndex()
+	self:RebuildChargesIndex()
+	self:RebuildPowerIndex()
+	updateItemCountCache()
+	self:RefreshPanel(panelId)
+	if self.IsEditorOpen and self:IsEditorOpen() then self:RefreshEditor() end
+	if refreshDialog and self.RefreshLayoutEntryStandaloneMenu then self:RefreshLayoutEntryStandaloneMenu(true) end
+end
+
+function CooldownPanels:DisableEntryGlowForQuickSetup(panelId, entryId, entry)
+	if not entry then return end
+	entry.glowUseGlobal = false
+	entry.glowReady = false
+	entry.pandemicGlow = false
+	entry.procGlowUseGlobal = false
+	entry.procGlowEnabled = false
+	entry.activationOverlayGlow = false
+	self.ClearReadyGlowEntryState(panelId, entryId, true)
+end
+
+function CooldownPanels:SetEntryAlwaysShowForQuickSetup(entry)
+	if not entry then return end
+	entry.alwaysShow = true
+	if entry.type == "CDM_AURA" then
+		entry.cdmAuraAlwaysShowUseGlobal = false
+		entry.cdmAuraAlwaysShowMode = CooldownPanels.CDM_AURA_ALWAYS_SHOW_MODE and CooldownPanels.CDM_AURA_ALWAYS_SHOW_MODE.SHOW or "SHOW"
+	end
+end
+
+function CooldownPanels:ApplyTextInfoOnCooldownQuickSetup(panelId, entryId, refreshDialog, layoutKey)
+	panelId = normalizeId(panelId)
+	entryId = normalizeId(entryId)
+	local panel = panelId and self:GetPanel(panelId) or nil
+	local entry = panel and panel.entries and panel.entries[entryId] or nil
+	if not entry then return false end
+	local textInfoLayout = cdp.ENTRY.TEXT_INFO_LAYOUTS[layoutKey] or cdp.ENTRY.TEXT_INFO_LAYOUTS.COOLDOWN_ABOVE_TEXT_BELOW
+	entry.hideIcon = true
+	entry.cooldownVisibilityUseGlobal = false
+	entry.hideOnCooldown = false
+	entry.showOnCooldown = true
+	entry.showCooldownText = true
+	entry.cooldownTextUseGlobal = false
+	entry.cooldownTextX = textInfoLayout.cooldownTextX
+	entry.cooldownTextY = textInfoLayout.cooldownTextY
+	entry.cooldownVisualsUseGlobal = false
+	entry.cooldownDrawSwipe = false
+	entry.cooldownDrawBling = false
+	entry.cooldownDrawEdge = false
+	if entry.type == "ITEM" then entry.showItemCount = false end
+	self:DisableEntryGlowForQuickSetup(panelId, entryId, entry)
+	entry.staticText = getEntryName(entry)
+	entry.staticTextShowOnCooldown = true
+	entry.staticTextUseGlobal = false
+	entry.staticTextAnchor = textInfoLayout.staticTextAnchor
+	entry.staticTextX = textInfoLayout.staticTextX
+	entry.staticTextY = textInfoLayout.staticTextY
+	if refreshDialog then self:FocusEntryStaticTextStandaloneSettings(panelId) end
+	self:RefreshEntryStyleMutation(panelId, entryId, entry, refreshDialog)
+	return true
+end
+
+function CooldownPanels:ApplyTextAlwaysWithCooldownQuickSetup(panelId, entryId, refreshDialog, layoutKey)
+	panelId = normalizeId(panelId)
+	entryId = normalizeId(entryId)
+	local panel = panelId and self:GetPanel(panelId) or nil
+	local entry = panel and panel.entries and panel.entries[entryId] or nil
+	if not entry then return false end
+	local textInfoLayout = cdp.ENTRY.TEXT_INFO_LAYOUTS[layoutKey] or cdp.ENTRY.TEXT_INFO_LAYOUTS.COOLDOWN_ABOVE_TEXT_BELOW
+	entry.hideIcon = true
+	self:SetEntryAlwaysShowForQuickSetup(entry)
+	entry.cooldownVisibilityUseGlobal = false
+	entry.hideOnCooldown = false
+	entry.showOnCooldown = false
+	entry.showCooldownText = true
+	entry.cooldownTextUseGlobal = false
+	entry.cooldownTextX = textInfoLayout.cooldownTextX
+	entry.cooldownTextY = textInfoLayout.cooldownTextY
+	entry.cooldownVisualsUseGlobal = false
+	entry.cooldownDrawSwipe = false
+	entry.cooldownDrawBling = false
+	entry.cooldownDrawEdge = false
+	if entry.type == "ITEM" then entry.showItemCount = false end
+	self:DisableEntryGlowForQuickSetup(panelId, entryId, entry)
+	entry.staticText = getEntryName(entry)
+	entry.staticTextShowOnCooldown = false
+	entry.staticTextUseGlobal = false
+	entry.staticTextAnchor = textInfoLayout.staticTextAnchor
+	entry.staticTextX = textInfoLayout.staticTextX
+	entry.staticTextY = textInfoLayout.staticTextY
+	if refreshDialog then self:FocusEntryStaticTextStandaloneSettings(panelId) end
+	self:RefreshEntryStyleMutation(panelId, entryId, entry, refreshDialog)
+	return true
+end
+
+function CooldownPanels:ApplyTextInfoWhenReadyQuickSetup(panelId, entryId, refreshDialog)
+	panelId = normalizeId(panelId)
+	entryId = normalizeId(entryId)
+	local panel = panelId and self:GetPanel(panelId) or nil
+	local entry = panel and panel.entries and panel.entries[entryId] or nil
+	if not entry then return false end
+	entry.hideIcon = true
+	entry.cooldownVisibilityUseGlobal = false
+	entry.hideOnCooldown = true
+	entry.showOnCooldown = false
+	entry.showCooldownText = false
+	entry.cooldownVisualsUseGlobal = false
+	entry.cooldownDrawSwipe = false
+	entry.cooldownDrawBling = false
+	entry.cooldownDrawEdge = false
+	if entry.type == "ITEM" then entry.showItemCount = false end
+	self:DisableEntryGlowForQuickSetup(panelId, entryId, entry)
+	entry.staticText = getEntryName(entry)
+	entry.staticTextShowOnCooldown = false
+	entry.staticTextUseGlobal = false
+	entry.staticTextAnchor = "CENTER"
+	entry.staticTextX = 0
+	entry.staticTextY = 0
+	if refreshDialog then self:FocusEntryStaticTextStandaloneSettings(panelId) end
+	self:RefreshEntryStyleMutation(panelId, entryId, entry, refreshDialog)
+	return true
+end
+
+function CooldownPanels:CopyEntryStyle(panelId, entryId)
+	panelId = normalizeId(panelId)
+	entryId = normalizeId(entryId)
+	local panel = panelId and self:GetPanel(panelId) or nil
+	local entry = panel and panel.entries and panel.entries[entryId] or nil
+	if not entry then return false end
+	CooldownPanels.runtime = CooldownPanels.runtime or {}
+	local fields = {}
+	for key, value in pairs(entry) do
+		if cdp.ENTRY.IsStyleClipboardKeyAllowedForEntry(key, entry) then fields[key] = cdp.ENTRY.CopyStyleValue(value) end
+	end
+	CooldownPanels.runtime.entryStyleClipboard = {
+		sourcePanelId = panelId,
+		sourceEntryId = entryId,
+		sourceType = entry.type,
+		sourceName = getEntryName(entry),
+		fields = fields,
+	}
+	print("|cff00ff98Enhance QoL|r: " .. (L["CooldownPanelEntryStyleCopied"] or "Entry style copied."))
+	return true
+end
+
+function CooldownPanels:CanPasteEntryStyle()
+	local clipboard = CooldownPanels.runtime and CooldownPanels.runtime.entryStyleClipboard
+	return type(clipboard) == "table" and type(clipboard.fields) == "table" and next(clipboard.fields) ~= nil
+end
+
+function CooldownPanels:PasteEntryStyle(panelId, entryId)
+	panelId = normalizeId(panelId)
+	entryId = normalizeId(entryId)
+	local clipboard = CooldownPanels.runtime and CooldownPanels.runtime.entryStyleClipboard or nil
+	if not (type(clipboard) == "table" and type(clipboard.fields) == "table") then
+		print("|cff00ff98Enhance QoL|r: " .. (L["CooldownPanelEntryStyleClipboardEmpty"] or "No entry style copied."))
+		return false
+	end
+	local panel = panelId and self:GetPanel(panelId) or nil
+	local entry = panel and panel.entries and panel.entries[entryId] or nil
+	if not entry then return false end
+	local bars = self.Bars
+	local wasBarDisplayMode = bars and bars.IsBarDisplayModeValue and bars.IsBarDisplayModeValue(entry.displayMode) or false
+	local changed = false
+	for key, value in pairs(clipboard.fields) do
+		if cdp.ENTRY.IsStyleClipboardKeyAllowedForEntry(key, entry) then
+			entry[key] = cdp.ENTRY.CopyStyleValue(value)
+			changed = true
+		end
+	end
+	if not changed then return false end
+	if bars and bars.HandleEntryStylePaste then bars.HandleEntryStylePaste(panelId, entryId, entry, wasBarDisplayMode) end
+	self:RefreshEntryStyleMutation(panelId, entryId, entry, true)
+	print("|cff00ff98Enhance QoL|r: " .. (L["CooldownPanelEntryStylePasted"] or "Entry style pasted."))
+	return true
+end
+
 function CooldownPanels:UpdateRuntimeIcons(panelId)
 	local panel = self:GetPanel(panelId)
 	if not panel then return end
@@ -18493,7 +18906,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 			end
 			local staticTextCooldown = false
 			if data.entry and data.entry.staticTextShowOnCooldown == true then
-				staticTextCooldown = data.stanceActive == true or cdmAuraActive or durationActive or (cooldownEnabledOk and isCooldownActive(cooldownStart, cooldownDuration))
+				staticTextCooldown = layoutEditActive == true or data.stanceActive == true or cdmAuraActive or durationActive or (cooldownEnabledOk and isCooldownActive(cooldownStart, cooldownDuration))
 			end
 			if data._eqolRuntimeBaseDecorDirty and not icon.keybind then cdp.RUNTIME.WriteBaseDecorSnapshot(icon._eqolRuntimeSnapshot, data, showTooltips) end
 			if data._eqolRuntimePlacementDirty or cdp.RUNTIME.HasStaticTextChange(icon._eqolRuntimeSnapshot, data, staticFontPath, staticFontSize, staticFontStyle, staticTextCooldown) then

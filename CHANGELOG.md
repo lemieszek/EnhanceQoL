@@ -2,6 +2,10 @@
 
 ## [10.20.0] - 2026-05-22
 
+### ✨ Added
+
+- Cooldown Panels / Layout Edit: Added entry Quick Setups and entry style copy/paste buttons.
+
 ### 🐛 Fixed
 
 - UI Options / Visibility: Fixed `Always hidden` for Blizzard frames using only alpha hiding instead of the visibility state driver, and require a reload when leaving that state.
