@@ -66,6 +66,7 @@ LSM:Register("border", "EQOL: Midnight 18px", "Interface\\AddOns\\" .. addonName
 LSM:Register("border", "EQOL: Midnight white", "Interface\\AddOns\\" .. addonName .. "\\Assets\\border-midnight-white.tga")
 LSM:Register("border", "EQOL: Midnight white 12px", "Interface\\AddOns\\" .. addonName .. "\\Assets\\border-midnight-white-12px.tga")
 LSM:Register("border", "EQOL: Midnight white 18px", "Interface\\AddOns\\" .. addonName .. "\\Assets\\border-midnight-white-18px.tga")
+LSM:Register("border", "EQOL: Solid", "Interface\\Buttons\\WHITE8x8")
 
 
 LSM:Register("font", "EQOL: Expressway", "Interface\\AddOns\\" .. addonName .. "\\Fonts\\ExpresswayRegular.ttf")

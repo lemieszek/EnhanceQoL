@@ -708,6 +708,7 @@ function H.applyCooldownTextStyle(cooldown, size)
 end
 
 function H.resolveBorderTexture(key)
+	if type(key) == "string" and key:upper() == "SOLID" then return "Interface\\Buttons\\WHITE8x8" end
 	if not key or key == "" or key == "DEFAULT" then return "Interface\\Buttons\\WHITE8x8" end
 	if LSM then
 		local tex = LSM:Fetch("border", key)
