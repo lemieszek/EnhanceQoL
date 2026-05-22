@@ -543,6 +543,7 @@ end
 
 local function resolveBorderTexture(key)
 	if UFHelper and UFHelper.resolveBorderTexture then return UFHelper.resolveBorderTexture(key) end
+	if type(key) == "string" and key:upper() == "SOLID" then return "Interface\\Buttons\\WHITE8x8" end
 	if not key or key == "" or key == "DEFAULT" then return "Interface\\Buttons\\WHITE8x8" end
 	if LSM then
 		local tex = LSM:Fetch("border", key)
@@ -2674,6 +2675,8 @@ local DEFAULTS = {
 					barReverseFill = false,
 					barThickness = 6,
 					borderSize = 2,
+					borderStrata = nil,
+					borderFrameLevelOffset = 4,
 					color = {
 						1,
 						0.82,
@@ -3486,6 +3489,8 @@ local DEFAULTS = {
 					barReverseFill = false,
 					barThickness = 6,
 					borderSize = 2,
+					borderStrata = nil,
+					borderFrameLevelOffset = 4,
 					color = {
 						1,
 						0.82,
@@ -5465,6 +5470,8 @@ function GF._hbpPlacementDigest(placement)
 				tostring(group.barThickness or ""),
 				tostring(group.inset or ""),
 				tostring(group.borderSize or ""),
+				tostring(group.borderStrata or ""),
+				tostring(group.borderFrameLevelOffset or ""),
 				tostring(group.ruleMatch or ""),
 				tostring(group.iconMode or ""),
 				tostring(cr),
@@ -5554,6 +5561,8 @@ function GF._hbpGroupSignature(group, ruleBlob)
 		tostring(group.barThickness or ""),
 		tostring(group.inset or ""),
 		tostring(group.borderSize or ""),
+		tostring(group.borderStrata or ""),
+		tostring(group.borderFrameLevelOffset or ""),
 		tostring(group.ruleMatch or ""),
 		tostring(group.iconMode or ""),
 		tostring(cr),

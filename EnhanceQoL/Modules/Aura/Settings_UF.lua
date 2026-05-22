@@ -1895,6 +1895,7 @@ function borderOptions()
 		list[#list + 1] = { value = value, label = label }
 	end
 	add("DEFAULT", DEFAULT)
+	add("SOLID", "Solid")
 	local names, hash = getCachedLSMMedia("border")
 	for i = 1, #names do
 		local name = names[i]

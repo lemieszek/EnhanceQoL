@@ -1,10 +1,16 @@
 # Changelog
 
-## [10.18.6] - 2026-05-21
+## [10.19.0] - 2026-05-22
+
+### ✨ Added
+
+- Combat Logging: Added a default-enabled option to limit automatic raid combat logging to raids from the current expansion, preventing old raid transmog runs from being logged while leaving Mythic+ dungeon logging unrestricted.
+- Unit Frames / Healer Buff Placement: Added Strata and Level controls for HBP border indicators, allowing border layering to be adjusted when it overlaps other effects such as the dispel glow.
 
 ### 🐛 Fixed
 
 - SharedMedia: Restored the previous EQOL voiceover sounds while keeping the newer deep voice variants available as a separate Shared Media Deep Voice Sounds option.
+- Unit Frames: Fixed Solid borders missing when no other addon registers a `Solid` border texture, and added `EQOL: Solid` as a dedicated SharedMedia border option.
 - Unit Frames / Visibility: Fixed the custom player frame health bar staying visible after loading screens or zone changes when visibility rules should keep it hidden.
 
 ---

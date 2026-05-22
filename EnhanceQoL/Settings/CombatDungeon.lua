@@ -21,6 +21,7 @@ local COMBAT_LOG_TOGGLE_DB_KEYS = {
 	delve = "combatLogDelve",
 }
 local COMBAT_LOG_DELAY_SECONDS = 30
+local CURRENT_EXPANSION_RAID_INSTANCE_CACHE
 local combatLogInstanceMap = {
 	party = "dungeon",
 	raid = "raid",
@@ -255,6 +256,65 @@ local function getCombatLogDecision(category, difficultyID)
 	return isCombatLogSelected(category, key)
 end
 
+local function getCurrentExpansionLevel()
+	local expansionLevel
+	if type(LE_EXPANSION_LEVEL_CURRENT) == "number" then expansionLevel = LE_EXPANSION_LEVEL_CURRENT end
+	if type(expansionLevel) ~= "number" and _G.GetServerExpansionLevel then expansionLevel = _G.GetServerExpansionLevel() end
+	if type(expansionLevel) ~= "number" and _G.GetMaximumExpansionLevel then expansionLevel = _G.GetMaximumExpansionLevel() end
+	if type(expansionLevel) ~= "number" and GetExpansionLevel then expansionLevel = GetExpansionLevel() end
+	if issecretvalue and issecretvalue(expansionLevel) then return nil end
+	return type(expansionLevel) == "number" and expansionLevel or nil
+end
+
+local function getCurrentExpansionRaidInstanceCache()
+	local expansionLevel = getCurrentExpansionLevel()
+	if not expansionLevel then return nil end
+	if CURRENT_EXPANSION_RAID_INSTANCE_CACHE and CURRENT_EXPANSION_RAID_INSTANCE_CACHE.expansionLevel == expansionLevel then return CURRENT_EXPANSION_RAID_INSTANCE_CACHE end
+	if not (EJ_SelectTier and EJ_GetInstanceByIndex) then return nil end
+
+	local cache = { expansionLevel = expansionLevel, instances = {}, maps = {} }
+	local previousTier = EJ_GetCurrentTier and EJ_GetCurrentTier() or nil
+	EJ_SelectTier(expansionLevel + 1)
+
+	local index = 1
+	while true do
+		local journalInstanceID, _, _, _, _, _, _, _, _, _, mapID = EJ_GetInstanceByIndex(index, true)
+		if not journalInstanceID then break end
+		cache.instances[journalInstanceID] = true
+		if type(mapID) == "number" and mapID > 0 then cache.maps[mapID] = true end
+		index = index + 1
+	end
+
+	if previousTier then EJ_SelectTier(previousTier) end
+	CURRENT_EXPANSION_RAID_INSTANCE_CACHE = cache
+	return cache
+end
+
+local function isCurrentExpansionRaidInstance(difficultyID, instanceMapID, lfgDungeonID)
+	local currentExpansionLevel = getCurrentExpansionLevel()
+	if not currentExpansionLevel then return true end
+
+	if GetLFGDungeonInfo and lfgDungeonID then
+		local _, _, _, _, _, _, _, _, expansionLevel, _, _, _, _, _, _, _, _, isTimewalker = GetLFGDungeonInfo(lfgDungeonID)
+		if issecretvalue and issecretvalue(expansionLevel) then expansionLevel = nil end
+		if issecretvalue and issecretvalue(isTimewalker) then isTimewalker = nil end
+		if isTimewalker == true then return false end
+		if type(expansionLevel) == "number" then return expansionLevel >= currentExpansionLevel end
+	end
+
+	local ids = (_G.DifficultyUtil and _G.DifficultyUtil.ID) or {}
+	if difficultyID == (ids.RaidTimewalker or 33) then return false end
+
+	local cache = getCurrentExpansionRaidInstanceCache()
+	if type(cache) ~= "table" then return true end
+	if type(instanceMapID) == "number" and cache.maps[instanceMapID] then return true end
+
+	local journalInstanceID = C_EncounterJournal and C_EncounterJournal.GetInstanceForGameMap and type(instanceMapID) == "number"
+		and C_EncounterJournal.GetInstanceForGameMap(instanceMapID)
+		or nil
+	return journalInstanceID ~= nil and cache.instances[journalInstanceID] == true
+end
+
 local function printCombatLogMessage(message)
 	if not message or message == "" then return end
 	local prefix = "|cff33ff99EQOL|r: "
@@ -320,7 +380,7 @@ local function updateCombatLogState()
 		return
 	end
 
-	local _, instanceType, difficultyID = GetInstanceInfo()
+	local _, instanceType, difficultyID, _, _, _, _, instanceMapID, _, lfgDungeonID = GetInstanceInfo()
 	if not instanceType or instanceType == "none" then
 		if addon.variables and addon.variables.combatLogRestoreState ~= nil then
 			applyCombatLogState(addon.variables.combatLogRestoreState)
@@ -335,6 +395,7 @@ local function updateCombatLogState()
 
 	local decision = getCombatLogDecision(category, difficultyID)
 	if decision == nil then return end
+	if decision == true and category == "raid" and addon.db.combatLogRaidCurrentExpansionOnly and not isCurrentExpansionRaidInstance(difficultyID, instanceMapID, lfgDungeonID) then decision = false end
 	applyCombatLogState(decision)
 end
 
@@ -2062,6 +2123,7 @@ function addon.functions.initDungeonFrame()
 	addon.functions.InitDBValue("autoCombatLog", false)
 	addon.functions.InitDBValue("combatLogDungeonDifficulties", {})
 	addon.functions.InitDBValue("combatLogRaidDifficulties", {})
+	addon.functions.InitDBValue("combatLogRaidCurrentExpansionOnly", true)
 	addon.functions.InitDBValue("combatLogPvp", false)
 	addon.functions.InitDBValue("combatLogScenario", false)
 	addon.functions.InitDBValue("combatLogDelve", false)
@@ -2150,6 +2212,20 @@ function addon.functions.initDungeonFrame()
 
 	createCombatLogDropdown("combatLogDungeonDifficulties", L["combatLogDungeon"] or "Dungeons", "dungeon")
 	createCombatLogDropdown("combatLogRaidDifficulties", L["combatLogRaid"] or "Raids", "raid")
+	addon.functions.SettingsCreateCheckbox(cChar, {
+		var = "combatLogRaidCurrentExpansionOnly",
+		text = L["combatLogRaidCurrentExpansionOnly"] or "Only current expansion raids",
+		desc = L["combatLogRaidCurrentExpansionOnlyDesc"] or "Automatically toggle combat logging for raids only when the raid belongs to the current expansion.",
+		func = function(value)
+			addon.db.combatLogRaidCurrentExpansionOnly = value and true or false
+			if addon.db.autoCombatLog and addon.functions.UpdateCombatLogState then addon.functions.UpdateCombatLogState() end
+		end,
+		default = true,
+		element = combatLogEnabled.element,
+		parentSection = combatLogSection,
+		parentCheck = isCombatLogEnabled,
+		parent = true,
+	})
 
 	local find = {
 		["CLICK EQOLWorldMarkerCycler:LeftButton"] = true,

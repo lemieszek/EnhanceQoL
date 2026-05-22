@@ -15,6 +15,7 @@ local L = LibStub("AceLocale-3.0"):GetLocale("EnhanceQoL")
 UF.GroupFramesHealerBuffs = UF.GroupFramesHealerBuffs or {}
 local HB = UF.GroupFramesHealerBuffs
 
+local GF = UF.GroupFrames
 local GFH = UF.GroupFramesHelper
 local AuraUtil = UF.AuraUtil
 local UFHelper = addon.Aura.UFHelper
@@ -84,6 +85,17 @@ local ICON_MODE_SET = {
 local KIND_SET = {
 	[KIND_PARTY] = true,
 	[KIND_RAID] = true,
+}
+
+local FRAME_STRATA_SET = {
+	BACKGROUND = true,
+	LOW = true,
+	MEDIUM = true,
+	HIGH = true,
+	DIALOG = true,
+	FULLSCREEN = true,
+	FULLSCREEN_DIALOG = true,
+	TOOLTIP = true,
 }
 
 local ANCHOR_SET = {
@@ -477,6 +489,15 @@ local function normalizeAnchor(value)
 	return "CENTER"
 end
 
+local function normalizeFrameStrataToken(value)
+	if GF and GF.NormalizeFrameStrataToken then return GF.NormalizeFrameStrataToken(value) end
+	if type(value) ~= "string" or value == "" then return nil end
+	local token = string.upper(value)
+	if token == "DEFAULT" then return nil end
+	if FRAME_STRATA_SET[token] then return token end
+	return nil
+end
+
 local function parseGrowth(growth)
 	if not growth then return nil end
 	local raw = tostring(growth):upper():gsub("[%s_]+", "")
@@ -695,6 +716,8 @@ function HB.CreateDefaultGroup(id)
 		barReverseFill = false,
 		inset = 0,
 		borderSize = 2,
+		borderStrata = nil,
+		borderFrameLevelOffset = 4,
 		indicatorBorderEnabled = false,
 		indicatorBorderTexture = "DEFAULT",
 		indicatorBorderSize = 1,
@@ -752,6 +775,8 @@ local function normalizeGroup(group, id)
 	group.barReverseFill = normalizeBarReverseFill(group.barReverseFill)
 	group.inset = roundInt(clamp(group.inset, 0, 60, 0))
 	group.borderSize = roundInt(clamp(group.borderSize, 1, 24, 2))
+	group.borderStrata = normalizeFrameStrataToken(group.borderStrata)
+	group.borderFrameLevelOffset = roundInt(clamp(group.borderFrameLevelOffset, -20, 1000, 4))
 	local indicatorBorderEnabled = group.indicatorBorderEnabled
 	if indicatorBorderEnabled == nil then indicatorBorderEnabled = group.iconBorderEnabled end
 	group.indicatorBorderEnabled = indicatorBorderEnabled == true
@@ -2220,6 +2245,8 @@ local function didBorderRenderStateChange(cache, group, groupId, layoutRevision,
 		or cache.groupId ~= groupId
 		or cache.layoutRevision ~= layoutRevision
 		or cache.borderSize ~= group.borderSize
+		or cache.borderStrata ~= group.borderStrata
+		or cache.borderFrameLevelOffset ~= group.borderFrameLevelOffset
 		or cache.inset ~= group.inset
 		or cache.anchorPoint ~= group.anchorPoint
 		or cache.x ~= group.x
@@ -2233,6 +2260,8 @@ local function didBorderRenderStateChange(cache, group, groupId, layoutRevision,
 	cache.groupId = groupId
 	cache.layoutRevision = layoutRevision
 	cache.borderSize = group.borderSize
+	cache.borderStrata = group.borderStrata
+	cache.borderFrameLevelOffset = group.borderFrameLevelOffset
 	cache.inset = group.inset
 	cache.anchorPoint = group.anchorPoint
 	cache.x = group.x
@@ -2521,6 +2550,16 @@ local function renderBorder(st, group, colorRule)
 	if not group then
 		border:Hide()
 		return
+	end
+	local root = st.healerBuffRoot
+	if root then
+		local targetStrata = normalizeFrameStrataToken(group.borderStrata)
+		if not targetStrata and root.GetFrameStrata then targetStrata = root:GetFrameStrata() end
+		if targetStrata then setFrameStrataCached(border, targetStrata) end
+		if root.GetFrameLevel then
+			local levelOffset = roundInt(clamp(group.borderFrameLevelOffset, -20, 1000, 4))
+			setFrameLevelCached(border, (root:GetFrameLevel() or 0) + levelOffset)
+		end
 	end
 	local inset = group.inset or 0
 	local size = max(1, group.borderSize or 1)

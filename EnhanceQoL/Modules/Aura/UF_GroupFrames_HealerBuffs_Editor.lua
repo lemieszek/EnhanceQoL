@@ -960,6 +960,47 @@ local function buildBorderOptionsForMenu()
 	return list
 end
 
+local function buildFrameStrataOptionsForMenu()
+	local raw = (GF and GF._FRAME_STRATA_OPTIONS_WITH_DEFAULT)
+		or {
+			{ value = "", label = DEFAULT or "Default" },
+			{ value = "BACKGROUND", label = "BACKGROUND" },
+			{ value = "LOW", label = "LOW" },
+			{ value = "MEDIUM", label = "MEDIUM" },
+			{ value = "HIGH", label = "HIGH" },
+			{ value = "DIALOG", label = "DIALOG" },
+			{ value = "FULLSCREEN", label = "FULLSCREEN" },
+			{ value = "FULLSCREEN_DIALOG", label = "FULLSCREEN_DIALOG" },
+			{ value = "TOOLTIP", label = "TOOLTIP" },
+		}
+	local list = {}
+	for i = 1, #raw do
+		local option = raw[i]
+		list[#list + 1] = { value = option.value or "", label = option.label or tostring(option.value or "") }
+	end
+	return list
+end
+
+local function normalizeFrameStrataToken(value)
+	if GF and GF.NormalizeFrameStrataToken then return GF.NormalizeFrameStrataToken(value) end
+	if type(value) ~= "string" or value == "" then return nil end
+	local token = value:upper()
+	if token == "DEFAULT" then return nil end
+	if
+		token == "BACKGROUND"
+		or token == "LOW"
+		or token == "MEDIUM"
+		or token == "HIGH"
+		or token == "DIALOG"
+		or token == "FULLSCREEN"
+		or token == "FULLSCREEN_DIALOG"
+		or token == "TOOLTIP"
+	then
+		return token
+	end
+	return nil
+end
+
 local function getGroupLabel(placement, groupId)
 	if not placement or not groupId then return tostring(groupId or "") end
 	local group = placement.groupsById and placement.groupsById[groupId]
@@ -1549,8 +1590,15 @@ function Editor:EnsureFrame()
 	controls.BarAlphaLabel, controls.BarAlpha, controls.BarAlphaValue = createSettingSlider(controls.BarHeightLabel, tr("Alpha", "Alpha"), 0, 1, 0.01)
 	controls.InsetLabel, controls.Inset, controls.InsetValue = createSettingSlider(controls.BarAlphaLabel, tr("UFGroupHealerBuffEditorInset", "Inset"), 0, 40, 1)
 	controls.BorderSizeLabel, controls.BorderSize, controls.BorderSizeValue = createSettingSlider(controls.InsetLabel, tr("Border Size", "Border Size"), 1, 16, 1)
+	controls.BorderStrataLabel = groupControlParent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	controls.BorderStrataLabel:SetPoint("TOPLEFT", controls.BorderSizeLabel, "BOTTOMLEFT", 0, -18)
+	controls.BorderStrataLabel:SetText(tr("UFGroupHealerBuffEditorBorderStrata", "Strata"))
+	controls.BorderStrata = createDropdown(groupControlParent, 180)
+	controls.BorderStrata:SetPoint("TOPLEFT", controls.BorderStrataLabel, "TOPRIGHT", 0, 12)
+	controls.BorderFrameLevelLabel, controls.BorderFrameLevel, controls.BorderFrameLevelValue =
+		createSettingSlider(controls.BorderStrataLabel, tr("UFGroupHealerBuffEditorBorderLevel", "Level"), -20, 1000, 1)
 	controls.IndicatorBorder = createCheck(groupControlParent, tr("UFGroupHealerBuffEditorIndicatorBorderEnabled", "Indicator Border"))
-	controls.IndicatorBorder:SetPoint("TOPLEFT", controls.BorderSizeLabel, "BOTTOMLEFT", -4, -8)
+	controls.IndicatorBorder:SetPoint("TOPLEFT", controls.BorderFrameLevelLabel, "BOTTOMLEFT", -4, -8)
 	controls.IndicatorBorderTextureLabel = groupControlParent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	controls.IndicatorBorderTextureLabel:SetPoint("TOPLEFT", controls.IndicatorBorder, "BOTTOMLEFT", 4, -18)
 	controls.IndicatorBorderTextureLabel:SetText(tr("UFGroupHealerBuffEditorIndicatorBorderTexture", "Border Texture"))
@@ -1683,6 +1731,8 @@ function Editor:EnsureFrame()
 		placeSlider(controls.BarAlphaLabel, controls.BarAlpha, controls.BarAlphaValue)
 		placeSlider(controls.InsetLabel, controls.Inset, controls.InsetValue)
 		placeSlider(controls.BorderSizeLabel, controls.BorderSize, controls.BorderSizeValue)
+		placeDropdown(controls.BorderStrataLabel, controls.BorderStrata)
+		placeSlider(controls.BorderFrameLevelLabel, controls.BorderFrameLevel, controls.BorderFrameLevelValue)
 		placeCheck(controls.IndicatorBorder, nil, -4, -8)
 		placeDropdown(controls.IndicatorBorderTextureLabel, controls.IndicatorBorderTexture)
 		placeSlider(controls.IndicatorBorderSizeLabel, controls.IndicatorBorderSize, controls.IndicatorBorderSizeValue)
@@ -2383,6 +2433,7 @@ function Editor:EnsureFrame()
 	updateGroupFromSlider("barAlpha", controls.BarAlpha, controls.BarAlphaValue, 0, 1, 0.01)
 	updateGroupFromSlider("inset", controls.Inset, controls.InsetValue, 0, 40, 1)
 	updateGroupFromSlider("borderSize", controls.BorderSize, controls.BorderSizeValue, 1, 16, 1)
+	updateGroupFromSlider("borderFrameLevelOffset", controls.BorderFrameLevel, controls.BorderFrameLevelValue, -20, 1000, 1)
 	updateGroupFromSlider("indicatorBorderSize", controls.IndicatorBorderSize, controls.IndicatorBorderSizeValue, 1, 24, 1)
 	updateGroupFromSlider("indicatorBorderOffset", controls.IndicatorBorderOffset, controls.IndicatorBorderOffsetValue, -12, 12, 1)
 
@@ -2444,6 +2495,15 @@ function Editor:EnsureFrame()
 		local texture = tostring(value or "DEFAULT")
 		if texture == "" then texture = "DEFAULT" end
 		group.indicatorBorderTexture = texture
+		Editor:RefreshPreview()
+		Editor:QueueRuntimeRefresh()
+	end)
+
+	setDropdown(controls.BorderStrata, buildFrameStrataOptionsForMenu(), nil, function(value)
+		local group = groupFromSelection()
+		if not group then return end
+		group.borderStrata = normalizeFrameStrataToken(value)
+		Editor:RefreshGroupControls()
 		Editor:RefreshPreview()
 		Editor:QueueRuntimeRefresh()
 	end)
@@ -3100,6 +3160,14 @@ function Editor:RefreshGroupControls()
 		controls.InsetValue:SetText(tostring(group.inset or 0))
 		controls.BorderSize:SetValue(group.borderSize or 2)
 		controls.BorderSizeValue:SetText(tostring(group.borderSize or 2))
+		group.borderStrata = normalizeFrameStrataToken(group.borderStrata)
+		local borderFrameLevel = roundInt(tonumber(group.borderFrameLevelOffset) or 4)
+		if borderFrameLevel < -20 then borderFrameLevel = -20 end
+		if borderFrameLevel > 1000 then borderFrameLevel = 1000 end
+		group.borderFrameLevelOffset = borderFrameLevel
+		setDropdown(controls.BorderStrata, buildFrameStrataOptionsForMenu(), group.borderStrata or "", controls.BorderStrata._eqolOnSelect)
+		controls.BorderFrameLevel:SetValue(borderFrameLevel)
+		controls.BorderFrameLevelValue:SetText(tostring(borderFrameLevel))
 
 		if group.indicatorBorderEnabled == nil then group.indicatorBorderEnabled = false end
 		local borderTexture = tostring(group.indicatorBorderTexture or "DEFAULT")
@@ -3161,6 +3229,8 @@ function Editor:RefreshGroupControls()
 		setSliderState(controls.BarAlphaLabel, controls.BarAlpha, controls.BarAlphaValue, showBarAlpha, true)
 		setSliderState(controls.InsetLabel, controls.Inset, controls.InsetValue, showInset, true)
 		setSliderState(controls.BorderSizeLabel, controls.BorderSize, controls.BorderSizeValue, showBorder, true)
+		setFieldState(controls.BorderStrataLabel, controls.BorderStrata, showBorder, true)
+		setSliderState(controls.BorderFrameLevelLabel, controls.BorderFrameLevel, controls.BorderFrameLevelValue, showBorder, true)
 		setCheckState(controls.IndicatorBorder, showIndicatorBorder, true, group.indicatorBorderEnabled == true)
 		setFieldState(controls.IndicatorBorderTextureLabel, controls.IndicatorBorderTexture, showIndicatorBorder, group.indicatorBorderEnabled == true)
 		setSliderState(controls.IndicatorBorderSizeLabel, controls.IndicatorBorderSize, controls.IndicatorBorderSizeValue, showIndicatorBorder, group.indicatorBorderEnabled == true)
@@ -3194,6 +3264,8 @@ function Editor:RefreshGroupControls()
 		setSliderState(controls.BarAlphaLabel, controls.BarAlpha, controls.BarAlphaValue, false, false)
 		setSliderState(controls.InsetLabel, controls.Inset, controls.InsetValue, false, false)
 		setSliderState(controls.BorderSizeLabel, controls.BorderSize, controls.BorderSizeValue, false, false)
+		setFieldState(controls.BorderStrataLabel, controls.BorderStrata, false, false)
+		setSliderState(controls.BorderFrameLevelLabel, controls.BorderFrameLevel, controls.BorderFrameLevelValue, false, false)
 		setCheckState(controls.IndicatorBorder, false, false, false)
 		setFieldState(controls.IndicatorBorderTextureLabel, controls.IndicatorBorderTexture, false, false)
 		setSliderState(controls.IndicatorBorderSizeLabel, controls.IndicatorBorderSize, controls.IndicatorBorderSizeValue, false, false)
