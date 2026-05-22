@@ -2028,7 +2028,7 @@ local function getStorageEntryDefault(entry, entryDefaults, key, barsDefaults, b
 		if mode == nil and barsDefaults then mode = barsDefaults.barMode end
 		return getStorageBarColorDefault(mode, barsDefaults, barsColors)
 	end
-	if key == "showCharges" and entry and entry.type == "SPELL" then return spellHasCharges(entry.spellID) end
+	if entry and entry.type == "SPELL" and (key == "showCharges" or key == "showStacks") then return nil end
 	if entryDefaults and entryDefaults[key] ~= nil then return entryDefaults[key] end
 	if Helper.ENTRY_DEFAULTS[key] ~= nil then return Helper.ENTRY_DEFAULTS[key] end
 	if barsDefaults and barsDefaults[key] ~= nil then return barsDefaults[key] end

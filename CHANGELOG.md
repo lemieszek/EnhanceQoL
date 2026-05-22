@@ -11,6 +11,7 @@
 ### 🐛 Fixed
 
 - SharedMedia: Restored the previous EQOL voiceover sounds while keeping the newer deep voice variants available as a separate Shared Media Deep Voice Sounds option.
+- Cooldown Panels: Fixed imported spell charge and stack display settings being removed from saved profiles during cleanup, which could make later exports depend on the current character's spell data.
 - Unit Frames: Fixed Solid borders missing when no other addon registers a `Solid` border texture, and added `EQOL: Solid` as a dedicated SharedMedia border option.
 - Unit Frames / Visibility: Fixed the custom player frame health bar staying visible after loading screens or zone changes when visibility rules should keep it hidden.
 
