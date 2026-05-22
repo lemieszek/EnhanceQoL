@@ -4,6 +4,7 @@
 
 ### 🐛 Fixed
 
+- SharedMedia: Restored the previous EQOL voiceover sounds while keeping the newer deep voice variants available as a separate Shared Media Deep Voice Sounds option.
 - Unit Frames / Visibility: Fixed the custom player frame health bar staying visible after loading screens or zone changes when visibility rules should keep it hidden.
 
 ---
