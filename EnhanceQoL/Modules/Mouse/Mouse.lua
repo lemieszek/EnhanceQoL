@@ -14,6 +14,7 @@ local GetVisibilityRuleMetadata = addon.functions and addon.functions.GetVisibil
 
 -- Hotpath locals & constants
 local GetCursorPosition = GetCursorPosition
+local GetInstanceInfo = GetInstanceInfo
 local IsMouseButtonDown = IsMouseButtonDown
 local IsInInstance = IsInInstance
 local IsInGroup = IsInGroup
@@ -105,6 +106,7 @@ local cachedTrailColorG = 1
 local cachedTrailColorB = 1
 local cachedTrailColorA = 1
 local RING_PROGRESS_UPDATE_INTERVAL = 1 / 45
+local CURRENT_EXPANSION_RAID_INSTANCE_CACHE
 local markRingVisibilityDirty
 local markRingProgressDirty
 local setRunnerCombatActive
@@ -355,6 +357,72 @@ local function getCrosshairVisibilityRuleOptions()
 	end)
 	crosshairVisibilityOptionsCache = options
 	return options
+end
+
+local function getCurrentExpansionLevel()
+	local expansionLevel
+	if type(LE_EXPANSION_LEVEL_CURRENT) == "number" then expansionLevel = LE_EXPANSION_LEVEL_CURRENT end
+	if type(expansionLevel) ~= "number" and _G.GetServerExpansionLevel then expansionLevel = _G.GetServerExpansionLevel() end
+	if type(expansionLevel) ~= "number" and _G.GetMaximumExpansionLevel then expansionLevel = _G.GetMaximumExpansionLevel() end
+	if type(expansionLevel) ~= "number" and GetExpansionLevel then expansionLevel = GetExpansionLevel() end
+	if issecretvalue and issecretvalue(expansionLevel) then return nil end
+	return type(expansionLevel) == "number" and expansionLevel or nil
+end
+
+local function getCurrentExpansionRaidInstanceCache()
+	local expansionLevel = getCurrentExpansionLevel()
+	if not expansionLevel then return nil end
+	if CURRENT_EXPANSION_RAID_INSTANCE_CACHE and CURRENT_EXPANSION_RAID_INSTANCE_CACHE.expansionLevel == expansionLevel then return CURRENT_EXPANSION_RAID_INSTANCE_CACHE end
+	if not (EJ_SelectTier and EJ_GetInstanceByIndex) then return nil end
+
+	local cache = { expansionLevel = expansionLevel, instances = {}, maps = {} }
+	local previousTier = EJ_GetCurrentTier and EJ_GetCurrentTier() or nil
+	EJ_SelectTier(expansionLevel + 1)
+
+	local index = 1
+	while true do
+		local journalInstanceID, _, _, _, _, _, _, _, _, _, mapID = EJ_GetInstanceByIndex(index, true)
+		if not journalInstanceID then break end
+		cache.instances[journalInstanceID] = true
+		if type(mapID) == "number" and mapID > 0 then cache.maps[mapID] = true end
+		index = index + 1
+	end
+
+	if previousTier then EJ_SelectTier(previousTier) end
+	CURRENT_EXPANSION_RAID_INSTANCE_CACHE = cache
+	return cache
+end
+
+local function isCurrentExpansionRaidInstance(difficultyID, instanceMapID, lfgDungeonID)
+	local currentExpansionLevel = getCurrentExpansionLevel()
+	if not currentExpansionLevel then return true end
+
+	if GetLFGDungeonInfo and lfgDungeonID then
+		local _, _, _, _, _, _, _, _, expansionLevel, _, _, _, _, _, _, _, _, isTimewalker = GetLFGDungeonInfo(lfgDungeonID)
+		if issecretvalue and issecretvalue(expansionLevel) then expansionLevel = nil end
+		if issecretvalue and issecretvalue(isTimewalker) then isTimewalker = nil end
+		if isTimewalker == true then return false end
+		if type(expansionLevel) == "number" then return expansionLevel >= currentExpansionLevel end
+	end
+
+	local ids = (_G.DifficultyUtil and _G.DifficultyUtil.ID) or {}
+	if difficultyID == (ids.RaidTimewalker or 33) then return false end
+
+	local cache = getCurrentExpansionRaidInstanceCache()
+	if type(cache) ~= "table" then return true end
+	if type(instanceMapID) == "number" and cache.maps[instanceMapID] then return true end
+
+	local journalInstanceID = C_EncounterJournal and C_EncounterJournal.GetInstanceForGameMap and type(instanceMapID) == "number"
+		and C_EncounterJournal.GetInstanceForGameMap(instanceMapID)
+		or nil
+	return journalInstanceID ~= nil and cache.instances[journalInstanceID] == true
+end
+
+local function isLegacyRaidInstance()
+	if not GetInstanceInfo then return false end
+	local _, instanceType, difficultyID, _, _, _, _, instanceMapID, _, lfgDungeonID = GetInstanceInfo()
+	if instanceType ~= "raid" then return false end
+	return not isCurrentExpansionRaidInstance(difficultyID, instanceMapID, lfgDungeonID)
 end
 
 local function isCrosshairRuleMatched(rule, context)
@@ -1077,6 +1145,7 @@ local function isCrosshairWanted(db, context)
 	if not db then return false end
 	if db["mouseCrosshairEnabled"] ~= true then return false end
 	if addon.EditMode and addon.EditMode.IsInEditMode and addon.EditMode:IsInEditMode() then return true end
+	if db["mouseCrosshairHideInLegacyRaidInstances"] == true and isLegacyRaidInstance() then return false end
 	return isCrosshairVisibilityMatch(context)
 end
 
@@ -1174,6 +1243,18 @@ local function registerCrosshairWithEditMode(frame)
 				end,
 				isShown = function() return visibilityRuleOptions and #visibilityRuleOptions > 0 end,
 				isEnabled = function() return visibilityRuleOptions and #visibilityRuleOptions > 0 end,
+			},
+			{
+				name = L["mouseCrosshairHideInLegacyRaidInstances"] or "Hide in legacy raid instances",
+				kind = SettingType.Checkbox,
+				parentId = "crosshairFrame",
+				default = false,
+				get = function() return addon.db and addon.db["mouseCrosshairHideInLegacyRaidInstances"] == true end,
+				set = function(_, value)
+					if not addon.db then return end
+					addon.db["mouseCrosshairHideInLegacyRaidInstances"] = value and true or false
+					refreshCrosshairVisibility()
+				end,
 			},
 			{
 				name = L["Anchor point"] or "Anchor point",

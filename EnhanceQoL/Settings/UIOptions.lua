@@ -1150,6 +1150,7 @@ local function setFrameRule(info, key, shouldSelect)
 	end
 	local working = addon.db[info.var]
 	if type(working) ~= "table" then working = {} end
+	local wasAlwaysHidden = working.ALWAYS_HIDDEN == true
 
 	if key == "ALWAYS_HIDDEN" and shouldSelect then
 		working = { ALWAYS_HIDDEN = true }
@@ -1160,7 +1161,11 @@ local function setFrameRule(info, key, shouldSelect)
 		working[key] = nil
 	end
 
-	NormalizeUnitFrameVisibilityConfig(info.var, working)
+	local normalized = NormalizeUnitFrameVisibilityConfig(info.var, working)
+	if wasAlwaysHidden and not (normalized and normalized.ALWAYS_HIDDEN == true) then
+		addon.variables.requireReload = true
+		if addon.functions and addon.functions.checkReloadFrame then addon.functions.checkReloadFrame() end
+	end
 	UpdateUnitFrameMouseover(info.name, info)
 end
 

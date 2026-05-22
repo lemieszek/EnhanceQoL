@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.20.0] - 2026-05-22
+
+### 🐛 Fixed
+
+- UI Options / Visibility: Fixed `Always hidden` for Blizzard frames using only alpha hiding instead of the visibility state driver, and require a reload when leaving that state.
+
+---
+
 ## [10.19.0] - 2026-05-22
 
 ### ✨ Added

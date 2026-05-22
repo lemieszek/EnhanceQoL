@@ -1363,7 +1363,7 @@ UpdateUnitFrameMouseover = function(barName, cbData)
 	if not cbData or not cbData.var then return end
 
 	local config = NormalizeUnitFrameVisibilityConfig(cbData.var)
-	local manualOpts = { noStateDriver = true }
+	local manualOpts = { noStateDriver = not (config and config.ALWAYS_HIDDEN == true) }
 	-- local handled = false
 
 	if barName == BOSS_FRAME_CONTAINER_NAME then
