@@ -83,9 +83,12 @@ local nameplateFocusHealthbarDefaults = setmetatable({}, { __mode = "k" })
 local nameplateQuestMarkerCache = {}
 local nameplateMobColorState = {
 	isActive = false,
-	contextKey = nil,
+	isDirty = true,
+	instanceType = "none",
+	zonePvpType = nil,
 	lastLFGInstanceID = nil,
 	isInstancedPve = false,
+	isAllowed = false,
 	referenceLevel = nil,
 	lieutenantLevel = nil,
 }
@@ -446,9 +449,9 @@ end
 
 local function isLegacyNameplateMobFallbackColor(dbKey, color)
 	if dbKey == NAMEPLATE_MOB_COLOR_NEUTRAL_DB_KEY or dbKey == NAMEPLATE_MOB_COLOR_THREAT_WARNING_DB_KEY then
-		return colorsMatch(color, { r = 1, g = 1, b = 0 })
+		return colorsMatch(color, NAMEPLATE_MOB_COLOR_DEFAULTS[NAMEPLATE_MOB_COLOR_THREAT_WARNING_DB_KEY])
 	elseif dbKey == NAMEPLATE_MOB_COLOR_THREAT_LOST_DB_KEY then
-		return colorsMatch(color, { r = 1, g = 0.6, b = 0 })
+		return colorsMatch(color, NAMEPLATE_MOB_COLOR_DEFAULTS[NAMEPLATE_MOB_COLOR_THREAT_LOST_DB_KEY])
 	end
 
 	return false
@@ -467,8 +470,6 @@ end
 
 local function getNameplateMobColorDefault(dbKey, unit)
 	if dbKey == NAMEPLATE_MOB_COLOR_NEUTRAL_DB_KEY then return getNeutralNameplateDefaultColor(unit) end
-	if dbKey == NAMEPLATE_MOB_COLOR_THREAT_LOST_DB_KEY then return buildNameplateColorDefault(_G.ORANGE_THREAT_COLOR, 1, 0.6, 0) end
-	if dbKey == NAMEPLATE_MOB_COLOR_THREAT_WARNING_DB_KEY then return buildNameplateColorDefault(_G.YELLOW_THREAT_COLOR, 1, 1, 0) end
 	return NAMEPLATE_MOB_COLOR_DEFAULTS[dbKey]
 end
 
@@ -823,7 +824,7 @@ local function isNameplateMobColorPvpContext(instanceType, zonePvpType)
 	return zonePvpType == "arena" or zonePvpType == "combat" or zonePvpType == "ffapvp"
 end
 
-local function getNameplateMobColorContext()
+local function readNameplateMobColorContext()
 	local _, instanceType, _, _, _, _, _, _, _, lfgDungeonID = GetInstanceInfo()
 	if isSecretValue(instanceType) then instanceType = nil end
 	if isSecretValue(lfgDungeonID) then lfgDungeonID = nil end
@@ -840,15 +841,7 @@ local function getNameplateMobColorContext()
 	local isInstancedPve = instanceType == "party" or instanceType == "raid" or instanceType == "scenario"
 	local isPvp = isNameplateMobColorPvpContext(instanceType, zonePvpType)
 	local isAllowedByScope = (isInstancedPve and allowInDungeons) or ((not isInstancedPve) and allowOutsideDungeons)
-
-	return {
-		instanceType = instanceType,
-		lfgDungeonID = lfgDungeonID,
-		zonePvpType = zonePvpType,
-		isInstancedPve = isInstancedPve,
-		isPvp = isPvp,
-		isAllowed = isAllowedByScope and not isPvp,
-	}
+	return instanceType, lfgDungeonID, zonePvpType, isInstancedPve, isAllowedByScope and not isPvp
 end
 
 local function isPlayerControlledNameplateUnit(unit)
@@ -864,35 +857,40 @@ local function isPlayerControlledNameplateUnit(unit)
 end
 
 local function updateNameplateMobColorContext(forceRefresh)
+	if not forceRefresh and not nameplateMobColorState.isDirty then return end
 	local isFeatureEnabled = isNameplateMobColorsActive()
-	local context = getNameplateMobColorContext()
-	local contextKey = table.concat({
-		context.instanceType or "none",
-		tostring(context.lfgDungeonID or 0),
-		context.zonePvpType or "",
-		context.isAllowed and "1" or "0",
-	}, "|")
+	local instanceType, lfgDungeonID, zonePvpType, isInstancedPve, isAllowed = readNameplateMobColorContext()
+	local state = nameplateMobColorState
+	local contextChanged = state.instanceType ~= instanceType
+		or state.lastLFGInstanceID ~= lfgDungeonID
+		or state.zonePvpType ~= zonePvpType
+		or state.isAllowed ~= isAllowed
+	state.isDirty = false
 
-	if not isFeatureEnabled or not context.isAllowed then
-		nameplateMobColorState.isActive = false
-		nameplateMobColorState.contextKey = contextKey
-		nameplateMobColorState.lastLFGInstanceID = context.lfgDungeonID
-		nameplateMobColorState.isInstancedPve = context.isInstancedPve == true
-		nameplateMobColorState.referenceLevel = nil
-		nameplateMobColorState.lieutenantLevel = nil
+	if not isFeatureEnabled or not isAllowed then
+		state.isActive = false
+		state.instanceType = instanceType
+		state.zonePvpType = zonePvpType
+		state.lastLFGInstanceID = lfgDungeonID
+		state.isInstancedPve = isInstancedPve == true
+		state.isAllowed = isAllowed == true
+		state.referenceLevel = nil
+		state.lieutenantLevel = nil
 		return
 	end
 
-	if not forceRefresh and nameplateMobColorState.contextKey == contextKey and nameplateMobColorState.isActive == true then return end
+	if not forceRefresh and not contextChanged and state.isActive == true then return end
 
-	nameplateMobColorState.isActive = true
-	nameplateMobColorState.contextKey = contextKey
-	nameplateMobColorState.lastLFGInstanceID = context.lfgDungeonID
-	nameplateMobColorState.isInstancedPve = context.isInstancedPve == true
-	nameplateMobColorState.lieutenantLevel = nil
+	state.isActive = true
+	state.instanceType = instanceType
+	state.zonePvpType = zonePvpType
+	state.lastLFGInstanceID = lfgDungeonID
+	state.isInstancedPve = isInstancedPve == true
+	state.isAllowed = isAllowed == true
+	state.lieutenantLevel = nil
 
 	local referenceLevel
-	if context.lfgDungeonID and context.isInstancedPve and type(_G.GetMaximumExpansionLevel) == "function" and type(_G.GetMaxLevelForExpansionLevel) == "function" then
+	if lfgDungeonID and isInstancedPve and type(_G.GetMaximumExpansionLevel) == "function" and type(_G.GetMaxLevelForExpansionLevel) == "function" then
 		local maximumExpansionLevel = _G.GetMaximumExpansionLevel()
 		if not isSecretValue(maximumExpansionLevel) then
 			referenceLevel = _G.GetMaxLevelForExpansionLevel(maximumExpansionLevel)
@@ -909,7 +907,7 @@ local function updateNameplateMobColorContext(forceRefresh)
 		if isSecretValue(referenceLevel) then referenceLevel = nil end
 	end
 
-	nameplateMobColorState.referenceLevel = type(referenceLevel) == "number" and referenceLevel or nil
+	state.referenceLevel = type(referenceLevel) == "number" and referenceLevel or nil
 end
 
 local function getNameplateHealthBar(unitFrame)
@@ -1106,9 +1104,11 @@ local function getNameplateEliteMarkerUnitLevel(unit)
 end
 
 local function getNameplateEliteMarkerReferenceLevel()
-	local context = getNameplateMobColorContext()
+	updateNameplateMobColorContext()
+	local lfgDungeonID = nameplateMobColorState.lastLFGInstanceID
+	local isInstancedPve = nameplateMobColorState.isInstancedPve
 	local referenceLevel
-	if context.lfgDungeonID and context.isInstancedPve and type(_G.GetMaximumExpansionLevel) == "function" and type(_G.GetMaxLevelForExpansionLevel) == "function" then
+	if lfgDungeonID and isInstancedPve and type(_G.GetMaximumExpansionLevel) == "function" and type(_G.GetMaxLevelForExpansionLevel) == "function" then
 		local maximumExpansionLevel = _G.GetMaximumExpansionLevel()
 		if not isSecretValue(maximumExpansionLevel) then
 			referenceLevel = _G.GetMaxLevelForExpansionLevel(maximumExpansionLevel)
@@ -1366,11 +1366,10 @@ end
 
 local function getNameplateMobColor(dbKey, unit)
 	local color = addon.db and addon.db[dbKey]
-	local defaultColor = getNameplateMobColorDefault(dbKey, unit)
-	if type(color) ~= "table" then return defaultColor end
+	if type(color) ~= "table" then return getNameplateMobColorDefault(dbKey, unit) end
 
 	if colorsMatch(color, NAMEPLATE_MOB_COLOR_DEFAULTS[dbKey]) or isLegacyNameplateMobFallbackColor(dbKey, color) then
-		return defaultColor
+		return getNameplateMobColorDefault(dbKey, unit)
 	end
 
 	return color
@@ -1379,7 +1378,6 @@ end
 -- Mirror Blizzard threat health bar priority so EQoL can customize the color
 -- without suppressing the default Health Bar Color state on nameplates.
 local function getNameplateThreatStatus(unitFrame)
-	updateNameplateMobColorContext()
 	if not nameplateMobColorState.isActive then return nil end
 	if not unitFrame or issecretvalue(unitFrame) then return nil end
 	if not unitFrame.displayThreatHealthBarColor then return nil end
@@ -1424,7 +1422,6 @@ local function getNameplateThreatColor(unitFrame, threatStatus)
 end
 
 local function getNameplateTankModeColor(unitFrame, threatStatus)
-	updateNameplateMobColorContext()
 	if not nameplateMobColorState.isActive then return nil end
 	if not (addon.db and addon.db[NAMEPLATE_MOB_TANK_MODE_DB_KEY] == true) then return nil end
 	if not isPlayerEffectivelyTank() then return nil end
@@ -1457,7 +1454,6 @@ local function isManaUsingNameplateMob(unit)
 end
 
 local function computeNameplateMobColor(unit, unitFrame)
-	updateNameplateMobColorContext()
 	if not nameplateMobColorState.isActive then return nil end
 	if not isNameplateUnitToken(unit) then return nil end
 	if isNeutralUnit(unit) then
@@ -1513,6 +1509,7 @@ local function applyNameplateMobColor(unitFrame)
 	local unit = unitFrame.unit
 	if not isNameplateUnitToken(unit) then return end
 
+	updateNameplateMobColorContext()
 	local threatStatus = getNameplateThreatStatus(unitFrame)
 	local color = getNameplateTankModeColor(unitFrame, threatStatus)
 	if not color then color = getNameplateThreatColor(unitFrame, threatStatus) end
@@ -1628,6 +1625,7 @@ local function refreshNameplateMobColorUnitFrame(unitFrame)
 	local unit = unitFrame.unit
 	if not isNameplateUnitToken(unit) then return end
 
+	updateNameplateMobColorContext()
 	updateNameplateEliteMarker(unitFrame, unit)
 	updateNameplateQuestMarker(unitFrame, unit)
 	updateNameplateTargetMarkers(unitFrame, unit)
@@ -1709,6 +1707,7 @@ local function ensureNameplateMobColorWatcher()
 		end
 
 		local forceRefresh = event ~= "NAME_PLATE_UNIT_ADDED"
+		if forceRefresh then nameplateMobColorState.isDirty = true end
 		updateNameplateMobColorContext(forceRefresh)
 		if event == "NAME_PLATE_UNIT_ADDED" and unit and C_NamePlate and C_NamePlate.GetNamePlateForUnit then
 			local namePlate = C_NamePlate.GetNamePlateForUnit(unit)
@@ -1724,7 +1723,8 @@ end
 local function syncNameplateMobColors()
 	if not isNameplateMobColorsActive() then return end
 	ensureNameplateMobColorWatcher()
-	updateNameplateMobColorContext()
+	nameplateMobColorState.isDirty = true
+	updateNameplateMobColorContext(true)
 	refreshAllNameplateMobColors()
 end
 
@@ -1876,6 +1876,7 @@ function addon.functions.SetDefaultNameplateMobColorsEnabled(value)
 	local wasActive = isNameplateMobColorsActive()
 	local enabled = value and true or false
 	addon.db[NAMEPLATE_MOB_COLORS_DB_KEY] = enabled
+	nameplateMobColorState.isDirty = true
 	if enabled then
 		nameplateMobColorsActive = true
 		syncNameplateMobColors()
@@ -1885,6 +1886,7 @@ function addon.functions.SetDefaultNameplateMobColorsEnabled(value)
 end
 
 function addon.functions.RefreshDefaultNameplateMobColors()
+	nameplateMobColorState.isDirty = true
 	if isNameplateMobColorsActive() then syncNameplateMobColors() end
 end
 
