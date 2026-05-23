@@ -1210,6 +1210,7 @@ end
 
 local refreshCrosshairStyle
 local refreshCrosshairVisibility
+local updateMouseEventRegistrations
 
 local function registerCrosshairWithEditMode(frame)
 	if crosshairEditModeRegistered then return end
@@ -1595,6 +1596,7 @@ local function updateRunnerState()
 		lastRingCursorX, lastRingCursorY, lastRingCursorScale = nil, nil, nil
 		ringProgressAccumulator = 0
 	end
+	if updateMouseEventRegistrations then updateMouseEventRegistrations() end
 end
 addon.Mouse.functions.updateRunnerState = updateRunnerState
 
@@ -1661,6 +1663,7 @@ function addon.Mouse.functions.InitState()
 	refreshCrosshairVisibility()
 	if db["mouseTrailEnabled"] then applyPreset(db["mouseTrailDensity"]) end
 	updateRunnerState()
+	if updateMouseEventRegistrations then updateMouseEventRegistrations() end
 end
 
 local function handleProgressEvent(event, unit, ...)
@@ -1731,46 +1734,72 @@ local ringProgressEvents = {
 	UNIT_SPELLCAST_DELAYED = true,
 	UNIT_SPELLCAST_EMPOWER_STOP = true,
 }
-eventFrame:RegisterEvent("PLAYER_LOGIN")
-eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
-eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED") -- enter combat
-eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED") -- leave combat
-eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
-eventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
-eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
-eventFrame:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
-eventFrame:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
-eventFrame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
-eventFrame:RegisterEvent("ACTIONBAR_UPDATE_COOLDOWN")
-eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_SENT", PLAYER_UNIT)
-eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_START", PLAYER_UNIT)
-eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_STOP", PLAYER_UNIT)
-eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_FAILED", PLAYER_UNIT)
-eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_INTERRUPTED", PLAYER_UNIT)
-eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_START", PLAYER_UNIT)
-eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_STOP", PLAYER_UNIT)
-eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_UPDATE", PLAYER_UNIT)
-eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_EMPOWER_START", PLAYER_UNIT)
-eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_EMPOWER_UPDATE", PLAYER_UNIT)
-eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_DELAYED", PLAYER_UNIT)
-eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_EMPOWER_STOP", PLAYER_UNIT)
+updateMouseEventRegistrations = function()
+	local db = addon.db
+	eventFrame:UnregisterAllEvents()
+	if not db then return end
+	local ringEnabled = db["mouseRingEnabled"] == true
+	local trailEnabled = db["mouseTrailEnabled"] == true
+	local crosshairEnabled = db["mouseCrosshairEnabled"] == true
+	if not ringEnabled and not trailEnabled and not crosshairEnabled then return end
+
+	eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+	eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
+	eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+	eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+
+	if crosshairEnabled then
+		eventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
+		eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
+		eventFrame:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
+		eventFrame:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
+	end
+
+	if ringEnabled or crosshairEnabled then
+		eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_START", PLAYER_UNIT)
+		eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_STOP", PLAYER_UNIT)
+		eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_FAILED", PLAYER_UNIT)
+		eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_INTERRUPTED", PLAYER_UNIT)
+		eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_START", PLAYER_UNIT)
+		eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_STOP", PLAYER_UNIT)
+		eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_EMPOWER_START", PLAYER_UNIT)
+		eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_EMPOWER_STOP", PLAYER_UNIT)
+	end
+
+	if ringEnabled then
+		eventFrame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
+		eventFrame:RegisterEvent("ACTIONBAR_UPDATE_COOLDOWN")
+		eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_SENT", PLAYER_UNIT)
+		eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_UPDATE", PLAYER_UNIT)
+		eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_EMPOWER_UPDATE", PLAYER_UNIT)
+		eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_DELAYED", PLAYER_UNIT)
+	end
+end
+addon.Mouse.functions.updateEventRegistrations = updateMouseEventRegistrations
 eventFrame:SetScript("OnEvent", function(_, event, unit, ...)
-	if not addon.db then return end
-	if event == "PLAYER_LOGIN" or event == "PLAYER_ENTERING_WORLD" then
-		setRunnerCombatActive(UnitAffectingCombat and UnitAffectingCombat(PLAYER_UNIT))
-		syncRingProgressState()
-		refreshRingVisibility()
-		refreshCrosshairVisibility()
+	local db = addon.db
+	if not db then return end
+	local ringEnabled = db["mouseRingEnabled"] == true
+	local trailEnabled = db["mouseTrailEnabled"] == true
+	local crosshairEnabled = db["mouseCrosshairEnabled"] == true
+	if not ringEnabled and not trailEnabled and not crosshairEnabled then return end
+	if event == "PLAYER_ENTERING_WORLD" then
+		if ringEnabled or trailEnabled then setRunnerCombatActive(UnitAffectingCombat and UnitAffectingCombat(PLAYER_UNIT)) end
+		if ringEnabled then
+			syncRingProgressState()
+			refreshRingVisibility()
+		end
+		if crosshairEnabled then refreshCrosshairVisibility() end
 		return
 	end
 	if event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" or event == "ZONE_CHANGED_NEW_AREA" then
-		setRunnerCombatActive(UnitAffectingCombat and UnitAffectingCombat(PLAYER_UNIT))
-		refreshRingVisibility()
-		refreshCrosshairVisibility()
+		if ringEnabled or trailEnabled then setRunnerCombatActive(UnitAffectingCombat and UnitAffectingCombat(PLAYER_UNIT)) end
+		if ringEnabled then refreshRingVisibility() end
+		if crosshairEnabled then refreshCrosshairVisibility() end
 		return
 	end
-	if crosshairContextRefreshEvents[event] then refreshCrosshairVisibility() end
-	if ringProgressEvents[event] then handleProgressEvent(event, unit, ...) end
+	if crosshairEnabled and crosshairContextRefreshEvents[event] then refreshCrosshairVisibility() end
+	if ringEnabled and ringProgressEvents[event] then handleProgressEvent(event, unit, ...) end
 end)
 
 -- Shared runner for ring + trail updates

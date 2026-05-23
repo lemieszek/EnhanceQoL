@@ -1139,6 +1139,9 @@ function Labels.GetAdditionalHotkeyBarOptions()
 end
 
 hooksecurefunc("ActionButton_UpdateRangeIndicator", function(self, checksRange, inRange)
+	local db = addon.db
+	local hiddenHotkeys = db and db.actionBarHiddenHotkeys
+	if not db or (not db.actionBarFullRangeColoring and not db.actionBarHotkeyFontOverride and (type(hiddenHotkeys) ~= "table" or not next(hiddenHotkeys))) then return end
 	if not self or not self.action then return end
 	self.EQOL_RangeOutOfRange = checksRange and inRange == false
 	if checksRange and inRange == false then

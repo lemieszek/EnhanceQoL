@@ -529,6 +529,7 @@ data = {
 		default = false,
 		func = function(v)
 			addon.db["mouseCrosshairEnabled"] = v and true or false
+			if addon.Mouse.functions.updateEventRegistrations then addon.Mouse.functions.updateEventRegistrations() end
 			if addon.Mouse.functions.refreshCrosshairVisibility then addon.Mouse.functions.refreshCrosshairVisibility() end
 		end,
 		parentSection = expandable,
