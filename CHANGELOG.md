@@ -1,13 +1,19 @@
 # Changelog
 
+<!--@eqol-beta@-->
 ## [10.20.0-beta2] - 2026-05-23
 
 ### ✨ Added
 
 - Cooldown Panels / Layout Edit: Quick Setups now hide count text and improve side-by-side text alignment.
 - SharedMedia: Added `Tank dead`, `Healer dead`, and `DPS dead` voiceover sounds, including deep voice variants.
+- Group Tools / Healer Mana Indicator: Added a new Edit Mode configurable healer mana display with dungeon and raid visibility, grow direction, name hiding, name shortening, LibSharedMedia font controls, and global font/style support.
+- Group Tools / Death Alert: Added a new role-based death notification with Edit Mode text styling, localized death text, per-role text suppression, per-role LibSharedMedia sounds, per-role TTS messages, selectable TTS voices, volume control, and a TTS preview button.
+- Group Tools / No Target Indicator: Added a new Edit Mode configurable combat indicator for missing or invalid targets, including custom text, LibSharedMedia sounds, friendly-target handling, font controls, color, strata, and global font/style support.
+- Group Tools / Focus Marker: Added a new Settings UI controlled focus marker macro helper with marker selection, macro update button, and optional ready-check party announcement that respects chat messaging lockdown.
 
 ---
+<!--@end-eqol-beta@-->
 
 ## [10.20.0-beta1] - 2026-05-22
 

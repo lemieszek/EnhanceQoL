@@ -83,7 +83,6 @@ local DB = {
 
 	deathEnabled = "groupToolsDeathAlertEnabled",
 	deathShowText = "groupToolsDeathAlertShowText",
-	deathText = "groupToolsDeathAlertText",
 	deathColor = "groupToolsDeathAlertColor",
 	deathDuration = "groupToolsDeathAlertDuration",
 	deathFontFace = "groupToolsDeathAlertFontFace",
@@ -689,10 +688,9 @@ function DeathAlert:GetRoleConfig(role)
 		cfg = {}
 		addon.db[DB.deathRoleConfig][role] = cfg
 	end
-	if cfg.showText == nil then cfg.showText = true end
+	if cfg.textDisabled == nil then cfg.textDisabled = false end
 	if cfg.soundEnabled == nil then cfg.soundEnabled = false end
 	if cfg.ttsEnabled == nil then cfg.ttsEnabled = false end
-	if cfg.text == nil then cfg.text = "" end
 	if cfg.sound == nil then cfg.sound = "" end
 	if cfg.tts == nil then cfg.tts = "" end
 	return cfg
@@ -709,30 +707,11 @@ function DeathAlert:ApplyStyle()
 	frame:SetSize(DEATH_ALERT_FRAME_WIDTH, fontSize + 8)
 end
 
-function DeathAlert:GetDefaultSuffix()
-	local suffix = getDB(DB.deathText, locale("groupToolsDeathAlertDefaultSuffix", "died"))
-	if type(suffix) ~= "string" or suffix == "" then suffix = locale("groupToolsDeathAlertDefaultSuffix", "died") end
-	return suffix
-end
-
-function DeathAlert:FormatMessage(template, coloredName, plainName, role, fallbackSuffix, useAsFullMessage)
-	local roleLabel = ROLE_LABELS[role] or role or ""
-	local name = coloredName or plainName or roleLabel
-	local plain = plainName or roleLabel
-	if type(template) == "string" and template ~= "" then
-		if template:find("{name}", 1, true) or template:find("{plainName}", 1, true) or template:find("{role}", 1, true) then
-			local message = template:gsub("{name}", name):gsub("{plainName}", plain):gsub("{role}", roleLabel)
-			return message
-		end
-		if useAsFullMessage then return template end
-	end
-	return (name or "") .. " " .. (fallbackSuffix or self:GetDefaultSuffix())
-end
-
 function DeathAlert:GetDisplayMessage(role, coloredName, plainName)
-	local roleCfg = role and self:GetRoleConfig(role)
-	if roleCfg and type(roleCfg.text) == "string" and roleCfg.text ~= "" then return self:FormatMessage(roleCfg.text, coloredName, plainName, role, self:GetDefaultSuffix(), true) end
-	return self:FormatMessage(getDB(DB.deathText, self:GetDefaultSuffix()), coloredName, plainName, role, self:GetDefaultSuffix(), false)
+	local name = coloredName or plainName or ROLE_LABELS[role] or ""
+	local suffix = locale("groupToolsDeathAlertDefaultSuffix", "died")
+	if type(suffix) ~= "string" or suffix == "" then return name end
+	return name .. " " .. suffix
 end
 
 function DeathAlert:GetTTSVoice()
@@ -742,7 +721,7 @@ end
 function DeathAlert:GetTTSMessage(role, plainName)
 	local roleCfg = self:GetRoleConfig(role)
 	local tts = roleCfg.tts
-	if type(tts) == "string" and tts ~= "" then return self:FormatMessage(tts, plainName, plainName, role, self:GetDefaultSuffix(), true) end
+	if type(tts) == "string" and tts ~= "" then return tts end
 	return self:GetDisplayMessage(role, plainName, plainName)
 end
 
@@ -788,7 +767,7 @@ function DeathAlert:HandleDeath(guid)
 	local roleCfg = self:GetRoleConfig(role)
 	local coloredName, plainName = classColoredUnitName(unit)
 
-	if addon.db[DB.deathShowText] == true and roleCfg.showText == true then self:ShowText(self:GetDisplayMessage(role, coloredName or plainName or unit, plainName or unit)) end
+	if addon.db[DB.deathShowText] == true and roleCfg.textDisabled ~= true then self:ShowText(self:GetDisplayMessage(role, coloredName or plainName or unit, plainName or unit)) end
 
 	local now = GetTime()
 	self.lastNotificationByGUID = self.lastNotificationByGUID or {}
@@ -1117,8 +1096,6 @@ end
 local function applyDeathSetting(field, value)
 	if field == "showText" then
 		setDB(DB.deathShowText, value == true)
-	elseif field == "text" then
-		setDB(DB.deathText, type(value) == "string" and value or "")
 	elseif field == "color" then
 		setDB(DB.deathColor, normalizeColor(value, { r = 1, g = 1, b = 1, a = 1 }))
 	elseif field == "duration" then
@@ -1141,10 +1118,8 @@ end
 
 local function applyRoleDeathSetting(role, field, value)
 	local cfg = DeathAlert:GetRoleConfig(role)
-	if field == "showText" then
-		cfg.showText = value == true
-	elseif field == "text" then
-		cfg.text = type(value) == "string" and value or ""
+	if field == "textDisabled" then
+		cfg.textDisabled = value == true
 	elseif field == "soundEnabled" then
 		cfg.soundEnabled = value == true
 	elseif field == "sound" then
@@ -1285,15 +1260,6 @@ function DeathAlert:RegisterEditMode()
 		set = function(_, value) applyDeathSetting("showText", value) end,
 	}, EDITMODE_IDS.deathAlert, function() DeathAlert:Preview() end)
 	settings[#settings + 1] = {
-		name = locale("groupToolsDisplayText", "Display text"),
-		kind = SettingType.Input,
-		maxChars = 64,
-		inputWidth = 180,
-		get = function() return getDB(DB.deathText, locale("groupToolsDeathAlertDefaultSuffix", "died")) end,
-		set = function(_, value) applyDeathSetting("text", value) end,
-		isEnabled = textAlertsEnabled,
-	}
-	settings[#settings + 1] = {
 		name = L["Text color"] or "Text color",
 		kind = SettingType.Color,
 		hasOpacity = true,
@@ -1328,27 +1294,16 @@ function DeathAlert:RegisterEditMode()
 	for _, role in ipairs(ROLE_ORDER) do
 		local roleKey = role
 		local roleSectionId = "groupToolsDeathAlert" .. roleKey
-		local function roleTextEnabled() return textAlertsEnabled() and DeathAlert:GetRoleConfig(roleKey).showText == true end
 		local function roleSoundEnabled() return DeathAlert:GetRoleConfig(roleKey).soundEnabled == true end
 		local function roleTTSEnabled() return DeathAlert:GetRoleConfig(roleKey).ttsEnabled == true end
 		settings[#settings + 1] = { name = ROLE_LABELS[roleKey], kind = SettingType.Collapsible, id = roleSectionId, defaultCollapsed = true }
 		settings[#settings + 1] = {
-			name = locale("groupToolsDeathAlertShowText", "Show text alert"),
+			name = (locale("groupToolsDeathAlertDisableTextFor", "Disable text for %s")):format(ROLE_LABELS[roleKey]),
 			kind = SettingType.Checkbox,
 			parentId = roleSectionId,
-			get = function() return DeathAlert:GetRoleConfig(roleKey).showText == true end,
-			set = function(_, value) applyRoleDeathSetting(roleKey, "showText", value) end,
+			get = function() return DeathAlert:GetRoleConfig(roleKey).textDisabled == true end,
+			set = function(_, value) applyRoleDeathSetting(roleKey, "textDisabled", value) end,
 			isEnabled = textAlertsEnabled,
-		}
-		settings[#settings + 1] = {
-			name = locale("groupToolsDisplayText", "Display text"),
-			kind = SettingType.Input,
-			parentId = roleSectionId,
-			maxChars = 64,
-			inputWidth = 180,
-			get = function() return DeathAlert:GetRoleConfig(roleKey).text or "" end,
-			set = function(_, value) applyRoleDeathSetting(roleKey, "text", value) end,
-			isEnabled = roleTextEnabled,
 		}
 		settings[#settings + 1] = {
 			name = locale("groupToolsPlaySound", "Play sound"),
@@ -1509,7 +1464,6 @@ function GroupTools.functions.InitDB()
 
 	initDBValue(DB.deathEnabled, false)
 	initDBValue(DB.deathShowText, true)
-	initDBValue(DB.deathText, locale("groupToolsDeathAlertDefaultSuffix", "died"))
 	initDBValue(DB.deathColor, { r = 1, g = 1, b = 1, a = 1 })
 	initDBValue(DB.deathDuration, 2)
 	initDBValue(DB.deathFontFace, globalFontKey())
@@ -1519,9 +1473,9 @@ function GroupTools.functions.InitDB()
 	initDBValue(DB.deathTTSVoice, TTS_VOICE_DEFAULT)
 	initDBValue(DB.deathTTSVolume, 50)
 	initDBValue(DB.deathRoleConfig, {
-		TANK = { showText = true, text = "", soundEnabled = false, sound = "", ttsEnabled = false, tts = "" },
-		HEALER = { showText = true, text = "", soundEnabled = false, sound = "", ttsEnabled = false, tts = "" },
-		DAMAGER = { showText = true, text = "", soundEnabled = false, sound = "", ttsEnabled = false, tts = "" },
+		TANK = { textDisabled = false, soundEnabled = false, sound = "", ttsEnabled = false, tts = "" },
+		HEALER = { textDisabled = false, soundEnabled = false, sound = "", ttsEnabled = false, tts = "" },
+		DAMAGER = { textDisabled = false, soundEnabled = false, sound = "", ttsEnabled = false, tts = "" },
 	})
 	for _, role in ipairs(ROLE_ORDER) do
 		DeathAlert:GetRoleConfig(role)
