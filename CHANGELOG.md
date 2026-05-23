@@ -20,6 +20,7 @@
 
 - Cooldown Panels: Reduced repeated visibility driver rebuild work by caching unchanged visibility driver expressions per panel, improving refresh performance in large panel setups.
 - Cooldown Panels: Reduced duplicated spell resolution during keybind text refreshes by reusing spell IDs already resolved during panel runtime updates.
+- Cooldown Panels: Reduced fixed layout refresh overhead by avoiding repeated dynamic group target scans and override normalization on unchanged fixed panel layouts.
 
 ---
 <!--@end-eqol-beta@-->

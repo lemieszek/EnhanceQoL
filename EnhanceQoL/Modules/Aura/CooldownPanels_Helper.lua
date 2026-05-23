@@ -712,16 +712,6 @@ end
 
 local function getFixedCellKey(column, row) return tostring(column) .. ":" .. tostring(row) end
 
-local function fixedLayoutCacheHasMissingDynamicTargets(candidate)
-	local groups = candidate and candidate.groups or nil
-	if type(groups) ~= "table" then return false end
-	for i = 1, #groups do
-		local group = groups[i]
-		if group and Helper.FixedGroupUsesStaticSlots(group) ~= true and type(getFixedGroupDynamicTargetIndices(group)) ~= "table" then return true end
-	end
-	return false
-end
-
 local function isWithinConfiguredFixedGrid(column, row, configuredColumns, configuredRows)
 	if not (column and row) then return false end
 	if configuredColumns > 0 and column > configuredColumns then return false end
@@ -1165,7 +1155,7 @@ function Helper.GetFixedLayoutCache(panel)
 		and cache.fixedGridColumns == layout.fixedGridColumns
 		and cache.fixedGridRows == layout.fixedGridRows
 		and cache.wrapCount == layout.wrapCount
-		and not fixedLayoutCacheHasMissingDynamicTargets(cache)
+		and cache.dynamicTargetsReady ~= false
 	then
 		return cache
 	end
@@ -1325,6 +1315,7 @@ function Helper.GetFixedLayoutCache(panel)
 	local slotCount = 0
 	local slotEntryIds = {}
 	local staticTargetIndexByEntryId = {}
+	local dynamicTargetsReady = true
 	if not (boundsColumns <= 0 and boundsRows <= 0) then
 		if boundsColumns <= 0 then boundsColumns = 1 end
 		if boundsRows <= 0 then boundsRows = 1 end
@@ -1377,6 +1368,14 @@ function Helper.GetFixedLayoutCache(panel)
 				end
 			end
 		end
+	else
+		for i = 1, #fixedGroups do
+			local group = fixedGroups[i]
+			if group and Helper.FixedGroupUsesStaticSlots(group) ~= true then
+				dynamicTargetsReady = false
+				break
+			end
+		end
 	end
 
 	cache = {
@@ -1389,6 +1388,7 @@ function Helper.GetFixedLayoutCache(panel)
 		fixedGridColumns = layout.fixedGridColumns,
 		fixedGridRows = layout.fixedGridRows,
 		wrapCount = layout.wrapCount,
+		dynamicTargetsReady = dynamicTargetsReady,
 		groups = fixedGroups,
 		groupById = fixedGroupById,
 		groupIndexById = fixedGroupIndexById,
