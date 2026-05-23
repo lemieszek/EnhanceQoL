@@ -1064,6 +1064,9 @@ function FocusMarker:Announce()
 	if not self:IsEnabled() or addon.db[DB.focusMarkerAnnounce] ~= true then return end
 	local inInstance, instanceType = IsInInstance()
 	if not inInstance or instanceType ~= "party" then return end
+	if C_ChatInfo and C_ChatInfo.InChatMessagingLockdown and C_ChatInfo.InChatMessagingLockdown() then return end
+	local socialRestrictions = _G.C_SocialRestrictions
+	if socialRestrictions and socialRestrictions.CanSendChat and not socialRestrictions.CanSendChat() then return end
 	if C_ChatInfo and C_ChatInfo.SendChatMessage then
 		C_ChatInfo.SendChatMessage(self:GetAnnounceMessage(), "PARTY")
 	elseif _G.SendChatMessage then
