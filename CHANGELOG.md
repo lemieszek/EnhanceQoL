@@ -16,6 +16,10 @@
 
 - Cooldown Panels: Fixed Racial entries so they update to the current character's racial cooldown on login and specialization changes without using the broad runtime racial variant group that caused performance spikes in large shared profiles.
 
+### ⚡ Performance
+
+- Cooldown Panels: Reduced repeated visibility driver rebuild work by caching unchanged visibility driver expressions per panel, improving refresh performance in large panel setups.
+
 ---
 <!--@end-eqol-beta@-->
 
