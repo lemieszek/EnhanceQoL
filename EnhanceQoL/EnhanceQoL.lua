@@ -1522,6 +1522,7 @@ GetDruidTravelStanceIndexes = function()
 	end
 	return indexes
 end
+addon.functions.GetDruidTravelStanceIndexes = GetDruidTravelStanceIndexes
 
 IsInDruidTravelForm = function()
 	local class = addon.variables and addon.variables.unitClass

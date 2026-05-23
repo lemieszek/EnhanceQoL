@@ -19266,7 +19266,7 @@ function CooldownPanels:BuildVisibilityDriverSignature(layout)
 	weight = weight * 2
 	if addon.variables and addon.variables.unitClass == "DRUID" then signature = signature + weight end
 	weight = weight * 2
-	if GetDruidTravelStanceIndexes then signature = signature + weight end
+	if addon.functions and addon.functions.GetDruidTravelStanceIndexes then signature = signature + weight end
 	weight = weight * 2
 	if addon.functions and addon.functions.BuildUnitFrameDriverExpression then signature = signature + weight end
 	weight = weight * 2
