@@ -1,42 +1,17 @@
 # Changelog
 
-## [10.20.0-beta3] - 2026-05-23
-
-### ⚡ Performance
-
-- Cooldown Panels: Reduced repeated visibility driver rebuild work by caching unchanged visibility driver expressions per panel, improving refresh performance in large panel setups.
-- Cooldown Panels: Reduced duplicated spell resolution during keybind text refreshes by reusing spell IDs already resolved during panel runtime updates.
-- Cooldown Panels: Reduced fixed layout refresh overhead by avoiding repeated dynamic group target scans and override normalization on unchanged fixed panel layouts.
-
----
-
-## [10.20.0-beta2] - 2026-05-23
+## [10.20.0] - 2026-05-23
 
 ### ✨ Added
 
 - Cooldown Panels / Layout Edit: Quick Setups now hide count text and improve side-by-side text alignment.
+- Cooldown Panels / Layout Edit: Added entry Quick Setups and entry style copy/paste buttons.
+- Cooldown Panels / Bars: Added a Segment charges Quick Setup preset.
 - SharedMedia: Added `Tank dead`, `Healer dead`, and `DPS dead` voiceover sounds, including deep voice variants.
 - Group Tools / Healer Mana Indicator: Added a new Edit Mode configurable healer mana display with dungeon and raid visibility, grow direction, name hiding, name shortening, LibSharedMedia font controls, and global font/style support.
 - Group Tools / Death Alert: Added a new role-based death notification with Edit Mode text styling, localized death text, per-role text suppression, per-role LibSharedMedia sounds, per-role TTS messages, selectable TTS voices, volume control, and a TTS preview button.
 - Group Tools / No Target Indicator: Added a new Edit Mode configurable combat indicator for missing or invalid targets, including custom text, LibSharedMedia sounds, friendly-target handling, font controls, color, strata, and global font/style support.
 - Group Tools / Focus Marker: Added a new Settings UI controlled focus marker macro helper with marker selection, macro update button, and optional ready-check party announcement that respects chat messaging lockdown.
-
-### 🐛 Fixed
-
-- Cooldown Panels: Fixed Racial entries so they update to the current character's racial cooldown on login and specialization changes without using the broad runtime racial variant group that caused performance spikes in large shared profiles.
-
----
-
-## [10.20.0-beta1] - 2026-05-22
-
-### ✨ Added
-
-- Cooldown Panels / Layout Edit: Added entry Quick Setups and entry style copy/paste buttons.
-- Cooldown Panels / Bars: Added a Segment charges Quick Setup preset.
-
-### 🐛 Fixed
-
-- UI Options / Visibility: Fixed `Always hidden` for Blizzard frames using only alpha hiding instead of the visibility state driver, and require a reload when leaving that state.
 
 ---
 
