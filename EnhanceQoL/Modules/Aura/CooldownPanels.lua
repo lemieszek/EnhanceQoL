@@ -105,15 +105,16 @@ CooldownPanels.staticSpellVariantGroups = CooldownPanels.staticSpellVariantGroup
 		{ 20572, 33697, 33702 },
 		-- Draenei racial with class-specific spellIDs.
 		{ 59545, 59543, 59548, 121093, 59542, 59544, 59547, 28880, 370626, 416250 },
-		-- Primary racial cooldowns. Stored entries resolve to the current player's known racial variant.
-		{
-			20572, 26297, 7744, 20549,
-			202719, 50613, 80483, 28730, 129597, 155145, 232633, 25046, 69179,
-			69070, 59752, 20594, 58984, 20589,
-			59545, 59543, 59548, 121093, 59542, 59544, 59547, 28880, 370626, 416250,
-			68992, 107079, 357214, 260364, 255654, 274738, 291944, 312411, 256948,
-			255647, 265221, 287712, 312924, 436344, 1237885,
-		},
+	}
+
+CooldownPanels.playerRacialSpellIDs = CooldownPanels.playerRacialSpellIDs
+	or {
+		20572, 33697, 33702, 26297, 7744, 20549,
+		202719, 50613, 80483, 28730, 129597, 155145, 232633, 25046, 69179,
+		69070, 59752, 20594, 58984, 20589,
+		59545, 59543, 59548, 121093, 59542, 59544, 59547, 28880, 370626, 416250,
+		68992, 107079, 357214, 368970, 260364, 255654, 274738, 291944, 312411, 256948,
+		255647, 265221, 287712, 312924, 436344, 1237885,
 	}
 
 function CooldownPanels:RegisterItemRankGroup(rankList)
@@ -1004,7 +1005,7 @@ function CooldownPanels:ResolveStaticKnownSpellVariantID(spellId)
 	if Api.IsSpellKnown and Api.IsSpellKnown(baseSpellID, false) then return baseSpellID, false, group end
 	for i = 1, #group do
 		local candidateID = tonumber(group[i])
-		if candidateID and candidateID > 0 and candidateID ~= baseSpellID and Api.IsSpellKnown and Api.IsSpellKnown(candidateID, true) then return candidateID, true, group end
+		if candidateID and candidateID > 0 and Api.IsSpellKnown and Api.IsSpellKnown(candidateID, false) then return candidateID, candidateID ~= baseSpellID, group end
 	end
 	return baseSpellID, false, group
 end
@@ -1182,7 +1183,6 @@ local updateItemCountCacheForItem
 local ensureRoot
 local ensurePanelAnchor
 local panelAllowsSpec
-local getPlayerSpecId
 local ensureAssistedHighlightHook
 
 local STRATA_INDEX = {}
@@ -1409,7 +1409,7 @@ local function scheduleCursorSpecRetry()
 	C_Timer.After(0.5, function()
 		cursorSpecRetryPending = false
 		if not hasSpecFilteredCursorPanels() then return end
-		if getPlayerSpecId and getPlayerSpecId() then
+		if queryPlayerSpecId() then
 			CooldownPanels:UpdateCursorAnchorState()
 			return
 		end
@@ -1463,7 +1463,7 @@ function CooldownPanels:UpdateCursorAnchorState()
 	else
 		stopCursorFollow()
 		setFakeCursorMode("hidden")
-		if hasSpecFilteredCursorPanels() and getPlayerSpecId and not getPlayerSpecId() then scheduleCursorSpecRetry() end
+		if hasSpecFilteredCursorPanels() and not queryPlayerSpecId() then scheduleCursorSpecRetry() end
 	end
 end
 
@@ -3433,8 +3433,6 @@ end
 
 function cdp.ENTRY.CopyStyleValue(value) return Helper.CopyTableDeep(value) end
 
-getPlayerSpecId = queryPlayerSpecId
-
 local function getPlayerClassSpecMap()
 	local classId = UnitClass and select(3, UnitClass("player")) or nil
 	if not classId then return nil end
@@ -3469,7 +3467,7 @@ end
 
 panelAllowsSpec = function(panel)
 	if not panelHasSpecFilter(panel) then return true end
-	local specId = getPlayerSpecId()
+	local specId = queryPlayerSpecId()
 	if not specId then return false end
 	local filter = panel and panel.specFilter
 	return filter and filter[specId] == true
@@ -3725,6 +3723,76 @@ function CooldownPanels:GetPlayerRacialSpellEntries()
 	return entries
 end
 
+function CooldownPanels:GetPlayerRacialSpellIDSet()
+	local set = self.playerRacialSpellIDSet
+	if type(set) == "table" then return set end
+	set = {}
+	for _, spellId in ipairs(self.playerRacialSpellIDs or {}) do
+		local numericSpellId = tonumber(spellId)
+		if numericSpellId then set[numericSpellId] = true end
+	end
+	self.playerRacialSpellIDSet = set
+	return set
+end
+
+function CooldownPanels:IsRacialSpellID(spellId)
+	local numericSpellId = tonumber(spellId)
+	if not numericSpellId then return false end
+	local set = self:GetPlayerRacialSpellIDSet()
+	return set[numericSpellId] == true
+end
+
+function CooldownPanels:GetCurrentPlayerRacialSpellIDs()
+	local ids = {}
+	local seen = {}
+	local racials = self:GetPlayerRacialSpellEntries()
+	for i = 1, #racials do
+		local racial = racials[i]
+		local spellId = tonumber(racial and racial.spellID)
+		if spellId and racial.isFallback ~= true and self:IsRacialSpellID(spellId) and not seen[spellId] then
+			seen[spellId] = true
+			ids[#ids + 1] = spellId
+		end
+	end
+	return ids
+end
+
+function CooldownPanels:NormalizePlayerRacialSpellID(spellId, currentPlayerRacialSpellIDs)
+	local numericSpellId = tonumber(spellId)
+	if not numericSpellId or not self:IsRacialSpellID(numericSpellId) then return spellId end
+	if type(currentPlayerRacialSpellIDs) ~= "table" or #currentPlayerRacialSpellIDs == 0 then return numericSpellId end
+	for i = 1, #currentPlayerRacialSpellIDs do
+		if tonumber(currentPlayerRacialSpellIDs[i]) == numericSpellId then return numericSpellId end
+	end
+	return tonumber(currentPlayerRacialSpellIDs[1]) or numericSpellId
+end
+
+function CooldownPanels:NormalizeActivePanelPlayerRacials(root)
+	root = root or ensureRoot()
+	if not (root and root.panels) then return false end
+	local currentPlayerRacialSpellIDs = self:GetCurrentPlayerRacialSpellIDs()
+	if type(currentPlayerRacialSpellIDs) ~= "table" or #currentPlayerRacialSpellIDs == 0 then return false end
+	local changed = false
+	for _, panel in pairs(root.panels) do
+		if panel and panel.enabled ~= false and panelAllowsSpec(panel) then
+			local panelChanged = false
+			for _, entry in pairs(panel.entries or {}) do
+				if entry and entry.type == "SPELL" and entry.spellID then
+					local normalizedSpellID = self:NormalizePersistentSpellID(entry.spellID, { allowTalentChoiceCanonical = false }) or entry.spellID
+					normalizedSpellID = self:NormalizePlayerRacialSpellID(normalizedSpellID, currentPlayerRacialSpellIDs)
+					if normalizedSpellID ~= entry.spellID then
+						entry.spellID = normalizedSpellID
+						changed = true
+						panelChanged = true
+					end
+				end
+			end
+			if panelChanged then Helper.InvalidateFixedLayoutCache(panel) end
+		end
+	end
+	return changed
+end
+
 function CooldownPanels:FindEquivalentSpellEntry(panelId, spellId)
 	panelId = normalizeId(panelId)
 	local panel = self:GetPanel(panelId)
@@ -3795,16 +3863,6 @@ function CooldownPanels:GetRacialExclusionDefinitions()
 		{ spellID = 436344 },
 		{ spellID = 1237885 },
 	}
-end
-
-function CooldownPanels:IsRacialSpellID(spellId)
-	local numericSpellId = tonumber(spellId)
-	if not numericSpellId then return false end
-	for _, definition in ipairs(self:GetRacialExclusionDefinitions()) do
-		local definitionSpellId = tonumber(definition and definition.spellID)
-		if definitionSpellId and self:AreSpellVariantsEquivalent(numericSpellId, definitionSpellId) then return true end
-	end
-	return false
 end
 
 function CooldownPanels:IsRacialSpellEntry(entry)
@@ -4999,7 +5057,7 @@ function CooldownPanels:RebuildSpellIndex()
 	local itemUsesTrackedIds = {}
 	local rangeCheckSpells = {}
 	self:EnsureFoodRankGroupsLoaded()
-	local activeSpecId = getPlayerSpecId()
+	local activeSpecId = queryPlayerSpecId()
 	local classSpecs = getPlayerClassSpecMap()
 	if classSpecs then
 		for specId in pairs(classSpecs) do
@@ -5492,17 +5550,21 @@ function CooldownPanels:NormalizeAll()
 	normalizedRoots[root] = true
 	Helper.SyncOrder(root.order, root.panels)
 	root._orderDirty = nil
+	local currentPlayerRacialSpellIDs = self:GetCurrentPlayerRacialSpellIDs()
 	for panelId, panel in pairs(root.panels) do
 		if panel and panel.id == nil then panel.id = panelId end
 		Helper.NormalizePanel(panel, root.defaults)
 		Helper.InvalidateFixedLayoutCache(panel)
 		normalizedPanels[panel] = true
 		Helper.SyncOrder(panel.order, panel.entries)
+		local normalizePlayerRacials = panel and panel.enabled ~= false and panelAllowsSpec(panel)
 		for entryId, entry in pairs(panel.entries) do
 			if entry and entry.id == nil then entry.id = entryId end
 			Helper.NormalizeEntry(entry, root.defaults)
 			if entry and entry.type == "SPELL" and entry.spellID then
-				entry.spellID = self:NormalizePersistentSpellID(entry.spellID, { allowTalentChoiceCanonical = false }) or entry.spellID
+				local normalizedSpellID = self:NormalizePersistentSpellID(entry.spellID, { allowTalentChoiceCanonical = false }) or entry.spellID
+				if normalizePlayerRacials then normalizedSpellID = self:NormalizePlayerRacialSpellID(normalizedSpellID, currentPlayerRacialSpellIDs) end
+				entry.spellID = normalizedSpellID
 			end
 			if entry and entry.type == "ITEM" then
 				local canonicalItemID, wasHigherRank = self:GetCanonicalItemRankID(entry.itemID)
@@ -19194,6 +19256,56 @@ local function playerHasVehicleUI()
 	return false
 end
 
+function CooldownPanels:BuildVisibilityDriverSignature(layout)
+	local source = layout and layout.visibility
+	local signature = 0
+	local weight = 1
+	if layout and layout.hideInPetBattle == true then signature = signature + weight end
+	weight = weight * 2
+	if layout and layout.hideInVehicle == true then signature = signature + weight end
+	weight = weight * 2
+	if addon.variables and addon.variables.unitClass == "DRUID" then signature = signature + weight end
+	weight = weight * 2
+	if GetDruidTravelStanceIndexes then signature = signature + weight end
+	weight = weight * 2
+	if addon.functions and addon.functions.BuildUnitFrameDriverExpression then signature = signature + weight end
+	weight = weight * 2
+	if addon.functions and addon.functions.VisibilityConfigUsesManualEvaluation then signature = signature + weight end
+	weight = weight * 2
+	if type(source) == "table" then
+		signature = signature + weight
+		weight = weight * 2
+		if source.MOUSEOVER then signature = signature + weight end
+		weight = weight * 2
+		if source.ALWAYS_IN_COMBAT then signature = signature + weight end
+		weight = weight * 2
+		if source.ALWAYS_OUT_OF_COMBAT then signature = signature + weight end
+		weight = weight * 2
+		if source.PLAYER_CASTING then signature = signature + weight end
+		weight = weight * 2
+		if source.PLAYER_MOUNTED then signature = signature + weight end
+		weight = weight * 2
+		if source.PLAYER_NOT_MOUNTED then signature = signature + weight end
+		weight = weight * 2
+		if source.PLAYER_HAS_TARGET then signature = signature + weight end
+		weight = weight * 2
+		if source.PLAYER_IN_GROUP then signature = signature + weight end
+		weight = weight * 2
+		if source.SKYRIDING_ACTIVE then signature = signature + weight end
+		weight = weight * 2
+		if source.SKYRIDING_INACTIVE then signature = signature + weight end
+		weight = weight * 2
+		if source.FLYING_ACTIVE then signature = signature + weight end
+		weight = weight * 2
+		if source.FLYING_INACTIVE then signature = signature + weight end
+		weight = weight * 2
+		if source.ALWAYS_HIDDEN then signature = signature + weight end
+		return signature, nil
+	else
+		return signature, source
+	end
+end
+
 local function isPetBattleActive() return C_PetBattles and C_PetBattles.IsInBattle and C_PetBattles.IsInBattle() == true end
 local function isClientSceneActive()
 	local runtime = CooldownPanels.runtime
@@ -19254,34 +19366,53 @@ function CooldownPanels:ApplyVisibilityDriverToFrame(frame, expression)
 	return false
 end
 
-function CooldownPanels:BuildVisibilityDriver(panel)
+function CooldownPanels:BuildVisibilityDriver(panel, panelId)
 	if not panel then return nil, false, nil end
 	panel.layout = panel.layout or Helper.CopyTableShallow(Helper.PANEL_LAYOUT_DEFAULTS)
 	local layout = panel.layout
+	local signature, signatureSource = self:BuildVisibilityDriverSignature(layout)
+	panelId = panelId or panel.id
+	local runtime = panelId and getRuntime(panelId) or nil
+	local cache = runtime and runtime.visibilityDriverCache
+	if cache and cache.signature == signature and cache.signatureSource == signatureSource then return cache.expression, cache.usesManualVisibility, cache.visibilityCfg end
+
 	local visibilityCfg = PanelVisibility.NormalizeConfig(layout.visibility)
 	local hideInPetBattle = layout.hideInPetBattle == true
 	local hideInVehicle = layout.hideInVehicle == true
-	if visibilityCfg and visibilityCfg.ALWAYS_HIDDEN then return "hide", false, visibilityCfg end
+	local expression
+	local usesManual = false
+	if visibilityCfg and visibilityCfg.ALWAYS_HIDDEN then
+		expression = "hide"
+		if runtime then runtime.visibilityDriverCache = { signature = signature, signatureSource = signatureSource, expression = expression, usesManualVisibility = false, visibilityCfg = visibilityCfg } end
+		return expression, false, visibilityCfg
+	end
 	local usesManualVisibility = addon.functions and addon.functions.VisibilityConfigUsesManualEvaluation
-	if usesManualVisibility and usesManualVisibility(visibilityCfg, { allowMouseover = false }) then return nil, true, visibilityCfg end
-	if not visibilityCfg and not hideInPetBattle and not hideInVehicle then return nil, false, nil end
+	if usesManualVisibility and usesManualVisibility(visibilityCfg, { allowMouseover = false }) then
+		usesManual = true
+		if runtime then runtime.visibilityDriverCache = { signature = signature, signatureSource = signatureSource, expression = nil, usesManualVisibility = true, visibilityCfg = visibilityCfg } end
+		return nil, true, visibilityCfg
+	end
+	if not visibilityCfg and not hideInPetBattle and not hideInVehicle then
+		if runtime then runtime.visibilityDriverCache = { signature = signature, signatureSource = signatureSource, expression = nil, usesManualVisibility = false, visibilityCfg = nil } end
+		return nil, false, nil
+	end
 
 	local prependHideClauses = {}
 	if hideInPetBattle then prependHideClauses[#prependHideClauses + 1] = "petbattle" end
 	if hideInVehicle then prependHideClauses[#prependHideClauses + 1] = "vehicleui" end
 
-	local expr
 	local buildDriverExpression = addon.functions and addon.functions.BuildUnitFrameDriverExpression
-	if visibilityCfg and next(visibilityCfg) and buildDriverExpression then expr = buildDriverExpression(visibilityCfg, { prependHideClauses = prependHideClauses }) end
-	if not expr and #prependHideClauses > 0 then
+	if visibilityCfg and next(visibilityCfg) and buildDriverExpression then expression = buildDriverExpression(visibilityCfg, { prependHideClauses = prependHideClauses }) end
+	if not expression and #prependHideClauses > 0 then
 		local clauses = {}
 		for i = 1, #prependHideClauses do
 			clauses[#clauses + 1] = ("[%s] hide"):format(prependHideClauses[i])
 		end
 		clauses[#clauses + 1] = "show"
-		expr = table.concat(clauses, "; ")
+		expression = table.concat(clauses, "; ")
 	end
-	return expr, false, visibilityCfg
+	if runtime then runtime.visibilityDriverCache = { signature = signature, signatureSource = signatureSource, expression = expression, usesManualVisibility = usesManual, visibilityCfg = visibilityCfg } end
+	return expression, usesManual, visibilityCfg
 end
 
 function CooldownPanels:ShouldShowPanel(panelId)
@@ -19346,7 +19477,7 @@ function CooldownPanels:UpdateVisibility(panelId)
 	local driverExpression
 	local usesManualVisibility = false
 	if canUseDriver then
-		driverExpression, usesManualVisibility = self:BuildVisibilityDriver(panel)
+		driverExpression, usesManualVisibility = self:BuildVisibilityDriver(panel, panelId)
 	end
 	if canUseDriver and driverExpression and not usesManualVisibility then
 		if self:ApplyVisibilityDriverToFrame(frame, driverExpression) then
@@ -23547,6 +23678,8 @@ local function performSpecAwareRebuild(cause)
 	local runtime = CooldownPanels.runtime
 	local previousSpecId = runtime and runtime.activeSpecId
 	local previousEnabledPanels = runtime and runtime.enabledPanels
+	local racialsChanged = CooldownPanels:NormalizeActivePanelPlayerRacials()
+	if racialsChanged then Keybinds.MarkPanelsDirty() end
 	CooldownPanels:RebuildSpellIndex()
 	local currentSpecId = CooldownPanels.runtime and CooldownPanels.runtime.activeSpecId
 	if previousSpecId ~= nil and previousSpecId ~= currentSpecId then refreshPanelsDisabledBySpecChange(previousEnabledPanels) end
@@ -23872,7 +24005,7 @@ function CooldownPanels:CheckCDMAuraQuickSetup(cause)
 	if cdp.RUNTIME.ShouldSuppressCDMSetupPrompt(root, issues) then return false end
 	runtime.cdmAuraQuickSetupPromptShown = runtime.cdmAuraQuickSetupPromptShown or {}
 	runtime.cdmAuraQuickSetupPromptPending = runtime.cdmAuraQuickSetupPromptPending or {}
-	local specKey = tostring(getPlayerSpecId() or "nospec")
+	local specKey = tostring(queryPlayerSpecId() or "nospec")
 	if runtime.cdmAuraQuickSetupPromptShown[specKey] then return false end
 	if runtime.cdmAuraQuickSetupPromptPending[specKey] then return false end
 	if StaticPopup_Visible and StaticPopup_Visible(cdp.RUNTIME.CDM_SETUP_POPUP) then return false end

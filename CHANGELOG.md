@@ -12,6 +12,10 @@
 - Group Tools / No Target Indicator: Added a new Edit Mode configurable combat indicator for missing or invalid targets, including custom text, LibSharedMedia sounds, friendly-target handling, font controls, color, strata, and global font/style support.
 - Group Tools / Focus Marker: Added a new Settings UI controlled focus marker macro helper with marker selection, macro update button, and optional ready-check party announcement that respects chat messaging lockdown.
 
+### 🐛 Fixed
+
+- Cooldown Panels: Fixed Racial entries so they update to the current character's racial cooldown on login and specialization changes without using the broad runtime racial variant group that caused performance spikes in large shared profiles.
+
 ---
 <!--@end-eqol-beta@-->
 
