@@ -1969,8 +1969,10 @@ registerEditModeBars = function()
 					},
 					get = function()
 						local c = curSpecCfg()
-						local count = (c and c.thresholdCount) or DEFAULT_THRESHOLD_COUNT
-						return tostring(count)
+						local count = tonumber(c and c.thresholdCount) or DEFAULT_THRESHOLD_COUNT
+						if count < 1 then count = 1 end
+						if count > 4 then count = 4 end
+						return math.floor(count + 0.5)
 					end,
 					set = function(_, value)
 						local c = curSpecCfg()
@@ -1982,7 +1984,7 @@ registerEditModeBars = function()
 						c.thresholdCount = new
 						queueRefresh()
 					end,
-					default = tostring(DEFAULT_THRESHOLD_COUNT),
+					default = DEFAULT_THRESHOLD_COUNT,
 					isEnabled = function()
 						local c = curSpecCfg()
 						return c and c.showThresholds == true
