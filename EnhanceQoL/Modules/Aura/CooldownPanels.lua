@@ -1004,7 +1004,7 @@ function CooldownPanels:ResolveStaticKnownSpellVariantID(spellId)
 	if Api.IsSpellKnown and Api.IsSpellKnown(baseSpellID, false) then return baseSpellID, false, group end
 	for i = 1, #group do
 		local candidateID = tonumber(group[i])
-		if candidateID and candidateID > 0 and Api.IsSpellKnown and Api.IsSpellKnown(candidateID, false) then return candidateID, candidateID ~= baseSpellID, group end
+		if candidateID and candidateID > 0 and candidateID ~= baseSpellID and Api.IsSpellKnown and Api.IsSpellKnown(candidateID, true) then return candidateID, true, group end
 	end
 	return baseSpellID, false, group
 end
@@ -3293,6 +3293,7 @@ cdp.ENTRY.STYLE_CLIPBOARD = {
 		iconOffsetY = true,
 		customIconID = true,
 		ignoreMasque = true,
+		staticText = true,
 		stateTextureType = true,
 		stateTextureAtlas = true,
 		stateTextureFileID = true,
@@ -3388,7 +3389,7 @@ cdp.ENTRY.TEXT_INFO_LAYOUTS = {
 		fallback = "Text left, cooldown right",
 		cooldownTextX = 28,
 		cooldownTextY = 0,
-		staticTextAnchor = "CENTER",
+		staticTextAnchor = "RIGHT",
 		staticTextX = -28,
 		staticTextY = 0,
 	},
@@ -3397,7 +3398,7 @@ cdp.ENTRY.TEXT_INFO_LAYOUTS = {
 		fallback = "Cooldown left, text right",
 		cooldownTextX = -28,
 		cooldownTextY = 0,
-		staticTextAnchor = "CENTER",
+		staticTextAnchor = "LEFT",
 		staticTextX = 28,
 		staticTextY = 0,
 	},
@@ -7179,6 +7180,9 @@ local function applyStaticText(icon, layout, entry, defaultFontPath, defaultFont
 		addon.functions.ApplyFontStyleShadow(icon.staticText, fontStyleChoice, defaultFontStyle)
 	end
 	icon.staticText:SetTextColor(fontColor[1] or 1, fontColor[2] or 1, fontColor[3] or 1, fontColor[4] or 1)
+	if icon.staticText.SetJustifyH then
+		icon.staticText:SetJustifyH(anchor == "LEFT" and "LEFT" or anchor == "RIGHT" and "RIGHT" or "CENTER")
+	end
 	icon.staticText:ClearAllPoints()
 	icon.staticText:SetPoint(anchor, icon.overlay, anchor, x, y)
 	icon.staticText:SetText(text)
@@ -17511,6 +17515,17 @@ function CooldownPanels:DisableEntryGlowForQuickSetup(panelId, entryId, entry)
 	self.ClearReadyGlowEntryState(panelId, entryId, true)
 end
 
+function CooldownPanels:DisableEntryCountersForQuickSetup(entry)
+	if not entry then return end
+	entry.showCharges = false
+	entry.showChargesCooldown = false
+	entry.showStacks = false
+	if entry.type == "ITEM" then
+		entry.showItemCount = false
+		entry.showItemUses = false
+	end
+end
+
 function CooldownPanels:SetEntryAlwaysShowForQuickSetup(entry)
 	if not entry then return end
 	entry.alwaysShow = true
@@ -17539,7 +17554,7 @@ function CooldownPanels:ApplyTextInfoOnCooldownQuickSetup(panelId, entryId, refr
 	entry.cooldownDrawSwipe = false
 	entry.cooldownDrawBling = false
 	entry.cooldownDrawEdge = false
-	if entry.type == "ITEM" then entry.showItemCount = false end
+	self:DisableEntryCountersForQuickSetup(entry)
 	self:DisableEntryGlowForQuickSetup(panelId, entryId, entry)
 	entry.staticText = getEntryName(entry)
 	entry.staticTextShowOnCooldown = true
@@ -17572,7 +17587,7 @@ function CooldownPanels:ApplyTextAlwaysWithCooldownQuickSetup(panelId, entryId, 
 	entry.cooldownDrawSwipe = false
 	entry.cooldownDrawBling = false
 	entry.cooldownDrawEdge = false
-	if entry.type == "ITEM" then entry.showItemCount = false end
+	self:DisableEntryCountersForQuickSetup(entry)
 	self:DisableEntryGlowForQuickSetup(panelId, entryId, entry)
 	entry.staticText = getEntryName(entry)
 	entry.staticTextShowOnCooldown = false
@@ -17600,7 +17615,7 @@ function CooldownPanels:ApplyTextInfoWhenReadyQuickSetup(panelId, entryId, refre
 	entry.cooldownDrawSwipe = false
 	entry.cooldownDrawBling = false
 	entry.cooldownDrawEdge = false
-	if entry.type == "ITEM" then entry.showItemCount = false end
+	self:DisableEntryCountersForQuickSetup(entry)
 	self:DisableEntryGlowForQuickSetup(panelId, entryId, entry)
 	entry.staticText = getEntryName(entry)
 	entry.staticTextShowOnCooldown = false
@@ -17907,7 +17922,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 					CooldownPanels.ClearReadyGlowEntryState(panelId, entryId, true)
 				elseif spellPassive then
 					show = false
-				elseif Api.IsSpellKnown and not talentChoiceResolved and not Api.IsSpellKnown(spellId) then
+				elseif Api.IsSpellKnown and not talentChoiceResolved and not Api.IsSpellKnown(spellId, true) then
 					show = false
 				else
 					canTriggerReadyGlow = true
@@ -22379,7 +22394,7 @@ function cdp.ENTRY.TryRefreshVisibleSpellEntry(panelId, entryId, mode)
 	local spellId = effectiveSpellId or baseSpellId
 	local spellPassive = not shouldTrackPassiveSpell(entry) and isSpellPassiveSafe(resolvedSpellId or baseSpellId, effectiveSpellId) or false
 	local talentChoiceResolved = variantGroup and variantGroup.kind == "talentChoice"
-	if spellPassive or (Api.IsSpellKnown and not talentChoiceResolved and not Api.IsSpellKnown(spellId)) then return false end
+	if spellPassive or (Api.IsSpellKnown and not talentChoiceResolved and not Api.IsSpellKnown(spellId, true)) then return false end
 
 	local showCooldown = entry.showCooldown ~= false
 	local staticTextShowOnCooldown = entry.staticTextShowOnCooldown == true
