@@ -392,3 +392,8 @@ Regeneratin;180;"[[pbas -60]]";Regeneratin;|T1850550:16|t
 # profession
 New Crafting Order;180;"[[pbas -60]]";New Crafting Order
 Canceled Crafting Order;180;"[[pbas -60]]";Canceled Crafting Order
+
+# role status
+Tank dead;180;"[[pbas -60]]";Tank dead
+Healer dead;180;"[[pbas -60]]";Healer dead
+DPS dead;180;"[[pbas -60]]";DPS dead

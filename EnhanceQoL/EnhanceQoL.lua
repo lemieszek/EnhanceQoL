@@ -6579,6 +6579,7 @@ local function setAllHooks()
 	addon.functions.initUIOptions()
 	addon.functions.initActionTracker()
 	addon.functions.initClassBuffReminder()
+	if addon.GroupTools and addon.GroupTools.functions and addon.GroupTools.functions.InitDB then addon.GroupTools.functions.InitDB() end
 	initParty()
 	initActionBars()
 	initUI()
@@ -6691,6 +6692,7 @@ local function setAllHooks()
 			if addon.CombatText.ApplyStyle then addon.CombatText:ApplyStyle() end
 			if addon.CombatText.UpdateFrameSize then addon.CombatText:UpdateFrameSize() end
 		end
+		if addon.GroupTools and addon.GroupTools.functions and addon.GroupTools.functions.RefreshGlobalFont then addon.GroupTools.functions.RefreshGlobalFont() end
 		if addon.DataPanel and addon.DataPanel.List and addon.DataPanel.Get then
 			for id in pairs(addon.DataPanel.List() or {}) do
 				local panel = addon.DataPanel.Get(id)
@@ -6792,6 +6794,7 @@ local function setAllHooks()
 		if addon.Drinks.functions.InitDrinkMacro then addon.Drinks.functions.InitDrinkMacro() end
 		if addon.Drinks.functions.InitFoodReminder then addon.Drinks.functions.InitFoodReminder() end
 	end
+	if addon.GroupTools and addon.GroupTools.functions and addon.GroupTools.functions.InitState then addon.GroupTools.functions.InitState() end
 	if addon.Health and addon.Health.functions and addon.Health.functions.InitHealthMacro then addon.Health.functions.InitHealthMacro() end
 	if addon.Flasks and addon.Flasks.functions and addon.Flasks.functions.InitFlaskMacro then addon.Flasks.functions.InitFlaskMacro() end
 	if addon.BuffFoods and addon.BuffFoods.functions and addon.BuffFoods.functions.InitBuffFoodMacro then addon.BuffFoods.functions.InitBuffFoodMacro() end

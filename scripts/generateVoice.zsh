@@ -59,7 +59,7 @@ while IFS=';' read -r WORD SPEED PITCH FNAME ICON PNAME || [[ -n "$WORD" ]]; do
   say -v "$VOICE" -r "$RATE_LOCAL" -o "$OUT" "${PITCH_CLEAN}${WORD}"
 
   # 2) AIFF -> OGG konvertieren
-  ffmpeg -loglevel error -y -i "$OUT" -af "volume=${VOLUME_GAIN_DB}dB" "${OGG_ENCODER_ARGS[@]}" -c:a "$OGG_ENCODER" -q:a 4 "$OGG"
+  ffmpeg -loglevel error -y -i "$OUT" -af "volume=${VOLUME_GAIN_DB}dB" -ac 2 "${OGG_ENCODER_ARGS[@]}" -c:a "$OGG_ENCODER" -q:a 4 "$OGG"
 
   KEY_NAME="${WORD//\"/\\\"}"
   LABEL_NAME="$NAME_PREFIX$BASENAME"
