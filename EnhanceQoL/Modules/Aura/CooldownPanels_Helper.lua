@@ -2650,6 +2650,7 @@ local ELVUI_ACTION_BUTTONS = 12
 
 local GetItemInfoInstantFn = C_Item and C_Item.GetItemInfoInstant
 local GetOverrideSpell = C_Spell and C_Spell.GetOverrideSpell
+local GetBaseSpell = C_Spell and C_Spell.GetBaseSpell
 local GetInventoryItemID = GetInventoryItemID
 local GetActionDisplayCount = C_ActionBar and C_ActionBar.GetActionDisplayCount
 local GetMacroIndexByName = GetMacroIndexByName
@@ -2666,6 +2667,16 @@ local function getEffectiveSpellId(spellId)
 	if GetOverrideSpell then
 		local overrideId = GetOverrideSpell(id)
 		if type(overrideId) == "number" and overrideId > 0 then return overrideId end
+	end
+	return id
+end
+
+local function getBaseSpellId(spellId)
+	local id = tonumber(spellId)
+	if not id then return nil end
+	if GetBaseSpell then
+		local baseId = GetBaseSpell(id)
+		if type(baseId) == "number" and baseId > 0 then return baseId end
 	end
 	return id
 end
@@ -3090,7 +3101,14 @@ local function refreshPanelKeybindsOnly(panelId)
 			local barDisplayMode = type(bars) == "table" and type(bars.DISPLAY_MODE) == "table" and bars.DISPLAY_MODE.BAR or "BAR"
 			local suppressForBarMode = type(entry) == "table" and type(entry.displayMode) == "string" and string.upper(entry.displayMode) == barDisplayMode
 			local show = data and data.layout and data.layout.keybindsEnabled == true and entry ~= nil and not suppressForBarMode
-			local text = show and Keybinds.GetEntryKeybindText(data.entry, data.layout) or nil
+			local text
+			if show then
+				if entry and entry.type == "SPELL" and data.resolvedType == "SPELL" then
+					text = Keybinds.GetEntryKeybindText(data.entry, data.layout, data.effectiveSpellId, data.resolvedSpellId, nil, true)
+				else
+					text = Keybinds.GetEntryKeybindText(data.entry, data.layout)
+				end
+			end
 			if data then
 				data.showKeybinds = show == true
 				data.keybindText = text
@@ -3148,27 +3166,34 @@ function Keybinds.RequestRefresh(cause, invalidateLookup)
 	end)
 end
 
-function Keybinds.GetEntryKeybindText(entry, layout)
+function Keybinds.GetEntryKeybindText(entry, layout, preEffectiveSpellId, preResolvedSpellId, preStoredBaseSpellId, preResolvedSpellIdsReady)
 	if not entry then return nil end
-	if layout and layout.keybindsIgnoreItems == true and (entry.type == "ITEM" or entry.type == "SLOT") then return nil end
+	local entryType = entry.type
+	if layout and layout.keybindsIgnoreItems == true and (entryType == "ITEM" or entryType == "SLOT") then return nil end
 	local runtime = CooldownPanels.runtime or {}
 	runtime._eqolKeybindCache = runtime._eqolKeybindCache or {}
 	local generation = runtime._eqolKeybindLookupGeneration or 0
 	local ignoreItems = layout and layout.keybindsIgnoreItems == true or false
 	local slotItemId
-	if entry.type == "SLOT" and entry.slotID then slotItemId = GetInventoryItemID and GetInventoryItemID("player", entry.slotID) end
+	if entryType == "SLOT" and entry.slotID then slotItemId = GetInventoryItemID and GetInventoryItemID("player", entry.slotID) end
 	local resolvedEffectiveSpellId, resolvedSpellId, storedBaseSpellId
-	if entry.type == "SPELL" and entry.spellID and CooldownPanels and CooldownPanels.ResolveTrackedSpellID then
-		resolvedEffectiveSpellId, resolvedSpellId, storedBaseSpellId = CooldownPanels:ResolveTrackedSpellID(entry.spellID)
+	if entryType == "SPELL" and entry.spellID then
+		if preResolvedSpellIdsReady == true then
+			resolvedEffectiveSpellId = preEffectiveSpellId
+			resolvedSpellId = preResolvedSpellId
+			storedBaseSpellId = preStoredBaseSpellId or getBaseSpellId(entry.spellID)
+		elseif CooldownPanels and CooldownPanels.ResolveTrackedSpellID then
+			resolvedEffectiveSpellId, resolvedSpellId, storedBaseSpellId = CooldownPanels:ResolveTrackedSpellID(entry.spellID)
+		end
 	end
-	local effectiveSpellId = tonumber(resolvedEffectiveSpellId or (entry.type == "SPELL" and getEffectiveSpellId(entry.spellID) or nil))
+	local effectiveSpellId = tonumber(resolvedEffectiveSpellId or (entryType == "SPELL" and getEffectiveSpellId(entry.spellID) or nil))
 	resolvedSpellId = tonumber(resolvedSpellId)
 	storedBaseSpellId = tonumber(storedBaseSpellId)
 	local entrySpellId = tonumber(entry.spellID)
 	if
 		entry._eqolKeybindCacheGeneration == generation
 		and entry._eqolKeybindCacheIgnoreItems == ignoreItems
-		and entry._eqolKeybindCacheType == entry.type
+		and entry._eqolKeybindCacheType == entryType
 		and entry._eqolKeybindCacheSpellID == entry.spellID
 		and entry._eqolKeybindCacheEffectiveSpellID == effectiveSpellId
 		and entry._eqolKeybindCacheResolvedSpellID == resolvedSpellId
@@ -3183,12 +3208,12 @@ function Keybinds.GetEntryKeybindText(entry, layout)
 	end
 
 	local cacheValue = effectiveSpellId or resolvedSpellId or storedBaseSpellId or entry.spellID or entry.itemID or entry.slotID or entry.macroID or entry.macroName or ""
-	local cacheKey = tostring(entry.type) .. ":" .. tostring(cacheValue) .. ":" .. tostring(slotItemId or "")
+	local cacheKey = tostring(entryType) .. ":" .. tostring(cacheValue) .. ":" .. tostring(slotItemId or "")
 	local cached = runtime._eqolKeybindCache[cacheKey]
 	if cached ~= nil then
 		entry._eqolKeybindCacheGeneration = generation
 		entry._eqolKeybindCacheIgnoreItems = ignoreItems
-		entry._eqolKeybindCacheType = entry.type
+		entry._eqolKeybindCacheType = entryType
 		entry._eqolKeybindCacheSpellID = entry.spellID
 		entry._eqolKeybindCacheEffectiveSpellID = effectiveSpellId
 		entry._eqolKeybindCacheResolvedSpellID = resolvedSpellId
@@ -3203,20 +3228,20 @@ function Keybinds.GetEntryKeybindText(entry, layout)
 	end
 
 	local text = nil
-	if entry.type == "SPELL" and entry.spellID then
+	if entryType == "SPELL" and entry.spellID then
 		local lookup = buildKeybindLookup()
 		local usedA, usedB, usedC
 		text, usedA = getLookupSpellBindingTextIfDistinct(lookup, effectiveSpellId)
 		if not text then text, usedB = getLookupSpellBindingTextIfDistinct(lookup, resolvedSpellId, usedA) end
 		if not text then text, usedC = getLookupSpellBindingTextIfDistinct(lookup, storedBaseSpellId, usedA, usedB) end
 		if not text then text = getLookupSpellBindingTextIfDistinct(lookup, entrySpellId, usedA, usedB, usedC) end
-	elseif entry.type == "ITEM" and entry.itemID then
+	elseif entryType == "ITEM" and entry.itemID then
 		local lookup = buildKeybindLookup()
 		text = lookup.item and lookup.item[entry.itemID]
-	elseif entry.type == "SLOT" and slotItemId then
+	elseif entryType == "SLOT" and slotItemId then
 		local lookup = buildKeybindLookup()
 		text = lookup.item and lookup.item[slotItemId]
-	elseif entry.type == "MACRO" then
+	elseif entryType == "MACRO" then
 		local lookup = buildKeybindLookup()
 		local macroId = tonumber(entry.macroID)
 		local macroName = type(entry.macroName) == "string" and entry.macroName or nil
@@ -3232,7 +3257,7 @@ function Keybinds.GetEntryKeybindText(entry, layout)
 	runtime._eqolKeybindCache[cacheKey] = text or false
 	entry._eqolKeybindCacheGeneration = generation
 	entry._eqolKeybindCacheIgnoreItems = ignoreItems
-	entry._eqolKeybindCacheType = entry.type
+	entry._eqolKeybindCacheType = entryType
 	entry._eqolKeybindCacheSpellID = entry.spellID
 	entry._eqolKeybindCacheEffectiveSpellID = effectiveSpellId
 	entry._eqolKeybindCacheResolvedSpellID = resolvedSpellId

@@ -17952,8 +17952,8 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 			local cdmAuraAlwaysShowMode = resolvedType == "CDM_AURA" and CooldownPanels:ResolveEntryCDMAuraAlwaysShowMode(entryLayout, entry) or nil
 			local glowReady = entry.type ~= "MACRO" and entry.type ~= "CDM_AURA" and entry.glowReady ~= false
 			local baseSpellId = resolvedType == "SPELL" and ((macro and macro.spellID) or entry.spellID) or nil
-			local effectiveSpellId, resolvedSpellId, _, variantGroup
-			if baseSpellId then effectiveSpellId, resolvedSpellId, _, variantGroup = CooldownPanels:ResolveTrackedSpellID(baseSpellId) end
+			local effectiveSpellId, resolvedSpellId, storedBaseSpellId, variantGroup
+			if baseSpellId then effectiveSpellId, resolvedSpellId, storedBaseSpellId, variantGroup = CooldownPanels:ResolveTrackedSpellID(baseSpellId) end
 			local talentChoiceResolved = variantGroup and variantGroup.kind == "talentChoice"
 			local stanceRelevant = resolvedType == "STANCE" and CooldownPanels.IsStanceEntryRelevant and CooldownPanels:IsStanceEntryRelevant(entry) or false
 			local stanceActive = stanceRelevant and CooldownPanels.IsStanceEntryActive and CooldownPanels:IsStanceEntryActive(entry) or false
@@ -18313,7 +18313,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				data.showItemUses = showItemUses
 				data.chargesHideWhenZero = entryLayout.chargesHideWhenZero == true
 				data.showKeybinds = entryLayout.keybindsEnabled == true
-				data.keybindText = data.showKeybinds and Keybinds.GetEntryKeybindText(entry, entryLayout) or nil
+				data.keybindText = data.showKeybinds and Keybinds.GetEntryKeybindText(entry, entryLayout, effectiveSpellId, resolvedSpellId, storedBaseSpellId, entry.type == "SPELL" and resolvedType == "SPELL") or nil
 				data.layout = entryLayout
 				data.liveGlowAllowed = entryLayout.hideGlowOutOfCombat ~= true or playerInCombat == true
 				data.entry = entry
