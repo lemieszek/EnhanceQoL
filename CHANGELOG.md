@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.20.2] - 2026-05-24
+
+### 🐛 Fixed
+
+- Mythic Plus / BR & Bloodlust Tracker: Fixed Edit Mode X/Y fields not refreshing immediately after moving the tracker anchors.
+
+---
+
 ## [10.20.1] - 2026-05-24
 
 ### 🐛 Fixed

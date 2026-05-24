@@ -1599,6 +1599,12 @@ local function ensureBRAnchor()
 				end
 				applyBRLayoutData(data)
 			end,
+			onPositionChanged = function(_, _, data)
+				applyBRLayoutData(data)
+				if addon.EditModeLib and addon.EditModeLib.internal and addon.EditModeLib.internal.RefreshSettingValues then
+					addon.EditModeLib.internal:RefreshSettingValues()
+				end
+			end,
 			settings = settings,
 			relativeTo = function() return resolveTrackerAnchorFrame(addon.db and addon.db["mythicPlusBRTrackerRelativeFrame"]) end,
 			allowDrag = function() return trackerAnchorUsesUIParent(addon.db and addon.db["mythicPlusBRTrackerRelativeFrame"]) end,
@@ -2857,6 +2863,12 @@ local function ensureBloodlustAnchor()
 					return
 				end
 				applyBloodlustLayoutData(data)
+			end,
+			onPositionChanged = function(_, _, data)
+				applyBloodlustLayoutData(data)
+				if addon.EditModeLib and addon.EditModeLib.internal and addon.EditModeLib.internal.RefreshSettingValues then
+					addon.EditModeLib.internal:RefreshSettingValues()
+				end
 			end,
 			settings = settings,
 			relativeTo = function() return resolveTrackerAnchorFrame(addon.db and addon.db["mythicPlusBloodlustTrackerRelativeFrame"]) end,
