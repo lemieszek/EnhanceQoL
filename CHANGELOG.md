@@ -4,6 +4,7 @@
 
 ### 🐛 Fixed
 
+- Cooldown Panels: Fixed spell tooltips for talent choice nodes showing the first choice instead of the currently selected spell.
 - Mythic Plus / BR & Bloodlust Tracker: Fixed Edit Mode X/Y fields not refreshing immediately after moving the tracker anchors.
 
 ---

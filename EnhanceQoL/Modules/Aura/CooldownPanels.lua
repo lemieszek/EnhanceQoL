@@ -6039,6 +6039,7 @@ function CooldownPanels.ShowIconTooltip(self)
 
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 	local resolvedEntry = entry
+	local runtimeData = self._eqolRuntimeData
 	if entry.type == "MACRO" then
 		local macro = CooldownPanels.ResolveMacroEntry(entry)
 		if macro and macro.kind == "SPELL" and macro.spellID then
@@ -6048,7 +6049,9 @@ function CooldownPanels.ShowIconTooltip(self)
 		end
 	end
 	if resolvedEntry.type == "SPELL" and resolvedEntry.spellID and GameTooltip.SetSpellByID then
-		GameTooltip:SetSpellByID(getEffectiveSpellId(resolvedEntry.spellID) or resolvedEntry.spellID)
+		local tooltipSpellID = runtimeData and runtimeData.resolvedType == "SPELL" and (runtimeData.effectiveSpellId or runtimeData.spellId or runtimeData.resolvedSpellId) or nil
+		if not tooltipSpellID then tooltipSpellID = CooldownPanels:ResolveTrackedSpellID(resolvedEntry.spellID) end
+		GameTooltip:SetSpellByID(tooltipSpellID or getEffectiveSpellId(resolvedEntry.spellID) or resolvedEntry.spellID)
 	elseif resolvedEntry.type == "CDM_AURA" and resolvedEntry.spellID and GameTooltip.SetSpellByID then
 		GameTooltip:SetSpellByID(getEffectiveSpellId(resolvedEntry.spellID) or resolvedEntry.spellID)
 	elseif resolvedEntry.type == "ITEM" and resolvedEntry.itemID and GameTooltip.SetItemByID then
