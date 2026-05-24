@@ -33,19 +33,22 @@ deploy_to() {
 	local label="$2"
 	local addon_dir="$wow_addon_dir/EnhanceQoL"
 	local query_dir="$wow_addon_dir/EnhanceQoLQuery"
+	local routes_journel_dir="$wow_addon_dir/EnhanceQoLRoutesJournel"
 	local sharedmedia_dir="$wow_addon_dir/EnhanceQoLSharedMedia"
 
 	echo "Deploy: $label ($wow_addon_dir)"
 
 	rm -rf "$wow_addon_dir"/EnhanceQoL*
-	mkdir -p "$addon_dir" "$query_dir" "$sharedmedia_dir"
+	mkdir -p "$addon_dir" "$query_dir" "$routes_journel_dir" "$sharedmedia_dir"
 
 	cp -r "$ROOT_DIR/EnhanceQoL/"* "$addon_dir/"
 	cp -r "$ROOT_DIR/EnhanceQoLQuery/"* "$query_dir/"
+	cp -r "$ROOT_DIR/EnhanceQoLRoutesJournel/"* "$routes_journel_dir/"
 	cp -r "$ROOT_DIR/EnhanceQoLSharedMedia/"* "$sharedmedia_dir/"
 
 	sed -i '' "s/@project-version@/$VERSION/" "$addon_dir/EnhanceQoL.toc"
 	sed -i '' "s/@project-version@/$VERSION/" "$query_dir/EnhanceQoLQuery.toc"
+	sed -i '' "s/@project-version@/$VERSION/" "$routes_journel_dir/EnhanceQoLRoutesJournel.toc"
 	sed -i '' "s/@project-version@/$VERSION/" "$sharedmedia_dir/EnhanceQoLSharedMedia.toc"
 }
 

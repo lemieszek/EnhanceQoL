@@ -1,0 +1,22 @@
+## Interface: 120005, 120007
+## Title: Enhance QoL Routes Journel
+## Notes: Store and share MDT-compatible routes
+## Notes-deDE: MDT-kompatible Routen speichern und teilen
+## Notes-esES: Guarda y comparte rutas compatibles con MDT
+## Notes-esMX: Guarda y comparte rutas compatibles con MDT
+## Notes-frFR: Enregistrer et partager des routes compatibles MDT
+## Notes-itIT: Salva e condividi percorsi compatibili con MDT
+## Notes-ptBR: Salve e compartilhe rotas compatíveis com MDT
+## Notes-ruRU: Сохраняйте маршруты, совместимые с MDT, и делитесь ими
+## Notes-koKR: MDT 호환 경로를 저장하고 공유합니다
+## Notes-zhCN: 保存并分享兼容 MDT 的路线
+## Notes-zhTW: 儲存並分享相容 MDT 的路線
+## Author: R41Z0R
+## Version: @project-version@
+## Dependencies: EnhanceQoL
+## OptionalDeps: MythicDungeonTools
+## IconTexture: Interface\AddOns\EnhanceQoL\Icons\Dungeon.tga
+## X-Compatible-With: retail
+## Globe-Main: EnhanceQoL
+
+EnhanceQoLRoutesJournel.lua

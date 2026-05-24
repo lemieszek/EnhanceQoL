@@ -5,6 +5,8 @@
 ### 🐛 Fixed
 
 - Cooldown Panels: Added a one-time migration that removes duplicate racial cooldown entries from active panels after racial entries are normalized to the current character's racials.
+- Settings: Fixed the 10.20.0 new-tag markers so the Unit Frames expandable is marked for the new Healer Mana Indicator setting.
+- Tooltips: Fixed a secret-value error when player tooltip inspection compared protected unit identities against the player.
 
 ---
 

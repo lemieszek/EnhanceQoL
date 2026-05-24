@@ -82,6 +82,13 @@ local function SafeUnitPlayerControlled(unit)
 	return UnitPlayerControlled(unit)
 end
 
+local function SafeUnitIsUnit(unit, otherUnit)
+	if not UnitIsUnit or not IsSafeUnitToken(unit) or not IsSafeUnitToken(otherUnit) then return nil end
+	local same = UnitIsUnit(unit, otherUnit)
+	if isSecret(same) then return nil end
+	return same == true
+end
+
 local function SafeUnitName(unit)
 	if IsUnitIdentitySecret(unit) or not UnitName then return nil end
 	local name, realm = UnitName(unit)
@@ -336,7 +343,7 @@ EnsureUnitData = function(unit)
 	end
 
 	-- Self: no inspect needed
-	if UnitIsUnit(unit, "player") then
+	if SafeUnitIsUnit(unit, "player") then
 		local ilvl
 		if GetAverageItemLevel then
 			local _, eq = GetAverageItemLevel()
@@ -393,11 +400,7 @@ end
 
 local function FormatUnitName(unit)
 	if IsUnitIdentitySecret(unit) then return nil end
-	if UnitIsUnit then
-		local same = UnitIsUnit(unit, "player")
-		if issecretvalue and issecretvalue(same) then return nil end
-		if same then return "<YOU>" end
-	end
+	if SafeUnitIsUnit(unit, "player") then return "<YOU>" end
 	local name, realm = SafeUnitName(unit)
 	if not name then return nil end
 	if realm and realm ~= "" then name = name .. "-" .. realm end

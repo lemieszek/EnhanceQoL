@@ -17,6 +17,7 @@ ignore:
   - .release
   - Agents.md
   - EnhanceQoLQuery
+  - EnhanceQoLRoutesJournel
   - scripts
   - .vscode
   - agents
