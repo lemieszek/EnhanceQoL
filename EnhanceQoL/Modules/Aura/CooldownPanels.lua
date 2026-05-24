@@ -1536,6 +1536,7 @@ local refreshPanelsForSpell
 local refreshPanelsForCharges
 local normalizedRoots = setmetatable({}, { __mode = "k" })
 local normalizedPanels = setmetatable({}, { __mode = "k" })
+local COOLDOWN_PANELS_STORAGE_VERSION = 2
 CooldownPanels._styleCacheRoots = CooldownPanels._styleCacheRoots
 	or {
 		cooldownTextPanel = setmetatable({}, { __mode = "k" }),
@@ -3806,6 +3807,55 @@ function CooldownPanels:NormalizeActivePanelPlayerRacials(root)
 	return changed
 end
 
+function CooldownPanels:DedupeActivePanelPlayerRacials(root)
+	root = root or ensureRoot()
+	if not (root and root.panels) then return false end
+	local changed = false
+	for panelId, panel in pairs(root.panels) do
+		if panel and panel.enabled ~= false and panelAllowsSpec(panel) and type(panel.entries) == "table" and type(panel.order) == "table" then
+			local seen = nil
+			local panelChanged = false
+			for _, entryId in ipairs(panel.order) do
+				local entry = panel.entries[entryId]
+				local spellId = entry and entry.type == "SPELL" and tonumber(entry.spellID) or nil
+				if spellId and self:IsRacialSpellID(spellId) then
+					seen = seen or {}
+					if seen[spellId] then
+						panel.entries[entryId] = nil
+						local runtime = CooldownPanels.runtime
+						if runtime and runtime.actionDisplayCounts then runtime.actionDisplayCounts[Helper.GetEntryKey(panelId, entryId)] = nil end
+						panelChanged = true
+						changed = true
+					else
+						seen[spellId] = entryId
+					end
+				end
+			end
+			if panelChanged then
+				Helper.SyncOrder(panel.order, panel.entries)
+				Helper.InvalidateFixedLayoutCache(panel)
+			end
+		end
+	end
+	return changed
+end
+
+function CooldownPanels:RunStorageMigrations(root)
+	root = root or ensureRoot()
+	if type(root) ~= "table" then return false end
+	local version = tonumber(root.version) or 1
+	local changed = false
+	if version < 2 then
+		if self:DedupeActivePanelPlayerRacials(root) then changed = true end
+		version = 2
+	end
+	if version < COOLDOWN_PANELS_STORAGE_VERSION and root.version ~= COOLDOWN_PANELS_STORAGE_VERSION then
+		root.version = COOLDOWN_PANELS_STORAGE_VERSION
+		changed = true
+	end
+	return changed
+end
+
 function CooldownPanels:FindEquivalentSpellEntry(panelId, spellId)
 	panelId = normalizeId(panelId)
 	local panel = self:GetPanel(panelId)
@@ -5610,6 +5660,7 @@ function CooldownPanels:NormalizeAll()
 		end
 		if Helper.IsFixedLayout(panel.layout) then Helper.EnsureFixedSlotAssignments(panel) end
 	end
+	self:RunStorageMigrations(root)
 	self:RebuildSpellIndex()
 end
 

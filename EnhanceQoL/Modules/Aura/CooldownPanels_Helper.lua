@@ -2133,7 +2133,7 @@ end
 
 function Helper.CreateRoot()
 	return {
-		version = 1,
+		version = 2,
 		panels = {},
 		order = {},
 		selectedPanel = nil,

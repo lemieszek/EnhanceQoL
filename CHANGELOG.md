@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.20.1] - 2026-05-24
+
+### 🐛 Fixed
+
+- Cooldown Panels: Added a one-time migration that removes duplicate racial cooldown entries from active panels after racial entries are normalized to the current character's racials.
+
+---
+
 ## [10.20.0] - 2026-05-23
 
 ### ✨ Added
