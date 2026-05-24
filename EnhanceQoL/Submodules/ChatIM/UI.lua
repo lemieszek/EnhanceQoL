@@ -13,6 +13,32 @@ local canaccessvalue = _G.canaccessvalue
 
 local function colorWrap(hex, text) return "|cff" .. hex .. text .. "|r" end
 
+local function colorToHex(colorInfo)
+	if not colorInfo then colorInfo = { r = 1, g = 1, b = 1 } end
+	local r = math.floor((colorInfo.r or 1) * 255 + 0.5)
+	local g = math.floor((colorInfo.g or 1) * 255 + 0.5)
+	local b = math.floor((colorInfo.b or 1) * 255 + 0.5)
+	return ("%02x%02x%02x"):format(r, g, b)
+end
+
+local function getDefaultMessageColor(outbound, isBN)
+	if isBN then return outbound and ChatTypeInfo.BN_WHISPER_INFORM or ChatTypeInfo.BN_WHISPER end
+	return outbound and ChatTypeInfo.WHISPER_INFORM or ChatTypeInfo.WHISPER
+end
+
+local function getMessageColorHex(outbound, isBN)
+	local key = outbound and "chatIMOutgoingMessageColor" or "chatIMIncomingMessageColor"
+	local color = addon.db and addon.db[key]
+	if type(color) ~= "table" then color = getDefaultMessageColor(outbound, isBN) end
+	return colorToHex(color)
+end
+
+local function applyMessageColor(text, hex)
+	text = tostring(text or "")
+	if text:find("|r", 1, true) then text = text:gsub("|r", "|r|cff" .. hex) end
+	return "|cff" .. hex .. text .. "|r"
+end
+
 addon.ChatIM = addon.ChatIM or {}
 
 local ChatIM = addon.ChatIM
@@ -566,18 +592,15 @@ function ChatIM:AddMessage(partner, text, outbound, isBN, bnetID)
 	local prefix = "|cff999999" .. timestamp .. "|r"
 	local formattedText = self:FormatURLs(text)
 	local storeText = formattedText:gsub("%%", "%%%%")
-	local nameLink, colorInfo
+	local nameLink
 	if isBN then
 		nameLink = string.format("|HBNplayer:%s:%s|h[%s]|h", partner, tostring(bnetID or ""), shortName)
-		colorInfo = outbound and ChatTypeInfo.BN_WHISPER_INFORM or ChatTypeInfo.BN_WHISPER
 	else
 		nameLink = string.format("|Hplayer:%s|h[%s]|h", partner, shortName)
-		colorInfo = outbound and ChatTypeInfo.WHISPER_INFORM or ChatTypeInfo.WHISPER
 	end
-	local cHex = ("%02x%02x%02x"):format(colorInfo.r * 255, colorInfo.g * 255, colorInfo.b * 255)
+	local cHex = getMessageColorHex(outbound, isBN)
 
-	-- plain line (no |cff…) so embedded hyperlinks keep native colours
-	local line = string.format("%s |cff%s%s|r: |cff%s%s|r", prefix, cHex, nameLink, cHex, formattedText)
+	local line = string.format("%s %s: %s", prefix, applyMessageColor(nameLink, cHex), applyMessageColor(formattedText, cHex))
 	tab.msg:AddMessage(line)
 	local historyKey = isBN and tab.battleTag or partner
 	local storeLine
@@ -588,7 +611,7 @@ function ChatIM:AddMessage(partner, text, outbound, isBN, bnetID)
 		else
 			nameLinkFmt = "|HBNplayer:%s:" .. tostring(bnetID or "") .. "|h[%s]|h"
 		end
-		storeLine = string.format("%s |cff%s%s|r: |cff%s%s|r", prefix, cHex, nameLinkFmt, cHex, storeText)
+		storeLine = string.format("%s %s: %s", prefix, applyMessageColor(nameLinkFmt, cHex), applyMessageColor(storeText, cHex))
 	else
 		storeLine = line
 	end

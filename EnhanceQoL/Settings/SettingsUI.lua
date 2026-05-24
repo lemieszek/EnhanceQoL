@@ -443,7 +443,8 @@ function addon.functions.SettingsCreateColorPicker(cat, cbData)
 		getColor = function(key)
 			local db = addon.db[cbData.var]
 			if cbData.subvar and db then db = db[cbData.subvar] end
-			local col = db or { r = 0, g = 0, b = 0, a = 1 }
+			local default = type(cbData.default) == "function" and cbData.default() or cbData.default
+			local col = db or default or { r = 0, g = 0, b = 0, a = 1 }
 			return col.r or 0, col.g or 0, col.b or 0, col.a or 1
 		end,
 		setColor = function(key, r, g, b, a)
@@ -455,7 +456,10 @@ function addon.functions.SettingsCreateColorPicker(cat, cbData)
 			end
 			if cbData.callback then cbData.callback(r, g, b, a) end
 		end,
-		getDefaultColor = function() return 1, 1, 1, 1 end,
+		getDefaultColor = function()
+			local default = type(cbData.default) == "function" and cbData.default() or cbData.default
+			return default and default.r or 1, default and default.g or 1, default and default.b or 1, default and default.a or 1
+		end,
 		parent = cbData.element,
 		parentCheck = cbData.parentCheck,
 		searchtags = cbData.searchtags,

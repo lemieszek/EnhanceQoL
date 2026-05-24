@@ -16,6 +16,12 @@ local wipeTable = _G.wipe or table.wipe
 local chatIMSoundOptions = {}
 local chatIMSoundOrder = {}
 local chatIMSoundCacheVersion = -1
+
+local function getChatIMMessageColorDefault(outbound)
+	local color = outbound and ChatTypeInfo.WHISPER_INFORM or ChatTypeInfo.WHISPER
+	return { r = color and color.r or 1, g = color and color.g or 1, b = color and color.b or 1, a = 1 }
+end
+
 local function getChatIMSoundDropdownOptions()
 	local version = (addon.functions and addon.functions.GetLSMMediaVersion and addon.functions.GetLSMMediaVersion("sound")) or 0
 	if chatIMSoundCacheVersion == version then return chatIMSoundOptions end
@@ -353,6 +359,18 @@ data = {
 				sType = "checkbox",
 			},
 			{
+				var = "chatIMIncomingMessageColor",
+				text = L["chatIMIncomingMessageColor"],
+				default = function() return getChatIMMessageColorDefault(false) end,
+				parentCheck = function()
+					return addon.SettingsLayout.elements["enableChatIM"]
+						and addon.SettingsLayout.elements["enableChatIM"].setting
+						and addon.SettingsLayout.elements["enableChatIM"].setting:GetValue() == true
+				end,
+				parent = true,
+				sType = "colorpicker",
+			},
+			{
 
 				var = "chatIMUseAnimation",
 				text = L["chatIMUseAnimation"],
@@ -367,6 +385,18 @@ data = {
 				default = false,
 				type = Settings.VarType.Boolean,
 				sType = "checkbox",
+			},
+			{
+				var = "chatIMOutgoingMessageColor",
+				text = L["chatIMOutgoingMessageColor"],
+				default = function() return getChatIMMessageColorDefault(true) end,
+				parentCheck = function()
+					return addon.SettingsLayout.elements["enableChatIM"]
+						and addon.SettingsLayout.elements["enableChatIM"].setting
+						and addon.SettingsLayout.elements["enableChatIM"].setting:GetValue() == true
+				end,
+				parent = true,
+				sType = "colorpicker",
 			},
 			{
 				var = "chatIMMaxHistory",

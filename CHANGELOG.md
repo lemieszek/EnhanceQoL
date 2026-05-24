@@ -1,6 +1,10 @@
 # Changelog
 
-## [10.20.2] - 2026-05-24
+## [10.21.0] - 2026-05-24
+
+### ✨ Added
+
+- Instant Messenger: Added separate configurable text colors for incoming and outgoing messages.
 
 ### 🐛 Fixed
 
