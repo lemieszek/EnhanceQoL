@@ -23,6 +23,11 @@ local SESSION_TYPES = {
 	current = Enum and Enum.DamageMeterSessionType and Enum.DamageMeterSessionType.Current,
 	overall = Enum and Enum.DamageMeterSessionType and Enum.DamageMeterSessionType.Overall,
 }
+local SYNC_EXCLUDED_KEYS = {
+	enabled = true,
+	sessionType = true,
+	visibility = true,
+}
 local DEFAULT_WINDOW = {
 	enabled = true,
 	anchorToWindow = 0,
@@ -46,6 +51,13 @@ local DEFAULT_WINDOW = {
 	barBorderColor = { r = 0, g = 0, b = 0, a = 0.9 },
 	barBorderSize = 1,
 	barBorderInset = 0,
+	changeIconSize = false,
+	iconSizeOffset = 0,
+	iconBorderEnabled = false,
+	iconBorderTexture = "",
+	iconBorderColor = { r = 0, g = 0, b = 0, a = 0.9 },
+	iconBorderSize = 1,
+	iconBorderInset = 0,
 	showHeader = true,
 	showStatus = true,
 	showNames = true,
@@ -142,6 +154,22 @@ local function copyWindowConfig(source)
 		end
 	end
 	return copy
+end
+
+local function copySyncedWindowConfig(source, target)
+	source = type(source) == "table" and source or {}
+	target = type(target) == "table" and target or {}
+	copyDefaults(target, DEFAULT_WINDOW)
+	for key, defaultValue in pairs(DEFAULT_WINDOW) do
+		if not SYNC_EXCLUDED_KEYS[key] then
+			if source[key] ~= nil then
+				target[key] = copyValue(source[key])
+			else
+				target[key] = copyValue(defaultValue)
+			end
+		end
+	end
+	return target
 end
 
 local function getGlobalFontKey()
@@ -364,6 +392,28 @@ local function getRowMetrics(config)
 	return rowHeight, barHeight, spacing
 end
 
+local function getBarBorderOutset(config)
+	if config.barBorderEnabled ~= true then return 0 end
+	return clampNumber(config.barBorderInset, 0, 24, DEFAULT_WINDOW.barBorderInset)
+end
+
+local function getIconBorderOutset(config)
+	if config.iconBorderEnabled ~= true then return 0 end
+	return clampNumber(config.iconBorderInset, 0, 24, DEFAULT_WINDOW.iconBorderInset)
+end
+
+local function getEffectiveRowHeight(config)
+	local rowHeight = getRowMetrics(config)
+	return rowHeight + (math.max(getBarBorderOutset(config), getIconBorderOutset(config)) * 2)
+end
+
+local function getIconSize(config)
+	local maxSize = math.max(8, getEffectiveRowHeight(config) - (getIconBorderOutset(config) * 2))
+	if config.changeIconSize ~= true then return maxSize end
+	local offset = clampNumber(config.iconSizeOffset, -60, 0, DEFAULT_WINDOW.iconSizeOffset)
+	return clampNumber(maxSize + offset, 8, maxSize, maxSize)
+end
+
 local function getEffectiveRankWidth(config)
 	if config.showRanks == false or config.prefixRankInName == true then return 0 end
 	local rankFontSize = clampNumber(config.rankFontSize, 8, 24, DEFAULT_WINDOW.rankFontSize)
@@ -373,10 +423,9 @@ local function getEffectiveRankWidth(config)
 end
 
 local function getRowTextInsets(config)
-	local rowHeight = getRowMetrics(config)
 	local rankWidth = getEffectiveRankWidth(config)
 	local rankGap = clampNumber(config.rankGap, 0, 24, DEFAULT_WINDOW.rankGap)
-	local iconSize = math.max(12, rowHeight - 4)
+	local iconSize = getIconSize(config)
 	local leftInset = 4 + iconSize + 4
 	if rankWidth > 0 then
 		leftInset = leftInset + rankWidth + rankGap
@@ -587,27 +636,51 @@ function DamageMeter:ApplyBarBorder(row, config)
 	end
 end
 
+function DamageMeter:ApplyIconBorder(row, config)
+	if not row.iconBorder or not row.iconBorder.SetBackdrop then return end
+	if config.iconBorderEnabled == true then
+		local borderTexture = resolveMedia("border", config.iconBorderTexture, DEFAULT_BORDER)
+		local borderColor = normalizeColor(config.iconBorderColor, DEFAULT_WINDOW.iconBorderColor)
+		local size = clampNumber(config.iconBorderSize, 1, 32, DEFAULT_WINDOW.iconBorderSize)
+		row.iconBorder:SetBackdrop({
+			edgeFile = borderTexture,
+			edgeSize = size,
+		})
+		row.iconBorder:SetBackdropBorderColor(borderColor.r, borderColor.g, borderColor.b, borderColor.a)
+		row.iconBorder:Show()
+	else
+		row.iconBorder:SetBackdrop(nil)
+		row.iconBorder:Hide()
+	end
+end
+
 function DamageMeter:ApplyRowTextLayout(row, config)
 	local _, barHeight = getRowMetrics(config)
+	local borderOutset = getBarBorderOutset(config)
 	local leftInset, rightInset, iconSize, rankWidth, rankGap = getRowTextInsets(config)
 	local showRankColumn = config.showRanks ~= false and rankWidth > 0
 	row.rank:SetWidth(rankWidth)
 	row.rank:SetShown(showRankColumn)
-	row.icon:SetSize(iconSize, iconSize)
-	row.icon:ClearAllPoints()
+	row.iconFrame:SetSize(iconSize, iconSize)
+	row.iconFrame:ClearAllPoints()
 	if showRankColumn then
-		row.icon:SetPoint("LEFT", row.rank, "RIGHT", rankGap, 0)
+		row.iconFrame:SetPoint("LEFT", row.rank, "RIGHT", rankGap, 0)
 	else
-		row.icon:SetPoint("LEFT", 4, 0)
+		row.iconFrame:SetPoint("LEFT", 4, 0)
 	end
+	row.iconBorder:ClearAllPoints()
+	local iconBorderOffset = getIconBorderOutset(config)
+	row.iconBorder:SetPoint("TOPLEFT", row.iconFrame, "TOPLEFT", -iconBorderOffset, iconBorderOffset)
+	row.iconBorder:SetPoint("BOTTOMRIGHT", row.iconFrame, "BOTTOMRIGHT", iconBorderOffset, -iconBorderOffset)
+	row.iconBorder:SetFrameLevel(row.iconFrame:GetFrameLevel() + 2)
 	row.bar:ClearAllPoints()
-	row.bar:SetPoint("LEFT", row.icon, "RIGHT", 4, 0)
+	row.bar:SetPoint("LEFT", row.iconFrame, "RIGHT", 4, 0)
 	row.bar:SetPoint("RIGHT", row, "RIGHT", -4, 0)
 	row.bar:SetHeight(barHeight)
 	if normalizeAnchorV(config.barAnchor) == "TOP" then
-		row.bar:SetPoint("TOP", row, "TOP", 0, 0)
+		row.bar:SetPoint("TOP", row, "TOP", 0, -borderOutset)
 	elseif normalizeAnchorV(config.barAnchor) == "BOTTOM" then
-		row.bar:SetPoint("BOTTOM", row, "BOTTOM", 0, 0)
+		row.bar:SetPoint("BOTTOM", row, "BOTTOM", 0, borderOutset)
 	else
 		row.bar:SetPoint("CENTER", row, "CENTER", 0, 0)
 	end
@@ -669,10 +742,11 @@ end
 
 function DamageMeter:CreateRow(window, index)
 	local config = self:GetConfig(window.index)
-	local rowHeight, _, spacing = getRowMetrics(config)
+	local _, _, spacing = getRowMetrics(config)
+	local effectiveRowHeight = getEffectiveRowHeight(config)
 	local texture = resolveMedia("statusbar", config.texture, DEFAULT_TEXTURE)
 	local row = CreateFrame("Button", nil, window.rowsContainer)
-	row:SetHeight(rowHeight)
+	row:SetHeight(effectiveRowHeight)
 	row:ClearAllPoints()
 	if index > 1 and window.rows[index - 1] then
 		row:SetPoint("TOPLEFT", window.rows[index - 1], "BOTTOMLEFT", 0, -spacing)
@@ -687,9 +761,15 @@ function DamageMeter:CreateRow(window, index)
 	row.rank:SetWidth(24)
 	row.rank:SetJustifyH("LEFT")
 
-	row.icon = row:CreateTexture(nil, "ARTWORK")
-	row.icon:SetSize(16, 16)
+	row.iconFrame = CreateFrame("Frame", nil, row, "BackdropTemplate")
+	row.iconFrame:EnableMouse(false)
+
+	row.icon = row.iconFrame:CreateTexture(nil, "ARTWORK")
+	row.icon:SetAllPoints()
 	row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+	row.iconBorder = CreateFrame("Frame", nil, row, "BackdropTemplate")
+	row.iconBorder:EnableMouse(false)
 
 	row.bar = CreateFrame("StatusBar", nil, row, "BackdropTemplate")
 	row.bar:SetMinMaxValues(0, 1)
@@ -717,6 +797,7 @@ function DamageMeter:CreateRow(window, index)
 	self:ApplyFontString(row.name, config)
 	self:ApplyValueFontString(row.value, config)
 	self:ApplyRowTextLayout(row, config)
+	self:ApplyIconBorder(row, config)
 	self:ApplyBarBorder(row, config)
 
 	window.rows[index] = row
@@ -746,12 +827,13 @@ function DamageMeter:EnsureWindow(index)
 	rowsViewport:EnableMouseWheel(true)
 	rowsViewport:SetScript("OnMouseWheel", function(_, delta)
 		local config = DamageMeter:GetConfig(index)
-		local rowHeight, _, spacing = getRowMetrics(config)
+		local _, _, spacing = getRowMetrics(config)
+		local effectiveRowHeight = getEffectiveRowHeight(config)
 		local maxRows = clampNumber(config.maxRows, 1, 30, DEFAULT_WINDOW.maxRows)
 		local visibleRows = math.min(maxRows, clampNumber(config.visibleRows, 1, 30, DEFAULT_WINDOW.visibleRows))
 		local contentRows = math.min(maxRows, frame.contentRows or maxRows)
-		local maxScroll = math.max(0, (contentRows - visibleRows) * (rowHeight + spacing))
-		local nextScroll = (rowsViewport:GetVerticalScroll() or 0) - (delta * (rowHeight + spacing))
+		local maxScroll = math.max(0, (contentRows - visibleRows) * (effectiveRowHeight + spacing))
+		local nextScroll = (rowsViewport:GetVerticalScroll() or 0) - (delta * (effectiveRowHeight + spacing))
 		rowsViewport:SetVerticalScroll(clampNumber(nextScroll, 0, maxScroll, 0))
 	end)
 	frame.rowsViewport = rowsViewport
@@ -827,11 +909,12 @@ function DamageMeter:ApplyWindowStyle(index, contentRows)
 	local backdropTexture = resolveMedia("statusbar", config.backdropTexture, "Interface\\Buttons\\WHITE8x8")
 	local backdropColor = normalizeColor(config.backdropColor, DEFAULT_WINDOW.backdropColor)
 	local borderColor = normalizeColor(config.borderColor, DEFAULT_WINDOW.borderColor)
-	local rowHeight, _, spacing = getRowMetrics(config)
+	local _, _, spacing = getRowMetrics(config)
+	local effectiveRowHeight = getEffectiveRowHeight(config)
 	local maxRows = clampNumber(config.maxRows, 1, 30, DEFAULT_WINDOW.maxRows)
 	local visibleRows = math.min(maxRows, clampNumber(config.visibleRows, 1, 30, DEFAULT_WINDOW.visibleRows))
 	contentRows = math.min(maxRows, clampNumber(contentRows, 0, maxRows, maxRows))
-	local viewportHeight = (visibleRows * rowHeight) + math.max(0, visibleRows - 1) * spacing
+	local viewportHeight = (visibleRows * effectiveRowHeight) + math.max(0, visibleRows - 1) * spacing
 	local titleFontSize = clampNumber(config.titleFontSize, 8, 28, DEFAULT_WINDOW.titleFontSize)
 	local statusFontSize = clampNumber(config.statusFontSize, 8, 24, DEFAULT_WINDOW.statusFontSize)
 	local statusHeight = showStatus and math.max(16, statusFontSize + 6) or 0
@@ -841,7 +924,7 @@ function DamageMeter:ApplyWindowStyle(index, contentRows)
 	local topOffset = math.floor(heightOffset / 2)
 	local bottomOffset = heightOffset - topOffset
 	local height = math.max(60, viewportHeight + topInset + bottomInset + heightOffset)
-	local contentHeight = contentRows > 0 and ((contentRows * rowHeight) + math.max(0, contentRows - 1) * spacing) or 1
+	local contentHeight = contentRows > 0 and ((contentRows * effectiveRowHeight) + math.max(0, contentRows - 1) * spacing) or 1
 	frame.contentRows = contentRows
 
 	frame:SetSize(width, height)
@@ -889,7 +972,7 @@ function DamageMeter:ApplyWindowStyle(index, contentRows)
 
 	local previous
 	for rowIndex, row in ipairs(frame.rows) do
-		row:SetHeight(rowHeight)
+		row:SetHeight(effectiveRowHeight)
 		row:ClearAllPoints()
 		if previous then
 			row:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, -spacing)
@@ -899,6 +982,7 @@ function DamageMeter:ApplyWindowStyle(index, contentRows)
 			row:SetPoint("TOPRIGHT", frame.rowsContainer, "TOPRIGHT")
 		end
 		row.bar:SetStatusBarTexture(texture)
+		self:ApplyIconBorder(row, config)
 		self:ApplyBarBorder(row, config)
 		self:ApplyRankFontString(row.rank, config)
 		self:ApplyFontString(row.name, config)
@@ -1030,7 +1114,7 @@ function DamageMeter:ApplySyncedConfig(sourceIndex)
 	local source = copyWindowConfig(windows[sourceIndex])
 	for index = 1, MAX_WINDOWS do
 		if index ~= sourceIndex then
-			windows[index] = copyWindowConfig(source)
+			windows[index] = copySyncedWindowConfig(source, windows[index])
 		end
 	end
 	self:Refresh()
@@ -1235,7 +1319,7 @@ function DamageMeter:SetConfigValue(index, key, value)
 		local rowHeight = clampNumber(config.rowHeight, 10, 70, DEFAULT_WINDOW.rowHeight)
 		config.barHeight = clampNumber(config.barHeight, 1, rowHeight, DEFAULT_WINDOW.barHeight)
 	end
-	if db().damageMeterSyncSettings == true then
+	if db().damageMeterSyncSettings == true and not SYNC_EXCLUDED_KEYS[key] then
 		local windows = self:GetWindowsDB()
 		for windowIndex = 1, MAX_WINDOWS do
 			if windowIndex ~= index then
@@ -1258,6 +1342,8 @@ function DamageMeter:BuildWindowSettings(index)
 	local function statusEnabled() return cfg().showStatus ~= false end
 	local function customBarSizeEnabled() return cfg().changeBarSize == true end
 	local function barBorderEnabled() return cfg().barBorderEnabled == true end
+	local function customIconSizeEnabled() return cfg().changeIconSize == true end
+	local function iconBorderEnabled() return cfg().iconBorderEnabled == true end
 	local function rankingEnabled() return cfg().showRanks ~= false end
 	local function rankColumnEnabled() return cfg().showRanks ~= false and cfg().prefixRankInName ~= true end
 	local function windowAnchorVisible() return index > 1 end
@@ -1267,6 +1353,7 @@ function DamageMeter:BuildWindowSettings(index)
 	local headerId = "damageMeterHeader" .. index
 	local statusId = "damageMeterStatus" .. index
 	local barId = "damageMeterBar" .. index
+	local iconId = "damageMeterIcon" .. index
 	local namesId = "damageMeterNames" .. index
 	local valuesId = "damageMeterValues" .. index
 	local rankingId = "damageMeterRanking" .. index
@@ -1336,6 +1423,21 @@ function DamageMeter:BuildWindowSettings(index)
 		colorSetting(L["damageMeterBarBorderColor"] or "Bar border color", function() return normalizeColor(cfg().barBorderColor, DEFAULT_WINDOW.barBorderColor) end, function(value) self:SetConfigValue(index, "barBorderColor", normalizeColor(value, DEFAULT_WINDOW.barBorderColor)) end, DEFAULT_WINDOW.barBorderColor, barId, barBorderEnabled),
 		sliderSetting(L["damageMeterBarBorderSize"] or "Bar border size", function() return cfg().barBorderSize end, function(value) self:SetConfigValue(index, "barBorderSize", clampNumber(value, 1, 32, DEFAULT_WINDOW.barBorderSize)) end, 1, 32, 1, barId, barBorderEnabled),
 		sliderSetting(L["damageMeterBarBorderOffset"] or "Bar border offset", function() return cfg().barBorderInset end, function(value) self:SetConfigValue(index, "barBorderInset", clampNumber(value, 0, 24, DEFAULT_WINDOW.barBorderInset)) end, 0, 24, 1, barId, barBorderEnabled),
+		{ name = L["damageMeterIcon"] or "Icon", kind = SettingType.Collapsible, id = iconId, defaultCollapsed = true },
+		checkboxSetting(L["damageMeterChangeIconSize"] or "Change icon size", function() return cfg().changeIconSize == true end, function(value)
+			self:SetConfigValue(index, "changeIconSize", value)
+			requestEditModeSettingsRefresh()
+		end, iconId),
+		sliderSetting(L["damageMeterIconSizeOffset"] or "Icon size offset", function() return cfg().iconSizeOffset end, function(value) self:SetConfigValue(index, "iconSizeOffset", clampNumber(value, -60, 0, DEFAULT_WINDOW.iconSizeOffset)) end, -60, 0, 1, iconId, customIconSizeEnabled),
+		dividerSetting(iconId),
+		checkboxSetting(L["damageMeterIconBorder"] or "Icon border", function() return cfg().iconBorderEnabled == true end, function(value)
+			self:SetConfigValue(index, "iconBorderEnabled", value)
+			requestEditModeSettingsRefresh()
+		end, iconId),
+		dropdownSetting(L["damageMeterIconBorderTexture"] or "Icon border texture", function() return cfg().iconBorderTexture end, function(value) self:SetConfigValue(index, "iconBorderTexture", value) end, buildMediaOptions("border", false), iconId, 260, iconBorderEnabled),
+		colorSetting(L["damageMeterIconBorderColor"] or "Icon border color", function() return normalizeColor(cfg().iconBorderColor, DEFAULT_WINDOW.iconBorderColor) end, function(value) self:SetConfigValue(index, "iconBorderColor", normalizeColor(value, DEFAULT_WINDOW.iconBorderColor)) end, DEFAULT_WINDOW.iconBorderColor, iconId, iconBorderEnabled),
+		sliderSetting(L["damageMeterIconBorderSize"] or "Icon border size", function() return cfg().iconBorderSize end, function(value) self:SetConfigValue(index, "iconBorderSize", clampNumber(value, 1, 32, DEFAULT_WINDOW.iconBorderSize)) end, 1, 32, 1, iconId, iconBorderEnabled),
+		sliderSetting(L["damageMeterIconBorderOffset"] or "Icon border offset", function() return cfg().iconBorderInset end, function(value) self:SetConfigValue(index, "iconBorderInset", clampNumber(value, 0, 24, DEFAULT_WINDOW.iconBorderInset)) end, 0, 24, 1, iconId, iconBorderEnabled),
 		{ name = L["damageMeterNames"] or "Names", kind = SettingType.Collapsible, id = namesId, defaultCollapsed = true },
 		checkboxSetting(L["damageMeterShowNames"] or "Show names", function() return cfg().showNames == true end, function(value) self:SetConfigValue(index, "showNames", value) end, namesId),
 		checkboxSetting(L["damageMeterHideRealmNames"] or "Hide realm names", function() return cfg().hideRealmNames ~= false end, function(value) self:SetConfigValue(index, "hideRealmNames", value) end, namesId),
