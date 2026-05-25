@@ -61,6 +61,11 @@ local DEFAULT_WINDOW = {
 	iconBorderSize = 1,
 	iconBorderInset = 0,
 	showHeader = true,
+	showHeaderSession = true,
+	showHeaderType = true,
+	showHeaderTime = true,
+	headerFormat = "timeTypeDash",
+	headerTimeFormat = "smart",
 	showStatus = true,
 	showNames = true,
 	showRanks = true,
@@ -82,6 +87,8 @@ local DEFAULT_WINDOW = {
 	valueOffsetX = -5,
 	valueOffsetY = 0,
 	useClassColors = true,
+	nameUseClassColors = false,
+	nameColor = { r = 1, g = 1, b = 1, a = 1 },
 	texture = "",
 	backdropTexture = "",
 	backdropColor = { r = 0.02, g = 0.025, b = 0.03, a = 0.78 },
@@ -99,6 +106,7 @@ local DEFAULT_WINDOW = {
 	titleFontFace = GLOBAL_FONT_KEY,
 	titleFontOutline = GLOBAL_STYLE_KEY,
 	titleFontSize = 12,
+	titleColor = { r = 1, g = 0.82, b = 0, a = 1 },
 	statusFontFace = GLOBAL_FONT_KEY,
 	statusFontOutline = GLOBAL_STYLE_KEY,
 	statusFontSize = 11,
@@ -402,14 +410,42 @@ local function formatNumber(value, mode)
 	return formatShort(value)
 end
 
-local function formatDuration(seconds)
+local function formatDuration(seconds, mode)
 	seconds = safeNumber(seconds)
 	if not seconds then return nil end
 	seconds = math.floor(seconds + 0.5)
+	if mode == "seconds" then
+		return tostring(seconds) .. "s"
+	end
 	if seconds >= 60 then
 		return string.format("%d:%02d", math.floor(seconds / 60), seconds % 60)
 	end
 	return tostring(seconds) .. "s"
+end
+
+local function buildHeaderFormatOptions()
+	return {
+		{ value = "timeTypeDash", label = L["damageMeterHeaderFormatTimeTypeDash"] or "<combat time> - <type>" },
+		{ value = "timeTypeSpace", label = L["damageMeterHeaderFormatTimeTypeSpace"] or "<combat time> <type>" },
+		{ value = "typeTimeDash", label = L["damageMeterHeaderFormatTypeTimeDash"] or "<type> - <combat time>" },
+		{ value = "typeTimeSpace", label = L["damageMeterHeaderFormatTypeTimeSpace"] or "<type> <combat time>" },
+	}
+end
+
+local function buildHeaderTimeFormatOptions()
+	return {
+		{ value = "smart", label = L["damageMeterHeaderTimeFormatSmart"] or "1:05 after 60s" },
+		{ value = "seconds", label = L["damageMeterHeaderTimeFormatSeconds"] or "65s" },
+	}
+end
+
+local function normalizeHeaderFormat(value)
+	if value == "timeTypeSpace" or value == "typeTimeDash" or value == "typeTimeSpace" then return value end
+	return "timeTypeDash"
+end
+
+local function normalizeHeaderTimeFormat(value)
+	return value == "seconds" and "seconds" or "smart"
 end
 
 local function formatSourceName(value, config)
@@ -626,6 +662,15 @@ function DamageMeter:GetClassColor(config, classFilename)
 		return color.r or 1, color.g or 1, color.b or 1
 	end
 	return 0.55, 0.55, 0.55
+end
+
+function DamageMeter:GetNameColor(config, classFilename)
+	if config.nameUseClassColors == true and type(classFilename) == "string" and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFilename] then
+		local color = RAID_CLASS_COLORS[classFilename]
+		return color.r or 1, color.g or 1, color.b or 1, 1
+	end
+	local fixedColor = normalizeColor(config.nameColor, DEFAULT_WINDOW.nameColor)
+	return fixedColor.r, fixedColor.g, fixedColor.b, fixedColor.a
 end
 
 function DamageMeter:ApplyFontString(fontString, config)
@@ -1039,6 +1084,8 @@ function DamageMeter:ApplyWindowStyle(index, contentRows)
 	end
 
 	self:ApplyTitleFontString(frame.header, config)
+	local titleColor = normalizeColor(config.titleColor, DEFAULT_WINDOW.titleColor)
+	frame.header:SetTextColor(titleColor.r, titleColor.g, titleColor.b, titleColor.a)
 	self:ApplyFontString(frame.empty, config)
 	self:ApplyStatusFontString(frame.status.text, config)
 
@@ -1071,12 +1118,22 @@ function DamageMeter:UpdateHeader(index, session)
 	local sessionLabel = config.sessionType == "overall" and (L["damageMeterOverall"] or "Overall") or (L["damageMeterCurrent"] or "Current")
 	local typeLabel = getDamageMeterTypeLabel(config.damageMeterType)
 	local duration = self:GetSessionDuration(index, session)
-	local durationText = formatDuration(duration)
-	if durationText then
-		frame.header:SetText(string.format("%s %d - %s - %s - %s", L["damageMeterTitle"] or "Damage Meter", index, typeLabel, sessionLabel, durationText))
-	else
-		frame.header:SetText(string.format("%s %d - %s - %s", L["damageMeterTitle"] or "Damage Meter", index, typeLabel, sessionLabel))
+	local durationText = config.showHeaderTime ~= false and formatDuration(duration, normalizeHeaderTimeFormat(config.headerTimeFormat)) or nil
+	local formatMode = normalizeHeaderFormat(config.headerFormat)
+	local primary = {}
+	if config.showHeaderTime ~= false and durationText and (formatMode == "timeTypeDash" or formatMode == "timeTypeSpace") then primary[#primary + 1] = durationText end
+	if config.showHeaderType ~= false and typeLabel then primary[#primary + 1] = typeLabel end
+	if config.showHeaderTime ~= false and durationText and (formatMode == "typeTimeDash" or formatMode == "typeTimeSpace") then primary[#primary + 1] = durationText end
+	local separator = (formatMode == "timeTypeSpace" or formatMode == "typeTimeSpace") and " " or " - "
+	local headerText = table.concat(primary, separator)
+	if config.showHeaderSession ~= false and sessionLabel then
+		if headerText ~= "" then
+			headerText = sessionLabel .. " - " .. headerText
+		else
+			headerText = sessionLabel
+		end
 	end
+	frame.header:SetText(headerText)
 	frame.status.text:SetText(string.format("%s: %s  |  %s", L["damageMeterQuickSwitch"] or "Quick switch", sessionLabel, typeLabel))
 end
 
@@ -1110,6 +1167,7 @@ function DamageMeter:RefreshWindow(index)
 			local amount = safeNumber(source.totalAmount)
 			local percent = totalAmount and totalAmount > 0 and amount and (amount / totalAmount * 100) or nil
 			local r, g, b = self:GetClassColor(config, source.classFilename)
+			local nr, ng, nb, na = self:GetNameColor(config, source.classFilename)
 			local amountText = formatNumber(source.totalAmount, config.abbreviation)
 			local dpsText = formatNumber(source.amountPerSecond, config.abbreviation)
 			local valueText = formatValueText(amountText, dpsText, percent, config)
@@ -1117,6 +1175,7 @@ function DamageMeter:RefreshWindow(index)
 			self:ApplyRankText(row, rowIndex, config)
 			row.icon:SetTexture(safeNumber(source.specIconID) or 136243)
 			row.name:SetText(formatDisplayName(source.name, rowIndex, config))
+			row.name:SetTextColor(nr, ng, nb, na)
 			row.value:SetText(valueText)
 			self:ApplyRowValueWidth(row, config)
 			row.bar:SetStatusBarColor(r, g, b, 0.85)
@@ -1415,7 +1474,10 @@ end
 function DamageMeter:BuildWindowSettings(index)
 	local function cfg() return self:GetConfig(index) end
 	local function headerEnabled() return cfg().showHeader == true end
+	local function headerTimeEnabled() return cfg().showHeader == true and cfg().showHeaderTime ~= false end
 	local function statusEnabled() return cfg().showStatus ~= false end
+	local function namesEnabled() return cfg().showNames == true end
+	local function fixedNameColorEnabled() return cfg().showNames == true and cfg().nameUseClassColors ~= true end
 	local function customBarSizeEnabled() return cfg().changeBarSize == true end
 	local function barBorderEnabled() return cfg().barBorderEnabled == true end
 	local function customIconSizeEnabled() return cfg().changeIconSize == true end
@@ -1478,9 +1540,16 @@ function DamageMeter:BuildWindowSettings(index)
 		sliderSetting(L["damageMeterWindowOffsetY"] or "Window Y offset", function() return cfg().windowOffsetY end, function(value) self:SetConfigValue(index, "windowOffsetY", clampNumber(value, -1000, 1000, DEFAULT_WINDOW.windowOffsetY)) end, -1000, 1000, 1, layoutId, windowAnchorEnabled, windowAnchorVisible),
 		{ name = L["Header"] or "Header", kind = SettingType.Collapsible, id = headerId, defaultCollapsed = true },
 		checkboxSetting(L["damageMeterShowHeader"] or "Show header", function() return cfg().showHeader == true end, function(value) self:SetConfigValue(index, "showHeader", value) end, headerId),
+		checkboxSetting(L["damageMeterShowHeaderSession"] or "Show session", function() return cfg().showHeaderSession ~= false end, function(value) self:SetConfigValue(index, "showHeaderSession", value) end, headerId, headerEnabled),
+		checkboxSetting(L["damageMeterShowHeaderType"] or "Show type", function() return cfg().showHeaderType ~= false end, function(value) self:SetConfigValue(index, "showHeaderType", value) end, headerId, headerEnabled),
+		checkboxSetting(L["damageMeterShowHeaderTime"] or "Show combat time", function() return cfg().showHeaderTime ~= false end, function(value) self:SetConfigValue(index, "showHeaderTime", value) end, headerId, headerEnabled),
+		dropdownSetting(L["damageMeterHeaderFormat"] or "Header format", function() return normalizeHeaderFormat(cfg().headerFormat) end, function(value) self:SetConfigValue(index, "headerFormat", normalizeHeaderFormat(value)) end, buildHeaderFormatOptions(), headerId, 150, headerTimeEnabled),
+		dropdownSetting(L["damageMeterHeaderTimeFormat"] or "Time format", function() return normalizeHeaderTimeFormat(cfg().headerTimeFormat) end, function(value) self:SetConfigValue(index, "headerTimeFormat", normalizeHeaderTimeFormat(value)) end, buildHeaderTimeFormatOptions(), headerId, 120, headerTimeEnabled),
+		dividerSetting(headerId),
 		dropdownSetting(L["damageMeterTitleFont"] or "Title font", function() return cfg().titleFontFace end, function(value) self:SetConfigValue(index, "titleFontFace", value) end, buildMediaOptions("font", true), headerId, 260, headerEnabled),
 		dropdownSetting(L["damageMeterTitleFontOutline"] or "Title font outline", function() return cfg().titleFontOutline end, function(value) self:SetConfigValue(index, "titleFontOutline", normalizeStyle(value)) end, buildStyleOptions(), headerId, 180, headerEnabled),
 		sliderSetting(L["damageMeterTitleFontSize"] or "Title font size", function() return cfg().titleFontSize end, function(value) self:SetConfigValue(index, "titleFontSize", clampNumber(value, 8, 28, DEFAULT_WINDOW.titleFontSize)) end, 8, 28, 1, headerId, headerEnabled),
+		colorSetting(L["damageMeterHeaderColor"] or "Header color", function() return normalizeColor(cfg().titleColor, DEFAULT_WINDOW.titleColor) end, function(value) self:SetConfigValue(index, "titleColor", normalizeColor(value, DEFAULT_WINDOW.titleColor)) end, DEFAULT_WINDOW.titleColor, headerId, headerEnabled),
 		{ name = L["Status"] or "Status", kind = SettingType.Collapsible, id = statusId, defaultCollapsed = true },
 		checkboxSetting(L["damageMeterShowStatus"] or "Show status line", function() return cfg().showStatus ~= false end, function(value) self:SetConfigValue(index, "showStatus", value) end, statusId),
 		dropdownSetting(L["damageMeterStatusFont"] or "Status font", function() return cfg().statusFontFace end, function(value) self:SetConfigValue(index, "statusFontFace", value) end, buildMediaOptions("font", true), statusId, 260, statusEnabled),
@@ -1517,16 +1586,18 @@ function DamageMeter:BuildWindowSettings(index)
 		sliderSetting(L["damageMeterIconBorderOffset"] or "Icon border offset", function() return cfg().iconBorderInset end, function(value) self:SetConfigValue(index, "iconBorderInset", clampNumber(value, 0, 24, DEFAULT_WINDOW.iconBorderInset)) end, 0, 24, 1, iconId, iconBorderEnabled),
 		{ name = L["damageMeterNames"] or "Names", kind = SettingType.Collapsible, id = namesId, defaultCollapsed = true },
 		checkboxSetting(L["damageMeterShowNames"] or "Show names", function() return cfg().showNames == true end, function(value) self:SetConfigValue(index, "showNames", value) end, namesId),
-		checkboxSetting(L["damageMeterHideRealmNames"] or "Hide realm names", function() return cfg().hideRealmNames ~= false end, function(value) self:SetConfigValue(index, "hideRealmNames", value) end, namesId),
+		checkboxSetting(L["damageMeterHideRealmNames"] or "Hide realm names", function() return cfg().hideRealmNames ~= false end, function(value) self:SetConfigValue(index, "hideRealmNames", value) end, namesId, namesEnabled),
+		checkboxSetting(L["damageMeterNameUseClassColor"] or "Use class color for names", function() return cfg().nameUseClassColors == true end, function(value) self:SetConfigValue(index, "nameUseClassColors", value) end, namesId, namesEnabled),
+		colorSetting(L["damageMeterNameColor"] or "Name color", function() return normalizeColor(cfg().nameColor, DEFAULT_WINDOW.nameColor) end, function(value) self:SetConfigValue(index, "nameColor", normalizeColor(value, DEFAULT_WINDOW.nameColor)) end, DEFAULT_WINDOW.nameColor, namesId, fixedNameColorEnabled),
 		dividerSetting(namesId),
-		dropdownSetting(L["damageMeterNameFont"] or "Name font", function() return cfg().fontFace end, function(value) self:SetConfigValue(index, "fontFace", value) end, buildMediaOptions("font", true), namesId, 260),
-		dropdownSetting(L["damageMeterNameFontOutline"] or "Name font outline", function() return cfg().fontOutline end, function(value) self:SetConfigValue(index, "fontOutline", normalizeStyle(value)) end, buildStyleOptions(), namesId, 180),
-		sliderSetting(L["damageMeterNameFontSize"] or "Name font size", function() return cfg().fontSize end, function(value) self:SetConfigValue(index, "fontSize", clampNumber(value, 8, 24, DEFAULT_WINDOW.fontSize)) end, 8, 24, 1, namesId),
+		dropdownSetting(L["damageMeterNameFont"] or "Name font", function() return cfg().fontFace end, function(value) self:SetConfigValue(index, "fontFace", value) end, buildMediaOptions("font", true), namesId, 260, namesEnabled),
+		dropdownSetting(L["damageMeterNameFontOutline"] or "Name font outline", function() return cfg().fontOutline end, function(value) self:SetConfigValue(index, "fontOutline", normalizeStyle(value)) end, buildStyleOptions(), namesId, 180, namesEnabled),
+		sliderSetting(L["damageMeterNameFontSize"] or "Name font size", function() return cfg().fontSize end, function(value) self:SetConfigValue(index, "fontSize", clampNumber(value, 8, 24, DEFAULT_WINDOW.fontSize)) end, 8, 24, 1, namesId, namesEnabled),
 		dividerSetting(namesId),
-		dropdownSetting(L["damageMeterNameAnchorH"] or "Name horizontal anchor", function() return normalizeAnchorH(cfg().nameAnchorH) end, function(value) self:SetConfigValue(index, "nameAnchorH", normalizeAnchorH(value)) end, buildHorizontalAnchorOptions(), namesId, 120),
-		dropdownSetting(L["damageMeterNameAnchorV"] or "Name vertical anchor", function() return normalizeAnchorV(cfg().nameAnchorV) end, function(value) self:SetConfigValue(index, "nameAnchorV", normalizeAnchorV(value)) end, buildVerticalAnchorOptions(), namesId, 120),
-		sliderSetting(L["damageMeterNameOffsetX"] or "Name X offset", function() return cfg().nameOffsetX end, function(value) self:SetConfigValue(index, "nameOffsetX", clampNumber(value, -200, 200, DEFAULT_WINDOW.nameOffsetX)) end, -200, 200, 1, namesId),
-		sliderSetting(L["damageMeterNameOffsetY"] or "Name Y offset", function() return cfg().nameOffsetY end, function(value) self:SetConfigValue(index, "nameOffsetY", clampNumber(value, -200, 200, DEFAULT_WINDOW.nameOffsetY)) end, -200, 200, 1, namesId),
+		dropdownSetting(L["damageMeterNameAnchorH"] or "Name horizontal anchor", function() return normalizeAnchorH(cfg().nameAnchorH) end, function(value) self:SetConfigValue(index, "nameAnchorH", normalizeAnchorH(value)) end, buildHorizontalAnchorOptions(), namesId, 120, namesEnabled),
+		dropdownSetting(L["damageMeterNameAnchorV"] or "Name vertical anchor", function() return normalizeAnchorV(cfg().nameAnchorV) end, function(value) self:SetConfigValue(index, "nameAnchorV", normalizeAnchorV(value)) end, buildVerticalAnchorOptions(), namesId, 120, namesEnabled),
+		sliderSetting(L["damageMeterNameOffsetX"] or "Name X offset", function() return cfg().nameOffsetX end, function(value) self:SetConfigValue(index, "nameOffsetX", clampNumber(value, -200, 200, DEFAULT_WINDOW.nameOffsetX)) end, -200, 200, 1, namesId, namesEnabled),
+		sliderSetting(L["damageMeterNameOffsetY"] or "Name Y offset", function() return cfg().nameOffsetY end, function(value) self:SetConfigValue(index, "nameOffsetY", clampNumber(value, -200, 200, DEFAULT_WINDOW.nameOffsetY)) end, -200, 200, 1, namesId, namesEnabled),
 		{ name = L["damageMeterValues"] or "Values", kind = SettingType.Collapsible, id = valuesId, defaultCollapsed = true },
 		checkboxSetting(L["damageMeterShowPercent"] or "Show percent", function() return cfg().showPercent ~= false end, function(value) self:SetConfigValue(index, "showPercent", value) end, valuesId),
 		dividerSetting(valuesId),
