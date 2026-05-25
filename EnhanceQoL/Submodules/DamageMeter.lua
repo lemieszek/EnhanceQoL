@@ -1,4 +1,4 @@
--- luacheck: globals C_DamageMeter C_DeathRecap C_LFGInfo C_Spell C_StringUtil StaticPopupDialogs StaticPopup_Show YES CANCEL MenuUtil GameTooltip SecondsToClock DAMAGE_METER_COMBAT_NUMBER CLASS_ICON_TCOORDS UnitClass UnitExists UnitGUID IsInRaid UISpecialFrames GetCursorPosition GetTime ACTION_SWING ACTION_ENVIRONMENTAL_DAMAGE_DROWNING ACTION_ENVIRONMENTAL_DAMAGE_FALLING ACTION_ENVIRONMENTAL_DAMAGE_FIRE ACTION_ENVIRONMENTAL_DAMAGE_LAVA ACTION_ENVIRONMENTAL_DAMAGE_SLIME ACTION_ENVIRONMENTAL_DAMAGE_FATIGUE DEATH_RECAP_TITLE CreateAbbreviateConfig
+-- luacheck: globals C_DamageMeter C_DeathRecap C_LFGInfo C_Spell C_StringUtil C_CVar SetCVar StaticPopupDialogs StaticPopup_Show YES CANCEL MenuUtil GameTooltip SecondsToClock DAMAGE_METER_COMBAT_NUMBER CLASS_ICON_TCOORDS UnitClass UnitExists UnitGUID IsInRaid UISpecialFrames GetCursorPosition GetTime ACTION_SWING ACTION_ENVIRONMENTAL_DAMAGE_DROWNING ACTION_ENVIRONMENTAL_DAMAGE_FALLING ACTION_ENVIRONMENTAL_DAMAGE_FIRE ACTION_ENVIRONMENTAL_DAMAGE_LAVA ACTION_ENVIRONMENTAL_DAMAGE_SLIME ACTION_ENVIRONMENTAL_DAMAGE_FATIGUE DEATH_RECAP_TITLE CreateAbbreviateConfig
 local addonName, addon = ...
 
 local L = LibStub("AceLocale-3.0"):GetLocale(addonName)
@@ -24,6 +24,7 @@ local CONTEXT_MENU_WIDTH = 376
 local CONTEXT_MENU_PADDING = 8
 local CONTEXT_MENU_BUTTON_HEIGHT = 30
 local CONTEXT_MENU_BUTTON_GAP = 4
+local BLIZZARD_DAMAGE_METER_ENABLED_CVAR = "damageMeterEnabled"
 local getWindowCount
 local PARTY_UNIT_TOKENS = { "player", "party1", "party2", "party3", "party4" }
 local SESSION_TYPES = {
@@ -35,8 +36,8 @@ local LOW_NUMBER_ABBREV_BREAKPOINT = { breakpoint = 1, abbreviation = "", signif
 local FALLBACK_SHORT_NUMBER_ABBREV_BREAKPOINTS = {
 	{ breakpoint = 10000000000, abbreviation = "B", significandDivisor = 1000000000, fractionDivisor = 1, abbreviationIsGlobal = false },
 	{ breakpoint = 1000000000, abbreviation = "B", significandDivisor = 1000000000, fractionDivisor = 10, abbreviationIsGlobal = false },
-	{ breakpoint = 10000000, abbreviation = "M", significandDivisor = 1000000, fractionDivisor = 1, abbreviationIsGlobal = false },
-	{ breakpoint = 1000000, abbreviation = "M", significandDivisor = 1000000, fractionDivisor = 10, abbreviationIsGlobal = false },
+	{ breakpoint = 10000000, abbreviation = "M", significandDivisor = 1000000, fractionDivisor = 100, abbreviationIsGlobal = false },
+	{ breakpoint = 1000000, abbreviation = "M", significandDivisor = 1000000, fractionDivisor = 100, abbreviationIsGlobal = false },
 	{ breakpoint = 10000, abbreviation = "K", significandDivisor = 1000, fractionDivisor = 1, abbreviationIsGlobal = false },
 	{ breakpoint = 1000, abbreviation = "K", significandDivisor = 1000, fractionDivisor = 10, abbreviationIsGlobal = false },
 	LOW_NUMBER_ABBREV_BREAKPOINT,
@@ -551,11 +552,16 @@ local function copyShortNumberAbbrevBreakpoints(data)
 	local breakpoints = {}
 	for _, breakpoint in ipairs(data) do
 		if type(breakpoint) == "table" then
+			local significandDivisor = breakpoint.significandDivisor
+			local fractionDivisor = breakpoint.fractionDivisor
+			if significandDivisor == 1000000 then
+				fractionDivisor = 100
+			end
 			breakpoints[#breakpoints + 1] = {
 				breakpoint = breakpoint.breakpoint,
 				abbreviation = breakpoint.abbreviation,
-				significandDivisor = breakpoint.significandDivisor,
-				fractionDivisor = breakpoint.fractionDivisor,
+				significandDivisor = significandDivisor,
+				fractionDivisor = fractionDivisor,
 				abbreviationIsGlobal = breakpoint.abbreviationIsGlobal ~= false,
 			}
 		end
@@ -1146,6 +1152,27 @@ end
 function DamageMeter:IsAvailable()
 	if not C_DamageMeter or not C_DamageMeter.IsDamageMeterAvailable then return false end
 	return C_DamageMeter.IsDamageMeterAvailable() == true
+end
+
+function DamageMeter:SetBlizzardDamageMeterEnabled(enabled)
+	local value = enabled and "1" or "0"
+	if C_CVar and C_CVar.SetCVar then
+		C_CVar.SetCVar(BLIZZARD_DAMAGE_METER_ENABLED_CVAR, value)
+	elseif SetCVar then
+		SetCVar(BLIZZARD_DAMAGE_METER_ENABLED_CVAR, value)
+	end
+end
+
+function DamageMeter:SuppressBlizzardDamageMeter()
+	self.blizzardDamageMeterSuppressed = true
+	self:SetBlizzardDamageMeterEnabled(false)
+	local blizzardDamageMeter = _G.DamageMeter
+	if blizzardDamageMeter then
+		blizzardDamageMeter:Hide()
+		if blizzardDamageMeter.UpdateShownState then
+			blizzardDamageMeter:UpdateShownState()
+		end
+	end
 end
 
 function DamageMeter:IsInEditMode()
@@ -3232,7 +3259,13 @@ end
 
 function DamageMeter:UpdateEventState()
 	self:InvalidateLiveEventWatch()
-	if self:IsEnabled() and self:IsAvailable() then
+	local enabled = self:IsEnabled()
+	if enabled then
+		self:SuppressBlizzardDamageMeter()
+	else
+		self.blizzardDamageMeterSuppressed = false
+	end
+	if enabled and self:IsAvailable() then
 		self:RegisterLiveEvents()
 	else
 		self:UnregisterLiveEvents()

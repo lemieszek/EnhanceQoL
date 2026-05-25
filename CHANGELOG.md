@@ -1,19 +1,12 @@
 # Changelog
 
 <!--@eqol-beta@-->
+
 ## [10.21.0-beta2] - 2026-05-25
 
 ### ✨ Added
 
-- Damage Meter: Added a new independent EnhanceQoL Damage Meter powered by Blizzard's Retail `C_DamageMeter` data, with Current/Overall sessions, multiple meter types, quick-switch favorites, multi-window support, Edit Mode movement, custom row/header/status/icon/tooltip styling, class colors, row sorting/growth options, raid row overrides, and optional always-show-player behavior.
-- Damage Meter: Added row breakdown tooltips for supported Blizzard damage meter details, including configurable spell/target columns, tooltip anchoring, font, background, border, and bar styling.
-
-### 🔄 Changed
-
-- Damage Meter: Optimized live refreshes by keeping Blizzard combat values transient, moving defaults/style/font/layout work out of the hot path, caching non-combat Quick Switch labels and static styling, and avoiding per-refresh row table churn.
-
-### 🐛 Fixed
-
+- Damage Meter: Added a new independent EnhanceQoL Damage Meter, with Current/Overall views, favorites, multi-window support, Edit Mode movement, and configurable styling.
 - Profiles: Added Damage Meter as a separate protected import section so Damage Meter settings can be kept unchanged during full profile or external installer profile imports.
 
 ---
@@ -30,6 +23,7 @@
 - Mythic Plus / BR & Bloodlust Tracker: Fixed Edit Mode X/Y fields not refreshing immediately after moving the tracker anchors.
 
 ---
+
 <!--@end-eqol-beta@-->
 
 ## [10.20.1] - 2026-05-24
