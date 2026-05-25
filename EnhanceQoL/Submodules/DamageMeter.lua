@@ -1,4 +1,4 @@
--- luacheck: globals C_DamageMeter C_DeathRecap C_LFGInfo C_Spell C_StringUtil StaticPopupDialogs StaticPopup_Show YES CANCEL MenuUtil GameTooltip SecondsToClock DAMAGE_METER_COMBAT_NUMBER CLASS_ICON_TCOORDS UnitClass UnitExists UnitGUID IsInRaid UISpecialFrames GetCursorPosition ACTION_SWING ACTION_ENVIRONMENTAL_DAMAGE_DROWNING ACTION_ENVIRONMENTAL_DAMAGE_FALLING ACTION_ENVIRONMENTAL_DAMAGE_FIRE ACTION_ENVIRONMENTAL_DAMAGE_LAVA ACTION_ENVIRONMENTAL_DAMAGE_SLIME ACTION_ENVIRONMENTAL_DAMAGE_FATIGUE DEATH_RECAP_TITLE
+-- luacheck: globals C_DamageMeter C_DeathRecap C_LFGInfo C_Spell C_StringUtil StaticPopupDialogs StaticPopup_Show YES CANCEL MenuUtil GameTooltip SecondsToClock DAMAGE_METER_COMBAT_NUMBER CLASS_ICON_TCOORDS UnitClass UnitExists UnitGUID IsInRaid UISpecialFrames GetCursorPosition GetTime ACTION_SWING ACTION_ENVIRONMENTAL_DAMAGE_DROWNING ACTION_ENVIRONMENTAL_DAMAGE_FALLING ACTION_ENVIRONMENTAL_DAMAGE_FIRE ACTION_ENVIRONMENTAL_DAMAGE_LAVA ACTION_ENVIRONMENTAL_DAMAGE_SLIME ACTION_ENVIRONMENTAL_DAMAGE_FATIGUE DEATH_RECAP_TITLE
 local addonName, addon = ...
 
 local L = LibStub("AceLocale-3.0"):GetLocale(addonName)
@@ -665,14 +665,6 @@ local function formatDisplayName(value, rowIndex, config)
 	return name
 end
 
-local function formatValueText(amountText, dpsText, percent, config)
-	local text = config.valueFormat == "parentheses" and string.format("%s (%s)", amountText, dpsText) or string.format("%s / %s", amountText, dpsText)
-	if config.showPercent ~= false and percent then
-		text = string.format("%s (%.1f%%)", text, percent)
-	end
-	return text
-end
-
 local function isPerSecondMeterType(key)
 	key = normalizeDamageMeterTypeKey(key)
 	return key == "Dps" or key == "Hps"
@@ -681,6 +673,13 @@ end
 local function isCountOnlyMeterType(key)
 	key = normalizeDamageMeterTypeKey(key)
 	return key == "Dispels" or key == "Interrupts"
+end
+
+local function getRowValueMode(damageMeterType)
+	if damageMeterType == "Deaths" then return "death" end
+	if damageMeterType == "Dispels" or damageMeterType == "Interrupts" then return "count" end
+	if damageMeterType == "Dps" or damageMeterType == "Hps" then return "perSecond" end
+	return "amountAndRate"
 end
 
 local function useRaidRows(config)
@@ -710,27 +709,27 @@ local function formatDeathTimeText(source)
 	return formatDuration(deathTimeSeconds, "clock") or ""
 end
 
-local function formatRowValueText(source, percent, config, damageMeterType)
-	if normalizeDamageMeterTypeKey(damageMeterType or config.damageMeterType) == "Deaths" then
+local function appendRowPercent(text, percent, showPercent)
+	if showPercent and percent then
+		return string.format("%s (%.1f%%)", text, percent)
+	end
+	return text
+end
+
+local function formatRowValueText(source, percent, valueMode, abbreviation, showPercent, useParentheses)
+	if valueMode == "death" then
 		return formatDeathTimeText(source)
 	end
-	if isCountOnlyMeterType(damageMeterType or config.damageMeterType) then
-		local text = formatNumber(source.totalAmount, config.abbreviation)
-		if config.showPercent ~= false and percent then
-			text = string.format("%s (%.1f%%)", text, percent)
-		end
-		return text
+	if valueMode == "count" then
+		return appendRowPercent(formatNumber(source.totalAmount, abbreviation), percent, showPercent)
 	end
-	if isPerSecondMeterType(damageMeterType or config.damageMeterType) then
-		local text = formatNumber(source.amountPerSecond, config.abbreviation)
-		if config.showPercent ~= false and percent then
-			text = string.format("%s (%.1f%%)", text, percent)
-		end
-		return text
+	if valueMode == "perSecond" then
+		return appendRowPercent(formatNumber(source.amountPerSecond, abbreviation), percent, showPercent)
 	end
-	local amountText = formatNumber(source.totalAmount, config.abbreviation)
-	local dpsText = formatNumber(source.amountPerSecond, config.abbreviation)
-	return formatValueText(amountText, dpsText, percent, config)
+	local amountText = formatNumber(source.totalAmount, abbreviation)
+	local dpsText = formatNumber(source.amountPerSecond, abbreviation)
+	local text = useParentheses and string.format("%s (%s)", amountText, dpsText) or string.format("%s / %s", amountText, dpsText)
+	return appendRowPercent(text, percent, showPercent)
 end
 
 local function isInFollowerDungeon()
@@ -947,6 +946,10 @@ function DamageMeter:GetWindowStyleVersion(index)
 	return self.windowStyleVersions[index] or 0
 end
 
+function DamageMeter:InvalidateLiveEventWatch()
+	self.liveEventWatchDirty = true
+end
+
 function DamageMeter:MarkWindowStyleDirty(index)
 	self.windowStyleVersions = self.windowStyleVersions or {}
 	if index then
@@ -1066,6 +1069,7 @@ end
 function DamageMeter:SetTemporaryDamageMeterType(index, damageMeterType)
 	local temporary = self:GetTemporarySelection(index)
 	temporary.damageMeterType = normalizeDamageMeterTypeKey(damageMeterType)
+	self:InvalidateLiveEventWatch()
 	self:ScheduleRefresh()
 end
 
@@ -1081,6 +1085,7 @@ function DamageMeter:SetTemporarySessionType(index, sessionType)
 	temporary.sessionName = nil
 	temporary.sessionDurationSeconds = nil
 	temporary.sessionType = sessionType == "overall" and "overall" or "current"
+	self:InvalidateLiveEventWatch()
 	self:ScheduleRefresh()
 end
 
@@ -1092,12 +1097,14 @@ function DamageMeter:SetTemporarySessionID(index, sessionID, sessionName, durati
 	temporary.sessionID = sessionID
 	temporary.sessionName = sessionName
 	temporary.sessionDurationSeconds = durationSeconds
+	self:InvalidateLiveEventWatch()
 	self:ScheduleRefresh()
 end
 
 function DamageMeter:ClearTemporarySelection(index)
 	self.temporarySelections = self.temporarySelections or {}
 	self.temporarySelections[index] = nil
+	self:InvalidateLiveEventWatch()
 	self:ScheduleRefresh()
 end
 
@@ -1143,6 +1150,67 @@ function DamageMeter:GetSession(index)
 	local sessionType = SESSION_TYPES[self:GetEffectiveSessionType(index)] or SESSION_TYPES.current
 	if not sessionType or not C_DamageMeter.GetCombatSessionFromType then return nil end
 	return C_DamageMeter.GetCombatSessionFromType(sessionType, damageMeterType)
+end
+
+function DamageMeter:BuildLiveEventWatch()
+	local typeWatch = self.liveEventTypeWatch
+	if not typeWatch then
+		typeWatch = {}
+		self.liveEventTypeWatch = typeWatch
+	else
+		for key in pairs(typeWatch) do
+			typeWatch[key] = nil
+		end
+	end
+	local allSessionWatch = self.liveEventAllSessionWatch
+	if not allSessionWatch then
+		allSessionWatch = {}
+		self.liveEventAllSessionWatch = allSessionWatch
+	else
+		for key in pairs(allSessionWatch) do
+			allSessionWatch[key] = nil
+		end
+	end
+	local sessionWatch = self.liveEventSessionWatch
+	if not sessionWatch then
+		sessionWatch = {}
+		self.liveEventSessionWatch = sessionWatch
+	else
+		for key in pairs(sessionWatch) do
+			sessionWatch[key] = nil
+		end
+	end
+	if self:IsEnabled() then
+		for index = 1, getWindowCount() do
+			local damageMeterType = getDamageMeterTypeValue(self:GetEffectiveDamageMeterType(index))
+			if damageMeterType ~= nil then
+				typeWatch[damageMeterType] = true
+				local sessionID = self:GetEffectiveSessionID(index)
+				if sessionID then
+					local sessions = sessionWatch[damageMeterType]
+					if not sessions then
+						sessions = {}
+						sessionWatch[damageMeterType] = sessions
+					end
+					sessions[sessionID] = true
+				else
+					allSessionWatch[damageMeterType] = true
+				end
+			end
+		end
+	end
+	self.liveEventWatchDirty = false
+end
+
+function DamageMeter:IsLiveEventRelevant(damageMeterType, sessionID)
+	if damageMeterType == nil then return true end
+	if self.liveEventWatchDirty or not self.liveEventTypeWatch then
+		self:BuildLiveEventWatch()
+	end
+	if not self.liveEventTypeWatch[damageMeterType] then return false end
+	if self.liveEventAllSessionWatch[damageMeterType] then return true end
+	local sessions = self.liveEventSessionWatch[damageMeterType]
+	return sessionID ~= nil and sessions and sessions[sessionID] == true
 end
 
 function DamageMeter:GetSessionDuration(index, session)
@@ -2788,6 +2856,10 @@ function DamageMeter:RefreshWindow(index)
 	local totalAmount = safeNumber(session and session.totalAmount)
 	local shown = 0
 	local inFollowerDungeon = isInFollowerDungeon()
+	local valueMode = getRowValueMode(damageMeterType)
+	local valueAbbreviation = config.abbreviation
+	local valueShowPercent = config.showPercent ~= false
+	local valueUseParentheses = config.valueFormat == "parentheses"
 
 	for rowIndex = 1, maxRows do
 		local visualTopIndex = rowsGrowUp and (contentRows - rowIndex + 1) or rowIndex
@@ -2818,7 +2890,7 @@ function DamageMeter:RefreshWindow(index)
 			local r, g, b = self:GetClassColor(config, source.classFilename)
 			local nr, ng, nb, na = self:GetNameColor(config, source.classFilename)
 			local vr, vg, vb, va = self:GetValueColor(config, source.classFilename)
-			local valueText = formatRowValueText(source, percent, config, damageMeterType)
+			local valueText = formatRowValueText(source, percent, valueMode, valueAbbreviation, valueShowPercent, valueUseParentheses)
 
 			self:ApplyRankText(row, sourceIndex, config)
 			row.sourceData = source
@@ -2857,11 +2929,19 @@ function DamageMeter:Refresh()
 end
 
 function DamageMeter:ScheduleRefresh()
-	if self.refreshTimer then return end
-	self.refreshTimer = C_Timer.NewTimer(getUpdateRate(), function()
-		self.refreshTimer = nil
-		self:Refresh()
-	end)
+	if GetTime then
+		self.lastLiveRefreshTime = GetTime()
+	end
+	self:Refresh()
+end
+
+function DamageMeter:RefreshFromLiveEvent(damageMeterType, sessionID)
+	if not self:IsLiveEventRelevant(damageMeterType, sessionID) then return end
+	local now = GetTime and GetTime() or 0
+	local last = self.lastLiveRefreshTime or 0
+	if now - last < getUpdateRate() then return end
+	self.lastLiveRefreshTime = now
+	self:Refresh()
 end
 
 function DamageMeter:RegisterLiveEvents()
@@ -2891,6 +2971,7 @@ function DamageMeter:UnregisterLiveEvents()
 end
 
 function DamageMeter:UpdateEventState()
+	self:InvalidateLiveEventWatch()
 	if self:IsEnabled() and self:IsAvailable() then
 		self:RegisterLiveEvents()
 	else
@@ -2920,6 +3001,7 @@ function DamageMeter:CopySettings(sourceIndex, targetIndex)
 	if sourceIndex < 1 or sourceIndex > count or targetIndex < 1 or targetIndex > count then return end
 	local windows = self:GetWindowsDB()
 	windows[targetIndex] = copyWindowConfig(windows[sourceIndex])
+	self:InvalidateLiveEventWatch()
 	self:MarkWindowStyleDirty(targetIndex)
 	if db().damageMeterSyncSettings == true then
 		self:ApplySyncedConfig(targetIndex)
@@ -2934,6 +3016,7 @@ function DamageMeter:AddWindow(sourceIndex)
 	local newIndex = count + 1
 	setWindowCount(newIndex)
 	self:GetWindowsDB()
+	self:InvalidateLiveEventWatch()
 	self:MarkWindowStyleDirty(newIndex)
 	if db().damageMeterSyncSettings == true then
 		self:CopySettings(sourceIndex or 1, newIndex)
@@ -2971,6 +3054,7 @@ function DamageMeter:RemoveWindow(index)
 		local frame = self.windows and self.windows[windowIndex]
 		if frame then frame:Hide() end
 	end
+	self:InvalidateLiveEventWatch()
 	self:Refresh()
 end
 
@@ -3036,6 +3120,7 @@ function DamageMeter:ResetData()
 		C_DamageMeter.ResetAllCombatSessions()
 	end
 	self.temporarySelections = {}
+	self:InvalidateLiveEventWatch()
 	self:ScheduleRefresh()
 end
 
@@ -3143,6 +3228,9 @@ function DamageMeter:SetConfigValue(index, key, value)
 		if self.quickTypeLabelCache then self.quickTypeLabelCache[index] = nil end
 	else
 		config[key] = copyValue(value)
+	end
+	if key == "damageMeterType" or key == "sessionType" then
+		self:InvalidateLiveEventWatch()
 	end
 	self:MarkWindowStyleDirty(index)
 	if key == "tooltipPreview" and value ~= true and self.sourceTooltip then
@@ -3449,7 +3537,7 @@ function DamageMeter:Init()
 	self.eventFrame = CreateFrame("Frame")
 	self.partyClassGeneration = 0
 	self.currentPartyClassGeneration = 0
-	self.eventFrame:SetScript("OnEvent", function(_, event)
+	self.eventFrame:SetScript("OnEvent", function(_, event, damageMeterType, sessionID)
 		if event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" then
 			self:InvalidatePartyClassFallback()
 		elseif event == "PLAYER_REGEN_DISABLED" then
@@ -3458,7 +3546,13 @@ function DamageMeter:Init()
 			self:InvalidatePartyClassFallback()
 			self:MarkPartyClassFallbackCurrent()
 		end
-		self:ScheduleRefresh()
+		if event == "DAMAGE_METER_COMBAT_SESSION_UPDATED" then
+			self:RefreshFromLiveEvent(damageMeterType, sessionID)
+		elseif event == "DAMAGE_METER_CURRENT_SESSION_UPDATED" then
+			self:RefreshFromLiveEvent()
+		else
+			self:ScheduleRefresh()
+		end
 	end)
 	self:UpdateEventState()
 end
