@@ -783,10 +783,6 @@ local function colorComponents(value, fallback)
 		clampNumber(value.a or value[4], 0, 1, fallback.a or fallback[4] or 1)
 end
 
-local function colorSignature(r, g, b, a)
-	return (r or 0) .. ":" .. (g or 0) .. ":" .. (b or 0) .. ":" .. (a or 1)
-end
-
 local function getGlobalFontStateVersion()
 	if addon.functions and addon.functions.GetGlobalFontStateVersion then return addon.functions.GetGlobalFontStateVersion() or 0 end
 	return 0
@@ -1369,20 +1365,38 @@ function DamageMeter:ApplyBarBorder(row, config, classFilename)
 	if config.barBorderEnabled == true then
 		local size = clampNumber(config.barBorderSize, 1, 32, DEFAULT_WINDOW.barBorderSize)
 		local br, bg, bb, ba = getClassOrCustomColor(classKey, config.barBorderColor, DEFAULT_WINDOW.barBorderColor, config.barBorderUseClassColor)
-		local signature = tostring(config.barBorderTexture) .. ":" .. size .. ":" .. colorSignature(br, bg, bb, ba)
-		if border._damageMeterBorderSignature ~= signature then
-			border._damageMeterBorderSignature = signature
+		if border._damageMeterBackdropEnabled ~= true
+			or border._damageMeterBackdropTexture ~= config.barBorderTexture
+			or border._damageMeterBackdropSize ~= size then
+			border._damageMeterBackdropEnabled = true
+			border._damageMeterBackdropTexture = config.barBorderTexture
+			border._damageMeterBackdropSize = size
 			local borderTexture = resolveMedia("border", config.barBorderTexture, DEFAULT_BORDER)
 			border:SetBackdrop({
 				edgeFile = borderTexture,
 				edgeSize = size,
 			})
+		end
+		if border._damageMeterBorderColorR ~= br
+			or border._damageMeterBorderColorG ~= bg
+			or border._damageMeterBorderColorB ~= bb
+			or border._damageMeterBorderColorA ~= ba then
+			border._damageMeterBorderColorR = br
+			border._damageMeterBorderColorG = bg
+			border._damageMeterBorderColorB = bb
+			border._damageMeterBorderColorA = ba
 			border:SetBackdropBorderColor(br, bg, bb, ba)
 		end
 		setShownIfChanged(border, true)
 	else
-		if border._damageMeterBorderSignature ~= "off" then
-			border._damageMeterBorderSignature = "off"
+		if border._damageMeterBackdropEnabled ~= false then
+			border._damageMeterBackdropEnabled = false
+			border._damageMeterBackdropTexture = nil
+			border._damageMeterBackdropSize = nil
+			border._damageMeterBorderColorR = nil
+			border._damageMeterBorderColorG = nil
+			border._damageMeterBorderColorB = nil
+			border._damageMeterBorderColorA = nil
 			border:SetBackdrop(nil)
 		end
 		setShownIfChanged(border, false)
@@ -1407,20 +1421,38 @@ function DamageMeter:ApplyIconBorder(row, config, classFilename)
 	if config.iconBorderEnabled == true then
 		local size = clampNumber(config.iconBorderSize, 1, 32, DEFAULT_WINDOW.iconBorderSize)
 		local br, bg, bb, ba = getClassOrCustomColor(classKey, config.iconBorderColor, DEFAULT_WINDOW.iconBorderColor, config.iconBorderUseClassColor)
-		local signature = tostring(config.iconBorderTexture) .. ":" .. size .. ":" .. colorSignature(br, bg, bb, ba)
-		if border._damageMeterBorderSignature ~= signature then
-			border._damageMeterBorderSignature = signature
+		if border._damageMeterBackdropEnabled ~= true
+			or border._damageMeterBackdropTexture ~= config.iconBorderTexture
+			or border._damageMeterBackdropSize ~= size then
+			border._damageMeterBackdropEnabled = true
+			border._damageMeterBackdropTexture = config.iconBorderTexture
+			border._damageMeterBackdropSize = size
 			local borderTexture = resolveMedia("border", config.iconBorderTexture, DEFAULT_BORDER)
 			border:SetBackdrop({
 				edgeFile = borderTexture,
 				edgeSize = size,
 			})
+		end
+		if border._damageMeterBorderColorR ~= br
+			or border._damageMeterBorderColorG ~= bg
+			or border._damageMeterBorderColorB ~= bb
+			or border._damageMeterBorderColorA ~= ba then
+			border._damageMeterBorderColorR = br
+			border._damageMeterBorderColorG = bg
+			border._damageMeterBorderColorB = bb
+			border._damageMeterBorderColorA = ba
 			border:SetBackdropBorderColor(br, bg, bb, ba)
 		end
 		setShownIfChanged(border, true)
 	else
-		if border._damageMeterBorderSignature ~= "off" then
-			border._damageMeterBorderSignature = "off"
+		if border._damageMeterBackdropEnabled ~= false then
+			border._damageMeterBackdropEnabled = false
+			border._damageMeterBackdropTexture = nil
+			border._damageMeterBackdropSize = nil
+			border._damageMeterBorderColorR = nil
+			border._damageMeterBorderColorG = nil
+			border._damageMeterBorderColorB = nil
+			border._damageMeterBorderColorA = nil
 			border:SetBackdrop(nil)
 		end
 		setShownIfChanged(border, false)
