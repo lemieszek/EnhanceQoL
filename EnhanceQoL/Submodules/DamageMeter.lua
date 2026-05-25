@@ -1735,7 +1735,8 @@ function DamageMeter:GetTooltipLine(frame, lineIndex)
 	line.icon = line:CreateTexture(nil, "ARTWORK")
 	line.icon:SetSize(14, 14)
 	line.icon:SetPoint("LEFT", 6, 0)
-	line.bar = line:CreateTexture(nil, "BACKGROUND")
+	line.barBG = line:CreateTexture(nil, "BACKGROUND")
+	line.bar = line:CreateTexture(nil, "BORDER")
 	line.bar:SetPoint("TOPLEFT", line.icon, "TOPRIGHT", 4, 0)
 	line.bar:SetPoint("BOTTOMLEFT", line.icon, "BOTTOMRIGHT", 4, 0)
 	line.name = line:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -1911,6 +1912,14 @@ function DamageMeter:BuildTooltipRows(details, config, damageMeterType)
 
 	rows[#rows + 1] = { header = true, name = L["damageMeterTooltipSpellName"] or "Spell Name", icon = "Interface\\WORLDSTATEFRAME\\CombatSwords", amount = showAmount and (L["damageMeterTooltipAmount"] or "Amount"), dps = showDPS and (L["damageMeterTooltipDPS"] or "DPS"), percent = showPercent and "%" }
 	local targetMap = {}
+	local spellMaxAmount = 0
+	local spellMaxScanRows = 0
+	for _, spell in ipairs(details.combatSpells) do
+		if spellMaxScanRows >= spellLimit then break end
+		local amount = safeNumber(spell.totalAmount)
+		if amount and amount > spellMaxAmount then spellMaxAmount = amount end
+		spellMaxScanRows = spellMaxScanRows + 1
+	end
 	local spellRows = 0
 	for _, spell in ipairs(details.combatSpells) do
 		local spellName, spellIcon = resolveCombatSpellDisplay(spell)
@@ -1918,7 +1927,7 @@ function DamageMeter:BuildTooltipRows(details, config, damageMeterType)
 		local dps = spell.amountPerSecond
 		local percent = totalAmount and totalAmount > 0 and safeNumber(amount) and (safeNumber(amount) / totalAmount * 100) or nil
 		if spellRows < spellLimit then
-			rows[#rows + 1] = { name = spellName, icon = spellIcon, amount = showAmount and formatNumber(amount, config.abbreviation), dps = showDPS and formatNumber(dps, config.abbreviation), percent = showPercent and percent and string.format("%.1f%%", percent), sortAmount = safeNumber(amount) or 0, barValue = safeNumber(amount), barMax = totalAmount }
+			rows[#rows + 1] = { name = spellName, icon = spellIcon, amount = showAmount and formatNumber(amount, config.abbreviation), dps = showDPS and formatNumber(dps, config.abbreviation), percent = showPercent and percent and string.format("%.1f%%", percent), sortAmount = safeNumber(amount) or 0, barValue = safeNumber(amount), barMax = spellMaxAmount }
 			spellRows = spellRows + 1
 		end
 
@@ -1945,10 +1954,14 @@ function DamageMeter:BuildTooltipRows(details, config, damageMeterType)
 		addTooltipSectionGap(rows)
 		rows[#rows + 1] = { header = true, name = L["damageMeterTooltipTargets"] or "Targets", icon = "Interface\\MINIMAP\\TRACKING\\Target", amount = showAmount and (L["damageMeterTooltipAmount"] or "Amount"), dps = showDPS and (L["damageMeterTooltipDPS"] or "DPS"), percent = showPercent and "%" }
 		local targetTotal = 0
-		for _, target in ipairs(targets) do targetTotal = targetTotal + (target.amount or 0) end
+		local targetMaxAmount = 0
+		for _, target in ipairs(targets) do
+			targetTotal = targetTotal + (target.amount or 0)
+			if target.amount and target.amount > targetMaxAmount then targetMaxAmount = target.amount end
+		end
 		for _, target in ipairs(targets) do
 			local percent = targetTotal > 0 and (target.amount / targetTotal * 100) or nil
-			rows[#rows + 1] = { name = target.name, icon = target.icon, amount = showAmount and formatNumber(target.amount, config.abbreviation), dps = showDPS and formatNumber(target.dps, config.abbreviation), percent = showPercent and percent and string.format("%.1f%%", percent), sortAmount = target.amount or 0, barValue = target.amount, barMax = targetTotal }
+			rows[#rows + 1] = { name = target.name, icon = target.icon, amount = showAmount and formatNumber(target.amount, config.abbreviation), dps = showDPS and formatNumber(target.dps, config.abbreviation), percent = showPercent and percent and string.format("%.1f%%", percent), sortAmount = target.amount or 0, barValue = target.amount, barMax = targetMaxAmount }
 		end
 	end
 	return rows
@@ -2016,20 +2029,29 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 			line.amount:ClearAllPoints()
 			line.dps:ClearAllPoints()
 			line.percent:ClearAllPoints()
+			line.barBG:ClearAllPoints()
 			line.bar:ClearAllPoints()
 			line.name:SetPoint("LEFT", line.icon, "RIGHT", 4, 0)
 			line.name:SetPoint("RIGHT", line, "RIGHT", nameRight, 0)
 			line.icon:SetShown(not data.spacer)
 			if not data.spacer then line.icon:SetTexture(data.icon or 136243) end
 			if showBars and not data.header and not data.spacer and data.barValue and data.barMax and data.barMax > 0 then
-				local availableBarWidth = math.max(1, width + nameRight - 30)
+				local barStartX = 24
+				local availableBarWidth = math.max(1, width - rightPadding - barStartX)
 				local barWidth = math.max(1, availableBarWidth * math.min(1, data.barValue / data.barMax))
+				local barHeight = math.max(1, currentLineHeight - 3)
+				line.barBG:SetTexture(barTexture)
+				line.barBG:SetVertexColor(0, 0, 0, math.min(0.45, (barColor.a or 1) * 0.6))
+				line.barBG:SetPoint("LEFT", line.icon, "RIGHT", 4, 0)
+				line.barBG:SetSize(availableBarWidth, barHeight)
+				line.barBG:Show()
 				line.bar:SetTexture(barTexture)
 				line.bar:SetVertexColor(barColor.r, barColor.g, barColor.b, barColor.a)
 				line.bar:SetPoint("LEFT", line.icon, "RIGHT", 4, 0)
-				line.bar:SetSize(barWidth, math.max(1, currentLineHeight - 3))
+				line.bar:SetSize(barWidth, barHeight)
 				line.bar:Show()
 			else
+				line.barBG:Hide()
 				line.bar:Hide()
 			end
 			line.name:SetText(data.spacer and "" or data.name or "")
