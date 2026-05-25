@@ -1,4 +1,4 @@
--- luacheck: globals C_DamageMeter C_LFGInfo C_Spell C_StringUtil StaticPopupDialogs StaticPopup_Show YES CANCEL MenuUtil GameTooltip SecondsToClock DAMAGE_METER_COMBAT_NUMBER CLASS_ICON_TCOORDS UnitClass UnitExists UnitGUID IsInRaid
+-- luacheck: globals C_DamageMeter C_DeathRecap C_LFGInfo C_Spell C_StringUtil StaticPopupDialogs StaticPopup_Show YES CANCEL MenuUtil GameTooltip SecondsToClock DAMAGE_METER_COMBAT_NUMBER CLASS_ICON_TCOORDS UnitClass UnitExists UnitGUID IsInRaid UISpecialFrames GetCursorPosition ACTION_SWING ACTION_ENVIRONMENTAL_DAMAGE_DROWNING ACTION_ENVIRONMENTAL_DAMAGE_FALLING ACTION_ENVIRONMENTAL_DAMAGE_FIRE ACTION_ENVIRONMENTAL_DAMAGE_LAVA ACTION_ENVIRONMENTAL_DAMAGE_SLIME ACTION_ENVIRONMENTAL_DAMAGE_FATIGUE DEATH_RECAP_TITLE
 local addonName, addon = ...
 
 local L = LibStub("AceLocale-3.0"):GetLocale(addonName)
@@ -20,6 +20,10 @@ local GLOBAL_STYLE_KEY = "__EQOL_GLOBAL_FONT_STYLE__"
 local REMOVE_WINDOW_POPUP = "EQOL_DAMAGE_METER_REMOVE_WINDOW"
 local COPY_WINDOW_POPUP = "EQOL_DAMAGE_METER_COPY_WINDOW"
 local RESET_DATA_POPUP = "EQOL_DAMAGE_METER_RESET_DATA"
+local CONTEXT_MENU_WIDTH = 376
+local CONTEXT_MENU_PADDING = 8
+local CONTEXT_MENU_BUTTON_HEIGHT = 30
+local CONTEXT_MENU_BUTTON_GAP = 4
 local getWindowCount
 local PARTY_UNIT_TOKENS = { "player", "party1", "party2", "party3", "party4" }
 local SESSION_TYPES = {
@@ -53,6 +57,7 @@ local DEFAULT_WINDOW = {
 	windowOffsetY = 0,
 	sessionType = "current",
 	damageMeterType = "DamageDone",
+	quickTypes = { "DamageDone" },
 	visibility = "always",
 	maxRows = 8,
 	visibleRows = 8,
@@ -145,6 +150,9 @@ local DEFAULT_WINDOW = {
 	tooltipBackdropTexture = "",
 	tooltipBorderTexture = "",
 	tooltipBorderSize = 1,
+	tooltipShowBars = true,
+	tooltipBarTexture = "",
+	tooltipBarColor = { r = 0.1, g = 0.42, b = 0.78, a = 0.5 },
 	tooltipShowAmount = true,
 	tooltipShowDPS = true,
 	tooltipShowPercent = true,
@@ -381,6 +389,20 @@ local DAMAGE_METER_TYPES = {
 	{ key = "Interrupts", global = "DAMAGE_METER_TYPE_INTERRUPTS", enum = "Interrupts" },
 }
 
+local DAMAGE_METER_TYPE_ICONS = {
+	Absorbs = "Interface\\Icons\\Spell_Holy_PowerWordShield",
+	AvoidableDamageTaken = "Interface\\Icons\\Ability_Defend",
+	DamageDone = "Interface\\Icons\\INV_Sword_04",
+	DamageTaken = "Interface\\Icons\\Ability_Defend",
+	Deaths = "Interface\\Icons\\Ability_Creature_Cursed_02",
+	Dispels = "Interface\\Icons\\Spell_Holy_DispelMagic",
+	Dps = "Interface\\Icons\\INV_Sword_04",
+	EnemyDamageTaken = "Interface\\Icons\\Ability_DualWield",
+	HealingDone = "Interface\\Icons\\Spell_Holy_HolyBolt",
+	Hps = "Interface\\Icons\\Spell_Holy_HolyBolt",
+	Interrupts = "Interface\\Icons\\Ability_Kick",
+}
+
 local function getDamageMeterTypeInfo(key)
 	for _, info in ipairs(DAMAGE_METER_TYPES) do
 		if info.key == key then return info end
@@ -391,6 +413,10 @@ end
 local function getDamageMeterTypeLabel(key)
 	local info = getDamageMeterTypeInfo(key)
 	return _G[info.global] or info.key
+end
+
+local function getDamageMeterTypeIcon(key)
+	return DAMAGE_METER_TYPE_ICONS[getDamageMeterTypeInfo(key).key] or "Interface\\Icons\\INV_Misc_QuestionMark"
 end
 
 local function normalizeDamageMeterTypeKey(key)
@@ -412,6 +438,32 @@ local function buildDamageMeterTypeOptions()
 	end
 	table.sort(options, function(a, b) return a.label < b.label end)
 	return options
+end
+
+local function isValidDamageMeterTypeKey(key)
+	for _, info in ipairs(DAMAGE_METER_TYPES) do
+		if info.key == key then return true end
+	end
+	return false
+end
+
+local function normalizeQuickDamageMeterTypes(types, fallback)
+	local normalized = {}
+	local seen = {}
+	if type(types) == "table" then
+		for _, value in ipairs(types) do
+			local key = normalizeDamageMeterTypeKey(value)
+			if isValidDamageMeterTypeKey(key) and not seen[key] then
+				normalized[#normalized + 1] = key
+				seen[key] = true
+			end
+		end
+	end
+	if #normalized == 0 and fallback then
+		local key = normalizeDamageMeterTypeKey(fallback)
+		if isValidDamageMeterTypeKey(key) then normalized[1] = key end
+	end
+	return normalized
 end
 
 local function normalizeFramePoint(value)
@@ -603,7 +655,18 @@ local function isPerSecondMeterType(key)
 	return key == "Dps" or key == "Hps"
 end
 
+local function formatDeathTimeText(source)
+	local rawDeathTimeSeconds = source and source.deathTimeSeconds
+	if isSecret(rawDeathTimeSeconds) then return tostring(rawDeathTimeSeconds) end
+	local deathTimeSeconds = safeNumber(rawDeathTimeSeconds)
+	if not deathTimeSeconds or deathTimeSeconds == -1 then return "" end
+	return formatDuration(deathTimeSeconds, "clock") or ""
+end
+
 local function formatRowValueText(source, percent, config, damageMeterType)
+	if normalizeDamageMeterTypeKey(damageMeterType or config.damageMeterType) == "Deaths" then
+		return formatDeathTimeText(source)
+	end
 	if isPerSecondMeterType(damageMeterType or config.damageMeterType) then
 		local text = formatNumber(source.amountPerSecond, config.abbreviation)
 		if config.showPercent ~= false and percent then
@@ -796,6 +859,64 @@ function DamageMeter:GetEffectiveDamageMeterType(index)
 	return normalizeDamageMeterTypeKey(temporary.damageMeterType or self:GetConfig(index).damageMeterType)
 end
 
+function DamageMeter:GetQuickDamageMeterTypes(index)
+	local config = self:GetConfig(index)
+	if config.quickTypes == DEFAULT_WINDOW.quickTypes then
+		config.quickTypes = copyValue(DEFAULT_WINDOW.quickTypes)
+	end
+	if type(config.quickTypes) ~= "table" then
+		config.quickTypes = copyValue(DEFAULT_WINDOW.quickTypes)
+	end
+	config.quickTypes = normalizeQuickDamageMeterTypes(config.quickTypes)
+	return config.quickTypes
+end
+
+function DamageMeter:HasQuickDamageMeterType(index, damageMeterType)
+	local key = normalizeDamageMeterTypeKey(damageMeterType)
+	for _, quickType in ipairs(self:GetQuickDamageMeterTypes(index)) do
+		if quickType == key then return true end
+	end
+	return false
+end
+
+function DamageMeter:AddQuickDamageMeterType(index, damageMeterType)
+	local key = normalizeDamageMeterTypeKey(damageMeterType)
+	local quickTypes = self:GetQuickDamageMeterTypes(index)
+	for _, quickType in ipairs(quickTypes) do
+		if quickType == key then return end
+	end
+	quickTypes[#quickTypes + 1] = key
+	self:SetConfigValue(index, "quickTypes", quickTypes)
+end
+
+function DamageMeter:RemoveQuickDamageMeterType(index, damageMeterType)
+	local key = normalizeDamageMeterTypeKey(damageMeterType)
+	local quickTypes = self:GetQuickDamageMeterTypes(index)
+	for quickIndex = #quickTypes, 1, -1 do
+		if quickTypes[quickIndex] == key then
+			table.remove(quickTypes, quickIndex)
+		end
+	end
+	self:SetConfigValue(index, "quickTypes", quickTypes)
+end
+
+function DamageMeter:CycleQuickDamageMeterType(index, direction)
+	local quickTypes = self:GetQuickDamageMeterTypes(index)
+	if #quickTypes == 0 then return end
+	local current = self:GetEffectiveDamageMeterType(index)
+	local currentIndex = 1
+	for quickIndex, quickType in ipairs(quickTypes) do
+		if quickType == current then
+			currentIndex = quickIndex
+			break
+		end
+	end
+	local nextIndex = currentIndex + (direction or 1)
+	if nextIndex > #quickTypes then nextIndex = 1 end
+	if nextIndex < 1 then nextIndex = #quickTypes end
+	self:SetTemporaryDamageMeterType(index, quickTypes[nextIndex])
+end
+
 function DamageMeter:GetEffectiveSessionType(index)
 	local temporary = self:GetTemporarySelection(index)
 	if temporary.sessionID then return nil end
@@ -923,6 +1044,22 @@ function DamageMeter:GetSessionDuration(index, session)
 	return nil
 end
 
+function DamageMeter:InvalidatePartyClassFallback()
+	self.partyClassGeneration = (self.partyClassGeneration or 0) + 1
+	self.partyClassCache = nil
+end
+
+function DamageMeter:MarkPartyClassFallbackCurrent()
+	self.currentPartyClassGeneration = self.partyClassGeneration or 0
+end
+
+function DamageMeter:CanUsePartyClassFallback(index)
+	if self:UsePreviewData() then return false end
+	if self:GetEffectiveSessionID(index) then return false end
+	if self:GetEffectiveSessionType(index) ~= "current" then return false end
+	return (self.currentPartyClassGeneration or 0) == (self.partyClassGeneration or 0)
+end
+
 function DamageMeter:GetUniquePartyUnitTokenForClass(classFilename)
 	if type(classFilename) ~= "string" or classFilename == "" then return nil end
 	if IsInRaid and IsInRaid() then return nil end
@@ -970,7 +1107,7 @@ function DamageMeter:GetSourceDetails(index, source)
 	local sourceCreatureID = source.sourceCreatureID
 	local isLocalPlayer = source.isLocalPlayer == true
 	local isRestrictedSource = isSecret(source.name) or isSecret(source.sourceGUID)
-	local partyUnitToken = isRestrictedSource and not isLocalPlayer and self:GetUniquePartyUnitTokenForClass(source.classFilename) or nil
+	local partyUnitToken = isRestrictedSource and not isLocalPlayer and self:CanUsePartyClassFallback(index) and self:GetUniquePartyUnitTokenForClass(source.classFilename) or nil
 	if sourceGUID == nil and sourceCreatureID == nil and not isLocalPlayer and not partyUnitToken then return nil end
 	if sessionID and C_DamageMeter.GetCombatSessionSourceFromID then
 		local emptyLocalDetails
@@ -1257,6 +1394,28 @@ function DamageMeter:ShowTooltip(owner, text)
 	GameTooltip:Show()
 end
 
+function DamageMeter:CreateContextMenuIconButton(frame, label, tooltipText, onClick)
+	local button = CreateFrame("Button", nil, frame)
+	button:SetSize(18, 18)
+	button:SetScript("OnClick", onClick)
+	button:SetScript("OnEnter", function(owner)
+		button.bg:SetColorTexture(0.18, 0.18, 0.18, 0.95)
+		self:ShowTooltip(owner, tooltipText)
+	end)
+	button:SetScript("OnLeave", function()
+		button.bg:SetColorTexture(0.07, 0.07, 0.07, 0.85)
+		if GameTooltip then GameTooltip:Hide() end
+	end)
+	button.bg = button:CreateTexture(nil, "BACKGROUND")
+	button.bg:SetAllPoints()
+	button.bg:SetColorTexture(0.07, 0.07, 0.07, 0.85)
+	button.text = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	button.text:SetAllPoints()
+	button.text:SetJustifyH("CENTER")
+	button.text:SetText(label)
+	return button
+end
+
 function DamageMeter:CreateHeaderButton(frame, label, atlas, tooltipText, onClick)
 	local button = CreateFrame("Button", nil, frame)
 	button:SetSize(16, 16)
@@ -1274,6 +1433,251 @@ function DamageMeter:CreateHeaderButton(frame, label, atlas, tooltipText, onClic
 	button.text:SetText(label)
 	button.text:SetShown(hasAtlas ~= true)
 	return button
+end
+
+function DamageMeter:EnsureContextMenu()
+	if self.contextMenu then return self.contextMenu end
+	local frame = CreateFrame("Frame", "EnhanceQoLDamageMeterContextMenu", UIParent, "BackdropTemplate")
+	frame:SetFrameStrata("DIALOG")
+	frame:SetFrameLevel(80)
+	frame:SetClampedToScreen(true)
+	frame:SetToplevel(true)
+	frame:EnableMouse(true)
+	frame:SetWidth(CONTEXT_MENU_WIDTH)
+	frame:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
+	frame:SetBackdropColor(0.015, 0.016, 0.018, 0.94)
+	frame:SetBackdropBorderColor(0.16, 0.18, 0.2, 0.9)
+	frame:Hide()
+	frame.buttons = {}
+	frame.clickCatcher = CreateFrame("Button", nil, UIParent)
+	frame.clickCatcher:SetFrameStrata("DIALOG")
+	frame.clickCatcher:SetFrameLevel(79)
+	frame.clickCatcher:SetAllPoints(UIParent)
+	frame.clickCatcher:EnableMouse(true)
+	frame.clickCatcher:RegisterForClicks("AnyUp")
+	frame.clickCatcher:SetScript("OnClick", function() self:HideContextMenu() end)
+	frame.clickCatcher:Hide()
+	frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	frame.title:SetJustifyH("LEFT")
+	frame.title:SetWordWrap(false)
+	frame.addLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	frame.addLabel:SetJustifyH("CENTER")
+	frame.addLabel:SetWordWrap(false)
+	frame.modeHint = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	frame.modeHint:SetJustifyH("RIGHT")
+	frame.modeHint:SetWordWrap(false)
+	frame.resetButton = self:CreateContextMenuIconButton(frame, "R", L["damageMeterResetData"] or "Reset data", function()
+		self:HideContextMenu()
+		self:PromptResetData()
+	end)
+	frame.historyButton = self:CreateContextMenuIconButton(frame, "H", L["damageMeterShowHistory"] or "Show history", function()
+		local owner = frame.owner or frame
+		local index = frame.index or 1
+		self:HideContextMenu()
+		self:OpenHistoryMenu(owner, index)
+	end)
+	frame.clearButton = self:CreateContextMenuIconButton(frame, "X", L["damageMeterResetTemporarySelection"] or "Reset temporary selection", function()
+		local index = frame.index or 1
+		self:HideContextMenu()
+		self:ClearTemporarySelection(index)
+	end)
+	frame:SetScript("OnHide", function()
+		if GameTooltip then GameTooltip:Hide() end
+		if frame.clickCatcher then frame.clickCatcher:Hide() end
+	end)
+	if UISpecialFrames then
+		UISpecialFrames[#UISpecialFrames + 1] = frame:GetName()
+	end
+	self.contextMenu = frame
+	return frame
+end
+
+function DamageMeter:HideContextMenu()
+	if self.contextMenu then
+		if self.contextMenu.clickCatcher then self.contextMenu.clickCatcher:Hide() end
+		self.contextMenu:Hide()
+	end
+end
+
+function DamageMeter:GetContextMenuButton(frame, buttonIndex)
+	local button = frame.buttons[buttonIndex]
+	if button then return button end
+	button = CreateFrame("Button", nil, frame)
+	button:RegisterForClicks("LeftButtonUp", "RightButtonUp", "MiddleButtonUp")
+	button:SetHeight(CONTEXT_MENU_BUTTON_HEIGHT)
+	button.bg = button:CreateTexture(nil, "BACKGROUND")
+	button.bg:SetAllPoints()
+	button.bg:SetColorTexture(0.06, 0.065, 0.07, 0.92)
+	button.icon = button:CreateTexture(nil, "ARTWORK")
+	button.icon:SetPoint("LEFT", 9, 0)
+	button.icon:SetSize(18, 18)
+	button.text = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	button.text:SetPoint("LEFT", button.icon, "RIGHT", 8, 0)
+	button.text:SetPoint("RIGHT", -28, 0)
+	button.text:SetJustifyH("LEFT")
+	button.text:SetWordWrap(false)
+	button.rightText = button:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	button.rightText:SetPoint("RIGHT", -8, 0)
+	button.rightText:SetJustifyH("RIGHT")
+	button.rightText:SetWordWrap(false)
+	button.removeButton = CreateFrame("Button", nil, button)
+	button.removeButton:SetSize(18, 18)
+	button.removeButton:SetPoint("RIGHT", -3, 0)
+	button.removeButton:SetFrameLevel(button:GetFrameLevel() + 3)
+	button.removeButton:RegisterForClicks("AnyUp")
+	button.removeButton.text = button.removeButton:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	button.removeButton.text:SetAllPoints()
+	button.removeButton.text:SetJustifyH("CENTER")
+	button.removeButton.text:SetText("X")
+	button.removeButton.text:SetTextColor(0.55, 0.58, 0.6, 1)
+	button.removeButton:SetScript("OnEnter", function(owner)
+		owner.text:SetTextColor(1, 0.25, 0.25, 1)
+	end)
+	button.removeButton:SetScript("OnLeave", function(owner)
+		owner.text:SetTextColor(0.55, 0.58, 0.6, 1)
+	end)
+	button:SetScript("OnEnter", function(owner)
+		local selected = owner.selected == true
+		owner.bg:SetColorTexture(selected and 0.03 or 0.12, selected and 0.24 or 0.13, selected and 0.21 or 0.15, 0.96)
+	end)
+	button:SetScript("OnLeave", function(owner)
+		if owner.selected == true then
+			owner.bg:SetColorTexture(0.02, 0.19, 0.17, 0.95)
+		else
+			owner.bg:SetColorTexture(0.06, 0.065, 0.07, 0.92)
+		end
+	end)
+	frame.buttons[buttonIndex] = button
+	return button
+end
+
+function DamageMeter:SetupContextMenuButton(button, label, icon, selected, rightText, onClick, disabled, onRemove)
+	button.selected = selected == true
+	button.disabled = disabled == true
+	button:SetEnabled(disabled ~= true)
+	button:SetAlpha(disabled and 0.45 or 1)
+	button.bg:SetColorTexture(selected and 0.02 or 0.06, selected and 0.19 or 0.065, selected and 0.17 or 0.07, selected and 0.95 or 0.92)
+	button.icon:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark")
+	button.text:SetText(label or "")
+	button.rightText:SetText(rightText or "")
+	button:SetScript("OnClick", onClick)
+	button.removeButton:SetShown(type(onRemove) == "function")
+	button.removeButton:SetScript("OnClick", onRemove)
+	button:Show()
+end
+
+function DamageMeter:AnchorContextMenu(frame, owner)
+	frame:ClearAllPoints()
+	if GetCursorPosition and UIParent and UIParent.GetEffectiveScale then
+		local scale = UIParent:GetEffectiveScale()
+		local cursorX, cursorY = GetCursorPosition()
+		if scale and scale > 0 and cursorX and cursorY then
+			frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", (cursorX / scale) + 6, (cursorY / scale) - 6)
+			return
+		end
+	end
+	frame:SetPoint("TOPLEFT", owner or UIParent, "BOTTOMLEFT", 0, -4)
+end
+
+function DamageMeter:RefreshContextMenu(owner, index)
+	local frame = self:EnsureContextMenu()
+	index = tonumber(index) or 1
+	frame.owner = owner
+	frame.index = index
+
+	local effectiveType = self:GetEffectiveDamageMeterType(index)
+	local typeLabel = getDamageMeterTypeLabel(effectiveType)
+	local durationText = formatDuration(self:GetSessionDuration(index, self:GetSession(index)), "clock")
+	frame.title:SetText(durationText and string.format("%s (%s)", typeLabel, durationText) or typeLabel)
+
+	local pad = CONTEXT_MENU_PADDING
+	local y = -pad
+	frame.title:ClearAllPoints()
+	frame.title:SetPoint("TOPLEFT", pad, y)
+	frame.title:SetPoint("TOPRIGHT", -84, y)
+	frame.title:SetHeight(18)
+	frame.clearButton:ClearAllPoints()
+	frame.clearButton:SetPoint("TOPRIGHT", -pad, y + 1)
+	frame.historyButton:ClearAllPoints()
+	frame.historyButton:SetPoint("RIGHT", frame.clearButton, "LEFT", -4, 0)
+	frame.resetButton:ClearAllPoints()
+	frame.resetButton:SetPoint("RIGHT", frame.historyButton, "LEFT", -4, 0)
+	y = y - 24
+
+	local buttonIndex = 1
+	frame.addLabel:SetText(L["damageMeterQuickSwitch"] or "Quick switch")
+	frame.addLabel:ClearAllPoints()
+	frame.addLabel:SetPoint("TOPLEFT", pad, y + 1)
+	frame.addLabel:SetPoint("TOPRIGHT", -pad, y + 1)
+	frame.addLabel:SetHeight(16)
+	y = y - 20
+
+	local quickTypes = self:GetQuickDamageMeterTypes(index)
+	local quickSeen = {}
+	for _, quickType in ipairs(quickTypes) do
+		quickSeen[quickType] = true
+		local button = self:GetContextMenuButton(frame, buttonIndex)
+		self:SetupContextMenuButton(button, getDamageMeterTypeLabel(quickType), getDamageMeterTypeIcon(quickType), effectiveType == quickType, nil, function(_, mouseButton)
+			if mouseButton == "RightButton" or mouseButton == "MiddleButton" then
+				self:RemoveQuickDamageMeterType(index, quickType)
+				self:RefreshContextMenu(owner, index)
+				return
+			end
+			self:HideContextMenu()
+			self:SetTemporaryDamageMeterType(index, quickType)
+		end, false, function()
+			self:RemoveQuickDamageMeterType(index, quickType)
+			self:RefreshContextMenu(owner, index)
+		end)
+		button:ClearAllPoints()
+		button:SetPoint("TOPLEFT", pad, y)
+		button:SetPoint("TOPRIGHT", -pad, y)
+		buttonIndex = buttonIndex + 1
+		y = y - CONTEXT_MENU_BUTTON_HEIGHT - CONTEXT_MENU_BUTTON_GAP
+	end
+
+	y = y - CONTEXT_MENU_BUTTON_GAP
+	frame.modeHint:SetText(_G.ADD or "Add")
+	frame.modeHint:ClearAllPoints()
+	frame.modeHint:SetPoint("TOPLEFT", pad, y + 1)
+	frame.modeHint:SetPoint("TOPRIGHT", -pad, y + 1)
+	frame.modeHint:SetJustifyH("CENTER")
+	frame.modeHint:SetHeight(16)
+	y = y - 20
+
+	local options = buildDamageMeterTypeOptions()
+	local columns = 2
+	local columnGap = CONTEXT_MENU_BUTTON_GAP
+	local buttonWidth = (CONTEXT_MENU_WIDTH - (pad * 2) - columnGap) / columns
+	local addIndex = 0
+	for _, option in ipairs(options) do
+		if not quickSeen[option.value] then
+			addIndex = addIndex + 1
+			local button = self:GetContextMenuButton(frame, buttonIndex)
+			local optionValue = option.value
+			self:SetupContextMenuButton(button, option.label, getDamageMeterTypeIcon(optionValue), false, nil, function()
+				self:AddQuickDamageMeterType(index, optionValue)
+				self:HideContextMenu()
+				self:SetTemporaryDamageMeterType(index, optionValue)
+			end)
+			button:ClearAllPoints()
+			local column = (addIndex - 1) % columns
+			local row = math.floor((addIndex - 1) / columns)
+			button:SetPoint("TOPLEFT", pad + (column * (buttonWidth + columnGap)), y - (row * (CONTEXT_MENU_BUTTON_HEIGHT + CONTEXT_MENU_BUTTON_GAP)))
+			button:SetSize(buttonWidth, CONTEXT_MENU_BUTTON_HEIGHT)
+			buttonIndex = buttonIndex + 1
+		end
+	end
+	local rows = addIndex > 0 and math.ceil(addIndex / columns) or 0
+	y = y - (rows * (CONTEXT_MENU_BUTTON_HEIGHT + CONTEXT_MENU_BUTTON_GAP))
+	for unusedIndex = buttonIndex, #frame.buttons do
+		frame.buttons[unusedIndex]:Hide()
+	end
+
+	frame:SetHeight(math.abs(y) + pad)
+	self:AnchorContextMenu(frame, owner)
+	if frame.clickCatcher then frame.clickCatcher:Show() end
+	frame:Show()
 end
 
 function DamageMeter:BuildSessionMenu(index, rootDescription)
@@ -1301,22 +1705,7 @@ function DamageMeter:BuildSessionMenu(index, rootDescription)
 end
 
 function DamageMeter:OpenContextMenu(owner, index)
-	if not MenuUtil or not MenuUtil.CreateContextMenu then return end
-	MenuUtil.CreateContextMenu(owner, function(_, rootDescription)
-		rootDescription:SetTag("MENU_EQOL_DAMAGE_METER")
-
-		local typeSubmenu = rootDescription:CreateButton(L["damageMeterTemporaryType"] or "Temporary type")
-		for _, option in ipairs(buildDamageMeterTypeOptions()) do
-			typeSubmenu:CreateRadio(option.label, function(value) return self:GetEffectiveDamageMeterType(index) == value end, function(value) self:SetTemporaryDamageMeterType(index, value) end, option.value)
-		end
-
-		local sessionSubmenu = rootDescription:CreateButton(L["damageMeterShowHistory"] or "Show history")
-		self:BuildSessionMenu(index, sessionSubmenu)
-
-		rootDescription:CreateDivider()
-		rootDescription:CreateButton(L["damageMeterResetTemporarySelection"] or "Reset temporary selection", function() self:ClearTemporarySelection(index) end)
-		rootDescription:CreateButton(L["damageMeterResetData"] or "Reset data", function() self:PromptResetData() end)
-	end)
+	self:RefreshContextMenu(owner, index)
 end
 
 function DamageMeter:OpenHistoryMenu(owner, index)
@@ -1346,6 +1735,9 @@ function DamageMeter:GetTooltipLine(frame, lineIndex)
 	line.icon = line:CreateTexture(nil, "ARTWORK")
 	line.icon:SetSize(14, 14)
 	line.icon:SetPoint("LEFT", 6, 0)
+	line.bar = line:CreateTexture(nil, "BACKGROUND")
+	line.bar:SetPoint("TOPLEFT", line.icon, "TOPRIGHT", 4, 0)
+	line.bar:SetPoint("BOTTOMLEFT", line.icon, "BOTTOMRIGHT", 4, 0)
 	line.name = line:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	line.name:SetPoint("LEFT", line.icon, "RIGHT", 4, 0)
 	line.name:SetJustifyH("LEFT")
@@ -1415,12 +1807,104 @@ local function resolveCombatSpellDisplay(spell)
 	return spellName, spellIcon or 136243
 end
 
-function DamageMeter:BuildTooltipRows(details, config)
-	local rows = {}
-	if not details or type(details.combatSpells) ~= "table" then return rows end
+local function getTooltipColumnVisibility(config, damageMeterType)
 	local showAmount = config.tooltipShowAmount ~= false
 	local showDPS = config.tooltipShowDPS ~= false
 	local showPercent = config.tooltipShowPercent ~= false
+	if damageMeterType == "Deaths" or damageMeterType == "Dispels" or damageMeterType == "Interrupts" then
+		showDPS = false
+	end
+	if damageMeterType == "Dps" or damageMeterType == "Hps" then
+		showAmount = false
+	end
+	return showAmount, showDPS, showPercent
+end
+
+local function resolveDeathRecapEventDisplay(eventData)
+	if type(eventData) ~= "table" then return L["Unknown"] or UNKNOWN or "Unknown", 136243 end
+	local eventType = eventData.event
+	local spellID = eventData.spellId
+	local spellName = eventData.spellName
+	local icon
+	if eventType == "SWING_DAMAGE" then
+		spellID = 88163
+		spellName = ACTION_SWING or spellName
+	elseif eventType == "ENVIRONMENTAL_DAMAGE" then
+		local environmentalType = type(eventData.environmentalType) == "string" and string.upper(eventData.environmentalType) or ""
+		spellName = _G["ACTION_ENVIRONMENTAL_DAMAGE_" .. environmentalType] or spellName or eventType
+		if environmentalType == "DROWNING" then
+			icon = "Interface\\Icons\\spell_shadow_demonbreath"
+		elseif environmentalType == "FALLING" then
+			icon = "Interface\\Icons\\ability_rogue_quickrecovery"
+		elseif environmentalType == "FIRE" or environmentalType == "LAVA" then
+			icon = "Interface\\Icons\\spell_fire_fire"
+		elseif environmentalType == "SLIME" then
+			icon = "Interface\\Icons\\inv_misc_slime_01"
+		elseif environmentalType == "FATIGUE" then
+			icon = "Interface\\Icons\\ability_creature_cursed_05"
+		else
+			icon = "Interface\\Icons\\ability_creature_cursed_05"
+		end
+	end
+	if spellID and C_Spell and C_Spell.GetSpellTexture then
+		local ok, texture = pcall(C_Spell.GetSpellTexture, spellID)
+		if ok and texture then icon = texture end
+	end
+	return spellName or eventType or (L["Unknown"] or UNKNOWN or "Unknown"), icon or 136243
+end
+
+function DamageMeter:BuildDeathRecapRows(source, config)
+	local rows = {}
+	if not C_DeathRecap or not C_DeathRecap.GetRecapEvents or not source then return rows end
+	local recapID = safeNumber(source.deathRecapID)
+	if not recapID or recapID == 0 then return rows end
+	local ok, events = pcall(C_DeathRecap.GetRecapEvents, recapID)
+	if not ok or type(events) ~= "table" or #events == 0 then return rows end
+	local maxHealth
+	if C_DeathRecap.GetRecapMaxHealth then
+		ok, maxHealth = pcall(C_DeathRecap.GetRecapMaxHealth, recapID)
+		if not ok then maxHealth = nil end
+	end
+	maxHealth = safeNumber(maxHealth)
+	local showAmount, _, showPercent = getTooltipColumnVisibility(config, "Deaths")
+	rows[#rows + 1] = { header = true, name = DEATH_RECAP_TITLE or getDamageMeterTypeLabel("Deaths"), icon = getDamageMeterTypeIcon("Deaths"), amount = showAmount and (L["damageMeterTooltipAmount"] or "Amount"), percent = showPercent and "%" }
+	local deathTimestamp = 0
+	local maxAmount = 0
+	for _, eventData in ipairs(events) do
+		local timestamp = safeNumber(eventData.timestamp)
+		if timestamp and timestamp > deathTimestamp then deathTimestamp = timestamp end
+		local amount = safeNumber(eventData.amount)
+		if amount and amount > maxAmount then maxAmount = amount end
+	end
+	for eventIndex = #events, 1, -1 do
+		local eventData = events[eventIndex]
+		local spellName, spellIcon = resolveDeathRecapEventDisplay(eventData)
+		local timestamp = safeNumber(eventData.timestamp)
+		local seconds = timestamp and math.max(0, deathTimestamp - timestamp) or 0
+		local amount = safeNumber(eventData.amount)
+		local overkill = safeNumber(eventData.overkill)
+		local amountText = amount and ("-" .. formatNumber(amount, config.abbreviation)) or nil
+		if amountText and overkill and overkill > 0 then
+			amountText = string.format("%s (%s %s)", amountText, formatNumber(overkill, config.abbreviation), _G.OVERKILL or "overkill")
+		end
+		local percent = amount and maxHealth and maxHealth > 0 and (amount / maxHealth * 100) or nil
+		rows[#rows + 1] = {
+			name = string.format("-%.1fs %s", seconds, spellName),
+			icon = spellIcon,
+			amount = showAmount and amountText,
+			percent = showPercent and percent and string.format("%.0f%%", percent),
+			sortAmount = amount or 0,
+			barValue = amount,
+			barMax = maxAmount,
+		}
+	end
+	return rows
+end
+
+function DamageMeter:BuildTooltipRows(details, config, damageMeterType)
+	local rows = {}
+	if not details or type(details.combatSpells) ~= "table" then return rows end
+	local showAmount, showDPS, showPercent = getTooltipColumnVisibility(config, damageMeterType)
 	local showTargets = config.tooltipShowTargets ~= false
 	local spellLimit = clampNumber(config.tooltipMaxLines, 4, 30, DEFAULT_WINDOW.tooltipMaxLines)
 	local totalAmount = safeNumber(details.totalAmount)
@@ -1434,7 +1918,7 @@ function DamageMeter:BuildTooltipRows(details, config)
 		local dps = spell.amountPerSecond
 		local percent = totalAmount and totalAmount > 0 and safeNumber(amount) and (safeNumber(amount) / totalAmount * 100) or nil
 		if spellRows < spellLimit then
-			rows[#rows + 1] = { name = spellName, icon = spellIcon, amount = showAmount and formatNumber(amount, config.abbreviation), dps = showDPS and formatNumber(dps, config.abbreviation), percent = showPercent and percent and string.format("%.1f%%", percent), sortAmount = safeNumber(amount) or 0 }
+			rows[#rows + 1] = { name = spellName, icon = spellIcon, amount = showAmount and formatNumber(amount, config.abbreviation), dps = showDPS and formatNumber(dps, config.abbreviation), percent = showPercent and percent and string.format("%.1f%%", percent), sortAmount = safeNumber(amount) or 0, barValue = safeNumber(amount), barMax = totalAmount }
 			spellRows = spellRows + 1
 		end
 
@@ -1464,7 +1948,7 @@ function DamageMeter:BuildTooltipRows(details, config)
 		for _, target in ipairs(targets) do targetTotal = targetTotal + (target.amount or 0) end
 		for _, target in ipairs(targets) do
 			local percent = targetTotal > 0 and (target.amount / targetTotal * 100) or nil
-			rows[#rows + 1] = { name = target.name, icon = target.icon, amount = showAmount and formatNumber(target.amount, config.abbreviation), dps = showDPS and formatNumber(target.dps, config.abbreviation), percent = showPercent and percent and string.format("%.1f%%", percent), sortAmount = target.amount or 0 }
+			rows[#rows + 1] = { name = target.name, icon = target.icon, amount = showAmount and formatNumber(target.amount, config.abbreviation), dps = showDPS and formatNumber(target.dps, config.abbreviation), percent = showPercent and percent and string.format("%.1f%%", percent), sortAmount = target.amount or 0, barValue = target.amount, barMax = targetTotal }
 		end
 	end
 	return rows
@@ -1474,21 +1958,29 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 	local config = self:GetConfig(index)
 	if config.tooltipEnabled ~= true then return end
 	local frame = self:EnsureSourceTooltip()
-	local details = self:GetSourceDetails(index, source)
-	local rows = self:BuildTooltipRows(details, config)
+	local damageMeterType = self:GetEffectiveDamageMeterType(index)
+	local rows = damageMeterType == "Deaths" and self:BuildDeathRecapRows(source, config) or nil
+	if not rows or #rows == 0 then
+		local details = self:GetSourceDetails(index, source)
+		rows = self:BuildTooltipRows(details, config, damageMeterType)
+	end
 	if #rows == 0 then
 		rows[1] = { name = L["damageMeterTooltipNoData"] or "No details available", icon = 136243 }
 	end
 	local width = clampNumber(config.tooltipWidth, 220, 600, DEFAULT_WINDOW.tooltipWidth)
 	local lineHeight = clampNumber(config.tooltipFontSize, 8, 24, DEFAULT_WINDOW.tooltipFontSize) + 7
-	local percentWidth = config.tooltipShowPercent ~= false and 48 or 0
-	local dpsWidth = config.tooltipShowDPS ~= false and 54 or 0
-	local amountWidth = config.tooltipShowAmount ~= false and 72 or 0
+	local showAmount, showDPS, showPercent = getTooltipColumnVisibility(config, damageMeterType)
+	local percentWidth = showPercent and 44 or 0
+	local dpsWidth = showDPS and 54 or 0
+	local amountWidth = showAmount and (damageMeterType == "Deaths" and 150 or 72) or 0
 	local rightPadding = 10
 	local percentRight = -rightPadding
 	local dpsRight = percentRight - percentWidth
 	local amountRight = dpsRight - dpsWidth
 	local nameRight = amountRight - amountWidth - 8
+	local showBars = config.tooltipShowBars == true and damageMeterType ~= "Deaths"
+	local barTexture = resolveMedia("statusbar", config.tooltipBarTexture, DEFAULT_TEXTURE)
+	local barColor = normalizeColor(config.tooltipBarColor, DEFAULT_WINDOW.tooltipBarColor)
 	local shown = #rows
 	local tooltipHeight = 10
 	for rowIndex = 1, shown do
@@ -1524,10 +2016,22 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 			line.amount:ClearAllPoints()
 			line.dps:ClearAllPoints()
 			line.percent:ClearAllPoints()
+			line.bar:ClearAllPoints()
 			line.name:SetPoint("LEFT", line.icon, "RIGHT", 4, 0)
 			line.name:SetPoint("RIGHT", line, "RIGHT", nameRight, 0)
 			line.icon:SetShown(not data.spacer)
 			if not data.spacer then line.icon:SetTexture(data.icon or 136243) end
+			if showBars and not data.header and not data.spacer and data.barValue and data.barMax and data.barMax > 0 then
+				local availableBarWidth = math.max(1, width + nameRight - 30)
+				local barWidth = math.max(1, availableBarWidth * math.min(1, data.barValue / data.barMax))
+				line.bar:SetTexture(barTexture)
+				line.bar:SetVertexColor(barColor.r, barColor.g, barColor.b, barColor.a)
+				line.bar:SetPoint("LEFT", line.icon, "RIGHT", 4, 0)
+				line.bar:SetSize(barWidth, math.max(1, currentLineHeight - 3))
+				line.bar:Show()
+			else
+				line.bar:Hide()
+			end
 			line.name:SetText(data.spacer and "" or data.name or "")
 			line.amount:SetPoint("RIGHT", line, "RIGHT", amountRight, 0)
 			line.dps:SetPoint("RIGHT", line, "RIGHT", dpsRight, 0)
@@ -1737,10 +2241,18 @@ function DamageMeter:EnsureWindow(index)
 			DamageMeter:OpenContextMenu(owner, index)
 			return
 		end
-		local config = DamageMeter:GetConfig(index)
-		config.sessionType = config.sessionType == "overall" and "current" or "overall"
-		DamageMeter:ScheduleRefresh()
+		if button == "MiddleButton" then
+			local config = DamageMeter:GetConfig(index)
+			config.sessionType = config.sessionType == "overall" and "current" or "overall"
+			DamageMeter:ScheduleRefresh()
+			return
+		end
+		DamageMeter:CycleQuickDamageMeterType(index, 1)
 	end)
+	status:SetScript("OnMouseWheel", function(_, delta)
+		DamageMeter:CycleQuickDamageMeterType(index, delta and delta < 0 and -1 or 1)
+	end)
+	status:EnableMouseWheel(true)
 	status.text = status:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	status.text:SetAllPoints()
 	status.text:SetJustifyH("CENTER")
@@ -1929,7 +2441,12 @@ function DamageMeter:UpdateHeader(index, session)
 		end
 	end
 	frame.header:SetText(headerText)
-	frame.status.text:SetText(string.format("%s: %s  |  %s", L["damageMeterQuickSwitch"] or "Quick switch", sessionLabel, typeLabel))
+	local quickLabels = {}
+	for _, quickType in ipairs(self:GetQuickDamageMeterTypes(index)) do
+		quickLabels[#quickLabels + 1] = getDamageMeterTypeLabel(quickType)
+	end
+	if #quickLabels == 0 then quickLabels[1] = typeLabel end
+	frame.status.text:SetText(string.format("%s: %s  |  %s", L["damageMeterQuickSwitch"] or "Quick switch", sessionLabel, table.concat(quickLabels, " / ")))
 end
 
 function DamageMeter:RefreshWindow(index)
@@ -1943,8 +2460,20 @@ function DamageMeter:RefreshWindow(index)
 	local session = self:GetSession(index)
 	local sources = session and type(session.combatSources) == "table" and session.combatSources or {}
 	local maxRows = clampNumber(config.maxRows, 1, 30, DEFAULT_WINDOW.maxRows)
-	local contentRows = math.min(maxRows, #sources)
 	local damageMeterType = self:GetEffectiveDamageMeterType(index)
+	local orderedSources = sources
+	if damageMeterType == "Deaths" and type(sources) == "table" and #sources > 1 then
+		orderedSources = {}
+		for sourceIndex, source in ipairs(sources) do
+			orderedSources[sourceIndex] = source
+		end
+		table.sort(orderedSources, function(left, right)
+			local leftTime = safeNumber(left and left.deathTimeSeconds) or math.huge
+			local rightTime = safeNumber(right and right.deathTimeSeconds) or math.huge
+			return leftTime < rightTime
+		end)
+	end
+	local contentRows = math.min(maxRows, #orderedSources)
 	local rowsGrowUp = normalizeRowGrowth(config.rowGrowth) == "UP"
 	local highestBottom = normalizeRowSort(config.rowSort) == "BOTTOM"
 
@@ -1957,13 +2486,17 @@ function DamageMeter:RefreshWindow(index)
 	for rowIndex = 1, maxRows do
 		local visualTopIndex = rowsGrowUp and (contentRows - rowIndex + 1) or rowIndex
 		local sourceIndex = highestBottom and (contentRows - visualTopIndex + 1) or visualTopIndex
-		local source = sourceIndex >= 1 and sourceIndex <= contentRows and sources[sourceIndex] or nil
+		local source = sourceIndex >= 1 and sourceIndex <= contentRows and orderedSources[sourceIndex] or nil
 		local row = frame.rows[rowIndex] or self:CreateRow(frame, rowIndex)
 		if source then
 			local rawMaxAmount = session and session.maxAmount
 			local rawAmount = source.totalAmount
 			if rawMaxAmount == nil then rawMaxAmount = 1 end
 			if rawAmount == nil then rawAmount = 0 end
+			if damageMeterType == "Deaths" then
+				rawMaxAmount = 1
+				rawAmount = 1
+			end
 			local amount = safeNumber(source.totalAmount)
 			local percent = totalAmount and totalAmount > 0 and amount and (amount / totalAmount * 100) or nil
 			local r, g, b = self:GetClassColor(config, source.classFilename)
@@ -2021,6 +2554,7 @@ function DamageMeter:RegisterLiveEvents()
 	frame:RegisterEvent("DAMAGE_METER_COMBAT_SESSION_UPDATED")
 	frame:RegisterEvent("DAMAGE_METER_CURRENT_SESSION_UPDATED")
 	frame:RegisterEvent("DAMAGE_METER_RESET")
+	frame:RegisterEvent("GROUP_ROSTER_UPDATE")
 	frame:RegisterEvent("PLAYER_REGEN_DISABLED")
 	frame:RegisterEvent("PLAYER_REGEN_ENABLED")
 	frame:RegisterEvent("PLAYER_ENTERING_WORLD")
@@ -2033,6 +2567,7 @@ function DamageMeter:UnregisterLiveEvents()
 	frame:UnregisterEvent("DAMAGE_METER_COMBAT_SESSION_UPDATED")
 	frame:UnregisterEvent("DAMAGE_METER_CURRENT_SESSION_UPDATED")
 	frame:UnregisterEvent("DAMAGE_METER_RESET")
+	frame:UnregisterEvent("GROUP_ROSTER_UPDATE")
 	frame:UnregisterEvent("PLAYER_REGEN_DISABLED")
 	frame:UnregisterEvent("PLAYER_REGEN_ENABLED")
 	frame:UnregisterEvent("PLAYER_ENTERING_WORLD")
@@ -2086,6 +2621,7 @@ function DamageMeter:AddWindow(sourceIndex)
 	end
 	self:UpdateEventState()
 	self:Refresh()
+	return newIndex
 end
 
 function DamageMeter:CloseEditModeDialogForWindow(index)
@@ -2104,6 +2640,7 @@ function DamageMeter:RemoveWindow(index)
 	index = tonumber(index)
 	local count = getWindowCount()
 	if not index or index <= 1 or index > count then return end
+	self:HideContextMenu()
 	self:CloseEditModeDialogForWindow(index)
 	local windows = self:GetWindowsDB()
 	for windowIndex = index, count - 1 do
@@ -2488,6 +3025,7 @@ function DamageMeter:BuildWindowSettings(index)
 		checkboxSetting(L["damageMeterTooltipPreview"] or "Preview tooltip", function() return cfg().tooltipPreview == true end, function(value) self:SetConfigValue(index, "tooltipPreview", value) end, tooltipId, tooltipEnabled),
 		dividerSetting(tooltipId),
 		checkboxSetting(L["damageMeterTooltipShowAmount"] or "Show amount column", function() return cfg().tooltipShowAmount ~= false end, function(value) self:SetConfigValue(index, "tooltipShowAmount", value) end, tooltipId, tooltipEnabled),
+		checkboxSetting(L["damageMeterTooltipShowBars"] or "Show bars", function() return cfg().tooltipShowBars == true end, function(value) self:SetConfigValue(index, "tooltipShowBars", value) end, tooltipId, tooltipEnabled),
 		checkboxSetting(L["damageMeterTooltipShowDPS"] or "Show DPS column", function() return cfg().tooltipShowDPS ~= false end, function(value) self:SetConfigValue(index, "tooltipShowDPS", value) end, tooltipId, tooltipEnabled),
 		checkboxSetting(L["damageMeterTooltipShowPercent"] or "Show percent column", function() return cfg().tooltipShowPercent ~= false end, function(value) self:SetConfigValue(index, "tooltipShowPercent", value) end, tooltipId, tooltipEnabled),
 		checkboxSetting(L["damageMeterTooltipShowTargets"] or "Show targets", function() return cfg().tooltipShowTargets ~= false end, function(value) self:SetConfigValue(index, "tooltipShowTargets", value) end, tooltipId, tooltipEnabled),
@@ -2499,6 +3037,8 @@ function DamageMeter:BuildWindowSettings(index)
 		sliderSetting(L["damageMeterTooltipMaxLines"] or "Tooltip max lines", function() return cfg().tooltipMaxLines end, function(value) self:SetConfigValue(index, "tooltipMaxLines", clampNumber(value, 4, 30, DEFAULT_WINDOW.tooltipMaxLines)) end, 4, 30, 1, tooltipId, tooltipEnabled),
 		sliderSetting(L["damageMeterTooltipFontSize"] or "Tooltip font size", function() return cfg().tooltipFontSize end, function(value) self:SetConfigValue(index, "tooltipFontSize", clampNumber(value, 8, 24, DEFAULT_WINDOW.tooltipFontSize)) end, 8, 24, 1, tooltipId, tooltipEnabled),
 		dividerSetting(tooltipId),
+		dropdownSetting(L["damageMeterTooltipBarTexture"] or "Tooltip bar texture", function() return cfg().tooltipBarTexture end, function(value) self:SetConfigValue(index, "tooltipBarTexture", value) end, buildMediaOptions("statusbar", false), tooltipId, 260, tooltipEnabled),
+		colorSetting(L["damageMeterTooltipBarColor"] or "Tooltip bar color", function() return normalizeColor(cfg().tooltipBarColor, DEFAULT_WINDOW.tooltipBarColor) end, function(value) self:SetConfigValue(index, "tooltipBarColor", normalizeColor(value, DEFAULT_WINDOW.tooltipBarColor)) end, DEFAULT_WINDOW.tooltipBarColor, tooltipId, tooltipEnabled),
 		dropdownSetting(L["damageMeterTooltipBackgroundTexture"] or "Tooltip background texture", function() return cfg().tooltipBackdropTexture end, function(value) self:SetConfigValue(index, "tooltipBackdropTexture", value) end, buildMediaOptions("statusbar", false), tooltipId, 260, tooltipEnabled),
 		colorSetting(L["damageMeterTooltipBackgroundColor"] or "Tooltip background color", function() return normalizeColor(cfg().tooltipBackdropColor, DEFAULT_WINDOW.tooltipBackdropColor) end, function(value) self:SetConfigValue(index, "tooltipBackdropColor", normalizeColor(value, DEFAULT_WINDOW.tooltipBackdropColor)) end, DEFAULT_WINDOW.tooltipBackdropColor, tooltipId, tooltipEnabled),
 		dropdownSetting(L["damageMeterTooltipBorderTexture"] or "Tooltip border texture", function() return cfg().tooltipBorderTexture end, function(value) self:SetConfigValue(index, "tooltipBorderTexture", value) end, buildMediaOptions("border", false), tooltipId, 260, tooltipEnabled),
@@ -2575,7 +3115,17 @@ function DamageMeter:Init()
 	end
 	self:RegisterEditMode()
 	self.eventFrame = CreateFrame("Frame")
-	self.eventFrame:SetScript("OnEvent", function()
+	self.partyClassGeneration = 0
+	self.currentPartyClassGeneration = 0
+	self.eventFrame:SetScript("OnEvent", function(_, event)
+		if event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" then
+			self:InvalidatePartyClassFallback()
+		elseif event == "PLAYER_REGEN_DISABLED" then
+			self:MarkPartyClassFallbackCurrent()
+		elseif event == "DAMAGE_METER_RESET" then
+			self:InvalidatePartyClassFallback()
+			self:MarkPartyClassFallbackCurrent()
+		end
 		self:ScheduleRefresh()
 	end)
 	self:UpdateEventState()
