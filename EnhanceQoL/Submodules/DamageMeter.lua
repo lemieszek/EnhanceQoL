@@ -2464,18 +2464,31 @@ function DamageMeter:RefreshWindow(index)
 	local orderedSources = sources
 	if damageMeterType == "Deaths" and type(sources) == "table" and #sources > 1 then
 		orderedSources = {}
-		for sourceIndex, source in ipairs(sources) do
-			orderedSources[sourceIndex] = source
+		local hasComparableDeathTime = false
+		for _, source in ipairs(sources) do
+			if safeNumber(source and source.deathTimeSeconds) then
+				hasComparableDeathTime = true
+				break
+			end
 		end
-		table.sort(orderedSources, function(left, right)
-			local leftTime = safeNumber(left and left.deathTimeSeconds) or math.huge
-			local rightTime = safeNumber(right and right.deathTimeSeconds) or math.huge
-			return leftTime < rightTime
-		end)
+		if hasComparableDeathTime then
+			for sourceIndex, source in ipairs(sources) do
+				orderedSources[sourceIndex] = source
+			end
+			table.sort(orderedSources, function(left, right)
+				local leftTime = safeNumber(left and left.deathTimeSeconds) or math.huge
+				local rightTime = safeNumber(right and right.deathTimeSeconds) or math.huge
+				return leftTime < rightTime
+			end)
+		else
+			for sourceIndex = 1, #sources do
+				orderedSources[sourceIndex] = sources[#sources - sourceIndex + 1]
+			end
+		end
 	end
 	local contentRows = math.min(maxRows, #orderedSources)
 	local rowsGrowUp = normalizeRowGrowth(config.rowGrowth) == "UP"
-	local highestBottom = normalizeRowSort(config.rowSort) == "BOTTOM"
+	local highestBottom = damageMeterType ~= "Deaths" and normalizeRowSort(config.rowSort) == "BOTTOM"
 
 	self:ApplyWindowStyle(index, contentRows)
 	self:UpdateHeader(index, session)
