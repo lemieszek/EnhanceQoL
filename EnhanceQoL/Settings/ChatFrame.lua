@@ -245,6 +245,7 @@ local chatIMExpandable = addon.functions.SettingsCreateExpandableSection(cChatFr
 	name = L["InstantMessenger"] or "Instant Messenger",
 	expanded = false,
 	colorizeTitle = false,
+	newTagID = "InstantMessenger",
 })
 
 addon.functions.SettingsCreateText(cChatFrame, "|cff99e599" .. L["RightClickCloseTab"] .. "|r", { parentSection = chatIMExpandable })

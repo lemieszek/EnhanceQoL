@@ -1,21 +1,18 @@
 local addonName, addon = ...
 
 addon.variables.NewVersionTableEQOL = {
-	-- 10.20.0 Group Tools root categories
-	EQOL_GAMEPLAY = true,
-	EQOL_UI = true,
+	-- 10.21.0 Damage Meter
+	EQOL_DungeonsMythicPlus = true,
+	EQOL_damageMeterEditModeSample = true,
+	EQOL_damageMeterEnabled = true,
+	EQOL_damageMeterUpdateRate = true,
 
-	-- 10.20.0 Group Tools expandables
-	EQOL_GroupToolsCombatAlerts = true,
-	EQOL_GroupToolsFocusMarker = true,
-	EQOL_UnitFrames = true,
+	-- 10.21.0 Instant Messenger
+	EQOL_InstantMessenger = true,
+	EQOL_chatIMIncomingMessageColor = true,
+	EQOL_chatIMOutgoingMessageColor = true,
 
-	-- 10.20.0 Group Tools Settings UI controls
-	EQOL_groupToolsDeathAlertEnabled = true,
-	EQOL_groupToolsFocusMarkerAnnounce = true,
-	EQOL_groupToolsFocusMarkerEnabled = true,
-	EQOL_groupToolsFocusMarkerIcon = true,
-	EQOL_groupToolsFocusMarkerMessage = true,
-	EQOL_groupToolsHealerManaEnabled = true,
-	EQOL_groupToolsNoTargetEnabled = true,
+	-- 10.21.0 Profile import protection
+	EQOL_ProfilesAddOn = true,
+	EQOL_importProtection = true,
 }

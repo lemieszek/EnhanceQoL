@@ -292,6 +292,11 @@ end
 
 local function IsCustomBorderStyle(style) return type(style) == "string" and style ~= "" and style ~= DEFAULT_BORDER_STYLE end
 
+local function IsActionButtonBorderFeatureEnabled()
+	if not addon.db then return false end
+	return addon.db.actionBarHideBorders == true or IsCustomBorderStyle(GetCustomBorderStyle())
+end
+
 local function BuildActionButtonBorderState(state)
 	state = state or {}
 	local style = GetCustomBorderStyle()
@@ -312,6 +317,7 @@ local function BuildActionButtonBorderState(state)
 	state.colorG = g
 	state.colorB = b
 	state.colorA = a
+	state.enabled = state.hide or state.hasCustom
 	state.version = Labels._actionButtonBorderStateVersion or 0
 	return state
 end
@@ -466,8 +472,14 @@ local function RefreshButtonBorder(button, borderState)
 end
 
 function Labels.RefreshActionButtonBorders(reason)
-	if Labels.EnsureActionButtonArtHook then Labels.EnsureActionButtonArtHook() end
-	if Labels.EnsureZoneAbilityBorderHook then Labels.EnsureZoneAbilityBorderHook() end
+	local wasActive = Labels._actionButtonBorderFeatureActive == true
+	local isActive = IsActionButtonBorderFeatureEnabled()
+	Labels._actionButtonBorderFeatureActive = isActive
+	if not isActive and not wasActive then return end
+	if isActive then
+		if Labels.EnsureActionButtonArtHook then Labels.EnsureActionButtonArtHook() end
+		if Labels.EnsureZoneAbilityBorderHook then Labels.EnsureZoneAbilityBorderHook() end
+	end
 	MarkActionButtonBorderStateDirty()
 	local borderState = GetCachedActionButtonBorderState()
 	if reason == "PLAYER_LOGIN" and Labels._actionBarBorderFullRefreshVersion == borderState.version then return end
@@ -475,7 +487,10 @@ function Labels.RefreshActionButtonBorders(reason)
 	Labels._actionBarBorderFullRefreshVersion = borderState.version
 end
 
-function Labels.RefreshActionButtonBorder(button) RefreshButtonBorder(button) end
+function Labels.RefreshActionButtonBorder(button)
+	if Labels._actionButtonBorderFeatureActive ~= true then return end
+	RefreshButtonBorder(button)
+end
 
 local function SyncRangeOverlayMask(btn, icon, overlay)
 	if not (btn and icon and overlay) then return end
@@ -1249,7 +1264,6 @@ end
 
 local function OnPlayerLogin(self, event)
 	if event ~= "PLAYER_LOGIN" then return end
-	if Labels.EnsureActionButtonArtHook then Labels.EnsureActionButtonArtHook() end
 	EnsureRangeUsableHook()
 	if Labels.RefreshAllMacroNameVisibility then Labels.RefreshAllMacroNameVisibility() end
 	if Labels.RefreshAllHotkeyStyles then Labels.RefreshAllHotkeyStyles() end
