@@ -735,8 +735,7 @@ end
 
 local function isInFollowerDungeon()
 	if C_LFGInfo and C_LFGInfo.IsInLFGFollowerDungeon then
-		local ok, isFollowerDungeon = pcall(C_LFGInfo.IsInLFGFollowerDungeon)
-		if ok and isFollowerDungeon == true then return true end
+		if C_LFGInfo.IsInLFGFollowerDungeon() == true then return true end
 	end
 	local _, instanceType, difficultyID = GetInstanceInfo()
 	return instanceType == "party" and difficultyID == 205
@@ -753,8 +752,8 @@ local function applySourceIcon(texture, source, inFollowerDungeon)
 	if inFollowerDungeon and source.isLocalPlayer ~= true and applyClassIcon(texture, source.classFilename) then
 		return
 	end
-	local specIconID = safeNumber(source.specIconID)
-	if specIconID then
+	local specIconID = source.specIconID
+	if specIconID and specIconID ~= 0 then
 		texture:SetTexture(specIconID)
 		texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 		return
@@ -1076,8 +1075,8 @@ end
 
 function DamageMeter:GetAvailableCombatSessions()
 	if not C_DamageMeter or not C_DamageMeter.GetAvailableCombatSessions then return {} end
-	local ok, sessions = pcall(C_DamageMeter.GetAvailableCombatSessions)
-	return ok and type(sessions) == "table" and sessions or {}
+	local sessions = C_DamageMeter.GetAvailableCombatSessions()
+	return type(sessions) == "table" and sessions or {}
 end
 
 function DamageMeter:SetTemporarySessionType(index, sessionType)
@@ -1116,8 +1115,7 @@ end
 
 function DamageMeter:IsAvailable()
 	if not C_DamageMeter or not C_DamageMeter.IsDamageMeterAvailable then return false end
-	local ok, available = pcall(C_DamageMeter.IsDamageMeterAvailable)
-	return ok and available == true
+	return C_DamageMeter.IsDamageMeterAvailable() == true
 end
 
 function DamageMeter:IsInEditMode()
@@ -1144,15 +1142,11 @@ function DamageMeter:GetSession(index)
 	local damageMeterType = getDamageMeterTypeValue(self:GetEffectiveDamageMeterType(index))
 	if damageMeterType == nil then return nil end
 	if sessionID and C_DamageMeter.GetCombatSessionFromID then
-		local ok, session = pcall(C_DamageMeter.GetCombatSessionFromID, sessionID, damageMeterType)
-		if ok then return session end
-		return nil
+		return C_DamageMeter.GetCombatSessionFromID(sessionID, damageMeterType)
 	end
 	local sessionType = SESSION_TYPES[self:GetEffectiveSessionType(index)] or SESSION_TYPES.current
 	if not sessionType or not C_DamageMeter.GetCombatSessionFromType then return nil end
-	local ok, session = pcall(C_DamageMeter.GetCombatSessionFromType, sessionType, damageMeterType)
-	if ok then return session end
-	return nil
+	return C_DamageMeter.GetCombatSessionFromType(sessionType, damageMeterType)
 end
 
 function DamageMeter:GetSessionDuration(index, session)
@@ -1168,8 +1162,8 @@ function DamageMeter:GetSessionDuration(index, session)
 	end
 	local sessionType = SESSION_TYPES[self:GetEffectiveSessionType(index)] or SESSION_TYPES.current
 	if sessionType and C_DamageMeter and C_DamageMeter.GetSessionDurationSeconds then
-		local ok, duration = pcall(C_DamageMeter.GetSessionDurationSeconds, sessionType)
-		if ok and not isSecret(duration) then return safeNumber(duration) end
+		local duration = C_DamageMeter.GetSessionDurationSeconds(sessionType)
+		if not isSecret(duration) then return safeNumber(duration) end
 	end
 	return nil
 end
@@ -1233,32 +1227,32 @@ function DamageMeter:GetSourceDetails(index, source)
 	local damageMeterType = getDamageMeterTypeValue(self:GetEffectiveDamageMeterType(index))
 	if damageMeterType == nil then return nil end
 	local sessionID = self:GetEffectiveSessionID(index)
-	local sourceGUID = source.sourceGUID
-	local sourceCreatureID = source.sourceCreatureID
+	local rawSourceGUID = source.sourceGUID
+	local rawSourceCreatureID = source.sourceCreatureID
+	local sourceGUID = not isSecret(rawSourceGUID) and rawSourceGUID or nil
+	local sourceCreatureID = not isSecret(rawSourceCreatureID) and rawSourceCreatureID or nil
 	local isLocalPlayer = source.isLocalPlayer == true
-	local isRestrictedSource = isSecret(source.name) or isSecret(source.sourceGUID)
+	local isRestrictedSource = isSecret(source.name) or isSecret(rawSourceGUID) or isSecret(rawSourceCreatureID)
 	local partyUnitToken = isRestrictedSource and not isLocalPlayer and self:CanUsePartyClassFallback(index) and self:GetUniquePartyUnitTokenForClass(source.classFilename) or nil
 	if sourceGUID == nil and sourceCreatureID == nil and not isLocalPlayer and not partyUnitToken then return nil end
 	if sessionID and C_DamageMeter.GetCombatSessionSourceFromID then
 		local emptyLocalDetails
-		local ok, details = pcall(C_DamageMeter.GetCombatSessionSourceFromID, sessionID, damageMeterType, sourceGUID, sourceCreatureID)
-		if ok then
-			if not isLocalPlayer or self:HasSourceSpellDetails(details) then return details end
-			emptyLocalDetails = details
-		end
+		local details = C_DamageMeter.GetCombatSessionSourceFromID(sessionID, damageMeterType, sourceGUID, sourceCreatureID)
+		if not isLocalPlayer or self:HasSourceSpellDetails(details) then return details end
+		emptyLocalDetails = details
 		if isLocalPlayer then
 			local playerGUID = self:GetUnitTokenGUID("player")
 			if playerGUID then
-				ok, details = pcall(C_DamageMeter.GetCombatSessionSourceFromID, sessionID, damageMeterType, playerGUID, nil)
-				if ok then return details end
+				details = C_DamageMeter.GetCombatSessionSourceFromID(sessionID, damageMeterType, playerGUID, nil)
+				return details
 			end
-			ok, details = pcall(C_DamageMeter.GetCombatSessionSourceFromID, sessionID, damageMeterType, nil, nil)
-			if ok and self:HasSourceSpellDetails(details) then return details end
+			details = C_DamageMeter.GetCombatSessionSourceFromID(sessionID, damageMeterType, nil, nil)
+			if self:HasSourceSpellDetails(details) then return details end
 		end
 		local partyGUID = self:GetUnitTokenGUID(partyUnitToken)
 		if partyGUID then
-			ok, details = pcall(C_DamageMeter.GetCombatSessionSourceFromID, sessionID, damageMeterType, partyGUID, nil)
-			if ok then return details end
+			details = C_DamageMeter.GetCombatSessionSourceFromID(sessionID, damageMeterType, partyGUID, nil)
+			return details
 		end
 		if emptyLocalDetails then return emptyLocalDetails end
 		return nil
@@ -1266,24 +1260,22 @@ function DamageMeter:GetSourceDetails(index, source)
 	local sessionType = SESSION_TYPES[self:GetEffectiveSessionType(index)] or SESSION_TYPES.current
 	if sessionType and C_DamageMeter.GetCombatSessionSourceFromType then
 		local emptyLocalDetails
-		local ok, details = pcall(C_DamageMeter.GetCombatSessionSourceFromType, sessionType, damageMeterType, sourceGUID, sourceCreatureID)
-		if ok then
-			if not isLocalPlayer or self:HasSourceSpellDetails(details) then return details end
-			emptyLocalDetails = details
-		end
+		local details = C_DamageMeter.GetCombatSessionSourceFromType(sessionType, damageMeterType, sourceGUID, sourceCreatureID)
+		if not isLocalPlayer or self:HasSourceSpellDetails(details) then return details end
+		emptyLocalDetails = details
 		if isLocalPlayer then
 			local playerGUID = self:GetUnitTokenGUID("player")
 			if playerGUID then
-				ok, details = pcall(C_DamageMeter.GetCombatSessionSourceFromType, sessionType, damageMeterType, playerGUID, nil)
-				if ok then return details end
+				details = C_DamageMeter.GetCombatSessionSourceFromType(sessionType, damageMeterType, playerGUID, nil)
+				return details
 			end
-			ok, details = pcall(C_DamageMeter.GetCombatSessionSourceFromType, sessionType, damageMeterType, nil, nil)
-			if ok and self:HasSourceSpellDetails(details) then return details end
+			details = C_DamageMeter.GetCombatSessionSourceFromType(sessionType, damageMeterType, nil, nil)
+			if self:HasSourceSpellDetails(details) then return details end
 		end
 		local partyGUID = self:GetUnitTokenGUID(partyUnitToken)
 		if partyGUID then
-			ok, details = pcall(C_DamageMeter.GetCombatSessionSourceFromType, sessionType, damageMeterType, partyGUID, nil)
-			if ok then return details end
+			details = C_DamageMeter.GetCombatSessionSourceFromType(sessionType, damageMeterType, partyGUID, nil)
+			return details
 		end
 		if emptyLocalDetails then return emptyLocalDetails end
 	end
@@ -1363,7 +1355,7 @@ function DamageMeter:ApplyBarBorder(row, config, classFilename)
 	local border = row.barBorder
 	if not border or not border.SetBackdrop then return end
 	local enabled = config.barBorderEnabled == true
-	local classKey = enabled and config.barBorderUseClassColor == true and not isSecret(classFilename) and type(classFilename) == "string" and classFilename or false
+	local classKey = enabled and config.barBorderUseClassColor == true and type(classFilename) == "string" and classFilename ~= "" and classFilename or false
 	local styleVersion = self:GetWindowStyleVersion(row.windowIndex or 0)
 	if border._damageMeterApplyVersion == styleVersion
 		and border._damageMeterApplyEnabled == enabled
@@ -1401,7 +1393,7 @@ function DamageMeter:ApplyIconBorder(row, config, classFilename)
 	local border = row.iconBorder
 	if not border or not border.SetBackdrop then return end
 	local enabled = config.iconBorderEnabled == true
-	local classKey = enabled and config.iconBorderUseClassColor == true and not isSecret(classFilename) and type(classFilename) == "string" and classFilename or false
+	local classKey = enabled and config.iconBorderUseClassColor == true and type(classFilename) == "string" and classFilename ~= "" and classFilename or false
 	local styleVersion = self:GetWindowStyleVersion(row.windowIndex or 0)
 	if border._damageMeterApplyVersion == styleVersion
 		and border._damageMeterApplyEnabled == enabled
@@ -1579,7 +1571,10 @@ function DamageMeter:CreateHeaderButton(frame, label, atlas, tooltipText, onClic
 	button.icon = button:CreateTexture(nil, "ARTWORK")
 	button.icon:SetPoint("CENTER")
 	button.icon:SetSize(14, 14)
-	local hasAtlas = atlas and pcall(button.icon.SetAtlas, button.icon, atlas)
+	local hasAtlas = atlas ~= nil
+	if hasAtlas then
+		button.icon:SetAtlas(atlas)
+	end
 	button.icon:SetShown(hasAtlas == true)
 	button.text = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	button.text:SetAllPoints()
@@ -1970,19 +1965,17 @@ local function resolveCombatSpellDisplay(spell)
 	local spellIcon
 	if spellID and C_Spell then
 		if C_Spell.GetSpellInfo then
-			local ok, spellInfo = pcall(C_Spell.GetSpellInfo, spellID)
-			if ok and type(spellInfo) == "table" then
+			local spellInfo = C_Spell.GetSpellInfo(spellID)
+			if type(spellInfo) == "table" then
 				spellName = spellInfo.name
 				spellIcon = spellInfo.iconID
 			end
 		end
 		if not spellName and C_Spell.GetSpellName then
-			local ok, result = pcall(C_Spell.GetSpellName, spellID)
-			if ok then spellName = result end
+			spellName = C_Spell.GetSpellName(spellID)
 		end
 		if not spellIcon and C_Spell.GetSpellTexture then
-			local ok, result = pcall(C_Spell.GetSpellTexture, spellID)
-			if ok then spellIcon = result end
+			spellIcon = C_Spell.GetSpellTexture(spellID)
 		end
 	end
 	if not spellName then
@@ -2038,8 +2031,8 @@ local function resolveDeathRecapEventDisplay(eventData)
 		end
 	end
 	if spellID and C_Spell and C_Spell.GetSpellTexture then
-		local ok, texture = pcall(C_Spell.GetSpellTexture, spellID)
-		if ok and texture then icon = texture end
+		local texture = C_Spell.GetSpellTexture(spellID)
+		if texture then icon = texture end
 	end
 	return spellName or eventType or (L["Unknown"] or UNKNOWN or "Unknown"), icon or 136243
 end
@@ -2047,14 +2040,13 @@ end
 function DamageMeter:BuildDeathRecapRows(source, config)
 	local rows = {}
 	if not C_DeathRecap or not C_DeathRecap.GetRecapEvents or not source then return rows end
-	local recapID = safeNumber(source.deathRecapID)
+	local recapID = source.deathRecapID
 	if not recapID or recapID == 0 then return rows end
-	local ok, events = pcall(C_DeathRecap.GetRecapEvents, recapID)
-	if not ok or type(events) ~= "table" or #events == 0 then return rows end
+	local events = C_DeathRecap.GetRecapEvents(recapID)
+	if type(events) ~= "table" or #events == 0 then return rows end
 	local maxHealth
 	if C_DeathRecap.GetRecapMaxHealth then
-		ok, maxHealth = pcall(C_DeathRecap.GetRecapMaxHealth, recapID)
-		if not ok then maxHealth = nil end
+		maxHealth = C_DeathRecap.GetRecapMaxHealth(recapID)
 	end
 	maxHealth = safeNumber(maxHealth)
 	local showAmount, _, showPercent = getTooltipColumnVisibility(config, "Deaths")
@@ -2130,7 +2122,7 @@ function DamageMeter:BuildTooltipRows(details, config, damageMeterType)
 			if targetName then
 				local entry = targetMap[targetName]
 				if not entry then
-					entry = { name = targetName, icon = safeNumber(target.specIconID) or 136243, amount = 0, dps = 0 }
+					entry = { name = targetName, icon = target.specIconID ~= 0 and target.specIconID or 136243, amount = 0, dps = 0 }
 					targetMap[targetName] = entry
 				end
 				local targetAmount = damageMeterType == "EnemyDamageTaken" and safeNumber(spell.totalAmount) or safeNumber(target.amount)
@@ -2779,13 +2771,15 @@ function DamageMeter:RefreshWindow(index)
 		local source = sourceIndex and orderedSources[sourceIndex] or nil
 		local row = frame.rows[rowIndex] or self:CreateRow(frame, rowIndex)
 		if source then
-			local rawMaxAmount = session and session.maxAmount
-			local rawAmount = source.totalAmount
-			if rawMaxAmount == nil then rawMaxAmount = 1 end
-			if rawAmount == nil then rawAmount = 0 end
+			local rawMaxAmount, rawAmount
 			if damageMeterType == "Deaths" then
 				rawMaxAmount = 1
 				rawAmount = 1
+			else
+				rawMaxAmount = session and session.maxAmount
+				rawAmount = source.totalAmount
+				if rawMaxAmount == nil then rawMaxAmount = 1 end
+				if rawAmount == nil then rawAmount = 0 end
 			end
 			local amount = safeNumber(source.totalAmount)
 			local percent = totalAmount and totalAmount > 0 and amount and (amount / totalAmount * 100) or nil
@@ -3007,7 +3001,7 @@ end
 
 function DamageMeter:ResetData()
 	if C_DamageMeter and C_DamageMeter.ResetAllCombatSessions then
-		pcall(C_DamageMeter.ResetAllCombatSessions)
+		C_DamageMeter.ResetAllCombatSessions()
 	end
 	self.temporarySelections = {}
 	self:ScheduleRefresh()
