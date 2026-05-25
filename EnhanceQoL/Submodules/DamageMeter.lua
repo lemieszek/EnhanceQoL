@@ -45,6 +45,9 @@ local DEFAULT_WINDOW = {
 	visibleRows = 8,
 	width = 320,
 	heightOffset = 0,
+	headerPosition = "TOP",
+	rowGrowth = "DOWN",
+	rowSort = "TOP",
 	rowHeight = 20,
 	changeBarSize = false,
 	barHeight = 20,
@@ -120,7 +123,11 @@ local DEFAULT_WINDOW = {
 	tooltipOffsetY = 0,
 	tooltipFontSize = 11,
 	tooltipMaxLines = 12,
+	tooltipShowTargets = true,
 	tooltipWidth = 330,
+	tooltipBackdropTexture = "",
+	tooltipBorderTexture = "",
+	tooltipBorderSize = 1,
 	tooltipShowAmount = true,
 	tooltipShowDPS = true,
 	tooltipShowPercent = true,
@@ -319,6 +326,27 @@ local function buildTooltipAnchorOptions()
 		{ value = "LEFT", label = _G.LEFT or "Left" },
 		{ value = "TOP", label = _G.TOP or "Top" },
 		{ value = "BOTTOM", label = _G.BOTTOM or "Bottom" },
+	}
+end
+
+local function buildHeaderPositionOptions()
+	return {
+		{ value = "TOP", label = _G.TOP or "Top" },
+		{ value = "BOTTOM", label = _G.BOTTOM or "Bottom" },
+	}
+end
+
+local function buildRowGrowthOptions()
+	return {
+		{ value = "DOWN", label = L["damageMeterRowsGrowDown"] or "Down" },
+		{ value = "UP", label = L["damageMeterRowsGrowUp"] or "Up" },
+	}
+end
+
+local function buildRowSortOptions()
+	return {
+		{ value = "TOP", label = L["damageMeterHighestBarTop"] or "Highest bar on top" },
+		{ value = "BOTTOM", label = L["damageMeterHighestBarBottom"] or "Highest bar on bottom" },
 	}
 end
 
@@ -645,6 +673,18 @@ end
 local function normalizeTooltipAnchor(value)
 	if value == "LEFT" or value == "TOP" or value == "BOTTOM" then return value end
 	return "RIGHT"
+end
+
+local function normalizeHeaderPosition(value)
+	return value == "BOTTOM" and "BOTTOM" or "TOP"
+end
+
+local function normalizeRowGrowth(value)
+	return value == "UP" and "UP" or "DOWN"
+end
+
+local function normalizeRowSort(value)
+	return value == "BOTTOM" and "BOTTOM" or "TOP"
 end
 
 local function anchorPoint(horizontal, vertical)
@@ -1192,12 +1232,16 @@ function DamageMeter:AnchorSourceTooltip(frame, owner, config)
 	if anchor == "LEFT" then
 		frame:SetPoint("RIGHT", owner, "LEFT", -offsetX, offsetY)
 	elseif anchor == "TOP" then
-		frame:SetPoint("BOTTOM", owner, "TOP", offsetX, offsetY)
+		frame:SetPoint("BOTTOMLEFT", owner, "TOPLEFT", offsetX, offsetY)
 	elseif anchor == "BOTTOM" then
-		frame:SetPoint("TOP", owner, "BOTTOM", offsetX, -offsetY)
+		frame:SetPoint("TOPLEFT", owner, "BOTTOMLEFT", offsetX, -offsetY)
 	else
 		frame:SetPoint("LEFT", owner, "RIGHT", offsetX, offsetY)
 	end
+end
+
+local function addTooltipSectionGap(rows)
+	rows[#rows + 1] = { spacer = true, heightMultiplier = 0.7 }
 end
 
 function DamageMeter:BuildTooltipRows(details, config)
@@ -1206,10 +1250,13 @@ function DamageMeter:BuildTooltipRows(details, config)
 	local showAmount = config.tooltipShowAmount ~= false
 	local showDPS = config.tooltipShowDPS ~= false
 	local showPercent = config.tooltipShowPercent ~= false
+	local showTargets = config.tooltipShowTargets ~= false
+	local spellLimit = clampNumber(config.tooltipMaxLines, 4, 30, DEFAULT_WINDOW.tooltipMaxLines)
 	local totalAmount = safeNumber(details.totalAmount)
 
 	rows[#rows + 1] = { header = true, name = L["damageMeterTooltipSpellName"] or "Spell Name", icon = "Interface\\WORLDSTATEFRAME\\CombatSwords", amount = showAmount and (L["damageMeterTooltipAmount"] or "Amount"), dps = showDPS and (L["damageMeterTooltipDPS"] or "DPS"), percent = showPercent and "%" }
 	local targetMap = {}
+	local spellRows = 0
 	for _, spell in ipairs(details.combatSpells) do
 		local spellName
 		local spellIcon = safeNumber(spell.spellID) and C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellInfo(spell.spellID)
@@ -1224,10 +1271,13 @@ function DamageMeter:BuildTooltipRows(details, config)
 		local amount = spell.totalAmount
 		local dps = spell.amountPerSecond
 		local percent = totalAmount and totalAmount > 0 and safeNumber(amount) and (safeNumber(amount) / totalAmount * 100) or nil
-		rows[#rows + 1] = { name = spellName, icon = spellIcon or 136243, amount = showAmount and formatNumber(amount, config.abbreviation), dps = showDPS and formatNumber(dps, config.abbreviation), percent = showPercent and percent and string.format("%.1f%%", percent), sortAmount = safeNumber(amount) or 0 }
+		if spellRows < spellLimit then
+			rows[#rows + 1] = { name = spellName, icon = spellIcon or 136243, amount = showAmount and formatNumber(amount, config.abbreviation), dps = showDPS and formatNumber(dps, config.abbreviation), percent = showPercent and percent and string.format("%.1f%%", percent), sortAmount = safeNumber(amount) or 0 }
+			spellRows = spellRows + 1
+		end
 
 		local target = spell.combatSpellDetails
-		if type(target) == "table" then
+		if showTargets and type(target) == "table" then
 			local targetName = safeText(target.unitName, nil)
 			if targetName then
 				local entry = targetMap[targetName]
@@ -1241,11 +1291,12 @@ function DamageMeter:BuildTooltipRows(details, config)
 		end
 	end
 
+	if not showTargets then return rows end
 	local targets = {}
 	for _, target in pairs(targetMap) do targets[#targets + 1] = target end
 	table.sort(targets, function(a, b) return (a.amount or 0) > (b.amount or 0) end)
 	if #targets > 0 then
-		rows[#rows + 1] = { spacer = true }
+		addTooltipSectionGap(rows)
 		rows[#rows + 1] = { header = true, name = L["damageMeterTooltipTargets"] or "Targets", icon = "Interface\\MINIMAP\\TRACKING\\Target", amount = showAmount and (L["damageMeterTooltipAmount"] or "Amount"), dps = showDPS and (L["damageMeterTooltipDPS"] or "DPS"), percent = showPercent and "%" }
 		local targetTotal = 0
 		for _, target in ipairs(targets) do targetTotal = targetTotal + (target.amount or 0) end
@@ -1267,27 +1318,42 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 		rows[1] = { name = L["damageMeterTooltipNoData"] or "No details available", icon = 136243 }
 	end
 	local width = clampNumber(config.tooltipWidth, 220, 600, DEFAULT_WINDOW.tooltipWidth)
-	local maxLines = clampNumber(config.tooltipMaxLines, 4, 30, DEFAULT_WINDOW.tooltipMaxLines)
 	local lineHeight = clampNumber(config.tooltipFontSize, 8, 24, DEFAULT_WINDOW.tooltipFontSize) + 7
-	local amountX, dpsX, percentX = width - 116, width - 64, width - 10
-	local nameRight = width - 128
-	local shown = math.min(#rows, maxLines)
+	local percentWidth = config.tooltipShowPercent ~= false and 48 or 0
+	local dpsWidth = config.tooltipShowDPS ~= false and 54 or 0
+	local amountWidth = config.tooltipShowAmount ~= false and 72 or 0
+	local rightPadding = 10
+	local percentRight = -rightPadding
+	local dpsRight = percentRight - percentWidth
+	local amountRight = dpsRight - dpsWidth
+	local nameRight = amountRight - amountWidth - 8
+	local shown = #rows
+	local tooltipHeight = 10
+	for rowIndex = 1, shown do
+		local multiplier = rows[rowIndex].heightMultiplier or 1
+		tooltipHeight = tooltipHeight + (lineHeight * multiplier)
+	end
 
-	frame:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = DEFAULT_BORDER, edgeSize = 1 })
+	local backdropTexture = resolveMedia("statusbar", config.tooltipBackdropTexture, "Interface\\Buttons\\WHITE8x8")
+	local borderTexture = resolveMedia("border", config.tooltipBorderTexture, DEFAULT_BORDER)
+	local borderSize = clampNumber(config.tooltipBorderSize, 1, 32, DEFAULT_WINDOW.tooltipBorderSize)
+	frame:SetBackdrop({ bgFile = backdropTexture, edgeFile = borderTexture, edgeSize = borderSize })
 	local bg = normalizeColor(config.tooltipBackdropColor, DEFAULT_WINDOW.tooltipBackdropColor)
 	local border = normalizeColor(config.tooltipBorderColor, DEFAULT_WINDOW.tooltipBorderColor)
 	frame:SetBackdropColor(bg.r, bg.g, bg.b, bg.a)
 	frame:SetBackdropBorderColor(border.r, border.g, border.b, border.a)
-	frame:SetSize(width, (shown * lineHeight) + 10)
+	frame:SetSize(width, tooltipHeight)
 	self:AnchorSourceTooltip(frame, owner, config)
 
-	for lineIndex = 1, maxLines do
+	local yOffset = 5
+	for lineIndex = 1, shown do
 		local line = self:GetTooltipLine(frame, lineIndex)
 		local data = rows[lineIndex]
 		if data then
-			line:SetPoint("TOPLEFT", 0, -5 - ((lineIndex - 1) * lineHeight))
-			line:SetPoint("TOPRIGHT", 0, -5 - ((lineIndex - 1) * lineHeight))
-			line:SetHeight(lineHeight)
+			local currentLineHeight = lineHeight * (data.heightMultiplier or 1)
+			line:SetPoint("TOPLEFT", 0, -yOffset)
+			line:SetPoint("TOPRIGHT", 0, -yOffset)
+			line:SetHeight(currentLineHeight)
 			self:ApplyTooltipFontString(line.name, config)
 			self:ApplyTooltipFontString(line.amount, config)
 			self:ApplyTooltipFontString(line.dps, config)
@@ -1297,13 +1363,16 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 			line.dps:ClearAllPoints()
 			line.percent:ClearAllPoints()
 			line.name:SetPoint("LEFT", line.icon, "RIGHT", 4, 0)
+			line.name:SetPoint("RIGHT", line, "RIGHT", nameRight, 0)
 			line.icon:SetShown(not data.spacer)
 			if not data.spacer then line.icon:SetTexture(data.icon or 136243) end
 			line.name:SetText(data.spacer and "" or data.name or "")
-			line.name:SetPoint("RIGHT", frame, "LEFT", nameRight, 0)
-			line.amount:SetPoint("RIGHT", frame, "LEFT", amountX, 0)
-			line.dps:SetPoint("RIGHT", frame, "LEFT", dpsX, 0)
-			line.percent:SetPoint("RIGHT", frame, "LEFT", percentX, 0)
+			line.amount:SetPoint("RIGHT", line, "RIGHT", amountRight, 0)
+			line.dps:SetPoint("RIGHT", line, "RIGHT", dpsRight, 0)
+			line.percent:SetPoint("RIGHT", line, "RIGHT", percentRight, 0)
+			line.amount:SetWidth(amountWidth)
+			line.dps:SetWidth(dpsWidth)
+			line.percent:SetWidth(percentWidth)
 			line.amount:SetText(data.amount or "")
 			line.dps:SetText(data.dps or "")
 			line.percent:SetText(data.percent or "")
@@ -1319,11 +1388,12 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 				line.percent:SetTextColor(1, 1, 1, 1)
 			end
 			line:Show()
+			yOffset = yOffset + currentLineHeight
 		elseif line then
 			line:Hide()
 		end
 	end
-	for lineIndex = maxLines + 1, #frame.lines do
+	for lineIndex = shown + 1, #frame.lines do
 		frame.lines[lineIndex]:Hide()
 	end
 	frame:Show()
@@ -1371,12 +1441,22 @@ function DamageMeter:CreateRow(window, index)
 	end)
 	row:SetHeight(effectiveRowHeight)
 	row:ClearAllPoints()
-	if index > 1 and window.rows[index - 1] then
-		row:SetPoint("TOPLEFT", window.rows[index - 1], "BOTTOMLEFT", 0, -spacing)
-		row:SetPoint("TOPRIGHT", window.rows[index - 1], "BOTTOMRIGHT", 0, -spacing)
+	if normalizeRowGrowth(config.rowGrowth) == "UP" then
+		if index > 1 and window.rows[index - 1] then
+			row:SetPoint("BOTTOMLEFT", window.rows[index - 1], "TOPLEFT", 0, spacing)
+			row:SetPoint("BOTTOMRIGHT", window.rows[index - 1], "TOPRIGHT", 0, spacing)
+		else
+			row:SetPoint("BOTTOMLEFT", window.rowsContainer, "BOTTOMLEFT")
+			row:SetPoint("BOTTOMRIGHT", window.rowsContainer, "BOTTOMRIGHT")
+		end
 	else
-		row:SetPoint("TOPLEFT", window.rowsContainer, "TOPLEFT")
-		row:SetPoint("TOPRIGHT", window.rowsContainer, "TOPRIGHT")
+		if index > 1 and window.rows[index - 1] then
+			row:SetPoint("TOPLEFT", window.rows[index - 1], "BOTTOMLEFT", 0, -spacing)
+			row:SetPoint("TOPRIGHT", window.rows[index - 1], "BOTTOMRIGHT", 0, -spacing)
+		else
+			row:SetPoint("TOPLEFT", window.rowsContainer, "TOPLEFT")
+			row:SetPoint("TOPRIGHT", window.rowsContainer, "TOPRIGHT")
+		end
 	end
 
 	row.rank = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -1549,6 +1629,8 @@ function DamageMeter:ApplyWindowStyle(index, contentRows)
 	local showHeader = config.showHeader == true
 	local showHeaderButtons = showHeader and config.showHeaderButtons ~= false
 	local showStatus = config.showStatus ~= false
+	local headerPosition = normalizeHeaderPosition(config.headerPosition)
+	local rowsGrowUp = normalizeRowGrowth(config.rowGrowth) == "UP"
 	local texture = resolveMedia("statusbar", config.texture, DEFAULT_TEXTURE)
 	local backdropTexture = resolveMedia("statusbar", config.backdropTexture, "Interface\\Buttons\\WHITE8x8")
 	local backdropColor = normalizeColor(config.backdropColor, DEFAULT_WINDOW.backdropColor)
@@ -1561,9 +1643,10 @@ function DamageMeter:ApplyWindowStyle(index, contentRows)
 	local viewportHeight = (visibleRows * effectiveRowHeight) + math.max(0, visibleRows - 1) * spacing
 	local titleFontSize = clampNumber(config.titleFontSize, 8, 28, DEFAULT_WINDOW.titleFontSize)
 	local statusFontSize = clampNumber(config.statusFontSize, 8, 24, DEFAULT_WINDOW.statusFontSize)
+	local headerHeight = showHeader and math.max(24, titleFontSize + 12) or 0
 	local statusHeight = showStatus and math.max(16, statusFontSize + 6) or 0
-	local topInset = showHeader and math.max(24, titleFontSize + 12) or 4
-	local bottomInset = showStatus and (statusHeight + 6) or 4
+	local topInset = headerPosition == "TOP" and (headerHeight > 0 and headerHeight or 4) or 4
+	local bottomInset = 4 + (showStatus and (statusHeight + 2) or 0) + (headerPosition == "BOTTOM" and headerHeight or 0)
 	local heightOffset = clampNumber(config.heightOffset, 0, 300, DEFAULT_WINDOW.heightOffset)
 	local topOffset = math.floor(heightOffset / 2)
 	local bottomOffset = heightOffset - topOffset
@@ -1579,13 +1662,21 @@ function DamageMeter:ApplyWindowStyle(index, contentRows)
 	frame.historyButton:SetShown(showHeaderButtons)
 	frame.status:SetShown(showStatus)
 	frame.header:ClearAllPoints()
-	frame.header:SetPoint("TOPLEFT", 8, -(7 + topOffset))
-	frame.header:SetPoint("TOPRIGHT", showHeaderButtons and -48 or -8, -(7 + topOffset))
 	frame.headerButtons:ClearAllPoints()
-	frame.headerButtons:SetPoint("TOPRIGHT", -8, -(7 + topOffset))
 	frame.status:ClearAllPoints()
-	frame.status:SetPoint("BOTTOMLEFT", 4, 4 + bottomOffset)
-	frame.status:SetPoint("BOTTOMRIGHT", -4, 4 + bottomOffset)
+	if headerPosition == "BOTTOM" then
+		frame.header:SetPoint("BOTTOMLEFT", 8, 7 + bottomOffset)
+		frame.header:SetPoint("BOTTOMRIGHT", showHeaderButtons and -48 or -8, 7 + bottomOffset)
+		frame.headerButtons:SetPoint("BOTTOMRIGHT", -8, 7 + bottomOffset)
+		frame.status:SetPoint("BOTTOMLEFT", 4, 4 + bottomOffset + headerHeight)
+		frame.status:SetPoint("BOTTOMRIGHT", -4, 4 + bottomOffset + headerHeight)
+	else
+		frame.header:SetPoint("TOPLEFT", 8, -(7 + topOffset))
+		frame.header:SetPoint("TOPRIGHT", showHeaderButtons and -48 or -8, -(7 + topOffset))
+		frame.headerButtons:SetPoint("TOPRIGHT", -8, -(7 + topOffset))
+		frame.status:SetPoint("BOTTOMLEFT", 4, 4 + bottomOffset)
+		frame.status:SetPoint("BOTTOMRIGHT", -4, 4 + bottomOffset)
+	end
 
 	local borderTexture = resolveMedia("border", config.borderTexture, DEFAULT_BORDER)
 	if config.borderEnabled == true then
@@ -1625,12 +1716,22 @@ function DamageMeter:ApplyWindowStyle(index, contentRows)
 	for rowIndex, row in ipairs(frame.rows) do
 		row:SetHeight(effectiveRowHeight)
 		row:ClearAllPoints()
-		if previous then
-			row:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, -spacing)
-			row:SetPoint("TOPRIGHT", previous, "BOTTOMRIGHT", 0, -spacing)
+		if rowsGrowUp then
+			if previous then
+				row:SetPoint("BOTTOMLEFT", previous, "TOPLEFT", 0, spacing)
+				row:SetPoint("BOTTOMRIGHT", previous, "TOPRIGHT", 0, spacing)
+			else
+				row:SetPoint("BOTTOMLEFT", frame.rowsContainer, "BOTTOMLEFT")
+				row:SetPoint("BOTTOMRIGHT", frame.rowsContainer, "BOTTOMRIGHT")
+			end
 		else
-			row:SetPoint("TOPLEFT", frame.rowsContainer, "TOPLEFT")
-			row:SetPoint("TOPRIGHT", frame.rowsContainer, "TOPRIGHT")
+			if previous then
+				row:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, -spacing)
+				row:SetPoint("TOPRIGHT", previous, "BOTTOMRIGHT", 0, -spacing)
+			else
+				row:SetPoint("TOPLEFT", frame.rowsContainer, "TOPLEFT")
+				row:SetPoint("TOPRIGHT", frame.rowsContainer, "TOPRIGHT")
+			end
 		end
 		row.bar:SetStatusBarTexture(texture)
 		self:ApplyIconBorder(row, config)
@@ -1682,6 +1783,8 @@ function DamageMeter:RefreshWindow(index)
 	local maxRows = clampNumber(config.maxRows, 1, 30, DEFAULT_WINDOW.maxRows)
 	local contentRows = math.min(maxRows, #sources)
 	local damageMeterType = self:GetEffectiveDamageMeterType(index)
+	local rowsGrowUp = normalizeRowGrowth(config.rowGrowth) == "UP"
+	local highestBottom = normalizeRowSort(config.rowSort) == "BOTTOM"
 
 	self:ApplyWindowStyle(index, contentRows)
 	self:UpdateHeader(index, session)
@@ -1690,7 +1793,9 @@ function DamageMeter:RefreshWindow(index)
 	local shown = 0
 
 	for rowIndex = 1, maxRows do
-		local source = sources[rowIndex]
+		local visualTopIndex = rowsGrowUp and (contentRows - rowIndex + 1) or rowIndex
+		local sourceIndex = highestBottom and (contentRows - visualTopIndex + 1) or visualTopIndex
+		local source = sourceIndex >= 1 and sourceIndex <= contentRows and sources[sourceIndex] or nil
 		local row = frame.rows[rowIndex] or self:CreateRow(frame, rowIndex)
 		if source then
 			local rawMaxAmount = session and session.maxAmount
@@ -1703,10 +1808,10 @@ function DamageMeter:RefreshWindow(index)
 			local nr, ng, nb, na = self:GetNameColor(config, source.classFilename)
 			local valueText = formatRowValueText(source, percent, config, damageMeterType)
 
-			self:ApplyRankText(row, rowIndex, config)
+			self:ApplyRankText(row, sourceIndex, config)
 			row.sourceData = source
 			applySourceIcon(row.icon, source)
-			row.name:SetText(formatDisplayName(source.name, rowIndex, config))
+			row.name:SetText(formatDisplayName(source.name, sourceIndex, config))
 			row.name:SetTextColor(nr, ng, nb, na)
 			row.value:SetText(valueText)
 			self:ApplyRowValueWidth(row, config)
@@ -2101,6 +2206,10 @@ function DamageMeter:BuildWindowSettings(index)
 		sliderSetting(L["damageMeterVisibleRows"] or "Visible rows", function() return cfg().visibleRows end, function(value) self:SetConfigValue(index, "visibleRows", clampNumber(value, 1, 30, DEFAULT_WINDOW.visibleRows)) end, 1, 30, 1, layoutId),
 		sliderSetting(L["Width"] or "Width", function() return cfg().width end, function(value) self:SetConfigValue(index, "width", clampNumber(value, 220, 700, DEFAULT_WINDOW.width)) end, 220, 700, 10, layoutId),
 		sliderSetting(L["damageMeterHeightOffset"] or "Height offset", function() return cfg().heightOffset end, function(value) self:SetConfigValue(index, "heightOffset", clampNumber(value, 0, 300, DEFAULT_WINDOW.heightOffset)) end, 0, 300, 1, layoutId),
+		dividerSetting(layoutId),
+		dropdownSetting(L["damageMeterHeaderPosition"] or "Header position", function() return normalizeHeaderPosition(cfg().headerPosition) end, function(value) self:SetConfigValue(index, "headerPosition", normalizeHeaderPosition(value)) end, buildHeaderPositionOptions(), layoutId, 120),
+		dropdownSetting(L["damageMeterRowGrowth"] or "Rows grow", function() return normalizeRowGrowth(cfg().rowGrowth) end, function(value) self:SetConfigValue(index, "rowGrowth", normalizeRowGrowth(value)) end, buildRowGrowthOptions(), layoutId, 120),
+		dropdownSetting(L["damageMeterRowSort"] or "Row order", function() return normalizeRowSort(cfg().rowSort) end, function(value) self:SetConfigValue(index, "rowSort", normalizeRowSort(value)) end, buildRowSortOptions(), layoutId, 160),
 		dividerSetting(layoutId, nil, windowAnchorVisible),
 		dropdownSetting(L["damageMeterAnchorToWindow"] or "Anchor to window", function() return tostring(clampNumber(cfg().anchorToWindow, 0, index - 1, 0)) end, function(value)
 			self:SetConfigValue(index, "anchorToWindow", clampNumber(value, 0, index - 1, 0))
@@ -2198,6 +2307,7 @@ function DamageMeter:BuildWindowSettings(index)
 		checkboxSetting(L["damageMeterTooltipShowAmount"] or "Show amount column", function() return cfg().tooltipShowAmount ~= false end, function(value) self:SetConfigValue(index, "tooltipShowAmount", value) end, tooltipId, tooltipEnabled),
 		checkboxSetting(L["damageMeterTooltipShowDPS"] or "Show DPS column", function() return cfg().tooltipShowDPS ~= false end, function(value) self:SetConfigValue(index, "tooltipShowDPS", value) end, tooltipId, tooltipEnabled),
 		checkboxSetting(L["damageMeterTooltipShowPercent"] or "Show percent column", function() return cfg().tooltipShowPercent ~= false end, function(value) self:SetConfigValue(index, "tooltipShowPercent", value) end, tooltipId, tooltipEnabled),
+		checkboxSetting(L["damageMeterTooltipShowTargets"] or "Show targets", function() return cfg().tooltipShowTargets ~= false end, function(value) self:SetConfigValue(index, "tooltipShowTargets", value) end, tooltipId, tooltipEnabled),
 		dividerSetting(tooltipId),
 		dropdownSetting(L["damageMeterTooltipAnchor"] or "Tooltip anchor", function() return normalizeTooltipAnchor(cfg().tooltipAnchor) end, function(value) self:SetConfigValue(index, "tooltipAnchor", normalizeTooltipAnchor(value)) end, buildTooltipAnchorOptions(), tooltipId, 120, tooltipEnabled),
 		sliderSetting(L["damageMeterTooltipOffsetX"] or "Tooltip X offset", function() return cfg().tooltipOffsetX end, function(value) self:SetConfigValue(index, "tooltipOffsetX", clampNumber(value, -300, 300, DEFAULT_WINDOW.tooltipOffsetX)) end, -300, 300, 1, tooltipId, tooltipEnabled),
@@ -2206,8 +2316,11 @@ function DamageMeter:BuildWindowSettings(index)
 		sliderSetting(L["damageMeterTooltipMaxLines"] or "Tooltip max lines", function() return cfg().tooltipMaxLines end, function(value) self:SetConfigValue(index, "tooltipMaxLines", clampNumber(value, 4, 30, DEFAULT_WINDOW.tooltipMaxLines)) end, 4, 30, 1, tooltipId, tooltipEnabled),
 		sliderSetting(L["damageMeterTooltipFontSize"] or "Tooltip font size", function() return cfg().tooltipFontSize end, function(value) self:SetConfigValue(index, "tooltipFontSize", clampNumber(value, 8, 24, DEFAULT_WINDOW.tooltipFontSize)) end, 8, 24, 1, tooltipId, tooltipEnabled),
 		dividerSetting(tooltipId),
+		dropdownSetting(L["damageMeterTooltipBackgroundTexture"] or "Tooltip background texture", function() return cfg().tooltipBackdropTexture end, function(value) self:SetConfigValue(index, "tooltipBackdropTexture", value) end, buildMediaOptions("statusbar", false), tooltipId, 260, tooltipEnabled),
 		colorSetting(L["damageMeterTooltipBackgroundColor"] or "Tooltip background color", function() return normalizeColor(cfg().tooltipBackdropColor, DEFAULT_WINDOW.tooltipBackdropColor) end, function(value) self:SetConfigValue(index, "tooltipBackdropColor", normalizeColor(value, DEFAULT_WINDOW.tooltipBackdropColor)) end, DEFAULT_WINDOW.tooltipBackdropColor, tooltipId, tooltipEnabled),
+		dropdownSetting(L["damageMeterTooltipBorderTexture"] or "Tooltip border texture", function() return cfg().tooltipBorderTexture end, function(value) self:SetConfigValue(index, "tooltipBorderTexture", value) end, buildMediaOptions("border", false), tooltipId, 260, tooltipEnabled),
 		colorSetting(L["damageMeterTooltipBorderColor"] or "Tooltip border color", function() return normalizeColor(cfg().tooltipBorderColor, DEFAULT_WINDOW.tooltipBorderColor) end, function(value) self:SetConfigValue(index, "tooltipBorderColor", normalizeColor(value, DEFAULT_WINDOW.tooltipBorderColor)) end, DEFAULT_WINDOW.tooltipBorderColor, tooltipId, tooltipEnabled),
+		sliderSetting(L["damageMeterTooltipBorderSize"] or "Tooltip border size", function() return cfg().tooltipBorderSize end, function(value) self:SetConfigValue(index, "tooltipBorderSize", clampNumber(value, 1, 32, DEFAULT_WINDOW.tooltipBorderSize)) end, 1, 32, 1, tooltipId, tooltipEnabled),
 		{ name = L["Ranking"] or "Ranking", kind = SettingType.Collapsible, id = rankingId, defaultCollapsed = true },
 		checkboxSetting(L["damageMeterShowRanks"] or "Show ranks", function() return cfg().showRanks ~= false end, function(value) self:SetConfigValue(index, "showRanks", value) end, rankingId),
 		checkboxSetting(L["damageMeterPrefixRankInName"] or "Prefix rank in name", function() return cfg().prefixRankInName == true end, function(value) self:SetConfigValue(index, "prefixRankInName", value) end, rankingId, rankingEnabled),
