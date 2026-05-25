@@ -362,6 +362,7 @@ data = {
 			{
 				var = "chatIMIncomingMessageColor",
 				text = L["chatIMIncomingMessageColor"],
+				newTagID = "chatIMIncomingMessageColor",
 				default = function() return getChatIMMessageColorDefault(false) end,
 				parentCheck = function()
 					return addon.SettingsLayout.elements["enableChatIM"]
@@ -390,6 +391,7 @@ data = {
 			{
 				var = "chatIMOutgoingMessageColor",
 				text = L["chatIMOutgoingMessageColor"],
+				newTagID = "chatIMOutgoingMessageColor",
 				default = function() return getChatIMMessageColorDefault(true) end,
 				parentCheck = function()
 					return addon.SettingsLayout.elements["enableChatIM"]

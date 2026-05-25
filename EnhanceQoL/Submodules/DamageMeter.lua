@@ -1138,18 +1138,127 @@ function DamageMeter:ShouldShow(index)
 	return true
 end
 
-function DamageMeter:GetSession(index)
-	if self:UsePreviewData() then return PREVIEW_SESSION end
-	if not self:IsAvailable() then return nil end
-	local sessionID = self:GetEffectiveSessionID(index)
-	local damageMeterType = getDamageMeterTypeValue(self:GetEffectiveDamageMeterType(index))
-	if damageMeterType == nil then return nil end
-	if sessionID and C_DamageMeter.GetCombatSessionFromID then
-		return C_DamageMeter.GetCombatSessionFromID(sessionID, damageMeterType)
+function DamageMeter:BuildRefreshSharedState()
+	local shared = self.refreshSharedState
+	if not shared then
+		shared = {}
+		self.refreshSharedState = shared
 	end
-	local sessionType = SESSION_TYPES[self:GetEffectiveSessionType(index)] or SESSION_TYPES.current
-	if not sessionType or not C_DamageMeter.GetCombatSessionFromType then return nil end
-	return C_DamageMeter.GetCombatSessionFromType(sessionType, damageMeterType)
+	local editMode = self:IsInEditMode()
+	local preview = editMode and db().damageMeterEditModeSample ~= false
+	local enabled = self:IsEnabled()
+	local available = preview or (enabled and self:IsAvailable())
+	shared.available = available
+	shared.editMode = editMode
+	shared.enabled = enabled
+	shared.inFollowerDungeon = isInFollowerDungeon()
+	shared.preview = preview
+	shared.windowCount = getWindowCount()
+	return shared
+end
+
+function DamageMeter:BuildWindowRefreshState(index, shared)
+	shared = shared or self:BuildRefreshSharedState()
+	self.refreshWindowStates = self.refreshWindowStates or {}
+	local state = self.refreshWindowStates[index]
+	if not state then
+		state = {}
+		self.refreshWindowStates[index] = state
+	end
+	local config = self:GetConfig(index)
+	local temporary = self.temporarySelections and self.temporarySelections[index]
+	local damageMeterType = normalizeDamageMeterTypeKey((temporary and temporary.damageMeterType) or config.damageMeterType)
+	local damageMeterEnum = getDamageMeterTypeValue(damageMeterType)
+	local sessionID = temporary and temporary.sessionID or nil
+	local sessionType = sessionID and nil or ((temporary and temporary.sessionType) or config.sessionType)
+	local sessionEnum = sessionType and (SESSION_TYPES[sessionType] or SESSION_TYPES.current) or nil
+	local visible = shared.enabled == true and index <= shared.windowCount
+	if visible and not shared.editMode then
+		visible = shared.available == true
+		if visible and config.visibility == "combat" then
+			visible = UnitAffectingCombat("player") == true
+		end
+	end
+	state.available = shared.available
+	state.config = config
+	state.damageMeterEnum = damageMeterEnum
+	state.damageMeterType = damageMeterType
+	state.editMode = shared.editMode
+	state.index = index
+	state.inFollowerDungeon = shared.inFollowerDungeon
+	state.preview = shared.preview
+	state.sessionEnum = sessionEnum
+	state.sessionID = sessionID
+	state.sessionType = sessionType
+	state.temporary = temporary
+	state.visible = visible
+	return state
+end
+
+function DamageMeter:GetSessionForState(state, sessionCache)
+	if state.preview then return PREVIEW_SESSION end
+	if not state.available or state.damageMeterEnum == nil then return nil end
+	if state.sessionID and C_DamageMeter.GetCombatSessionFromID then
+		if sessionCache then
+			sessionCache.byID = sessionCache.byID or {}
+			local typeCache = sessionCache.byID[state.damageMeterEnum]
+			if not typeCache then
+				typeCache = {}
+				sessionCache.byID[state.damageMeterEnum] = typeCache
+			end
+			local cached = typeCache[state.sessionID]
+			if cached ~= nil then return cached ~= false and cached or nil end
+			local session = C_DamageMeter.GetCombatSessionFromID(state.sessionID, state.damageMeterEnum)
+			typeCache[state.sessionID] = session or false
+			return session
+		end
+		return C_DamageMeter.GetCombatSessionFromID(state.sessionID, state.damageMeterEnum)
+	end
+	if not state.sessionEnum or not C_DamageMeter.GetCombatSessionFromType then return nil end
+	if sessionCache then
+		sessionCache.byType = sessionCache.byType or {}
+		local typeCache = sessionCache.byType[state.damageMeterEnum]
+		if not typeCache then
+			typeCache = {}
+			sessionCache.byType[state.damageMeterEnum] = typeCache
+		end
+		local cached = typeCache[state.sessionEnum]
+		if cached ~= nil then return cached ~= false and cached or nil end
+		local session = C_DamageMeter.GetCombatSessionFromType(state.sessionEnum, state.damageMeterEnum)
+		typeCache[state.sessionEnum] = session or false
+		return session
+	end
+	return C_DamageMeter.GetCombatSessionFromType(state.sessionEnum, state.damageMeterEnum)
+end
+
+function DamageMeter:GetSession(index)
+	return self:GetSessionForState(self:BuildWindowRefreshState(index))
+end
+
+function DamageMeter:ClearRefreshSessionCache(cache)
+	if not cache then return end
+	if cache.byID then
+		for damageMeterType, sessions in pairs(cache.byID) do
+			if type(sessions) == "table" then
+				for sessionID in pairs(sessions) do
+					sessions[sessionID] = nil
+				end
+			else
+				cache.byID[damageMeterType] = nil
+			end
+		end
+	end
+	if cache.byType then
+		for damageMeterType, sessions in pairs(cache.byType) do
+			if type(sessions) == "table" then
+				for sessionType in pairs(sessions) do
+					sessions[sessionType] = nil
+				end
+			else
+				cache.byType[damageMeterType] = nil
+			end
+		end
+	end
 end
 
 function DamageMeter:BuildLiveEventWatch()
@@ -1213,20 +1322,18 @@ function DamageMeter:IsLiveEventRelevant(damageMeterType, sessionID)
 	return sessionID ~= nil and sessions and sessions[sessionID] == true
 end
 
-function DamageMeter:GetSessionDuration(index, session)
+function DamageMeter:GetSessionDuration(index, session, state)
+	state = state or self:BuildWindowRefreshState(index)
 	if session then
 		local duration = session.durationSeconds
 		if duration and not isSecret(duration) then return safeNumber(duration) end
 	end
-	if self:UsePreviewData() then return PREVIEW_SESSION.durationSeconds end
-	local sessionID = self:GetEffectiveSessionID(index)
-	if sessionID then
-		local temporary = self:GetTemporarySelection(index)
-		return safeNumber(temporary.sessionDurationSeconds)
+	if state.preview then return PREVIEW_SESSION.durationSeconds end
+	if state.sessionID then
+		return safeNumber(state.temporary and state.temporary.sessionDurationSeconds)
 	end
-	local sessionType = SESSION_TYPES[self:GetEffectiveSessionType(index)] or SESSION_TYPES.current
-	if sessionType and C_DamageMeter and C_DamageMeter.GetSessionDurationSeconds then
-		local duration = C_DamageMeter.GetSessionDurationSeconds(sessionType)
+	if state.sessionEnum and C_DamageMeter and C_DamageMeter.GetSessionDurationSeconds then
+		local duration = C_DamageMeter.GetSessionDurationSeconds(state.sessionEnum)
 		if not isSecret(duration) then return safeNumber(duration) end
 	end
 	return nil
@@ -2736,14 +2843,21 @@ function DamageMeter:ApplyWindowStyle(index, contentRows)
 	end
 end
 
-function DamageMeter:UpdateHeader(index, session)
+function DamageMeter:UpdateHeader(index, session, state)
+	state = state or self:BuildWindowRefreshState(index)
 	local frame = self:EnsureWindow(index)
-	local config = self:GetConfig(index)
-	local sessionLabel = self:GetEffectiveSessionLabel(index)
-	local typeLabel = getDamageMeterTypeLabel(self:GetEffectiveDamageMeterType(index))
+	local config = state.config
+	local sessionLabel
+	if state.sessionID then
+		local fallback = DAMAGE_METER_COMBAT_NUMBER and DAMAGE_METER_COMBAT_NUMBER:format(state.sessionID) or string.format("%s %d", L["damageMeterCombat"] or "Combat", state.sessionID)
+		sessionLabel = safeText(state.temporary and state.temporary.sessionName, fallback)
+	else
+		sessionLabel = state.sessionType == "overall" and (L["damageMeterOverall"] or "Overall") or (L["damageMeterCurrent"] or "Current")
+	end
+	local typeLabel = getDamageMeterTypeLabel(state.damageMeterType)
 	local durationText
 	if config.showHeaderTime ~= false then
-		durationText = formatDuration(self:GetSessionDuration(index, session), normalizeHeaderTimeFormat(config.headerTimeFormat))
+		durationText = formatDuration(self:GetSessionDuration(index, session, state), normalizeHeaderTimeFormat(config.headerTimeFormat))
 	end
 	local formatMode = normalizeHeaderFormat(config.headerFormat)
 	local separator = (formatMode == "timeTypeSpace" or formatMode == "typeTimeSpace") and " " or " - "
@@ -2766,18 +2880,19 @@ function DamageMeter:UpdateHeader(index, session)
 	setPlainTextIfChanged(frame.status.text, string.format("%s: %s  |  %s", L["damageMeterQuickSwitch"] or "Quick switch", sessionLabel, self:GetQuickDamageMeterTypeLabels(index, typeLabel)))
 end
 
-function DamageMeter:RefreshWindow(index)
+function DamageMeter:RefreshWindow(index, shared, sessionCache)
+	local state = self:BuildWindowRefreshState(index, shared)
 	local frame = self:EnsureWindow(index)
-	if not self:ShouldShow(index) then
+	if not state.visible then
 		frame:Hide()
 		return
 	end
 
-	local config = self:GetConfig(index)
-	local session = self:GetSession(index)
+	local config = state.config
+	local session = self:GetSessionForState(state, sessionCache)
 	local sources = session and type(session.combatSources) == "table" and session.combatSources or {}
 	local maxRows = getEffectiveMaxRows(config)
-	local damageMeterType = self:GetEffectiveDamageMeterType(index)
+	local damageMeterType = state.damageMeterType
 	local orderedSources = sources
 	if damageMeterType == "Deaths" and type(sources) == "table" and #sources > 1 then
 		orderedSources = {}
@@ -2851,11 +2966,11 @@ function DamageMeter:RefreshWindow(index)
 	end
 
 	self:ApplyWindowStyle(index, contentRows)
-	self:UpdateHeader(index, session)
+	self:UpdateHeader(index, session, state)
 
 	local totalAmount = safeNumber(session and session.totalAmount)
 	local shown = 0
-	local inFollowerDungeon = isInFollowerDungeon()
+	local inFollowerDungeon = state.inFollowerDungeon
 	local valueMode = getRowValueMode(damageMeterType)
 	local valueAbbreviation = config.abbreviation
 	local valueShowPercent = config.showPercent ~= false
@@ -2923,9 +3038,17 @@ function DamageMeter:RefreshWindow(index)
 end
 
 function DamageMeter:Refresh()
-	for index = 1, MAX_WINDOWS do
-		self:RefreshWindow(index)
+	local shared = self:BuildRefreshSharedState()
+	local sessionCache = self.refreshSessionCache
+	if not sessionCache then
+		sessionCache = {}
+		self.refreshSessionCache = sessionCache
 	end
+	self:ClearRefreshSessionCache(sessionCache)
+	for index = 1, MAX_WINDOWS do
+		self:RefreshWindow(index, shared, sessionCache)
+	end
+	self:ClearRefreshSessionCache(sessionCache)
 end
 
 function DamageMeter:ScheduleRefresh()
