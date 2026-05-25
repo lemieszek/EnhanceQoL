@@ -1745,10 +1745,13 @@ function DamageMeter:GetTooltipLine(frame, lineIndex)
 	line.name:SetWordWrap(false)
 	line.amount = line:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	line.amount:SetJustifyH("RIGHT")
+	line.amount:SetWordWrap(false)
 	line.dps = line:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	line.dps:SetJustifyH("RIGHT")
+	line.dps:SetWordWrap(false)
 	line.percent = line:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	line.percent:SetJustifyH("RIGHT")
+	line.percent:SetWordWrap(false)
 	frame.lines[lineIndex] = line
 	return line
 end
@@ -1981,11 +1984,12 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 		rows[1] = { name = L["damageMeterTooltipNoData"] or "No details available", icon = 136243 }
 	end
 	local width = clampNumber(config.tooltipWidth, 220, 600, DEFAULT_WINDOW.tooltipWidth)
-	local lineHeight = clampNumber(config.tooltipFontSize, 8, 24, DEFAULT_WINDOW.tooltipFontSize) + 7
+	local tooltipFontSize = clampNumber(config.tooltipFontSize, 8, 24, DEFAULT_WINDOW.tooltipFontSize)
+	local lineHeight = tooltipFontSize + 7
 	local showAmount, showDPS, showPercent = getTooltipColumnVisibility(config, damageMeterType)
-	local percentWidth = showPercent and 44 or 0
-	local dpsWidth = showDPS and 54 or 0
-	local amountWidth = showAmount and (damageMeterType == "Deaths" and 150 or 72) or 0
+	local percentWidth = showPercent and math.max(56, tooltipFontSize * 4.8) or 0
+	local dpsWidth = showDPS and math.max(58, tooltipFontSize * 4.8) or 0
+	local amountWidth = showAmount and (damageMeterType == "Deaths" and 150 or math.max(76, tooltipFontSize * 6.2)) or 0
 	local rightPadding = 10
 	local percentRight = -rightPadding
 	local dpsRight = percentRight - percentWidth
