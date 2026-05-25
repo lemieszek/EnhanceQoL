@@ -45,9 +45,19 @@ local FALLBACK_SHORT_NUMBER_ABBREV_BREAKPOINTS = {
 local shortNumberAbbrevOptions
 local SYNC_EXCLUDED_KEYS = {
 	alwaysShowPlayer = true,
+	anchorToWindow = true,
 	sessionType = true,
 	damageMeterType = true,
 	visibility = true,
+	maxRows = true,
+	visibleRows = true,
+	raidRowsEnabled = true,
+	raidMaxRows = true,
+	raidVisibleRows = true,
+	windowAnchorPoint = true,
+	windowRelativePoint = true,
+	windowOffsetX = true,
+	windowOffsetY = true,
 	showHeaderTime = true,
 }
 local DEFAULT_WINDOW = {
@@ -2221,6 +2231,7 @@ function DamageMeter:EnsureSourceTooltip()
 	local frame = CreateFrame("Frame", "EnhanceQoLDamageMeterSourceTooltip", UIParent, "BackdropTemplate")
 	frame:SetFrameStrata("TOOLTIP")
 	frame:SetFrameLevel(20)
+	if frame.SetClampedToScreen then frame:SetClampedToScreen(true) end
 	frame:Hide()
 	frame.lines = {}
 	self.sourceTooltip = frame
@@ -2711,6 +2722,7 @@ function DamageMeter:EnsureWindow(index)
 
 	local frame = CreateFrame("Frame", "EnhanceQoLDamageMeterFrame" .. index, UIParent, "BackdropTemplate")
 	frame:SetFrameStrata("MEDIUM")
+	if frame.SetClampedToScreen then frame:SetClampedToScreen(true) end
 	frame:EnableMouse(true)
 	frame:SetScript("OnMouseUp", function(owner, button)
 		if button == "RightButton" then
@@ -2984,7 +2996,8 @@ function DamageMeter:UpdateHeader(index, session, state)
 	local durationText
 	local durationBucket = false
 	local headerTimeFormat = normalizeHeaderTimeFormat(config.headerTimeFormat)
-	if showHeader and config.showHeaderTime ~= false then
+	local showHeaderTime = config.showHeaderTime ~= false and state.sessionType ~= "overall"
+	if showHeader and showHeaderTime then
 		local duration = self:GetSessionDuration(index, session, state)
 		if duration then
 			durationBucket = math.floor(duration + 0.5)
@@ -2999,7 +3012,7 @@ function DamageMeter:UpdateHeader(index, session, state)
 		and frame._damageMeterHeaderShowStatus == showStatus
 		and frame._damageMeterHeaderShowSession == (config.showHeaderSession ~= false)
 		and frame._damageMeterHeaderShowType == (config.showHeaderType ~= false)
-		and frame._damageMeterHeaderShowTime == (config.showHeaderTime ~= false)
+		and frame._damageMeterHeaderShowTime == showHeaderTime
 		and frame._damageMeterHeaderFormat == formatMode
 		and frame._damageMeterHeaderTimeFormat == headerTimeFormat
 		and frame._damageMeterHeaderDurationBucket == durationBucket
@@ -3013,7 +3026,7 @@ function DamageMeter:UpdateHeader(index, session, state)
 	frame._damageMeterHeaderShowStatus = showStatus
 	frame._damageMeterHeaderShowSession = config.showHeaderSession ~= false
 	frame._damageMeterHeaderShowType = config.showHeaderType ~= false
-	frame._damageMeterHeaderShowTime = config.showHeaderTime ~= false
+	frame._damageMeterHeaderShowTime = showHeaderTime
 	frame._damageMeterHeaderFormat = formatMode
 	frame._damageMeterHeaderTimeFormat = headerTimeFormat
 	frame._damageMeterHeaderDurationBucket = durationBucket
@@ -3303,6 +3316,24 @@ function DamageMeter:CopySettings(sourceIndex, targetIndex)
 	end
 end
 
+function DamageMeter:ResetNewWindowPlacement(index)
+	local config = self:GetConfig(index)
+	config.anchorToWindow = 0
+	config.windowAnchorPoint = "CENTER"
+	config.windowRelativePoint = "CENTER"
+	config.windowOffsetX = 0
+	config.windowOffsetY = 0
+	local frame = self:EnsureWindow(index)
+	if frame then
+		frame._damageMeterAnchored = false
+		frame:ClearAllPoints()
+		frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+	end
+	if EditMode and EditMode.SetFramePosition then
+		EditMode:SetFramePosition(EDITMODE_ID_PREFIX .. index, "CENTER", 0, 0, nil, true, "CENTER")
+	end
+end
+
 function DamageMeter:AddWindow(sourceIndex)
 	local count = getWindowCount()
 	if count >= MAX_WINDOWS then return end
@@ -3314,6 +3345,7 @@ function DamageMeter:AddWindow(sourceIndex)
 	if db().damageMeterSyncSettings == true then
 		self:CopySettings(sourceIndex or 1, newIndex)
 	end
+	self:ResetNewWindowPlacement(newIndex)
 	self:UpdateEventState()
 	self:Refresh()
 	return newIndex
@@ -3570,6 +3602,7 @@ function DamageMeter:BuildWindowSettings(index)
 	local function customIconSizeEnabled() return cfg().changeIconSize == true end
 	local function iconBorderEnabled() return cfg().iconBorderEnabled == true end
 	local function fixedIconBorderColorEnabled() return cfg().iconBorderEnabled == true and cfg().iconBorderUseClassColor ~= true end
+	local function windowBorderEnabled() return cfg().borderEnabled == true end
 	local function fixedValueColorEnabled() return cfg().valueUseClassColors ~= true end
 	local function rankingEnabled() return cfg().showRanks ~= false end
 	local function rankColumnEnabled() return cfg().showRanks ~= false and cfg().prefixRankInName ~= true end
@@ -3664,6 +3697,9 @@ function DamageMeter:BuildWindowSettings(index)
 		dropdownSetting(L["damageMeterBarAnchor"] or "Bar anchor", function() return normalizeAnchorV(cfg().barAnchor) end, function(value) self:SetConfigValue(index, "barAnchor", normalizeAnchorV(value)) end, buildVerticalAnchorOptions(), barId, 120, customBarSizeEnabled),
 		dividerSetting(barId),
 		sliderSetting(L["damageMeterBarSpacing"] or "Bar spacing", function() return cfg().barSpacing end, function(value) self:SetConfigValue(index, "barSpacing", clampNumber(value, 0, 16, DEFAULT_WINDOW.barSpacing)) end, 0, 16, 1, barId),
+		dividerSetting(barId),
+		dropdownSetting(L["Texture"] or "Texture", function() return cfg().texture end, function(value) self:SetConfigValue(index, "texture", value) end, buildMediaOptions("statusbar", false), barId, 260),
+		checkboxSetting(L["damageMeterUseClassColors"] or "Use class colors", function() return cfg().useClassColors == true end, function(value) self:SetConfigValue(index, "useClassColors", value) end, barId),
 		dividerSetting(barId),
 		checkboxSetting(L["damageMeterBarBorder"] or "Bar border", function() return cfg().barBorderEnabled == true end, function(value) self:SetConfigValue(index, "barBorderEnabled", value) end, barId),
 		dropdownSetting(L["damageMeterBarBorderTexture"] or "Bar border texture", function() return cfg().barBorderTexture end, function(value) self:SetConfigValue(index, "barBorderTexture", value) end, buildMediaOptions("border", false), barId, 260, barBorderEnabled),
@@ -3764,17 +3800,15 @@ function DamageMeter:BuildWindowSettings(index)
 		dropdownSetting(L["damageMeterRankFontOutline"] or "Rank font outline", function() return cfg().rankFontOutline end, function(value) self:SetConfigValue(index, "rankFontOutline", normalizeStyle(value)) end, buildStyleOptions(), rankingId, 180, rankColumnEnabled),
 		sliderSetting(L["damageMeterRankFontSize"] or "Rank font size", function() return cfg().rankFontSize end, function(value) self:SetConfigValue(index, "rankFontSize", clampNumber(value, 8, 24, DEFAULT_WINDOW.rankFontSize)) end, 8, 24, 1, rankingId, rankColumnEnabled),
 		sliderSetting(L["damageMeterRankGap"] or "Rank gap", function() return cfg().rankGap end, function(value) self:SetConfigValue(index, "rankGap", clampNumber(value, 0, 24, DEFAULT_WINDOW.rankGap)) end, 0, 24, 1, rankingId, rankingEnabled),
-		{ name = L["Media"] or "Media", kind = SettingType.Collapsible, id = mediaId, defaultCollapsed = true },
-		dropdownSetting(L["Texture"] or "Texture", function() return cfg().texture end, function(value) self:SetConfigValue(index, "texture", value) end, buildMediaOptions("statusbar", false), mediaId, 260),
+		{ name = L["Background"] or "Backdrop", kind = SettingType.Collapsible, id = mediaId, defaultCollapsed = true },
 		dropdownSetting(L["Backdrop texture"] or "Backdrop texture", function() return cfg().backdropTexture end, function(value) self:SetConfigValue(index, "backdropTexture", value) end, buildMediaOptions("statusbar", false), mediaId, 260),
 		colorSetting(L["Background color"] or "Background color", function() return normalizeColor(cfg().backdropColor, DEFAULT_WINDOW.backdropColor) end, function(value) self:SetConfigValue(index, "backdropColor", normalizeColor(value, DEFAULT_WINDOW.backdropColor)) end, DEFAULT_WINDOW.backdropColor, mediaId),
-		checkboxSetting(L["damageMeterUseClassColors"] or "Use class colors", function() return cfg().useClassColors == true end, function(value) self:SetConfigValue(index, "useClassColors", value) end, mediaId),
 		{ name = L["Border"] or "Border", kind = SettingType.Collapsible, id = borderId, defaultCollapsed = true },
 		checkboxSetting(L["Use border"] or "Use border", function() return cfg().borderEnabled == true end, function(value) self:SetConfigValue(index, "borderEnabled", value) end, borderId),
-		dropdownSetting(L["Border texture"] or "Border texture", function() return cfg().borderTexture end, function(value) self:SetConfigValue(index, "borderTexture", value) end, buildMediaOptions("border", false), borderId, 260),
-		colorSetting(L["Border color"] or "Border color", function() return normalizeColor(cfg().borderColor, DEFAULT_WINDOW.borderColor) end, function(value) self:SetConfigValue(index, "borderColor", normalizeColor(value, DEFAULT_WINDOW.borderColor)) end, DEFAULT_WINDOW.borderColor, borderId),
-		sliderSetting(L["Border size"] or "Border size", function() return cfg().borderSize end, function(value) self:SetConfigValue(index, "borderSize", clampNumber(value, 1, 32, DEFAULT_WINDOW.borderSize)) end, 1, 32, 1, borderId),
-		sliderSetting(L["Border offset"] or "Border offset", function() return cfg().borderInset end, function(value) self:SetConfigValue(index, "borderInset", clampNumber(value, 0, 24, DEFAULT_WINDOW.borderInset)) end, 0, 24, 1, borderId),
+		dropdownSetting(L["Border texture"] or "Border texture", function() return cfg().borderTexture end, function(value) self:SetConfigValue(index, "borderTexture", value) end, buildMediaOptions("border", false), borderId, 260, windowBorderEnabled),
+		colorSetting(L["Border color"] or "Border color", function() return normalizeColor(cfg().borderColor, DEFAULT_WINDOW.borderColor) end, function(value) self:SetConfigValue(index, "borderColor", normalizeColor(value, DEFAULT_WINDOW.borderColor)) end, DEFAULT_WINDOW.borderColor, borderId, windowBorderEnabled),
+		sliderSetting(L["Border size"] or "Border size", function() return cfg().borderSize end, function(value) self:SetConfigValue(index, "borderSize", clampNumber(value, 1, 32, DEFAULT_WINDOW.borderSize)) end, 1, 32, 1, borderId, windowBorderEnabled),
+		sliderSetting(L["Border offset"] or "Border offset", function() return cfg().borderInset end, function(value) self:SetConfigValue(index, "borderInset", clampNumber(value, 0, 24, DEFAULT_WINDOW.borderInset)) end, 0, 24, 1, borderId, windowBorderEnabled),
 	}
 	return settings
 end
