@@ -26,6 +26,7 @@ local SESSION_TYPES = {
 local SYNC_EXCLUDED_KEYS = {
 	enabled = true,
 	sessionType = true,
+	damageMeterType = true,
 	visibility = true,
 }
 local DEFAULT_WINDOW = {
@@ -36,6 +37,7 @@ local DEFAULT_WINDOW = {
 	windowOffsetX = 0,
 	windowOffsetY = 0,
 	sessionType = "current",
+	damageMeterType = "DamageDone",
 	visibility = "always",
 	maxRows = 8,
 	visibleRows = 8,
@@ -276,6 +278,53 @@ local function buildVerticalAnchorOptions()
 	}
 end
 
+local DAMAGE_METER_TYPES = {
+	{ key = "Absorbs", global = "DAMAGE_METER_TYPE_ABSORBS", enum = "Absorbs" },
+	{ key = "AvoidableDamageTaken", global = "DAMAGE_METER_TYPE_AVOIDABLE_DAMAGE_TAKEN", enum = "AvoidableDamageTaken" },
+	{ key = "DamageDone", global = "DAMAGE_METER_TYPE_DAMAGE_DONE", enum = "DamageDone" },
+	{ key = "DamageTaken", global = "DAMAGE_METER_TYPE_DAMAGE_TAKEN", enum = "DamageTaken" },
+	{ key = "Deaths", global = "DAMAGE_METER_TYPE_DEATHS", enum = "Deaths" },
+	{ key = "Dispels", global = "DAMAGE_METER_TYPE_DISPELS", enum = "Dispels" },
+	{ key = "Dps", global = "DAMAGE_METER_TYPE_DPS", enum = "Dps" },
+	{ key = "EnemyDamageTaken", global = "DAMAGE_METER_TYPE_ENEMY_DAMAGE_TAKEN", enum = "EnemyDamageTaken" },
+	{ key = "HealingDone", global = "DAMAGE_METER_TYPE_HEALING_DONE", enum = "HealingDone" },
+	{ key = "Hps", global = "DAMAGE_METER_TYPE_HPS", enum = "Hps" },
+	{ key = "Interrupts", global = "DAMAGE_METER_TYPE_INTERRUPTS", enum = "Interrupts" },
+}
+
+local function getDamageMeterTypeInfo(key)
+	for _, info in ipairs(DAMAGE_METER_TYPES) do
+		if info.key == key then return info end
+	end
+	return DAMAGE_METER_TYPES[3]
+end
+
+local function getDamageMeterTypeLabel(key)
+	local info = getDamageMeterTypeInfo(key)
+	return _G[info.global] or info.key
+end
+
+local function normalizeDamageMeterTypeKey(key)
+	local info = getDamageMeterTypeInfo(key)
+	return info and info.key or DEFAULT_WINDOW.damageMeterType
+end
+
+local function getDamageMeterTypeValue(key)
+	local info = getDamageMeterTypeInfo(key)
+	return Enum and Enum.DamageMeterType and Enum.DamageMeterType[info.enum]
+end
+
+local function buildDamageMeterTypeOptions()
+	local options = {}
+	for _, info in ipairs(DAMAGE_METER_TYPES) do
+		if Enum and Enum.DamageMeterType and Enum.DamageMeterType[info.enum] ~= nil then
+			options[#options + 1] = { value = info.key, label = getDamageMeterTypeLabel(info.key) }
+		end
+	end
+	table.sort(options, function(a, b) return a.label < b.label end)
+	return options
+end
+
 local function normalizeFramePoint(value)
 	if value == "TOPLEFT" or value == "TOP" or value == "TOPRIGHT" or value == "LEFT" or value == "CENTER" or value == "RIGHT" or value == "BOTTOMLEFT" or value == "BOTTOM" or value == "BOTTOMRIGHT" then
 		return value
@@ -318,12 +367,27 @@ local function safeText(value, fallback)
 	return value
 end
 
+local function safeNumber(value)
+	if value == nil or isSecret(value) then return nil end
+	return tonumber(value)
+end
+
 local function formatFull(value)
+	if isSecret(value) then
+		if AbbreviateNumbers then return AbbreviateNumbers(value) end
+		if AbbreviateLargeNumbers then return AbbreviateLargeNumbers(value) end
+		return ""
+	end
 	value = tonumber(value) or 0
 	return BreakUpLargeNumbers and BreakUpLargeNumbers(math.floor(value + 0.5)) or tostring(math.floor(value + 0.5))
 end
 
 local function formatShort(value)
+	if isSecret(value) then
+		if AbbreviateNumbers then return AbbreviateNumbers(value) end
+		if AbbreviateLargeNumbers then return AbbreviateLargeNumbers(value) end
+		return ""
+	end
 	value = tonumber(value) or 0
 	if AbbreviateNumbers then return AbbreviateNumbers(value) end
 	if AbbreviateLargeNumbers then return AbbreviateLargeNumbers(value) end
@@ -339,7 +403,9 @@ local function formatNumber(value, mode)
 end
 
 local function formatDuration(seconds)
-	seconds = math.floor((tonumber(seconds) or 0) + 0.5)
+	seconds = safeNumber(seconds)
+	if not seconds then return nil end
+	seconds = math.floor(seconds + 0.5)
 	if seconds >= 60 then
 		return string.format("%d:%02d", math.floor(seconds / 60), seconds % 60)
 	end
@@ -368,7 +434,7 @@ end
 
 local function formatValueText(amountText, dpsText, percent, config)
 	local text = config.valueFormat == "parentheses" and string.format("%s (%s)", amountText, dpsText) or string.format("%s / %s", amountText, dpsText)
-	if config.showPercent ~= false then
+	if config.showPercent ~= false and percent then
 		text = string.format("%s (%.1f%%)", text, percent)
 	end
 	return text
@@ -467,10 +533,6 @@ local function isDefaultTextLayout(config)
 		and clampNumber(config.valueOffsetY, -200, 200, DEFAULT_WINDOW.valueOffsetY) == DEFAULT_WINDOW.valueOffsetY
 end
 
-local function getDamageDoneType()
-	return Enum and Enum.DamageMeterType and Enum.DamageMeterType.DamageDone
-end
-
 local function getUpdateRate()
 	return clampNumber(db().damageMeterUpdateRate, 0.1, 2, 0.1)
 end
@@ -536,20 +598,23 @@ function DamageMeter:GetSession(index)
 	if not self:IsAvailable() then return nil end
 	local config = self:GetConfig(index)
 	local sessionType = SESSION_TYPES[config.sessionType] or SESSION_TYPES.current
-	local damageDoneType = getDamageDoneType()
-	if not sessionType or not damageDoneType or not C_DamageMeter.GetCombatSessionFromType then return nil end
-	local ok, session = pcall(C_DamageMeter.GetCombatSessionFromType, sessionType, damageDoneType)
+	local damageMeterType = getDamageMeterTypeValue(config.damageMeterType)
+	if not sessionType or damageMeterType == nil or not C_DamageMeter.GetCombatSessionFromType then return nil end
+	local ok, session = pcall(C_DamageMeter.GetCombatSessionFromType, sessionType, damageMeterType)
 	if ok then return session end
 	return nil
 end
 
 function DamageMeter:GetSessionDuration(index, session)
-	if session and type(session.durationSeconds) == "number" then return session.durationSeconds end
+	if session then
+		local duration = session.durationSeconds
+		if duration and not isSecret(duration) then return safeNumber(duration) end
+	end
 	if self:UsePreviewData() then return PREVIEW_SESSION.durationSeconds end
 	local sessionType = SESSION_TYPES[self:GetConfig(index).sessionType] or SESSION_TYPES.current
 	if sessionType and C_DamageMeter and C_DamageMeter.GetSessionDurationSeconds then
 		local ok, duration = pcall(C_DamageMeter.GetSessionDurationSeconds, sessionType)
-		if ok then return duration end
+		if ok and not isSecret(duration) then return safeNumber(duration) end
 	end
 	return nil
 end
@@ -699,12 +764,19 @@ function DamageMeter:ApplyRowValueWidth(row, config)
 	local frameWidth = clampNumber(config.width, 220, 700, DEFAULT_WINDOW.width)
 	local leftInset, rightInset = getRowTextInsets(config)
 	local availableWidth = math.max(1, (frameWidth - 8) - leftInset - rightInset)
-	local valueTextWidth = row.value.GetStringWidth and row.value:GetStringWidth() or 0
-	local valueTargetWidth = math.ceil(valueTextWidth + 12)
 	local minNameWidth = config.showNames == false and 0 or 24
 	local nameGap = config.showNames == false and 0 or 8
 	local maxValueWidth = math.max(1, availableWidth - minNameWidth - nameGap)
-	local valueWidth = math.min(math.max(64, valueTargetWidth), maxValueWidth)
+	local valueFontSize = clampNumber(config.valueFontSize, 8, 24, DEFAULT_WINDOW.valueFontSize)
+	local estimatedCharacters
+	if config.showPercent ~= false then
+		estimatedCharacters = config.valueFormat == "parentheses" and 19 or 21
+	else
+		estimatedCharacters = config.valueFormat == "parentheses" and 13 or 15
+	end
+	local valueTargetWidth = math.ceil((valueFontSize * estimatedCharacters * 0.62) + 12)
+	local minValueWidth = config.valueFormat == "parentheses" and 76 or 86
+	local valueWidth = math.min(math.max(minValueWidth, valueTargetWidth), maxValueWidth)
 	local nameWidth = math.max(minNameWidth, availableWidth - valueWidth - nameGap)
 	row.value:SetWidth(valueWidth)
 	row.name:SetWidth(nameWidth)
@@ -997,13 +1069,15 @@ function DamageMeter:UpdateHeader(index, session)
 	local frame = self:EnsureWindow(index)
 	local config = self:GetConfig(index)
 	local sessionLabel = config.sessionType == "overall" and (L["damageMeterOverall"] or "Overall") or (L["damageMeterCurrent"] or "Current")
+	local typeLabel = getDamageMeterTypeLabel(config.damageMeterType)
 	local duration = self:GetSessionDuration(index, session)
-	if duration and duration > 0 then
-		frame.header:SetText(string.format("%s %d - %s - %s", L["damageMeterTitle"] or "Damage Meter", index, sessionLabel, formatDuration(duration)))
+	local durationText = formatDuration(duration)
+	if durationText then
+		frame.header:SetText(string.format("%s %d - %s - %s - %s", L["damageMeterTitle"] or "Damage Meter", index, typeLabel, sessionLabel, durationText))
 	else
-		frame.header:SetText(string.format("%s %d - %s", L["damageMeterTitle"] or "Damage Meter", index, sessionLabel))
+		frame.header:SetText(string.format("%s %d - %s - %s", L["damageMeterTitle"] or "Damage Meter", index, typeLabel, sessionLabel))
 	end
-	frame.status.text:SetText(string.format("%s: %s  |  %s", L["damageMeterQuickSwitch"] or "Quick switch", sessionLabel, L["damageMeterDamageDone"] or "Damage Done"))
+	frame.status.text:SetText(string.format("%s: %s  |  %s", L["damageMeterQuickSwitch"] or "Quick switch", sessionLabel, typeLabel))
 end
 
 function DamageMeter:RefreshWindow(index)
@@ -1022,30 +1096,32 @@ function DamageMeter:RefreshWindow(index)
 	self:ApplyWindowStyle(index, contentRows)
 	self:UpdateHeader(index, session)
 
-	local maxAmount = tonumber(session and session.maxAmount) or 0
-	local totalAmount = tonumber(session and session.totalAmount) or 0
+	local totalAmount = safeNumber(session and session.totalAmount)
 	local shown = 0
 
 	for rowIndex = 1, maxRows do
 		local source = sources[rowIndex]
 		local row = frame.rows[rowIndex] or self:CreateRow(frame, rowIndex)
 		if source then
-			local amount = tonumber(source.totalAmount) or 0
-			local dps = tonumber(source.amountPerSecond) or 0
-			local percent = totalAmount > 0 and (amount / totalAmount * 100) or 0
-			local barValue = maxAmount > 0 and (amount / maxAmount) or 0
+			local rawMaxAmount = session and session.maxAmount
+			local rawAmount = source.totalAmount
+			if rawMaxAmount == nil then rawMaxAmount = 1 end
+			if rawAmount == nil then rawAmount = 0 end
+			local amount = safeNumber(source.totalAmount)
+			local percent = totalAmount and totalAmount > 0 and amount and (amount / totalAmount * 100) or nil
 			local r, g, b = self:GetClassColor(config, source.classFilename)
-			local amountText = formatNumber(amount, config.abbreviation)
-			local dpsText = formatNumber(dps, config.abbreviation)
+			local amountText = formatNumber(source.totalAmount, config.abbreviation)
+			local dpsText = formatNumber(source.amountPerSecond, config.abbreviation)
 			local valueText = formatValueText(amountText, dpsText, percent, config)
 
 			self:ApplyRankText(row, rowIndex, config)
-			row.icon:SetTexture(tonumber(source.specIconID) or 136243)
+			row.icon:SetTexture(safeNumber(source.specIconID) or 136243)
 			row.name:SetText(formatDisplayName(source.name, rowIndex, config))
 			row.value:SetText(valueText)
 			self:ApplyRowValueWidth(row, config)
 			row.bar:SetStatusBarColor(r, g, b, 0.85)
-			row.bar:SetValue(barValue)
+			row.bar:SetMinMaxValues(0, rawMaxAmount)
+			row.bar:SetValue(rawAmount)
 			row:Show()
 			shown = shown + 1
 		else
@@ -1380,6 +1456,7 @@ function DamageMeter:BuildWindowSettings(index)
 			{ value = "current", label = L["damageMeterCurrent"] or "Current" },
 			{ value = "overall", label = L["damageMeterOverall"] or "Overall" },
 		}, behaviorId, 110),
+		dropdownSetting(_G.TYPE or "Type", function() return normalizeDamageMeterTypeKey(cfg().damageMeterType) end, function(value) self:SetConfigValue(index, "damageMeterType", normalizeDamageMeterTypeKey(value)) end, buildDamageMeterTypeOptions, behaviorId, 180),
 		dropdownSetting(L["damageMeterVisibility"] or "Visibility", function() return cfg().visibility end, function(value) self:SetConfigValue(index, "visibility", (value == "combat" or value == "hidden") and value or "always") end, {
 			{ value = "always", label = L["Always show"] or "Always show" },
 			{ value = "combat", label = L["Always in combat"] or "Always in combat" },
