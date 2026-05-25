@@ -43,14 +43,12 @@ local FALLBACK_SHORT_NUMBER_ABBREV_BREAKPOINTS = {
 }
 local shortNumberAbbrevOptions
 local SYNC_EXCLUDED_KEYS = {
-	enabled = true,
 	alwaysShowPlayer = true,
 	sessionType = true,
 	damageMeterType = true,
 	visibility = true,
 }
 local DEFAULT_WINDOW = {
-	enabled = true,
 	alwaysShowPlayer = false,
 	anchorToWindow = 0,
 	windowAnchorPoint = "TOPLEFT",
@@ -63,6 +61,9 @@ local DEFAULT_WINDOW = {
 	visibility = "always",
 	maxRows = 8,
 	visibleRows = 8,
+	raidRowsEnabled = false,
+	raidMaxRows = 8,
+	raidVisibleRows = 8,
 	width = 320,
 	heightOffset = 0,
 	headerPosition = "TOP",
@@ -663,6 +664,25 @@ local function isCountOnlyMeterType(key)
 	return key == "Dispels" or key == "Interrupts"
 end
 
+local function useRaidRows(config)
+	return config.raidRowsEnabled == true and IsInRaid and IsInRaid() == true
+end
+
+local function getEffectiveMaxRows(config)
+	if useRaidRows(config) then
+		return clampNumber(config.raidMaxRows, 1, 30, DEFAULT_WINDOW.raidMaxRows)
+	end
+	return clampNumber(config.maxRows, 1, 30, DEFAULT_WINDOW.maxRows)
+end
+
+local function getEffectiveVisibleRows(config, maxRows)
+	maxRows = maxRows or getEffectiveMaxRows(config)
+	if useRaidRows(config) then
+		return math.min(maxRows, clampNumber(config.raidVisibleRows, 1, 30, DEFAULT_WINDOW.raidVisibleRows))
+	end
+	return math.min(maxRows, clampNumber(config.visibleRows, 1, 30, DEFAULT_WINDOW.visibleRows))
+end
+
 local function formatDeathTimeText(source)
 	local rawDeathTimeSeconds = source and source.deathTimeSeconds
 	if isSecret(rawDeathTimeSeconds) then return tostring(rawDeathTimeSeconds) end
@@ -768,7 +788,7 @@ end
 local function getEffectiveRankWidth(config)
 	if config.showRanks == false or config.prefixRankInName == true then return 0 end
 	local rankFontSize = clampNumber(config.rankFontSize, 8, 24, DEFAULT_WINDOW.rankFontSize)
-	local maxRows = clampNumber(config.maxRows, 1, 30, DEFAULT_WINDOW.maxRows)
+	local maxRows = getEffectiveMaxRows(config)
 	local rankChars = #tostring(maxRows) + 1
 	return math.min(60, math.ceil(rankChars * rankFontSize * 0.52) + 3)
 end
@@ -995,7 +1015,7 @@ function DamageMeter:IsEnabled()
 end
 
 function DamageMeter:IsWindowEnabled(index)
-	return self:IsEnabled() and index <= getWindowCount() and self:GetConfig(index).enabled == true
+	return self:IsEnabled() and index <= getWindowCount()
 end
 
 function DamageMeter:IsAvailable()
@@ -1017,7 +1037,6 @@ function DamageMeter:ShouldShow(index)
 	if self:IsInEditMode() then return true end
 	if not self:IsAvailable() then return false end
 	local visibility = self:GetConfig(index).visibility
-	if visibility == "hidden" then return false end
 	if visibility == "combat" then return UnitAffectingCombat("player") == true end
 	return true
 end
@@ -2292,8 +2311,8 @@ function DamageMeter:EnsureWindow(index)
 		local config = DamageMeter:GetConfig(index)
 		local _, _, spacing = getRowMetrics(config)
 		local effectiveRowHeight = getEffectiveRowHeight(config)
-		local maxRows = clampNumber(config.maxRows, 1, 30, DEFAULT_WINDOW.maxRows)
-		local visibleRows = math.min(maxRows, clampNumber(config.visibleRows, 1, 30, DEFAULT_WINDOW.visibleRows))
+		local maxRows = getEffectiveMaxRows(config)
+		local visibleRows = getEffectiveVisibleRows(config, maxRows)
 		local contentRows = math.min(maxRows, frame.contentRows or maxRows)
 		local maxScroll = math.max(0, (contentRows - visibleRows) * (effectiveRowHeight + spacing))
 		local nextScroll = (rowsViewport:GetVerticalScroll() or 0) - (delta * (effectiveRowHeight + spacing))
@@ -2390,8 +2409,8 @@ function DamageMeter:ApplyWindowStyle(index, contentRows)
 	local borderColor = normalizeColor(config.borderColor, DEFAULT_WINDOW.borderColor)
 	local _, _, spacing = getRowMetrics(config)
 	local effectiveRowHeight = getEffectiveRowHeight(config)
-	local maxRows = clampNumber(config.maxRows, 1, 30, DEFAULT_WINDOW.maxRows)
-	local visibleRows = math.min(maxRows, clampNumber(config.visibleRows, 1, 30, DEFAULT_WINDOW.visibleRows))
+	local maxRows = getEffectiveMaxRows(config)
+	local visibleRows = getEffectiveVisibleRows(config, maxRows)
 	contentRows = math.min(maxRows, clampNumber(contentRows, 0, maxRows, maxRows))
 	local viewportHeight = (visibleRows * effectiveRowHeight) + math.max(0, visibleRows - 1) * spacing
 	local titleFontSize = clampNumber(config.titleFontSize, 8, 28, DEFAULT_WINDOW.titleFontSize)
@@ -2536,7 +2555,7 @@ function DamageMeter:RefreshWindow(index)
 	local config = self:GetConfig(index)
 	local session = self:GetSession(index)
 	local sources = session and type(session.combatSources) == "table" and session.combatSources or {}
-	local maxRows = clampNumber(config.maxRows, 1, 30, DEFAULT_WINDOW.maxRows)
+	local maxRows = getEffectiveMaxRows(config)
 	local damageMeterType = self:GetEffectiveDamageMeterType(index)
 	local orderedSources = sources
 	if damageMeterType == "Deaths" and type(sources) == "table" and #sources > 1 then
@@ -2565,7 +2584,7 @@ function DamageMeter:RefreshWindow(index)
 	end
 	local rowsGrowUp = normalizeRowGrowth(config.rowGrowth) == "UP"
 	local highestBottom = damageMeterType ~= "Deaths" and normalizeRowSort(config.rowSort) == "BOTTOM"
-	local visibleRows = math.min(maxRows, clampNumber(config.visibleRows, 1, 30, DEFAULT_WINDOW.visibleRows))
+	local visibleRows = getEffectiveVisibleRows(config, maxRows)
 	local contentRows = math.min(maxRows, #orderedSources)
 	local displayEntries = {}
 	local playerSourceIndex
@@ -2991,6 +3010,7 @@ function DamageMeter:BuildWindowSettings(index)
 	local function rankColumnEnabled() return cfg().showRanks ~= false and cfg().prefixRankInName ~= true end
 	local function windowAnchorVisible() return index > 1 end
 	local function windowAnchorEnabled() return index > 1 and clampNumber(cfg().anchorToWindow, 0, index - 1, 0) > 0 end
+	local function raidRowsEnabled() return cfg().raidRowsEnabled == true end
 	local behaviorId = "damageMeterBehavior" .. index
 	local layoutId = "damageMeterLayout" .. index
 	local headerId = "damageMeterHeader" .. index
@@ -3019,21 +3039,24 @@ function DamageMeter:BuildWindowSettings(index)
 			if sourceIndex then self:PromptCopySettings(sourceIndex, index) end
 		end, function() return buildWindowCopyOptions(index) end, settingsId, 160, function() return getWindowCount() > 1 and db().damageMeterSyncSettings ~= true end),
 		{ name = L["Behavior"] or "Behavior", kind = SettingType.Collapsible, id = behaviorId, defaultCollapsed = true },
-		checkboxSetting(L["damageMeterWindowEnabled"] or "Enable window", function() return cfg().enabled == true end, function(value) self:SetConfigValue(index, "enabled", value) end, behaviorId),
 		checkboxSetting(L["damageMeterAlwaysShowPlayer"] or "Always show player", function() return cfg().alwaysShowPlayer == true end, function(value) self:SetConfigValue(index, "alwaysShowPlayer", value) end, behaviorId),
 		dropdownSetting(L["damageMeterSession"] or "Session", function() return cfg().sessionType end, function(value) self:SetConfigValue(index, "sessionType", value == "overall" and "overall" or "current") end, {
 			{ value = "current", label = L["damageMeterCurrent"] or "Current" },
 			{ value = "overall", label = L["damageMeterOverall"] or "Overall" },
 		}, behaviorId, 110),
 		dropdownSetting(_G.TYPE or "Type", function() return normalizeDamageMeterTypeKey(cfg().damageMeterType) end, function(value) self:SetConfigValue(index, "damageMeterType", normalizeDamageMeterTypeKey(value)) end, buildDamageMeterTypeOptions, behaviorId, 180),
-		dropdownSetting(L["damageMeterVisibility"] or "Visibility", function() return cfg().visibility end, function(value) self:SetConfigValue(index, "visibility", (value == "combat" or value == "hidden") and value or "always") end, {
+		dropdownSetting(L["damageMeterVisibility"] or "Show when", function() return cfg().visibility == "combat" and "combat" or "always" end, function(value) self:SetConfigValue(index, "visibility", value == "combat" and "combat" or "always") end, {
 			{ value = "always", label = L["Always show"] or "Always show" },
 			{ value = "combat", label = L["Always in combat"] or "Always in combat" },
-			{ value = "hidden", label = _G.HIDE or "Hide" },
 		}, behaviorId, 120),
 		{ name = L["Layout"] or "Layout", kind = SettingType.Collapsible, id = layoutId, defaultCollapsed = false },
 		sliderSetting(L["damageMeterMaxRows"] or "Max rows", function() return cfg().maxRows end, function(value) self:SetConfigValue(index, "maxRows", clampNumber(value, 1, 30, DEFAULT_WINDOW.maxRows)) end, 1, 30, 1, layoutId),
 		sliderSetting(L["damageMeterVisibleRows"] or "Visible rows", function() return cfg().visibleRows end, function(value) self:SetConfigValue(index, "visibleRows", clampNumber(value, 1, 30, DEFAULT_WINDOW.visibleRows)) end, 1, 30, 1, layoutId),
+		dividerSetting(layoutId),
+		checkboxSetting(L["damageMeterDifferentRaidRows"] or "Different settings in raid", function() return cfg().raidRowsEnabled == true end, function(value) self:SetConfigValue(index, "raidRowsEnabled", value) end, layoutId),
+		sliderSetting(L["damageMeterRaidMaxRows"] or "Raid max rows", function() return cfg().raidMaxRows end, function(value) self:SetConfigValue(index, "raidMaxRows", clampNumber(value, 1, 30, DEFAULT_WINDOW.raidMaxRows)) end, 1, 30, 1, layoutId, raidRowsEnabled),
+		sliderSetting(L["damageMeterRaidVisibleRows"] or "Raid visible rows", function() return cfg().raidVisibleRows end, function(value) self:SetConfigValue(index, "raidVisibleRows", clampNumber(value, 1, 30, DEFAULT_WINDOW.raidVisibleRows)) end, 1, 30, 1, layoutId, raidRowsEnabled),
+		dividerSetting(layoutId),
 		sliderSetting(L["Width"] or "Width", function() return cfg().width end, function(value) self:SetConfigValue(index, "width", clampNumber(value, 220, 700, DEFAULT_WINDOW.width)) end, 220, 700, 10, layoutId),
 		sliderSetting(L["damageMeterHeightOffset"] or "Height offset", function() return cfg().heightOffset end, function(value) self:SetConfigValue(index, "heightOffset", clampNumber(value, 0, 300, DEFAULT_WINDOW.heightOffset)) end, 0, 300, 1, layoutId),
 		dividerSetting(layoutId),
