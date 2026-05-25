@@ -1,4 +1,4 @@
--- luacheck: globals C_DamageMeter C_LFGInfo C_Spell C_StringUtil StaticPopupDialogs StaticPopup_Show YES CANCEL MenuUtil GameTooltip SecondsToClock DAMAGE_METER_COMBAT_NUMBER CLASS_ICON_TCOORDS
+-- luacheck: globals C_DamageMeter C_LFGInfo C_Spell C_StringUtil StaticPopupDialogs StaticPopup_Show YES CANCEL MenuUtil GameTooltip SecondsToClock DAMAGE_METER_COMBAT_NUMBER CLASS_ICON_TCOORDS UnitClass UnitExists UnitGUID IsInRaid
 local addonName, addon = ...
 
 local L = LibStub("AceLocale-3.0"):GetLocale(addonName)
@@ -21,6 +21,7 @@ local REMOVE_WINDOW_POPUP = "EQOL_DAMAGE_METER_REMOVE_WINDOW"
 local COPY_WINDOW_POPUP = "EQOL_DAMAGE_METER_COPY_WINDOW"
 local RESET_DATA_POPUP = "EQOL_DAMAGE_METER_RESET_DATA"
 local getWindowCount
+local PARTY_UNIT_TOKENS = { "player", "party1", "party2", "party3", "party4" }
 local SESSION_TYPES = {
 	current = Enum and Enum.DamageMeterSessionType and Enum.DamageMeterSessionType.Current,
 	overall = Enum and Enum.DamageMeterSessionType and Enum.DamageMeterSessionType.Overall,
@@ -68,6 +69,7 @@ local DEFAULT_WINDOW = {
 	barBorderEnabled = false,
 	barBorderTexture = "",
 	barBorderColor = { r = 0, g = 0, b = 0, a = 0.9 },
+	barBorderUseClassColor = false,
 	barBorderSize = 1,
 	barBorderInset = 0,
 	changeIconSize = false,
@@ -75,6 +77,7 @@ local DEFAULT_WINDOW = {
 	iconBorderEnabled = false,
 	iconBorderTexture = "",
 	iconBorderColor = { r = 0, g = 0, b = 0, a = 0.9 },
+	iconBorderUseClassColor = false,
 	iconBorderSize = 1,
 	iconBorderInset = 0,
 	showHeader = true,
@@ -121,6 +124,8 @@ local DEFAULT_WINDOW = {
 	valueFontFace = GLOBAL_FONT_KEY,
 	valueFontOutline = GLOBAL_STYLE_KEY,
 	valueFontSize = 11,
+	valueUseClassColors = false,
+	valueColor = { r = 1, g = 1, b = 1, a = 1 },
 	titleFontFace = GLOBAL_FONT_KEY,
 	titleFontOutline = GLOBAL_STYLE_KEY,
 	titleFontSize = 12,
@@ -918,6 +923,43 @@ function DamageMeter:GetSessionDuration(index, session)
 	return nil
 end
 
+function DamageMeter:GetUniquePartyUnitTokenForClass(classFilename)
+	if type(classFilename) ~= "string" or classFilename == "" then return nil end
+	if IsInRaid and IsInRaid() then return nil end
+	if not UnitExists or not UnitClass then return nil end
+	self.partyClassCache = self.partyClassCache or {}
+	for key in pairs(self.partyClassCache) do
+		self.partyClassCache[key] = nil
+	end
+	for _, unitToken in ipairs(PARTY_UNIT_TOKENS) do
+		if UnitExists(unitToken) then
+			local _, unitClassFilename = UnitClass(unitToken)
+			if type(unitClassFilename) == "string" and unitClassFilename ~= "" then
+				local entry = self.partyClassCache[unitClassFilename]
+				if entry then
+					entry.duplicate = true
+				else
+					self.partyClassCache[unitClassFilename] = { token = unitToken, duplicate = false }
+				end
+			end
+		end
+	end
+	local entry = self.partyClassCache[classFilename]
+	if entry and not entry.duplicate and entry.token ~= "player" then return entry.token end
+	return nil
+end
+
+function DamageMeter:GetUnitTokenGUID(unitToken)
+	if not unitToken or not UnitGUID then return nil end
+	local guid = UnitGUID(unitToken)
+	if guid and not isSecret(guid) then return guid end
+	return nil
+end
+
+function DamageMeter:HasSourceSpellDetails(details)
+	return type(details) == "table" and type(details.combatSpells) == "table" and #details.combatSpells > 0
+end
+
 function DamageMeter:GetSourceDetails(index, source)
 	if self:UsePreviewData() then return PREVIEW_SOURCE_DETAILS end
 	if not source or not self:IsAvailable() then return nil end
@@ -926,36 +968,91 @@ function DamageMeter:GetSourceDetails(index, source)
 	local sessionID = self:GetEffectiveSessionID(index)
 	local sourceGUID = source.sourceGUID
 	local sourceCreatureID = source.sourceCreatureID
-	if sourceGUID == nil and sourceCreatureID == nil then return nil end
+	local isLocalPlayer = source.isLocalPlayer == true
+	local isRestrictedSource = isSecret(source.name) or isSecret(source.sourceGUID)
+	local partyUnitToken = isRestrictedSource and not isLocalPlayer and self:GetUniquePartyUnitTokenForClass(source.classFilename) or nil
+	if sourceGUID == nil and sourceCreatureID == nil and not isLocalPlayer and not partyUnitToken then return nil end
 	if sessionID and C_DamageMeter.GetCombatSessionSourceFromID then
+		local emptyLocalDetails
 		local ok, details = pcall(C_DamageMeter.GetCombatSessionSourceFromID, sessionID, damageMeterType, sourceGUID, sourceCreatureID)
-		if ok then return details end
+		if ok then
+			if not isLocalPlayer or self:HasSourceSpellDetails(details) then return details end
+			emptyLocalDetails = details
+		end
+		if isLocalPlayer then
+			local playerGUID = self:GetUnitTokenGUID("player")
+			if playerGUID then
+				ok, details = pcall(C_DamageMeter.GetCombatSessionSourceFromID, sessionID, damageMeterType, playerGUID, nil)
+				if ok then return details end
+			end
+			ok, details = pcall(C_DamageMeter.GetCombatSessionSourceFromID, sessionID, damageMeterType, nil, nil)
+			if ok and self:HasSourceSpellDetails(details) then return details end
+		end
+		local partyGUID = self:GetUnitTokenGUID(partyUnitToken)
+		if partyGUID then
+			ok, details = pcall(C_DamageMeter.GetCombatSessionSourceFromID, sessionID, damageMeterType, partyGUID, nil)
+			if ok then return details end
+		end
+		if emptyLocalDetails then return emptyLocalDetails end
 		return nil
 	end
 	local sessionType = SESSION_TYPES[self:GetEffectiveSessionType(index)] or SESSION_TYPES.current
 	if sessionType and C_DamageMeter.GetCombatSessionSourceFromType then
+		local emptyLocalDetails
 		local ok, details = pcall(C_DamageMeter.GetCombatSessionSourceFromType, sessionType, damageMeterType, sourceGUID, sourceCreatureID)
-		if ok then return details end
+		if ok then
+			if not isLocalPlayer or self:HasSourceSpellDetails(details) then return details end
+			emptyLocalDetails = details
+		end
+		if isLocalPlayer then
+			local playerGUID = self:GetUnitTokenGUID("player")
+			if playerGUID then
+				ok, details = pcall(C_DamageMeter.GetCombatSessionSourceFromType, sessionType, damageMeterType, playerGUID, nil)
+				if ok then return details end
+			end
+			ok, details = pcall(C_DamageMeter.GetCombatSessionSourceFromType, sessionType, damageMeterType, nil, nil)
+			if ok and self:HasSourceSpellDetails(details) then return details end
+		end
+		local partyGUID = self:GetUnitTokenGUID(partyUnitToken)
+		if partyGUID then
+			ok, details = pcall(C_DamageMeter.GetCombatSessionSourceFromType, sessionType, damageMeterType, partyGUID, nil)
+			if ok then return details end
+		end
+		if emptyLocalDetails then return emptyLocalDetails end
 	end
 	return nil
 end
 
+local function getRaidClassColor(classFilename)
+	if type(classFilename) == "string" and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFilename] then
+		return RAID_CLASS_COLORS[classFilename]
+	end
+end
+
+local function getClassOrCustomColor(classFilename, customColor, defaultColor, useClassColor)
+	local fixedColor = normalizeColor(customColor, defaultColor)
+	local classColor = useClassColor == true and getRaidClassColor(classFilename)
+	if classColor then
+		return classColor.r or 1, classColor.g or 1, classColor.b or 1, fixedColor.a
+	end
+	return fixedColor.r, fixedColor.g, fixedColor.b, fixedColor.a
+end
+
 function DamageMeter:GetClassColor(config, classFilename)
 	if config.useClassColors ~= true then return 0.22, 0.56, 0.9 end
-	if type(classFilename) == "string" and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFilename] then
-		local color = RAID_CLASS_COLORS[classFilename]
+	local color = getRaidClassColor(classFilename)
+	if color then
 		return color.r or 1, color.g or 1, color.b or 1
 	end
 	return 0.55, 0.55, 0.55
 end
 
 function DamageMeter:GetNameColor(config, classFilename)
-	if config.nameUseClassColors == true and type(classFilename) == "string" and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFilename] then
-		local color = RAID_CLASS_COLORS[classFilename]
-		return color.r or 1, color.g or 1, color.b or 1, 1
-	end
-	local fixedColor = normalizeColor(config.nameColor, DEFAULT_WINDOW.nameColor)
-	return fixedColor.r, fixedColor.g, fixedColor.b, fixedColor.a
+	return getClassOrCustomColor(classFilename, config.nameColor, DEFAULT_WINDOW.nameColor, config.nameUseClassColors)
+end
+
+function DamageMeter:GetValueColor(config, classFilename)
+	return getClassOrCustomColor(classFilename, config.valueColor, DEFAULT_WINDOW.valueColor, config.valueUseClassColors)
 end
 
 function DamageMeter:ApplyFontString(fontString, config)
@@ -1024,17 +1121,17 @@ function DamageMeter:ApplyTooltipFontString(fontString, config)
 	fontString:SetFont(font, size, style)
 end
 
-function DamageMeter:ApplyBarBorder(row, config)
+function DamageMeter:ApplyBarBorder(row, config, classFilename)
 	if not row.barBorder or not row.barBorder.SetBackdrop then return end
 	if config.barBorderEnabled == true then
 		local borderTexture = resolveMedia("border", config.barBorderTexture, DEFAULT_BORDER)
-		local borderColor = normalizeColor(config.barBorderColor, DEFAULT_WINDOW.barBorderColor)
+		local br, bg, bb, ba = getClassOrCustomColor(classFilename, config.barBorderColor, DEFAULT_WINDOW.barBorderColor, config.barBorderUseClassColor)
 		local size = clampNumber(config.barBorderSize, 1, 32, DEFAULT_WINDOW.barBorderSize)
 		row.barBorder:SetBackdrop({
 			edgeFile = borderTexture,
 			edgeSize = size,
 		})
-		row.barBorder:SetBackdropBorderColor(borderColor.r, borderColor.g, borderColor.b, borderColor.a)
+		row.barBorder:SetBackdropBorderColor(br, bg, bb, ba)
 		row.barBorder:Show()
 	else
 		row.barBorder:SetBackdrop(nil)
@@ -1042,17 +1139,17 @@ function DamageMeter:ApplyBarBorder(row, config)
 	end
 end
 
-function DamageMeter:ApplyIconBorder(row, config)
+function DamageMeter:ApplyIconBorder(row, config, classFilename)
 	if not row.iconBorder or not row.iconBorder.SetBackdrop then return end
 	if config.iconBorderEnabled == true then
 		local borderTexture = resolveMedia("border", config.iconBorderTexture, DEFAULT_BORDER)
-		local borderColor = normalizeColor(config.iconBorderColor, DEFAULT_WINDOW.iconBorderColor)
+		local br, bg, bb, ba = getClassOrCustomColor(classFilename, config.iconBorderColor, DEFAULT_WINDOW.iconBorderColor, config.iconBorderUseClassColor)
 		local size = clampNumber(config.iconBorderSize, 1, 32, DEFAULT_WINDOW.iconBorderSize)
 		row.iconBorder:SetBackdrop({
 			edgeFile = borderTexture,
 			edgeSize = size,
 		})
-		row.iconBorder:SetBackdropBorderColor(borderColor.r, borderColor.g, borderColor.b, borderColor.a)
+		row.iconBorder:SetBackdropBorderColor(br, bg, bb, ba)
 		row.iconBorder:Show()
 	else
 		row.iconBorder:SetBackdrop(nil)
@@ -1283,6 +1380,41 @@ local function addTooltipSectionGap(rows)
 	rows[#rows + 1] = { spacer = true, heightMultiplier = 0.7 }
 end
 
+local function resolveCombatSpellDisplay(spell)
+	if not spell then return L["Unknown"] or UNKNOWN or "Unknown", 136243 end
+	local spellID = spell.spellID
+	local spellName
+	local spellIcon
+	if spellID and C_Spell then
+		if C_Spell.GetSpellInfo then
+			local ok, spellInfo = pcall(C_Spell.GetSpellInfo, spellID)
+			if ok and type(spellInfo) == "table" then
+				spellName = spellInfo.name
+				spellIcon = spellInfo.iconID
+			end
+		end
+		if not spellName and C_Spell.GetSpellName then
+			local ok, result = pcall(C_Spell.GetSpellName, spellID)
+			if ok then spellName = result end
+		end
+		if not spellIcon and C_Spell.GetSpellTexture then
+			local ok, result = pcall(C_Spell.GetSpellTexture, spellID)
+			if ok then spellIcon = result end
+		end
+	end
+	if not spellName then
+		local creatureName = spell.creatureName
+		if creatureName and isSecret(creatureName) then
+			spellName = creatureName
+		elseif creatureName and tostring(creatureName) ~= "" then
+			spellName = tostring(creatureName)
+		else
+			spellName = L["Unknown"] or UNKNOWN or "Unknown"
+		end
+	end
+	return spellName, spellIcon or 136243
+end
+
 function DamageMeter:BuildTooltipRows(details, config)
 	local rows = {}
 	if not details or type(details.combatSpells) ~= "table" then return rows end
@@ -1297,21 +1429,12 @@ function DamageMeter:BuildTooltipRows(details, config)
 	local targetMap = {}
 	local spellRows = 0
 	for _, spell in ipairs(details.combatSpells) do
-		local spellName
-		local spellIcon = safeNumber(spell.spellID) and C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellInfo(spell.spellID)
-		if type(spellIcon) == "table" then
-			spellName = spellIcon.name
-			spellIcon = spellIcon.iconID
-		else
-			spellName = safeNumber(spell.spellID) and C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(spell.spellID)
-			spellIcon = safeNumber(spell.spellID) and C_Spell and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(spell.spellID)
-		end
-		spellName = spellName or safeText(spell.creatureName, L["Unknown"] or UNKNOWN or "Unknown")
+		local spellName, spellIcon = resolveCombatSpellDisplay(spell)
 		local amount = spell.totalAmount
 		local dps = spell.amountPerSecond
 		local percent = totalAmount and totalAmount > 0 and safeNumber(amount) and (safeNumber(amount) / totalAmount * 100) or nil
 		if spellRows < spellLimit then
-			rows[#rows + 1] = { name = spellName, icon = spellIcon or 136243, amount = showAmount and formatNumber(amount, config.abbreviation), dps = showDPS and formatNumber(dps, config.abbreviation), percent = showPercent and percent and string.format("%.1f%%", percent), sortAmount = safeNumber(amount) or 0 }
+			rows[#rows + 1] = { name = spellName, icon = spellIcon, amount = showAmount and formatNumber(amount, config.abbreviation), dps = showDPS and formatNumber(dps, config.abbreviation), percent = showPercent and percent and string.format("%.1f%%", percent), sortAmount = safeNumber(amount) or 0 }
 			spellRows = spellRows + 1
 		end
 
@@ -1845,14 +1968,18 @@ function DamageMeter:RefreshWindow(index)
 			local percent = totalAmount and totalAmount > 0 and amount and (amount / totalAmount * 100) or nil
 			local r, g, b = self:GetClassColor(config, source.classFilename)
 			local nr, ng, nb, na = self:GetNameColor(config, source.classFilename)
+			local vr, vg, vb, va = self:GetValueColor(config, source.classFilename)
 			local valueText = formatRowValueText(source, percent, config, damageMeterType)
 
 			self:ApplyRankText(row, sourceIndex, config)
 			row.sourceData = source
+			self:ApplyIconBorder(row, config, source.classFilename)
+			self:ApplyBarBorder(row, config, source.classFilename)
 			applySourceIcon(row.icon, source)
 			row.name:SetText(formatDisplayName(source.name, sourceIndex, config))
 			row.name:SetTextColor(nr, ng, nb, na)
 			row.value:SetText(valueText)
+			row.value:SetTextColor(vr, vg, vb, va)
 			self:ApplyRowValueWidth(row, config)
 			row.bar:SetStatusBarColor(r, g, b, 0.85)
 			row.bar:SetMinMaxValues(0, rawMaxAmount)
@@ -2195,8 +2322,11 @@ function DamageMeter:BuildWindowSettings(index)
 	local function tooltipEnabled() return cfg().tooltipEnabled == true end
 	local function customBarSizeEnabled() return cfg().changeBarSize == true end
 	local function barBorderEnabled() return cfg().barBorderEnabled == true end
+	local function fixedBarBorderColorEnabled() return cfg().barBorderEnabled == true and cfg().barBorderUseClassColor ~= true end
 	local function customIconSizeEnabled() return cfg().changeIconSize == true end
 	local function iconBorderEnabled() return cfg().iconBorderEnabled == true end
+	local function fixedIconBorderColorEnabled() return cfg().iconBorderEnabled == true and cfg().iconBorderUseClassColor ~= true end
+	local function fixedValueColorEnabled() return cfg().valueUseClassColors ~= true end
 	local function rankingEnabled() return cfg().showRanks ~= false end
 	local function rankColumnEnabled() return cfg().showRanks ~= false and cfg().prefixRankInName ~= true end
 	local function windowAnchorVisible() return index > 1 end
@@ -2287,7 +2417,11 @@ function DamageMeter:BuildWindowSettings(index)
 		dividerSetting(barId),
 		checkboxSetting(L["damageMeterBarBorder"] or "Bar border", function() return cfg().barBorderEnabled == true end, function(value) self:SetConfigValue(index, "barBorderEnabled", value) end, barId),
 		dropdownSetting(L["damageMeterBarBorderTexture"] or "Bar border texture", function() return cfg().barBorderTexture end, function(value) self:SetConfigValue(index, "barBorderTexture", value) end, buildMediaOptions("border", false), barId, 260, barBorderEnabled),
-		colorSetting(L["damageMeterBarBorderColor"] or "Bar border color", function() return normalizeColor(cfg().barBorderColor, DEFAULT_WINDOW.barBorderColor) end, function(value) self:SetConfigValue(index, "barBorderColor", normalizeColor(value, DEFAULT_WINDOW.barBorderColor)) end, DEFAULT_WINDOW.barBorderColor, barId, barBorderEnabled),
+		checkboxSetting(L["damageMeterUseClassColor"] or "Use class color", function() return cfg().barBorderUseClassColor == true end, function(value)
+			self:SetConfigValue(index, "barBorderUseClassColor", value)
+			requestEditModeSettingsRefresh()
+		end, barId, barBorderEnabled),
+		colorSetting(L["damageMeterBarBorderColor"] or "Bar border color", function() return normalizeColor(cfg().barBorderColor, DEFAULT_WINDOW.barBorderColor) end, function(value) self:SetConfigValue(index, "barBorderColor", normalizeColor(value, DEFAULT_WINDOW.barBorderColor)) end, DEFAULT_WINDOW.barBorderColor, barId, fixedBarBorderColorEnabled),
 		sliderSetting(L["damageMeterBarBorderSize"] or "Bar border size", function() return cfg().barBorderSize end, function(value) self:SetConfigValue(index, "barBorderSize", clampNumber(value, 1, 32, DEFAULT_WINDOW.barBorderSize)) end, 1, 32, 1, barId, barBorderEnabled),
 		sliderSetting(L["damageMeterBarBorderOffset"] or "Bar border offset", function() return cfg().barBorderInset end, function(value) self:SetConfigValue(index, "barBorderInset", clampNumber(value, 0, 24, DEFAULT_WINDOW.barBorderInset)) end, 0, 24, 1, barId, barBorderEnabled),
 		{ name = L["damageMeterIcon"] or "Icon", kind = SettingType.Collapsible, id = iconId, defaultCollapsed = true },
@@ -2302,7 +2436,11 @@ function DamageMeter:BuildWindowSettings(index)
 			requestEditModeSettingsRefresh()
 		end, iconId),
 		dropdownSetting(L["damageMeterIconBorderTexture"] or "Icon border texture", function() return cfg().iconBorderTexture end, function(value) self:SetConfigValue(index, "iconBorderTexture", value) end, buildMediaOptions("border", false), iconId, 260, iconBorderEnabled),
-		colorSetting(L["damageMeterIconBorderColor"] or "Icon border color", function() return normalizeColor(cfg().iconBorderColor, DEFAULT_WINDOW.iconBorderColor) end, function(value) self:SetConfigValue(index, "iconBorderColor", normalizeColor(value, DEFAULT_WINDOW.iconBorderColor)) end, DEFAULT_WINDOW.iconBorderColor, iconId, iconBorderEnabled),
+		checkboxSetting(L["damageMeterUseClassColor"] or "Use class color", function() return cfg().iconBorderUseClassColor == true end, function(value)
+			self:SetConfigValue(index, "iconBorderUseClassColor", value)
+			requestEditModeSettingsRefresh()
+		end, iconId, iconBorderEnabled),
+		colorSetting(L["damageMeterIconBorderColor"] or "Icon border color", function() return normalizeColor(cfg().iconBorderColor, DEFAULT_WINDOW.iconBorderColor) end, function(value) self:SetConfigValue(index, "iconBorderColor", normalizeColor(value, DEFAULT_WINDOW.iconBorderColor)) end, DEFAULT_WINDOW.iconBorderColor, iconId, fixedIconBorderColorEnabled),
 		sliderSetting(L["damageMeterIconBorderSize"] or "Icon border size", function() return cfg().iconBorderSize end, function(value) self:SetConfigValue(index, "iconBorderSize", clampNumber(value, 1, 32, DEFAULT_WINDOW.iconBorderSize)) end, 1, 32, 1, iconId, iconBorderEnabled),
 		sliderSetting(L["damageMeterIconBorderOffset"] or "Icon border offset", function() return cfg().iconBorderInset end, function(value) self:SetConfigValue(index, "iconBorderInset", clampNumber(value, 0, 24, DEFAULT_WINDOW.iconBorderInset)) end, 0, 24, 1, iconId, iconBorderEnabled),
 		{ name = L["damageMeterNames"] or "Names", kind = SettingType.Collapsible, id = namesId, defaultCollapsed = true },
@@ -2321,6 +2459,12 @@ function DamageMeter:BuildWindowSettings(index)
 		sliderSetting(L["damageMeterNameOffsetY"] or "Name Y offset", function() return cfg().nameOffsetY end, function(value) self:SetConfigValue(index, "nameOffsetY", clampNumber(value, -200, 200, DEFAULT_WINDOW.nameOffsetY)) end, -200, 200, 1, namesId, namesEnabled),
 		{ name = L["damageMeterValues"] or "Values", kind = SettingType.Collapsible, id = valuesId, defaultCollapsed = true },
 		checkboxSetting(L["damageMeterShowPercent"] or "Show percent", function() return cfg().showPercent ~= false end, function(value) self:SetConfigValue(index, "showPercent", value) end, valuesId),
+		dividerSetting(valuesId),
+		checkboxSetting(L["damageMeterUseClassColor"] or "Use class color", function() return cfg().valueUseClassColors == true end, function(value)
+			self:SetConfigValue(index, "valueUseClassColors", value)
+			requestEditModeSettingsRefresh()
+		end, valuesId),
+		colorSetting(L["damageMeterValueColor"] or "Value color", function() return normalizeColor(cfg().valueColor, DEFAULT_WINDOW.valueColor) end, function(value) self:SetConfigValue(index, "valueColor", normalizeColor(value, DEFAULT_WINDOW.valueColor)) end, DEFAULT_WINDOW.valueColor, valuesId, fixedValueColorEnabled),
 		dividerSetting(valuesId),
 		dropdownSetting(L["damageMeterValueFont"] or "Value font", function() return cfg().valueFontFace end, function(value) self:SetConfigValue(index, "valueFontFace", value) end, buildMediaOptions("font", true), valuesId, 260),
 		dropdownSetting(L["damageMeterValueFontOutline"] or "Value font outline", function() return cfg().valueFontOutline end, function(value) self:SetConfigValue(index, "valueFontOutline", normalizeStyle(value)) end, buildStyleOptions(), valuesId, 180),
