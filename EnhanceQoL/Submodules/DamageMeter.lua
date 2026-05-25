@@ -200,6 +200,7 @@ local function clampNumber(value, minValue, maxValue, default)
 end
 
 local copyValue
+local normalizeWindowQuickTypes
 
 local function copyDefaults(target, defaults)
 	for key, value in pairs(defaults) do
@@ -224,6 +225,7 @@ local function applyWindowDefaults(target, index)
 	if index > 1 and not hadSessionType then
 		target.sessionType = index % 2 == 0 and "overall" or "current"
 	end
+	normalizeWindowQuickTypes(target)
 	return target
 end
 
@@ -481,6 +483,11 @@ local function normalizeQuickDamageMeterTypes(types, fallback)
 	return normalized
 end
 
+normalizeWindowQuickTypes = function(config)
+	config.quickTypes = normalizeQuickDamageMeterTypes(config.quickTypes, config.damageMeterType or DEFAULT_WINDOW.damageMeterType)
+	return config.quickTypes
+end
+
 local function normalizeFramePoint(value)
 	if value == "TOPLEFT" or value == "TOP" or value == "TOPRIGHT" or value == "LEFT" or value == "CENTER" or value == "RIGHT" or value == "BOTTOMLEFT" or value == "BOTTOM" or value == "BOTTOMRIGHT" then
 		return value
@@ -649,6 +656,7 @@ end
 
 local function formatDisplayName(value, rowIndex, config)
 	local name = formatSourceName(value, config)
+	if isSecret(name) then return name end
 	if config.showRanks ~= false and config.prefixRankInName == true then
 		local gap = clampNumber(config.rankGap, 0, 24, DEFAULT_WINDOW.rankGap)
 		local spaces = string.rep(" ", math.ceil(gap / 4))
@@ -741,8 +749,8 @@ local function applyClassIcon(texture, classFilename)
 	return true
 end
 
-local function applySourceIcon(texture, source)
-	if isInFollowerDungeon() and source.isLocalPlayer ~= true and applyClassIcon(texture, source.classFilename) then
+local function applySourceIcon(texture, source, inFollowerDungeon)
+	if inFollowerDungeon and source.isLocalPlayer ~= true and applyClassIcon(texture, source.classFilename) then
 		return
 	end
 	local specIconID = safeNumber(source.specIconID)
@@ -791,10 +799,25 @@ local function setShownIfChanged(region, shown)
 end
 
 local function setTextColorIfChanged(fontString, r, g, b, a)
-	local signature = colorSignature(r, g, b, a)
-	if fontString._damageMeterTextColorSignature == signature then return end
-	fontString._damageMeterTextColorSignature = signature
+	a = a == nil and 1 or a
+	if fontString._damageMeterTextColorR == r
+		and fontString._damageMeterTextColorG == g
+		and fontString._damageMeterTextColorB == b
+		and fontString._damageMeterTextColorA == a then
+		return
+	end
+	fontString._damageMeterTextColorR = r
+	fontString._damageMeterTextColorG = g
+	fontString._damageMeterTextColorB = b
+	fontString._damageMeterTextColorA = a
 	fontString:SetTextColor(r, g, b, a)
+end
+
+local function setPlainTextIfChanged(fontString, text)
+	text = text or ""
+	if fontString._damageMeterPlainText == text then return end
+	fontString._damageMeterPlainText = text
+	fontString:SetText(text)
 end
 
 local function getRowMetrics(config)
@@ -956,11 +979,27 @@ function DamageMeter:GetQuickDamageMeterTypes(index)
 	if config.quickTypes == DEFAULT_WINDOW.quickTypes then
 		config.quickTypes = copyValue(DEFAULT_WINDOW.quickTypes)
 	end
-	if type(config.quickTypes) ~= "table" then
-		config.quickTypes = copyValue(DEFAULT_WINDOW.quickTypes)
-	end
-	config.quickTypes = normalizeQuickDamageMeterTypes(config.quickTypes)
+	if type(config.quickTypes) ~= "table" or #config.quickTypes == 0 then return normalizeWindowQuickTypes(config) end
 	return config.quickTypes
+end
+
+function DamageMeter:GetQuickDamageMeterTypeLabels(index, fallbackLabel)
+	self.quickTypeLabelCache = self.quickTypeLabelCache or {}
+	local quickTypes = self:GetQuickDamageMeterTypes(index)
+	local cache = self.quickTypeLabelCache[index]
+	if cache and cache.quickTypes == quickTypes and cache.fallbackLabel == fallbackLabel then return cache.text end
+	local text
+	for quickIndex, quickType in ipairs(quickTypes) do
+		local label = getDamageMeterTypeLabel(quickType)
+		text = text and (text .. " / " .. label) or label
+	end
+	if not text or text == "" then text = fallbackLabel or "" end
+	self.quickTypeLabelCache[index] = {
+		quickTypes = quickTypes,
+		fallbackLabel = fallbackLabel,
+		text = text,
+	}
+	return text
 end
 
 function DamageMeter:HasQuickDamageMeterType(index, damageMeterType)
@@ -973,7 +1012,7 @@ end
 
 function DamageMeter:AddQuickDamageMeterType(index, damageMeterType)
 	local key = normalizeDamageMeterTypeKey(damageMeterType)
-	local quickTypes = self:GetQuickDamageMeterTypes(index)
+	local quickTypes = copyValue(self:GetQuickDamageMeterTypes(index))
 	for _, quickType in ipairs(quickTypes) do
 		if quickType == key then return end
 	end
@@ -983,7 +1022,7 @@ end
 
 function DamageMeter:RemoveQuickDamageMeterType(index, damageMeterType)
 	local key = normalizeDamageMeterTypeKey(damageMeterType)
-	local quickTypes = self:GetQuickDamageMeterTypes(index)
+	local quickTypes = copyValue(self:GetQuickDamageMeterTypes(index))
 	for quickIndex = #quickTypes, 1, -1 do
 		if quickTypes[quickIndex] == key then
 			table.remove(quickTypes, quickIndex)
@@ -1321,52 +1360,78 @@ function DamageMeter:ApplyTooltipFontString(fontString, config)
 end
 
 function DamageMeter:ApplyBarBorder(row, config, classFilename)
-	if not row.barBorder or not row.barBorder.SetBackdrop then return end
+	local border = row.barBorder
+	if not border or not border.SetBackdrop then return end
+	local enabled = config.barBorderEnabled == true
+	local classKey = enabled and config.barBorderUseClassColor == true and not isSecret(classFilename) and type(classFilename) == "string" and classFilename or false
+	local styleVersion = self:GetWindowStyleVersion(row.windowIndex or 0)
+	if border._damageMeterApplyVersion == styleVersion
+		and border._damageMeterApplyEnabled == enabled
+		and border._damageMeterApplyClassKey == classKey then
+		setShownIfChanged(border, enabled)
+		return
+	end
+	border._damageMeterApplyVersion = styleVersion
+	border._damageMeterApplyEnabled = enabled
+	border._damageMeterApplyClassKey = classKey
 	if config.barBorderEnabled == true then
 		local size = clampNumber(config.barBorderSize, 1, 32, DEFAULT_WINDOW.barBorderSize)
-		local br, bg, bb, ba = getClassOrCustomColor(classFilename, config.barBorderColor, DEFAULT_WINDOW.barBorderColor, config.barBorderUseClassColor)
+		local br, bg, bb, ba = getClassOrCustomColor(classKey, config.barBorderColor, DEFAULT_WINDOW.barBorderColor, config.barBorderUseClassColor)
 		local signature = tostring(config.barBorderTexture) .. ":" .. size .. ":" .. colorSignature(br, bg, bb, ba)
-		if row.barBorder._damageMeterBorderSignature ~= signature then
-			row.barBorder._damageMeterBorderSignature = signature
+		if border._damageMeterBorderSignature ~= signature then
+			border._damageMeterBorderSignature = signature
 			local borderTexture = resolveMedia("border", config.barBorderTexture, DEFAULT_BORDER)
-			row.barBorder:SetBackdrop({
+			border:SetBackdrop({
 				edgeFile = borderTexture,
 				edgeSize = size,
 			})
-			row.barBorder:SetBackdropBorderColor(br, bg, bb, ba)
+			border:SetBackdropBorderColor(br, bg, bb, ba)
 		end
-		row.barBorder:Show()
+		setShownIfChanged(border, true)
 	else
-		if row.barBorder._damageMeterBorderSignature ~= "off" then
-			row.barBorder._damageMeterBorderSignature = "off"
-			row.barBorder:SetBackdrop(nil)
+		if border._damageMeterBorderSignature ~= "off" then
+			border._damageMeterBorderSignature = "off"
+			border:SetBackdrop(nil)
 		end
-		row.barBorder:Hide()
+		setShownIfChanged(border, false)
 	end
 end
 
 function DamageMeter:ApplyIconBorder(row, config, classFilename)
-	if not row.iconBorder or not row.iconBorder.SetBackdrop then return end
+	local border = row.iconBorder
+	if not border or not border.SetBackdrop then return end
+	local enabled = config.iconBorderEnabled == true
+	local classKey = enabled and config.iconBorderUseClassColor == true and not isSecret(classFilename) and type(classFilename) == "string" and classFilename or false
+	local styleVersion = self:GetWindowStyleVersion(row.windowIndex or 0)
+	if border._damageMeterApplyVersion == styleVersion
+		and border._damageMeterApplyEnabled == enabled
+		and border._damageMeterApplyClassKey == classKey then
+		setShownIfChanged(border, enabled)
+		return
+	end
+	border._damageMeterApplyVersion = styleVersion
+	border._damageMeterApplyEnabled = enabled
+	border._damageMeterApplyClassKey = classKey
 	if config.iconBorderEnabled == true then
 		local size = clampNumber(config.iconBorderSize, 1, 32, DEFAULT_WINDOW.iconBorderSize)
-		local br, bg, bb, ba = getClassOrCustomColor(classFilename, config.iconBorderColor, DEFAULT_WINDOW.iconBorderColor, config.iconBorderUseClassColor)
+		local br, bg, bb, ba = getClassOrCustomColor(classKey, config.iconBorderColor, DEFAULT_WINDOW.iconBorderColor, config.iconBorderUseClassColor)
 		local signature = tostring(config.iconBorderTexture) .. ":" .. size .. ":" .. colorSignature(br, bg, bb, ba)
-		if row.iconBorder._damageMeterBorderSignature ~= signature then
-			row.iconBorder._damageMeterBorderSignature = signature
+		if border._damageMeterBorderSignature ~= signature then
+			border._damageMeterBorderSignature = signature
 			local borderTexture = resolveMedia("border", config.iconBorderTexture, DEFAULT_BORDER)
-			row.iconBorder:SetBackdrop({
+			border:SetBackdrop({
 				edgeFile = borderTexture,
 				edgeSize = size,
 			})
-			row.iconBorder:SetBackdropBorderColor(br, bg, bb, ba)
+			border:SetBackdropBorderColor(br, bg, bb, ba)
 		end
-		row.iconBorder:Show()
+		setShownIfChanged(border, true)
 	else
-		if row.iconBorder._damageMeterBorderSignature ~= "off" then
-			row.iconBorder._damageMeterBorderSignature = "off"
-			row.iconBorder:SetBackdrop(nil)
+		if border._damageMeterBorderSignature ~= "off" then
+			border._damageMeterBorderSignature = "off"
+			border:SetBackdrop(nil)
 		end
-		row.iconBorder:Hide()
+		setShownIfChanged(border, false)
 	end
 end
 
@@ -2584,15 +2649,20 @@ function DamageMeter:UpdateHeader(index, session)
 	local config = self:GetConfig(index)
 	local sessionLabel = self:GetEffectiveSessionLabel(index)
 	local typeLabel = getDamageMeterTypeLabel(self:GetEffectiveDamageMeterType(index))
-	local duration = self:GetSessionDuration(index, session)
-	local durationText = config.showHeaderTime ~= false and formatDuration(duration, normalizeHeaderTimeFormat(config.headerTimeFormat)) or nil
+	local durationText
+	if config.showHeaderTime ~= false then
+		durationText = formatDuration(self:GetSessionDuration(index, session), normalizeHeaderTimeFormat(config.headerTimeFormat))
+	end
 	local formatMode = normalizeHeaderFormat(config.headerFormat)
-	local primary = {}
-	if config.showHeaderTime ~= false and durationText and (formatMode == "timeTypeDash" or formatMode == "timeTypeSpace") then primary[#primary + 1] = durationText end
-	if config.showHeaderType ~= false and typeLabel then primary[#primary + 1] = typeLabel end
-	if config.showHeaderTime ~= false and durationText and (formatMode == "typeTimeDash" or formatMode == "typeTimeSpace") then primary[#primary + 1] = durationText end
 	local separator = (formatMode == "timeTypeSpace" or formatMode == "typeTimeSpace") and " " or " - "
-	local headerText = table.concat(primary, separator)
+	local headerText = ""
+	if durationText and (formatMode == "timeTypeDash" or formatMode == "timeTypeSpace") then headerText = durationText end
+	if config.showHeaderType ~= false and typeLabel then
+		headerText = headerText ~= "" and (headerText .. separator .. typeLabel) or typeLabel
+	end
+	if durationText and (formatMode == "typeTimeDash" or formatMode == "typeTimeSpace") then
+		headerText = headerText ~= "" and (headerText .. separator .. durationText) or durationText
+	end
 	if config.showHeaderSession ~= false and sessionLabel then
 		if headerText ~= "" then
 			headerText = sessionLabel .. " - " .. headerText
@@ -2600,13 +2670,8 @@ function DamageMeter:UpdateHeader(index, session)
 			headerText = sessionLabel
 		end
 	end
-	frame.header:SetText(headerText)
-	local quickLabels = {}
-	for _, quickType in ipairs(self:GetQuickDamageMeterTypes(index)) do
-		quickLabels[#quickLabels + 1] = getDamageMeterTypeLabel(quickType)
-	end
-	if #quickLabels == 0 then quickLabels[1] = typeLabel end
-	frame.status.text:SetText(string.format("%s: %s  |  %s", L["damageMeterQuickSwitch"] or "Quick switch", sessionLabel, table.concat(quickLabels, " / ")))
+	setPlainTextIfChanged(frame.header, headerText)
+	setPlainTextIfChanged(frame.status.text, string.format("%s: %s  |  %s", L["damageMeterQuickSwitch"] or "Quick switch", sessionLabel, self:GetQuickDamageMeterTypeLabels(index, typeLabel)))
 end
 
 function DamageMeter:RefreshWindow(index)
@@ -2650,7 +2715,7 @@ function DamageMeter:RefreshWindow(index)
 	local highestBottom = damageMeterType ~= "Deaths" and normalizeRowSort(config.rowSort) == "BOTTOM"
 	local visibleRows = getEffectiveVisibleRows(config, maxRows)
 	local contentRows = math.min(maxRows, #orderedSources)
-	local displayEntries = {}
+	local displayIndices
 	local playerSourceIndex
 	if config.alwaysShowPlayer == true then
 		for sourceIndex, source in ipairs(orderedSources) do
@@ -2663,21 +2728,33 @@ function DamageMeter:RefreshWindow(index)
 	local playerVisibleLimit = highestBottom and math.max(1, contentRows - visibleRows + 1) or math.min(contentRows, visibleRows)
 	local forcePlayer = playerSourceIndex and contentRows > 0 and ((highestBottom and playerSourceIndex < playerVisibleLimit) or (not highestBottom and playerSourceIndex > playerVisibleLimit))
 	if forcePlayer then
-		local usedSourceIndices = { [playerSourceIndex] = true }
+		displayIndices = frame._damageMeterDisplayIndices
+		if not displayIndices then
+			displayIndices = {}
+			frame._damageMeterDisplayIndices = displayIndices
+		end
+		for displayIndex = #displayIndices, 1, -1 do
+			displayIndices[displayIndex] = nil
+		end
+		local usedSourceIndices = frame._damageMeterUsedSourceIndices
+		if not usedSourceIndices then
+			usedSourceIndices = {}
+			frame._damageMeterUsedSourceIndices = usedSourceIndices
+		end
+		for sourceIndex in pairs(usedSourceIndices) do
+			usedSourceIndices[sourceIndex] = nil
+		end
+		usedSourceIndices[playerSourceIndex] = true
 		local playerSlot = playerVisibleLimit
 		for sourceIndex = 1, playerSlot - 1 do
-			displayEntries[#displayEntries + 1] = { source = orderedSources[sourceIndex], sourceIndex = sourceIndex }
+			displayIndices[#displayIndices + 1] = sourceIndex
 		end
-		displayEntries[#displayEntries + 1] = { source = orderedSources[playerSourceIndex], sourceIndex = playerSourceIndex }
+		displayIndices[#displayIndices + 1] = playerSourceIndex
 		for sourceIndex = playerSlot, #orderedSources do
-			if #displayEntries >= contentRows then break end
+			if #displayIndices >= contentRows then break end
 			if not usedSourceIndices[sourceIndex] then
-				displayEntries[#displayEntries + 1] = { source = orderedSources[sourceIndex], sourceIndex = sourceIndex }
+				displayIndices[#displayIndices + 1] = sourceIndex
 			end
-		end
-	else
-		for sourceIndex = 1, contentRows do
-			displayEntries[#displayEntries + 1] = { source = orderedSources[sourceIndex], sourceIndex = sourceIndex }
 		end
 	end
 
@@ -2686,13 +2763,20 @@ function DamageMeter:RefreshWindow(index)
 
 	local totalAmount = safeNumber(session and session.totalAmount)
 	local shown = 0
+	local inFollowerDungeon = isInFollowerDungeon()
 
 	for rowIndex = 1, maxRows do
 		local visualTopIndex = rowsGrowUp and (contentRows - rowIndex + 1) or rowIndex
 		local entryIndex = highestBottom and (contentRows - visualTopIndex + 1) or visualTopIndex
-		local displayEntry = entryIndex >= 1 and entryIndex <= contentRows and displayEntries[entryIndex] or nil
-		local source = displayEntry and displayEntry.source or nil
-		local sourceIndex = displayEntry and displayEntry.sourceIndex or entryIndex
+		local sourceIndex
+		if entryIndex >= 1 and entryIndex <= contentRows then
+			if displayIndices then
+				sourceIndex = displayIndices[entryIndex]
+			else
+				sourceIndex = entryIndex
+			end
+		end
+		local source = sourceIndex and orderedSources[sourceIndex] or nil
 		local row = frame.rows[rowIndex] or self:CreateRow(frame, rowIndex)
 		if source then
 			local rawMaxAmount = session and session.maxAmount
@@ -2714,7 +2798,7 @@ function DamageMeter:RefreshWindow(index)
 			row.sourceData = source
 			self:ApplyIconBorder(row, config, source.classFilename)
 			self:ApplyBarBorder(row, config, source.classFilename)
-			applySourceIcon(row.icon, source)
+			applySourceIcon(row.icon, source, inFollowerDungeon)
 			row.name:SetText(formatDisplayName(source.name, sourceIndex, config))
 			setTextColorIfChanged(row.name, nr, ng, nb, na)
 			row.value:SetText(valueText)
@@ -3028,7 +3112,12 @@ end
 
 function DamageMeter:SetConfigValue(index, key, value)
 	local config = self:GetConfig(index)
-	config[key] = copyValue(value)
+	if key == "quickTypes" then
+		config.quickTypes = normalizeQuickDamageMeterTypes(value, config.damageMeterType or DEFAULT_WINDOW.damageMeterType)
+		if self.quickTypeLabelCache then self.quickTypeLabelCache[index] = nil end
+	else
+		config[key] = copyValue(value)
+	end
 	self:MarkWindowStyleDirty(index)
 	if key == "tooltipPreview" and value ~= true and self.sourceTooltip then
 		self.sourceTooltip:Hide()
