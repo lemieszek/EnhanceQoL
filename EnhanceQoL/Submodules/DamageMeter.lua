@@ -44,12 +44,14 @@ local FALLBACK_SHORT_NUMBER_ABBREV_BREAKPOINTS = {
 local shortNumberAbbrevOptions
 local SYNC_EXCLUDED_KEYS = {
 	enabled = true,
+	alwaysShowPlayer = true,
 	sessionType = true,
 	damageMeterType = true,
 	visibility = true,
 }
 local DEFAULT_WINDOW = {
 	enabled = true,
+	alwaysShowPlayer = false,
 	anchorToWindow = 0,
 	windowAnchorPoint = "TOPLEFT",
 	windowRelativePoint = "TOPRIGHT",
@@ -90,6 +92,7 @@ local DEFAULT_WINDOW = {
 	showHeaderType = true,
 	showHeaderTime = true,
 	showHeaderButtons = true,
+	headerButtonSize = 16,
 	headerFormat = "timeTypeDash",
 	headerTimeFormat = "smart",
 	showStatus = true,
@@ -166,7 +169,7 @@ local PREVIEW_SESSION = {
 		{ totalAmount = 71000, amountPerSecond = 7100, name = "Thrall", classFilename = "SHAMAN", specIconID = 136048 },
 		{ totalAmount = 64000, amountPerSecond = 6400, name = "Liadrin", classFilename = "PALADIN", specIconID = 135920 },
 		{ totalAmount = 51000, amountPerSecond = 5100, name = "Alleria", classFilename = "HUNTER", specIconID = 461115 },
-		{ totalAmount = 42000, amountPerSecond = 4200, name = "Anduin", classFilename = "PRIEST", specIconID = 135940 },
+		{ totalAmount = 42000, amountPerSecond = 4200, name = "Anduin", classFilename = "PRIEST", specIconID = 135940, isLocalPlayer = true },
 	},
 	maxAmount = 100000,
 	totalAmount = 411000,
@@ -634,7 +637,7 @@ end
 
 local function formatDisplayName(value, rowIndex, config)
 	local name = formatSourceName(value, config)
-	if config.showRanks ~= false and config.prefixRankInName == true and not isSecret(name) then
+	if config.showRanks ~= false and config.prefixRankInName == true then
 		local gap = clampNumber(config.rankGap, 0, 24, DEFAULT_WINDOW.rankGap)
 		local spaces = string.rep(" ", math.ceil(gap / 4))
 		return string.format("%d.%s%s", rowIndex, spaces, name)
@@ -1449,6 +1452,25 @@ function DamageMeter:CreateHeaderButton(frame, label, atlas, tooltipText, onClic
 	return button
 end
 
+function DamageMeter:ApplyHeaderButtons(frame, config, showHeaderButtons)
+	local buttonSize = clampNumber(config.headerButtonSize, 10, 32, DEFAULT_WINDOW.headerButtonSize)
+	local gap = math.max(2, math.floor(buttonSize / 4))
+	local iconSize = math.max(8, buttonSize - 2)
+	frame.headerButtons:SetSize((buttonSize * 2) + gap, buttonSize)
+	frame.resetButton:SetSize(buttonSize, buttonSize)
+	frame.historyButton:SetSize(buttonSize, buttonSize)
+	frame.resetButton.icon:SetSize(iconSize, iconSize)
+	frame.historyButton.icon:SetSize(iconSize, iconSize)
+	frame.resetButton:ClearAllPoints()
+	frame.resetButton:SetPoint("RIGHT", frame.headerButtons, "RIGHT", 0, 0)
+	frame.historyButton:ClearAllPoints()
+	frame.historyButton:SetPoint("RIGHT", frame.resetButton, "LEFT", -gap, 0)
+	frame.headerButtons:SetShown(showHeaderButtons)
+	frame.resetButton:SetShown(showHeaderButtons)
+	frame.historyButton:SetShown(showHeaderButtons)
+	return showHeaderButtons and ((buttonSize * 2) + gap + 12) or 8
+end
+
 function DamageMeter:EnsureContextMenu()
 	if self.contextMenu then return self.contextMenu end
 	local frame = CreateFrame("Frame", "EnhanceQoLDamageMeterContextMenu", UIParent, "BackdropTemplate")
@@ -1509,8 +1531,15 @@ end
 function DamageMeter:HideContextMenu()
 	if self.contextMenu then
 		if self.contextMenu.clickCatcher then self.contextMenu.clickCatcher:Hide() end
+		self.contextMenu.owner = nil
+		self.contextMenu.index = nil
 		self.contextMenu:Hide()
 	end
+end
+
+function DamageMeter:IsContextMenuOpenFor(index)
+	local frame = self.contextMenu
+	return frame and frame:IsShown() and (tonumber(index) or 1) == (tonumber(frame.index) or 1)
 end
 
 function DamageMeter:GetContextMenuButton(frame, buttonIndex)
@@ -1593,10 +1622,10 @@ function DamageMeter:AnchorContextMenu(frame, owner)
 	frame:SetPoint("TOPLEFT", owner or UIParent, "BOTTOMLEFT", 0, -4)
 end
 
-function DamageMeter:RefreshContextMenu(owner, index)
+function DamageMeter:RefreshContextMenu(owner, index, keepAnchor)
 	local frame = self:EnsureContextMenu()
 	index = tonumber(index) or 1
-	frame.owner = owner
+	frame.owner = owner or frame.owner
 	frame.index = index
 
 	local effectiveType = self:GetEffectiveDamageMeterType(index)
@@ -1634,14 +1663,14 @@ function DamageMeter:RefreshContextMenu(owner, index)
 		self:SetupContextMenuButton(button, getDamageMeterTypeLabel(quickType), getDamageMeterTypeIcon(quickType), effectiveType == quickType, nil, function(_, mouseButton)
 			if mouseButton == "RightButton" or mouseButton == "MiddleButton" then
 				self:RemoveQuickDamageMeterType(index, quickType)
-				self:RefreshContextMenu(owner, index)
+				self:RefreshContextMenu(owner, index, true)
 				return
 			end
 			self:HideContextMenu()
 			self:SetTemporaryDamageMeterType(index, quickType)
 		end, false, function()
 			self:RemoveQuickDamageMeterType(index, quickType)
-			self:RefreshContextMenu(owner, index)
+			self:RefreshContextMenu(owner, index, true)
 		end)
 		button:ClearAllPoints()
 		button:SetPoint("TOPLEFT", pad, y)
@@ -1689,7 +1718,9 @@ function DamageMeter:RefreshContextMenu(owner, index)
 	end
 
 	frame:SetHeight(math.abs(y) + pad)
-	self:AnchorContextMenu(frame, owner)
+	if keepAnchor ~= true then
+		self:AnchorContextMenu(frame, owner)
+	end
 	if frame.clickCatcher then frame.clickCatcher:Show() end
 	frame:Show()
 end
@@ -1719,6 +1750,7 @@ function DamageMeter:BuildSessionMenu(index, rootDescription)
 end
 
 function DamageMeter:OpenContextMenu(owner, index)
+	if self:IsContextMenuOpenFor(index) then return end
 	self:RefreshContextMenu(owner, index)
 end
 
@@ -2377,23 +2409,21 @@ function DamageMeter:ApplyWindowStyle(index, contentRows)
 
 	frame:SetSize(width, height)
 	self:ApplyWindowAnchor(index)
+	local headerButtonTextInset = self:ApplyHeaderButtons(frame, config, showHeaderButtons)
 	frame.header:SetShown(showHeader)
-	frame.headerButtons:SetShown(showHeaderButtons)
-	frame.resetButton:SetShown(showHeaderButtons)
-	frame.historyButton:SetShown(showHeaderButtons)
 	frame.status:SetShown(showStatus)
 	frame.header:ClearAllPoints()
 	frame.headerButtons:ClearAllPoints()
 	frame.status:ClearAllPoints()
 	if headerPosition == "BOTTOM" then
 		frame.header:SetPoint("BOTTOMLEFT", 8, 7 + bottomOffset)
-		frame.header:SetPoint("BOTTOMRIGHT", showHeaderButtons and -48 or -8, 7 + bottomOffset)
+		frame.header:SetPoint("BOTTOMRIGHT", -headerButtonTextInset, 7 + bottomOffset)
 		frame.headerButtons:SetPoint("BOTTOMRIGHT", -8, 7 + bottomOffset)
 		frame.status:SetPoint("BOTTOMLEFT", 4, 4 + bottomOffset + headerHeight)
 		frame.status:SetPoint("BOTTOMRIGHT", -4, 4 + bottomOffset + headerHeight)
 	else
 		frame.header:SetPoint("TOPLEFT", 8, -(7 + topOffset))
-		frame.header:SetPoint("TOPRIGHT", showHeaderButtons and -48 or -8, -(7 + topOffset))
+		frame.header:SetPoint("TOPRIGHT", -headerButtonTextInset, -(7 + topOffset))
 		frame.headerButtons:SetPoint("TOPRIGHT", -8, -(7 + topOffset))
 		frame.status:SetPoint("BOTTOMLEFT", 4, 4 + bottomOffset)
 		frame.status:SetPoint("BOTTOMRIGHT", -4, 4 + bottomOffset)
@@ -2533,9 +2563,40 @@ function DamageMeter:RefreshWindow(index)
 			end
 		end
 	end
-	local contentRows = math.min(maxRows, #orderedSources)
 	local rowsGrowUp = normalizeRowGrowth(config.rowGrowth) == "UP"
 	local highestBottom = damageMeterType ~= "Deaths" and normalizeRowSort(config.rowSort) == "BOTTOM"
+	local visibleRows = math.min(maxRows, clampNumber(config.visibleRows, 1, 30, DEFAULT_WINDOW.visibleRows))
+	local contentRows = math.min(maxRows, #orderedSources)
+	local displayEntries = {}
+	local playerSourceIndex
+	if config.alwaysShowPlayer == true then
+		for sourceIndex, source in ipairs(orderedSources) do
+			if source and source.isLocalPlayer == true then
+				playerSourceIndex = sourceIndex
+				break
+			end
+		end
+	end
+	local playerVisibleLimit = highestBottom and math.max(1, contentRows - visibleRows + 1) or math.min(contentRows, visibleRows)
+	local forcePlayer = playerSourceIndex and contentRows > 0 and ((highestBottom and playerSourceIndex < playerVisibleLimit) or (not highestBottom and playerSourceIndex > playerVisibleLimit))
+	if forcePlayer then
+		local usedSourceIndices = { [playerSourceIndex] = true }
+		local playerSlot = playerVisibleLimit
+		for sourceIndex = 1, playerSlot - 1 do
+			displayEntries[#displayEntries + 1] = { source = orderedSources[sourceIndex], sourceIndex = sourceIndex }
+		end
+		displayEntries[#displayEntries + 1] = { source = orderedSources[playerSourceIndex], sourceIndex = playerSourceIndex }
+		for sourceIndex = playerSlot, #orderedSources do
+			if #displayEntries >= contentRows then break end
+			if not usedSourceIndices[sourceIndex] then
+				displayEntries[#displayEntries + 1] = { source = orderedSources[sourceIndex], sourceIndex = sourceIndex }
+			end
+		end
+	else
+		for sourceIndex = 1, contentRows do
+			displayEntries[#displayEntries + 1] = { source = orderedSources[sourceIndex], sourceIndex = sourceIndex }
+		end
+	end
 
 	self:ApplyWindowStyle(index, contentRows)
 	self:UpdateHeader(index, session)
@@ -2545,8 +2606,10 @@ function DamageMeter:RefreshWindow(index)
 
 	for rowIndex = 1, maxRows do
 		local visualTopIndex = rowsGrowUp and (contentRows - rowIndex + 1) or rowIndex
-		local sourceIndex = highestBottom and (contentRows - visualTopIndex + 1) or visualTopIndex
-		local source = sourceIndex >= 1 and sourceIndex <= contentRows and orderedSources[sourceIndex] or nil
+		local entryIndex = highestBottom and (contentRows - visualTopIndex + 1) or visualTopIndex
+		local displayEntry = entryIndex >= 1 and entryIndex <= contentRows and displayEntries[entryIndex] or nil
+		local source = displayEntry and displayEntry.source or nil
+		local sourceIndex = displayEntry and displayEntry.sourceIndex or entryIndex
 		local row = frame.rows[rowIndex] or self:CreateRow(frame, rowIndex)
 		if source then
 			local rawMaxAmount = session and session.maxAmount
@@ -2957,6 +3020,7 @@ function DamageMeter:BuildWindowSettings(index)
 		end, function() return buildWindowCopyOptions(index) end, settingsId, 160, function() return getWindowCount() > 1 and db().damageMeterSyncSettings ~= true end),
 		{ name = L["Behavior"] or "Behavior", kind = SettingType.Collapsible, id = behaviorId, defaultCollapsed = true },
 		checkboxSetting(L["damageMeterWindowEnabled"] or "Enable window", function() return cfg().enabled == true end, function(value) self:SetConfigValue(index, "enabled", value) end, behaviorId),
+		checkboxSetting(L["damageMeterAlwaysShowPlayer"] or "Always show player", function() return cfg().alwaysShowPlayer == true end, function(value) self:SetConfigValue(index, "alwaysShowPlayer", value) end, behaviorId),
 		dropdownSetting(L["damageMeterSession"] or "Session", function() return cfg().sessionType end, function(value) self:SetConfigValue(index, "sessionType", value == "overall" and "overall" or "current") end, {
 			{ value = "current", label = L["damageMeterCurrent"] or "Current" },
 			{ value = "overall", label = L["damageMeterOverall"] or "Overall" },
@@ -2991,6 +3055,7 @@ function DamageMeter:BuildWindowSettings(index)
 		checkboxSetting(L["damageMeterShowHeaderType"] or "Show type", function() return cfg().showHeaderType ~= false end, function(value) self:SetConfigValue(index, "showHeaderType", value) end, headerId, headerEnabled),
 		checkboxSetting(L["damageMeterShowHeaderTime"] or "Show combat time", function() return cfg().showHeaderTime ~= false end, function(value) self:SetConfigValue(index, "showHeaderTime", value) end, headerId, headerEnabled),
 		checkboxSetting(L["damageMeterShowHeaderButtons"] or "Show header buttons", function() return cfg().showHeaderButtons ~= false end, function(value) self:SetConfigValue(index, "showHeaderButtons", value) end, headerId, headerEnabled),
+		sliderSetting(L["damageMeterHeaderButtonSize"] or "Header button size", function() return cfg().headerButtonSize end, function(value) self:SetConfigValue(index, "headerButtonSize", clampNumber(value, 10, 32, DEFAULT_WINDOW.headerButtonSize)) end, 10, 32, 1, headerId, function() return cfg().showHeader == true and cfg().showHeaderButtons ~= false end),
 		dropdownSetting(L["damageMeterHeaderFormat"] or "Header format", function() return normalizeHeaderFormat(cfg().headerFormat) end, function(value) self:SetConfigValue(index, "headerFormat", normalizeHeaderFormat(value)) end, buildHeaderFormatOptions(), headerId, 150, headerTimeEnabled),
 		dropdownSetting(L["damageMeterHeaderTimeFormat"] or "Time format", function() return normalizeHeaderTimeFormat(cfg().headerTimeFormat) end, function(value) self:SetConfigValue(index, "headerTimeFormat", normalizeHeaderTimeFormat(value)) end, buildHeaderTimeFormatOptions(), headerId, 120, headerTimeEnabled),
 		dividerSetting(headerId),
