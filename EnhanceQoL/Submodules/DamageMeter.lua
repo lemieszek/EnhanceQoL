@@ -742,8 +742,12 @@ end
 
 local function applyClassIcon(texture, classFilename)
 	if type(classFilename) ~= "string" or classFilename == "" or not CLASS_ICON_TCOORDS or not CLASS_ICON_TCOORDS[classFilename] then return false end
+	if texture._damageMeterIconKind == "class" and texture._damageMeterIconValue == classFilename then return true end
+	texture._damageMeterIconKind = "class"
+	texture._damageMeterIconValue = classFilename
+	local coords = CLASS_ICON_TCOORDS[classFilename]
 	texture:SetTexture(CLASS_ICON_TEXTURE)
-	texture:SetTexCoord(unpack(CLASS_ICON_TCOORDS[classFilename]))
+	texture:SetTexCoord(coords[1], coords[2], coords[3], coords[4])
 	return true
 end
 
@@ -753,13 +757,21 @@ local function applySourceIcon(texture, source, inFollowerDungeon)
 	end
 	local specIconID = source.specIconID
 	if specIconID and specIconID ~= 0 then
-		texture:SetTexture(specIconID)
-		texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		if texture._damageMeterIconKind ~= "spec" or texture._damageMeterIconValue ~= specIconID then
+			texture._damageMeterIconKind = "spec"
+			texture._damageMeterIconValue = specIconID
+			texture:SetTexture(specIconID)
+			texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		end
 		return
 	end
 	if applyClassIcon(texture, source.classFilename) then return end
-	texture:SetTexture(136243)
-	texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	if texture._damageMeterIconKind ~= "fallback" then
+		texture._damageMeterIconKind = "fallback"
+		texture._damageMeterIconValue = 136243
+		texture:SetTexture(136243)
+		texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	end
 end
 
 local function normalizeColor(value, fallback)
@@ -1485,10 +1497,43 @@ function DamageMeter:GetValueColor(config, classFilename)
 	return getClassOrCustomColor(classFilename, config.valueColor, DEFAULT_WINDOW.valueColor, config.valueUseClassColors)
 end
 
+function DamageMeter:GetRowColorState(frame, config, classFilename)
+	local styleVersion = self:GetWindowStyleVersion(frame.index or 0)
+	local cache = frame._damageMeterRowColorCache
+	if not cache or cache.styleVersion ~= styleVersion then
+		cache = { styleVersion = styleVersion, byClass = {} }
+		frame._damageMeterRowColorCache = cache
+	end
+	local classKey = type(classFilename) == "string" and classFilename ~= "" and classFilename or false
+	local entry = cache.byClass[classKey]
+	if entry then return entry end
+	local r, g, b = self:GetClassColor(config, classKey)
+	local nr, ng, nb, na = self:GetNameColor(config, classKey)
+	local vr, vg, vb, va = self:GetValueColor(config, classKey)
+	entry = {
+		r = r, g = g, b = b,
+		nr = nr, ng = ng, nb = nb, na = na,
+		vr = vr, vg = vg, vb = vb, va = va,
+	}
+	cache.byClass[classKey] = entry
+	return entry
+end
+
 local function applyCachedFontString(fontString, fontFace, size, fontOutline, cachePrefix)
-	local signature = (cachePrefix or "font") .. ":" .. tostring(fontFace) .. ":" .. tostring(size) .. ":" .. tostring(fontOutline) .. ":" .. getGlobalFontStateVersion()
-	if fontString._damageMeterFontSignature == signature then return end
-	fontString._damageMeterFontSignature = signature
+	local globalFontVersion = getGlobalFontStateVersion()
+	cachePrefix = cachePrefix or "font"
+	if fontString._damageMeterFontPrefix == cachePrefix
+		and fontString._damageMeterFontFace == fontFace
+		and fontString._damageMeterFontSize == size
+		and fontString._damageMeterFontOutline == fontOutline
+		and fontString._damageMeterFontGlobalVersion == globalFontVersion then
+		return
+	end
+	fontString._damageMeterFontPrefix = cachePrefix
+	fontString._damageMeterFontFace = fontFace
+	fontString._damageMeterFontSize = size
+	fontString._damageMeterFontOutline = fontOutline
+	fontString._damageMeterFontGlobalVersion = globalFontVersion
 	if addon.functions.ApplyFontString then
 		addon.functions.ApplyFontString(fontString, fontFace, size, fontOutline, DEFAULT_FONT, "OUTLINE")
 		return
@@ -1636,9 +1681,13 @@ end
 
 function DamageMeter:ApplyRowTextLayout(row, config)
 	local rowMode = config.raidRowsEnabled == true and IsInRaid() and "raid" or "default"
-	local signature = self:GetWindowStyleVersion(row.windowIndex or 0) .. ":" .. rowMode
-	if row._damageMeterTextLayoutSignature == signature then return end
-	row._damageMeterTextLayoutSignature = signature
+	local styleVersion = self:GetWindowStyleVersion(row.windowIndex or 0)
+	if row._damageMeterTextLayoutStyleVersion == styleVersion
+		and row._damageMeterTextLayoutRowMode == rowMode then
+		return
+	end
+	row._damageMeterTextLayoutStyleVersion = styleVersion
+	row._damageMeterTextLayoutRowMode = rowMode
 
 	local _, barHeight = getRowMetrics(config)
 	local borderOutset = getBarBorderOutset(config)
@@ -1683,9 +1732,15 @@ end
 function DamageMeter:ApplyRowValueWidth(row, config, damageMeterType)
 	damageMeterType = damageMeterType or config.damageMeterType
 	local rowMode = config.raidRowsEnabled == true and IsInRaid() and "raid" or "default"
-	local signature = self:GetWindowStyleVersion(row.windowIndex or 0) .. ":" .. rowMode .. ":" .. tostring(damageMeterType)
-	if row._damageMeterValueLayoutSignature == signature then return end
-	row._damageMeterValueLayoutSignature = signature
+	local styleVersion = self:GetWindowStyleVersion(row.windowIndex or 0)
+	if row._damageMeterValueLayoutStyleVersion == styleVersion
+		and row._damageMeterValueLayoutRowMode == rowMode
+		and row._damageMeterValueLayoutType == damageMeterType then
+		return
+	end
+	row._damageMeterValueLayoutStyleVersion = styleVersion
+	row._damageMeterValueLayoutRowMode = rowMode
+	row._damageMeterValueLayoutType = damageMeterType
 
 	local frameWidth = clampNumber(config.width, 220, 700, DEFAULT_WINDOW.width)
 	local leftInset, rightInset = getRowTextInsets(config)
@@ -2720,9 +2775,21 @@ function DamageMeter:ApplyWindowStyle(index, contentRows)
 	local frame = self:EnsureWindow(index)
 	local config = self:GetConfig(index)
 	local rowMode = config.raidRowsEnabled == true and IsInRaid() and "raid" or "default"
-	local updateSignature = self:GetWindowStyleVersion(index) .. ":" .. tostring(contentRows) .. ":" .. tostring(#frame.rows) .. ":" .. rowMode .. ":" .. getGlobalFontStateVersion()
-	if frame._damageMeterWindowStyleUpdateSignature == updateSignature then return end
-	frame._damageMeterWindowStyleUpdateSignature = updateSignature
+	local styleVersion = self:GetWindowStyleVersion(index)
+	local rowCount = #frame.rows
+	local globalFontVersion = getGlobalFontStateVersion()
+	if frame._damageMeterWindowStyleVersion == styleVersion
+		and frame._damageMeterWindowStyleContentRows == contentRows
+		and frame._damageMeterWindowStyleRowCount == rowCount
+		and frame._damageMeterWindowStyleRowMode == rowMode
+		and frame._damageMeterWindowStyleGlobalFontVersion == globalFontVersion then
+		return
+	end
+	frame._damageMeterWindowStyleVersion = styleVersion
+	frame._damageMeterWindowStyleContentRows = contentRows
+	frame._damageMeterWindowStyleRowCount = rowCount
+	frame._damageMeterWindowStyleRowMode = rowMode
+	frame._damageMeterWindowStyleGlobalFontVersion = globalFontVersion
 
 	local width = clampNumber(config.width, 220, 700, DEFAULT_WINDOW.width)
 	local showHeader = config.showHeader == true
@@ -2847,6 +2914,9 @@ function DamageMeter:UpdateHeader(index, session, state)
 	state = state or self:BuildWindowRefreshState(index)
 	local frame = self:EnsureWindow(index)
 	local config = state.config
+	local showHeader = config.showHeader == true
+	local showStatus = config.showStatus ~= false
+	if not showHeader and not showStatus then return end
 	local sessionLabel
 	if state.sessionID then
 		local fallback = DAMAGE_METER_COMBAT_NUMBER and DAMAGE_METER_COMBAT_NUMBER:format(state.sessionID) or string.format("%s %d", L["damageMeterCombat"] or "Combat", state.sessionID)
@@ -2856,28 +2926,67 @@ function DamageMeter:UpdateHeader(index, session, state)
 	end
 	local typeLabel = getDamageMeterTypeLabel(state.damageMeterType)
 	local durationText
-	if config.showHeaderTime ~= false then
-		durationText = formatDuration(self:GetSessionDuration(index, session, state), normalizeHeaderTimeFormat(config.headerTimeFormat))
-	end
-	local formatMode = normalizeHeaderFormat(config.headerFormat)
-	local separator = (formatMode == "timeTypeSpace" or formatMode == "typeTimeSpace") and " " or " - "
-	local headerText = ""
-	if durationText and (formatMode == "timeTypeDash" or formatMode == "timeTypeSpace") then headerText = durationText end
-	if config.showHeaderType ~= false and typeLabel then
-		headerText = headerText ~= "" and (headerText .. separator .. typeLabel) or typeLabel
-	end
-	if durationText and (formatMode == "typeTimeDash" or formatMode == "typeTimeSpace") then
-		headerText = headerText ~= "" and (headerText .. separator .. durationText) or durationText
-	end
-	if config.showHeaderSession ~= false and sessionLabel then
-		if headerText ~= "" then
-			headerText = sessionLabel .. " - " .. headerText
-		else
-			headerText = sessionLabel
+	local durationBucket = false
+	local headerTimeFormat = normalizeHeaderTimeFormat(config.headerTimeFormat)
+	if showHeader and config.showHeaderTime ~= false then
+		local duration = self:GetSessionDuration(index, session, state)
+		if duration then
+			durationBucket = math.floor(duration + 0.5)
+			durationText = formatDuration(duration, headerTimeFormat)
 		end
 	end
-	setPlainTextIfChanged(frame.header, headerText)
-	setPlainTextIfChanged(frame.status.text, string.format("%s: %s  |  %s", L["damageMeterQuickSwitch"] or "Quick switch", sessionLabel, self:GetQuickDamageMeterTypeLabels(index, typeLabel)))
+	local formatMode = normalizeHeaderFormat(config.headerFormat)
+	local quickTypeLabels = showStatus and self:GetQuickDamageMeterTypeLabels(index, typeLabel) or nil
+	local styleVersion = self:GetWindowStyleVersion(index)
+	if frame._damageMeterHeaderStyleVersion == styleVersion
+		and frame._damageMeterHeaderShowHeader == showHeader
+		and frame._damageMeterHeaderShowStatus == showStatus
+		and frame._damageMeterHeaderShowSession == (config.showHeaderSession ~= false)
+		and frame._damageMeterHeaderShowType == (config.showHeaderType ~= false)
+		and frame._damageMeterHeaderShowTime == (config.showHeaderTime ~= false)
+		and frame._damageMeterHeaderFormat == formatMode
+		and frame._damageMeterHeaderTimeFormat == headerTimeFormat
+		and frame._damageMeterHeaderDurationBucket == durationBucket
+		and frame._damageMeterHeaderSessionLabel == sessionLabel
+		and frame._damageMeterHeaderTypeLabel == typeLabel
+		and frame._damageMeterHeaderQuickTypeLabels == quickTypeLabels then
+		return
+	end
+	frame._damageMeterHeaderStyleVersion = styleVersion
+	frame._damageMeterHeaderShowHeader = showHeader
+	frame._damageMeterHeaderShowStatus = showStatus
+	frame._damageMeterHeaderShowSession = config.showHeaderSession ~= false
+	frame._damageMeterHeaderShowType = config.showHeaderType ~= false
+	frame._damageMeterHeaderShowTime = config.showHeaderTime ~= false
+	frame._damageMeterHeaderFormat = formatMode
+	frame._damageMeterHeaderTimeFormat = headerTimeFormat
+	frame._damageMeterHeaderDurationBucket = durationBucket
+	frame._damageMeterHeaderSessionLabel = sessionLabel
+	frame._damageMeterHeaderTypeLabel = typeLabel
+	frame._damageMeterHeaderQuickTypeLabels = quickTypeLabels
+
+	local separator = (formatMode == "timeTypeSpace" or formatMode == "typeTimeSpace") and " " or " - "
+	local headerText = ""
+	if showHeader then
+		if durationText and (formatMode == "timeTypeDash" or formatMode == "timeTypeSpace") then headerText = durationText end
+		if config.showHeaderType ~= false and typeLabel then
+			headerText = headerText ~= "" and (headerText .. separator .. typeLabel) or typeLabel
+		end
+		if durationText and (formatMode == "typeTimeDash" or formatMode == "typeTimeSpace") then
+			headerText = headerText ~= "" and (headerText .. separator .. durationText) or durationText
+		end
+		if config.showHeaderSession ~= false and sessionLabel then
+			if headerText ~= "" then
+				headerText = sessionLabel .. " - " .. headerText
+			else
+				headerText = sessionLabel
+			end
+		end
+		setPlainTextIfChanged(frame.header, headerText)
+	end
+	if showStatus then
+		setPlainTextIfChanged(frame.status.text, string.format("%s: %s  |  %s", L["damageMeterQuickSwitch"] or "Quick switch", sessionLabel, quickTypeLabels))
+	end
 end
 
 function DamageMeter:RefreshWindow(index, shared, sessionCache)
@@ -3002,9 +3111,7 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 			end
 			local amount = safeNumber(source.totalAmount)
 			local percent = totalAmount and totalAmount > 0 and amount and (amount / totalAmount * 100) or nil
-			local r, g, b = self:GetClassColor(config, source.classFilename)
-			local nr, ng, nb, na = self:GetNameColor(config, source.classFilename)
-			local vr, vg, vb, va = self:GetValueColor(config, source.classFilename)
+			local colors = self:GetRowColorState(frame, config, source.classFilename)
 			local valueText = formatRowValueText(source, percent, valueMode, valueAbbreviation, valueShowPercent, valueUseParentheses)
 
 			self:ApplyRankText(row, sourceIndex, config)
@@ -3013,11 +3120,11 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 			self:ApplyBarBorder(row, config, source.classFilename)
 			applySourceIcon(row.icon, source, inFollowerDungeon)
 			row.name:SetText(formatDisplayName(source.name, sourceIndex, config))
-			setTextColorIfChanged(row.name, nr, ng, nb, na)
+			setTextColorIfChanged(row.name, colors.nr, colors.ng, colors.nb, colors.na)
 			row.value:SetText(valueText)
-			setTextColorIfChanged(row.value, vr, vg, vb, va)
+			setTextColorIfChanged(row.value, colors.vr, colors.vg, colors.vb, colors.va)
 			self:ApplyRowValueWidth(row, config, damageMeterType)
-			row.bar:SetStatusBarColor(r, g, b, 0.85)
+			row.bar:SetStatusBarColor(colors.r, colors.g, colors.b, 0.85)
 			row.bar:SetMinMaxValues(0, rawMaxAmount)
 			row.bar:SetValue(rawAmount)
 			row:Show()
