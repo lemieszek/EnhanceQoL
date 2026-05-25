@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.21.0-beta2] - 2026-05-25
+
+### 🐛 Fixed
+
+- Profiles: Added Damage Meter as a separate protected import section so Damage Meter settings can be kept unchanged during full profile or external installer profile imports.
+
+---
+
 ## [10.21.0-beta1] - 2026-05-24
 
 ### ✨ Added

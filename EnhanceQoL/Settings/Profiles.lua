@@ -14,6 +14,7 @@ local IMPORT_PROTECTION = {
 	BAGS = "bags",
 	CASTBARS = "castbars",
 	COOLDOWN_PANELS = "cooldownPanels",
+	DAMAGE_METER = "damageMeter",
 	DATA_PANELS = "dataPanels",
 	DUNGEON_COMBAT = "dungeonCombat",
 	HBP = "hbp",
@@ -29,6 +30,7 @@ local IMPORT_PROTECTION_DEFS = {
 	{ key = IMPORT_PROTECTION.BAGS, labelKey = "ProfileImportProtectionBags", fallback = "Bags" },
 	{ key = IMPORT_PROTECTION.CASTBARS, labelKey = "ProfileImportProtectionCastbars", fallback = "Castbars" },
 	{ key = IMPORT_PROTECTION.COOLDOWN_PANELS, labelKey = "ProfileImportProtectionCooldownPanels", fallback = "Cooldown Panels" },
+	{ key = IMPORT_PROTECTION.DAMAGE_METER, labelKey = "ProfileImportProtectionDamageMeter", fallback = "Damage Meter" },
 	{ key = IMPORT_PROTECTION.DATA_PANELS, labelKey = "ProfileImportProtectionDataPanels", fallback = "Data Panels" },
 	{ key = IMPORT_PROTECTION.DUNGEON_COMBAT, labelKey = "ProfileImportProtectionDungeonCombat", fallback = "Dungeon & Combat Tools" },
 	{ key = IMPORT_PROTECTION.HBP, labelKey = "ProfileImportProtectionHBP", fallback = "Healer Buff Placement" },
@@ -791,6 +793,10 @@ local function isDataPanelsProfileKey(key)
 	return key == "datapanel" or key == "dataPanels"
 end
 
+local function isDamageMeterProfileKey(key)
+	return profileKeyStartsWith(key, "damageMeter")
+end
+
 local function isDungeonCombatProfileKey(key)
 	return profileKeyStartsWith(key, "mythicPlus")
 		or profileKeyStartsWith(key, "combatText")
@@ -899,6 +905,7 @@ local function applyImportProtection(imported, current)
 	if isImportSectionProtected(IMPORT_PROTECTION.BAGS) then preserveProtectedKeys(imported, current, isBagsProfileKey) end
 	if isImportSectionProtected(IMPORT_PROTECTION.CASTBARS) then preserveProtectedKeys(imported, current, isCastbarProfileKey) end
 	if isImportSectionProtected(IMPORT_PROTECTION.COOLDOWN_PANELS) then preserveProtectedKeys(imported, current, isCooldownPanelsProfileKey) end
+	if isImportSectionProtected(IMPORT_PROTECTION.DAMAGE_METER) then preserveProtectedKeys(imported, current, isDamageMeterProfileKey) end
 	if isImportSectionProtected(IMPORT_PROTECTION.DATA_PANELS) then preserveProtectedKeys(imported, current, isDataPanelsProfileKey) end
 	if isImportSectionProtected(IMPORT_PROTECTION.DUNGEON_COMBAT) then preserveProtectedKeys(imported, current, isDungeonCombatProfileKey) end
 	if isImportSectionProtected(IMPORT_PROTECTION.INSTANCE_DIFFICULTY) then preserveProtectedKeys(imported, current, isInstanceDifficultyProfileKey) end
