@@ -1912,8 +1912,11 @@ function DamageMeter:BuildTooltipRows(details, config, damageMeterType)
 	local showTargets = config.tooltipShowTargets ~= false
 	local spellLimit = clampNumber(config.tooltipMaxLines, 4, 30, DEFAULT_WINDOW.tooltipMaxLines)
 	local totalAmount = safeNumber(details.totalAmount)
+	local showSpellSection = damageMeterType ~= "EnemyDamageTaken"
 
-	rows[#rows + 1] = { header = true, name = L["damageMeterTooltipSpellName"] or "Spell Name", icon = "Interface\\WORLDSTATEFRAME\\CombatSwords", amount = showAmount and (L["damageMeterTooltipAmount"] or "Amount"), dps = showDPS and (L["damageMeterTooltipDPS"] or "DPS"), percent = showPercent and "%" }
+	if showSpellSection then
+		rows[#rows + 1] = { header = true, name = L["damageMeterTooltipSpellName"] or "Spell Name", icon = "Interface\\WORLDSTATEFRAME\\CombatSwords", amount = showAmount and (L["damageMeterTooltipAmount"] or "Amount"), dps = showDPS and (L["damageMeterTooltipDPS"] or "DPS"), percent = showPercent and "%" }
+	end
 	local targetMap = {}
 	local spellMaxAmount = 0
 	local spellMaxScanRows = 0
@@ -1929,7 +1932,7 @@ function DamageMeter:BuildTooltipRows(details, config, damageMeterType)
 		local amount = spell.totalAmount
 		local dps = spell.amountPerSecond
 		local percent = totalAmount and totalAmount > 0 and safeNumber(amount) and (safeNumber(amount) / totalAmount * 100) or nil
-		if spellRows < spellLimit then
+		if showSpellSection and spellRows < spellLimit then
 			rows[#rows + 1] = { name = spellName, icon = spellIcon, amount = showAmount and formatNumber(amount, config.abbreviation), dps = showDPS and formatNumber(dps, config.abbreviation), percent = showPercent and percent and string.format("%.1f%%", percent), sortAmount = safeNumber(amount) or 0, barValue = safeNumber(amount), barMax = spellMaxAmount }
 			spellRows = spellRows + 1
 		end
@@ -1943,7 +1946,8 @@ function DamageMeter:BuildTooltipRows(details, config, damageMeterType)
 					entry = { name = targetName, icon = safeNumber(target.specIconID) or 136243, amount = 0, dps = 0 }
 					targetMap[targetName] = entry
 				end
-				entry.amount = entry.amount + (safeNumber(target.amount) or 0)
+				local targetAmount = damageMeterType == "EnemyDamageTaken" and safeNumber(spell.totalAmount) or safeNumber(target.amount)
+				entry.amount = entry.amount + (targetAmount or 0)
 				entry.dps = entry.dps + (safeNumber(spell.amountPerSecond) or 0)
 			end
 		end
@@ -1954,7 +1958,7 @@ function DamageMeter:BuildTooltipRows(details, config, damageMeterType)
 	for _, target in pairs(targetMap) do targets[#targets + 1] = target end
 	table.sort(targets, function(a, b) return (a.amount or 0) > (b.amount or 0) end)
 	if #targets > 0 then
-		addTooltipSectionGap(rows)
+		if showSpellSection then addTooltipSectionGap(rows) end
 		rows[#rows + 1] = { header = true, name = L["damageMeterTooltipTargets"] or "Targets", icon = "Interface\\MINIMAP\\TRACKING\\Target", amount = showAmount and (L["damageMeterTooltipAmount"] or "Amount"), dps = showDPS and (L["damageMeterTooltipDPS"] or "DPS"), percent = showPercent and "%" }
 		local targetTotal = 0
 		local targetMaxAmount = 0
