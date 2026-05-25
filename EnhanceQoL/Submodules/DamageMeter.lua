@@ -655,6 +655,11 @@ local function isPerSecondMeterType(key)
 	return key == "Dps" or key == "Hps"
 end
 
+local function isCountOnlyMeterType(key)
+	key = normalizeDamageMeterTypeKey(key)
+	return key == "Dispels" or key == "Interrupts"
+end
+
 local function formatDeathTimeText(source)
 	local rawDeathTimeSeconds = source and source.deathTimeSeconds
 	if isSecret(rawDeathTimeSeconds) then return tostring(rawDeathTimeSeconds) end
@@ -666,6 +671,13 @@ end
 local function formatRowValueText(source, percent, config, damageMeterType)
 	if normalizeDamageMeterTypeKey(damageMeterType or config.damageMeterType) == "Deaths" then
 		return formatDeathTimeText(source)
+	end
+	if isCountOnlyMeterType(damageMeterType or config.damageMeterType) then
+		local text = formatNumber(source.totalAmount, config.abbreviation)
+		if config.showPercent ~= false and percent then
+			text = string.format("%s (%.1f%%)", text, percent)
+		end
+		return text
 	end
 	if isPerSecondMeterType(damageMeterType or config.damageMeterType) then
 		local text = formatNumber(source.amountPerSecond, config.abbreviation)
@@ -1335,7 +1347,7 @@ function DamageMeter:ApplyRowTextLayout(row, config)
 	row.name:SetShown(config.showNames == true)
 end
 
-function DamageMeter:ApplyRowValueWidth(row, config)
+function DamageMeter:ApplyRowValueWidth(row, config, damageMeterType)
 	local frameWidth = clampNumber(config.width, 220, 700, DEFAULT_WINDOW.width)
 	local leftInset, rightInset = getRowTextInsets(config)
 	local availableWidth = math.max(1, (frameWidth - 8) - leftInset - rightInset)
@@ -1344,13 +1356,15 @@ function DamageMeter:ApplyRowValueWidth(row, config)
 	local maxValueWidth = math.max(1, availableWidth - minNameWidth - nameGap)
 	local valueFontSize = clampNumber(config.valueFontSize, 8, 24, DEFAULT_WINDOW.valueFontSize)
 	local estimatedCharacters
-	if config.showPercent ~= false then
+	if isCountOnlyMeterType(damageMeterType or config.damageMeterType) then
+		estimatedCharacters = config.showPercent ~= false and 10 or 4
+	elseif config.showPercent ~= false then
 		estimatedCharacters = config.valueFormat == "parentheses" and 19 or 21
 	else
 		estimatedCharacters = config.valueFormat == "parentheses" and 13 or 15
 	end
 	local valueTargetWidth = math.ceil((valueFontSize * estimatedCharacters * 0.62) + 12)
-	local minValueWidth = config.valueFormat == "parentheses" and 76 or 86
+	local minValueWidth = isCountOnlyMeterType(damageMeterType or config.damageMeterType) and 42 or (config.valueFormat == "parentheses" and 76 or 86)
 	local valueWidth = math.min(math.max(minValueWidth, valueTargetWidth), maxValueWidth)
 	local nameWidth = math.max(minNameWidth, availableWidth - valueWidth - nameGap)
 	row.value:SetWidth(valueWidth)
@@ -1995,6 +2009,10 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 	local dpsWidth = showDPS and math.max(58, tooltipFontSize * 4.8) or 0
 	local amountWidth = showAmount and (damageMeterType == "Deaths" and 150 or math.max(76, tooltipFontSize * 6.2)) or 0
 	local rightPadding = 10
+	local barStartX = 24
+	local minNameWidth = math.max(150, tooltipFontSize * 13)
+	local requiredWidth = barStartX + minNameWidth + amountWidth + dpsWidth + percentWidth + rightPadding + 8
+	width = math.min(600, math.max(width, requiredWidth))
 	local percentRight = -rightPadding
 	local dpsRight = percentRight - percentWidth
 	local amountRight = dpsRight - dpsWidth
@@ -2044,7 +2062,6 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 			line.icon:SetShown(not data.spacer)
 			if not data.spacer then line.icon:SetTexture(data.icon or 136243) end
 			if showBars and not data.header and not data.spacer and data.barValue and data.barMax and data.barMax > 0 then
-				local barStartX = 24
 				local availableBarWidth = math.max(1, width - rightPadding - barStartX)
 				local barWidth = math.max(1, availableBarWidth * math.min(1, data.barValue / data.barMax))
 				local barHeight = math.max(1, currentLineHeight - 3)
@@ -2556,7 +2573,7 @@ function DamageMeter:RefreshWindow(index)
 			row.name:SetTextColor(nr, ng, nb, na)
 			row.value:SetText(valueText)
 			row.value:SetTextColor(vr, vg, vb, va)
-			self:ApplyRowValueWidth(row, config)
+			self:ApplyRowValueWidth(row, config, damageMeterType)
 			row.bar:SetStatusBarColor(r, g, b, 0.85)
 			row.bar:SetMinMaxValues(0, rawMaxAmount)
 			row.bar:SetValue(rawAmount)
