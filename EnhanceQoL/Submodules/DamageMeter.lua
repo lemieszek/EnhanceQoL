@@ -199,21 +199,32 @@ local function clampNumber(value, minValue, maxValue, default)
 	return value
 end
 
+local copyValue
+
 local function copyDefaults(target, defaults)
 	for key, value in pairs(defaults) do
 		if target[key] == nil then
-			target[key] = value
+			target[key] = copyValue(value)
 		end
 	end
 end
 
-local function copyValue(value)
+copyValue = function(value)
 	if type(value) ~= "table" then return value end
 	local copy = {}
 	for key, child in pairs(value) do
 		copy[key] = copyValue(child)
 	end
 	return copy
+end
+
+local function applyWindowDefaults(target, index)
+	local hadSessionType = target.sessionType ~= nil
+	copyDefaults(target, DEFAULT_WINDOW)
+	if index > 1 and not hadSessionType then
+		target.sessionType = index % 2 == 0 and "overall" or "current"
+	end
+	return target
 end
 
 local function copyWindowConfig(source)
@@ -756,6 +767,36 @@ local function normalizeColor(value, fallback)
 	}
 end
 
+local function colorComponents(value, fallback)
+	fallback = fallback or DEFAULT_WINDOW.backdropColor
+	if type(value) ~= "table" then value = fallback end
+	return clampNumber(value.r or value[1], 0, 1, fallback.r or fallback[1] or 0),
+		clampNumber(value.g or value[2], 0, 1, fallback.g or fallback[2] or 0),
+		clampNumber(value.b or value[3], 0, 1, fallback.b or fallback[3] or 0),
+		clampNumber(value.a or value[4], 0, 1, fallback.a or fallback[4] or 1)
+end
+
+local function colorSignature(r, g, b, a)
+	return (r or 0) .. ":" .. (g or 0) .. ":" .. (b or 0) .. ":" .. (a or 1)
+end
+
+local function getGlobalFontStateVersion()
+	if addon.functions and addon.functions.GetGlobalFontStateVersion then return addon.functions.GetGlobalFontStateVersion() or 0 end
+	return 0
+end
+
+local function setShownIfChanged(region, shown)
+	shown = shown == true
+	if region:IsShown() ~= shown then region:SetShown(shown) end
+end
+
+local function setTextColorIfChanged(fontString, r, g, b, a)
+	local signature = colorSignature(r, g, b, a)
+	if fontString._damageMeterTextColorSignature == signature then return end
+	fontString._damageMeterTextColorSignature = signature
+	fontString:SetTextColor(r, g, b, a)
+end
+
 local function getRowMetrics(config)
 	local rowHeight = clampNumber(config.rowHeight, 10, 70, DEFAULT_WINDOW.rowHeight)
 	local barHeight = config.changeBarSize == true and math.min(rowHeight, clampNumber(config.barHeight, 1, rowHeight, DEFAULT_WINDOW.barHeight)) or rowHeight
@@ -870,17 +911,33 @@ end
 function DamageMeter:GetWindowsDB()
 	local profile = db()
 	if type(profile.damageMeterWindows) ~= "table" then profile.damageMeterWindows = {} end
+	if self.normalizedWindowsDB == profile.damageMeterWindows then return profile.damageMeterWindows end
 	for index = 1, MAX_WINDOWS do
 		if type(profile.damageMeterWindows[index]) ~= "table" then profile.damageMeterWindows[index] = {} end
-		local hadSessionType = profile.damageMeterWindows[index].sessionType ~= nil
-		copyDefaults(profile.damageMeterWindows[index], DEFAULT_WINDOW)
-		if index > 1 and not hadSessionType then profile.damageMeterWindows[index].sessionType = index % 2 == 0 and "overall" or "current" end
+		applyWindowDefaults(profile.damageMeterWindows[index], index)
 	end
+	self.normalizedWindowsDB = profile.damageMeterWindows
 	return profile.damageMeterWindows
 end
 
 function DamageMeter:GetConfig(index)
 	return self:GetWindowsDB()[index]
+end
+
+function DamageMeter:GetWindowStyleVersion(index)
+	self.windowStyleVersions = self.windowStyleVersions or {}
+	return self.windowStyleVersions[index] or 0
+end
+
+function DamageMeter:MarkWindowStyleDirty(index)
+	self.windowStyleVersions = self.windowStyleVersions or {}
+	if index then
+		self.windowStyleVersions[index] = (self.windowStyleVersions[index] or 0) + 1
+		return
+	end
+	for windowIndex = 1, MAX_WINDOWS do
+		self.windowStyleVersions[windowIndex] = (self.windowStyleVersions[windowIndex] or 0) + 1
+	end
 end
 
 function DamageMeter:GetTemporarySelection(index)
@@ -1201,12 +1258,12 @@ local function getRaidClassColor(classFilename)
 end
 
 local function getClassOrCustomColor(classFilename, customColor, defaultColor, useClassColor)
-	local fixedColor = normalizeColor(customColor, defaultColor)
+	local r, g, b, a = colorComponents(customColor, defaultColor)
 	local classColor = useClassColor == true and getRaidClassColor(classFilename)
 	if classColor then
-		return classColor.r or 1, classColor.g or 1, classColor.b or 1, fixedColor.a
+		return classColor.r or 1, classColor.g or 1, classColor.b or 1, a
 	end
-	return fixedColor.r, fixedColor.g, fixedColor.b, fixedColor.a
+	return r, g, b, a
 end
 
 function DamageMeter:GetClassColor(config, classFilename)
@@ -1226,86 +1283,64 @@ function DamageMeter:GetValueColor(config, classFilename)
 	return getClassOrCustomColor(classFilename, config.valueColor, DEFAULT_WINDOW.valueColor, config.valueUseClassColors)
 end
 
-function DamageMeter:ApplyFontString(fontString, config)
-	local size = clampNumber(config.fontSize, 8, 24, 11)
+local function applyCachedFontString(fontString, fontFace, size, fontOutline, cachePrefix)
+	local signature = (cachePrefix or "font") .. ":" .. tostring(fontFace) .. ":" .. tostring(size) .. ":" .. tostring(fontOutline) .. ":" .. getGlobalFontStateVersion()
+	if fontString._damageMeterFontSignature == signature then return end
+	fontString._damageMeterFontSignature = signature
 	if addon.functions.ApplyFontString then
-		addon.functions.ApplyFontString(fontString, config.fontFace, size, config.fontOutline, DEFAULT_FONT, "OUTLINE")
+		addon.functions.ApplyFontString(fontString, fontFace, size, fontOutline, DEFAULT_FONT, "OUTLINE")
 		return
 	end
-	local font = resolveFont(config.fontFace)
-	local style = resolveStyle(config.fontOutline)
+	local font = resolveFont(fontFace)
+	local style = resolveStyle(fontOutline)
 	fontString:SetFont(font, size, style)
+end
+
+function DamageMeter:ApplyFontString(fontString, config)
+	applyCachedFontString(fontString, config.fontFace, clampNumber(config.fontSize, 8, 24, 11), config.fontOutline, "name")
 end
 
 function DamageMeter:ApplyRankFontString(fontString, config)
-	local size = clampNumber(config.rankFontSize, 8, 24, DEFAULT_WINDOW.rankFontSize)
-	if addon.functions.ApplyFontString then
-		addon.functions.ApplyFontString(fontString, config.rankFontFace, size, config.rankFontOutline, DEFAULT_FONT, "OUTLINE")
-		return
-	end
-	local font = resolveFont(config.rankFontFace)
-	local style = resolveStyle(config.rankFontOutline)
-	fontString:SetFont(font, size, style)
+	applyCachedFontString(fontString, config.rankFontFace, clampNumber(config.rankFontSize, 8, 24, DEFAULT_WINDOW.rankFontSize), config.rankFontOutline, "rank")
 end
 
 function DamageMeter:ApplyValueFontString(fontString, config)
-	local size = clampNumber(config.valueFontSize, 8, 24, DEFAULT_WINDOW.valueFontSize)
-	if addon.functions.ApplyFontString then
-		addon.functions.ApplyFontString(fontString, config.valueFontFace, size, config.valueFontOutline, DEFAULT_FONT, "OUTLINE")
-		return
-	end
-	local font = resolveFont(config.valueFontFace)
-	local style = resolveStyle(config.valueFontOutline)
-	fontString:SetFont(font, size, style)
+	applyCachedFontString(fontString, config.valueFontFace, clampNumber(config.valueFontSize, 8, 24, DEFAULT_WINDOW.valueFontSize), config.valueFontOutline, "value")
 end
 
 function DamageMeter:ApplyTitleFontString(fontString, config)
-	local size = clampNumber(config.titleFontSize, 8, 28, DEFAULT_WINDOW.titleFontSize)
-	if addon.functions.ApplyFontString then
-		addon.functions.ApplyFontString(fontString, config.titleFontFace, size, config.titleFontOutline, DEFAULT_FONT, "OUTLINE")
-		return
-	end
-	local font = resolveFont(config.titleFontFace)
-	local style = resolveStyle(config.titleFontOutline)
-	fontString:SetFont(font, size, style)
+	applyCachedFontString(fontString, config.titleFontFace, clampNumber(config.titleFontSize, 8, 28, DEFAULT_WINDOW.titleFontSize), config.titleFontOutline, "title")
 end
 
 function DamageMeter:ApplyStatusFontString(fontString, config)
-	local size = clampNumber(config.statusFontSize, 8, 24, DEFAULT_WINDOW.statusFontSize)
-	if addon.functions.ApplyFontString then
-		addon.functions.ApplyFontString(fontString, config.statusFontFace, size, config.statusFontOutline, DEFAULT_FONT, "OUTLINE")
-		return
-	end
-	local font = resolveFont(config.statusFontFace)
-	local style = resolveStyle(config.statusFontOutline)
-	fontString:SetFont(font, size, style)
+	applyCachedFontString(fontString, config.statusFontFace, clampNumber(config.statusFontSize, 8, 24, DEFAULT_WINDOW.statusFontSize), config.statusFontOutline, "status")
 end
 
 function DamageMeter:ApplyTooltipFontString(fontString, config)
-	local size = clampNumber(config.tooltipFontSize, 8, 24, DEFAULT_WINDOW.tooltipFontSize)
-	if addon.functions.ApplyFontString then
-		addon.functions.ApplyFontString(fontString, config.fontFace, size, config.fontOutline, DEFAULT_FONT, "OUTLINE")
-		return
-	end
-	local font = resolveFont(config.fontFace)
-	local style = resolveStyle(config.fontOutline)
-	fontString:SetFont(font, size, style)
+	applyCachedFontString(fontString, config.fontFace, clampNumber(config.tooltipFontSize, 8, 24, DEFAULT_WINDOW.tooltipFontSize), config.fontOutline, "tooltip")
 end
 
 function DamageMeter:ApplyBarBorder(row, config, classFilename)
 	if not row.barBorder or not row.barBorder.SetBackdrop then return end
 	if config.barBorderEnabled == true then
-		local borderTexture = resolveMedia("border", config.barBorderTexture, DEFAULT_BORDER)
-		local br, bg, bb, ba = getClassOrCustomColor(classFilename, config.barBorderColor, DEFAULT_WINDOW.barBorderColor, config.barBorderUseClassColor)
 		local size = clampNumber(config.barBorderSize, 1, 32, DEFAULT_WINDOW.barBorderSize)
-		row.barBorder:SetBackdrop({
-			edgeFile = borderTexture,
-			edgeSize = size,
-		})
-		row.barBorder:SetBackdropBorderColor(br, bg, bb, ba)
+		local br, bg, bb, ba = getClassOrCustomColor(classFilename, config.barBorderColor, DEFAULT_WINDOW.barBorderColor, config.barBorderUseClassColor)
+		local signature = tostring(config.barBorderTexture) .. ":" .. size .. ":" .. colorSignature(br, bg, bb, ba)
+		if row.barBorder._damageMeterBorderSignature ~= signature then
+			row.barBorder._damageMeterBorderSignature = signature
+			local borderTexture = resolveMedia("border", config.barBorderTexture, DEFAULT_BORDER)
+			row.barBorder:SetBackdrop({
+				edgeFile = borderTexture,
+				edgeSize = size,
+			})
+			row.barBorder:SetBackdropBorderColor(br, bg, bb, ba)
+		end
 		row.barBorder:Show()
 	else
-		row.barBorder:SetBackdrop(nil)
+		if row.barBorder._damageMeterBorderSignature ~= "off" then
+			row.barBorder._damageMeterBorderSignature = "off"
+			row.barBorder:SetBackdrop(nil)
+		end
 		row.barBorder:Hide()
 	end
 end
@@ -1313,28 +1348,40 @@ end
 function DamageMeter:ApplyIconBorder(row, config, classFilename)
 	if not row.iconBorder or not row.iconBorder.SetBackdrop then return end
 	if config.iconBorderEnabled == true then
-		local borderTexture = resolveMedia("border", config.iconBorderTexture, DEFAULT_BORDER)
-		local br, bg, bb, ba = getClassOrCustomColor(classFilename, config.iconBorderColor, DEFAULT_WINDOW.iconBorderColor, config.iconBorderUseClassColor)
 		local size = clampNumber(config.iconBorderSize, 1, 32, DEFAULT_WINDOW.iconBorderSize)
-		row.iconBorder:SetBackdrop({
-			edgeFile = borderTexture,
-			edgeSize = size,
-		})
-		row.iconBorder:SetBackdropBorderColor(br, bg, bb, ba)
+		local br, bg, bb, ba = getClassOrCustomColor(classFilename, config.iconBorderColor, DEFAULT_WINDOW.iconBorderColor, config.iconBorderUseClassColor)
+		local signature = tostring(config.iconBorderTexture) .. ":" .. size .. ":" .. colorSignature(br, bg, bb, ba)
+		if row.iconBorder._damageMeterBorderSignature ~= signature then
+			row.iconBorder._damageMeterBorderSignature = signature
+			local borderTexture = resolveMedia("border", config.iconBorderTexture, DEFAULT_BORDER)
+			row.iconBorder:SetBackdrop({
+				edgeFile = borderTexture,
+				edgeSize = size,
+			})
+			row.iconBorder:SetBackdropBorderColor(br, bg, bb, ba)
+		end
 		row.iconBorder:Show()
 	else
-		row.iconBorder:SetBackdrop(nil)
+		if row.iconBorder._damageMeterBorderSignature ~= "off" then
+			row.iconBorder._damageMeterBorderSignature = "off"
+			row.iconBorder:SetBackdrop(nil)
+		end
 		row.iconBorder:Hide()
 	end
 end
 
 function DamageMeter:ApplyRowTextLayout(row, config)
+	local rowMode = config.raidRowsEnabled == true and IsInRaid() and "raid" or "default"
+	local signature = self:GetWindowStyleVersion(row.windowIndex or 0) .. ":" .. rowMode
+	if row._damageMeterTextLayoutSignature == signature then return end
+	row._damageMeterTextLayoutSignature = signature
+
 	local _, barHeight = getRowMetrics(config)
 	local borderOutset = getBarBorderOutset(config)
 	local leftInset, rightInset, iconSize, rankWidth, rankGap = getRowTextInsets(config)
 	local showRankColumn = config.showRanks ~= false and rankWidth > 0
 	row.rank:SetWidth(rankWidth)
-	row.rank:SetShown(showRankColumn)
+	setShownIfChanged(row.rank, showRankColumn)
 	row.iconFrame:SetSize(iconSize, iconSize)
 	row.iconFrame:ClearAllPoints()
 	if showRankColumn then
@@ -1366,10 +1413,16 @@ function DamageMeter:ApplyRowTextLayout(row, config)
 	row.textArea:ClearAllPoints()
 	row.textArea:SetPoint("TOPLEFT", row, "TOPLEFT", leftInset, 0)
 	row.textArea:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -rightInset, 0)
-	row.name:SetShown(config.showNames == true)
+	setShownIfChanged(row.name, config.showNames == true)
 end
 
 function DamageMeter:ApplyRowValueWidth(row, config, damageMeterType)
+	damageMeterType = damageMeterType or config.damageMeterType
+	local rowMode = config.raidRowsEnabled == true and IsInRaid() and "raid" or "default"
+	local signature = self:GetWindowStyleVersion(row.windowIndex or 0) .. ":" .. rowMode .. ":" .. tostring(damageMeterType)
+	if row._damageMeterValueLayoutSignature == signature then return end
+	row._damageMeterValueLayoutSignature = signature
+
 	local frameWidth = clampNumber(config.width, 220, 700, DEFAULT_WINDOW.width)
 	local leftInset, rightInset = getRowTextInsets(config)
 	local availableWidth = math.max(1, (frameWidth - 8) - leftInset - rightInset)
@@ -1378,7 +1431,7 @@ function DamageMeter:ApplyRowValueWidth(row, config, damageMeterType)
 	local maxValueWidth = math.max(1, availableWidth - minNameWidth - nameGap)
 	local valueFontSize = clampNumber(config.valueFontSize, 8, 24, DEFAULT_WINDOW.valueFontSize)
 	local estimatedCharacters
-	if isCountOnlyMeterType(damageMeterType or config.damageMeterType) then
+	if isCountOnlyMeterType(damageMeterType) then
 		estimatedCharacters = config.showPercent ~= false and 10 or 4
 	elseif config.showPercent ~= false then
 		estimatedCharacters = config.valueFormat == "parentheses" and 19 or 21
@@ -1386,7 +1439,7 @@ function DamageMeter:ApplyRowValueWidth(row, config, damageMeterType)
 		estimatedCharacters = config.valueFormat == "parentheses" and 13 or 15
 	end
 	local valueTargetWidth = math.ceil((valueFontSize * estimatedCharacters * 0.62) + 12)
-	local minValueWidth = isCountOnlyMeterType(damageMeterType or config.damageMeterType) and 42 or (config.valueFormat == "parentheses" and 76 or 86)
+	local minValueWidth = isCountOnlyMeterType(damageMeterType) and 42 or (config.valueFormat == "parentheses" and 76 or 86)
 	local valueWidth = math.min(math.max(minValueWidth, valueTargetWidth), maxValueWidth)
 	local nameWidth = math.max(minNameWidth, availableWidth - valueWidth - nameGap)
 	row.value:SetWidth(valueWidth)
@@ -1475,18 +1528,22 @@ function DamageMeter:ApplyHeaderButtons(frame, config, showHeaderButtons)
 	local buttonSize = clampNumber(config.headerButtonSize, 10, 32, DEFAULT_WINDOW.headerButtonSize)
 	local gap = math.max(2, math.floor(buttonSize / 4))
 	local iconSize = math.max(8, buttonSize - 2)
-	frame.headerButtons:SetSize((buttonSize * 2) + gap, buttonSize)
-	frame.resetButton:SetSize(buttonSize, buttonSize)
-	frame.historyButton:SetSize(buttonSize, buttonSize)
-	frame.resetButton.icon:SetSize(iconSize, iconSize)
-	frame.historyButton.icon:SetSize(iconSize, iconSize)
-	frame.resetButton:ClearAllPoints()
-	frame.resetButton:SetPoint("RIGHT", frame.headerButtons, "RIGHT", 0, 0)
-	frame.historyButton:ClearAllPoints()
-	frame.historyButton:SetPoint("RIGHT", frame.resetButton, "LEFT", -gap, 0)
-	frame.headerButtons:SetShown(showHeaderButtons)
-	frame.resetButton:SetShown(showHeaderButtons)
-	frame.historyButton:SetShown(showHeaderButtons)
+	local signature = buttonSize .. ":" .. gap .. ":" .. iconSize .. ":" .. tostring(showHeaderButtons == true)
+	if frame.headerButtons._damageMeterHeaderButtonsSignature ~= signature then
+		frame.headerButtons._damageMeterHeaderButtonsSignature = signature
+		frame.headerButtons:SetSize((buttonSize * 2) + gap, buttonSize)
+		frame.resetButton:SetSize(buttonSize, buttonSize)
+		frame.historyButton:SetSize(buttonSize, buttonSize)
+		frame.resetButton.icon:SetSize(iconSize, iconSize)
+		frame.historyButton.icon:SetSize(iconSize, iconSize)
+		frame.resetButton:ClearAllPoints()
+		frame.resetButton:SetPoint("RIGHT", frame.headerButtons, "RIGHT", 0, 0)
+		frame.historyButton:ClearAllPoints()
+		frame.historyButton:SetPoint("RIGHT", frame.resetButton, "LEFT", -gap, 0)
+		setShownIfChanged(frame.headerButtons, showHeaderButtons)
+		setShownIfChanged(frame.resetButton, showHeaderButtons)
+		setShownIfChanged(frame.historyButton, showHeaderButtons)
+	end
 	return showHeaderButtons and ((buttonSize * 2) + gap + 12) or 8
 end
 
@@ -2191,6 +2248,7 @@ function DamageMeter:CreateRow(window, index)
 	local effectiveRowHeight = getEffectiveRowHeight(config)
 	local texture = resolveMedia("statusbar", config.texture, DEFAULT_TEXTURE)
 	local row = CreateFrame("Button", nil, window.rowsContainer)
+	row.windowIndex = window.index
 	row:RegisterForClicks("AnyUp")
 	row:SetScript("OnClick", function(owner, button)
 		if button == "RightButton" then
@@ -2397,16 +2455,17 @@ end
 function DamageMeter:ApplyWindowStyle(index, contentRows)
 	local frame = self:EnsureWindow(index)
 	local config = self:GetConfig(index)
+	local rowMode = config.raidRowsEnabled == true and IsInRaid() and "raid" or "default"
+	local updateSignature = self:GetWindowStyleVersion(index) .. ":" .. tostring(contentRows) .. ":" .. tostring(#frame.rows) .. ":" .. rowMode .. ":" .. getGlobalFontStateVersion()
+	if frame._damageMeterWindowStyleUpdateSignature == updateSignature then return end
+	frame._damageMeterWindowStyleUpdateSignature = updateSignature
+
 	local width = clampNumber(config.width, 220, 700, DEFAULT_WINDOW.width)
 	local showHeader = config.showHeader == true
 	local showHeaderButtons = showHeader and config.showHeaderButtons ~= false
 	local showStatus = config.showStatus ~= false
 	local headerPosition = normalizeHeaderPosition(config.headerPosition)
 	local rowsGrowUp = normalizeRowGrowth(config.rowGrowth) == "UP"
-	local texture = resolveMedia("statusbar", config.texture, DEFAULT_TEXTURE)
-	local backdropTexture = resolveMedia("statusbar", config.backdropTexture, "Interface\\Buttons\\WHITE8x8")
-	local backdropColor = normalizeColor(config.backdropColor, DEFAULT_WINDOW.backdropColor)
-	local borderColor = normalizeColor(config.borderColor, DEFAULT_WINDOW.borderColor)
 	local _, _, spacing = getRowMetrics(config)
 	local effectiveRowHeight = getEffectiveRowHeight(config)
 	local maxRows = getEffectiveMaxRows(config)
@@ -2424,13 +2483,18 @@ function DamageMeter:ApplyWindowStyle(index, contentRows)
 	local bottomOffset = heightOffset - topOffset
 	local height = math.max(60, viewportHeight + topInset + bottomInset + heightOffset)
 	local contentHeight = contentRows > 0 and ((contentRows * effectiveRowHeight) + math.max(0, contentRows - 1) * spacing) or 1
+	local backdropR, backdropG, backdropB, backdropA = colorComponents(config.backdropColor, DEFAULT_WINDOW.backdropColor)
+	local borderR, borderG, borderB, borderA = colorComponents(config.borderColor, DEFAULT_WINDOW.borderColor)
+	local titleR, titleG, titleB, titleA = colorComponents(config.titleColor, DEFAULT_WINDOW.titleColor)
 	frame.contentRows = contentRows
 
+	local texture = resolveMedia("statusbar", config.texture, DEFAULT_TEXTURE)
+	local backdropTexture = resolveMedia("statusbar", config.backdropTexture, "Interface\\Buttons\\WHITE8x8")
 	frame:SetSize(width, height)
 	self:ApplyWindowAnchor(index)
 	local headerButtonTextInset = self:ApplyHeaderButtons(frame, config, showHeaderButtons)
-	frame.header:SetShown(showHeader)
-	frame.status:SetShown(showStatus)
+	setShownIfChanged(frame.header, showHeader)
+	setShownIfChanged(frame.status, showStatus)
 	frame.header:ClearAllPoints()
 	frame.headerButtons:ClearAllPoints()
 	frame.status:ClearAllPoints()
@@ -2458,11 +2522,11 @@ function DamageMeter:ApplyWindowStyle(index, contentRows)
 			edgeSize = size,
 			insets = { left = inset, right = inset, top = inset, bottom = inset },
 		})
-		frame:SetBackdropBorderColor(borderColor.r, borderColor.g, borderColor.b, borderColor.a)
+		frame:SetBackdropBorderColor(borderR, borderG, borderB, borderA)
 	else
 		frame:SetBackdrop({ bgFile = backdropTexture })
 	end
-	frame:SetBackdropColor(backdropColor.r, backdropColor.g, backdropColor.b, backdropColor.a)
+	frame:SetBackdropColor(backdropR, backdropG, backdropB, backdropA)
 
 	frame.status:SetHeight(math.max(1, statusHeight))
 
@@ -2477,8 +2541,7 @@ function DamageMeter:ApplyWindowStyle(index, contentRows)
 	end
 
 	self:ApplyTitleFontString(frame.header, config)
-	local titleColor = normalizeColor(config.titleColor, DEFAULT_WINDOW.titleColor)
-	frame.header:SetTextColor(titleColor.r, titleColor.g, titleColor.b, titleColor.a)
+	setTextColorIfChanged(frame.header, titleR, titleG, titleB, titleA)
 	self:ApplyFontString(frame.empty, config)
 	self:ApplyStatusFontString(frame.status.text, config)
 
@@ -2503,9 +2566,10 @@ function DamageMeter:ApplyWindowStyle(index, contentRows)
 				row:SetPoint("TOPRIGHT", frame.rowsContainer, "TOPRIGHT")
 			end
 		end
-		row.bar:SetStatusBarTexture(texture)
-		self:ApplyIconBorder(row, config)
-		self:ApplyBarBorder(row, config)
+		if row.bar._damageMeterTexture ~= texture then
+			row.bar._damageMeterTexture = texture
+			row.bar:SetStatusBarTexture(texture)
+		end
 		self:ApplyRankFontString(row.rank, config)
 		self:ApplyFontString(row.name, config)
 		self:ApplyValueFontString(row.value, config)
@@ -2652,9 +2716,9 @@ function DamageMeter:RefreshWindow(index)
 			self:ApplyBarBorder(row, config, source.classFilename)
 			applySourceIcon(row.icon, source)
 			row.name:SetText(formatDisplayName(source.name, sourceIndex, config))
-			row.name:SetTextColor(nr, ng, nb, na)
+			setTextColorIfChanged(row.name, nr, ng, nb, na)
 			row.value:SetText(valueText)
-			row.value:SetTextColor(vr, vg, vb, va)
+			setTextColorIfChanged(row.value, vr, vg, vb, va)
 			self:ApplyRowValueWidth(row, config, damageMeterType)
 			row.bar:SetStatusBarColor(r, g, b, 0.85)
 			row.bar:SetMinMaxValues(0, rawMaxAmount)
@@ -2734,6 +2798,7 @@ function DamageMeter:ApplySyncedConfig(sourceIndex)
 			windows[index] = copySyncedWindowConfig(source, windows[index])
 		end
 	end
+	self:MarkWindowStyleDirty()
 	self:Refresh()
 end
 
@@ -2745,6 +2810,7 @@ function DamageMeter:CopySettings(sourceIndex, targetIndex)
 	if sourceIndex < 1 or sourceIndex > count or targetIndex < 1 or targetIndex > count then return end
 	local windows = self:GetWindowsDB()
 	windows[targetIndex] = copyWindowConfig(windows[sourceIndex])
+	self:MarkWindowStyleDirty(targetIndex)
 	if db().damageMeterSyncSettings == true then
 		self:ApplySyncedConfig(targetIndex)
 	else
@@ -2758,6 +2824,7 @@ function DamageMeter:AddWindow(sourceIndex)
 	local newIndex = count + 1
 	setWindowCount(newIndex)
 	self:GetWindowsDB()
+	self:MarkWindowStyleDirty(newIndex)
 	if db().damageMeterSyncSettings == true then
 		self:CopySettings(sourceIndex or 1, newIndex)
 	end
@@ -2962,6 +3029,7 @@ end
 function DamageMeter:SetConfigValue(index, key, value)
 	local config = self:GetConfig(index)
 	config[key] = copyValue(value)
+	self:MarkWindowStyleDirty(index)
 	if key == "tooltipPreview" and value ~= true and self.sourceTooltip then
 		self.sourceTooltip:Hide()
 		if self.previewTooltipIndex == index then self.previewTooltipIndex = nil end
@@ -2979,6 +3047,7 @@ function DamageMeter:SetConfigValue(index, key, value)
 		for windowIndex = 1, MAX_WINDOWS do
 			if windowIndex ~= index then
 				windows[windowIndex][key] = copyValue(config[key])
+				self:MarkWindowStyleDirty(windowIndex)
 				if key == "rowHeight" or key == "barHeight" or key == "changeBarSize" then
 					local rowHeight = clampNumber(windows[windowIndex].rowHeight, 10, 70, DEFAULT_WINDOW.rowHeight)
 					windows[windowIndex].barHeight = clampNumber(windows[windowIndex].barHeight, 1, rowHeight, DEFAULT_WINDOW.barHeight)
