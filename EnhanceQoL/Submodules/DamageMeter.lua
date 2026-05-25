@@ -1,0 +1,1452 @@
+-- luacheck: globals C_DamageMeter StaticPopupDialogs StaticPopup_Show YES CANCEL
+local addonName, addon = ...
+
+local L = LibStub("AceLocale-3.0"):GetLocale(addonName)
+local LSM = LibStub("LibSharedMedia-3.0", true)
+local EditMode = addon.EditMode
+local SettingType = EditMode and EditMode.lib and EditMode.lib.SettingType
+
+local DamageMeter = {}
+addon.DamageMeter = DamageMeter
+
+local EDITMODE_ID_PREFIX = "EQOL_DamageMeter"
+local MAX_WINDOWS = 5
+local DEFAULT_TEXTURE = "Interface\\TargetingFrame\\UI-StatusBar"
+local DEFAULT_BORDER = "Interface\\Buttons\\WHITE8x8"
+local DEFAULT_FONT = "Fonts\\FRIZQT__.TTF"
+local GLOBAL_FONT_KEY = "__EQOL_GLOBAL_FONT__"
+local GLOBAL_STYLE_KEY = "__EQOL_GLOBAL_FONT_STYLE__"
+local REMOVE_WINDOW_POPUP = "EQOL_DAMAGE_METER_REMOVE_WINDOW"
+local COPY_WINDOW_POPUP = "EQOL_DAMAGE_METER_COPY_WINDOW"
+local getWindowCount
+local SESSION_TYPES = {
+	current = Enum and Enum.DamageMeterSessionType and Enum.DamageMeterSessionType.Current,
+	overall = Enum and Enum.DamageMeterSessionType and Enum.DamageMeterSessionType.Overall,
+}
+local DEFAULT_WINDOW = {
+	enabled = true,
+	anchorToWindow = 0,
+	windowAnchorPoint = "TOPLEFT",
+	windowRelativePoint = "TOPRIGHT",
+	windowOffsetX = 0,
+	windowOffsetY = 0,
+	sessionType = "current",
+	visibility = "always",
+	maxRows = 8,
+	visibleRows = 8,
+	width = 320,
+	heightOffset = 0,
+	rowHeight = 20,
+	changeBarSize = false,
+	barHeight = 20,
+	barAnchor = "CENTER",
+	barSpacing = 2,
+	barBorderEnabled = false,
+	barBorderTexture = "",
+	barBorderColor = { r = 0, g = 0, b = 0, a = 0.9 },
+	barBorderSize = 1,
+	barBorderInset = 0,
+	showHeader = true,
+	showStatus = true,
+	showNames = true,
+	showRanks = true,
+	prefixRankInName = false,
+	rankGap = 2,
+	rankFontFace = GLOBAL_FONT_KEY,
+	rankFontOutline = GLOBAL_STYLE_KEY,
+	rankFontSize = 11,
+	showPercent = true,
+	hideRealmNames = true,
+	abbreviation = "short",
+	valueFormat = "slash",
+	nameAnchorH = "LEFT",
+	nameAnchorV = "CENTER",
+	nameOffsetX = 5,
+	nameOffsetY = 0,
+	valueAnchorH = "RIGHT",
+	valueAnchorV = "CENTER",
+	valueOffsetX = -5,
+	valueOffsetY = 0,
+	useClassColors = true,
+	texture = "",
+	backdropTexture = "",
+	backdropColor = { r = 0.02, g = 0.025, b = 0.03, a = 0.78 },
+	borderEnabled = true,
+	borderTexture = "",
+	borderColor = { r = 0.1, g = 0.12, b = 0.14, a = 0.95 },
+	borderSize = 1,
+	borderInset = 0,
+	fontFace = GLOBAL_FONT_KEY,
+	fontOutline = GLOBAL_STYLE_KEY,
+	fontSize = 11,
+	valueFontFace = GLOBAL_FONT_KEY,
+	valueFontOutline = GLOBAL_STYLE_KEY,
+	valueFontSize = 11,
+	titleFontFace = GLOBAL_FONT_KEY,
+	titleFontOutline = GLOBAL_STYLE_KEY,
+	titleFontSize = 12,
+	statusFontFace = GLOBAL_FONT_KEY,
+	statusFontOutline = GLOBAL_STYLE_KEY,
+	statusFontSize = 11,
+}
+local PREVIEW_SESSION = {
+	combatSources = {
+		{ totalAmount = 100000, amountPerSecond = 10000, name = "Khadgar", classFilename = "MAGE", specIconID = 135932 },
+		{ totalAmount = 83000, amountPerSecond = 8300, name = "Valeera", classFilename = "ROGUE", specIconID = 132320 },
+		{ totalAmount = 71000, amountPerSecond = 7100, name = "Thrall", classFilename = "SHAMAN", specIconID = 136048 },
+		{ totalAmount = 64000, amountPerSecond = 6400, name = "Liadrin", classFilename = "PALADIN", specIconID = 135920 },
+		{ totalAmount = 51000, amountPerSecond = 5100, name = "Alleria", classFilename = "HUNTER", specIconID = 461115 },
+		{ totalAmount = 42000, amountPerSecond = 4200, name = "Anduin", classFilename = "PRIEST", specIconID = 135940 },
+	},
+	maxAmount = 100000,
+	totalAmount = 411000,
+	durationSeconds = 10,
+}
+
+local function db()
+	return addon.db or {}
+end
+
+local function clampNumber(value, minValue, maxValue, default)
+	value = tonumber(value) or default
+	if value < minValue then return minValue end
+	if value > maxValue then return maxValue end
+	return value
+end
+
+local function copyDefaults(target, defaults)
+	for key, value in pairs(defaults) do
+		if target[key] == nil then
+			target[key] = value
+		end
+	end
+end
+
+local function copyValue(value)
+	if type(value) ~= "table" then return value end
+	local copy = {}
+	for key, child in pairs(value) do
+		copy[key] = copyValue(child)
+	end
+	return copy
+end
+
+local function copyWindowConfig(source)
+	local copy = {}
+	source = type(source) == "table" and source or {}
+	for key, defaultValue in pairs(DEFAULT_WINDOW) do
+		if source[key] ~= nil then
+			copy[key] = copyValue(source[key])
+		else
+			copy[key] = copyValue(defaultValue)
+		end
+	end
+	return copy
+end
+
+local function getGlobalFontKey()
+	return addon.functions.GetGlobalFontConfigKey and addon.functions.GetGlobalFontConfigKey() or GLOBAL_FONT_KEY
+end
+
+local function getGlobalFontLabel()
+	return addon.functions.GetGlobalFontConfigLabel and addon.functions.GetGlobalFontConfigLabel() or (L["useGlobalFontConfig"] or "Use global font config")
+end
+
+local function getGlobalStyleKey()
+	return addon.functions.GetGlobalFontStyleConfigKey and addon.functions.GetGlobalFontStyleConfigKey() or GLOBAL_STYLE_KEY
+end
+
+local function getGlobalStyleLabel()
+	return addon.functions.GetGlobalFontStyleConfigLabel and addon.functions.GetGlobalFontStyleConfigLabel() or (L["useGlobalFontStyleConfig"] or "Use global font styling")
+end
+
+local function normalizeStyle(value)
+	if addon.functions.NormalizeFontStyleChoice then
+		return addon.functions.NormalizeFontStyleChoice(value, getGlobalStyleKey(), true)
+	end
+	if value == GLOBAL_STYLE_KEY then return value end
+	if value == "NONE" or value == "OUTLINE" or value == "THICKOUTLINE" or value == "MONOCHROME" or value == "MONOCHROMEOUTLINE" then return value end
+	return GLOBAL_STYLE_KEY
+end
+
+local function resolveStyle(value)
+	if addon.functions.ResolveFontStyleChoice then
+		return addon.functions.ResolveFontStyleChoice(value, "OUTLINE")
+	end
+	value = normalizeStyle(value)
+	if value == GLOBAL_STYLE_KEY then
+		local globalValue = db().globalFontStyle
+		if type(globalValue) == "string" and globalValue ~= "" then return globalValue end
+		return "OUTLINE"
+	end
+	if value == "NONE" then return "" end
+	return value
+end
+
+local function resolveMedia(mediaType, key, fallback)
+	if type(key) == "string" and key ~= "" then
+		if addon.functions.ResolveLSMMedia then
+			local resolved = addon.functions.ResolveLSMMedia(mediaType, key, fallback, true)
+			if resolved then return resolved end
+		end
+		if LSM and LSM.Fetch then
+			local resolved = LSM:Fetch(mediaType, key, true)
+			if resolved then return resolved end
+		end
+	end
+	return fallback
+end
+
+local function resolveFont(key)
+	if key == GLOBAL_FONT_KEY then
+		key = db().globalFontFace or getGlobalFontKey()
+	end
+	return resolveMedia("font", key, DEFAULT_FONT)
+end
+
+local function buildMediaOptions(mediaType, includeGlobal)
+	local options = {}
+	if includeGlobal and mediaType == "font" then
+		options[#options + 1] = { value = getGlobalFontKey(), label = getGlobalFontLabel() }
+	elseif mediaType == "statusbar" or mediaType == "border" then
+		options[#options + 1] = { value = "", label = _G.DEFAULT or "Default" }
+	end
+	local names = addon.functions.GetLSMMediaNames and addon.functions.GetLSMMediaNames(mediaType) or {}
+	for _, name in ipairs(names) do
+		options[#options + 1] = { value = name, label = name }
+	end
+	return options
+end
+
+local function buildStyleOptions()
+	if addon.functions.GetFontStyleOptionList then
+		return addon.functions.GetFontStyleOptionList(true)
+	end
+	return {
+		{ value = getGlobalStyleKey(), label = getGlobalStyleLabel() },
+		{ value = "NONE", label = _G.NONE or "None" },
+		{ value = "OUTLINE", label = L["Font outline"] or "Font outline" },
+		{ value = "THICKOUTLINE", label = L["Thick outline"] or "Thick outline" },
+		{ value = "MONOCHROME", label = "Monochrome" },
+		{ value = "MONOCHROMEOUTLINE", label = "Monochrome Outline" },
+	}
+end
+
+local function buildHorizontalAnchorOptions()
+	return {
+		{ value = "LEFT", label = _G.LEFT or "Left" },
+		{ value = "CENTER", label = _G.CENTER or "Center" },
+		{ value = "RIGHT", label = _G.RIGHT or "Right" },
+	}
+end
+
+local function buildVerticalAnchorOptions()
+	return {
+		{ value = "TOP", label = _G.TOP or "Top" },
+		{ value = "CENTER", label = _G.CENTER or "Center" },
+		{ value = "BOTTOM", label = _G.BOTTOM or "Bottom" },
+	}
+end
+
+local function normalizeFramePoint(value)
+	if value == "TOPLEFT" or value == "TOP" or value == "TOPRIGHT" or value == "LEFT" or value == "CENTER" or value == "RIGHT" or value == "BOTTOMLEFT" or value == "BOTTOM" or value == "BOTTOMRIGHT" then
+		return value
+	end
+	return "TOPLEFT"
+end
+
+local function buildFramePointOptions()
+	return {
+		{ value = "TOPLEFT", label = "TOPLEFT" },
+		{ value = "TOP", label = "TOP" },
+		{ value = "TOPRIGHT", label = "TOPRIGHT" },
+		{ value = "LEFT", label = "LEFT" },
+		{ value = "CENTER", label = "CENTER" },
+		{ value = "RIGHT", label = "RIGHT" },
+		{ value = "BOTTOMLEFT", label = "BOTTOMLEFT" },
+		{ value = "BOTTOM", label = "BOTTOM" },
+		{ value = "BOTTOMRIGHT", label = "BOTTOMRIGHT" },
+	}
+end
+
+local function buildWindowAnchorOptions(index)
+	local options = {
+		{ value = "0", label = _G.NONE or "None" },
+	}
+	for windowIndex = 1, math.min(index - 1, getWindowCount()) do
+		options[#options + 1] = { value = tostring(windowIndex), label = string.format("%s %d", L["damageMeterTitle"] or "Damage Meter", windowIndex) }
+	end
+	return options
+end
+
+local function isSecret(value)
+	return _G.issecretvalue and _G.issecretvalue(value)
+end
+
+local function safeText(value, fallback)
+	if value == nil or isSecret(value) then return fallback end
+	value = tostring(value)
+	if value == "" then return fallback end
+	return value
+end
+
+local function formatFull(value)
+	value = tonumber(value) or 0
+	return BreakUpLargeNumbers and BreakUpLargeNumbers(math.floor(value + 0.5)) or tostring(math.floor(value + 0.5))
+end
+
+local function formatShort(value)
+	value = tonumber(value) or 0
+	if AbbreviateNumbers then return AbbreviateNumbers(value) end
+	if AbbreviateLargeNumbers then return AbbreviateLargeNumbers(value) end
+	if value >= 1000000000 then return string.format("%.1fb", value / 1000000000) end
+	if value >= 1000000 then return string.format("%.1fm", value / 1000000) end
+	if value >= 1000 then return string.format("%.1fk", value / 1000) end
+	return tostring(math.floor(value + 0.5))
+end
+
+local function formatNumber(value, mode)
+	if mode == "none" then return formatFull(value) end
+	return formatShort(value)
+end
+
+local function formatDuration(seconds)
+	seconds = math.floor((tonumber(seconds) or 0) + 0.5)
+	if seconds >= 60 then
+		return string.format("%d:%02d", math.floor(seconds / 60), seconds % 60)
+	end
+	return tostring(seconds) .. "s"
+end
+
+local function formatSourceName(value, config)
+	if value == nil then return L["Unknown"] or UNKNOWN or "Unknown" end
+	if isSecret(value) then return value end
+	local name = safeText(value, L["Unknown"] or UNKNOWN or "Unknown")
+	if config.hideRealmNames ~= false then
+		name = name:gsub("%-[^%-]+$", "")
+	end
+	return name
+end
+
+local function formatDisplayName(value, rowIndex, config)
+	local name = formatSourceName(value, config)
+	if config.showRanks ~= false and config.prefixRankInName == true and not isSecret(name) then
+		local gap = clampNumber(config.rankGap, 0, 24, DEFAULT_WINDOW.rankGap)
+		local spaces = string.rep(" ", math.ceil(gap / 4))
+		return string.format("%d.%s%s", rowIndex, spaces, name)
+	end
+	return name
+end
+
+local function formatValueText(amountText, dpsText, percent, config)
+	local text = config.valueFormat == "parentheses" and string.format("%s (%s)", amountText, dpsText) or string.format("%s / %s", amountText, dpsText)
+	if config.showPercent ~= false then
+		text = string.format("%s (%.1f%%)", text, percent)
+	end
+	return text
+end
+
+local function normalizeColor(value, fallback)
+	fallback = fallback or DEFAULT_WINDOW.backdropColor
+	if type(value) ~= "table" then value = fallback end
+	return {
+		r = clampNumber(value.r or value[1], 0, 1, fallback.r or fallback[1] or 0),
+		g = clampNumber(value.g or value[2], 0, 1, fallback.g or fallback[2] or 0),
+		b = clampNumber(value.b or value[3], 0, 1, fallback.b or fallback[3] or 0),
+		a = clampNumber(value.a or value[4], 0, 1, fallback.a or fallback[4] or 1),
+	}
+end
+
+local function getRowMetrics(config)
+	local rowHeight = clampNumber(config.rowHeight, 10, 70, DEFAULT_WINDOW.rowHeight)
+	local barHeight = config.changeBarSize == true and math.min(rowHeight, clampNumber(config.barHeight, 1, rowHeight, DEFAULT_WINDOW.barHeight)) or rowHeight
+	local spacing = clampNumber(config.barSpacing, 0, 16, DEFAULT_WINDOW.barSpacing)
+	return rowHeight, barHeight, spacing
+end
+
+local function getEffectiveRankWidth(config)
+	if config.showRanks == false or config.prefixRankInName == true then return 0 end
+	local rankFontSize = clampNumber(config.rankFontSize, 8, 24, DEFAULT_WINDOW.rankFontSize)
+	local maxRows = clampNumber(config.maxRows, 1, 30, DEFAULT_WINDOW.maxRows)
+	local rankChars = #tostring(maxRows) + 1
+	return math.min(60, math.ceil(rankChars * rankFontSize * 0.52) + 3)
+end
+
+local function getRowTextInsets(config)
+	local rowHeight = getRowMetrics(config)
+	local rankWidth = getEffectiveRankWidth(config)
+	local rankGap = clampNumber(config.rankGap, 0, 24, DEFAULT_WINDOW.rankGap)
+	local iconSize = math.max(12, rowHeight - 4)
+	local leftInset = 4 + iconSize + 4
+	if rankWidth > 0 then
+		leftInset = leftInset + rankWidth + rankGap
+	end
+	return leftInset, 4, iconSize, rankWidth, rankGap
+end
+
+local function normalizeAnchorH(value)
+	return (value == "CENTER" or value == "RIGHT") and value or "LEFT"
+end
+
+local function normalizeAnchorV(value)
+	return (value == "TOP" or value == "BOTTOM") and value or "CENTER"
+end
+
+local function anchorPoint(horizontal, vertical)
+	horizontal = normalizeAnchorH(horizontal)
+	vertical = normalizeAnchorV(vertical)
+	if vertical == "CENTER" then return horizontal end
+	if horizontal == "CENTER" then return vertical end
+	return vertical .. horizontal
+end
+
+local function justifyFromAnchor(horizontal)
+	horizontal = normalizeAnchorH(horizontal)
+	if horizontal == "RIGHT" then return "RIGHT" end
+	if horizontal == "CENTER" then return "CENTER" end
+	return "LEFT"
+end
+
+local function isDefaultTextLayout(config)
+	return normalizeAnchorH(config.nameAnchorH) == "LEFT"
+		and normalizeAnchorV(config.nameAnchorV) == "CENTER"
+		and normalizeAnchorH(config.valueAnchorH) == "RIGHT"
+		and normalizeAnchorV(config.valueAnchorV) == "CENTER"
+		and clampNumber(config.nameOffsetX, -200, 200, DEFAULT_WINDOW.nameOffsetX) == DEFAULT_WINDOW.nameOffsetX
+		and clampNumber(config.nameOffsetY, -200, 200, DEFAULT_WINDOW.nameOffsetY) == DEFAULT_WINDOW.nameOffsetY
+		and clampNumber(config.valueOffsetX, -200, 200, DEFAULT_WINDOW.valueOffsetX) == DEFAULT_WINDOW.valueOffsetX
+		and clampNumber(config.valueOffsetY, -200, 200, DEFAULT_WINDOW.valueOffsetY) == DEFAULT_WINDOW.valueOffsetY
+end
+
+local function getDamageDoneType()
+	return Enum and Enum.DamageMeterType and Enum.DamageMeterType.DamageDone
+end
+
+local function getUpdateRate()
+	return clampNumber(db().damageMeterUpdateRate, 0.1, 2, 0.1)
+end
+
+function getWindowCount()
+	return clampNumber(db().damageMeterWindowCount, 1, MAX_WINDOWS, 1)
+end
+
+local function setWindowCount(value)
+	db().damageMeterWindowCount = clampNumber(value, 1, MAX_WINDOWS, 1)
+end
+
+function DamageMeter:GetWindowsDB()
+	local profile = db()
+	if type(profile.damageMeterWindows) ~= "table" then profile.damageMeterWindows = {} end
+	for index = 1, MAX_WINDOWS do
+		if type(profile.damageMeterWindows[index]) ~= "table" then profile.damageMeterWindows[index] = {} end
+		local hadSessionType = profile.damageMeterWindows[index].sessionType ~= nil
+		copyDefaults(profile.damageMeterWindows[index], DEFAULT_WINDOW)
+		if index > 1 and not hadSessionType then profile.damageMeterWindows[index].sessionType = index % 2 == 0 and "overall" or "current" end
+	end
+	return profile.damageMeterWindows
+end
+
+function DamageMeter:GetConfig(index)
+	return self:GetWindowsDB()[index]
+end
+
+function DamageMeter:IsEnabled()
+	return db().damageMeterEnabled == true
+end
+
+function DamageMeter:IsWindowEnabled(index)
+	return self:IsEnabled() and index <= getWindowCount() and self:GetConfig(index).enabled == true
+end
+
+function DamageMeter:IsAvailable()
+	if not C_DamageMeter or not C_DamageMeter.IsDamageMeterAvailable then return false end
+	local ok, available = pcall(C_DamageMeter.IsDamageMeterAvailable)
+	return ok and available == true
+end
+
+function DamageMeter:IsInEditMode()
+	return EditMode and EditMode.IsInEditMode and EditMode:IsInEditMode()
+end
+
+function DamageMeter:UsePreviewData()
+	return self:IsInEditMode() and db().damageMeterEditModeSample ~= false
+end
+
+function DamageMeter:ShouldShow(index)
+	if not self:IsWindowEnabled(index) then return false end
+	if self:IsInEditMode() then return true end
+	if not self:IsAvailable() then return false end
+	local visibility = self:GetConfig(index).visibility
+	if visibility == "hidden" then return false end
+	if visibility == "combat" then return UnitAffectingCombat("player") == true end
+	return true
+end
+
+function DamageMeter:GetSession(index)
+	if self:UsePreviewData() then return PREVIEW_SESSION end
+	if not self:IsAvailable() then return nil end
+	local config = self:GetConfig(index)
+	local sessionType = SESSION_TYPES[config.sessionType] or SESSION_TYPES.current
+	local damageDoneType = getDamageDoneType()
+	if not sessionType or not damageDoneType or not C_DamageMeter.GetCombatSessionFromType then return nil end
+	local ok, session = pcall(C_DamageMeter.GetCombatSessionFromType, sessionType, damageDoneType)
+	if ok then return session end
+	return nil
+end
+
+function DamageMeter:GetSessionDuration(index, session)
+	if session and type(session.durationSeconds) == "number" then return session.durationSeconds end
+	if self:UsePreviewData() then return PREVIEW_SESSION.durationSeconds end
+	local sessionType = SESSION_TYPES[self:GetConfig(index).sessionType] or SESSION_TYPES.current
+	if sessionType and C_DamageMeter and C_DamageMeter.GetSessionDurationSeconds then
+		local ok, duration = pcall(C_DamageMeter.GetSessionDurationSeconds, sessionType)
+		if ok then return duration end
+	end
+	return nil
+end
+
+function DamageMeter:GetClassColor(config, classFilename)
+	if config.useClassColors ~= true then return 0.22, 0.56, 0.9 end
+	if type(classFilename) == "string" and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFilename] then
+		local color = RAID_CLASS_COLORS[classFilename]
+		return color.r or 1, color.g or 1, color.b or 1
+	end
+	return 0.55, 0.55, 0.55
+end
+
+function DamageMeter:ApplyFontString(fontString, config)
+	local size = clampNumber(config.fontSize, 8, 24, 11)
+	if addon.functions.ApplyFontString then
+		addon.functions.ApplyFontString(fontString, config.fontFace, size, config.fontOutline, DEFAULT_FONT, "OUTLINE")
+		return
+	end
+	local font = resolveFont(config.fontFace)
+	local style = resolveStyle(config.fontOutline)
+	fontString:SetFont(font, size, style)
+end
+
+function DamageMeter:ApplyRankFontString(fontString, config)
+	local size = clampNumber(config.rankFontSize, 8, 24, DEFAULT_WINDOW.rankFontSize)
+	if addon.functions.ApplyFontString then
+		addon.functions.ApplyFontString(fontString, config.rankFontFace, size, config.rankFontOutline, DEFAULT_FONT, "OUTLINE")
+		return
+	end
+	local font = resolveFont(config.rankFontFace)
+	local style = resolveStyle(config.rankFontOutline)
+	fontString:SetFont(font, size, style)
+end
+
+function DamageMeter:ApplyValueFontString(fontString, config)
+	local size = clampNumber(config.valueFontSize, 8, 24, DEFAULT_WINDOW.valueFontSize)
+	if addon.functions.ApplyFontString then
+		addon.functions.ApplyFontString(fontString, config.valueFontFace, size, config.valueFontOutline, DEFAULT_FONT, "OUTLINE")
+		return
+	end
+	local font = resolveFont(config.valueFontFace)
+	local style = resolveStyle(config.valueFontOutline)
+	fontString:SetFont(font, size, style)
+end
+
+function DamageMeter:ApplyTitleFontString(fontString, config)
+	local size = clampNumber(config.titleFontSize, 8, 28, DEFAULT_WINDOW.titleFontSize)
+	if addon.functions.ApplyFontString then
+		addon.functions.ApplyFontString(fontString, config.titleFontFace, size, config.titleFontOutline, DEFAULT_FONT, "OUTLINE")
+		return
+	end
+	local font = resolveFont(config.titleFontFace)
+	local style = resolveStyle(config.titleFontOutline)
+	fontString:SetFont(font, size, style)
+end
+
+function DamageMeter:ApplyStatusFontString(fontString, config)
+	local size = clampNumber(config.statusFontSize, 8, 24, DEFAULT_WINDOW.statusFontSize)
+	if addon.functions.ApplyFontString then
+		addon.functions.ApplyFontString(fontString, config.statusFontFace, size, config.statusFontOutline, DEFAULT_FONT, "OUTLINE")
+		return
+	end
+	local font = resolveFont(config.statusFontFace)
+	local style = resolveStyle(config.statusFontOutline)
+	fontString:SetFont(font, size, style)
+end
+
+function DamageMeter:ApplyBarBorder(row, config)
+	if not row.barBorder or not row.barBorder.SetBackdrop then return end
+	if config.barBorderEnabled == true then
+		local borderTexture = resolveMedia("border", config.barBorderTexture, DEFAULT_BORDER)
+		local borderColor = normalizeColor(config.barBorderColor, DEFAULT_WINDOW.barBorderColor)
+		local size = clampNumber(config.barBorderSize, 1, 32, DEFAULT_WINDOW.barBorderSize)
+		row.barBorder:SetBackdrop({
+			edgeFile = borderTexture,
+			edgeSize = size,
+		})
+		row.barBorder:SetBackdropBorderColor(borderColor.r, borderColor.g, borderColor.b, borderColor.a)
+		row.barBorder:Show()
+	else
+		row.barBorder:SetBackdrop(nil)
+		row.barBorder:Hide()
+	end
+end
+
+function DamageMeter:ApplyRowTextLayout(row, config)
+	local _, barHeight = getRowMetrics(config)
+	local leftInset, rightInset, iconSize, rankWidth, rankGap = getRowTextInsets(config)
+	local showRankColumn = config.showRanks ~= false and rankWidth > 0
+	row.rank:SetWidth(rankWidth)
+	row.rank:SetShown(showRankColumn)
+	row.icon:SetSize(iconSize, iconSize)
+	row.icon:ClearAllPoints()
+	if showRankColumn then
+		row.icon:SetPoint("LEFT", row.rank, "RIGHT", rankGap, 0)
+	else
+		row.icon:SetPoint("LEFT", 4, 0)
+	end
+	row.bar:ClearAllPoints()
+	row.bar:SetPoint("LEFT", row.icon, "RIGHT", 4, 0)
+	row.bar:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+	row.bar:SetHeight(barHeight)
+	if normalizeAnchorV(config.barAnchor) == "TOP" then
+		row.bar:SetPoint("TOP", row, "TOP", 0, 0)
+	elseif normalizeAnchorV(config.barAnchor) == "BOTTOM" then
+		row.bar:SetPoint("BOTTOM", row, "BOTTOM", 0, 0)
+	else
+		row.bar:SetPoint("CENTER", row, "CENTER", 0, 0)
+	end
+	row.barBorder:ClearAllPoints()
+	local borderOffset = clampNumber(config.barBorderInset, 0, 24, DEFAULT_WINDOW.barBorderInset)
+	row.barBorder:SetPoint("TOPLEFT", row.bar, "TOPLEFT", -borderOffset, borderOffset)
+	row.barBorder:SetPoint("BOTTOMRIGHT", row.bar, "BOTTOMRIGHT", borderOffset, -borderOffset)
+	row.barBorder:SetFrameLevel(row.bar:GetFrameLevel() + 2)
+	row.textArea:ClearAllPoints()
+	row.textArea:SetPoint("TOPLEFT", row, "TOPLEFT", leftInset, 0)
+	row.textArea:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -rightInset, 0)
+	row.name:SetShown(config.showNames == true)
+end
+
+function DamageMeter:ApplyRowValueWidth(row, config)
+	local frameWidth = clampNumber(config.width, 220, 700, DEFAULT_WINDOW.width)
+	local leftInset, rightInset = getRowTextInsets(config)
+	local availableWidth = math.max(1, (frameWidth - 8) - leftInset - rightInset)
+	local valueTextWidth = row.value.GetStringWidth and row.value:GetStringWidth() or 0
+	local valueTargetWidth = math.ceil(valueTextWidth + 12)
+	local minNameWidth = config.showNames == false and 0 or 24
+	local nameGap = config.showNames == false and 0 or 8
+	local maxValueWidth = math.max(1, availableWidth - minNameWidth - nameGap)
+	local valueWidth = math.min(math.max(64, valueTargetWidth), maxValueWidth)
+	local nameWidth = math.max(minNameWidth, availableWidth - valueWidth - nameGap)
+	row.value:SetWidth(valueWidth)
+	row.name:SetWidth(nameWidth)
+
+	row.value:ClearAllPoints()
+	row.name:ClearAllPoints()
+	if isDefaultTextLayout(config) then
+		row.value:SetPoint("RIGHT", row.textArea, "RIGHT", DEFAULT_WINDOW.valueOffsetX, DEFAULT_WINDOW.valueOffsetY)
+		row.value:SetJustifyH("RIGHT")
+		row.name:SetPoint("LEFT", row.textArea, "LEFT", DEFAULT_WINDOW.nameOffsetX, DEFAULT_WINDOW.nameOffsetY)
+		row.name:SetPoint("RIGHT", row.value, "LEFT", -6, 0)
+		row.name:SetJustifyH("LEFT")
+	else
+		local valueH = normalizeAnchorH(config.valueAnchorH)
+		local valueV = normalizeAnchorV(config.valueAnchorV)
+		local nameH = normalizeAnchorH(config.nameAnchorH)
+		local nameV = normalizeAnchorV(config.nameAnchorV)
+		row.value:SetPoint(anchorPoint(valueH, valueV), row.textArea, anchorPoint(valueH, valueV), clampNumber(config.valueOffsetX, -200, 200, DEFAULT_WINDOW.valueOffsetX), clampNumber(config.valueOffsetY, -200, 200, DEFAULT_WINDOW.valueOffsetY))
+		row.value:SetJustifyH(justifyFromAnchor(valueH))
+		row.name:SetPoint(anchorPoint(nameH, nameV), row.textArea, anchorPoint(nameH, nameV), clampNumber(config.nameOffsetX, -200, 200, DEFAULT_WINDOW.nameOffsetX), clampNumber(config.nameOffsetY, -200, 200, DEFAULT_WINDOW.nameOffsetY))
+		row.name:SetJustifyH(justifyFromAnchor(nameH))
+	end
+end
+
+function DamageMeter:ApplyRankText(row, rowIndex, config)
+	local rankWidth = getEffectiveRankWidth(config)
+	if config.showRanks == false or config.prefixRankInName == true or rankWidth <= 0 then
+		row.rank:SetText("")
+		return
+	end
+
+	local text = rowIndex .. "."
+	row.rank:SetText(text)
+end
+
+function DamageMeter:CreateRow(window, index)
+	local config = self:GetConfig(window.index)
+	local rowHeight, _, spacing = getRowMetrics(config)
+	local texture = resolveMedia("statusbar", config.texture, DEFAULT_TEXTURE)
+	local row = CreateFrame("Button", nil, window.rowsContainer)
+	row:SetHeight(rowHeight)
+	row:ClearAllPoints()
+	if index > 1 and window.rows[index - 1] then
+		row:SetPoint("TOPLEFT", window.rows[index - 1], "BOTTOMLEFT", 0, -spacing)
+		row:SetPoint("TOPRIGHT", window.rows[index - 1], "BOTTOMRIGHT", 0, -spacing)
+	else
+		row:SetPoint("TOPLEFT", window.rowsContainer, "TOPLEFT")
+		row:SetPoint("TOPRIGHT", window.rowsContainer, "TOPRIGHT")
+	end
+
+	row.rank = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	row.rank:SetPoint("LEFT", 4, 0)
+	row.rank:SetWidth(24)
+	row.rank:SetJustifyH("LEFT")
+
+	row.icon = row:CreateTexture(nil, "ARTWORK")
+	row.icon:SetSize(16, 16)
+	row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+	row.bar = CreateFrame("StatusBar", nil, row, "BackdropTemplate")
+	row.bar:SetMinMaxValues(0, 1)
+	row.bar:SetValue(0)
+	row.bar:SetStatusBarTexture(texture)
+
+	row.background = row.bar:CreateTexture(nil, "BACKGROUND")
+	row.background:SetAllPoints()
+	row.background:SetColorTexture(0, 0, 0, 0.45)
+
+	row.barBorder = CreateFrame("Frame", nil, row, "BackdropTemplate")
+	row.barBorder:EnableMouse(false)
+
+	row.textArea = CreateFrame("Frame", nil, row)
+
+	row.name = row.textArea:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	row.name:SetJustifyH("LEFT")
+	row.name:SetWordWrap(false)
+
+	row.value = row.textArea:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	row.value:SetJustifyH("RIGHT")
+	row.value:SetWordWrap(false)
+
+	self:ApplyRankFontString(row.rank, config)
+	self:ApplyFontString(row.name, config)
+	self:ApplyValueFontString(row.value, config)
+	self:ApplyRowTextLayout(row, config)
+	self:ApplyBarBorder(row, config)
+
+	window.rows[index] = row
+	return row
+end
+
+function DamageMeter:EnsureWindow(index)
+	self.windows = self.windows or {}
+	local window = self.windows[index]
+	if window then return window end
+
+	local frame = CreateFrame("Frame", "EnhanceQoLDamageMeterFrame" .. index, UIParent, "BackdropTemplate")
+	frame:SetFrameStrata("MEDIUM")
+	frame:EnableMouse(true)
+	frame:Hide()
+	frame.index = index
+
+	local header = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	header:SetPoint("TOPLEFT", 8, -7)
+	header:SetPoint("TOPRIGHT", -8, -7)
+	header:SetJustifyH("LEFT")
+	frame.header = header
+
+	local rowsViewport = CreateFrame("ScrollFrame", nil, frame)
+	rowsViewport:SetPoint("TOPLEFT", 4, -28)
+	rowsViewport:SetPoint("BOTTOMRIGHT", -4, 22)
+	rowsViewport:EnableMouseWheel(true)
+	rowsViewport:SetScript("OnMouseWheel", function(_, delta)
+		local config = DamageMeter:GetConfig(index)
+		local rowHeight, _, spacing = getRowMetrics(config)
+		local maxRows = clampNumber(config.maxRows, 1, 30, DEFAULT_WINDOW.maxRows)
+		local visibleRows = math.min(maxRows, clampNumber(config.visibleRows, 1, 30, DEFAULT_WINDOW.visibleRows))
+		local contentRows = math.min(maxRows, frame.contentRows or maxRows)
+		local maxScroll = math.max(0, (contentRows - visibleRows) * (rowHeight + spacing))
+		local nextScroll = (rowsViewport:GetVerticalScroll() or 0) - (delta * (rowHeight + spacing))
+		rowsViewport:SetVerticalScroll(clampNumber(nextScroll, 0, maxScroll, 0))
+	end)
+	frame.rowsViewport = rowsViewport
+
+	local rowsContainer = CreateFrame("Frame", nil, rowsViewport)
+	rowsViewport:SetScrollChild(rowsContainer)
+	frame.rowsContainer = rowsContainer
+
+	local empty = frame:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+	empty:SetPoint("CENTER", rowsViewport, "CENTER", 0, 0)
+	empty:SetText(L["damageMeterNoData"] or "No damage data")
+	frame.empty = empty
+
+	local status = CreateFrame("Button", nil, frame)
+	status:SetPoint("BOTTOMLEFT", 4, 4)
+	status:SetPoint("BOTTOMRIGHT", -4, 4)
+	status:SetHeight(16)
+	status:SetScript("OnClick", function()
+		local config = DamageMeter:GetConfig(index)
+		config.sessionType = config.sessionType == "overall" and "current" or "overall"
+		DamageMeter:ScheduleRefresh()
+	end)
+	status.text = status:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	status.text:SetAllPoints()
+	status.text:SetJustifyH("CENTER")
+	status.text:SetTextColor(0.8, 0.82, 0.86)
+	frame.status = status
+
+	frame.rows = {}
+	self.windows[index] = frame
+	return frame
+end
+
+function DamageMeter:ApplyWindowAnchor(index)
+	if index <= 1 then return end
+	local frame = self.windows and self.windows[index]
+	if not frame then return end
+	local config = self:GetConfig(index)
+	local targetIndex = clampNumber(config.anchorToWindow, 0, index - 1, 0)
+	if targetIndex <= 0 then
+		if frame._damageMeterAnchored then
+			local id = EDITMODE_ID_PREFIX .. index
+			local point = EditMode and EditMode.GetValue and EditMode:GetValue(id, "point") or "CENTER"
+			local relativePoint = EditMode and EditMode.GetValue and EditMode:GetValue(id, "relativePoint") or point
+			local x = EditMode and EditMode.GetValue and EditMode:GetValue(id, "x") or 300
+			local y = EditMode and EditMode.GetValue and EditMode:GetValue(id, "y") or (-120 - ((index - 1) * 30))
+			frame:ClearAllPoints()
+			frame:SetPoint(point or "CENTER", UIParent, relativePoint or point or "CENTER", x or 0, y or 0)
+			frame._damageMeterAnchored = false
+		end
+		return
+	end
+	local target = self:EnsureWindow(targetIndex)
+	if not target then return end
+	frame:ClearAllPoints()
+	frame:SetPoint(
+		normalizeFramePoint(config.windowAnchorPoint),
+		target,
+		normalizeFramePoint(config.windowRelativePoint),
+		clampNumber(config.windowOffsetX, -1000, 1000, DEFAULT_WINDOW.windowOffsetX),
+		clampNumber(config.windowOffsetY, -1000, 1000, DEFAULT_WINDOW.windowOffsetY)
+	)
+	frame._damageMeterAnchored = true
+end
+
+function DamageMeter:ApplyWindowStyle(index, contentRows)
+	local frame = self:EnsureWindow(index)
+	local config = self:GetConfig(index)
+	local width = clampNumber(config.width, 220, 700, DEFAULT_WINDOW.width)
+	local showHeader = config.showHeader == true
+	local showStatus = config.showStatus ~= false
+	local texture = resolveMedia("statusbar", config.texture, DEFAULT_TEXTURE)
+	local backdropTexture = resolveMedia("statusbar", config.backdropTexture, "Interface\\Buttons\\WHITE8x8")
+	local backdropColor = normalizeColor(config.backdropColor, DEFAULT_WINDOW.backdropColor)
+	local borderColor = normalizeColor(config.borderColor, DEFAULT_WINDOW.borderColor)
+	local rowHeight, _, spacing = getRowMetrics(config)
+	local maxRows = clampNumber(config.maxRows, 1, 30, DEFAULT_WINDOW.maxRows)
+	local visibleRows = math.min(maxRows, clampNumber(config.visibleRows, 1, 30, DEFAULT_WINDOW.visibleRows))
+	contentRows = math.min(maxRows, clampNumber(contentRows, 0, maxRows, maxRows))
+	local viewportHeight = (visibleRows * rowHeight) + math.max(0, visibleRows - 1) * spacing
+	local titleFontSize = clampNumber(config.titleFontSize, 8, 28, DEFAULT_WINDOW.titleFontSize)
+	local statusFontSize = clampNumber(config.statusFontSize, 8, 24, DEFAULT_WINDOW.statusFontSize)
+	local statusHeight = showStatus and math.max(16, statusFontSize + 6) or 0
+	local topInset = showHeader and math.max(24, titleFontSize + 12) or 4
+	local bottomInset = showStatus and (statusHeight + 6) or 4
+	local heightOffset = clampNumber(config.heightOffset, 0, 300, DEFAULT_WINDOW.heightOffset)
+	local topOffset = math.floor(heightOffset / 2)
+	local bottomOffset = heightOffset - topOffset
+	local height = math.max(60, viewportHeight + topInset + bottomInset + heightOffset)
+	local contentHeight = contentRows > 0 and ((contentRows * rowHeight) + math.max(0, contentRows - 1) * spacing) or 1
+	frame.contentRows = contentRows
+
+	frame:SetSize(width, height)
+	self:ApplyWindowAnchor(index)
+	frame.header:SetShown(showHeader)
+	frame.status:SetShown(showStatus)
+	frame.header:ClearAllPoints()
+	frame.header:SetPoint("TOPLEFT", 8, -(7 + topOffset))
+	frame.header:SetPoint("TOPRIGHT", -8, -(7 + topOffset))
+	frame.status:ClearAllPoints()
+	frame.status:SetPoint("BOTTOMLEFT", 4, 4 + bottomOffset)
+	frame.status:SetPoint("BOTTOMRIGHT", -4, 4 + bottomOffset)
+
+	local borderTexture = resolveMedia("border", config.borderTexture, DEFAULT_BORDER)
+	if config.borderEnabled == true then
+		local size = clampNumber(config.borderSize, 1, 32, DEFAULT_WINDOW.borderSize)
+		local inset = clampNumber(config.borderInset, 0, 24, DEFAULT_WINDOW.borderInset)
+		frame:SetBackdrop({
+			bgFile = backdropTexture,
+			edgeFile = borderTexture,
+			edgeSize = size,
+			insets = { left = inset, right = inset, top = inset, bottom = inset },
+		})
+		frame:SetBackdropBorderColor(borderColor.r, borderColor.g, borderColor.b, borderColor.a)
+	else
+		frame:SetBackdrop({ bgFile = backdropTexture })
+	end
+	frame:SetBackdropColor(backdropColor.r, backdropColor.g, backdropColor.b, backdropColor.a)
+
+	frame.status:SetHeight(math.max(1, statusHeight))
+
+	frame.rowsViewport:ClearAllPoints()
+	frame.rowsViewport:SetPoint("TOPLEFT", 4, -(topInset + topOffset))
+	frame.rowsViewport:SetPoint("TOPRIGHT", -4, -(topInset + topOffset))
+	frame.rowsViewport:SetHeight(viewportHeight)
+	frame.rowsContainer:SetSize(math.max(1, width - 8), math.max(1, contentHeight))
+	local maxScroll = math.max(0, contentHeight - viewportHeight)
+	if (frame.rowsViewport:GetVerticalScroll() or 0) > maxScroll then
+		frame.rowsViewport:SetVerticalScroll(maxScroll)
+	end
+
+	self:ApplyTitleFontString(frame.header, config)
+	self:ApplyFontString(frame.empty, config)
+	self:ApplyStatusFontString(frame.status.text, config)
+
+	local previous
+	for rowIndex, row in ipairs(frame.rows) do
+		row:SetHeight(rowHeight)
+		row:ClearAllPoints()
+		if previous then
+			row:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, -spacing)
+			row:SetPoint("TOPRIGHT", previous, "BOTTOMRIGHT", 0, -spacing)
+		else
+			row:SetPoint("TOPLEFT", frame.rowsContainer, "TOPLEFT")
+			row:SetPoint("TOPRIGHT", frame.rowsContainer, "TOPRIGHT")
+		end
+		row.bar:SetStatusBarTexture(texture)
+		self:ApplyBarBorder(row, config)
+		self:ApplyRankFontString(row.rank, config)
+		self:ApplyFontString(row.name, config)
+		self:ApplyValueFontString(row.value, config)
+		self:ApplyRowTextLayout(row, config)
+		self:ApplyRowValueWidth(row, config)
+		previous = row
+	end
+end
+
+function DamageMeter:UpdateHeader(index, session)
+	local frame = self:EnsureWindow(index)
+	local config = self:GetConfig(index)
+	local sessionLabel = config.sessionType == "overall" and (L["damageMeterOverall"] or "Overall") or (L["damageMeterCurrent"] or "Current")
+	local duration = self:GetSessionDuration(index, session)
+	if duration and duration > 0 then
+		frame.header:SetText(string.format("%s %d - %s - %s", L["damageMeterTitle"] or "Damage Meter", index, sessionLabel, formatDuration(duration)))
+	else
+		frame.header:SetText(string.format("%s %d - %s", L["damageMeterTitle"] or "Damage Meter", index, sessionLabel))
+	end
+	frame.status.text:SetText(string.format("%s: %s  |  %s", L["damageMeterQuickSwitch"] or "Quick switch", sessionLabel, L["damageMeterDamageDone"] or "Damage Done"))
+end
+
+function DamageMeter:RefreshWindow(index)
+	local frame = self:EnsureWindow(index)
+	if not self:ShouldShow(index) then
+		frame:Hide()
+		return
+	end
+
+	local config = self:GetConfig(index)
+	local session = self:GetSession(index)
+	local sources = session and type(session.combatSources) == "table" and session.combatSources or {}
+	local maxRows = clampNumber(config.maxRows, 1, 30, DEFAULT_WINDOW.maxRows)
+	local contentRows = math.min(maxRows, #sources)
+
+	self:ApplyWindowStyle(index, contentRows)
+	self:UpdateHeader(index, session)
+
+	local maxAmount = tonumber(session and session.maxAmount) or 0
+	local totalAmount = tonumber(session and session.totalAmount) or 0
+	local shown = 0
+
+	for rowIndex = 1, maxRows do
+		local source = sources[rowIndex]
+		local row = frame.rows[rowIndex] or self:CreateRow(frame, rowIndex)
+		if source then
+			local amount = tonumber(source.totalAmount) or 0
+			local dps = tonumber(source.amountPerSecond) or 0
+			local percent = totalAmount > 0 and (amount / totalAmount * 100) or 0
+			local barValue = maxAmount > 0 and (amount / maxAmount) or 0
+			local r, g, b = self:GetClassColor(config, source.classFilename)
+			local amountText = formatNumber(amount, config.abbreviation)
+			local dpsText = formatNumber(dps, config.abbreviation)
+			local valueText = formatValueText(amountText, dpsText, percent, config)
+
+			self:ApplyRankText(row, rowIndex, config)
+			row.icon:SetTexture(tonumber(source.specIconID) or 136243)
+			row.name:SetText(formatDisplayName(source.name, rowIndex, config))
+			row.value:SetText(valueText)
+			self:ApplyRowValueWidth(row, config)
+			row.bar:SetStatusBarColor(r, g, b, 0.85)
+			row.bar:SetValue(barValue)
+			row:Show()
+			shown = shown + 1
+		else
+			row:Hide()
+		end
+	end
+
+	for rowIndex = maxRows + 1, #frame.rows do
+		frame.rows[rowIndex]:Hide()
+	end
+
+	frame.empty:SetShown(shown == 0)
+	frame:SetShown(true)
+end
+
+function DamageMeter:Refresh()
+	for index = 1, MAX_WINDOWS do
+		self:RefreshWindow(index)
+	end
+end
+
+function DamageMeter:ScheduleRefresh()
+	if self.refreshTimer then return end
+	self.refreshTimer = C_Timer.NewTimer(getUpdateRate(), function()
+		self.refreshTimer = nil
+		self:Refresh()
+	end)
+end
+
+function DamageMeter:RegisterLiveEvents()
+	local frame = self.eventFrame
+	if not frame or self.liveEventsRegistered then return end
+	frame:RegisterEvent("DAMAGE_METER_COMBAT_SESSION_UPDATED")
+	frame:RegisterEvent("DAMAGE_METER_CURRENT_SESSION_UPDATED")
+	frame:RegisterEvent("DAMAGE_METER_RESET")
+	frame:RegisterEvent("PLAYER_REGEN_DISABLED")
+	frame:RegisterEvent("PLAYER_REGEN_ENABLED")
+	frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+	self.liveEventsRegistered = true
+end
+
+function DamageMeter:UnregisterLiveEvents()
+	local frame = self.eventFrame
+	if not frame or not self.liveEventsRegistered then return end
+	frame:UnregisterEvent("DAMAGE_METER_COMBAT_SESSION_UPDATED")
+	frame:UnregisterEvent("DAMAGE_METER_CURRENT_SESSION_UPDATED")
+	frame:UnregisterEvent("DAMAGE_METER_RESET")
+	frame:UnregisterEvent("PLAYER_REGEN_DISABLED")
+	frame:UnregisterEvent("PLAYER_REGEN_ENABLED")
+	frame:UnregisterEvent("PLAYER_ENTERING_WORLD")
+	self.liveEventsRegistered = false
+end
+
+function DamageMeter:UpdateEventState()
+	if self:IsEnabled() and self:IsAvailable() then
+		self:RegisterLiveEvents()
+	else
+		self:UnregisterLiveEvents()
+	end
+	self:ScheduleRefresh()
+end
+
+function DamageMeter:ApplySyncedConfig(sourceIndex)
+	if db().damageMeterSyncSettings ~= true then return end
+	local windows = self:GetWindowsDB()
+	local source = copyWindowConfig(windows[sourceIndex])
+	for index = 1, MAX_WINDOWS do
+		if index ~= sourceIndex then
+			windows[index] = copyWindowConfig(source)
+		end
+	end
+	self:Refresh()
+end
+
+function DamageMeter:CopySettings(sourceIndex, targetIndex)
+	sourceIndex = tonumber(sourceIndex)
+	targetIndex = tonumber(targetIndex)
+	if not sourceIndex or not targetIndex or sourceIndex == targetIndex then return end
+	local count = getWindowCount()
+	if sourceIndex < 1 or sourceIndex > count or targetIndex < 1 or targetIndex > count then return end
+	local windows = self:GetWindowsDB()
+	windows[targetIndex] = copyWindowConfig(windows[sourceIndex])
+	if db().damageMeterSyncSettings == true then
+		self:ApplySyncedConfig(targetIndex)
+	else
+		self:RefreshWindow(targetIndex)
+	end
+end
+
+function DamageMeter:AddWindow(sourceIndex)
+	local count = getWindowCount()
+	if count >= MAX_WINDOWS then return end
+	local newIndex = count + 1
+	setWindowCount(newIndex)
+	self:GetWindowsDB()
+	if db().damageMeterSyncSettings == true then
+		self:CopySettings(sourceIndex or 1, newIndex)
+	end
+	self:UpdateEventState()
+	self:Refresh()
+end
+
+function DamageMeter:CloseEditModeDialogForWindow(index)
+	local frame = self.windows and self.windows[index]
+	local lib = EditMode and EditMode.lib
+	local dialog = lib and lib.internal and lib.internal.dialog
+	if not (frame and dialog and dialog.IsShown and dialog:IsShown()) then return end
+	local contextFrame = dialog.context and dialog.context.frame
+	local selectionFrame = dialog.selection and dialog.selection.parent
+	if contextFrame == frame or selectionFrame == frame then
+		dialog:Hide()
+	end
+end
+
+function DamageMeter:RemoveWindow(index)
+	index = tonumber(index)
+	local count = getWindowCount()
+	if not index or index <= 1 or index > count then return end
+	self:CloseEditModeDialogForWindow(index)
+	local windows = self:GetWindowsDB()
+	for windowIndex = index, count - 1 do
+		windows[windowIndex] = copyWindowConfig(windows[windowIndex + 1])
+	end
+	windows[count] = copyWindowConfig(DEFAULT_WINDOW)
+	setWindowCount(count - 1)
+	for windowIndex = count, MAX_WINDOWS do
+		local frame = self.windows and self.windows[windowIndex]
+		if frame then frame:Hide() end
+	end
+	self:Refresh()
+end
+
+function DamageMeter:EnsureStaticPopups()
+	if not StaticPopupDialogs then return end
+	StaticPopupDialogs[REMOVE_WINDOW_POPUP] = StaticPopupDialogs[REMOVE_WINDOW_POPUP] or {
+		text = L["damageMeterRemoveWindowConfirm"] or "Remove Damage Meter window %s?",
+		button1 = YES or "Yes",
+		button2 = CANCEL or "Cancel",
+		timeout = 0,
+		whileDead = true,
+		hideOnEscape = true,
+		preferredIndex = 3,
+	}
+	StaticPopupDialogs[REMOVE_WINDOW_POPUP].OnAccept = function(_, data) DamageMeter:RemoveWindow(data) end
+
+	StaticPopupDialogs[COPY_WINDOW_POPUP] = StaticPopupDialogs[COPY_WINDOW_POPUP] or {
+		text = L["damageMeterCopyWindowConfirm"] or "Copy settings from Damage Meter %s to Damage Meter %s?",
+		button1 = YES or "Yes",
+		button2 = CANCEL or "Cancel",
+		timeout = 0,
+		whileDead = true,
+		hideOnEscape = true,
+		preferredIndex = 3,
+	}
+	StaticPopupDialogs[COPY_WINDOW_POPUP].OnAccept = function(_, data)
+		if type(data) == "table" then DamageMeter:CopySettings(data.source, data.target) end
+	end
+end
+
+function DamageMeter:PromptRemoveWindow(index)
+	self:EnsureStaticPopups()
+	if StaticPopup_Show then
+		StaticPopup_Show(REMOVE_WINDOW_POPUP, tostring(index), nil, index)
+	else
+		self:RemoveWindow(index)
+	end
+end
+
+function DamageMeter:PromptCopySettings(sourceIndex, targetIndex)
+	if sourceIndex == targetIndex then return end
+	self:EnsureStaticPopups()
+	if StaticPopup_Show then
+		StaticPopup_Show(COPY_WINDOW_POPUP, tostring(sourceIndex), tostring(targetIndex), { source = sourceIndex, target = targetIndex })
+	else
+		self:CopySettings(sourceIndex, targetIndex)
+	end
+end
+
+local function buildWindowCopyOptions(targetIndex)
+	local options = {}
+	local count = getWindowCount()
+	for index = 1, count do
+		if index ~= targetIndex then
+			options[#options + 1] = { value = tostring(index), label = string.format("%s %d", L["damageMeterTitle"] or "Damage Meter", index) }
+		end
+	end
+	if #options == 0 then options[#options + 1] = { value = "", label = _G.NONE or "None" } end
+	return options
+end
+
+local function dropdownSetting(name, getter, setter, options, parentId, height, isEnabled, isShown)
+	return {
+		name = name,
+		kind = SettingType.Dropdown,
+		parentId = parentId,
+		height = height or 160,
+		isEnabled = isEnabled,
+		isShown = isShown,
+		get = getter,
+		set = function(_, value) setter(value) end,
+		generator = function(_, root)
+			local optionList = type(options) == "function" and options() or options
+			for _, option in ipairs(optionList) do
+				root:CreateRadio(option.label, function() return getter() == option.value end, function() setter(option.value) end)
+			end
+		end,
+	}
+end
+
+local function sliderSetting(name, getter, setter, minValue, maxValue, step, parentId, isEnabled, isShown)
+	return {
+		name = name,
+		kind = SettingType.Slider,
+		parentId = parentId,
+		isEnabled = isEnabled,
+		isShown = isShown,
+		minValue = minValue,
+		maxValue = maxValue,
+		valueStep = step or 1,
+		allowInput = true,
+		get = getter,
+		set = function(_, value) setter(value) end,
+	}
+end
+
+local function checkboxSetting(name, getter, setter, parentId, isEnabled, tooltip)
+	return {
+		name = name,
+		kind = SettingType.Checkbox,
+		parentId = parentId,
+		isEnabled = isEnabled,
+		tooltip = tooltip,
+		get = getter,
+		set = function(_, value) setter(value == true) end,
+	}
+end
+
+local function colorSetting(name, getter, setter, default, parentId, isEnabled)
+	return {
+		name = name,
+		kind = SettingType.Color,
+		parentId = parentId,
+		isEnabled = isEnabled,
+		default = default,
+		hasOpacity = true,
+		get = getter,
+		set = function(_, value) setter(value) end,
+	}
+end
+
+local function dividerSetting(parentId, isEnabled, isShown)
+	return {
+		name = "",
+		kind = SettingType.Divider,
+		parentId = parentId,
+		isEnabled = isEnabled,
+		isShown = isShown,
+	}
+end
+
+local function requestEditModeSettingsRefresh()
+	if addon.EditModeLib and addon.EditModeLib.internal and addon.EditModeLib.internal.RequestRefreshSettings then
+		addon.EditModeLib.internal:RequestRefreshSettings()
+	end
+end
+
+function DamageMeter:SetConfigValue(index, key, value)
+	local config = self:GetConfig(index)
+	config[key] = copyValue(value)
+	if key == "rowHeight" or key == "barHeight" or key == "changeBarSize" then
+		local rowHeight = clampNumber(config.rowHeight, 10, 70, DEFAULT_WINDOW.rowHeight)
+		config.barHeight = clampNumber(config.barHeight, 1, rowHeight, DEFAULT_WINDOW.barHeight)
+	end
+	if db().damageMeterSyncSettings == true then
+		local windows = self:GetWindowsDB()
+		for windowIndex = 1, MAX_WINDOWS do
+			if windowIndex ~= index then
+				windows[windowIndex][key] = copyValue(config[key])
+				if key == "rowHeight" or key == "barHeight" or key == "changeBarSize" then
+					local rowHeight = clampNumber(windows[windowIndex].rowHeight, 10, 70, DEFAULT_WINDOW.rowHeight)
+					windows[windowIndex].barHeight = clampNumber(windows[windowIndex].barHeight, 1, rowHeight, DEFAULT_WINDOW.barHeight)
+				end
+			end
+		end
+		self:Refresh()
+	else
+		self:RefreshWindow(index)
+	end
+end
+
+function DamageMeter:BuildWindowSettings(index)
+	local function cfg() return self:GetConfig(index) end
+	local function headerEnabled() return cfg().showHeader == true end
+	local function statusEnabled() return cfg().showStatus ~= false end
+	local function customBarSizeEnabled() return cfg().changeBarSize == true end
+	local function barBorderEnabled() return cfg().barBorderEnabled == true end
+	local function rankingEnabled() return cfg().showRanks ~= false end
+	local function rankColumnEnabled() return cfg().showRanks ~= false and cfg().prefixRankInName ~= true end
+	local function windowAnchorVisible() return index > 1 end
+	local function windowAnchorEnabled() return index > 1 and clampNumber(cfg().anchorToWindow, 0, index - 1, 0) > 0 end
+	local behaviorId = "damageMeterBehavior" .. index
+	local layoutId = "damageMeterLayout" .. index
+	local headerId = "damageMeterHeader" .. index
+	local statusId = "damageMeterStatus" .. index
+	local barId = "damageMeterBar" .. index
+	local namesId = "damageMeterNames" .. index
+	local valuesId = "damageMeterValues" .. index
+	local rankingId = "damageMeterRanking" .. index
+	local mediaId = "damageMeterMedia" .. index
+	local borderId = "damageMeterBorder" .. index
+	local settingsId = "damageMeterSettings" .. index
+	local settings = {
+		{ name = L["damageMeterSettings"] or "Settings", kind = SettingType.Collapsible, id = settingsId, defaultCollapsed = true },
+		checkboxSetting(L["damageMeterSyncSettings"] or "Sync settings", function() return db().damageMeterSyncSettings == true end, function(value)
+			db().damageMeterSyncSettings = value == true
+			if value == true then
+				self:ApplySyncedConfig(index)
+			else
+				self:Refresh()
+			end
+		end, settingsId, nil, L["damageMeterSyncSettingsDesc"] or "When enabled, every Damage Meter window uses the same settings. Changes made in any window are applied to all windows."),
+		dropdownSetting(L["damageMeterCopySettingsFrom"] or "Copy settings from", function() return "" end, function(value)
+			local sourceIndex = tonumber(value)
+			if sourceIndex then self:PromptCopySettings(sourceIndex, index) end
+		end, function() return buildWindowCopyOptions(index) end, settingsId, 160, function() return getWindowCount() > 1 and db().damageMeterSyncSettings ~= true end),
+		{ name = L["Behavior"] or "Behavior", kind = SettingType.Collapsible, id = behaviorId, defaultCollapsed = true },
+		checkboxSetting(L["damageMeterWindowEnabled"] or "Enable window", function() return cfg().enabled == true end, function(value) self:SetConfigValue(index, "enabled", value) end, behaviorId),
+		dropdownSetting(L["damageMeterSession"] or "Session", function() return cfg().sessionType end, function(value) self:SetConfigValue(index, "sessionType", value == "overall" and "overall" or "current") end, {
+			{ value = "current", label = L["damageMeterCurrent"] or "Current" },
+			{ value = "overall", label = L["damageMeterOverall"] or "Overall" },
+		}, behaviorId, 110),
+		dropdownSetting(L["damageMeterVisibility"] or "Visibility", function() return cfg().visibility end, function(value) self:SetConfigValue(index, "visibility", (value == "combat" or value == "hidden") and value or "always") end, {
+			{ value = "always", label = L["Always show"] or "Always show" },
+			{ value = "combat", label = L["Always in combat"] or "Always in combat" },
+			{ value = "hidden", label = _G.HIDE or "Hide" },
+		}, behaviorId, 120),
+		{ name = L["Layout"] or "Layout", kind = SettingType.Collapsible, id = layoutId, defaultCollapsed = false },
+		sliderSetting(L["damageMeterMaxRows"] or "Max rows", function() return cfg().maxRows end, function(value) self:SetConfigValue(index, "maxRows", clampNumber(value, 1, 30, DEFAULT_WINDOW.maxRows)) end, 1, 30, 1, layoutId),
+		sliderSetting(L["damageMeterVisibleRows"] or "Visible rows", function() return cfg().visibleRows end, function(value) self:SetConfigValue(index, "visibleRows", clampNumber(value, 1, 30, DEFAULT_WINDOW.visibleRows)) end, 1, 30, 1, layoutId),
+		sliderSetting(L["Width"] or "Width", function() return cfg().width end, function(value) self:SetConfigValue(index, "width", clampNumber(value, 220, 700, DEFAULT_WINDOW.width)) end, 220, 700, 10, layoutId),
+		sliderSetting(L["damageMeterHeightOffset"] or "Height offset", function() return cfg().heightOffset end, function(value) self:SetConfigValue(index, "heightOffset", clampNumber(value, 0, 300, DEFAULT_WINDOW.heightOffset)) end, 0, 300, 1, layoutId),
+		dividerSetting(layoutId, nil, windowAnchorVisible),
+		dropdownSetting(L["damageMeterAnchorToWindow"] or "Anchor to window", function() return tostring(clampNumber(cfg().anchorToWindow, 0, index - 1, 0)) end, function(value)
+			self:SetConfigValue(index, "anchorToWindow", clampNumber(value, 0, index - 1, 0))
+			requestEditModeSettingsRefresh()
+		end, function() return buildWindowAnchorOptions(index) end, layoutId, 140, nil, windowAnchorVisible),
+		dropdownSetting(L["damageMeterWindowAnchorPoint"] or "Anchor point", function() return normalizeFramePoint(cfg().windowAnchorPoint) end, function(value) self:SetConfigValue(index, "windowAnchorPoint", normalizeFramePoint(value)) end, buildFramePointOptions(), layoutId, 180, windowAnchorEnabled, windowAnchorVisible),
+		dropdownSetting(L["damageMeterWindowRelativePoint"] or "Relative point", function() return normalizeFramePoint(cfg().windowRelativePoint) end, function(value) self:SetConfigValue(index, "windowRelativePoint", normalizeFramePoint(value)) end, buildFramePointOptions(), layoutId, 180, windowAnchorEnabled, windowAnchorVisible),
+		sliderSetting(L["damageMeterWindowOffsetX"] or "Window X offset", function() return cfg().windowOffsetX end, function(value) self:SetConfigValue(index, "windowOffsetX", clampNumber(value, -1000, 1000, DEFAULT_WINDOW.windowOffsetX)) end, -1000, 1000, 1, layoutId, windowAnchorEnabled, windowAnchorVisible),
+		sliderSetting(L["damageMeterWindowOffsetY"] or "Window Y offset", function() return cfg().windowOffsetY end, function(value) self:SetConfigValue(index, "windowOffsetY", clampNumber(value, -1000, 1000, DEFAULT_WINDOW.windowOffsetY)) end, -1000, 1000, 1, layoutId, windowAnchorEnabled, windowAnchorVisible),
+		{ name = L["Header"] or "Header", kind = SettingType.Collapsible, id = headerId, defaultCollapsed = true },
+		checkboxSetting(L["damageMeterShowHeader"] or "Show header", function() return cfg().showHeader == true end, function(value) self:SetConfigValue(index, "showHeader", value) end, headerId),
+		dropdownSetting(L["damageMeterTitleFont"] or "Title font", function() return cfg().titleFontFace end, function(value) self:SetConfigValue(index, "titleFontFace", value) end, buildMediaOptions("font", true), headerId, 260, headerEnabled),
+		dropdownSetting(L["damageMeterTitleFontOutline"] or "Title font outline", function() return cfg().titleFontOutline end, function(value) self:SetConfigValue(index, "titleFontOutline", normalizeStyle(value)) end, buildStyleOptions(), headerId, 180, headerEnabled),
+		sliderSetting(L["damageMeterTitleFontSize"] or "Title font size", function() return cfg().titleFontSize end, function(value) self:SetConfigValue(index, "titleFontSize", clampNumber(value, 8, 28, DEFAULT_WINDOW.titleFontSize)) end, 8, 28, 1, headerId, headerEnabled),
+		{ name = L["Status"] or "Status", kind = SettingType.Collapsible, id = statusId, defaultCollapsed = true },
+		checkboxSetting(L["damageMeterShowStatus"] or "Show status line", function() return cfg().showStatus ~= false end, function(value) self:SetConfigValue(index, "showStatus", value) end, statusId),
+		dropdownSetting(L["damageMeterStatusFont"] or "Status font", function() return cfg().statusFontFace end, function(value) self:SetConfigValue(index, "statusFontFace", value) end, buildMediaOptions("font", true), statusId, 260, statusEnabled),
+		dropdownSetting(L["damageMeterStatusFontOutline"] or "Status font outline", function() return cfg().statusFontOutline end, function(value) self:SetConfigValue(index, "statusFontOutline", normalizeStyle(value)) end, buildStyleOptions(), statusId, 180, statusEnabled),
+		sliderSetting(L["damageMeterStatusFontSize"] or "Status font size", function() return cfg().statusFontSize end, function(value) self:SetConfigValue(index, "statusFontSize", clampNumber(value, 8, 24, DEFAULT_WINDOW.statusFontSize)) end, 8, 24, 1, statusId, statusEnabled),
+		{ name = L["Bar"] or "Bar", kind = SettingType.Collapsible, id = barId, defaultCollapsed = true },
+		sliderSetting(L["damageMeterRowHeight"] or "Row height", function() return cfg().rowHeight end, function(value) self:SetConfigValue(index, "rowHeight", clampNumber(value, 10, 70, DEFAULT_WINDOW.rowHeight)) end, 10, 70, 1, barId),
+		dividerSetting(barId),
+		checkboxSetting(L["damageMeterChangeBarSize"] or "Change bar size", function() return cfg().changeBarSize == true end, function(value) self:SetConfigValue(index, "changeBarSize", value) end, barId),
+		sliderSetting(L["damageMeterBarHeight"] or "Bar height", function() return math.min(clampNumber(cfg().barHeight, 1, 70, DEFAULT_WINDOW.barHeight), clampNumber(cfg().rowHeight, 10, 70, DEFAULT_WINDOW.rowHeight)) end, function(value) self:SetConfigValue(index, "barHeight", clampNumber(value, 1, clampNumber(cfg().rowHeight, 10, 70, DEFAULT_WINDOW.rowHeight), DEFAULT_WINDOW.barHeight)) end, 1, 70, 1, barId, customBarSizeEnabled),
+		dropdownSetting(L["damageMeterBarAnchor"] or "Bar anchor", function() return normalizeAnchorV(cfg().barAnchor) end, function(value) self:SetConfigValue(index, "barAnchor", normalizeAnchorV(value)) end, buildVerticalAnchorOptions(), barId, 120, customBarSizeEnabled),
+		dividerSetting(barId),
+		sliderSetting(L["damageMeterBarSpacing"] or "Bar spacing", function() return cfg().barSpacing end, function(value) self:SetConfigValue(index, "barSpacing", clampNumber(value, 0, 16, DEFAULT_WINDOW.barSpacing)) end, 0, 16, 1, barId),
+		dividerSetting(barId),
+		checkboxSetting(L["damageMeterBarBorder"] or "Bar border", function() return cfg().barBorderEnabled == true end, function(value) self:SetConfigValue(index, "barBorderEnabled", value) end, barId),
+		dropdownSetting(L["damageMeterBarBorderTexture"] or "Bar border texture", function() return cfg().barBorderTexture end, function(value) self:SetConfigValue(index, "barBorderTexture", value) end, buildMediaOptions("border", false), barId, 260, barBorderEnabled),
+		colorSetting(L["damageMeterBarBorderColor"] or "Bar border color", function() return normalizeColor(cfg().barBorderColor, DEFAULT_WINDOW.barBorderColor) end, function(value) self:SetConfigValue(index, "barBorderColor", normalizeColor(value, DEFAULT_WINDOW.barBorderColor)) end, DEFAULT_WINDOW.barBorderColor, barId, barBorderEnabled),
+		sliderSetting(L["damageMeterBarBorderSize"] or "Bar border size", function() return cfg().barBorderSize end, function(value) self:SetConfigValue(index, "barBorderSize", clampNumber(value, 1, 32, DEFAULT_WINDOW.barBorderSize)) end, 1, 32, 1, barId, barBorderEnabled),
+		sliderSetting(L["damageMeterBarBorderOffset"] or "Bar border offset", function() return cfg().barBorderInset end, function(value) self:SetConfigValue(index, "barBorderInset", clampNumber(value, 0, 24, DEFAULT_WINDOW.barBorderInset)) end, 0, 24, 1, barId, barBorderEnabled),
+		{ name = L["damageMeterNames"] or "Names", kind = SettingType.Collapsible, id = namesId, defaultCollapsed = true },
+		checkboxSetting(L["damageMeterShowNames"] or "Show names", function() return cfg().showNames == true end, function(value) self:SetConfigValue(index, "showNames", value) end, namesId),
+		checkboxSetting(L["damageMeterHideRealmNames"] or "Hide realm names", function() return cfg().hideRealmNames ~= false end, function(value) self:SetConfigValue(index, "hideRealmNames", value) end, namesId),
+		dividerSetting(namesId),
+		dropdownSetting(L["damageMeterNameFont"] or "Name font", function() return cfg().fontFace end, function(value) self:SetConfigValue(index, "fontFace", value) end, buildMediaOptions("font", true), namesId, 260),
+		dropdownSetting(L["damageMeterNameFontOutline"] or "Name font outline", function() return cfg().fontOutline end, function(value) self:SetConfigValue(index, "fontOutline", normalizeStyle(value)) end, buildStyleOptions(), namesId, 180),
+		sliderSetting(L["damageMeterNameFontSize"] or "Name font size", function() return cfg().fontSize end, function(value) self:SetConfigValue(index, "fontSize", clampNumber(value, 8, 24, DEFAULT_WINDOW.fontSize)) end, 8, 24, 1, namesId),
+		dividerSetting(namesId),
+		dropdownSetting(L["damageMeterNameAnchorH"] or "Name horizontal anchor", function() return normalizeAnchorH(cfg().nameAnchorH) end, function(value) self:SetConfigValue(index, "nameAnchorH", normalizeAnchorH(value)) end, buildHorizontalAnchorOptions(), namesId, 120),
+		dropdownSetting(L["damageMeterNameAnchorV"] or "Name vertical anchor", function() return normalizeAnchorV(cfg().nameAnchorV) end, function(value) self:SetConfigValue(index, "nameAnchorV", normalizeAnchorV(value)) end, buildVerticalAnchorOptions(), namesId, 120),
+		sliderSetting(L["damageMeterNameOffsetX"] or "Name X offset", function() return cfg().nameOffsetX end, function(value) self:SetConfigValue(index, "nameOffsetX", clampNumber(value, -200, 200, DEFAULT_WINDOW.nameOffsetX)) end, -200, 200, 1, namesId),
+		sliderSetting(L["damageMeterNameOffsetY"] or "Name Y offset", function() return cfg().nameOffsetY end, function(value) self:SetConfigValue(index, "nameOffsetY", clampNumber(value, -200, 200, DEFAULT_WINDOW.nameOffsetY)) end, -200, 200, 1, namesId),
+		{ name = L["damageMeterValues"] or "Values", kind = SettingType.Collapsible, id = valuesId, defaultCollapsed = true },
+		checkboxSetting(L["damageMeterShowPercent"] or "Show percent", function() return cfg().showPercent ~= false end, function(value) self:SetConfigValue(index, "showPercent", value) end, valuesId),
+		dividerSetting(valuesId),
+		dropdownSetting(L["damageMeterValueFont"] or "Value font", function() return cfg().valueFontFace end, function(value) self:SetConfigValue(index, "valueFontFace", value) end, buildMediaOptions("font", true), valuesId, 260),
+		dropdownSetting(L["damageMeterValueFontOutline"] or "Value font outline", function() return cfg().valueFontOutline end, function(value) self:SetConfigValue(index, "valueFontOutline", normalizeStyle(value)) end, buildStyleOptions(), valuesId, 180),
+		sliderSetting(L["damageMeterValueFontSize"] or "Value font size", function() return cfg().valueFontSize end, function(value) self:SetConfigValue(index, "valueFontSize", clampNumber(value, 8, 24, DEFAULT_WINDOW.valueFontSize)) end, 8, 24, 1, valuesId),
+		dividerSetting(valuesId),
+		dropdownSetting(L["damageMeterValueAnchorH"] or "Value horizontal anchor", function() return normalizeAnchorH(cfg().valueAnchorH) end, function(value) self:SetConfigValue(index, "valueAnchorH", normalizeAnchorH(value)) end, buildHorizontalAnchorOptions(), valuesId, 120),
+		dropdownSetting(L["damageMeterValueAnchorV"] or "Value vertical anchor", function() return normalizeAnchorV(cfg().valueAnchorV) end, function(value) self:SetConfigValue(index, "valueAnchorV", normalizeAnchorV(value)) end, buildVerticalAnchorOptions(), valuesId, 120),
+		sliderSetting(L["damageMeterValueOffsetX"] or "Value X offset", function() return cfg().valueOffsetX end, function(value) self:SetConfigValue(index, "valueOffsetX", clampNumber(value, -200, 200, DEFAULT_WINDOW.valueOffsetX)) end, -200, 200, 1, valuesId),
+		sliderSetting(L["damageMeterValueOffsetY"] or "Value Y offset", function() return cfg().valueOffsetY end, function(value) self:SetConfigValue(index, "valueOffsetY", clampNumber(value, -200, 200, DEFAULT_WINDOW.valueOffsetY)) end, -200, 200, 1, valuesId),
+		dividerSetting(valuesId),
+		dropdownSetting(L["damageMeterAbbreviation"] or "Number format", function() return cfg().abbreviation end, function(value) self:SetConfigValue(index, "abbreviation", value == "none" and "none" or "short") end, {
+			{ value = "short", label = L["damageMeterAbbreviationShort"] or "Abbreviated" },
+			{ value = "none", label = L["damageMeterAbbreviationFull"] or "Full numbers" },
+		}, valuesId, 100),
+		dropdownSetting(L["damageMeterValueFormat"] or "Value format", function() return cfg().valueFormat end, function(value) self:SetConfigValue(index, "valueFormat", value == "parentheses" and "parentheses" or "slash") end, {
+			{ value = "slash", label = L["damageMeterValueFormatSlash"] or "<total> / <DPS>" },
+			{ value = "parentheses", label = L["damageMeterValueFormatParentheses"] or "<total> (<DPS>)" },
+		}, valuesId, 110),
+		{ name = L["Ranking"] or "Ranking", kind = SettingType.Collapsible, id = rankingId, defaultCollapsed = true },
+		checkboxSetting(L["damageMeterShowRanks"] or "Show ranks", function() return cfg().showRanks ~= false end, function(value) self:SetConfigValue(index, "showRanks", value) end, rankingId),
+		checkboxSetting(L["damageMeterPrefixRankInName"] or "Prefix rank in name", function() return cfg().prefixRankInName == true end, function(value) self:SetConfigValue(index, "prefixRankInName", value) end, rankingId, rankingEnabled),
+		dropdownSetting(L["damageMeterRankFont"] or "Rank font", function() return cfg().rankFontFace end, function(value) self:SetConfigValue(index, "rankFontFace", value) end, buildMediaOptions("font", true), rankingId, 260, rankColumnEnabled),
+		dropdownSetting(L["damageMeterRankFontOutline"] or "Rank font outline", function() return cfg().rankFontOutline end, function(value) self:SetConfigValue(index, "rankFontOutline", normalizeStyle(value)) end, buildStyleOptions(), rankingId, 180, rankColumnEnabled),
+		sliderSetting(L["damageMeterRankFontSize"] or "Rank font size", function() return cfg().rankFontSize end, function(value) self:SetConfigValue(index, "rankFontSize", clampNumber(value, 8, 24, DEFAULT_WINDOW.rankFontSize)) end, 8, 24, 1, rankingId, rankColumnEnabled),
+		sliderSetting(L["damageMeterRankGap"] or "Rank gap", function() return cfg().rankGap end, function(value) self:SetConfigValue(index, "rankGap", clampNumber(value, 0, 24, DEFAULT_WINDOW.rankGap)) end, 0, 24, 1, rankingId, rankingEnabled),
+		{ name = L["Media"] or "Media", kind = SettingType.Collapsible, id = mediaId, defaultCollapsed = true },
+		dropdownSetting(L["Texture"] or "Texture", function() return cfg().texture end, function(value) self:SetConfigValue(index, "texture", value) end, buildMediaOptions("statusbar", false), mediaId, 260),
+		dropdownSetting(L["Backdrop texture"] or "Backdrop texture", function() return cfg().backdropTexture end, function(value) self:SetConfigValue(index, "backdropTexture", value) end, buildMediaOptions("statusbar", false), mediaId, 260),
+		colorSetting(L["Background color"] or "Background color", function() return normalizeColor(cfg().backdropColor, DEFAULT_WINDOW.backdropColor) end, function(value) self:SetConfigValue(index, "backdropColor", normalizeColor(value, DEFAULT_WINDOW.backdropColor)) end, DEFAULT_WINDOW.backdropColor, mediaId),
+		checkboxSetting(L["damageMeterUseClassColors"] or "Use class colors", function() return cfg().useClassColors == true end, function(value) self:SetConfigValue(index, "useClassColors", value) end, mediaId),
+		{ name = L["Border"] or "Border", kind = SettingType.Collapsible, id = borderId, defaultCollapsed = true },
+		checkboxSetting(L["Use border"] or "Use border", function() return cfg().borderEnabled == true end, function(value) self:SetConfigValue(index, "borderEnabled", value) end, borderId),
+		dropdownSetting(L["Border texture"] or "Border texture", function() return cfg().borderTexture end, function(value) self:SetConfigValue(index, "borderTexture", value) end, buildMediaOptions("border", false), borderId, 260),
+		colorSetting(L["Border color"] or "Border color", function() return normalizeColor(cfg().borderColor, DEFAULT_WINDOW.borderColor) end, function(value) self:SetConfigValue(index, "borderColor", normalizeColor(value, DEFAULT_WINDOW.borderColor)) end, DEFAULT_WINDOW.borderColor, borderId),
+		sliderSetting(L["Border size"] or "Border size", function() return cfg().borderSize end, function(value) self:SetConfigValue(index, "borderSize", clampNumber(value, 1, 32, DEFAULT_WINDOW.borderSize)) end, 1, 32, 1, borderId),
+		sliderSetting(L["Border offset"] or "Border offset", function() return cfg().borderInset end, function(value) self:SetConfigValue(index, "borderInset", clampNumber(value, 0, 24, DEFAULT_WINDOW.borderInset)) end, 0, 24, 1, borderId),
+	}
+	return settings
+end
+
+function DamageMeter:BuildWindowButtons(index)
+	local buttons = {
+		{
+			text = L["damageMeterAddWindow"] or "Add new window",
+			click = function() DamageMeter:AddWindow(index) end,
+		},
+	}
+	if index > 1 then
+		buttons[#buttons + 1] = {
+			text = L["damageMeterRemoveWindow"] or "Remove window",
+			click = function() DamageMeter:PromptRemoveWindow(index) end,
+		}
+	end
+	return buttons
+end
+
+function DamageMeter:RegisterEditMode()
+	if self.editModeRegistered or not (EditMode and EditMode.RegisterFrame and SettingType) then return end
+	for index = 1, MAX_WINDOWS do
+		EditMode:RegisterFrame(EDITMODE_ID_PREFIX .. index, {
+			frame = self:EnsureWindow(index),
+			title = string.format("%s %d", L["damageMeterTitle"] or "Damage Meter", index),
+			layoutDefaults = { point = "CENTER", relativePoint = "CENTER", x = 300, y = -120 - ((index - 1) * 30) },
+			onApply = function() DamageMeter:RefreshWindow(index) end,
+			onEnter = function() DamageMeter:RefreshWindow(index) end,
+			onExit = function() C_Timer.After(0, function() DamageMeter:RefreshWindow(index) end) end,
+			isEnabled = function() return DamageMeter:ShouldShow(index) end,
+			settings = self:BuildWindowSettings(index),
+			buttons = self:BuildWindowButtons(index),
+			showOutsideEditMode = true,
+			showReset = false,
+			showSettingsReset = false,
+			enableOverlayToggle = true,
+			collapseExclusive = true,
+			settingsMaxHeight = 520,
+		})
+	end
+	self.editModeRegistered = true
+end
+
+function DamageMeter:Init()
+	if self.initialized then return end
+	self.initialized = true
+	self:GetWindowsDB()
+	for index = 1, MAX_WINDOWS do
+		self:EnsureWindow(index)
+	end
+	self:RegisterEditMode()
+	self.eventFrame = CreateFrame("Frame")
+	self.eventFrame:SetScript("OnEvent", function()
+		self:ScheduleRefresh()
+	end)
+	self:UpdateEventState()
+end
+
+local loader = CreateFrame("Frame")
+loader:RegisterEvent("PLAYER_LOGIN")
+loader:SetScript("OnEvent", function()
+	DamageMeter:Init()
+end)

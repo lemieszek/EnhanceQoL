@@ -2525,6 +2525,49 @@ if cChar and sectionDungeon then
 		parentSection = sectionDungeon,
 	})
 
+	local damageMeterEnable = addon.functions.SettingsCreateCheckbox(cChar, {
+		var = "damageMeterEnabled",
+		text = L["damageMeterEnabled"],
+		desc = L["damageMeterEditModeHint"],
+		func = function(value)
+			addon.db["damageMeterEnabled"] = value == true
+			if addon.DamageMeter and addon.DamageMeter.UpdateEventState then addon.DamageMeter:UpdateEventState() end
+		end,
+		parentSection = sectionDungeon,
+	})
+	local function isDamageMeterEnabled() return damageMeterEnable and damageMeterEnable.setting and damageMeterEnable.setting:GetValue() == true end
+	addon.functions.SettingsCreateSlider(cChar, {
+		var = "damageMeterUpdateRate",
+		text = L["damageMeterUpdateRate"],
+		desc = L["damageMeterUpdateRateDesc"],
+		min = 0.1,
+		max = 2,
+		step = 0.1,
+		default = 0.1,
+		get = function() return (addon.db and addon.db["damageMeterUpdateRate"]) or 0.1 end,
+		set = function(value)
+			addon.db["damageMeterUpdateRate"] = value
+			if addon.DamageMeter and addon.DamageMeter.ScheduleRefresh then addon.DamageMeter:ScheduleRefresh() end
+		end,
+		parent = true,
+		element = damageMeterEnable.element,
+		parentCheck = isDamageMeterEnabled,
+		parentSection = sectionDungeon,
+	})
+	addon.functions.SettingsCreateCheckbox(cChar, {
+		var = "damageMeterEditModeSample",
+		text = L["damageMeterEditModeSample"],
+		desc = L["damageMeterEditModeSampleDesc"],
+		func = function(value)
+			addon.db["damageMeterEditModeSample"] = value == true
+			if addon.DamageMeter and addon.DamageMeter.Refresh then addon.DamageMeter:Refresh() end
+		end,
+		parent = true,
+		element = damageMeterEnable.element,
+		parentCheck = isDamageMeterEnabled,
+		parentSection = sectionDungeon,
+	})
+
 	-- Objective Tracker
 	local objEnable = addon.functions.SettingsCreateCheckbox(cChar, {
 		var = "mythicPlusEnableObjectiveTracker",
