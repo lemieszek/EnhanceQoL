@@ -1,4 +1,4 @@
--- luacheck: globals C_DamageMeter C_DeathRecap C_LFGInfo C_Spell C_StringUtil StaticPopupDialogs StaticPopup_Show YES CANCEL MenuUtil GameTooltip SecondsToClock DAMAGE_METER_COMBAT_NUMBER CLASS_ICON_TCOORDS UnitClass UnitExists UnitGUID IsInRaid UISpecialFrames GetCursorPosition GetTime ACTION_SWING ACTION_ENVIRONMENTAL_DAMAGE_DROWNING ACTION_ENVIRONMENTAL_DAMAGE_FALLING ACTION_ENVIRONMENTAL_DAMAGE_FIRE ACTION_ENVIRONMENTAL_DAMAGE_LAVA ACTION_ENVIRONMENTAL_DAMAGE_SLIME ACTION_ENVIRONMENTAL_DAMAGE_FATIGUE DEATH_RECAP_TITLE
+-- luacheck: globals C_DamageMeter C_DeathRecap C_LFGInfo C_Spell C_StringUtil StaticPopupDialogs StaticPopup_Show YES CANCEL MenuUtil GameTooltip SecondsToClock DAMAGE_METER_COMBAT_NUMBER CLASS_ICON_TCOORDS UnitClass UnitExists UnitGUID IsInRaid UISpecialFrames GetCursorPosition GetTime ACTION_SWING ACTION_ENVIRONMENTAL_DAMAGE_DROWNING ACTION_ENVIRONMENTAL_DAMAGE_FALLING ACTION_ENVIRONMENTAL_DAMAGE_FIRE ACTION_ENVIRONMENTAL_DAMAGE_LAVA ACTION_ENVIRONMENTAL_DAMAGE_SLIME ACTION_ENVIRONMENTAL_DAMAGE_FATIGUE DEATH_RECAP_TITLE CreateAbbreviateConfig
 local addonName, addon = ...
 
 local L = LibStub("AceLocale-3.0"):GetLocale(addonName)
@@ -47,6 +47,7 @@ local SYNC_EXCLUDED_KEYS = {
 	sessionType = true,
 	damageMeterType = true,
 	visibility = true,
+	showHeaderTime = true,
 }
 local DEFAULT_WINDOW = {
 	alwaysShowPlayer = false,
@@ -567,7 +568,11 @@ end
 local function getShortNumberAbbrevOptions()
 	if not shortNumberAbbrevOptions then
 		local breakpoints = C_StringUtil and C_StringUtil.GetDefaultAbbreviationBreakpoints and copyShortNumberAbbrevBreakpoints(C_StringUtil.GetDefaultAbbreviationBreakpoints())
-		shortNumberAbbrevOptions = { breakpointData = breakpoints or FALLBACK_SHORT_NUMBER_ABBREV_BREAKPOINTS }
+		breakpoints = breakpoints or FALLBACK_SHORT_NUMBER_ABBREV_BREAKPOINTS
+		shortNumberAbbrevOptions = { breakpointData = breakpoints }
+		if CreateAbbreviateConfig then
+			shortNumberAbbrevOptions.config = CreateAbbreviateConfig(breakpoints)
+		end
 	end
 	return shortNumberAbbrevOptions
 end
@@ -716,21 +721,31 @@ local function appendRowPercent(text, percent, showPercent)
 	return text
 end
 
-local function formatRowValueText(source, percent, valueMode, abbreviation, showPercent, useParentheses)
-	if valueMode == "death" then
-		return formatDeathTimeText(source)
-	end
-	if valueMode == "count" then
-		return appendRowPercent(formatNumber(source.totalAmount, abbreviation), percent, showPercent)
-	end
-	if valueMode == "perSecond" then
-		return appendRowPercent(formatNumber(source.amountPerSecond, abbreviation), percent, showPercent)
-	end
+local function formatDeathRowValueText(source)
+	return formatDeathTimeText(source)
+end
+
+local function formatCountRowValueText(source, percent, abbreviation, showPercent)
+	return appendRowPercent(formatNumber(source.totalAmount, abbreviation), percent, showPercent)
+end
+
+local function formatPerSecondRowValueText(source, percent, abbreviation, showPercent)
+	return appendRowPercent(formatNumber(source.amountPerSecond, abbreviation), percent, showPercent)
+end
+
+local function formatAmountRateRowValueText(source, percent, abbreviation, showPercent, useParentheses)
 	local amountText = formatNumber(source.totalAmount, abbreviation)
 	local dpsText = formatNumber(source.amountPerSecond, abbreviation)
-	local text = useParentheses and string.format("%s (%s)", amountText, dpsText) or string.format("%s / %s", amountText, dpsText)
+	local text = useParentheses and (amountText .. " (" .. dpsText .. ")") or (amountText .. " / " .. dpsText)
 	return appendRowPercent(text, percent, showPercent)
 end
+
+local ROW_VALUE_FORMATTERS = {
+	amountAndRate = formatAmountRateRowValueText,
+	count = formatCountRowValueText,
+	death = formatDeathRowValueText,
+	perSecond = formatPerSecondRowValueText,
+}
 
 local function isInFollowerDungeon()
 	if C_LFGInfo and C_LFGInfo.IsInLFGFollowerDungeon then
@@ -1510,10 +1525,14 @@ function DamageMeter:GetRowColorState(frame, config, classFilename)
 	local r, g, b = self:GetClassColor(config, classKey)
 	local nr, ng, nb, na = self:GetNameColor(config, classKey)
 	local vr, vg, vb, va = self:GetValueColor(config, classKey)
+	local bbr, bbg, bbb, bba = getClassOrCustomColor(classKey, config.barBorderColor, DEFAULT_WINDOW.barBorderColor, config.barBorderUseClassColor)
+	local ibr, ibg, ibb, iba = getClassOrCustomColor(classKey, config.iconBorderColor, DEFAULT_WINDOW.iconBorderColor, config.iconBorderUseClassColor)
 	entry = {
 		r = r, g = g, b = b,
 		nr = nr, ng = ng, nb = nb, na = na,
 		vr = vr, vg = vg, vb = vb, va = va,
+		bbr = bbr, bbg = bbg, bbb = bbb, bba = bba,
+		ibr = ibr, ibg = ibg, ibb = ibb, iba = iba,
 	}
 	cache.byClass[classKey] = entry
 	return entry
@@ -1567,7 +1586,7 @@ function DamageMeter:ApplyTooltipFontString(fontString, config)
 	applyCachedFontString(fontString, config.fontFace, clampNumber(config.tooltipFontSize, 8, 24, DEFAULT_WINDOW.tooltipFontSize), config.fontOutline, "tooltip")
 end
 
-function DamageMeter:ApplyBarBorder(row, config, classFilename)
+function DamageMeter:ApplyBarBorder(row, config, classFilename, colors)
 	local border = row.barBorder
 	if not border or not border.SetBackdrop then return end
 	local enabled = config.barBorderEnabled == true
@@ -1584,7 +1603,12 @@ function DamageMeter:ApplyBarBorder(row, config, classFilename)
 	border._damageMeterApplyClassKey = classKey
 	if config.barBorderEnabled == true then
 		local size = clampNumber(config.barBorderSize, 1, 32, DEFAULT_WINDOW.barBorderSize)
-		local br, bg, bb, ba = getClassOrCustomColor(classKey, config.barBorderColor, DEFAULT_WINDOW.barBorderColor, config.barBorderUseClassColor)
+		local br, bg, bb, ba
+		if colors then
+			br, bg, bb, ba = colors.bbr, colors.bbg, colors.bbb, colors.bba
+		else
+			br, bg, bb, ba = getClassOrCustomColor(classKey, config.barBorderColor, DEFAULT_WINDOW.barBorderColor, config.barBorderUseClassColor)
+		end
 		if border._damageMeterBackdropEnabled ~= true
 			or border._damageMeterBackdropTexture ~= config.barBorderTexture
 			or border._damageMeterBackdropSize ~= size then
@@ -1623,7 +1647,7 @@ function DamageMeter:ApplyBarBorder(row, config, classFilename)
 	end
 end
 
-function DamageMeter:ApplyIconBorder(row, config, classFilename)
+function DamageMeter:ApplyIconBorder(row, config, classFilename, colors)
 	local border = row.iconBorder
 	if not border or not border.SetBackdrop then return end
 	local enabled = config.iconBorderEnabled == true
@@ -1640,7 +1664,12 @@ function DamageMeter:ApplyIconBorder(row, config, classFilename)
 	border._damageMeterApplyClassKey = classKey
 	if config.iconBorderEnabled == true then
 		local size = clampNumber(config.iconBorderSize, 1, 32, DEFAULT_WINDOW.iconBorderSize)
-		local br, bg, bb, ba = getClassOrCustomColor(classKey, config.iconBorderColor, DEFAULT_WINDOW.iconBorderColor, config.iconBorderUseClassColor)
+		local br, bg, bb, ba
+		if colors then
+			br, bg, bb, ba = colors.ibr, colors.ibg, colors.ibb, colors.iba
+		else
+			br, bg, bb, ba = getClassOrCustomColor(classKey, config.iconBorderColor, DEFAULT_WINDOW.iconBorderColor, config.iconBorderUseClassColor)
+		end
 		if border._damageMeterBackdropEnabled ~= true
 			or border._damageMeterBackdropTexture ~= config.iconBorderTexture
 			or border._damageMeterBackdropSize ~= size then
@@ -3081,6 +3110,7 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 	local shown = 0
 	local inFollowerDungeon = state.inFollowerDungeon
 	local valueMode = getRowValueMode(damageMeterType)
+	local valueFormatter = ROW_VALUE_FORMATTERS[valueMode] or formatAmountRateRowValueText
 	local valueAbbreviation = config.abbreviation
 	local valueShowPercent = config.showPercent ~= false
 	local valueUseParentheses = config.valueFormat == "parentheses"
@@ -3112,12 +3142,12 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 			local amount = safeNumber(source.totalAmount)
 			local percent = totalAmount and totalAmount > 0 and amount and (amount / totalAmount * 100) or nil
 			local colors = self:GetRowColorState(frame, config, source.classFilename)
-			local valueText = formatRowValueText(source, percent, valueMode, valueAbbreviation, valueShowPercent, valueUseParentheses)
+			local valueText = valueFormatter(source, percent, valueAbbreviation, valueShowPercent, valueUseParentheses)
 
 			self:ApplyRankText(row, sourceIndex, config)
 			row.sourceData = source
-			self:ApplyIconBorder(row, config, source.classFilename)
-			self:ApplyBarBorder(row, config, source.classFilename)
+			self:ApplyIconBorder(row, config, source.classFilename, colors)
+			self:ApplyBarBorder(row, config, source.classFilename, colors)
 			applySourceIcon(row.icon, source, inFollowerDungeon)
 			row.name:SetText(formatDisplayName(source.name, sourceIndex, config))
 			setTextColorIfChanged(row.name, colors.nr, colors.ng, colors.nb, colors.na)
