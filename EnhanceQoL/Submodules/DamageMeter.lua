@@ -1,4 +1,4 @@
--- luacheck: globals C_DamageMeter C_LFGInfo C_Spell StaticPopupDialogs StaticPopup_Show YES CANCEL MenuUtil GameTooltip SecondsToClock DAMAGE_METER_COMBAT_NUMBER CLASS_ICON_TCOORDS
+-- luacheck: globals C_DamageMeter C_LFGInfo C_Spell C_StringUtil StaticPopupDialogs StaticPopup_Show YES CANCEL MenuUtil GameTooltip SecondsToClock DAMAGE_METER_COMBAT_NUMBER CLASS_ICON_TCOORDS
 local addonName, addon = ...
 
 local L = LibStub("AceLocale-3.0"):GetLocale(addonName)
@@ -25,6 +25,18 @@ local SESSION_TYPES = {
 	current = Enum and Enum.DamageMeterSessionType and Enum.DamageMeterSessionType.Current,
 	overall = Enum and Enum.DamageMeterSessionType and Enum.DamageMeterSessionType.Overall,
 }
+-- Keep Blizzard's localized abbreviation breakpoints, with one extra floor so sub-1000 DPS values do not show long decimals.
+local LOW_NUMBER_ABBREV_BREAKPOINT = { breakpoint = 1, abbreviation = "", significandDivisor = 1, fractionDivisor = 1, abbreviationIsGlobal = false }
+local FALLBACK_SHORT_NUMBER_ABBREV_BREAKPOINTS = {
+	{ breakpoint = 10000000000, abbreviation = "B", significandDivisor = 1000000000, fractionDivisor = 1, abbreviationIsGlobal = false },
+	{ breakpoint = 1000000000, abbreviation = "B", significandDivisor = 1000000000, fractionDivisor = 10, abbreviationIsGlobal = false },
+	{ breakpoint = 10000000, abbreviation = "M", significandDivisor = 1000000, fractionDivisor = 1, abbreviationIsGlobal = false },
+	{ breakpoint = 1000000, abbreviation = "M", significandDivisor = 1000000, fractionDivisor = 10, abbreviationIsGlobal = false },
+	{ breakpoint = 10000, abbreviation = "K", significandDivisor = 1000, fractionDivisor = 1, abbreviationIsGlobal = false },
+	{ breakpoint = 1000, abbreviation = "K", significandDivisor = 1000, fractionDivisor = 10, abbreviationIsGlobal = false },
+	LOW_NUMBER_ABBREV_BREAKPOINT,
+}
+local shortNumberAbbrevOptions
 local SYNC_EXCLUDED_KEYS = {
 	enabled = true,
 	sessionType = true,
@@ -454,14 +466,41 @@ local function formatFull(value)
 	return BreakUpLargeNumbers and BreakUpLargeNumbers(math.floor(value + 0.5)) or tostring(math.floor(value + 0.5))
 end
 
+local function copyShortNumberAbbrevBreakpoints(data)
+	if type(data) ~= "table" then return nil end
+	local breakpoints = {}
+	for _, breakpoint in ipairs(data) do
+		if type(breakpoint) == "table" then
+			breakpoints[#breakpoints + 1] = {
+				breakpoint = breakpoint.breakpoint,
+				abbreviation = breakpoint.abbreviation,
+				significandDivisor = breakpoint.significandDivisor,
+				fractionDivisor = breakpoint.fractionDivisor,
+				abbreviationIsGlobal = breakpoint.abbreviationIsGlobal ~= false,
+			}
+		end
+	end
+	if #breakpoints == 0 then return nil end
+	breakpoints[#breakpoints + 1] = LOW_NUMBER_ABBREV_BREAKPOINT
+	return breakpoints
+end
+
+local function getShortNumberAbbrevOptions()
+	if not shortNumberAbbrevOptions then
+		local breakpoints = C_StringUtil and C_StringUtil.GetDefaultAbbreviationBreakpoints and copyShortNumberAbbrevBreakpoints(C_StringUtil.GetDefaultAbbreviationBreakpoints())
+		shortNumberAbbrevOptions = { breakpointData = breakpoints or FALLBACK_SHORT_NUMBER_ABBREV_BREAKPOINTS }
+	end
+	return shortNumberAbbrevOptions
+end
+
 local function formatShort(value)
+	if value == nil then return "0" end
+	if AbbreviateNumbers then return AbbreviateNumbers(value, getShortNumberAbbrevOptions()) end
 	if isSecret(value) then
-		if AbbreviateNumbers then return AbbreviateNumbers(value) end
 		if AbbreviateLargeNumbers then return AbbreviateLargeNumbers(value) end
 		return ""
 	end
 	value = tonumber(value) or 0
-	if AbbreviateNumbers then return AbbreviateNumbers(value) end
 	if AbbreviateLargeNumbers then return AbbreviateLargeNumbers(value) end
 	if value >= 1000000000 then return string.format("%.1fb", value / 1000000000) end
 	if value >= 1000000 then return string.format("%.1fm", value / 1000000) end
