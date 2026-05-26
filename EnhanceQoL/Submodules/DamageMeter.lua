@@ -35,11 +35,11 @@ local SESSION_TYPES = {
 local LOW_NUMBER_ABBREV_BREAKPOINT = { breakpoint = 1, abbreviation = "", significandDivisor = 1, fractionDivisor = 1, abbreviationIsGlobal = false }
 local FALLBACK_SHORT_NUMBER_ABBREV_BREAKPOINTS = {
 	{ breakpoint = 10000000000, abbreviation = "B", significandDivisor = 1000000000, fractionDivisor = 1, abbreviationIsGlobal = false },
-	{ breakpoint = 1000000000, abbreviation = "B", significandDivisor = 1000000000, fractionDivisor = 10, abbreviationIsGlobal = false },
-	{ breakpoint = 10000000, abbreviation = "M", significandDivisor = 1000000, fractionDivisor = 100, abbreviationIsGlobal = false },
-	{ breakpoint = 1000000, abbreviation = "M", significandDivisor = 1000000, fractionDivisor = 100, abbreviationIsGlobal = false },
+	{ breakpoint = 1000000000, abbreviation = "B", significandDivisor = 100000000, fractionDivisor = 10, abbreviationIsGlobal = false },
+	{ breakpoint = 10000000, abbreviation = "M", significandDivisor = 10000, fractionDivisor = 100, abbreviationIsGlobal = false },
+	{ breakpoint = 1000000, abbreviation = "M", significandDivisor = 10000, fractionDivisor = 100, abbreviationIsGlobal = false },
 	{ breakpoint = 10000, abbreviation = "K", significandDivisor = 1000, fractionDivisor = 1, abbreviationIsGlobal = false },
-	{ breakpoint = 1000, abbreviation = "K", significandDivisor = 1000, fractionDivisor = 10, abbreviationIsGlobal = false },
+	{ breakpoint = 1000, abbreviation = "K", significandDivisor = 100, fractionDivisor = 10, abbreviationIsGlobal = false },
 	LOW_NUMBER_ABBREV_BREAKPOINT,
 }
 local shortNumberAbbrevOptions
@@ -574,8 +574,10 @@ local function copyShortNumberAbbrevBreakpoints(data)
 		if type(breakpoint) == "table" then
 			local significandDivisor = breakpoint.significandDivisor
 			local fractionDivisor = breakpoint.fractionDivisor
-			if significandDivisor == 1000000 then
+			local order = significandDivisor and fractionDivisor and significandDivisor * fractionDivisor
+			if order == 1000000 then
 				fractionDivisor = 100
+				significandDivisor = 10000
 			end
 			breakpoints[#breakpoints + 1] = {
 				breakpoint = breakpoint.breakpoint,
