@@ -20,6 +20,10 @@
 ### 🐛 Fixed
 
 - Damage Meter / Edit Mode: Fixed the Layout width slider stepping in 10-pixel increments instead of single-pixel increments.
+- Damage Meter / Edit Mode: Moved header button X/Y offsets into the header button setting group and formatted opacity sliders with short decimal values.
+- Damage Meter / Rows: Improved name/value text layout so value text keeps priority and names shorten first in narrow windows.
+- Damage Meter / Rows: Improved realm hiding by using Blizzard's short name ambiguity handling for Damage Meter source names.
+- Damage Meter / Rows: Restored rank visibility for restricted rows when rank-prefix mode cannot safely prefix a secret name.
 - Damage Meter / Ranking: Fixed narrow rank columns abbreviating visible ranks with ellipses.
 
 ---

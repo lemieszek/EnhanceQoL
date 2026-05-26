@@ -1,4 +1,4 @@
--- luacheck: globals C_DamageMeter C_DeathRecap C_LFGInfo C_Spell C_StringUtil C_CVar SetCVar StaticPopupDialogs StaticPopup_Show YES CANCEL MenuUtil GameTooltip SecondsToClock DAMAGE_METER_COMBAT_NUMBER CLASS_ICON_TCOORDS UnitClass UnitExists UnitGUID IsInRaid UISpecialFrames GetCursorPosition GetTime ACTION_SWING ACTION_ENVIRONMENTAL_DAMAGE_DROWNING ACTION_ENVIRONMENTAL_DAMAGE_FALLING ACTION_ENVIRONMENTAL_DAMAGE_FIRE ACTION_ENVIRONMENTAL_DAMAGE_LAVA ACTION_ENVIRONMENTAL_DAMAGE_SLIME ACTION_ENVIRONMENTAL_DAMAGE_FATIGUE DEATH_RECAP_TITLE CreateAbbreviateConfig
+-- luacheck: globals C_DamageMeter C_DeathRecap C_LFGInfo C_Spell C_StringUtil C_CVar SetCVar StaticPopupDialogs StaticPopup_Show YES CANCEL MenuUtil GameTooltip SecondsToClock DAMAGE_METER_COMBAT_NUMBER CLASS_ICON_TCOORDS UnitClass UnitExists UnitGUID IsInRaid Ambiguate UISpecialFrames GetCursorPosition GetTime ACTION_SWING ACTION_ENVIRONMENTAL_DAMAGE_DROWNING ACTION_ENVIRONMENTAL_DAMAGE_FALLING ACTION_ENVIRONMENTAL_DAMAGE_FIRE ACTION_ENVIRONMENTAL_DAMAGE_LAVA ACTION_ENVIRONMENTAL_DAMAGE_SLIME ACTION_ENVIRONMENTAL_DAMAGE_FATIGUE DEATH_RECAP_TITLE CreateAbbreviateConfig
 local addonName, addon = ...
 
 local L = LibStub("AceLocale-3.0"):GetLocale(addonName)
@@ -690,19 +690,17 @@ local function buildValueModeOptions()
 end
 
 local function formatSourceName(value, config)
-	if value == nil then return L["Unknown"] or UNKNOWN or "Unknown" end
-	if isSecret(value) then return value end
-	local name = safeText(value, L["Unknown"] or UNKNOWN or "Unknown")
-	if config.hideRealmNames ~= false then
-		name = name:gsub("%-[^%-]+$", "")
+	if config.hideRealmNames ~= false and Ambiguate and value ~= nil then
+		return Ambiguate(value, "short")
 	end
-	return name
+	if value == nil then return L["Unknown"] or UNKNOWN or "Unknown" end
+	return value
 end
 
-local function formatDisplayName(value, rowIndex, config)
-	local name = formatSourceName(value, config)
+local function formatDisplayName(source, rowIndex, config, forceRankColumn)
+	local name = formatSourceName(source and source.name, config)
 	if isSecret(name) then return name end
-	if config.showRanks ~= false and config.prefixRankInName == true then
+	if config.showRanks ~= false and config.prefixRankInName == true and forceRankColumn ~= true then
 		local gap = clampNumber(config.rankGap, 0, 24, DEFAULT_WINDOW.rankGap)
 		local spaces = string.rep(" ", math.ceil(gap / 4))
 		return string.format("%d.%s%s", rowIndex, spaces, name)
@@ -890,6 +888,10 @@ local function setPlainTextIfChanged(fontString, text)
 	fontString:SetText(text)
 end
 
+local function formatAlphaSliderValue(value)
+	return string.format("%.2f", tonumber(value) or 0)
+end
+
 local function getRowMetrics(config)
 	local rowHeight = clampNumber(config.rowHeight, 10, 70, DEFAULT_WINDOW.rowHeight)
 	local barHeight = config.changeBarSize == true and math.min(rowHeight, clampNumber(config.barHeight, 1, rowHeight, DEFAULT_WINDOW.barHeight)) or rowHeight
@@ -920,16 +922,16 @@ local function getIconSize(config)
 	return clampNumber(maxSize + offset, 8, maxSize, maxSize)
 end
 
-local function getEffectiveRankWidth(config)
-	if config.showRanks == false or config.prefixRankInName == true then return 0 end
+local function getEffectiveRankWidth(config, forceRankColumn)
+	if config.showRanks == false or (config.prefixRankInName == true and forceRankColumn ~= true) then return 0 end
 	local rankFontSize = clampNumber(config.rankFontSize, 8, 24, DEFAULT_WINDOW.rankFontSize)
 	local maxRows = getEffectiveMaxRows(config)
 	local rankChars = #tostring(maxRows) + 1
 	return math.min(80, math.max(18, math.ceil(rankChars * rankFontSize * 0.9) + 6))
 end
 
-local function getRowTextInsets(config)
-	local rankWidth = getEffectiveRankWidth(config)
+local function getRowTextInsets(config, forceRankColumn)
+	local rankWidth = getEffectiveRankWidth(config, forceRankColumn)
 	local rankGap = clampNumber(config.rankGap, 0, 24, DEFAULT_WINDOW.rankGap)
 	local iconSize = getIconSize(config)
 	local leftInset = 4
@@ -1787,19 +1789,21 @@ function DamageMeter:ApplyIconBorder(row, config, classFilename, colors)
 	end
 end
 
-function DamageMeter:ApplyRowTextLayout(row, config)
+function DamageMeter:ApplyRowTextLayout(row, config, forceRankColumn)
 	local rowMode = config.raidRowsEnabled == true and IsInRaid() and "raid" or "default"
 	local styleVersion = self:GetWindowStyleVersion(row.windowIndex or 0)
 	if row._damageMeterTextLayoutStyleVersion == styleVersion
-		and row._damageMeterTextLayoutRowMode == rowMode then
+		and row._damageMeterTextLayoutRowMode == rowMode
+		and row._damageMeterTextLayoutForceRankColumn == (forceRankColumn == true) then
 		return
 	end
 	row._damageMeterTextLayoutStyleVersion = styleVersion
 	row._damageMeterTextLayoutRowMode = rowMode
+	row._damageMeterTextLayoutForceRankColumn = forceRankColumn == true
 
 	local _, barHeight = getRowMetrics(config)
 	local borderOutset = getBarBorderOutset(config)
-	local leftInset, rightInset, iconSize, rankWidth, rankGap = getRowTextInsets(config)
+	local leftInset, rightInset, iconSize, rankWidth, rankGap = getRowTextInsets(config, forceRankColumn)
 	local showRankColumn = config.showRanks ~= false and rankWidth > 0
 	row.rank:SetWidth(rankWidth)
 	setShownIfChanged(row.rank, showRankColumn)
@@ -1847,24 +1851,26 @@ function DamageMeter:ApplyRowTextLayout(row, config)
 	setShownIfChanged(row.name, config.showNames == true)
 end
 
-function DamageMeter:ApplyRowValueWidth(row, config, damageMeterType)
+function DamageMeter:ApplyRowValueWidth(row, config, damageMeterType, forceRankColumn)
 	damageMeterType = damageMeterType or config.damageMeterType
 	local rowMode = config.raidRowsEnabled == true and IsInRaid() and "raid" or "default"
 	local styleVersion = self:GetWindowStyleVersion(row.windowIndex or 0)
 	if row._damageMeterValueLayoutStyleVersion == styleVersion
 		and row._damageMeterValueLayoutRowMode == rowMode
-		and row._damageMeterValueLayoutType == damageMeterType then
+		and row._damageMeterValueLayoutType == damageMeterType
+		and row._damageMeterValueLayoutForceRankColumn == (forceRankColumn == true) then
 		return
 	end
 	row._damageMeterValueLayoutStyleVersion = styleVersion
 	row._damageMeterValueLayoutRowMode = rowMode
 	row._damageMeterValueLayoutType = damageMeterType
+	row._damageMeterValueLayoutForceRankColumn = forceRankColumn == true
 
 	local frameWidth = clampNumber(config.width, 220, 700, DEFAULT_WINDOW.width)
-	local leftInset, rightInset = getRowTextInsets(config)
+	local leftInset, rightInset = getRowTextInsets(config, forceRankColumn)
 	local availableWidth = math.max(1, (frameWidth - 8) - leftInset - rightInset)
-	local minNameWidth = config.showNames == false and 0 or 24
-	local nameGap = config.showNames == false and 0 or 8
+	local minNameWidth = config.showNames == false and 0 or 8
+	local nameGap = config.showNames == false and 0 or 4
 	local maxValueWidth = math.max(1, availableWidth - minNameWidth - nameGap)
 	local valueFontSize = clampNumber(config.valueFontSize, 8, 24, DEFAULT_WINDOW.valueFontSize)
 	local valueMode = getRowValueMode(damageMeterType, config)
@@ -1872,11 +1878,11 @@ function DamageMeter:ApplyRowValueWidth(row, config, damageMeterType)
 	if isCountOnlyMeterType(damageMeterType) then
 		estimatedCharacters = config.showPercent ~= false and 10 or 4
 	elseif valueMode == "amount" or valueMode == "perSecond" then
-		estimatedCharacters = config.showPercent ~= false and 13 or 7
+		estimatedCharacters = config.showPercent ~= false and 15 or 9
 	elseif config.showPercent ~= false then
-		estimatedCharacters = config.valueFormat == "parentheses" and 19 or 21
+		estimatedCharacters = config.valueFormat == "parentheses" and 22 or 24
 	else
-		estimatedCharacters = config.valueFormat == "parentheses" and 13 or 15
+		estimatedCharacters = config.valueFormat == "parentheses" and 16 or 18
 	end
 	local valueTargetWidth = math.ceil((valueFontSize * estimatedCharacters * 0.62) + 12)
 	local minValueWidth
@@ -1912,9 +1918,9 @@ function DamageMeter:ApplyRowValueWidth(row, config, damageMeterType)
 	end
 end
 
-function DamageMeter:ApplyRankText(row, rowIndex, config)
-	local rankWidth = getEffectiveRankWidth(config)
-	if config.showRanks == false or config.prefixRankInName == true or rankWidth <= 0 then
+function DamageMeter:ApplyRankText(row, rowIndex, config, forceRankColumn)
+	local rankWidth = getEffectiveRankWidth(config, forceRankColumn)
+	if config.showRanks == false or (config.prefixRankInName == true and forceRankColumn ~= true) or rankWidth <= 0 then
 		row.rank:SetText("")
 		return
 	end
@@ -2808,15 +2814,17 @@ function DamageMeter:CreateRow(window, index)
 	row.name = row.textArea:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	row.name:SetJustifyH("LEFT")
 	row.name:SetWordWrap(false)
+	if row.name.SetMaxLines then row.name:SetMaxLines(1) end
 
 	row.value = row.textArea:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	row.value:SetJustifyH("RIGHT")
 	row.value:SetWordWrap(false)
+	if row.value.SetMaxLines then row.value:SetMaxLines(1) end
 
 	self:ApplyRankFontString(row.rank, config)
 	self:ApplyFontString(row.name, config)
 	self:ApplyValueFontString(row.value, config)
-	self:ApplyRowTextLayout(row, config)
+	self:ApplyRowTextLayout(row, config, false)
 	self:ApplyIconBorder(row, config)
 	self:ApplyBarBorder(row, config)
 
@@ -2947,7 +2955,7 @@ function DamageMeter:ApplyWindowAnchor(index)
 	frame._damageMeterAnchored = true
 end
 
-function DamageMeter:ApplyWindowStyle(index, contentRows)
+function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 	local frame = self:EnsureWindow(index)
 	local config = self:GetConfig(index)
 	local rowMode = config.raidRowsEnabled == true and IsInRaid() and "raid" or "default"
@@ -2958,7 +2966,8 @@ function DamageMeter:ApplyWindowStyle(index, contentRows)
 		and frame._damageMeterWindowStyleContentRows == contentRows
 		and frame._damageMeterWindowStyleRowCount == rowCount
 		and frame._damageMeterWindowStyleRowMode == rowMode
-		and frame._damageMeterWindowStyleGlobalFontVersion == globalFontVersion then
+		and frame._damageMeterWindowStyleGlobalFontVersion == globalFontVersion
+		and frame._damageMeterWindowStyleForceRankColumn == (forceRankColumn == true) then
 		return
 	end
 	frame._damageMeterWindowStyleVersion = styleVersion
@@ -2966,6 +2975,7 @@ function DamageMeter:ApplyWindowStyle(index, contentRows)
 	frame._damageMeterWindowStyleRowCount = rowCount
 	frame._damageMeterWindowStyleRowMode = rowMode
 	frame._damageMeterWindowStyleGlobalFontVersion = globalFontVersion
+	frame._damageMeterWindowStyleForceRankColumn = forceRankColumn == true
 
 	local width = clampNumber(config.width, 220, 700, DEFAULT_WINDOW.width)
 	local showHeader = config.showHeader == true
@@ -3084,8 +3094,8 @@ function DamageMeter:ApplyWindowStyle(index, contentRows)
 		self:ApplyRankFontString(row.rank, config)
 		self:ApplyFontString(row.name, config)
 		self:ApplyValueFontString(row.value, config)
-		self:ApplyRowTextLayout(row, config)
-		self:ApplyRowValueWidth(row, config)
+		self:ApplyRowTextLayout(row, config, forceRankColumn)
+		self:ApplyRowValueWidth(row, config, nil, forceRankColumn)
 		previous = row
 	end
 end
@@ -3255,7 +3265,19 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 		end
 	end
 
-	self:ApplyWindowStyle(index, contentRows)
+	local forceRankColumn = false
+	if config.showRanks ~= false and config.prefixRankInName == true then
+		for entryIndex = 1, contentRows do
+			local sourceIndex = displayIndices and displayIndices[entryIndex] or entryIndex
+			local source = sourceIndex and orderedSources[sourceIndex]
+			if source and isSecret(source.name) then
+				forceRankColumn = true
+				break
+			end
+		end
+	end
+
+	self:ApplyWindowStyle(index, contentRows, forceRankColumn)
 	self:UpdateHeader(index, session, state)
 
 	local totalAmount = safeNumber(session and session.totalAmount)
@@ -3296,16 +3318,16 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 			local colors = self:GetRowColorState(frame, config, source.classFilename)
 			local valueText = valueFormatter(source, percent, valueAbbreviation, valueShowPercent, valueUseParentheses)
 
-			self:ApplyRankText(row, sourceIndex, config)
+			self:ApplyRankText(row, sourceIndex, config, forceRankColumn)
 			row.sourceData = source
 			self:ApplyIconBorder(row, config, source.classFilename, colors)
 			self:ApplyBarBorder(row, config, source.classFilename, colors)
 			if config.showIcons ~= false then applySourceIcon(row.icon, source, inFollowerDungeon) end
-			row.name:SetText(formatDisplayName(source.name, sourceIndex, config))
+			row.name:SetText(formatDisplayName(source, sourceIndex, config, forceRankColumn))
 			setTextColorIfChanged(row.name, colors.nr, colors.ng, colors.nb, colors.na)
 			row.value:SetText(valueText)
 			setTextColorIfChanged(row.value, colors.vr, colors.vg, colors.vb, colors.va)
-			self:ApplyRowValueWidth(row, config, damageMeterType)
+			self:ApplyRowValueWidth(row, config, damageMeterType, forceRankColumn)
 			row.bar:SetStatusBarColor(colors.r, colors.g, colors.b, 0.85)
 			row.bar:SetMinMaxValues(0, rawMaxAmount)
 			row.bar:SetValue(rawAmount)
@@ -3601,7 +3623,7 @@ local function dropdownSetting(name, getter, setter, options, parentId, height, 
 	}
 end
 
-local function sliderSetting(name, getter, setter, minValue, maxValue, step, parentId, isEnabled, isShown)
+local function sliderSetting(name, getter, setter, minValue, maxValue, step, parentId, isEnabled, isShown, formatter)
 	return {
 		name = name,
 		kind = SettingType.Slider,
@@ -3612,6 +3634,7 @@ local function sliderSetting(name, getter, setter, minValue, maxValue, step, par
 		maxValue = maxValue,
 		valueStep = step or 1,
 		allowInput = true,
+		formatter = formatter,
 		get = getter,
 		set = function(_, value) setter(value) end,
 	}
@@ -3790,10 +3813,12 @@ function DamageMeter:BuildWindowSettings(index)
 		checkboxSetting(L["damageMeterShowHeaderTime"] or "Show combat time", function() return cfg().showHeaderTime ~= false end, function(value) self:SetConfigValue(index, "showHeaderTime", value) end, headerId, headerEnabled),
 		checkboxSetting(L["damageMeterShowHeaderButtons"] or "Show header buttons", function() return cfg().showHeaderButtons ~= false end, function(value) self:SetConfigValue(index, "showHeaderButtons", value) end, headerId, headerEnabled),
 		sliderSetting(L["damageMeterHeaderButtonSize"] or "Header button size", function() return cfg().headerButtonSize end, function(value) self:SetConfigValue(index, "headerButtonSize", clampNumber(value, 10, 32, DEFAULT_WINDOW.headerButtonSize)) end, 10, 32, 1, headerId, function() return cfg().showHeader == true and cfg().showHeaderButtons ~= false end),
+		sliderSetting(L["damageMeterHeaderButtonOffsetX"] or "Header button X offset", function() return cfg().headerButtonOffsetX end, function(value) self:SetConfigValue(index, "headerButtonOffsetX", clampNumber(value, -100, 100, DEFAULT_WINDOW.headerButtonOffsetX)) end, -100, 100, 1, headerId, function() return cfg().showHeader == true and cfg().showHeaderButtons ~= false end),
+		sliderSetting(L["damageMeterHeaderButtonOffsetY"] or "Header button Y offset", function() return cfg().headerButtonOffsetY end, function(value) self:SetConfigValue(index, "headerButtonOffsetY", clampNumber(value, -100, 100, DEFAULT_WINDOW.headerButtonOffsetY)) end, -100, 100, 1, headerId, function() return cfg().showHeader == true and cfg().showHeaderButtons ~= false end),
 		colorSetting(L["damageMeterHeaderButtonColor"] or "Header button color", function() return normalizeColor(cfg().headerButtonColor, DEFAULT_WINDOW.headerButtonColor) end, function(value) self:SetConfigValue(index, "headerButtonColor", normalizeColor(value, DEFAULT_WINDOW.headerButtonColor)) end, DEFAULT_WINDOW.headerButtonColor, headerId, function() return cfg().showHeader == true and cfg().showHeaderButtons ~= false end),
-		sliderSetting(L["damageMeterHeaderButtonAlpha"] or "Header button opacity", function() return cfg().headerButtonAlpha end, function(value) self:SetConfigValue(index, "headerButtonAlpha", clampNumber(value, 0, 1, DEFAULT_WINDOW.headerButtonAlpha)) end, 0, 1, 0.05, headerId, function() return cfg().showHeader == true and cfg().showHeaderButtons ~= false end),
+		sliderSetting(L["damageMeterHeaderButtonAlpha"] or "Header button opacity", function() return cfg().headerButtonAlpha end, function(value) self:SetConfigValue(index, "headerButtonAlpha", clampNumber(value, 0, 1, DEFAULT_WINDOW.headerButtonAlpha)) end, 0, 1, 0.05, headerId, function() return cfg().showHeader == true and cfg().showHeaderButtons ~= false end, nil, formatAlphaSliderValue),
 		checkboxSetting(L["damageMeterHeaderButtonFade"] or "Fade header buttons", function() return cfg().headerButtonFadeEnabled == true end, function(value) self:SetConfigValue(index, "headerButtonFadeEnabled", value) end, headerId, function() return cfg().showHeader == true and cfg().showHeaderButtons ~= false end),
-		sliderSetting(L["damageMeterHeaderButtonFadeAlpha"] or "Faded button opacity", function() return cfg().headerButtonFadeAlpha end, function(value) self:SetConfigValue(index, "headerButtonFadeAlpha", clampNumber(value, 0, 1, DEFAULT_WINDOW.headerButtonFadeAlpha)) end, 0, 1, 0.05, headerId, function() return cfg().showHeader == true and cfg().showHeaderButtons ~= false and cfg().headerButtonFadeEnabled == true end),
+		sliderSetting(L["damageMeterHeaderButtonFadeAlpha"] or "Faded button opacity", function() return cfg().headerButtonFadeAlpha end, function(value) self:SetConfigValue(index, "headerButtonFadeAlpha", clampNumber(value, 0, 1, DEFAULT_WINDOW.headerButtonFadeAlpha)) end, 0, 1, 0.05, headerId, function() return cfg().showHeader == true and cfg().showHeaderButtons ~= false and cfg().headerButtonFadeEnabled == true end, nil, formatAlphaSliderValue),
 		dropdownSetting(L["damageMeterHeaderFormat"] or "Header format", function() return normalizeHeaderFormat(cfg().headerFormat) end, function(value) self:SetConfigValue(index, "headerFormat", normalizeHeaderFormat(value)) end, buildHeaderFormatOptions(), headerId, 150, headerTimeEnabled),
 		dropdownSetting(L["damageMeterHeaderTimeFormat"] or "Time format", function() return normalizeHeaderTimeFormat(cfg().headerTimeFormat) end, function(value) self:SetConfigValue(index, "headerTimeFormat", normalizeHeaderTimeFormat(value)) end, buildHeaderTimeFormatOptions(), headerId, 120, headerTimeEnabled),
 		dividerSetting(headerId),
@@ -3803,8 +3828,6 @@ function DamageMeter:BuildWindowSettings(index)
 		colorSetting(L["damageMeterHeaderColor"] or "Header color", function() return normalizeColor(cfg().titleColor, DEFAULT_WINDOW.titleColor) end, function(value) self:SetConfigValue(index, "titleColor", normalizeColor(value, DEFAULT_WINDOW.titleColor)) end, DEFAULT_WINDOW.titleColor, headerId, headerEnabled),
 		sliderSetting(L["damageMeterHeaderTextOffsetX"] or "Header text X offset", function() return cfg().headerTextOffsetX end, function(value) self:SetConfigValue(index, "headerTextOffsetX", clampNumber(value, -100, 100, DEFAULT_WINDOW.headerTextOffsetX)) end, -100, 100, 1, headerId, headerEnabled),
 		sliderSetting(L["damageMeterHeaderTextOffsetY"] or "Header text Y offset", function() return cfg().headerTextOffsetY end, function(value) self:SetConfigValue(index, "headerTextOffsetY", clampNumber(value, -100, 100, DEFAULT_WINDOW.headerTextOffsetY)) end, -100, 100, 1, headerId, headerEnabled),
-		sliderSetting(L["damageMeterHeaderButtonOffsetX"] or "Header button X offset", function() return cfg().headerButtonOffsetX end, function(value) self:SetConfigValue(index, "headerButtonOffsetX", clampNumber(value, -100, 100, DEFAULT_WINDOW.headerButtonOffsetX)) end, -100, 100, 1, headerId, function() return cfg().showHeader == true and cfg().showHeaderButtons ~= false end),
-		sliderSetting(L["damageMeterHeaderButtonOffsetY"] or "Header button Y offset", function() return cfg().headerButtonOffsetY end, function(value) self:SetConfigValue(index, "headerButtonOffsetY", clampNumber(value, -100, 100, DEFAULT_WINDOW.headerButtonOffsetY)) end, -100, 100, 1, headerId, function() return cfg().showHeader == true and cfg().showHeaderButtons ~= false end),
 		{ name = L["damageMeterQuickSwitch"] or "Quick switch", kind = SettingType.Collapsible, id = statusId, defaultCollapsed = true },
 		checkboxSetting(L["damageMeterShowStatus"] or "Show quick switch", function() return cfg().showStatus ~= false end, function(value) self:SetConfigValue(index, "showStatus", value) end, statusId),
 		dropdownSetting(L["damageMeterStatusFont"] or "Quick switch font", function() return cfg().statusFontFace end, function(value) self:SetConfigValue(index, "statusFontFace", value) end, buildMediaOptions("font", true), statusId, 260, statusEnabled),
