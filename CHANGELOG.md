@@ -2,6 +2,20 @@
 
 <!--@eqol-beta@-->
 
+## [10.21.0-beta4] - 2026-05-26
+
+### ✨ Added
+
+- Damage Meter / Header: Added optional header background texture and color controls.
+- Damage Meter / Rows: Added a unified row border around the icon and bar with texture, color, class-color, size, and offset controls.
+- Damage Meter / Values: Added a delimiter selector for total/rate value text so players can choose separators such as `/`, `|`, `-`, or spacing.
+
+### 🐛 Fixed
+
+- Damage Meter / Ranking: Fixed rank text rendering behind row bars.
+
+---
+
 ## [10.21.0-beta3] - 2026-05-25
 
 ### ✨ Added
@@ -9,7 +23,7 @@
 - Damage Meter / Profiles: Added a dedicated Damage Meter profile export/import section so players can share or restore only Damage Meter configuration without replacing the rest of the active profile.
 - Damage Meter / Header: Added separate X/Y offsets for header text and header buttons, plus button color, opacity, and optional faded inactive opacity controls.
 - Damage Meter / Rows: Added an option to hide row icons completely.
-- Damage Meter / Styling: Added custom color and class-color options for prefix ranks and tooltip bars, plus tooltip font, outline, and border offset controls.
+- Damage Meter / Styling: Added optional smooth row bars, bar background texture/color controls, custom color and class-color options for prefix ranks and tooltip bars, plus tooltip font, outline, and border offset controls.
 - Damage Meter / Values: Added a value display selector for automatic, total and rate, total only, or rate only display.
 
 ### 🔄 Changed

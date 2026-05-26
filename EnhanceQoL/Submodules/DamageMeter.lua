@@ -31,6 +31,8 @@ local SESSION_TYPES = {
 	current = Enum and Enum.DamageMeterSessionType and Enum.DamageMeterSessionType.Current,
 	overall = Enum and Enum.DamageMeterSessionType and Enum.DamageMeterSessionType.Overall,
 }
+local STATUSBAR_INTERP = Enum and Enum.StatusBarInterpolation
+local INTERP_EASE = STATUSBAR_INTERP and STATUSBAR_INTERP.Ease
 -- Keep Blizzard's localized abbreviation breakpoints, with one extra floor so sub-1000 DPS values do not show long decimals.
 local LOW_NUMBER_ABBREV_BREAKPOINT = { breakpoint = 1, abbreviation = "", significandDivisor = 1, fractionDivisor = 1, abbreviationIsGlobal = false }
 local FALLBACK_SHORT_NUMBER_ABBREV_BREAKPOINTS = {
@@ -86,6 +88,15 @@ local DEFAULT_WINDOW = {
 	barHeight = 20,
 	barAnchor = "CENTER",
 	barSpacing = 2,
+	smoothBars = false,
+	barBackgroundTexture = "",
+	barBackgroundColor = { r = 0, g = 0, b = 0, a = 0.45 },
+	rowBorderEnabled = false,
+	rowBorderTexture = "",
+	rowBorderColor = { r = 0, g = 0, b = 0, a = 0.9 },
+	rowBorderUseClassColor = false,
+	rowBorderSize = 1,
+	rowBorderInset = 0,
 	barBorderEnabled = false,
 	barBorderTexture = "",
 	barBorderColor = { r = 0, g = 0, b = 0, a = 0.9 },
@@ -112,6 +123,9 @@ local DEFAULT_WINDOW = {
 	headerButtonAlpha = 1,
 	headerButtonFadeEnabled = false,
 	headerButtonFadeAlpha = 0.35,
+	headerBackgroundEnabled = false,
+	headerBackgroundTexture = "",
+	headerBackgroundColor = { r = 0, g = 0, b = 0, a = 0.35 },
 	headerTextOffsetX = 0,
 	headerTextOffsetY = 0,
 	headerFormat = "timeTypeDash",
@@ -132,6 +146,7 @@ local DEFAULT_WINDOW = {
 	abbreviation = "short",
 	valueMode = "auto",
 	valueFormat = "slash",
+	valueSeparator = "/",
 	nameAnchorH = "LEFT",
 	nameAnchorV = "CENTER",
 	nameOffsetX = 5,
@@ -697,6 +712,44 @@ local function buildValueModeOptions()
 	}
 end
 
+local VALUE_SEPARATORS = {
+	[" "] = true,
+	["  "] = true,
+	["/"] = true,
+	[":"] = true,
+	["-"] = true,
+	["–"] = true,
+	["|"] = true,
+	["•"] = true,
+	["·"] = true,
+}
+
+local function normalizeValueSeparator(value)
+	return VALUE_SEPARATORS[value] and value or DEFAULT_WINDOW.valueSeparator
+end
+
+local function buildValueSeparatorOptions()
+	return {
+		{ value = " ", label = L["Space"] or "Space" },
+		{ value = "  ", label = L["Double Space"] or "Double space" },
+		{ value = "/", label = "/" },
+		{ value = ":", label = ":" },
+		{ value = "-", label = "-" },
+		{ value = "–", label = "–" },
+		{ value = "|", label = "|" },
+		{ value = "•", label = "•" },
+		{ value = "·", label = "·" },
+	}
+end
+
+local function joinValueText(leftText, rightText, separator)
+	separator = normalizeValueSeparator(separator)
+	if separator == " " or separator == "  " then
+		return leftText .. separator .. rightText
+	end
+	return leftText .. " " .. separator .. " " .. rightText
+end
+
 local function formatSourceName(value, config)
 	if config.hideRealmNames ~= false and Ambiguate and value ~= nil then
 		return Ambiguate(value, "short")
@@ -782,10 +835,10 @@ local function formatAmountRowValueText(source, percent, abbreviation, showPerce
 	return appendRowPercent(formatNumber(source.totalAmount, abbreviation), percent, showPercent)
 end
 
-local function formatAmountRateRowValueText(source, percent, abbreviation, showPercent, useParentheses)
+local function formatAmountRateRowValueText(source, percent, abbreviation, showPercent, useParentheses, separator)
 	local amountText = formatNumber(source.totalAmount, abbreviation)
 	local dpsText = formatNumber(source.amountPerSecond, abbreviation)
-	local text = useParentheses and (amountText .. " (" .. dpsText .. ")") or (amountText .. " / " .. dpsText)
+	local text = useParentheses and (amountText .. " (" .. dpsText .. ")") or joinValueText(amountText, dpsText, separator)
 	return appendRowPercent(text, percent, showPercent)
 end
 
@@ -857,6 +910,14 @@ local function colorComponents(value, fallback)
 		clampNumber(value.g or value[2], 0, 1, fallback.g or fallback[2] or 0),
 		clampNumber(value.b or value[3], 0, 1, fallback.b or fallback[3] or 0),
 		clampNumber(value.a or value[4], 0, 1, fallback.a or fallback[4] or 1)
+end
+
+local function setStatusBarValue(bar, value, smooth)
+	if smooth and INTERP_EASE then
+		bar:SetValue(value, INTERP_EASE)
+	else
+		bar:SetValue(value)
+	end
 end
 
 local function getGlobalFontStateVersion()
@@ -1617,6 +1678,7 @@ function DamageMeter:GetRowColorState(frame, config, classFilename)
 	local nr, ng, nb, na = self:GetNameColor(config, classKey)
 	local vr, vg, vb, va = self:GetValueColor(config, classKey)
 	local prr, prg, prb, pra = self:GetPrefixRankColor(config, classKey)
+	local rbr, rbg, rbb, rba = getClassOrCustomColor(classKey, config.rowBorderColor, DEFAULT_WINDOW.rowBorderColor, config.rowBorderUseClassColor)
 	local bbr, bbg, bbb, bba = getClassOrCustomColor(classKey, config.barBorderColor, DEFAULT_WINDOW.barBorderColor, config.barBorderUseClassColor)
 	local ibr, ibg, ibb, iba = getClassOrCustomColor(classKey, config.iconBorderColor, DEFAULT_WINDOW.iconBorderColor, config.iconBorderUseClassColor)
 	entry = {
@@ -1624,6 +1686,7 @@ function DamageMeter:GetRowColorState(frame, config, classFilename)
 		nr = nr, ng = ng, nb = nb, na = na,
 		vr = vr, vg = vg, vb = vb, va = va,
 		prr = prr, prg = prg, prb = prb, pra = pra,
+		rbr = rbr, rbg = rbg, rbb = rbb, rba = rba,
 		bbr = bbr, bbg = bbg, bbb = bbb, bba = bba,
 		ibr = ibr, ibg = ibg, ibb = ibb, iba = iba,
 	}
@@ -1682,6 +1745,121 @@ end
 
 function DamageMeter:ApplyTooltipFontString(fontString, config)
 	applyCachedFontString(fontString, config.tooltipFontFace, clampNumber(config.tooltipFontSize, 8, 24, DEFAULT_WINDOW.tooltipFontSize), config.tooltipFontOutline, "tooltip")
+end
+
+function DamageMeter:ApplyBarBackground(row, config)
+	local texture = resolveMedia("statusbar", config.barBackgroundTexture, "Interface\\Buttons\\WHITE8x8")
+	local r, g, b, a = colorComponents(config.barBackgroundColor, DEFAULT_WINDOW.barBackgroundColor)
+	if row.background._damageMeterTexture ~= texture then
+		row.background._damageMeterTexture = texture
+		row.background:SetTexture(texture)
+	end
+	if row.background._damageMeterColorR ~= r
+		or row.background._damageMeterColorG ~= g
+		or row.background._damageMeterColorB ~= b
+		or row.background._damageMeterColorA ~= a then
+		row.background._damageMeterColorR = r
+		row.background._damageMeterColorG = g
+		row.background._damageMeterColorB = b
+		row.background._damageMeterColorA = a
+		row.background:SetVertexColor(r, g, b, a)
+	end
+end
+
+function DamageMeter:ApplyHeaderBackground(frame, config, showHeader)
+	local enabled = showHeader and config.headerBackgroundEnabled == true
+	setShownIfChanged(frame.headerBackground, enabled)
+	if not enabled then return end
+	local texture = resolveMedia("statusbar", config.headerBackgroundTexture, "Interface\\Buttons\\WHITE8x8")
+	local r, g, b, a = colorComponents(config.headerBackgroundColor, DEFAULT_WINDOW.headerBackgroundColor)
+	if frame.headerBackground._damageMeterTexture ~= texture then
+		frame.headerBackground._damageMeterTexture = texture
+		frame.headerBackground:SetTexture(texture)
+	end
+	if frame.headerBackground._damageMeterColorR ~= r
+		or frame.headerBackground._damageMeterColorG ~= g
+		or frame.headerBackground._damageMeterColorB ~= b
+		or frame.headerBackground._damageMeterColorA ~= a then
+		frame.headerBackground._damageMeterColorR = r
+		frame.headerBackground._damageMeterColorG = g
+		frame.headerBackground._damageMeterColorB = b
+		frame.headerBackground._damageMeterColorA = a
+		frame.headerBackground:SetVertexColor(r, g, b, a)
+	end
+end
+
+function DamageMeter:PositionRowBorder(row, config)
+	if not row.rowBorder then return end
+	row.rowBorder:ClearAllPoints()
+	local borderOffset = clampNumber(config.rowBorderInset, 0, 24, DEFAULT_WINDOW.rowBorderInset)
+	local leftOwner = row.bar
+	if config.showIcons ~= false and row.iconFrame and row.iconFrame:IsShown() then
+		leftOwner = row.iconFrame
+	end
+	row.rowBorder:SetPoint("TOPLEFT", leftOwner, "TOPLEFT", -borderOffset, borderOffset)
+	row.rowBorder:SetPoint("BOTTOMRIGHT", row.bar, "BOTTOMRIGHT", borderOffset, -borderOffset)
+	row.rowBorder:SetFrameLevel(row.bar:GetFrameLevel() + 2)
+end
+
+function DamageMeter:ApplyRowBorder(row, config, classFilename, colors)
+	local border = row.rowBorder
+	if not border or not border.SetBackdrop then return end
+	local enabled = config.rowBorderEnabled == true
+	local styleVersion = self:GetWindowStyleVersion(row.windowIndex or 0)
+	local classKey = enabled and config.rowBorderUseClassColor == true and type(classFilename) == "string" and classFilename ~= "" and classFilename or false
+	if border._damageMeterApplyVersion == styleVersion
+		and border._damageMeterApplyEnabled == enabled
+		and border._damageMeterApplyClassKey == classKey then
+		setShownIfChanged(border, enabled)
+		return
+	end
+	border._damageMeterApplyVersion = styleVersion
+	border._damageMeterApplyEnabled = enabled
+	border._damageMeterApplyClassKey = classKey
+	if enabled then
+		local size = clampNumber(config.rowBorderSize, 1, 32, DEFAULT_WINDOW.rowBorderSize)
+		local br, bg, bb, ba
+		if colors then
+			br, bg, bb, ba = colors.rbr, colors.rbg, colors.rbb, colors.rba
+		else
+			br, bg, bb, ba = getClassOrCustomColor(classKey, config.rowBorderColor, DEFAULT_WINDOW.rowBorderColor, config.rowBorderUseClassColor)
+		end
+		if border._damageMeterBackdropEnabled ~= true
+			or border._damageMeterBackdropTexture ~= config.rowBorderTexture
+			or border._damageMeterBackdropSize ~= size then
+			border._damageMeterBackdropEnabled = true
+			border._damageMeterBackdropTexture = config.rowBorderTexture
+			border._damageMeterBackdropSize = size
+			local borderTexture = resolveMedia("border", config.rowBorderTexture, DEFAULT_BORDER)
+			border:SetBackdrop({
+				edgeFile = borderTexture,
+				edgeSize = size,
+			})
+		end
+		if border._damageMeterBorderColorR ~= br
+			or border._damageMeterBorderColorG ~= bg
+			or border._damageMeterBorderColorB ~= bb
+			or border._damageMeterBorderColorA ~= ba then
+			border._damageMeterBorderColorR = br
+			border._damageMeterBorderColorG = bg
+			border._damageMeterBorderColorB = bb
+			border._damageMeterBorderColorA = ba
+			border:SetBackdropBorderColor(br, bg, bb, ba)
+		end
+		setShownIfChanged(border, true)
+	else
+		if border._damageMeterBackdropEnabled ~= false then
+			border._damageMeterBackdropEnabled = false
+			border._damageMeterBackdropTexture = nil
+			border._damageMeterBackdropSize = nil
+			border._damageMeterBorderColorR = nil
+			border._damageMeterBorderColorG = nil
+			border._damageMeterBorderColorB = nil
+			border._damageMeterBorderColorA = nil
+			border:SetBackdrop(nil)
+		end
+		setShownIfChanged(border, false)
+	end
 end
 
 function DamageMeter:ApplyBarBorder(row, config, classFilename, colors)
@@ -1863,8 +2041,11 @@ function DamageMeter:ApplyRowTextLayout(row, config, forceRankColumn)
 	local borderOffset = clampNumber(config.barBorderInset, 0, 24, DEFAULT_WINDOW.barBorderInset)
 	row.barBorder:SetPoint("TOPLEFT", row.bar, "TOPLEFT", -borderOffset, borderOffset)
 	row.barBorder:SetPoint("BOTTOMRIGHT", row.bar, "BOTTOMRIGHT", borderOffset, -borderOffset)
-	row.barBorder:SetFrameLevel(row.bar:GetFrameLevel() + 2)
+	self:PositionRowBorder(row, config)
+	row.barBorder:SetFrameLevel(row.bar:GetFrameLevel() + 3)
+	row.rankFrame:SetFrameLevel(row.bar:GetFrameLevel() + 5)
 	row.textArea:ClearAllPoints()
+	row.textArea:SetFrameLevel(row.bar:GetFrameLevel() + 4)
 	row.textArea:SetPoint("TOPLEFT", row, "TOPLEFT", leftInset, 0)
 	row.textArea:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -rightInset, 0)
 	if showRankColumn then
@@ -2831,13 +3012,6 @@ function DamageMeter:CreateRow(window, index, forceRankColumn)
 		end
 	end
 
-	row.rank = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	row.rank:SetPoint("LEFT", 4, 0)
-	row.rank:SetWidth(24)
-	row.rank:SetJustifyH("LEFT")
-	row.rank:SetWordWrap(false)
-	if row.rank.SetMaxLines then row.rank:SetMaxLines(1) end
-
 	row.iconFrame = CreateFrame("Frame", nil, row, "BackdropTemplate")
 	row.iconFrame:EnableMouse(false)
 
@@ -2855,12 +3029,28 @@ function DamageMeter:CreateRow(window, index, forceRankColumn)
 
 	row.background = row.bar:CreateTexture(nil, "BACKGROUND")
 	row.background:SetAllPoints()
-	row.background:SetColorTexture(0, 0, 0, 0.45)
+	self:ApplyBarBackground(row, config)
 
 	row.barBorder = CreateFrame("Frame", nil, row, "BackdropTemplate")
 	row.barBorder:EnableMouse(false)
 
+	row.rowBorder = CreateFrame("Frame", nil, row, "BackdropTemplate")
+	row.rowBorder:EnableMouse(false)
+
+	row.rankFrame = CreateFrame("Frame", nil, row)
+	row.rankFrame:EnableMouse(false)
+	row.rankFrame:SetAllPoints(row)
+	row.rankFrame:SetFrameLevel(row.bar:GetFrameLevel() + 5)
+
+	row.rank = row.rankFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	row.rank:SetPoint("LEFT", 4, 0)
+	row.rank:SetWidth(24)
+	row.rank:SetJustifyH("LEFT")
+	row.rank:SetWordWrap(false)
+	if row.rank.SetMaxLines then row.rank:SetMaxLines(1) end
+
 	row.textArea = CreateFrame("Frame", nil, row)
+	row.textArea:SetFrameLevel(row.bar:GetFrameLevel() + 4)
 
 	row.name = row.textArea:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	row.name:SetJustifyH("LEFT")
@@ -2880,6 +3070,7 @@ function DamageMeter:CreateRow(window, index, forceRankColumn)
 	self:ApplyFontString(row.name, config)
 	self:ApplyValueFontString(row.value, config)
 	self:ApplyRowTextLayout(row, config, forceRankColumn)
+	self:ApplyRowBorder(row, config)
 	self:ApplyIconBorder(row, config)
 	self:ApplyBarBorder(row, config)
 
@@ -2903,6 +3094,10 @@ function DamageMeter:EnsureWindow(index)
 	end)
 	frame:Hide()
 	frame.index = index
+
+	local headerBackground = frame:CreateTexture(nil, "ARTWORK")
+	headerBackground:Hide()
+	frame.headerBackground = headerBackground
 
 	local header = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	header:SetPoint("TOPLEFT", 8, -7)
@@ -3072,21 +3267,27 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 	setShownIfChanged(frame.header, showHeader)
 	setShownIfChanged(frame.status, showStatus)
 	frame.header:ClearAllPoints()
+	frame.headerBackground:ClearAllPoints()
 	frame.headerButtons:ClearAllPoints()
 	frame.status:ClearAllPoints()
 	if headerPosition == "BOTTOM" then
+		frame.headerBackground:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 4, 4 + bottomOffset)
+		frame.headerBackground:SetPoint("TOPRIGHT", frame, "BOTTOMRIGHT", -4, 4 + bottomOffset + headerHeight)
 		frame.header:SetPoint("BOTTOMLEFT", 8 + headerTextOffsetX, 7 + bottomOffset + headerTextOffsetY)
 		frame.header:SetPoint("BOTTOMRIGHT", -headerButtonTextInset + headerTextOffsetX, 7 + bottomOffset + headerTextOffsetY)
 		frame.headerButtons:SetPoint("BOTTOMRIGHT", -8 + headerButtonOffsetX, 7 + bottomOffset + headerButtonOffsetY)
 		frame.status:SetPoint("BOTTOMLEFT", 4, 4 + bottomOffset + headerHeight)
 		frame.status:SetPoint("BOTTOMRIGHT", -4, 4 + bottomOffset + headerHeight)
 	else
+		frame.headerBackground:SetPoint("TOPLEFT", frame, "TOPLEFT", 4, -(topOffset + 4))
+		frame.headerBackground:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", -4, -(topOffset + headerHeight))
 		frame.header:SetPoint("TOPLEFT", 8 + headerTextOffsetX, -(7 + topOffset) + headerTextOffsetY)
 		frame.header:SetPoint("TOPRIGHT", -headerButtonTextInset + headerTextOffsetX, -(7 + topOffset) + headerTextOffsetY)
 		frame.headerButtons:SetPoint("TOPRIGHT", -8 + headerButtonOffsetX, -(7 + topOffset) + headerButtonOffsetY)
 		frame.status:SetPoint("BOTTOMLEFT", 4, 4 + bottomOffset)
 		frame.status:SetPoint("BOTTOMRIGHT", -4, 4 + bottomOffset)
 	end
+	self:ApplyHeaderBackground(frame, config, showHeader)
 
 	local borderTexture = resolveMedia("border", config.borderTexture, DEFAULT_BORDER)
 	if config.borderEnabled == true then
@@ -3146,6 +3347,7 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 			row.bar._damageMeterTexture = texture
 			row.bar:SetStatusBarTexture(texture)
 		end
+		self:ApplyBarBackground(row, config)
 		if config.prefixRankInName == true then
 			self:ApplyFontString(row.rank, config)
 		else
@@ -3154,6 +3356,7 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 		self:ApplyFontString(row.name, config)
 		self:ApplyValueFontString(row.value, config)
 		self:ApplyRowTextLayout(row, config, forceRankColumn)
+		self:ApplyRowBorder(row, config)
 		self:ApplyRowValueWidth(row, config, nil, forceRankColumn)
 		previous = row
 	end
@@ -3347,6 +3550,7 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 	local valueAbbreviation = config.abbreviation
 	local valueShowPercent = config.showPercent ~= false
 	local valueUseParentheses = config.valueFormat == "parentheses"
+	local valueSeparator = normalizeValueSeparator(config.valueSeparator)
 
 	for rowIndex = 1, maxRows do
 		local visualTopIndex = rowsGrowUp and (contentRows - rowIndex + 1) or rowIndex
@@ -3378,10 +3582,11 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 			local amount = safeNumber(source.totalAmount)
 			local percent = totalAmount and totalAmount > 0 and amount and (amount / totalAmount * 100) or nil
 			local colors = self:GetRowColorState(frame, config, source.classFilename)
-			local valueText = valueFormatter(source, percent, valueAbbreviation, valueShowPercent, valueUseParentheses)
+			local valueText = valueFormatter(source, percent, valueAbbreviation, valueShowPercent, valueUseParentheses, valueSeparator)
 
 			self:ApplyRankText(row, sourceIndex, config)
 			row.sourceData = source
+			self:ApplyRowBorder(row, config, source.classFilename, colors)
 			self:ApplyIconBorder(row, config, source.classFilename, colors)
 			self:ApplyBarBorder(row, config, source.classFilename, colors)
 			if config.showIcons ~= false then applySourceIcon(row.icon, source, inFollowerDungeon) end
@@ -3395,7 +3600,7 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 			self:ApplyRowValueWidth(row, config, damageMeterType, forceRankColumn)
 			row.bar:SetStatusBarColor(colors.r, colors.g, colors.b, 0.85)
 			row.bar:SetMinMaxValues(0, rawMaxAmount)
-			row.bar:SetValue(rawAmount)
+			setStatusBarValue(row.bar, rawAmount, config.smoothBars == true)
 			row:Show()
 			shown = shown + 1
 		else
@@ -3796,7 +4001,10 @@ function DamageMeter:BuildWindowSettings(index)
 	local function namesEnabled() return cfg().showNames == true end
 	local function fixedNameColorEnabled() return cfg().showNames == true and cfg().nameUseClassColors ~= true end
 	local function tooltipEnabled() return cfg().tooltipEnabled == true end
+	local function headerBackgroundEnabled() return cfg().showHeader == true and cfg().headerBackgroundEnabled == true end
 	local function customBarSizeEnabled() return cfg().changeBarSize == true end
+	local function rowBorderEnabled() return cfg().rowBorderEnabled == true end
+	local function fixedRowBorderColorEnabled() return cfg().rowBorderEnabled == true and cfg().rowBorderUseClassColor ~= true end
 	local function barBorderEnabled() return cfg().barBorderEnabled == true end
 	local function fixedBarBorderColorEnabled() return cfg().barBorderEnabled == true and cfg().barBorderUseClassColor ~= true end
 	local function iconsEnabled() return cfg().showIcons ~= false end
@@ -3887,6 +4095,14 @@ function DamageMeter:BuildWindowSettings(index)
 		sliderSetting(L["damageMeterHeaderButtonAlpha"] or "Header button opacity", function() return cfg().headerButtonAlpha end, function(value) self:SetConfigValue(index, "headerButtonAlpha", clampNumber(value, 0, 1, DEFAULT_WINDOW.headerButtonAlpha)) end, 0, 1, 0.05, headerId, function() return cfg().showHeader == true and cfg().showHeaderButtons ~= false end, nil, formatAlphaSliderValue),
 		checkboxSetting(L["damageMeterHeaderButtonFade"] or "Fade header buttons", function() return cfg().headerButtonFadeEnabled == true end, function(value) self:SetConfigValue(index, "headerButtonFadeEnabled", value) end, headerId, function() return cfg().showHeader == true and cfg().showHeaderButtons ~= false end),
 		sliderSetting(L["damageMeterHeaderButtonFadeAlpha"] or "Faded button opacity", function() return cfg().headerButtonFadeAlpha end, function(value) self:SetConfigValue(index, "headerButtonFadeAlpha", clampNumber(value, 0, 1, DEFAULT_WINDOW.headerButtonFadeAlpha)) end, 0, 1, 0.05, headerId, function() return cfg().showHeader == true and cfg().showHeaderButtons ~= false and cfg().headerButtonFadeEnabled == true end, nil, formatAlphaSliderValue),
+		dividerSetting(headerId),
+		checkboxSetting(L["damageMeterHeaderBackground"] or "Header background", function() return cfg().headerBackgroundEnabled == true end, function(value)
+			self:SetConfigValue(index, "headerBackgroundEnabled", value)
+			requestEditModeSettingsRefresh()
+		end, headerId, headerEnabled),
+		dropdownSetting(L["damageMeterHeaderBackgroundTexture"] or "Header background texture", function() return cfg().headerBackgroundTexture end, function(value) self:SetConfigValue(index, "headerBackgroundTexture", value) end, buildMediaOptions("statusbar", false), headerId, 260, headerBackgroundEnabled),
+		colorSetting(L["damageMeterHeaderBackgroundColor"] or "Header background color", function() return normalizeColor(cfg().headerBackgroundColor, DEFAULT_WINDOW.headerBackgroundColor) end, function(value) self:SetConfigValue(index, "headerBackgroundColor", normalizeColor(value, DEFAULT_WINDOW.headerBackgroundColor)) end, DEFAULT_WINDOW.headerBackgroundColor, headerId, headerBackgroundEnabled),
+		dividerSetting(headerId),
 		dropdownSetting(L["damageMeterHeaderFormat"] or "Header format", function() return normalizeHeaderFormat(cfg().headerFormat) end, function(value) self:SetConfigValue(index, "headerFormat", normalizeHeaderFormat(value)) end, buildHeaderFormatOptions(), headerId, 150, headerTimeEnabled),
 		dropdownSetting(L["damageMeterHeaderTimeFormat"] or "Time format", function() return normalizeHeaderTimeFormat(cfg().headerTimeFormat) end, function(value) self:SetConfigValue(index, "headerTimeFormat", normalizeHeaderTimeFormat(value)) end, buildHeaderTimeFormatOptions(), headerId, 120, headerTimeEnabled),
 		dividerSetting(headerId),
@@ -3912,6 +4128,22 @@ function DamageMeter:BuildWindowSettings(index)
 		dividerSetting(barId),
 		dropdownSetting(L["Texture"] or "Texture", function() return cfg().texture end, function(value) self:SetConfigValue(index, "texture", value) end, buildMediaOptions("statusbar", false), barId, 260),
 		checkboxSetting(L["damageMeterUseClassColors"] or "Use class colors", function() return cfg().useClassColors == true end, function(value) self:SetConfigValue(index, "useClassColors", value) end, barId),
+		checkboxSetting(L["damageMeterSmoothBars"] or "Smooth bars", function() return cfg().smoothBars == true end, function(value) self:SetConfigValue(index, "smoothBars", value) end, barId),
+		dropdownSetting(L["damageMeterBarBackgroundTexture"] or "Background texture", function() return cfg().barBackgroundTexture end, function(value) self:SetConfigValue(index, "barBackgroundTexture", value) end, buildMediaOptions("statusbar", false), barId, 260),
+		colorSetting(L["damageMeterBarBackgroundColor"] or "Background color", function() return normalizeColor(cfg().barBackgroundColor, DEFAULT_WINDOW.barBackgroundColor) end, function(value) self:SetConfigValue(index, "barBackgroundColor", normalizeColor(value, DEFAULT_WINDOW.barBackgroundColor)) end, DEFAULT_WINDOW.barBackgroundColor, barId),
+		dividerSetting(barId),
+		checkboxSetting(L["damageMeterRowBorder"] or "Row border", function() return cfg().rowBorderEnabled == true end, function(value)
+			self:SetConfigValue(index, "rowBorderEnabled", value)
+			requestEditModeSettingsRefresh()
+		end, barId),
+		dropdownSetting(L["damageMeterRowBorderTexture"] or "Row border texture", function() return cfg().rowBorderTexture end, function(value) self:SetConfigValue(index, "rowBorderTexture", value) end, buildMediaOptions("border", false), barId, 260, rowBorderEnabled),
+		checkboxSetting(L["damageMeterUseClassColor"] or "Use class color", function() return cfg().rowBorderUseClassColor == true end, function(value)
+			self:SetConfigValue(index, "rowBorderUseClassColor", value)
+			requestEditModeSettingsRefresh()
+		end, barId, rowBorderEnabled),
+		colorSetting(L["damageMeterRowBorderColor"] or "Row border color", function() return normalizeColor(cfg().rowBorderColor, DEFAULT_WINDOW.rowBorderColor) end, function(value) self:SetConfigValue(index, "rowBorderColor", normalizeColor(value, DEFAULT_WINDOW.rowBorderColor)) end, DEFAULT_WINDOW.rowBorderColor, barId, fixedRowBorderColorEnabled),
+		sliderSetting(L["damageMeterRowBorderSize"] or "Row border size", function() return cfg().rowBorderSize end, function(value) self:SetConfigValue(index, "rowBorderSize", clampNumber(value, 1, 32, DEFAULT_WINDOW.rowBorderSize)) end, 1, 32, 1, barId, rowBorderEnabled),
+		sliderSetting(L["damageMeterRowBorderOffset"] or "Row border offset", function() return cfg().rowBorderInset end, function(value) self:SetConfigValue(index, "rowBorderInset", clampNumber(value, 0, 24, DEFAULT_WINDOW.rowBorderInset)) end, 0, 24, 1, barId, rowBorderEnabled),
 		dividerSetting(barId),
 		checkboxSetting(L["damageMeterBarBorder"] or "Bar border", function() return cfg().barBorderEnabled == true end, function(value) self:SetConfigValue(index, "barBorderEnabled", value) end, barId),
 		dropdownSetting(L["damageMeterBarBorderTexture"] or "Bar border texture", function() return cfg().barBorderTexture end, function(value) self:SetConfigValue(index, "barBorderTexture", value) end, buildMediaOptions("border", false), barId, 260, barBorderEnabled),
@@ -3983,10 +4215,14 @@ function DamageMeter:BuildWindowSettings(index)
 			{ value = "short", label = L["damageMeterAbbreviationShort"] or "Abbreviated" },
 			{ value = "none", label = L["damageMeterAbbreviationFull"] or "Full numbers" },
 		}, valuesId, 100),
-		dropdownSetting(L["damageMeterValueFormat"] or "Value format", function() return cfg().valueFormat end, function(value) self:SetConfigValue(index, "valueFormat", value == "parentheses" and "parentheses" or "slash") end, {
+		dropdownSetting(L["damageMeterValueFormat"] or "Value format", function() return cfg().valueFormat end, function(value)
+			self:SetConfigValue(index, "valueFormat", value == "parentheses" and "parentheses" or "slash")
+			requestEditModeSettingsRefresh()
+		end, {
 			{ value = "slash", label = L["damageMeterValueFormatSlash"] or "<total> / <DPS>" },
 			{ value = "parentheses", label = L["damageMeterValueFormatParentheses"] or "<total> (<DPS>)" },
 		}, valuesId, 110),
+		dropdownSetting(L["Delimiter"] or "Delimiter", function() return normalizeValueSeparator(cfg().valueSeparator) end, function(value) self:SetConfigValue(index, "valueSeparator", normalizeValueSeparator(value)) end, buildValueSeparatorOptions(), valuesId, 120, function() return cfg().valueFormat ~= "parentheses" end),
 		{ name = L["damageMeterTooltip"] or "Tooltip", kind = SettingType.Collapsible, id = tooltipId, defaultCollapsed = true },
 		checkboxSetting(L["damageMeterTooltipEnabled"] or "Show row tooltip", function() return cfg().tooltipEnabled == true end, function(value) self:SetConfigValue(index, "tooltipEnabled", value) end, tooltipId),
 		checkboxSetting(L["damageMeterTooltipPreview"] or "Preview tooltip", function() return cfg().tooltipPreview == true end, function(value) self:SetConfigValue(index, "tooltipPreview", value) end, tooltipId, tooltipEnabled),
