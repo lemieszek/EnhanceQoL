@@ -2,6 +2,22 @@
 
 <!--@eqol-beta@-->
 
+## [10.21.0-beta7] - 2026-05-26
+
+### ✨ Added
+
+- Damage Meter / Header: Added an optional custom atlas name, texture file ID, or texture path override for the header background.
+- Damage Meter / Bars: Added the same optional custom atlas name, texture file ID, or texture path override for bar background textures.
+- Damage Meter / Footer: Renamed the Quick Switch settings section to Footer and added footer background texture controls with the same custom atlas/texture override support.
+- Damage Meter / Backgrounds: Added a separate content background layer between header and footer, plus custom texture and offset controls for both content and full-window backgrounds.
+
+### 🔄 Changed
+
+- Damage Meter: Changed the empty-state label from damage-specific wording to a generic "No data" message.
+- Damage Meter / Edit Mode: Increased the Damage Meter settings panel height to show more controls at once.
+
+---
+
 ## [10.21.0-beta6] - 2026-05-26
 
 ### ✨ Added

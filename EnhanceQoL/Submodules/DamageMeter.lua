@@ -89,6 +89,8 @@ local DEFAULT_WINDOW = {
 	barAnchor = "CENTER",
 	barSpacing = 2,
 	smoothBars = false,
+	barBackgroundUseCustomTexture = false,
+	barBackgroundCustomTexture = "",
 	barBackgroundTexture = "",
 	barBackgroundColor = { r = 0, g = 0, b = 0, a = 0.45 },
 	rowBorderEnabled = false,
@@ -126,6 +128,8 @@ local DEFAULT_WINDOW = {
 	headerButtonFadeEnabled = false,
 	headerButtonFadeAlpha = 0.35,
 	headerBackgroundEnabled = false,
+	headerBackgroundUseCustomTexture = false,
+	headerBackgroundCustomTexture = "",
 	headerBackgroundTexture = "",
 	headerBackgroundColor = { r = 0, g = 0, b = 0, a = 0.35 },
 	headerBackgroundOffsetX = 0,
@@ -137,6 +141,16 @@ local DEFAULT_WINDOW = {
 	headerFormat = "timeTypeDash",
 	headerTimeFormat = "smart",
 	showStatus = true,
+	footerBackgroundEnabled = false,
+	footerBackgroundUseCustomTexture = false,
+	footerBackgroundCustomTexture = "",
+	footerBackgroundTexture = "",
+	footerBackgroundColor = { r = 0, g = 0, b = 0, a = 0.35 },
+	footerBackgroundOffsetX = 0,
+	footerBackgroundOffsetY = 0,
+	footerBackgroundSizeOffsetX = 0,
+	footerBackgroundSizeOffsetY = 0,
+	showFooterQuickSwitch = true,
 	showNames = true,
 	showIcons = true,
 	showRanks = true,
@@ -165,8 +179,23 @@ local DEFAULT_WINDOW = {
 	nameUseClassColors = false,
 	nameColor = { r = 1, g = 1, b = 1, a = 1 },
 	texture = "",
+	backdropUseCustomTexture = false,
+	backdropCustomTexture = "",
 	backdropTexture = "",
 	backdropColor = { r = 0.02, g = 0.025, b = 0.03, a = 0.78 },
+	backdropOffsetX = 0,
+	backdropOffsetY = 0,
+	backdropSizeOffsetX = 0,
+	backdropSizeOffsetY = 0,
+	contentBackgroundEnabled = false,
+	contentBackgroundUseCustomTexture = false,
+	contentBackgroundCustomTexture = "",
+	contentBackgroundTexture = "",
+	contentBackgroundColor = { r = 0, g = 0, b = 0, a = 0.35 },
+	contentBackgroundOffsetX = 0,
+	contentBackgroundOffsetY = 0,
+	contentBackgroundSizeOffsetX = 0,
+	contentBackgroundSizeOffsetY = 0,
 	borderEnabled = true,
 	borderTexture = "",
 	borderColor = { r = 0.1, g = 0.12, b = 0.14, a = 0.95 },
@@ -1843,45 +1872,111 @@ function DamageMeter:ApplyTooltipFontString(fontString, config)
 	applyCachedFontString(fontString, config.tooltipFontFace, clampNumber(config.tooltipFontSize, 8, 24, DEFAULT_WINDOW.tooltipFontSize), config.tooltipFontOutline, "tooltip")
 end
 
+local function trimTextureInput(value)
+	if type(value) ~= "string" then return "" end
+	return (value:gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
+local function getCustomTextureInfo(value)
+	value = trimTextureInput(value)
+	if value == "" then return nil end
+	local textureID = tonumber(value)
+	if textureID then return "texture", textureID end
+	if _G.C_Texture and _G.C_Texture.GetAtlasInfo and _G.C_Texture.GetAtlasInfo(value) then
+		return "atlas", value
+	end
+	return "texture", value
+end
+
+local function applyTextureOverride(textureObject, textureKind, texture)
+	if textureObject._damageMeterTextureKind == textureKind and textureObject._damageMeterTexture == texture then return end
+	textureObject._damageMeterTextureKind = textureKind
+	textureObject._damageMeterTexture = texture
+	if textureKind == "atlas" then
+		textureObject:SetAtlas(texture)
+	else
+		textureObject:SetTexture(texture)
+		textureObject:SetTexCoord(0, 1, 0, 1)
+	end
+end
+
+local function applyTextureColor(textureObject, r, g, b, a)
+	if textureObject._damageMeterColorR == r
+		and textureObject._damageMeterColorG == g
+		and textureObject._damageMeterColorB == b
+		and textureObject._damageMeterColorA == a then
+		return
+	end
+	textureObject._damageMeterColorR = r
+	textureObject._damageMeterColorG = g
+	textureObject._damageMeterColorB = b
+	textureObject._damageMeterColorA = a
+	textureObject:SetVertexColor(r, g, b, a)
+end
+
 function DamageMeter:ApplyBarBackground(row, config)
-	local texture = resolveMedia("statusbar", config.barBackgroundTexture, "Interface\\Buttons\\WHITE8x8")
+	local textureKind, texture = getCustomTextureInfo(config.barBackgroundUseCustomTexture == true and config.barBackgroundCustomTexture or nil)
+	if not textureKind then
+		textureKind = "texture"
+		texture = resolveMedia("statusbar", config.barBackgroundTexture, "Interface\\Buttons\\WHITE8x8")
+	end
 	local r, g, b, a = colorComponents(config.barBackgroundColor, DEFAULT_WINDOW.barBackgroundColor)
-	if row.background._damageMeterTexture ~= texture then
-		row.background._damageMeterTexture = texture
-		row.background:SetTexture(texture)
-	end
-	if row.background._damageMeterColorR ~= r
-		or row.background._damageMeterColorG ~= g
-		or row.background._damageMeterColorB ~= b
-		or row.background._damageMeterColorA ~= a then
-		row.background._damageMeterColorR = r
-		row.background._damageMeterColorG = g
-		row.background._damageMeterColorB = b
-		row.background._damageMeterColorA = a
-		row.background:SetVertexColor(r, g, b, a)
-	end
+	applyTextureOverride(row.background, textureKind, texture)
+	applyTextureColor(row.background, r, g, b, a)
 end
 
 function DamageMeter:ApplyHeaderBackground(frame, config, showHeader)
 	local enabled = showHeader and config.headerBackgroundEnabled == true
 	setShownIfChanged(frame.headerBackground, enabled)
 	if not enabled then return end
-	local texture = resolveMedia("statusbar", config.headerBackgroundTexture, "Interface\\Buttons\\WHITE8x8")
+	local textureKind, texture = getCustomTextureInfo(config.headerBackgroundUseCustomTexture == true and config.headerBackgroundCustomTexture or nil)
+	if not textureKind then
+		textureKind = "texture"
+		texture = resolveMedia("statusbar", config.headerBackgroundTexture, "Interface\\Buttons\\WHITE8x8")
+	end
 	local r, g, b, a = colorComponents(config.headerBackgroundColor, DEFAULT_WINDOW.headerBackgroundColor)
-	if frame.headerBackground._damageMeterTexture ~= texture then
-		frame.headerBackground._damageMeterTexture = texture
-		frame.headerBackground:SetTexture(texture)
+	applyTextureOverride(frame.headerBackground, textureKind, texture)
+	applyTextureColor(frame.headerBackground, r, g, b, a)
+end
+
+function DamageMeter:ApplyFooterBackground(frame, config, showFooter)
+	local enabled = showFooter and config.footerBackgroundEnabled == true
+	setShownIfChanged(frame.footerBackground, enabled)
+	if not enabled then return end
+	local textureKind, texture = getCustomTextureInfo(config.footerBackgroundUseCustomTexture == true and config.footerBackgroundCustomTexture or nil)
+	if not textureKind then
+		textureKind = "texture"
+		texture = resolveMedia("statusbar", config.footerBackgroundTexture, "Interface\\Buttons\\WHITE8x8")
 	end
-	if frame.headerBackground._damageMeterColorR ~= r
-		or frame.headerBackground._damageMeterColorG ~= g
-		or frame.headerBackground._damageMeterColorB ~= b
-		or frame.headerBackground._damageMeterColorA ~= a then
-		frame.headerBackground._damageMeterColorR = r
-		frame.headerBackground._damageMeterColorG = g
-		frame.headerBackground._damageMeterColorB = b
-		frame.headerBackground._damageMeterColorA = a
-		frame.headerBackground:SetVertexColor(r, g, b, a)
+	local r, g, b, a = colorComponents(config.footerBackgroundColor, DEFAULT_WINDOW.footerBackgroundColor)
+	applyTextureOverride(frame.footerBackground, textureKind, texture)
+	applyTextureColor(frame.footerBackground, r, g, b, a)
+end
+
+function DamageMeter:ApplyWindowBackground(frame, config)
+	local textureKind, texture = getCustomTextureInfo(config.backdropUseCustomTexture == true and config.backdropCustomTexture or nil)
+	if not textureKind then
+		textureKind = "texture"
+		texture = resolveMedia("statusbar", config.backdropTexture, "Interface\\Buttons\\WHITE8x8")
 	end
+	local r, g, b, a = colorComponents(config.backdropColor, DEFAULT_WINDOW.backdropColor)
+	setShownIfChanged(frame.windowBackground, a > 0)
+	applyTextureOverride(frame.windowBackground, textureKind, texture)
+	applyTextureColor(frame.windowBackground, r, g, b, a)
+end
+
+function DamageMeter:ApplyContentBackground(frame, config)
+	local enabled = config.contentBackgroundEnabled == true
+	setShownIfChanged(frame.contentBackground, enabled)
+	if not enabled then return end
+	local textureKind, texture = getCustomTextureInfo(config.contentBackgroundUseCustomTexture == true and config.contentBackgroundCustomTexture or nil)
+	if not textureKind then
+		textureKind = "texture"
+		texture = resolveMedia("statusbar", config.contentBackgroundTexture, "Interface\\Buttons\\WHITE8x8")
+	end
+	local r, g, b, a = colorComponents(config.contentBackgroundColor, DEFAULT_WINDOW.contentBackgroundColor)
+	applyTextureOverride(frame.contentBackground, textureKind, texture)
+	applyTextureColor(frame.contentBackground, r, g, b, a)
 end
 
 function DamageMeter:PositionRowBorder(row, config)
@@ -3222,6 +3317,14 @@ function DamageMeter:EnsureWindow(index)
 	frame:Hide()
 	frame.index = index
 
+	local windowBackground = frame:CreateTexture(nil, "BACKGROUND")
+	windowBackground:Hide()
+	frame.windowBackground = windowBackground
+
+	local contentBackground = frame:CreateTexture(nil, "BACKGROUND")
+	contentBackground:Hide()
+	frame.contentBackground = contentBackground
+
 	local headerBackground = frame:CreateTexture(nil, "ARTWORK")
 	headerBackground:Hide()
 	frame.headerBackground = headerBackground
@@ -3272,7 +3375,7 @@ function DamageMeter:EnsureWindow(index)
 
 	local empty = frame:CreateFontString(nil, "OVERLAY", "GameFontDisable")
 	empty:SetPoint("CENTER", rowsViewport, "CENTER", 0, 0)
-	empty:SetText(L["damageMeterNoData"] or "No damage data")
+	empty:SetText(L["damageMeterNoData"] or "No data")
 	frame.empty = empty
 
 	local status = CreateFrame("Button", nil, frame)
@@ -3285,6 +3388,7 @@ function DamageMeter:EnsureWindow(index)
 			DamageMeter:OpenContextMenu(owner, index)
 			return
 		end
+		if DamageMeter:GetConfig(index).showFooterQuickSwitch == false then return end
 		if button == "MiddleButton" then
 			local currentSessionType = DamageMeter:GetEffectiveSessionType(index) or DamageMeter:GetConfig(index).sessionType
 			DamageMeter:SetTemporarySessionType(index, currentSessionType == "overall" and "current" or "overall")
@@ -3293,9 +3397,15 @@ function DamageMeter:EnsureWindow(index)
 		DamageMeter:CycleQuickDamageMeterType(index, 1)
 	end)
 	status:SetScript("OnMouseWheel", function(_, delta)
+		if DamageMeter:GetConfig(index).showFooterQuickSwitch == false then return end
 		DamageMeter:CycleQuickDamageMeterType(index, delta and delta < 0 and -1 or 1)
 	end)
 	status:EnableMouseWheel(true)
+	local footerBackground = status:CreateTexture(nil, "ARTWORK")
+	footerBackground:SetAllPoints()
+	footerBackground:Hide()
+	status.background = footerBackground
+	frame.footerBackground = footerBackground
 	status.text = status:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	status.text:SetAllPoints()
 	status.text:SetJustifyH("CENTER")
@@ -3388,6 +3498,14 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 	local backdropR, backdropG, backdropB, backdropA = colorComponents(config.backdropColor, DEFAULT_WINDOW.backdropColor)
 	local borderR, borderG, borderB, borderA = colorComponents(config.borderColor, DEFAULT_WINDOW.borderColor)
 	local titleR, titleG, titleB, titleA = colorComponents(config.titleColor, DEFAULT_WINDOW.titleColor)
+	local backdropOffsetX = clampNumber(config.backdropOffsetX, -200, 200, DEFAULT_WINDOW.backdropOffsetX)
+	local backdropOffsetY = clampNumber(config.backdropOffsetY, -200, 200, DEFAULT_WINDOW.backdropOffsetY)
+	local backdropSizeOffsetX = clampNumber(config.backdropSizeOffsetX, -200, 200, DEFAULT_WINDOW.backdropSizeOffsetX)
+	local backdropSizeOffsetY = clampNumber(config.backdropSizeOffsetY, -200, 200, DEFAULT_WINDOW.backdropSizeOffsetY)
+	local contentBackgroundOffsetX = clampNumber(config.contentBackgroundOffsetX, -200, 200, DEFAULT_WINDOW.contentBackgroundOffsetX)
+	local contentBackgroundOffsetY = clampNumber(config.contentBackgroundOffsetY, -200, 200, DEFAULT_WINDOW.contentBackgroundOffsetY)
+	local contentBackgroundSizeOffsetX = clampNumber(config.contentBackgroundSizeOffsetX, -200, 200, DEFAULT_WINDOW.contentBackgroundSizeOffsetX)
+	local contentBackgroundSizeOffsetY = clampNumber(config.contentBackgroundSizeOffsetY, -200, 200, DEFAULT_WINDOW.contentBackgroundSizeOffsetY)
 	local headerTextOffsetX = clampNumber(config.headerTextOffsetX, -100, 100, DEFAULT_WINDOW.headerTextOffsetX)
 	local headerTextOffsetY = clampNumber(config.headerTextOffsetY, -100, 100, DEFAULT_WINDOW.headerTextOffsetY)
 	local headerButtonOffsetX = clampNumber(config.headerButtonOffsetX, -100, 100, DEFAULT_WINDOW.headerButtonOffsetX)
@@ -3396,20 +3514,27 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 	local headerBackgroundOffsetY = clampNumber(config.headerBackgroundOffsetY, -200, 200, DEFAULT_WINDOW.headerBackgroundOffsetY)
 	local headerBackgroundSizeOffsetX = clampNumber(config.headerBackgroundSizeOffsetX, -200, 200, DEFAULT_WINDOW.headerBackgroundSizeOffsetX)
 	local headerBackgroundSizeOffsetY = clampNumber(config.headerBackgroundSizeOffsetY, -200, 200, DEFAULT_WINDOW.headerBackgroundSizeOffsetY)
+	local footerBackgroundOffsetX = clampNumber(config.footerBackgroundOffsetX, -200, 200, DEFAULT_WINDOW.footerBackgroundOffsetX)
+	local footerBackgroundOffsetY = clampNumber(config.footerBackgroundOffsetY, -200, 200, DEFAULT_WINDOW.footerBackgroundOffsetY)
+	local footerBackgroundSizeOffsetX = clampNumber(config.footerBackgroundSizeOffsetX, -200, 200, DEFAULT_WINDOW.footerBackgroundSizeOffsetX)
+	local footerBackgroundSizeOffsetY = clampNumber(config.footerBackgroundSizeOffsetY, -200, 200, DEFAULT_WINDOW.footerBackgroundSizeOffsetY)
 	frame.contentRows = contentRows
 
 	local texture = resolveMedia("statusbar", config.texture, DEFAULT_TEXTURE)
-	local backdropTexture = resolveMedia("statusbar", config.backdropTexture, "Interface\\Buttons\\WHITE8x8")
 	frame:SetSize(width, height)
 	self:ApplyWindowAnchor(index)
 	local headerButtonTextInset = self:ApplyHeaderButtons(frame, config, showHeaderButtons)
 	setShownIfChanged(frame.header, showHeader)
 	setShownIfChanged(frame.status, showStatus)
+	frame.status:EnableMouseWheel(showStatus and config.showFooterQuickSwitch ~= false)
 	frame.header:SetHeight(math.max(1, math.min(headerHeight, titleFontSize + 6)))
 	frame.header:ClearAllPoints()
 	frame.headerBackground:ClearAllPoints()
+	frame.windowBackground:ClearAllPoints()
+	frame.contentBackground:ClearAllPoints()
 	frame.headerButtons:ClearAllPoints()
 	frame.status:ClearAllPoints()
+	frame.footerBackground:ClearAllPoints()
 	if headerPosition == "BOTTOM" then
 		frame.headerBackground:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 4 + headerBackgroundOffsetX - headerBackgroundSizeOffsetX, 4 + bottomOffset + headerBackgroundOffsetY - headerBackgroundSizeOffsetY)
 		frame.headerBackground:SetPoint("TOPRIGHT", frame, "BOTTOMRIGHT", -4 + headerBackgroundOffsetX + headerBackgroundSizeOffsetX, 4 + bottomOffset + headerHeight + headerBackgroundOffsetY + headerBackgroundSizeOffsetY)
@@ -3428,7 +3553,17 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 		frame.status:SetPoint("BOTTOMRIGHT", -4, 4 + bottomOffset)
 	end
 	self:ApplyHeaderBackground(frame, config, showHeader)
+	frame.windowBackground:SetPoint("TOPLEFT", frame, "TOPLEFT", backdropOffsetX - backdropSizeOffsetX, backdropOffsetY + backdropSizeOffsetY)
+	frame.windowBackground:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", backdropOffsetX + backdropSizeOffsetX, backdropOffsetY - backdropSizeOffsetY)
+	self:ApplyWindowBackground(frame, config)
+	frame.contentBackground:SetPoint("TOPLEFT", frame.rowsViewport, "TOPLEFT", contentBackgroundOffsetX - contentBackgroundSizeOffsetX, contentBackgroundOffsetY + contentBackgroundSizeOffsetY)
+	frame.contentBackground:SetPoint("BOTTOMRIGHT", frame.rowsViewport, "BOTTOMRIGHT", contentBackgroundOffsetX + contentBackgroundSizeOffsetX, contentBackgroundOffsetY - contentBackgroundSizeOffsetY)
+	self:ApplyContentBackground(frame, config)
+	frame.footerBackground:SetPoint("TOPLEFT", frame.status, "TOPLEFT", footerBackgroundOffsetX - footerBackgroundSizeOffsetX, footerBackgroundOffsetY + footerBackgroundSizeOffsetY)
+	frame.footerBackground:SetPoint("BOTTOMRIGHT", frame.status, "BOTTOMRIGHT", footerBackgroundOffsetX + footerBackgroundSizeOffsetX, footerBackgroundOffsetY - footerBackgroundSizeOffsetY)
+	self:ApplyFooterBackground(frame, config, showStatus)
 
+	local backdropTexture = "Interface\\Buttons\\WHITE8x8"
 	local borderTexture = resolveMedia("border", config.borderTexture, DEFAULT_BORDER)
 	if config.borderEnabled == true then
 		local size = clampNumber(config.borderSize, 1, 32, DEFAULT_WINDOW.borderSize)
@@ -3441,9 +3576,9 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 		})
 		frame:SetBackdropBorderColor(borderR, borderG, borderB, borderA)
 	else
-		frame:SetBackdrop({ bgFile = backdropTexture })
+		frame:SetBackdrop(nil)
 	end
-	frame:SetBackdropColor(backdropR, backdropG, backdropB, backdropA)
+	frame:SetBackdropColor(backdropR, backdropG, backdropB, 0)
 
 	frame.status:SetHeight(math.max(1, statusHeight))
 
@@ -3508,6 +3643,7 @@ function DamageMeter:UpdateHeader(index, session, state)
 	local config = state.config
 	local showHeader = config.showHeader == true
 	local showStatus = config.showStatus ~= false
+	local showFooterQuickSwitch = showStatus and config.showFooterQuickSwitch ~= false
 	if not showHeader and not showStatus then return end
 	local sessionLabel
 	if state.sessionID then
@@ -3529,11 +3665,12 @@ function DamageMeter:UpdateHeader(index, session, state)
 		end
 	end
 	local formatMode = normalizeHeaderFormat(config.headerFormat)
-	local quickTypeLabels = showStatus and self:GetQuickDamageMeterTypeLabels(index, typeLabel) or nil
+	local quickTypeLabels = showFooterQuickSwitch and self:GetQuickDamageMeterTypeLabels(index, typeLabel) or nil
 	local styleVersion = self:GetWindowStyleVersion(index)
 	if frame._damageMeterHeaderStyleVersion == styleVersion
 		and frame._damageMeterHeaderShowHeader == showHeader
 		and frame._damageMeterHeaderShowStatus == showStatus
+		and frame._damageMeterHeaderShowFooterQuickSwitch == showFooterQuickSwitch
 		and frame._damageMeterHeaderShowSession == (config.showHeaderSession ~= false)
 		and frame._damageMeterHeaderShowType == (config.showHeaderType ~= false)
 		and frame._damageMeterHeaderShowTime == showHeaderTime
@@ -3548,6 +3685,7 @@ function DamageMeter:UpdateHeader(index, session, state)
 	frame._damageMeterHeaderStyleVersion = styleVersion
 	frame._damageMeterHeaderShowHeader = showHeader
 	frame._damageMeterHeaderShowStatus = showStatus
+	frame._damageMeterHeaderShowFooterQuickSwitch = showFooterQuickSwitch
 	frame._damageMeterHeaderShowSession = config.showHeaderSession ~= false
 	frame._damageMeterHeaderShowType = config.showHeaderType ~= false
 	frame._damageMeterHeaderShowTime = showHeaderTime
@@ -3578,7 +3716,7 @@ function DamageMeter:UpdateHeader(index, session, state)
 		setPlainTextIfChanged(frame.header, headerText)
 	end
 	if showStatus then
-		setPlainTextIfChanged(frame.status.text, string.format("%s: %s  |  %s", L["damageMeterQuickSwitch"] or "Quick switch", sessionLabel, quickTypeLabels))
+		setPlainTextIfChanged(frame.status.text, showFooterQuickSwitch and string.format("%s  |  %s", sessionLabel, quickTypeLabels) or "")
 	end
 end
 
@@ -4341,6 +4479,19 @@ local function checkboxSetting(name, getter, setter, parentId, isEnabled, toolti
 	}
 end
 
+local function inputSetting(name, getter, setter, parentId, isEnabled, tooltip, maxChars)
+	return {
+		name = name,
+		kind = SettingType.Input,
+		parentId = parentId,
+		isEnabled = isEnabled,
+		tooltip = tooltip,
+		maxChars = maxChars or 128,
+		get = getter,
+		set = function(_, value) setter(value) end,
+	}
+end
+
 local function colorSetting(name, getter, setter, default, parentId, isEnabled)
 	return {
 		name = name,
@@ -4510,10 +4661,12 @@ function DamageMeter:BuildWindowSettings(index)
 	local function headerEnabled() return cfg().showHeader == true end
 	local function headerTimeEnabled() return cfg().showHeader == true and cfg().showHeaderTime ~= false end
 	local function statusEnabled() return cfg().showStatus ~= false end
+	local function footerBackgroundEnabled() return cfg().showStatus ~= false and cfg().footerBackgroundEnabled == true end
 	local function namesEnabled() return cfg().showNames == true end
 	local function fixedNameColorEnabled() return cfg().showNames == true and cfg().nameUseClassColors ~= true end
 	local function tooltipEnabled() return cfg().tooltipEnabled == true end
 	local function headerBackgroundEnabled() return cfg().showHeader == true and cfg().headerBackgroundEnabled == true end
+	local function contentBackgroundEnabled() return cfg().contentBackgroundEnabled == true end
 	local function customBarSizeEnabled() return cfg().changeBarSize == true end
 	local function rowBorderEnabled() return cfg().rowBorderEnabled == true end
 	local function fixedRowBorderColorEnabled() return cfg().rowBorderEnabled == true and cfg().rowBorderUseClassColor ~= true end
@@ -4536,6 +4689,7 @@ function DamageMeter:BuildWindowSettings(index)
 	local behaviorId = "damageMeterBehavior" .. index
 	local layoutId = "damageMeterLayout" .. index
 	local headerId = "damageMeterHeader" .. index
+	local contentBackgroundId = "damageMeterContentBackground" .. index
 	local statusId = "damageMeterStatus" .. index
 	local barId = "damageMeterBar" .. index
 	local iconId = "damageMeterIcon" .. index
@@ -4620,7 +4774,12 @@ function DamageMeter:BuildWindowSettings(index)
 			self:SetConfigValue(index, "headerBackgroundEnabled", value)
 			requestEditModeSettingsRefresh()
 		end, headerId, headerEnabled),
-		dropdownSetting(L["damageMeterHeaderBackgroundTexture"] or "Header background texture", function() return cfg().headerBackgroundTexture end, function(value) self:SetConfigValue(index, "headerBackgroundTexture", value) end, buildMediaOptions("statusbar", false), headerId, 260, headerBackgroundEnabled),
+		checkboxSetting(L["damageMeterHeaderBackgroundUseCustomTexture"] or "Custom texture", function() return cfg().headerBackgroundUseCustomTexture == true end, function(value)
+			self:SetConfigValue(index, "headerBackgroundUseCustomTexture", value)
+			requestEditModeSettingsRefresh()
+		end, headerId, headerBackgroundEnabled),
+		inputSetting(L["damageMeterHeaderBackgroundCustomTexture"] or "Atlas name or texture ID", function() return cfg().headerBackgroundCustomTexture or "" end, function(value) self:SetConfigValue(index, "headerBackgroundCustomTexture", trimTextureInput(value)) end, headerId, function() return headerBackgroundEnabled() and cfg().headerBackgroundUseCustomTexture == true end, L["damageMeterHeaderBackgroundCustomTextureDesc"] or "Enter an atlas name, texture file ID, or texture path.", 160),
+		dropdownSetting(L["damageMeterHeaderBackgroundTexture"] or "Header background texture", function() return cfg().headerBackgroundTexture end, function(value) self:SetConfigValue(index, "headerBackgroundTexture", value) end, buildMediaOptions("statusbar", false), headerId, 260, function() return headerBackgroundEnabled() and cfg().headerBackgroundUseCustomTexture ~= true end),
 		colorSetting(L["damageMeterHeaderBackgroundColor"] or "Header background color", function() return normalizeColor(cfg().headerBackgroundColor, DEFAULT_WINDOW.headerBackgroundColor) end, function(value) self:SetConfigValue(index, "headerBackgroundColor", normalizeColor(value, DEFAULT_WINDOW.headerBackgroundColor)) end, DEFAULT_WINDOW.headerBackgroundColor, headerId, headerBackgroundEnabled),
 		sliderSetting(L["damageMeterHeaderBackgroundOffsetX"] or "X offset", function() return cfg().headerBackgroundOffsetX end, function(value) self:SetConfigValue(index, "headerBackgroundOffsetX", clampNumber(value, -200, 200, DEFAULT_WINDOW.headerBackgroundOffsetX)) end, -200, 200, 1, headerId, headerBackgroundEnabled),
 		sliderSetting(L["damageMeterHeaderBackgroundOffsetY"] or "Y offset", function() return cfg().headerBackgroundOffsetY end, function(value) self:SetConfigValue(index, "headerBackgroundOffsetY", clampNumber(value, -200, 200, DEFAULT_WINDOW.headerBackgroundOffsetY)) end, -200, 200, 1, headerId, headerBackgroundEnabled),
@@ -4636,11 +4795,47 @@ function DamageMeter:BuildWindowSettings(index)
 		colorSetting(L["damageMeterHeaderColor"] or "Header color", function() return normalizeColor(cfg().titleColor, DEFAULT_WINDOW.titleColor) end, function(value) self:SetConfigValue(index, "titleColor", normalizeColor(value, DEFAULT_WINDOW.titleColor)) end, DEFAULT_WINDOW.titleColor, headerId, headerEnabled),
 		sliderSetting(L["damageMeterHeaderTextOffsetX"] or "Header text X offset", function() return cfg().headerTextOffsetX end, function(value) self:SetConfigValue(index, "headerTextOffsetX", clampNumber(value, -100, 100, DEFAULT_WINDOW.headerTextOffsetX)) end, -100, 100, 1, headerId, headerEnabled),
 		sliderSetting(L["damageMeterHeaderTextOffsetY"] or "Header text Y offset", function() return cfg().headerTextOffsetY end, function(value) self:SetConfigValue(index, "headerTextOffsetY", clampNumber(value, -100, 100, DEFAULT_WINDOW.headerTextOffsetY)) end, -100, 100, 1, headerId, headerEnabled),
-		{ name = L["damageMeterQuickSwitch"] or "Quick switch", kind = SettingType.Collapsible, id = statusId, defaultCollapsed = true },
-		checkboxSetting(L["damageMeterShowStatus"] or "Show quick switch", function() return cfg().showStatus ~= false end, function(value) self:SetConfigValue(index, "showStatus", value) end, statusId),
-		dropdownSetting(L["damageMeterStatusFont"] or "Quick switch font", function() return cfg().statusFontFace end, function(value) self:SetConfigValue(index, "statusFontFace", value) end, buildMediaOptions("font", true), statusId, 260, statusEnabled),
-		dropdownSetting(L["damageMeterStatusFontOutline"] or "Quick switch font outline", function() return cfg().statusFontOutline end, function(value) self:SetConfigValue(index, "statusFontOutline", normalizeStyle(value)) end, buildStyleOptions(), statusId, 180, statusEnabled),
-		sliderSetting(L["damageMeterStatusFontSize"] or "Quick switch font size", function() return cfg().statusFontSize end, function(value) self:SetConfigValue(index, "statusFontSize", clampNumber(value, 8, 24, DEFAULT_WINDOW.statusFontSize)) end, 8, 24, 1, statusId, statusEnabled),
+		{ name = L["damageMeterContentBackground"] or "Content background", kind = SettingType.Collapsible, id = contentBackgroundId, defaultCollapsed = true },
+		checkboxSetting(L["damageMeterContentBackground"] or "Content background", function() return cfg().contentBackgroundEnabled == true end, function(value)
+			self:SetConfigValue(index, "contentBackgroundEnabled", value)
+			requestEditModeSettingsRefresh()
+		end, contentBackgroundId),
+		checkboxSetting(L["damageMeterContentBackgroundUseCustomTexture"] or "Custom texture", function() return cfg().contentBackgroundUseCustomTexture == true end, function(value)
+			self:SetConfigValue(index, "contentBackgroundUseCustomTexture", value)
+			requestEditModeSettingsRefresh()
+		end, contentBackgroundId, contentBackgroundEnabled),
+		inputSetting(L["damageMeterContentBackgroundCustomTexture"] or "Atlas name or texture ID", function() return cfg().contentBackgroundCustomTexture or "" end, function(value) self:SetConfigValue(index, "contentBackgroundCustomTexture", trimTextureInput(value)) end, contentBackgroundId, function() return contentBackgroundEnabled() and cfg().contentBackgroundUseCustomTexture == true end, L["damageMeterHeaderBackgroundCustomTextureDesc"] or "Enter an atlas name, texture file ID, or texture path.", 160),
+		dropdownSetting(L["damageMeterContentBackgroundTexture"] or "Texture", function() return cfg().contentBackgroundTexture end, function(value) self:SetConfigValue(index, "contentBackgroundTexture", value) end, buildMediaOptions("statusbar", false), contentBackgroundId, 260, function() return contentBackgroundEnabled() and cfg().contentBackgroundUseCustomTexture ~= true end),
+		colorSetting(L["damageMeterContentBackgroundColor"] or "Color", function() return normalizeColor(cfg().contentBackgroundColor, DEFAULT_WINDOW.contentBackgroundColor) end, function(value) self:SetConfigValue(index, "contentBackgroundColor", normalizeColor(value, DEFAULT_WINDOW.contentBackgroundColor)) end, DEFAULT_WINDOW.contentBackgroundColor, contentBackgroundId, contentBackgroundEnabled),
+		sliderSetting(L["damageMeterContentBackgroundOffsetX"] or "X offset", function() return cfg().contentBackgroundOffsetX end, function(value) self:SetConfigValue(index, "contentBackgroundOffsetX", clampNumber(value, -200, 200, DEFAULT_WINDOW.contentBackgroundOffsetX)) end, -200, 200, 1, contentBackgroundId, contentBackgroundEnabled),
+		sliderSetting(L["damageMeterContentBackgroundOffsetY"] or "Y offset", function() return cfg().contentBackgroundOffsetY end, function(value) self:SetConfigValue(index, "contentBackgroundOffsetY", clampNumber(value, -200, 200, DEFAULT_WINDOW.contentBackgroundOffsetY)) end, -200, 200, 1, contentBackgroundId, contentBackgroundEnabled),
+		sliderSetting(L["damageMeterContentBackgroundSizeOffsetX"] or "Width offset", function() return cfg().contentBackgroundSizeOffsetX end, function(value) self:SetConfigValue(index, "contentBackgroundSizeOffsetX", clampNumber(value, -200, 200, DEFAULT_WINDOW.contentBackgroundSizeOffsetX)) end, -200, 200, 1, contentBackgroundId, contentBackgroundEnabled),
+		sliderSetting(L["damageMeterContentBackgroundSizeOffsetY"] or "Height offset", function() return cfg().contentBackgroundSizeOffsetY end, function(value) self:SetConfigValue(index, "contentBackgroundSizeOffsetY", clampNumber(value, -200, 200, DEFAULT_WINDOW.contentBackgroundSizeOffsetY)) end, -200, 200, 1, contentBackgroundId, contentBackgroundEnabled),
+		{ name = L["damageMeterFooter"] or "Footer", kind = SettingType.Collapsible, id = statusId, defaultCollapsed = true },
+		checkboxSetting(L["damageMeterShowFooter"] or "Show footer", function() return cfg().showStatus ~= false end, function(value)
+			self:SetConfigValue(index, "showStatus", value)
+			requestEditModeSettingsRefresh()
+		end, statusId),
+		checkboxSetting(L["damageMeterShowFooterQuickSwitch"] or "Show quick switch", function() return cfg().showFooterQuickSwitch ~= false end, function(value) self:SetConfigValue(index, "showFooterQuickSwitch", value) end, statusId, statusEnabled),
+		dropdownSetting(L["damageMeterFooterFont"] or "Footer font", function() return cfg().statusFontFace end, function(value) self:SetConfigValue(index, "statusFontFace", value) end, buildMediaOptions("font", true), statusId, 260, statusEnabled),
+		dropdownSetting(L["damageMeterFooterFontOutline"] or "Footer font outline", function() return cfg().statusFontOutline end, function(value) self:SetConfigValue(index, "statusFontOutline", normalizeStyle(value)) end, buildStyleOptions(), statusId, 180, statusEnabled),
+		sliderSetting(L["damageMeterFooterFontSize"] or "Footer font size", function() return cfg().statusFontSize end, function(value) self:SetConfigValue(index, "statusFontSize", clampNumber(value, 8, 24, DEFAULT_WINDOW.statusFontSize)) end, 8, 24, 1, statusId, statusEnabled),
+		dividerSetting(statusId),
+		checkboxSetting(L["damageMeterFooterBackground"] or "Footer background", function() return cfg().footerBackgroundEnabled == true end, function(value)
+			self:SetConfigValue(index, "footerBackgroundEnabled", value)
+			requestEditModeSettingsRefresh()
+		end, statusId, statusEnabled),
+		checkboxSetting(L["damageMeterFooterBackgroundUseCustomTexture"] or "Custom texture", function() return cfg().footerBackgroundUseCustomTexture == true end, function(value)
+			self:SetConfigValue(index, "footerBackgroundUseCustomTexture", value)
+			requestEditModeSettingsRefresh()
+		end, statusId, footerBackgroundEnabled),
+		inputSetting(L["damageMeterFooterBackgroundCustomTexture"] or "Atlas name or texture ID", function() return cfg().footerBackgroundCustomTexture or "" end, function(value) self:SetConfigValue(index, "footerBackgroundCustomTexture", trimTextureInput(value)) end, statusId, function() return footerBackgroundEnabled() and cfg().footerBackgroundUseCustomTexture == true end, L["damageMeterHeaderBackgroundCustomTextureDesc"] or "Enter an atlas name, texture file ID, or texture path.", 160),
+		dropdownSetting(L["damageMeterFooterBackgroundTexture"] or "Texture", function() return cfg().footerBackgroundTexture end, function(value) self:SetConfigValue(index, "footerBackgroundTexture", value) end, buildMediaOptions("statusbar", false), statusId, 260, function() return footerBackgroundEnabled() and cfg().footerBackgroundUseCustomTexture ~= true end),
+		colorSetting(L["damageMeterFooterBackgroundColor"] or "Color", function() return normalizeColor(cfg().footerBackgroundColor, DEFAULT_WINDOW.footerBackgroundColor) end, function(value) self:SetConfigValue(index, "footerBackgroundColor", normalizeColor(value, DEFAULT_WINDOW.footerBackgroundColor)) end, DEFAULT_WINDOW.footerBackgroundColor, statusId, footerBackgroundEnabled),
+		sliderSetting(L["damageMeterFooterBackgroundOffsetX"] or "X offset", function() return cfg().footerBackgroundOffsetX end, function(value) self:SetConfigValue(index, "footerBackgroundOffsetX", clampNumber(value, -200, 200, DEFAULT_WINDOW.footerBackgroundOffsetX)) end, -200, 200, 1, statusId, footerBackgroundEnabled),
+		sliderSetting(L["damageMeterFooterBackgroundOffsetY"] or "Y offset", function() return cfg().footerBackgroundOffsetY end, function(value) self:SetConfigValue(index, "footerBackgroundOffsetY", clampNumber(value, -200, 200, DEFAULT_WINDOW.footerBackgroundOffsetY)) end, -200, 200, 1, statusId, footerBackgroundEnabled),
+		sliderSetting(L["damageMeterFooterBackgroundSizeOffsetX"] or "Width offset", function() return cfg().footerBackgroundSizeOffsetX end, function(value) self:SetConfigValue(index, "footerBackgroundSizeOffsetX", clampNumber(value, -200, 200, DEFAULT_WINDOW.footerBackgroundSizeOffsetX)) end, -200, 200, 1, statusId, footerBackgroundEnabled),
+		sliderSetting(L["damageMeterFooterBackgroundSizeOffsetY"] or "Height offset", function() return cfg().footerBackgroundSizeOffsetY end, function(value) self:SetConfigValue(index, "footerBackgroundSizeOffsetY", clampNumber(value, -200, 200, DEFAULT_WINDOW.footerBackgroundSizeOffsetY)) end, -200, 200, 1, statusId, footerBackgroundEnabled),
 		{ name = L["Bar"] or "Bar", kind = SettingType.Collapsible, id = barId, defaultCollapsed = true },
 		sliderSetting(L["damageMeterRowHeight"] or "Row height", function() return cfg().rowHeight end, function(value) self:SetConfigValue(index, "rowHeight", clampNumber(value, 10, 70, DEFAULT_WINDOW.rowHeight)) end, 10, 70, 1, barId),
 		dividerSetting(barId),
@@ -4653,7 +4848,12 @@ function DamageMeter:BuildWindowSettings(index)
 		dropdownSetting(L["Texture"] or "Texture", function() return cfg().texture end, function(value) self:SetConfigValue(index, "texture", value) end, buildMediaOptions("statusbar", false), barId, 260),
 		checkboxSetting(L["damageMeterUseClassColors"] or "Use class colors", function() return cfg().useClassColors == true end, function(value) self:SetConfigValue(index, "useClassColors", value) end, barId),
 		checkboxSetting(L["damageMeterSmoothBars"] or "Smooth bars", function() return cfg().smoothBars == true end, function(value) self:SetConfigValue(index, "smoothBars", value) end, barId),
-		dropdownSetting(L["damageMeterBarBackgroundTexture"] or "Background texture", function() return cfg().barBackgroundTexture end, function(value) self:SetConfigValue(index, "barBackgroundTexture", value) end, buildMediaOptions("statusbar", false), barId, 260),
+		checkboxSetting(L["damageMeterBarBackgroundUseCustomTexture"] or "Custom background texture", function() return cfg().barBackgroundUseCustomTexture == true end, function(value)
+			self:SetConfigValue(index, "barBackgroundUseCustomTexture", value)
+			requestEditModeSettingsRefresh()
+		end, barId),
+		inputSetting(L["damageMeterBarBackgroundCustomTexture"] or "Atlas name or texture ID", function() return cfg().barBackgroundCustomTexture or "" end, function(value) self:SetConfigValue(index, "barBackgroundCustomTexture", trimTextureInput(value)) end, barId, function() return cfg().barBackgroundUseCustomTexture == true end, L["damageMeterHeaderBackgroundCustomTextureDesc"] or "Enter an atlas name, texture file ID, or texture path.", 160),
+		dropdownSetting(L["damageMeterBarBackgroundTexture"] or "Background texture", function() return cfg().barBackgroundTexture end, function(value) self:SetConfigValue(index, "barBackgroundTexture", value) end, buildMediaOptions("statusbar", false), barId, 260, function() return cfg().barBackgroundUseCustomTexture ~= true end),
 		colorSetting(L["damageMeterBarBackgroundColor"] or "Background color", function() return normalizeColor(cfg().barBackgroundColor, DEFAULT_WINDOW.barBackgroundColor) end, function(value) self:SetConfigValue(index, "barBackgroundColor", normalizeColor(value, DEFAULT_WINDOW.barBackgroundColor)) end, DEFAULT_WINDOW.barBackgroundColor, barId),
 		dividerSetting(barId),
 		checkboxSetting(L["damageMeterRowBorder"] or "Row border", function() return cfg().rowBorderEnabled == true end, function(value)
@@ -4796,8 +4996,17 @@ function DamageMeter:BuildWindowSettings(index)
 		sliderSetting(L["damageMeterRankFontSize"] or "Rank font size", function() return cfg().rankFontSize end, function(value) self:SetConfigValue(index, "rankFontSize", clampNumber(value, 8, 24, DEFAULT_WINDOW.rankFontSize)) end, 8, 24, 1, rankingId, rankColumnEnabled),
 		sliderSetting(L["damageMeterRankGap"] or "Rank gap", function() return cfg().rankGap end, function(value) self:SetConfigValue(index, "rankGap", clampNumber(value, 0, 24, DEFAULT_WINDOW.rankGap)) end, 0, 24, 1, rankingId, rankingEnabled),
 		{ name = L["Background"] or "Backdrop", kind = SettingType.Collapsible, id = mediaId, defaultCollapsed = true },
-		dropdownSetting(L["Backdrop texture"] or "Backdrop texture", function() return cfg().backdropTexture end, function(value) self:SetConfigValue(index, "backdropTexture", value) end, buildMediaOptions("statusbar", false), mediaId, 260),
+		checkboxSetting(L["damageMeterBackdropUseCustomTexture"] or "Custom texture", function() return cfg().backdropUseCustomTexture == true end, function(value)
+			self:SetConfigValue(index, "backdropUseCustomTexture", value)
+			requestEditModeSettingsRefresh()
+		end, mediaId),
+		inputSetting(L["damageMeterBackdropCustomTexture"] or "Atlas name or texture ID", function() return cfg().backdropCustomTexture or "" end, function(value) self:SetConfigValue(index, "backdropCustomTexture", trimTextureInput(value)) end, mediaId, function() return cfg().backdropUseCustomTexture == true end, L["damageMeterHeaderBackgroundCustomTextureDesc"] or "Enter an atlas name, texture file ID, or texture path.", 160),
+		dropdownSetting(L["Backdrop texture"] or "Backdrop texture", function() return cfg().backdropTexture end, function(value) self:SetConfigValue(index, "backdropTexture", value) end, buildMediaOptions("statusbar", false), mediaId, 260, function() return cfg().backdropUseCustomTexture ~= true end),
 		colorSetting(L["Background color"] or "Background color", function() return normalizeColor(cfg().backdropColor, DEFAULT_WINDOW.backdropColor) end, function(value) self:SetConfigValue(index, "backdropColor", normalizeColor(value, DEFAULT_WINDOW.backdropColor)) end, DEFAULT_WINDOW.backdropColor, mediaId),
+		sliderSetting(L["damageMeterBackdropOffsetX"] or "X offset", function() return cfg().backdropOffsetX end, function(value) self:SetConfigValue(index, "backdropOffsetX", clampNumber(value, -200, 200, DEFAULT_WINDOW.backdropOffsetX)) end, -200, 200, 1, mediaId),
+		sliderSetting(L["damageMeterBackdropOffsetY"] or "Y offset", function() return cfg().backdropOffsetY end, function(value) self:SetConfigValue(index, "backdropOffsetY", clampNumber(value, -200, 200, DEFAULT_WINDOW.backdropOffsetY)) end, -200, 200, 1, mediaId),
+		sliderSetting(L["damageMeterBackdropSizeOffsetX"] or "Width offset", function() return cfg().backdropSizeOffsetX end, function(value) self:SetConfigValue(index, "backdropSizeOffsetX", clampNumber(value, -200, 200, DEFAULT_WINDOW.backdropSizeOffsetX)) end, -200, 200, 1, mediaId),
+		sliderSetting(L["damageMeterBackdropSizeOffsetY"] or "Height offset", function() return cfg().backdropSizeOffsetY end, function(value) self:SetConfigValue(index, "backdropSizeOffsetY", clampNumber(value, -200, 200, DEFAULT_WINDOW.backdropSizeOffsetY)) end, -200, 200, 1, mediaId),
 		{ name = L["Border"] or "Border", kind = SettingType.Collapsible, id = borderId, defaultCollapsed = true },
 		checkboxSetting(L["Use border"] or "Use border", function() return cfg().borderEnabled == true end, function(value) self:SetConfigValue(index, "borderEnabled", value) end, borderId),
 		dropdownSetting(L["Border texture"] or "Border texture", function() return cfg().borderTexture end, function(value) self:SetConfigValue(index, "borderTexture", value) end, buildMediaOptions("border", false), borderId, 260, windowBorderEnabled),
@@ -4842,7 +5051,7 @@ function DamageMeter:RegisterEditMode()
 			showSettingsReset = false,
 			enableOverlayToggle = true,
 			collapseExclusive = true,
-			settingsMaxHeight = 520,
+			settingsMaxHeight = 700,
 		})
 	end
 	self.editModeRegistered = true
