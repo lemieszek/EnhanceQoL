@@ -2,6 +2,14 @@
 
 <!--@eqol-beta@-->
 
+## [10.21.0-beta6] - 2026-05-26
+
+### ✨ Added
+
+- Damage Meter / Visibility: Added an out-of-combat visibility mode so windows can hide during combat and return after combat ends.
+
+---
+
 ## [10.21.0-beta5] - 2026-05-26
 
 ### ✨ Added

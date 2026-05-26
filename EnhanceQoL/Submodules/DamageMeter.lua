@@ -1329,6 +1329,7 @@ function DamageMeter:ShouldShow(index)
 	if not self:IsAvailable() then return false end
 	local visibility = self:GetConfig(index).visibility
 	if visibility == "combat" then return UnitAffectingCombat("player") == true end
+	if visibility == "outOfCombat" then return UnitAffectingCombat("player") ~= true end
 	return true
 end
 
@@ -1371,6 +1372,8 @@ function DamageMeter:BuildWindowRefreshState(index, shared)
 		visible = shared.available == true
 		if visible and config.visibility == "combat" then
 			visible = UnitAffectingCombat("player") == true
+		elseif visible and config.visibility == "outOfCombat" then
+			visible = UnitAffectingCombat("player") ~= true
 		end
 	end
 	state.available = shared.available
@@ -4195,9 +4198,15 @@ function DamageMeter:BuildWindowSettings(index)
 			{ value = "overall", label = L["damageMeterOverall"] or "Overall" },
 		}, behaviorId, 110),
 		dropdownSetting(_G.TYPE or "Type", function() return normalizeDamageMeterTypeKey(cfg().damageMeterType) end, function(value) self:SetConfigValue(index, "damageMeterType", normalizeDamageMeterTypeKey(value)) end, buildDamageMeterTypeOptions, behaviorId, 180),
-		dropdownSetting(L["damageMeterVisibility"] or "Show when", function() return cfg().visibility == "combat" and "combat" or "always" end, function(value) self:SetConfigValue(index, "visibility", value == "combat" and "combat" or "always") end, {
+		dropdownSetting(L["damageMeterVisibility"] or "Show when", function()
+			local visibility = cfg().visibility
+			return (visibility == "combat" or visibility == "outOfCombat") and visibility or "always"
+		end, function(value)
+			self:SetConfigValue(index, "visibility", (value == "combat" or value == "outOfCombat") and value or "always")
+		end, {
 			{ value = "always", label = L["Always show"] or "Always show" },
 			{ value = "combat", label = L["Always in combat"] or "Always in combat" },
+			{ value = "outOfCombat", label = L["Always out of combat"] or "Always out of combat" },
 		}, behaviorId, 120),
 		{ name = L["Layout"] or "Layout", kind = SettingType.Collapsible, id = layoutId, defaultCollapsed = false },
 		sliderSetting(L["damageMeterMaxRows"] or "Max rows", function() return cfg().maxRows end, function(value) self:SetConfigValue(index, "maxRows", clampNumber(value, 1, 30, DEFAULT_WINDOW.maxRows)) end, 1, 30, 1, layoutId),
