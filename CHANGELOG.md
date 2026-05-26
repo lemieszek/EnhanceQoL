@@ -9,6 +9,7 @@
 - Damage Meter / Profiles: Added a dedicated Damage Meter profile export/import section so players can share or restore only Damage Meter configuration without replacing the rest of the active profile.
 - Damage Meter / Header: Added separate X/Y offsets for header text and header buttons, plus button color, opacity, and optional faded inactive opacity controls.
 - Damage Meter / Rows: Added an option to hide row icons completely.
+- Damage Meter / Styling: Added custom color and class-color options for prefix ranks and tooltip bars, plus tooltip font, outline, and border offset controls.
 - Damage Meter / Values: Added a value display selector for automatic, total and rate, total only, or rate only display.
 
 ### 🔄 Changed
@@ -24,6 +25,7 @@
 - Damage Meter / Rows: Improved name/value text layout so value text keeps priority and names shorten first in narrow windows.
 - Damage Meter / Rows: Improved realm hiding by using Blizzard's short name ambiguity handling for Damage Meter source names.
 - Damage Meter / Rows: Restored rank visibility for restricted rows when rank-prefix mode cannot safely prefix a secret name.
+- Damage Meter / Rows: Fixed newly created rows applying stale text anchors until Edit Mode was opened.
 - Damage Meter / Ranking: Fixed narrow rank columns abbreviating visible ranks with ellipses.
 
 ---

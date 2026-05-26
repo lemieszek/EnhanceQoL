@@ -121,6 +121,8 @@ local DEFAULT_WINDOW = {
 	showIcons = true,
 	showRanks = true,
 	prefixRankInName = true,
+	prefixRankUseClassColors = false,
+	prefixRankColor = { r = 1, g = 1, b = 1, a = 1 },
 	rankGap = 2,
 	rankFontFace = GLOBAL_FONT_KEY,
 	rankFontOutline = GLOBAL_STYLE_KEY,
@@ -169,6 +171,8 @@ local DEFAULT_WINDOW = {
 	tooltipAnchor = "RIGHT",
 	tooltipOffsetX = 8,
 	tooltipOffsetY = 0,
+	tooltipFontFace = GLOBAL_FONT_KEY,
+	tooltipFontOutline = GLOBAL_STYLE_KEY,
 	tooltipFontSize = 11,
 	tooltipMaxLines = 12,
 	tooltipShowTargets = true,
@@ -176,9 +180,11 @@ local DEFAULT_WINDOW = {
 	tooltipBackdropTexture = "",
 	tooltipBorderTexture = "",
 	tooltipBorderSize = 1,
+	tooltipBorderInset = 0,
 	tooltipShowBars = true,
 	tooltipBarTexture = "",
 	tooltipBarColor = { r = 0.1, g = 0.42, b = 0.78, a = 0.5 },
+	tooltipBarUseClassColor = false,
 	tooltipShowAmount = true,
 	tooltipShowDPS = true,
 	tooltipShowPercent = true,
@@ -699,14 +705,9 @@ local function formatSourceName(value, config)
 	return value
 end
 
-local function formatDisplayName(source, rowIndex, config, forceRankColumn)
+local function formatDisplayName(source, config)
 	local name = formatSourceName(source and source.name, config)
 	if isSecret(name) then return name end
-	if config.showRanks ~= false and config.prefixRankInName == true and forceRankColumn ~= true then
-		local gap = clampNumber(config.rankGap, 0, 24, DEFAULT_WINDOW.rankGap)
-		local spaces = string.rep(" ", math.ceil(gap / 4))
-		return string.format("%d.%s%s", rowIndex, spaces, name)
-	end
 	return name
 end
 
@@ -924,23 +925,31 @@ local function getIconSize(config)
 	return clampNumber(maxSize + offset, 8, maxSize, maxSize)
 end
 
-local function getEffectiveRankWidth(config, forceRankColumn)
-	if config.showRanks == false or (config.prefixRankInName == true and forceRankColumn ~= true) then return 0 end
-	local rankFontSize = clampNumber(config.rankFontSize, 8, 24, DEFAULT_WINDOW.rankFontSize)
+local function getEffectiveRankWidth(config)
+	if config.showRanks == false then return 0 end
 	local maxRows = getEffectiveMaxRows(config)
 	local rankChars = #tostring(maxRows) + 1
+	if config.prefixRankInName == true then
+		local fontSize = clampNumber(config.fontSize, 8, 24, DEFAULT_WINDOW.fontSize)
+		return math.min(80, math.max(8, math.ceil(rankChars * fontSize * 0.62) + 2))
+	end
+	local rankFontSize = clampNumber(config.rankFontSize, 8, 24, DEFAULT_WINDOW.rankFontSize)
 	return math.min(80, math.max(18, math.ceil(rankChars * rankFontSize * 0.9) + 6))
 end
 
+local function useTextRankPrefix(config)
+	return config.showRanks ~= false and config.prefixRankInName == true
+end
+
 local function getRowTextInsets(config, forceRankColumn)
-	local rankWidth = getEffectiveRankWidth(config, forceRankColumn)
+	local rankWidth = getEffectiveRankWidth(config)
 	local rankGap = clampNumber(config.rankGap, 0, 24, DEFAULT_WINDOW.rankGap)
 	local iconSize = getIconSize(config)
 	local leftInset = 4
 	if iconSize > 0 then
 		leftInset = leftInset + iconSize + 4
 	end
-	if rankWidth > 0 then
+	if rankWidth > 0 and not useTextRankPrefix(config) then
 		leftInset = leftInset + rankWidth + rankGap
 	end
 	return leftInset, 4, iconSize, rankWidth, rankGap
@@ -1590,6 +1599,10 @@ function DamageMeter:GetValueColor(config, classFilename)
 	return getClassOrCustomColor(classFilename, config.valueColor, DEFAULT_WINDOW.valueColor, config.valueUseClassColors)
 end
 
+function DamageMeter:GetPrefixRankColor(config, classFilename)
+	return getClassOrCustomColor(classFilename, config.prefixRankColor, DEFAULT_WINDOW.prefixRankColor, config.prefixRankUseClassColors)
+end
+
 function DamageMeter:GetRowColorState(frame, config, classFilename)
 	local styleVersion = self:GetWindowStyleVersion(frame.index or 0)
 	local cache = frame._damageMeterRowColorCache
@@ -1603,12 +1616,14 @@ function DamageMeter:GetRowColorState(frame, config, classFilename)
 	local r, g, b = self:GetClassColor(config, classKey)
 	local nr, ng, nb, na = self:GetNameColor(config, classKey)
 	local vr, vg, vb, va = self:GetValueColor(config, classKey)
+	local prr, prg, prb, pra = self:GetPrefixRankColor(config, classKey)
 	local bbr, bbg, bbb, bba = getClassOrCustomColor(classKey, config.barBorderColor, DEFAULT_WINDOW.barBorderColor, config.barBorderUseClassColor)
 	local ibr, ibg, ibb, iba = getClassOrCustomColor(classKey, config.iconBorderColor, DEFAULT_WINDOW.iconBorderColor, config.iconBorderUseClassColor)
 	entry = {
 		r = r, g = g, b = b,
 		nr = nr, ng = ng, nb = nb, na = na,
 		vr = vr, vg = vg, vb = vb, va = va,
+		prr = prr, prg = prg, prb = prb, pra = pra,
 		bbr = bbr, bbg = bbg, bbb = bbb, bba = bba,
 		ibr = ibr, ibg = ibg, ibb = ibb, iba = iba,
 	}
@@ -1666,7 +1681,7 @@ function DamageMeter:ApplyStatusFontString(fontString, config)
 end
 
 function DamageMeter:ApplyTooltipFontString(fontString, config)
-	applyCachedFontString(fontString, config.fontFace, clampNumber(config.tooltipFontSize, 8, 24, DEFAULT_WINDOW.tooltipFontSize), config.fontOutline, "tooltip")
+	applyCachedFontString(fontString, config.tooltipFontFace, clampNumber(config.tooltipFontSize, 8, 24, DEFAULT_WINDOW.tooltipFontSize), config.tooltipFontOutline, "tooltip")
 end
 
 function DamageMeter:ApplyBarBorder(row, config, classFilename, colors)
@@ -1806,12 +1821,14 @@ function DamageMeter:ApplyRowTextLayout(row, config, forceRankColumn)
 	local _, barHeight = getRowMetrics(config)
 	local borderOutset = getBarBorderOutset(config)
 	local leftInset, rightInset, iconSize, rankWidth, rankGap = getRowTextInsets(config, forceRankColumn)
+	local rankPrefixText = useTextRankPrefix(config)
 	local showRankColumn = config.showRanks ~= false and rankWidth > 0
 	row.rank:SetWidth(rankWidth)
+	row.rank:ClearAllPoints()
 	setShownIfChanged(row.rank, showRankColumn)
 	row.iconFrame:SetSize(iconSize, iconSize)
 	row.iconFrame:ClearAllPoints()
-	if iconSize > 0 and showRankColumn then
+	if iconSize > 0 and showRankColumn and not rankPrefixText then
 		row.iconFrame:SetPoint("LEFT", row.rank, "RIGHT", rankGap, 0)
 		row.iconFrame:Show()
 	elseif iconSize > 0 then
@@ -1828,7 +1845,7 @@ function DamageMeter:ApplyRowTextLayout(row, config, forceRankColumn)
 	row.bar:ClearAllPoints()
 	if iconSize > 0 then
 		row.bar:SetPoint("LEFT", row.iconFrame, "RIGHT", 4, 0)
-	elseif showRankColumn then
+	elseif showRankColumn and not rankPrefixText then
 		row.bar:SetPoint("LEFT", row.rank, "RIGHT", rankGap, 0)
 	else
 		row.bar:SetPoint("LEFT", row, "LEFT", 4, 0)
@@ -1850,6 +1867,13 @@ function DamageMeter:ApplyRowTextLayout(row, config, forceRankColumn)
 	row.textArea:ClearAllPoints()
 	row.textArea:SetPoint("TOPLEFT", row, "TOPLEFT", leftInset, 0)
 	row.textArea:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -rightInset, 0)
+	if showRankColumn then
+		if rankPrefixText then
+			row.rank:SetPoint("LEFT", row.textArea, "LEFT", 0, 0)
+		else
+			row.rank:SetPoint("LEFT", row, "LEFT", 4, 0)
+		end
+	end
 	setShownIfChanged(row.name, config.showNames == true)
 end
 
@@ -1869,11 +1893,13 @@ function DamageMeter:ApplyRowValueWidth(row, config, damageMeterType, forceRankC
 	row._damageMeterValueLayoutForceRankColumn = forceRankColumn == true
 
 	local frameWidth = clampNumber(config.width, 220, 700, DEFAULT_WINDOW.width)
-	local leftInset, rightInset = getRowTextInsets(config, forceRankColumn)
+	local leftInset, rightInset, _, rankWidth, rankGap = getRowTextInsets(config, forceRankColumn)
 	local availableWidth = math.max(1, (frameWidth - 8) - leftInset - rightInset)
 	local minNameWidth = config.showNames == false and 0 or 8
 	local nameGap = config.showNames == false and 0 or 4
-	local maxValueWidth = math.max(1, availableWidth - minNameWidth - nameGap)
+	local rankPrefixText = useTextRankPrefix(config)
+	local rankPrefixWidth = rankPrefixText and (rankWidth + rankGap) or 0
+	local maxValueWidth = math.max(1, availableWidth - minNameWidth - nameGap - rankPrefixWidth)
 	local valueFontSize = clampNumber(config.valueFontSize, 8, 24, DEFAULT_WINDOW.valueFontSize)
 	local valueMode = getRowValueMode(damageMeterType, config)
 	local estimatedCharacters
@@ -1896,16 +1922,23 @@ function DamageMeter:ApplyRowValueWidth(row, config, damageMeterType, forceRankC
 		minValueWidth = config.valueFormat == "parentheses" and 76 or 86
 	end
 	local valueWidth = math.min(math.max(minValueWidth, valueTargetWidth), maxValueWidth)
-	local nameWidth = math.max(minNameWidth, availableWidth - valueWidth - nameGap)
+	local nameWidth = math.max(minNameWidth, availableWidth - valueWidth - nameGap - rankPrefixWidth)
 	row.value:SetWidth(valueWidth)
 	row.name:SetWidth(nameWidth)
+	row.rank:SetWidth(rankWidth)
 
 	row.value:ClearAllPoints()
 	row.name:ClearAllPoints()
+	if rankPrefixText then row.rank:ClearAllPoints() end
 	if isDefaultTextLayout(config) then
 		row.value:SetPoint("RIGHT", row.textArea, "RIGHT", DEFAULT_WINDOW.valueOffsetX, DEFAULT_WINDOW.valueOffsetY)
 		row.value:SetJustifyH("RIGHT")
-		row.name:SetPoint("LEFT", row.textArea, "LEFT", DEFAULT_WINDOW.nameOffsetX, DEFAULT_WINDOW.nameOffsetY)
+		if rankPrefixText then
+			row.rank:SetPoint("LEFT", row.textArea, "LEFT", DEFAULT_WINDOW.nameOffsetX, DEFAULT_WINDOW.nameOffsetY)
+			row.name:SetPoint("LEFT", row.rank, "RIGHT", rankGap, 0)
+		else
+			row.name:SetPoint("LEFT", row.textArea, "LEFT", DEFAULT_WINDOW.nameOffsetX, DEFAULT_WINDOW.nameOffsetY)
+		end
 		row.name:SetPoint("RIGHT", row.value, "LEFT", -6, 0)
 		row.name:SetJustifyH("LEFT")
 	else
@@ -1915,14 +1948,21 @@ function DamageMeter:ApplyRowValueWidth(row, config, damageMeterType, forceRankC
 		local nameV = normalizeAnchorV(config.nameAnchorV)
 		row.value:SetPoint(anchorPoint(valueH, valueV), row.textArea, anchorPoint(valueH, valueV), clampNumber(config.valueOffsetX, -200, 200, DEFAULT_WINDOW.valueOffsetX), clampNumber(config.valueOffsetY, -200, 200, DEFAULT_WINDOW.valueOffsetY))
 		row.value:SetJustifyH(justifyFromAnchor(valueH))
-		row.name:SetPoint(anchorPoint(nameH, nameV), row.textArea, anchorPoint(nameH, nameV), clampNumber(config.nameOffsetX, -200, 200, DEFAULT_WINDOW.nameOffsetX), clampNumber(config.nameOffsetY, -200, 200, DEFAULT_WINDOW.nameOffsetY))
+		if rankPrefixText then
+			local rankLeft = anchorPoint("LEFT", nameV)
+			local rankRight = anchorPoint("RIGHT", nameV)
+			row.rank:SetPoint(rankLeft, row.textArea, rankLeft, clampNumber(config.nameOffsetX, -200, 200, DEFAULT_WINDOW.nameOffsetX), clampNumber(config.nameOffsetY, -200, 200, DEFAULT_WINDOW.nameOffsetY))
+			row.name:SetPoint(anchorPoint("LEFT", nameV), row.rank, anchorPoint("RIGHT", nameV), rankGap, 0)
+		else
+			row.name:SetPoint(anchorPoint(nameH, nameV), row.textArea, anchorPoint(nameH, nameV), clampNumber(config.nameOffsetX, -200, 200, DEFAULT_WINDOW.nameOffsetX), clampNumber(config.nameOffsetY, -200, 200, DEFAULT_WINDOW.nameOffsetY))
+		end
 		row.name:SetJustifyH(justifyFromAnchor(nameH))
 	end
 end
 
-function DamageMeter:ApplyRankText(row, rowIndex, config, forceRankColumn)
-	local rankWidth = getEffectiveRankWidth(config, forceRankColumn)
-	if config.showRanks == false or (config.prefixRankInName == true and forceRankColumn ~= true) or rankWidth <= 0 then
+function DamageMeter:ApplyRankText(row, rowIndex, config)
+	local rankWidth = getEffectiveRankWidth(config)
+	if config.showRanks == false or rankWidth <= 0 then
 		row.rank:SetText("")
 		return
 	end
@@ -2349,6 +2389,9 @@ function DamageMeter:EnsureSourceTooltip()
 	if frame.SetClampedToScreen then frame:SetClampedToScreen(true) end
 	frame:Hide()
 	frame.lines = {}
+	frame.border = CreateFrame("Frame", nil, frame, "BackdropTemplate")
+	frame.border:EnableMouse(false)
+	frame.border:SetFrameLevel(frame:GetFrameLevel() + 2)
 	self.sourceTooltip = frame
 	return frame
 end
@@ -2628,7 +2671,7 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 	local nameRight = amountRight - amountWidth - 8
 	local showBars = config.tooltipShowBars == true and damageMeterType ~= "Deaths"
 	local barTexture = resolveMedia("statusbar", config.tooltipBarTexture, DEFAULT_TEXTURE)
-	local barColor = normalizeColor(config.tooltipBarColor, DEFAULT_WINDOW.tooltipBarColor)
+	local barR, barG, barB, barA = getClassOrCustomColor(source and source.classFilename, config.tooltipBarColor, DEFAULT_WINDOW.tooltipBarColor, config.tooltipBarUseClassColor)
 	local shown = #rows
 	local tooltipHeight = 10
 	for rowIndex = 1, shown do
@@ -2639,12 +2682,18 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 	local backdropTexture = resolveMedia("statusbar", config.tooltipBackdropTexture, "Interface\\Buttons\\WHITE8x8")
 	local borderTexture = resolveMedia("border", config.tooltipBorderTexture, DEFAULT_BORDER)
 	local borderSize = clampNumber(config.tooltipBorderSize, 1, 32, DEFAULT_WINDOW.tooltipBorderSize)
-	frame:SetBackdrop({ bgFile = backdropTexture, edgeFile = borderTexture, edgeSize = borderSize })
+	local borderOffset = clampNumber(config.tooltipBorderInset, 0, 32, DEFAULT_WINDOW.tooltipBorderInset)
+	frame:SetBackdrop({ bgFile = backdropTexture })
 	local bg = normalizeColor(config.tooltipBackdropColor, DEFAULT_WINDOW.tooltipBackdropColor)
 	local border = normalizeColor(config.tooltipBorderColor, DEFAULT_WINDOW.tooltipBorderColor)
 	frame:SetBackdropColor(bg.r, bg.g, bg.b, bg.a)
-	frame:SetBackdropBorderColor(border.r, border.g, border.b, border.a)
 	frame:SetSize(width, tooltipHeight)
+	frame.border:ClearAllPoints()
+	frame.border:SetPoint("TOPLEFT", frame, "TOPLEFT", -borderOffset, borderOffset)
+	frame.border:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", borderOffset, -borderOffset)
+	frame.border:SetBackdrop({ edgeFile = borderTexture, edgeSize = borderSize })
+	frame.border:SetBackdropBorderColor(border.r, border.g, border.b, border.a)
+	frame.border:Show()
 	self:AnchorSourceTooltip(frame, owner, config)
 
 	local yOffset = 5
@@ -2675,12 +2724,12 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 				local barWidth = math.max(1, availableBarWidth * math.min(1, data.barValue / data.barMax))
 				local barHeight = math.max(1, currentLineHeight - 3)
 				line.barBG:SetTexture(barTexture)
-				line.barBG:SetVertexColor(0, 0, 0, math.min(0.45, (barColor.a or 1) * 0.6))
+				line.barBG:SetVertexColor(0, 0, 0, math.min(0.45, (barA or 1) * 0.6))
 				line.barBG:SetPoint("LEFT", line.icon, "RIGHT", 4, 0)
 				line.barBG:SetSize(availableBarWidth, barHeight)
 				line.barBG:Show()
 				line.bar:SetTexture(barTexture)
-				line.bar:SetVertexColor(barColor.r, barColor.g, barColor.b, barColor.a)
+				line.bar:SetVertexColor(barR, barG, barB, barA)
 				line.bar:SetPoint("LEFT", line.icon, "RIGHT", 4, 0)
 				line.bar:SetSize(barWidth, barHeight)
 				line.bar:Show()
@@ -2743,7 +2792,7 @@ function DamageMeter:UpdatePreviewTooltip(index)
 	end
 end
 
-function DamageMeter:CreateRow(window, index)
+function DamageMeter:CreateRow(window, index, forceRankColumn)
 	local config = self:GetConfig(window.index)
 	local _, _, spacing = getRowMetrics(config)
 	local effectiveRowHeight = getEffectiveRowHeight(config)
@@ -2823,10 +2872,14 @@ function DamageMeter:CreateRow(window, index)
 	row.value:SetWordWrap(false)
 	if row.value.SetMaxLines then row.value:SetMaxLines(1) end
 
-	self:ApplyRankFontString(row.rank, config)
+	if config.prefixRankInName == true then
+		self:ApplyFontString(row.rank, config)
+	else
+		self:ApplyRankFontString(row.rank, config)
+	end
 	self:ApplyFontString(row.name, config)
 	self:ApplyValueFontString(row.value, config)
-	self:ApplyRowTextLayout(row, config, false)
+	self:ApplyRowTextLayout(row, config, forceRankColumn)
 	self:ApplyIconBorder(row, config)
 	self:ApplyBarBorder(row, config)
 
@@ -3093,7 +3146,11 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 			row.bar._damageMeterTexture = texture
 			row.bar:SetStatusBarTexture(texture)
 		end
-		self:ApplyRankFontString(row.rank, config)
+		if config.prefixRankInName == true then
+			self:ApplyFontString(row.rank, config)
+		else
+			self:ApplyRankFontString(row.rank, config)
+		end
 		self:ApplyFontString(row.name, config)
 		self:ApplyValueFontString(row.value, config)
 		self:ApplyRowTextLayout(row, config, forceRankColumn)
@@ -3303,7 +3360,10 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 			end
 		end
 		local source = sourceIndex and orderedSources[sourceIndex] or nil
-		local row = frame.rows[rowIndex] or self:CreateRow(frame, rowIndex)
+		local row = frame.rows[rowIndex]
+		if not row then
+			row = self:CreateRow(frame, rowIndex, forceRankColumn)
+		end
 		if source then
 			local rawMaxAmount, rawAmount
 			if damageMeterType == "Deaths" then
@@ -3320,13 +3380,16 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 			local colors = self:GetRowColorState(frame, config, source.classFilename)
 			local valueText = valueFormatter(source, percent, valueAbbreviation, valueShowPercent, valueUseParentheses)
 
-			self:ApplyRankText(row, sourceIndex, config, forceRankColumn)
+			self:ApplyRankText(row, sourceIndex, config)
 			row.sourceData = source
 			self:ApplyIconBorder(row, config, source.classFilename, colors)
 			self:ApplyBarBorder(row, config, source.classFilename, colors)
 			if config.showIcons ~= false then applySourceIcon(row.icon, source, inFollowerDungeon) end
-			row.name:SetText(formatDisplayName(source, sourceIndex, config, forceRankColumn))
+			row.name:SetText(formatDisplayName(source, config))
 			setTextColorIfChanged(row.name, colors.nr, colors.ng, colors.nb, colors.na)
+			if config.prefixRankInName == true then
+				setTextColorIfChanged(row.rank, colors.prr, colors.prg, colors.prb, colors.pra)
+			end
 			row.value:SetText(valueText)
 			setTextColorIfChanged(row.value, colors.vr, colors.vg, colors.vb, colors.va)
 			self:ApplyRowValueWidth(row, config, damageMeterType, forceRankColumn)
@@ -3744,6 +3807,9 @@ function DamageMeter:BuildWindowSettings(index)
 	local function fixedValueColorEnabled() return cfg().valueUseClassColors ~= true end
 	local function rankingEnabled() return cfg().showRanks ~= false end
 	local function rankColumnEnabled() return cfg().showRanks ~= false and cfg().prefixRankInName ~= true end
+	local function prefixRankEnabled() return cfg().showRanks ~= false and cfg().prefixRankInName == true end
+	local function fixedPrefixRankColorEnabled() return cfg().showRanks ~= false and cfg().prefixRankInName == true and cfg().prefixRankUseClassColors ~= true end
+	local function fixedTooltipBarColorEnabled() return cfg().tooltipEnabled == true and cfg().tooltipBarUseClassColor ~= true end
 	local function windowAnchorVisible() return index > 1 end
 	local function windowAnchorEnabled() return index > 1 and clampNumber(cfg().anchorToWindow, 0, index - 1, 0) > 0 end
 	local function raidRowsEnabled() return cfg().raidRowsEnabled == true end
@@ -3925,29 +3991,43 @@ function DamageMeter:BuildWindowSettings(index)
 		checkboxSetting(L["damageMeterTooltipEnabled"] or "Show row tooltip", function() return cfg().tooltipEnabled == true end, function(value) self:SetConfigValue(index, "tooltipEnabled", value) end, tooltipId),
 		checkboxSetting(L["damageMeterTooltipPreview"] or "Preview tooltip", function() return cfg().tooltipPreview == true end, function(value) self:SetConfigValue(index, "tooltipPreview", value) end, tooltipId, tooltipEnabled),
 		dividerSetting(tooltipId),
-		checkboxSetting(L["damageMeterTooltipShowAmount"] or "Show amount column", function() return cfg().tooltipShowAmount ~= false end, function(value) self:SetConfigValue(index, "tooltipShowAmount", value) end, tooltipId, tooltipEnabled),
-		checkboxSetting(L["damageMeterTooltipShowBars"] or "Show bars", function() return cfg().tooltipShowBars == true end, function(value) self:SetConfigValue(index, "tooltipShowBars", value) end, tooltipId, tooltipEnabled),
-		checkboxSetting(L["damageMeterTooltipShowDPS"] or "Show DPS column", function() return cfg().tooltipShowDPS ~= false end, function(value) self:SetConfigValue(index, "tooltipShowDPS", value) end, tooltipId, tooltipEnabled),
-		checkboxSetting(L["damageMeterTooltipShowPercent"] or "Show percent column", function() return cfg().tooltipShowPercent ~= false end, function(value) self:SetConfigValue(index, "tooltipShowPercent", value) end, tooltipId, tooltipEnabled),
-		checkboxSetting(L["damageMeterTooltipShowTargets"] or "Show targets", function() return cfg().tooltipShowTargets ~= false end, function(value) self:SetConfigValue(index, "tooltipShowTargets", value) end, tooltipId, tooltipEnabled),
-		dividerSetting(tooltipId),
 		dropdownSetting(L["damageMeterTooltipAnchor"] or "Tooltip anchor", function() return normalizeTooltipAnchor(cfg().tooltipAnchor) end, function(value) self:SetConfigValue(index, "tooltipAnchor", normalizeTooltipAnchor(value)) end, buildTooltipAnchorOptions(), tooltipId, 120, tooltipEnabled),
 		sliderSetting(L["damageMeterTooltipOffsetX"] or "Tooltip X offset", function() return cfg().tooltipOffsetX end, function(value) self:SetConfigValue(index, "tooltipOffsetX", clampNumber(value, -300, 300, DEFAULT_WINDOW.tooltipOffsetX)) end, -300, 300, 1, tooltipId, tooltipEnabled),
 		sliderSetting(L["damageMeterTooltipOffsetY"] or "Tooltip Y offset", function() return cfg().tooltipOffsetY end, function(value) self:SetConfigValue(index, "tooltipOffsetY", clampNumber(value, -300, 300, DEFAULT_WINDOW.tooltipOffsetY)) end, -300, 300, 1, tooltipId, tooltipEnabled),
 		sliderSetting(L["damageMeterTooltipWidth"] or "Tooltip width", function() return cfg().tooltipWidth end, function(value) self:SetConfigValue(index, "tooltipWidth", clampNumber(value, 220, 600, DEFAULT_WINDOW.tooltipWidth)) end, 220, 600, 10, tooltipId, tooltipEnabled),
 		sliderSetting(L["damageMeterTooltipMaxLines"] or "Tooltip max lines", function() return cfg().tooltipMaxLines end, function(value) self:SetConfigValue(index, "tooltipMaxLines", clampNumber(value, 4, 30, DEFAULT_WINDOW.tooltipMaxLines)) end, 4, 30, 1, tooltipId, tooltipEnabled),
+		dividerSetting(tooltipId),
+		dropdownSetting(L["damageMeterTooltipFont"] or "Font", function() return cfg().tooltipFontFace end, function(value) self:SetConfigValue(index, "tooltipFontFace", value) end, buildMediaOptions("font", true), tooltipId, 260, tooltipEnabled),
+		dropdownSetting(L["damageMeterTooltipFontOutline"] or "Font outline", function() return cfg().tooltipFontOutline end, function(value) self:SetConfigValue(index, "tooltipFontOutline", normalizeStyle(value)) end, buildStyleOptions(), tooltipId, 180, tooltipEnabled),
 		sliderSetting(L["damageMeterTooltipFontSize"] or "Tooltip font size", function() return cfg().tooltipFontSize end, function(value) self:SetConfigValue(index, "tooltipFontSize", clampNumber(value, 8, 24, DEFAULT_WINDOW.tooltipFontSize)) end, 8, 24, 1, tooltipId, tooltipEnabled),
 		dividerSetting(tooltipId),
+		checkboxSetting(L["damageMeterTooltipShowAmount"] or "Show amount column", function() return cfg().tooltipShowAmount ~= false end, function(value) self:SetConfigValue(index, "tooltipShowAmount", value) end, tooltipId, tooltipEnabled),
+		checkboxSetting(L["damageMeterTooltipShowDPS"] or "Show DPS column", function() return cfg().tooltipShowDPS ~= false end, function(value) self:SetConfigValue(index, "tooltipShowDPS", value) end, tooltipId, tooltipEnabled),
+		checkboxSetting(L["damageMeterTooltipShowPercent"] or "Show percent column", function() return cfg().tooltipShowPercent ~= false end, function(value) self:SetConfigValue(index, "tooltipShowPercent", value) end, tooltipId, tooltipEnabled),
+		checkboxSetting(L["damageMeterTooltipShowTargets"] or "Show targets", function() return cfg().tooltipShowTargets ~= false end, function(value) self:SetConfigValue(index, "tooltipShowTargets", value) end, tooltipId, tooltipEnabled),
+		dividerSetting(tooltipId),
+		checkboxSetting(L["damageMeterTooltipShowBars"] or "Show bars", function() return cfg().tooltipShowBars == true end, function(value) self:SetConfigValue(index, "tooltipShowBars", value) end, tooltipId, tooltipEnabled),
 		dropdownSetting(L["damageMeterTooltipBarTexture"] or "Tooltip bar texture", function() return cfg().tooltipBarTexture end, function(value) self:SetConfigValue(index, "tooltipBarTexture", value) end, buildMediaOptions("statusbar", false), tooltipId, 260, tooltipEnabled),
-		colorSetting(L["damageMeterTooltipBarColor"] or "Tooltip bar color", function() return normalizeColor(cfg().tooltipBarColor, DEFAULT_WINDOW.tooltipBarColor) end, function(value) self:SetConfigValue(index, "tooltipBarColor", normalizeColor(value, DEFAULT_WINDOW.tooltipBarColor)) end, DEFAULT_WINDOW.tooltipBarColor, tooltipId, tooltipEnabled),
+		checkboxSetting(L["damageMeterTooltipBarUseClassColor"] or "Use class color for tooltip bars", function() return cfg().tooltipBarUseClassColor == true end, function(value)
+			self:SetConfigValue(index, "tooltipBarUseClassColor", value)
+			requestEditModeSettingsRefresh()
+		end, tooltipId, tooltipEnabled),
+		colorSetting(L["damageMeterTooltipBarColor"] or "Tooltip bar color", function() return normalizeColor(cfg().tooltipBarColor, DEFAULT_WINDOW.tooltipBarColor) end, function(value) self:SetConfigValue(index, "tooltipBarColor", normalizeColor(value, DEFAULT_WINDOW.tooltipBarColor)) end, DEFAULT_WINDOW.tooltipBarColor, tooltipId, fixedTooltipBarColorEnabled),
 		dropdownSetting(L["damageMeterTooltipBackgroundTexture"] or "Tooltip background texture", function() return cfg().tooltipBackdropTexture end, function(value) self:SetConfigValue(index, "tooltipBackdropTexture", value) end, buildMediaOptions("statusbar", false), tooltipId, 260, tooltipEnabled),
 		colorSetting(L["damageMeterTooltipBackgroundColor"] or "Tooltip background color", function() return normalizeColor(cfg().tooltipBackdropColor, DEFAULT_WINDOW.tooltipBackdropColor) end, function(value) self:SetConfigValue(index, "tooltipBackdropColor", normalizeColor(value, DEFAULT_WINDOW.tooltipBackdropColor)) end, DEFAULT_WINDOW.tooltipBackdropColor, tooltipId, tooltipEnabled),
 		dropdownSetting(L["damageMeterTooltipBorderTexture"] or "Tooltip border texture", function() return cfg().tooltipBorderTexture end, function(value) self:SetConfigValue(index, "tooltipBorderTexture", value) end, buildMediaOptions("border", false), tooltipId, 260, tooltipEnabled),
 		colorSetting(L["damageMeterTooltipBorderColor"] or "Tooltip border color", function() return normalizeColor(cfg().tooltipBorderColor, DEFAULT_WINDOW.tooltipBorderColor) end, function(value) self:SetConfigValue(index, "tooltipBorderColor", normalizeColor(value, DEFAULT_WINDOW.tooltipBorderColor)) end, DEFAULT_WINDOW.tooltipBorderColor, tooltipId, tooltipEnabled),
 		sliderSetting(L["damageMeterTooltipBorderSize"] or "Tooltip border size", function() return cfg().tooltipBorderSize end, function(value) self:SetConfigValue(index, "tooltipBorderSize", clampNumber(value, 1, 32, DEFAULT_WINDOW.tooltipBorderSize)) end, 1, 32, 1, tooltipId, tooltipEnabled),
+		sliderSetting(L["damageMeterTooltipBorderOffset"] or "Border offset", function() return cfg().tooltipBorderInset end, function(value) self:SetConfigValue(index, "tooltipBorderInset", clampNumber(value, 0, 32, DEFAULT_WINDOW.tooltipBorderInset)) end, 0, 32, 1, tooltipId, tooltipEnabled),
 		{ name = L["Ranking"] or "Ranking", kind = SettingType.Collapsible, id = rankingId, defaultCollapsed = true },
 		checkboxSetting(L["damageMeterShowRanks"] or "Show ranks", function() return cfg().showRanks ~= false end, function(value) self:SetConfigValue(index, "showRanks", value) end, rankingId),
 		checkboxSetting(L["damageMeterPrefixRankInName"] or "Prefix rank in name", function() return cfg().prefixRankInName == true end, function(value) self:SetConfigValue(index, "prefixRankInName", value) end, rankingId, rankingEnabled),
+		checkboxSetting(L["damageMeterPrefixRankUseClassColor"] or "Use class color for prefix rank", function() return cfg().prefixRankUseClassColors == true end, function(value)
+			self:SetConfigValue(index, "prefixRankUseClassColors", value)
+			requestEditModeSettingsRefresh()
+		end, rankingId, prefixRankEnabled),
+		colorSetting(L["damageMeterPrefixRankColor"] or "Prefix rank color", function() return normalizeColor(cfg().prefixRankColor, DEFAULT_WINDOW.prefixRankColor) end, function(value) self:SetConfigValue(index, "prefixRankColor", normalizeColor(value, DEFAULT_WINDOW.prefixRankColor)) end, DEFAULT_WINDOW.prefixRankColor, rankingId, fixedPrefixRankColorEnabled),
+		dividerSetting(rankingId, rankingEnabled),
 		dropdownSetting(L["damageMeterRankFont"] or "Rank font", function() return cfg().rankFontFace end, function(value) self:SetConfigValue(index, "rankFontFace", value) end, buildMediaOptions("font", true), rankingId, 260, rankColumnEnabled),
 		dropdownSetting(L["damageMeterRankFontOutline"] or "Rank font outline", function() return cfg().rankFontOutline end, function(value) self:SetConfigValue(index, "rankFontOutline", normalizeStyle(value)) end, buildStyleOptions(), rankingId, 180, rankColumnEnabled),
 		sliderSetting(L["damageMeterRankFontSize"] or "Rank font size", function() return cfg().rankFontSize end, function(value) self:SetConfigValue(index, "rankFontSize", clampNumber(value, 8, 24, DEFAULT_WINDOW.rankFontSize)) end, 8, 24, 1, rankingId, rankColumnEnabled),
