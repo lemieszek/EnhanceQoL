@@ -7,11 +7,15 @@
 ### ✨ Added
 
 - Damage Meter / Profiles: Added a dedicated Damage Meter profile export/import section so players can share or restore only Damage Meter configuration without replacing the rest of the active profile.
+- Damage Meter / Header: Added separate X/Y offsets for header text and header buttons, plus button color, opacity, and optional faded inactive opacity controls.
+- Damage Meter / Rows: Added an option to hide row icons completely.
+- Damage Meter / Values: Added a value display selector for automatic, total and rate, total only, or rate only display.
 
 ### 🔄 Changed
 
 - Damage Meter / Edit Mode: Renamed the status-line settings group to Quick switch and updated the related font controls to match what the setting actually controls.
 - Damage Meter: New default windows now prefix ranks in the name text and hide percent values by default.
+- Damage Meter: Reused the Unit Frame font fallback path for Damage Meter text so broader alphabets can fall back to Blizzard-supported fonts where available.
 
 ### 🐛 Fixed
 

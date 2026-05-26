@@ -106,10 +106,19 @@ local DEFAULT_WINDOW = {
 	showHeaderTime = true,
 	showHeaderButtons = true,
 	headerButtonSize = 16,
+	headerButtonOffsetX = 0,
+	headerButtonOffsetY = 0,
+	headerButtonColor = { r = 1, g = 0.82, b = 0, a = 1 },
+	headerButtonAlpha = 1,
+	headerButtonFadeEnabled = false,
+	headerButtonFadeAlpha = 0.35,
+	headerTextOffsetX = 0,
+	headerTextOffsetY = 0,
 	headerFormat = "timeTypeDash",
 	headerTimeFormat = "smart",
 	showStatus = true,
 	showNames = true,
+	showIcons = true,
 	showRanks = true,
 	prefixRankInName = true,
 	rankGap = 2,
@@ -119,6 +128,7 @@ local DEFAULT_WINDOW = {
 	showPercent = false,
 	hideRealmNames = true,
 	abbreviation = "short",
+	valueMode = "auto",
 	valueFormat = "slash",
 	nameAnchorH = "LEFT",
 	nameAnchorV = "CENTER",
@@ -665,6 +675,20 @@ local function normalizeHeaderTimeFormat(value)
 	return value == "seconds" and "seconds" or "smart"
 end
 
+local function normalizeValueMode(value)
+	if value == "both" or value == "total" or value == "rate" then return value end
+	return "auto"
+end
+
+local function buildValueModeOptions()
+	return {
+		{ value = "auto", label = L["damageMeterValueModeAuto"] or "Automatic" },
+		{ value = "both", label = L["damageMeterValueModeBoth"] or "Total and rate" },
+		{ value = "total", label = L["damageMeterValueModeTotal"] or "Total only" },
+		{ value = "rate", label = L["damageMeterValueModeRate"] or "Rate only" },
+	}
+end
+
 local function formatSourceName(value, config)
 	if value == nil then return L["Unknown"] or UNKNOWN or "Unknown" end
 	if isSecret(value) then return value end
@@ -696,9 +720,13 @@ local function isCountOnlyMeterType(key)
 	return key == "Dispels" or key == "Interrupts"
 end
 
-local function getRowValueMode(damageMeterType)
+local function getRowValueMode(damageMeterType, config)
 	if damageMeterType == "Deaths" then return "death" end
 	if damageMeterType == "Dispels" or damageMeterType == "Interrupts" then return "count" end
+	local valueMode = normalizeValueMode(config and config.valueMode)
+	if valueMode == "both" then return "amountAndRate" end
+	if valueMode == "total" then return "amount" end
+	if valueMode == "rate" then return "perSecond" end
 	if damageMeterType == "Dps" or damageMeterType == "Hps" then return "perSecond" end
 	return "amountAndRate"
 end
@@ -749,6 +777,10 @@ local function formatPerSecondRowValueText(source, percent, abbreviation, showPe
 	return appendRowPercent(formatNumber(source.amountPerSecond, abbreviation), percent, showPercent)
 end
 
+local function formatAmountRowValueText(source, percent, abbreviation, showPercent)
+	return appendRowPercent(formatNumber(source.totalAmount, abbreviation), percent, showPercent)
+end
+
 local function formatAmountRateRowValueText(source, percent, abbreviation, showPercent, useParentheses)
 	local amountText = formatNumber(source.totalAmount, abbreviation)
 	local dpsText = formatNumber(source.amountPerSecond, abbreviation)
@@ -757,6 +789,7 @@ local function formatAmountRateRowValueText(source, percent, abbreviation, showP
 end
 
 local ROW_VALUE_FORMATTERS = {
+	amount = formatAmountRowValueText,
 	amountAndRate = formatAmountRateRowValueText,
 	count = formatCountRowValueText,
 	death = formatDeathRowValueText,
@@ -870,7 +903,7 @@ local function getBarBorderOutset(config)
 end
 
 local function getIconBorderOutset(config)
-	if config.iconBorderEnabled ~= true then return 0 end
+	if config.showIcons == false or config.iconBorderEnabled ~= true then return 0 end
 	return clampNumber(config.iconBorderInset, 0, 24, DEFAULT_WINDOW.iconBorderInset)
 end
 
@@ -880,6 +913,7 @@ local function getEffectiveRowHeight(config)
 end
 
 local function getIconSize(config)
+	if config.showIcons == false then return 0 end
 	local maxSize = math.max(8, getEffectiveRowHeight(config) - (getIconBorderOutset(config) * 2))
 	if config.changeIconSize ~= true then return maxSize end
 	local offset = clampNumber(config.iconSizeOffset, -60, 0, DEFAULT_WINDOW.iconSizeOffset)
@@ -898,7 +932,10 @@ local function getRowTextInsets(config)
 	local rankWidth = getEffectiveRankWidth(config)
 	local rankGap = clampNumber(config.rankGap, 0, 24, DEFAULT_WINDOW.rankGap)
 	local iconSize = getIconSize(config)
-	local leftInset = 4 + iconSize + 4
+	local leftInset = 4
+	if iconSize > 0 then
+		leftInset = leftInset + iconSize + 4
+	end
 	if rankWidth > 0 then
 		leftInset = leftInset + rankWidth + rankGap
 	end
@@ -1590,6 +1627,11 @@ local function applyCachedFontString(fontString, fontFace, size, fontOutline, ca
 	fontString._damageMeterFontSize = size
 	fontString._damageMeterFontOutline = fontOutline
 	fontString._damageMeterFontGlobalVersion = globalFontVersion
+	local ufHelper = addon.Aura and addon.Aura.UFHelper
+	if ufHelper and ufHelper.applyFont then
+		ufHelper.applyFont(fontString, fontFace, size, fontOutline)
+		return
+	end
 	if addon.functions.ApplyFontString then
 		addon.functions.ApplyFontString(fontString, fontFace, size, fontOutline, DEFAULT_FONT, "OUTLINE")
 		return
@@ -1687,7 +1729,7 @@ end
 function DamageMeter:ApplyIconBorder(row, config, classFilename, colors)
 	local border = row.iconBorder
 	if not border or not border.SetBackdrop then return end
-	local enabled = config.iconBorderEnabled == true
+	local enabled = config.showIcons ~= false and config.iconBorderEnabled == true
 	local classKey = enabled and config.iconBorderUseClassColor == true and type(classFilename) == "string" and classFilename ~= "" and classFilename or false
 	local styleVersion = self:GetWindowStyleVersion(row.windowIndex or 0)
 	if border._damageMeterApplyVersion == styleVersion
@@ -1763,10 +1805,14 @@ function DamageMeter:ApplyRowTextLayout(row, config)
 	setShownIfChanged(row.rank, showRankColumn)
 	row.iconFrame:SetSize(iconSize, iconSize)
 	row.iconFrame:ClearAllPoints()
-	if showRankColumn then
+	if iconSize > 0 and showRankColumn then
 		row.iconFrame:SetPoint("LEFT", row.rank, "RIGHT", rankGap, 0)
-	else
+		row.iconFrame:Show()
+	elseif iconSize > 0 then
 		row.iconFrame:SetPoint("LEFT", 4, 0)
+		row.iconFrame:Show()
+	else
+		row.iconFrame:Hide()
 	end
 	row.iconBorder:ClearAllPoints()
 	local iconBorderOffset = getIconBorderOutset(config)
@@ -1774,7 +1820,13 @@ function DamageMeter:ApplyRowTextLayout(row, config)
 	row.iconBorder:SetPoint("BOTTOMRIGHT", row.iconFrame, "BOTTOMRIGHT", iconBorderOffset, -iconBorderOffset)
 	row.iconBorder:SetFrameLevel(row.iconFrame:GetFrameLevel() + 2)
 	row.bar:ClearAllPoints()
-	row.bar:SetPoint("LEFT", row.iconFrame, "RIGHT", 4, 0)
+	if iconSize > 0 then
+		row.bar:SetPoint("LEFT", row.iconFrame, "RIGHT", 4, 0)
+	elseif showRankColumn then
+		row.bar:SetPoint("LEFT", row.rank, "RIGHT", rankGap, 0)
+	else
+		row.bar:SetPoint("LEFT", row, "LEFT", 4, 0)
+	end
 	row.bar:SetPoint("RIGHT", row, "RIGHT", -4, 0)
 	row.bar:SetHeight(barHeight)
 	if normalizeAnchorV(config.barAnchor) == "TOP" then
@@ -1815,16 +1867,26 @@ function DamageMeter:ApplyRowValueWidth(row, config, damageMeterType)
 	local nameGap = config.showNames == false and 0 or 8
 	local maxValueWidth = math.max(1, availableWidth - minNameWidth - nameGap)
 	local valueFontSize = clampNumber(config.valueFontSize, 8, 24, DEFAULT_WINDOW.valueFontSize)
+	local valueMode = getRowValueMode(damageMeterType, config)
 	local estimatedCharacters
 	if isCountOnlyMeterType(damageMeterType) then
 		estimatedCharacters = config.showPercent ~= false and 10 or 4
+	elseif valueMode == "amount" or valueMode == "perSecond" then
+		estimatedCharacters = config.showPercent ~= false and 13 or 7
 	elseif config.showPercent ~= false then
 		estimatedCharacters = config.valueFormat == "parentheses" and 19 or 21
 	else
 		estimatedCharacters = config.valueFormat == "parentheses" and 13 or 15
 	end
 	local valueTargetWidth = math.ceil((valueFontSize * estimatedCharacters * 0.62) + 12)
-	local minValueWidth = isCountOnlyMeterType(damageMeterType) and 42 or (config.valueFormat == "parentheses" and 76 or 86)
+	local minValueWidth
+	if isCountOnlyMeterType(damageMeterType) then
+		minValueWidth = 42
+	elseif valueMode == "amount" or valueMode == "perSecond" then
+		minValueWidth = 58
+	else
+		minValueWidth = config.valueFormat == "parentheses" and 76 or 86
+	end
 	local valueWidth = math.min(math.max(minValueWidth, valueTargetWidth), maxValueWidth)
 	local nameWidth = math.max(minNameWidth, availableWidth - valueWidth - nameGap)
 	row.value:SetWidth(valueWidth)
@@ -1894,8 +1956,16 @@ function DamageMeter:CreateHeaderButton(frame, label, atlas, tooltipText, onClic
 	local button = CreateFrame("Button", nil, frame)
 	button:SetSize(16, 16)
 	button:SetScript("OnClick", onClick)
-	button:SetScript("OnEnter", function(owner) self:ShowTooltip(owner, tooltipText) end)
-	button:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
+	button:SetScript("OnEnter", function(owner)
+		frame._damageMeterHeaderButtonHover = true
+		DamageMeter:UpdateHeaderButtonAlpha(frame)
+		self:ShowTooltip(owner, tooltipText)
+	end)
+	button:SetScript("OnLeave", function()
+		frame._damageMeterHeaderButtonHover = nil
+		DamageMeter:UpdateHeaderButtonAlpha(frame)
+		if GameTooltip then GameTooltip:Hide() end
+	end)
 	button.icon = button:CreateTexture(nil, "ARTWORK")
 	button.icon:SetPoint("CENTER")
 	button.icon:SetSize(14, 14)
@@ -1912,10 +1982,29 @@ function DamageMeter:CreateHeaderButton(frame, label, atlas, tooltipText, onClic
 	return button
 end
 
+function DamageMeter:UpdateHeaderButtonAlpha(frame)
+	if not frame then return end
+	local alpha
+	if frame._damageMeterHeaderButtonFadeEnabled and not frame._damageMeterHeaderButtonHover then
+		alpha = frame._damageMeterHeaderButtonFadeAlpha or DEFAULT_WINDOW.headerButtonFadeAlpha
+	else
+		alpha = frame._damageMeterHeaderButtonAlpha or DEFAULT_WINDOW.headerButtonAlpha
+	end
+	if frame._damageMeterHeaderButtonAppliedAlpha == alpha then return end
+	frame._damageMeterHeaderButtonAppliedAlpha = alpha
+	if frame.headerButtons then frame.headerButtons:SetAlpha(alpha) end
+	if frame.resetButton then frame.resetButton:SetAlpha(alpha) end
+	if frame.historyButton then frame.historyButton:SetAlpha(alpha) end
+end
+
 function DamageMeter:ApplyHeaderButtons(frame, config, showHeaderButtons)
 	local buttonSize = clampNumber(config.headerButtonSize, 10, 32, DEFAULT_WINDOW.headerButtonSize)
 	local gap = math.max(2, math.floor(buttonSize / 4))
 	local iconSize = math.max(8, buttonSize - 2)
+	local color = normalizeColor(config.headerButtonColor, DEFAULT_WINDOW.headerButtonColor)
+	local alpha = clampNumber(config.headerButtonAlpha, 0, 1, DEFAULT_WINDOW.headerButtonAlpha)
+	local fadeAlpha = clampNumber(config.headerButtonFadeAlpha, 0, 1, DEFAULT_WINDOW.headerButtonFadeAlpha)
+	local fadeEnabled = config.headerButtonFadeEnabled == true
 	local signature = buttonSize .. ":" .. gap .. ":" .. iconSize .. ":" .. tostring(showHeaderButtons == true)
 	if frame.headerButtons._damageMeterHeaderButtonsSignature ~= signature then
 		frame.headerButtons._damageMeterHeaderButtonsSignature = signature
@@ -1932,6 +2021,24 @@ function DamageMeter:ApplyHeaderButtons(frame, config, showHeaderButtons)
 		setShownIfChanged(frame.resetButton, showHeaderButtons)
 		setShownIfChanged(frame.historyButton, showHeaderButtons)
 	end
+	if frame.headerButtons._damageMeterHeaderButtonColorR ~= color.r
+		or frame.headerButtons._damageMeterHeaderButtonColorG ~= color.g
+		or frame.headerButtons._damageMeterHeaderButtonColorB ~= color.b
+		or frame.headerButtons._damageMeterHeaderButtonColorA ~= color.a then
+		frame.headerButtons._damageMeterHeaderButtonColorR = color.r
+		frame.headerButtons._damageMeterHeaderButtonColorG = color.g
+		frame.headerButtons._damageMeterHeaderButtonColorB = color.b
+		frame.headerButtons._damageMeterHeaderButtonColorA = color.a
+		frame.resetButton.icon:SetVertexColor(color.r, color.g, color.b, color.a)
+		frame.historyButton.icon:SetVertexColor(color.r, color.g, color.b, color.a)
+		frame.resetButton.text:SetTextColor(color.r, color.g, color.b, color.a)
+		frame.historyButton.text:SetTextColor(color.r, color.g, color.b, color.a)
+	end
+	frame._damageMeterHeaderButtonAlpha = alpha
+	frame._damageMeterHeaderButtonFadeAlpha = fadeAlpha
+	frame._damageMeterHeaderButtonFadeEnabled = fadeEnabled
+	if not showHeaderButtons then frame._damageMeterHeaderButtonHover = nil end
+	self:UpdateHeaderButtonAlpha(frame)
 	return showHeaderButtons and ((buttonSize * 2) + gap + 12) or 8
 end
 
@@ -2886,6 +2993,10 @@ function DamageMeter:ApplyWindowStyle(index, contentRows)
 	local backdropR, backdropG, backdropB, backdropA = colorComponents(config.backdropColor, DEFAULT_WINDOW.backdropColor)
 	local borderR, borderG, borderB, borderA = colorComponents(config.borderColor, DEFAULT_WINDOW.borderColor)
 	local titleR, titleG, titleB, titleA = colorComponents(config.titleColor, DEFAULT_WINDOW.titleColor)
+	local headerTextOffsetX = clampNumber(config.headerTextOffsetX, -100, 100, DEFAULT_WINDOW.headerTextOffsetX)
+	local headerTextOffsetY = clampNumber(config.headerTextOffsetY, -100, 100, DEFAULT_WINDOW.headerTextOffsetY)
+	local headerButtonOffsetX = clampNumber(config.headerButtonOffsetX, -100, 100, DEFAULT_WINDOW.headerButtonOffsetX)
+	local headerButtonOffsetY = clampNumber(config.headerButtonOffsetY, -100, 100, DEFAULT_WINDOW.headerButtonOffsetY)
 	frame.contentRows = contentRows
 
 	local texture = resolveMedia("statusbar", config.texture, DEFAULT_TEXTURE)
@@ -2899,15 +3010,15 @@ function DamageMeter:ApplyWindowStyle(index, contentRows)
 	frame.headerButtons:ClearAllPoints()
 	frame.status:ClearAllPoints()
 	if headerPosition == "BOTTOM" then
-		frame.header:SetPoint("BOTTOMLEFT", 8, 7 + bottomOffset)
-		frame.header:SetPoint("BOTTOMRIGHT", -headerButtonTextInset, 7 + bottomOffset)
-		frame.headerButtons:SetPoint("BOTTOMRIGHT", -8, 7 + bottomOffset)
+		frame.header:SetPoint("BOTTOMLEFT", 8 + headerTextOffsetX, 7 + bottomOffset + headerTextOffsetY)
+		frame.header:SetPoint("BOTTOMRIGHT", -headerButtonTextInset + headerTextOffsetX, 7 + bottomOffset + headerTextOffsetY)
+		frame.headerButtons:SetPoint("BOTTOMRIGHT", -8 + headerButtonOffsetX, 7 + bottomOffset + headerButtonOffsetY)
 		frame.status:SetPoint("BOTTOMLEFT", 4, 4 + bottomOffset + headerHeight)
 		frame.status:SetPoint("BOTTOMRIGHT", -4, 4 + bottomOffset + headerHeight)
 	else
-		frame.header:SetPoint("TOPLEFT", 8, -(7 + topOffset))
-		frame.header:SetPoint("TOPRIGHT", -headerButtonTextInset, -(7 + topOffset))
-		frame.headerButtons:SetPoint("TOPRIGHT", -8, -(7 + topOffset))
+		frame.header:SetPoint("TOPLEFT", 8 + headerTextOffsetX, -(7 + topOffset) + headerTextOffsetY)
+		frame.header:SetPoint("TOPRIGHT", -headerButtonTextInset + headerTextOffsetX, -(7 + topOffset) + headerTextOffsetY)
+		frame.headerButtons:SetPoint("TOPRIGHT", -8 + headerButtonOffsetX, -(7 + topOffset) + headerButtonOffsetY)
 		frame.status:SetPoint("BOTTOMLEFT", 4, 4 + bottomOffset)
 		frame.status:SetPoint("BOTTOMRIGHT", -4, 4 + bottomOffset)
 	end
@@ -3150,7 +3261,7 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 	local totalAmount = safeNumber(session and session.totalAmount)
 	local shown = 0
 	local inFollowerDungeon = state.inFollowerDungeon
-	local valueMode = getRowValueMode(damageMeterType)
+	local valueMode = getRowValueMode(damageMeterType, config)
 	local valueFormatter = ROW_VALUE_FORMATTERS[valueMode] or formatAmountRateRowValueText
 	local valueAbbreviation = config.abbreviation
 	local valueShowPercent = config.showPercent ~= false
@@ -3189,7 +3300,7 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 			row.sourceData = source
 			self:ApplyIconBorder(row, config, source.classFilename, colors)
 			self:ApplyBarBorder(row, config, source.classFilename, colors)
-			applySourceIcon(row.icon, source, inFollowerDungeon)
+			if config.showIcons ~= false then applySourceIcon(row.icon, source, inFollowerDungeon) end
 			row.name:SetText(formatDisplayName(source.name, sourceIndex, config))
 			setTextColorIfChanged(row.name, colors.nr, colors.ng, colors.nb, colors.na)
 			row.value:SetText(valueText)
@@ -3600,9 +3711,10 @@ function DamageMeter:BuildWindowSettings(index)
 	local function customBarSizeEnabled() return cfg().changeBarSize == true end
 	local function barBorderEnabled() return cfg().barBorderEnabled == true end
 	local function fixedBarBorderColorEnabled() return cfg().barBorderEnabled == true and cfg().barBorderUseClassColor ~= true end
-	local function customIconSizeEnabled() return cfg().changeIconSize == true end
-	local function iconBorderEnabled() return cfg().iconBorderEnabled == true end
-	local function fixedIconBorderColorEnabled() return cfg().iconBorderEnabled == true and cfg().iconBorderUseClassColor ~= true end
+	local function iconsEnabled() return cfg().showIcons ~= false end
+	local function customIconSizeEnabled() return cfg().showIcons ~= false and cfg().changeIconSize == true end
+	local function iconBorderEnabled() return cfg().showIcons ~= false and cfg().iconBorderEnabled == true end
+	local function fixedIconBorderColorEnabled() return cfg().showIcons ~= false and cfg().iconBorderEnabled == true and cfg().iconBorderUseClassColor ~= true end
 	local function windowBorderEnabled() return cfg().borderEnabled == true end
 	local function fixedValueColorEnabled() return cfg().valueUseClassColors ~= true end
 	local function rankingEnabled() return cfg().showRanks ~= false end
@@ -3678,6 +3790,10 @@ function DamageMeter:BuildWindowSettings(index)
 		checkboxSetting(L["damageMeterShowHeaderTime"] or "Show combat time", function() return cfg().showHeaderTime ~= false end, function(value) self:SetConfigValue(index, "showHeaderTime", value) end, headerId, headerEnabled),
 		checkboxSetting(L["damageMeterShowHeaderButtons"] or "Show header buttons", function() return cfg().showHeaderButtons ~= false end, function(value) self:SetConfigValue(index, "showHeaderButtons", value) end, headerId, headerEnabled),
 		sliderSetting(L["damageMeterHeaderButtonSize"] or "Header button size", function() return cfg().headerButtonSize end, function(value) self:SetConfigValue(index, "headerButtonSize", clampNumber(value, 10, 32, DEFAULT_WINDOW.headerButtonSize)) end, 10, 32, 1, headerId, function() return cfg().showHeader == true and cfg().showHeaderButtons ~= false end),
+		colorSetting(L["damageMeterHeaderButtonColor"] or "Header button color", function() return normalizeColor(cfg().headerButtonColor, DEFAULT_WINDOW.headerButtonColor) end, function(value) self:SetConfigValue(index, "headerButtonColor", normalizeColor(value, DEFAULT_WINDOW.headerButtonColor)) end, DEFAULT_WINDOW.headerButtonColor, headerId, function() return cfg().showHeader == true and cfg().showHeaderButtons ~= false end),
+		sliderSetting(L["damageMeterHeaderButtonAlpha"] or "Header button opacity", function() return cfg().headerButtonAlpha end, function(value) self:SetConfigValue(index, "headerButtonAlpha", clampNumber(value, 0, 1, DEFAULT_WINDOW.headerButtonAlpha)) end, 0, 1, 0.05, headerId, function() return cfg().showHeader == true and cfg().showHeaderButtons ~= false end),
+		checkboxSetting(L["damageMeterHeaderButtonFade"] or "Fade header buttons", function() return cfg().headerButtonFadeEnabled == true end, function(value) self:SetConfigValue(index, "headerButtonFadeEnabled", value) end, headerId, function() return cfg().showHeader == true and cfg().showHeaderButtons ~= false end),
+		sliderSetting(L["damageMeterHeaderButtonFadeAlpha"] or "Faded button opacity", function() return cfg().headerButtonFadeAlpha end, function(value) self:SetConfigValue(index, "headerButtonFadeAlpha", clampNumber(value, 0, 1, DEFAULT_WINDOW.headerButtonFadeAlpha)) end, 0, 1, 0.05, headerId, function() return cfg().showHeader == true and cfg().showHeaderButtons ~= false and cfg().headerButtonFadeEnabled == true end),
 		dropdownSetting(L["damageMeterHeaderFormat"] or "Header format", function() return normalizeHeaderFormat(cfg().headerFormat) end, function(value) self:SetConfigValue(index, "headerFormat", normalizeHeaderFormat(value)) end, buildHeaderFormatOptions(), headerId, 150, headerTimeEnabled),
 		dropdownSetting(L["damageMeterHeaderTimeFormat"] or "Time format", function() return normalizeHeaderTimeFormat(cfg().headerTimeFormat) end, function(value) self:SetConfigValue(index, "headerTimeFormat", normalizeHeaderTimeFormat(value)) end, buildHeaderTimeFormatOptions(), headerId, 120, headerTimeEnabled),
 		dividerSetting(headerId),
@@ -3685,6 +3801,10 @@ function DamageMeter:BuildWindowSettings(index)
 		dropdownSetting(L["damageMeterTitleFontOutline"] or "Title font outline", function() return cfg().titleFontOutline end, function(value) self:SetConfigValue(index, "titleFontOutline", normalizeStyle(value)) end, buildStyleOptions(), headerId, 180, headerEnabled),
 		sliderSetting(L["damageMeterTitleFontSize"] or "Title font size", function() return cfg().titleFontSize end, function(value) self:SetConfigValue(index, "titleFontSize", clampNumber(value, 8, 28, DEFAULT_WINDOW.titleFontSize)) end, 8, 28, 1, headerId, headerEnabled),
 		colorSetting(L["damageMeterHeaderColor"] or "Header color", function() return normalizeColor(cfg().titleColor, DEFAULT_WINDOW.titleColor) end, function(value) self:SetConfigValue(index, "titleColor", normalizeColor(value, DEFAULT_WINDOW.titleColor)) end, DEFAULT_WINDOW.titleColor, headerId, headerEnabled),
+		sliderSetting(L["damageMeterHeaderTextOffsetX"] or "Header text X offset", function() return cfg().headerTextOffsetX end, function(value) self:SetConfigValue(index, "headerTextOffsetX", clampNumber(value, -100, 100, DEFAULT_WINDOW.headerTextOffsetX)) end, -100, 100, 1, headerId, headerEnabled),
+		sliderSetting(L["damageMeterHeaderTextOffsetY"] or "Header text Y offset", function() return cfg().headerTextOffsetY end, function(value) self:SetConfigValue(index, "headerTextOffsetY", clampNumber(value, -100, 100, DEFAULT_WINDOW.headerTextOffsetY)) end, -100, 100, 1, headerId, headerEnabled),
+		sliderSetting(L["damageMeterHeaderButtonOffsetX"] or "Header button X offset", function() return cfg().headerButtonOffsetX end, function(value) self:SetConfigValue(index, "headerButtonOffsetX", clampNumber(value, -100, 100, DEFAULT_WINDOW.headerButtonOffsetX)) end, -100, 100, 1, headerId, function() return cfg().showHeader == true and cfg().showHeaderButtons ~= false end),
+		sliderSetting(L["damageMeterHeaderButtonOffsetY"] or "Header button Y offset", function() return cfg().headerButtonOffsetY end, function(value) self:SetConfigValue(index, "headerButtonOffsetY", clampNumber(value, -100, 100, DEFAULT_WINDOW.headerButtonOffsetY)) end, -100, 100, 1, headerId, function() return cfg().showHeader == true and cfg().showHeaderButtons ~= false end),
 		{ name = L["damageMeterQuickSwitch"] or "Quick switch", kind = SettingType.Collapsible, id = statusId, defaultCollapsed = true },
 		checkboxSetting(L["damageMeterShowStatus"] or "Show quick switch", function() return cfg().showStatus ~= false end, function(value) self:SetConfigValue(index, "showStatus", value) end, statusId),
 		dropdownSetting(L["damageMeterStatusFont"] or "Quick switch font", function() return cfg().statusFontFace end, function(value) self:SetConfigValue(index, "statusFontFace", value) end, buildMediaOptions("font", true), statusId, 260, statusEnabled),
@@ -3712,16 +3832,20 @@ function DamageMeter:BuildWindowSettings(index)
 		sliderSetting(L["damageMeterBarBorderSize"] or "Bar border size", function() return cfg().barBorderSize end, function(value) self:SetConfigValue(index, "barBorderSize", clampNumber(value, 1, 32, DEFAULT_WINDOW.barBorderSize)) end, 1, 32, 1, barId, barBorderEnabled),
 		sliderSetting(L["damageMeterBarBorderOffset"] or "Bar border offset", function() return cfg().barBorderInset end, function(value) self:SetConfigValue(index, "barBorderInset", clampNumber(value, 0, 24, DEFAULT_WINDOW.barBorderInset)) end, 0, 24, 1, barId, barBorderEnabled),
 		{ name = L["damageMeterIcon"] or "Icon", kind = SettingType.Collapsible, id = iconId, defaultCollapsed = true },
+		checkboxSetting(L["damageMeterShowIcons"] or "Show icons", function() return cfg().showIcons ~= false end, function(value)
+			self:SetConfigValue(index, "showIcons", value)
+			requestEditModeSettingsRefresh()
+		end, iconId),
 		checkboxSetting(L["damageMeterChangeIconSize"] or "Change icon size", function() return cfg().changeIconSize == true end, function(value)
 			self:SetConfigValue(index, "changeIconSize", value)
 			requestEditModeSettingsRefresh()
-		end, iconId),
+		end, iconId, iconsEnabled),
 		sliderSetting(L["damageMeterIconSizeOffset"] or "Icon size offset", function() return cfg().iconSizeOffset end, function(value) self:SetConfigValue(index, "iconSizeOffset", clampNumber(value, -60, 0, DEFAULT_WINDOW.iconSizeOffset)) end, -60, 0, 1, iconId, customIconSizeEnabled),
 		dividerSetting(iconId),
 		checkboxSetting(L["damageMeterIconBorder"] or "Icon border", function() return cfg().iconBorderEnabled == true end, function(value)
 			self:SetConfigValue(index, "iconBorderEnabled", value)
 			requestEditModeSettingsRefresh()
-		end, iconId),
+		end, iconId, iconsEnabled),
 		dropdownSetting(L["damageMeterIconBorderTexture"] or "Icon border texture", function() return cfg().iconBorderTexture end, function(value) self:SetConfigValue(index, "iconBorderTexture", value) end, buildMediaOptions("border", false), iconId, 260, iconBorderEnabled),
 		checkboxSetting(L["damageMeterUseClassColor"] or "Use class color", function() return cfg().iconBorderUseClassColor == true end, function(value)
 			self:SetConfigValue(index, "iconBorderUseClassColor", value)
@@ -3761,6 +3885,8 @@ function DamageMeter:BuildWindowSettings(index)
 		dropdownSetting(L["damageMeterValueAnchorV"] or "Value vertical anchor", function() return normalizeAnchorV(cfg().valueAnchorV) end, function(value) self:SetConfigValue(index, "valueAnchorV", normalizeAnchorV(value)) end, buildVerticalAnchorOptions(), valuesId, 120),
 		sliderSetting(L["damageMeterValueOffsetX"] or "Value X offset", function() return cfg().valueOffsetX end, function(value) self:SetConfigValue(index, "valueOffsetX", clampNumber(value, -200, 200, DEFAULT_WINDOW.valueOffsetX)) end, -200, 200, 1, valuesId),
 		sliderSetting(L["damageMeterValueOffsetY"] or "Value Y offset", function() return cfg().valueOffsetY end, function(value) self:SetConfigValue(index, "valueOffsetY", clampNumber(value, -200, 200, DEFAULT_WINDOW.valueOffsetY)) end, -200, 200, 1, valuesId),
+		dividerSetting(valuesId),
+		dropdownSetting(L["damageMeterValueMode"] or "Value display", function() return normalizeValueMode(cfg().valueMode) end, function(value) self:SetConfigValue(index, "valueMode", normalizeValueMode(value)) end, buildValueModeOptions(), valuesId, 160),
 		dividerSetting(valuesId),
 		dropdownSetting(L["damageMeterAbbreviation"] or "Number format", function() return cfg().abbreviation end, function(value) self:SetConfigValue(index, "abbreviation", value == "none" and "none" or "short") end, {
 			{ value = "short", label = L["damageMeterAbbreviationShort"] or "Abbreviated" },
