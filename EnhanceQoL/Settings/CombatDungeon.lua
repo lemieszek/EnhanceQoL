@@ -2541,7 +2541,7 @@ if cChar and sectionDungeon then
 		text = L["damageMeterUpdateRate"],
 		desc = L["damageMeterUpdateRateDesc"],
 		min = 0.1,
-		max = 2,
+		max = 5,
 		step = 0.1,
 		default = 0.1,
 		get = function() return (addon.db and addon.db["damageMeterUpdateRate"]) or 0.1 end,

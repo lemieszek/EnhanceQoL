@@ -2,6 +2,23 @@
 
 <!--@eqol-beta@-->
 
+## [10.21.0-beta5] - 2026-05-26
+
+### ✨ Added
+
+- Damage Meter / Icons: Added an icon gap slider so row icons can sit directly against the bar or use custom spacing.
+- Damage Meter / Settings: Added a source-window prompt when enabling synced window settings so the initial shared layout is explicit.
+
+### 🔄 Changed
+
+- Damage Meter / Performance: Extended the live update interval slider up to 5 seconds.
+
+### 🐛 Fixed
+
+- Damage Meter / Header: Prevented title text from wrapping underneath the top row.
+
+---
+
 ## [10.21.0-beta4] - 2026-05-26
 
 ### ✨ Added

@@ -105,6 +105,7 @@ local DEFAULT_WINDOW = {
 	barBorderInset = 0,
 	changeIconSize = false,
 	iconSizeOffset = 0,
+	iconGap = 4,
 	iconBorderEnabled = false,
 	iconBorderTexture = "",
 	iconBorderColor = { r = 0, g = 0, b = 0, a = 0.9 },
@@ -995,6 +996,10 @@ local function getIconSize(config)
 	return clampNumber(maxSize + offset, 8, maxSize, maxSize)
 end
 
+local function getIconGap(config)
+	return clampNumber(config.iconGap, 0, 24, DEFAULT_WINDOW.iconGap)
+end
+
 local function getEffectiveRankWidth(config)
 	if config.showRanks == false then return 0 end
 	local maxRows = getEffectiveMaxRows(config)
@@ -1015,9 +1020,10 @@ local function getRowTextInsets(config, forceRankColumn)
 	local rankWidth = getEffectiveRankWidth(config)
 	local rankGap = clampNumber(config.rankGap, 0, 24, DEFAULT_WINDOW.rankGap)
 	local iconSize = getIconSize(config)
+	local iconGap = getIconGap(config)
 	local leftInset = 4
 	if iconSize > 0 then
-		leftInset = leftInset + iconSize + 4
+		leftInset = leftInset + iconSize + iconGap
 	end
 	if rankWidth > 0 and not useTextRankPrefix(config) then
 		leftInset = leftInset + rankWidth + rankGap
@@ -1081,7 +1087,7 @@ local function isDefaultTextLayout(config)
 end
 
 local function getUpdateRate()
-	return clampNumber(db().damageMeterUpdateRate, 0.1, 2, 0.1)
+	return clampNumber(db().damageMeterUpdateRate, 0.1, 5, 0.1)
 end
 
 function getWindowCount()
@@ -2012,6 +2018,7 @@ function DamageMeter:ApplyRowTextLayout(row, config, forceRankColumn)
 	local _, barHeight = getRowMetrics(config)
 	local borderOutset = getBarBorderOutset(config)
 	local leftInset, rightInset, iconSize, rankWidth, rankGap = getRowTextInsets(config, forceRankColumn)
+	local iconGap = getIconGap(config)
 	local rankPrefixText = useTextRankPrefix(config)
 	local showRankColumn = config.showRanks ~= false and rankWidth > 0
 	row.rank:SetWidth(rankWidth)
@@ -2035,7 +2042,7 @@ function DamageMeter:ApplyRowTextLayout(row, config, forceRankColumn)
 	row.iconBorder:SetFrameLevel(row.iconFrame:GetFrameLevel() + 2)
 	row.bar:ClearAllPoints()
 	if iconSize > 0 then
-		row.bar:SetPoint("LEFT", row.iconFrame, "RIGHT", 4, 0)
+		row.bar:SetPoint("LEFT", row.iconFrame, "RIGHT", iconGap, 0)
 	elseif showRankColumn and not rankPrefixText then
 		row.bar:SetPoint("LEFT", row.rank, "RIGHT", rankGap, 0)
 	else
@@ -3136,6 +3143,10 @@ function DamageMeter:EnsureWindow(index)
 	header:SetPoint("TOPLEFT", 8, -7)
 	header:SetPoint("TOPRIGHT", -8, -7)
 	header:SetJustifyH("LEFT")
+	header:SetJustifyV("MIDDLE")
+	header:SetWordWrap(false)
+	if header.SetNonSpaceWrap then header:SetNonSpaceWrap(false) end
+	if header.SetMaxLines then header:SetMaxLines(1) end
 	frame.header = header
 
 	local headerButtons = CreateFrame("Frame", nil, frame)
@@ -3274,7 +3285,8 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 	local viewportHeight = (visibleRows * effectiveRowHeight) + math.max(0, visibleRows - 1) * spacing
 	local titleFontSize = clampNumber(config.titleFontSize, 8, 28, DEFAULT_WINDOW.titleFontSize)
 	local statusFontSize = clampNumber(config.statusFontSize, 8, 24, DEFAULT_WINDOW.statusFontSize)
-	local headerHeight = showHeader and math.max(24, titleFontSize + 12) or 0
+	local headerButtonSize = clampNumber(config.headerButtonSize, 10, 32, DEFAULT_WINDOW.headerButtonSize)
+	local headerHeight = showHeader and math.max(24, titleFontSize + 12, showHeaderButtons and (headerButtonSize + 8) or 0) or 0
 	local statusHeight = showStatus and math.max(16, statusFontSize + 6) or 0
 	local topInset = headerPosition == "TOP" and (headerHeight > 0 and headerHeight or 4) or 4
 	local bottomInset = 4 + (showStatus and (statusHeight + 2) or 0) + (headerPosition == "BOTTOM" and headerHeight or 0)
@@ -3299,6 +3311,7 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 	local headerButtonTextInset = self:ApplyHeaderButtons(frame, config, showHeaderButtons)
 	setShownIfChanged(frame.header, showHeader)
 	setShownIfChanged(frame.status, showStatus)
+	frame.header:SetHeight(math.max(1, math.min(headerHeight, titleFontSize + 6)))
 	frame.header:ClearAllPoints()
 	frame.headerBackground:ClearAllPoints()
 	frame.headerButtons:ClearAllPoints()
@@ -3984,6 +3997,99 @@ local function requestEditModeSettingsRefresh()
 	end
 end
 
+function DamageMeter:EnableSyncedConfigFromSource(sourceIndex)
+	sourceIndex = clampNumber(sourceIndex, 1, getWindowCount(), 1)
+	db().damageMeterSyncSettings = true
+	self:ApplySyncedConfig(sourceIndex)
+	requestEditModeSettingsRefresh()
+end
+
+function DamageMeter:EnsureSyncSourceDialog()
+	if self.syncSourceDialog then return self.syncSourceDialog end
+	local frame = CreateFrame("Frame", "EnhanceQoLDamageMeterSyncSourceDialog", UIParent, "BackdropTemplate")
+	frame:SetFrameStrata("DIALOG")
+	frame:SetFrameLevel(90)
+	frame:SetSize(360, 190)
+	frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+	frame:SetClampedToScreen(true)
+	frame:SetToplevel(true)
+	frame:EnableMouse(true)
+	frame:SetMovable(true)
+	frame:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
+	frame:SetBackdropColor(0.02, 0.02, 0.025, 0.96)
+	frame:SetBackdropBorderColor(0.22, 0.24, 0.28, 1)
+	frame:Hide()
+
+	frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+	frame.title:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -14)
+	frame.title:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -16, -14)
+	frame.title:SetJustifyH("LEFT")
+
+	frame.description = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	frame.description:SetPoint("TOPLEFT", frame.title, "BOTTOMLEFT", 0, -8)
+	frame.description:SetPoint("TOPRIGHT", frame.title, "BOTTOMRIGHT", 0, -8)
+	frame.description:SetJustifyH("LEFT")
+	frame.description:SetJustifyV("TOP")
+	frame.description:SetSpacing(2)
+
+	frame.buttons = {}
+	frame.cancel = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+	frame.cancel:SetSize(110, 24)
+	frame.cancel:SetText(CANCEL or "Cancel")
+	frame.cancel:SetScript("OnClick", function()
+		db().damageMeterSyncSettings = false
+		frame:Hide()
+		requestEditModeSettingsRefresh()
+	end)
+
+	table.insert(UISpecialFrames, frame:GetName())
+	self.syncSourceDialog = frame
+	return frame
+end
+
+function DamageMeter:PromptEnableSyncSettings(sourceIndex)
+	local count = getWindowCount()
+	if count <= 1 then
+		self:EnableSyncedConfigFromSource(1)
+		return
+	end
+	db().damageMeterSyncSettings = false
+	local frame = self:EnsureSyncSourceDialog()
+	frame.title:SetText(L["damageMeterSyncSourceTitle"] or "Choose sync source")
+	frame.description:SetText(L["damageMeterSyncSourceDesc"] or "Choose which Damage Meter window should provide the initial shared layout and styling settings. Behavior settings stay separate per window.")
+	local topOffset = 86
+	local buttonHeight = 26
+	local gap = 6
+	for index = 1, MAX_WINDOWS do
+		local button = frame.buttons[index]
+		if not button then
+			button = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+			button:SetHeight(buttonHeight)
+			frame.buttons[index] = button
+		end
+		if index <= count then
+			button:ClearAllPoints()
+			button:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -(topOffset + ((index - 1) * (buttonHeight + gap))))
+			button:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -16, -(topOffset + ((index - 1) * (buttonHeight + gap))))
+			button:SetText(string.format(L["damageMeterSyncSourceButton"] or "Use window %d", index))
+			button:SetScript("OnClick", function()
+				frame:Hide()
+				self:EnableSyncedConfigFromSource(index)
+			end)
+			button:Show()
+		else
+			button:Hide()
+		end
+	end
+	frame.cancel:ClearAllPoints()
+	frame.cancel:SetPoint("TOP", frame.buttons[count], "BOTTOM", 0, -12)
+	frame:SetHeight(topOffset + (count * (buttonHeight + gap)) + 42)
+	frame:ClearAllPoints()
+	frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+	frame:Show()
+	requestEditModeSettingsRefresh()
+end
+
 function DamageMeter:SetConfigValue(index, key, value)
 	local config = self:GetConfig(index)
 	if key == "quickTypes" then
@@ -4070,13 +4176,14 @@ function DamageMeter:BuildWindowSettings(index)
 	local settings = {
 		{ name = L["damageMeterSettings"] or "Settings", kind = SettingType.Collapsible, id = settingsId, defaultCollapsed = true },
 		checkboxSetting(L["damageMeterSyncSettings"] or "Sync settings", function() return db().damageMeterSyncSettings == true end, function(value)
-			db().damageMeterSyncSettings = value == true
 			if value == true then
-				self:ApplySyncedConfig(index)
+				self:PromptEnableSyncSettings(index)
 			else
+				db().damageMeterSyncSettings = false
 				self:Refresh()
+				requestEditModeSettingsRefresh()
 			end
-		end, settingsId, nil, L["damageMeterSyncSettingsDesc"] or "When enabled, every Damage Meter window uses the same settings. Changes made in any window are applied to all windows."),
+		end, settingsId, nil, L["damageMeterSyncSettingsDesc"] or "When enabled, choose the source window once. Damage Meter windows then share layout and styling settings. Behavior settings stay separate per window."),
 		dropdownSetting(L["damageMeterCopySettingsFrom"] or "Copy settings from", function() return "" end, function(value)
 			local sourceIndex = tonumber(value)
 			if sourceIndex then self:PromptCopySettings(sourceIndex, index) end
@@ -4197,6 +4304,7 @@ function DamageMeter:BuildWindowSettings(index)
 			requestEditModeSettingsRefresh()
 		end, iconId, iconsEnabled),
 		sliderSetting(L["damageMeterIconSizeOffset"] or "Icon size offset", function() return cfg().iconSizeOffset end, function(value) self:SetConfigValue(index, "iconSizeOffset", clampNumber(value, -60, 0, DEFAULT_WINDOW.iconSizeOffset)) end, -60, 0, 1, iconId, customIconSizeEnabled),
+		sliderSetting(L["damageMeterIconGap"] or "Icon gap", function() return cfg().iconGap end, function(value) self:SetConfigValue(index, "iconGap", clampNumber(value, 0, 24, DEFAULT_WINDOW.iconGap)) end, 0, 24, 1, iconId, iconsEnabled),
 		dividerSetting(iconId),
 		checkboxSetting(L["damageMeterIconBorder"] or "Icon border", function() return cfg().iconBorderEnabled == true end, function(value)
 			self:SetConfigValue(index, "iconBorderEnabled", value)
