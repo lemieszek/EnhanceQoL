@@ -51,6 +51,8 @@ local SYNC_EXCLUDED_KEYS = {
 	sessionType = true,
 	damageMeterType = true,
 	visibility = true,
+	visibilityFadeAlpha = true,
+	visibilityFadeMode = true,
 	maxRows = true,
 	visibleRows = true,
 	raidRowsEnabled = true,
@@ -73,6 +75,8 @@ local DEFAULT_WINDOW = {
 	damageMeterType = "DamageDone",
 	quickTypes = { "DamageDone" },
 	visibility = "always",
+	visibilityFadeMode = "none",
+	visibilityFadeAlpha = 0.25,
 	maxRows = 8,
 	visibleRows = 8,
 	raidRowsEnabled = false,
@@ -151,6 +155,7 @@ local DEFAULT_WINDOW = {
 	footerBackgroundSizeOffsetX = 0,
 	footerBackgroundSizeOffsetY = 0,
 	showFooterQuickSwitch = true,
+	showNoData = true,
 	showNames = true,
 	showIcons = true,
 	showRanks = true,
@@ -477,6 +482,76 @@ local function buildRowSortOptions()
 		{ value = "TOP", label = L["damageMeterHighestBarTop"] or "Highest bar on top" },
 		{ value = "BOTTOM", label = L["damageMeterHighestBarBottom"] or "Highest bar on bottom" },
 	}
+end
+
+local function buildVisibilityOptions()
+	local metadata = addon.functions and addon.functions.GetVisibilityRuleMetadata and addon.functions.GetVisibilityRuleMetadata()
+	if not metadata then return {} end
+	local frameKeys = addon.constants and addon.constants.FRAME_VISIBILITY_KEYS
+	local hiddenKeys = {
+		PLAYER_CASTING = true,
+		PLAYER_HAS_TARGET = true,
+	}
+	local options = {}
+	for key, data in pairs(metadata) do
+		if frameKeys and frameKeys[key] and key ~= "MOUSEOVER" and not hiddenKeys[key] then
+			options[#options + 1] = { value = key, label = data.label or key, text = data.label or key, order = data.order or 999 }
+		end
+	end
+	table.sort(options, function(a, b)
+		if a.order == b.order then
+			local left = tostring(a.label or a.value or "")
+			local right = tostring(b.label or b.value or "")
+			if strcmputf8i then return strcmputf8i(left, right) < 0 end
+			return left:lower() < right:lower()
+		end
+		return a.order < b.order
+	end)
+	return options
+end
+
+local function isVisibilityOptionAllowed(value)
+	if type(value) ~= "string" then return false end
+	if value == "PLAYER_CASTING" or value == "PLAYER_HAS_TARGET" then return false end
+	local frameKeys = addon.constants and addon.constants.FRAME_VISIBILITY_KEYS
+	return frameKeys and frameKeys[value] == true and value ~= "MOUSEOVER"
+end
+
+local function normalizeVisibilityConfig(value)
+	local normalize = addon.functions and addon.functions.NormalizeUnitFrameVisibilityConfig
+	if normalize then return normalize(nil, value, { skipSave = true, ignoreOverride = true }) end
+	if type(value) == "table" then return value end
+	return nil
+end
+
+local function normalizeVisibilityFadeMode(value)
+	return value == "mouseover" and "mouseover" or "none"
+end
+
+local function buildVisibilityFadeOptions()
+	return {
+		{ value = "none", label = L["damageMeterVisibilityFadeNone"] or _G.NONE or "None" },
+		{ value = "mouseover", label = L["damageMeterVisibilityFadeMouseover"] or "Fade until mouseover" },
+	}
+end
+
+local function visibilityMatchesContext(visibility)
+	local config = normalizeVisibilityConfig(visibility)
+	if not config then return true end
+	local shouldShow = addon.functions and addon.functions.ShouldShowVisibilityConfig
+	if shouldShow then
+		local visible = shouldShow(config, { isMouseOver = false })
+		return visible == true
+	end
+	return true
+end
+
+local function buildDamageMeterVisibilityDriverExpression(visibility)
+	local config = normalizeVisibilityConfig(visibility)
+	if not config then return nil end
+	local build = addon.functions and addon.functions.BuildUnitFrameDriverExpression
+	if build then return build(config, { inactiveState = "hide" }) end
+	return nil
 end
 
 local DAMAGE_METER_TYPES = {
@@ -1430,10 +1505,101 @@ function DamageMeter:ShouldShow(index)
 	if not self:IsWindowEnabled(index) then return false end
 	if self:IsInEditMode() then return true end
 	if not self:IsAvailable() then return false end
-	local visibility = self:GetConfig(index).visibility
-	if visibility == "combat" then return UnitAffectingCombat("player") == true end
-	if visibility == "outOfCombat" then return UnitAffectingCombat("player") ~= true end
+	return visibilityMatchesContext(self:GetConfig(index).visibility)
+end
+
+function DamageMeter:GetWindowAlpha(index)
+	local config = self:GetConfig(index)
+	if normalizeVisibilityFadeMode(config.visibilityFadeMode) ~= "mouseover" or self:IsInEditMode() then return 1 end
+	local frame = self.windows and self.windows[index]
+	if frame and frame._damageMeterMouseOver == true then return 1 end
+	return clampNumber(config.visibilityFadeAlpha, 0, 1, DEFAULT_WINDOW.visibilityFadeAlpha)
+end
+
+function DamageMeter:UpdateWindowAlpha(index)
+	local frame = self.windows and self.windows[index]
+	if not frame then return end
+	local alpha = self:GetWindowAlpha(index)
+	if frame._damageMeterAlpha == alpha then return end
+	frame._damageMeterAlpha = alpha
+	frame:SetAlpha(alpha)
+end
+
+function DamageMeter:SetWindowHover(index, hovered)
+	local frame = self.windows and self.windows[index]
+	if not frame then return end
+	if not hovered and frame.IsMouseOver and frame:IsMouseOver() then
+		return
+	end
+	frame._damageMeterMouseOver = hovered == true
+	self:UpdateWindowAlpha(index)
+end
+
+function DamageMeter:EnsureVisibilityDriverWatcher()
+	if self.visibilityDriverWatcher then return end
+	local watcher = CreateFrame("Frame")
+	watcher:RegisterEvent("PLAYER_REGEN_ENABLED")
+	watcher:SetScript("OnEvent", function()
+		local pending = DamageMeter.pendingVisibilityDrivers
+		if not pending then return end
+		DamageMeter.pendingVisibilityDrivers = nil
+		for frame, expression in pairs(pending) do
+			DamageMeter:ApplyVisibilityDriverToFrame(frame, expression ~= false and expression or nil)
+		end
+	end)
+	self.visibilityDriverWatcher = watcher
+end
+
+function DamageMeter:ApplyVisibilityDriverToFrame(frame, expression)
+	if not frame then return false end
+	if InCombatLockdown and InCombatLockdown() then
+		self.pendingVisibilityDrivers = self.pendingVisibilityDrivers or {}
+		self.pendingVisibilityDrivers[frame] = expression or false
+		self:EnsureVisibilityDriverWatcher()
+		return false
+	end
+	if not expression then
+		if frame._damageMeterVisibilityDriver and UnregisterStateDriver then
+			UnregisterStateDriver(frame, "visibility")
+		end
+		frame._damageMeterVisibilityDriver = nil
+		if frame.SetAttribute then frame:SetAttribute("state-visibility", nil) end
+		return true
+	end
+	if frame._damageMeterVisibilityDriver == expression then return true end
+	if not RegisterStateDriver then return false end
+	if frame._damageMeterVisibilityDriver and UnregisterStateDriver then
+		UnregisterStateDriver(frame, "visibility")
+		frame._damageMeterVisibilityDriver = nil
+	end
+	RegisterStateDriver(frame, "visibility", expression)
+	frame._damageMeterVisibilityDriver = expression
 	return true
+end
+
+function DamageMeter:ApplyWindowVisibilityDriver(frame, state)
+	if not frame or not state then return false end
+	if state.editMode then
+		self:ApplyVisibilityDriverToFrame(frame, nil)
+		return false
+	end
+	local expression = state.visibilityDriverExpression
+	if expression then
+		return self:ApplyVisibilityDriverToFrame(frame, expression)
+	end
+	self:ApplyVisibilityDriverToFrame(frame, nil)
+	return false
+end
+
+function DamageMeter:ClearWindowRows(frame)
+	if not frame then return end
+	if frame.rows then
+		for _, row in ipairs(frame.rows) do
+			row.sourceData = nil
+			row:Hide()
+		end
+	end
+	if frame.empty then frame.empty:Hide() end
 end
 
 function DamageMeter:BuildRefreshSharedState()
@@ -1470,14 +1636,12 @@ function DamageMeter:BuildWindowRefreshState(index, shared)
 	local sessionID = temporary and temporary.sessionID or nil
 	local sessionType = sessionID and nil or ((temporary and temporary.sessionType) or config.sessionType)
 	local sessionEnum = sessionType and (SESSION_TYPES[sessionType] or SESSION_TYPES.current) or nil
+	local visibilityDriverExpression = buildDamageMeterVisibilityDriverExpression(config.visibility)
+	local canUseVisibilityDriver = RegisterStateDriver ~= nil and visibilityDriverExpression ~= nil
 	local visible = shared.enabled == true and index <= shared.windowCount
 	if visible and not shared.editMode then
 		visible = shared.available == true
-		if visible and config.visibility == "combat" then
-			visible = UnitAffectingCombat("player") == true
-		elseif visible and config.visibility == "outOfCombat" then
-			visible = UnitAffectingCombat("player") ~= true
-		end
+		if visible and not canUseVisibilityDriver then visible = visibilityMatchesContext(config.visibility) end
 	end
 	state.available = shared.available
 	state.config = config
@@ -1491,7 +1655,9 @@ function DamageMeter:BuildWindowRefreshState(index, shared)
 	state.sessionID = sessionID
 	state.sessionType = sessionType
 	state.temporary = temporary
+	state.usesVisibilityDriver = canUseVisibilityDriver
 	state.visible = visible
+	state.visibilityDriverExpression = visibilityDriverExpression
 	return state
 end
 
@@ -2378,6 +2544,7 @@ function DamageMeter:CreateHeaderButton(frame, label, atlas, tooltipText, onClic
 	button:SetSize(16, 16)
 	button:SetScript("OnClick", onClick)
 	button:SetScript("OnEnter", function(owner)
+		DamageMeter:SetWindowHover(frame.index, true)
 		frame._damageMeterHeaderButtonHover = true
 		DamageMeter:UpdateHeaderButtonAlpha(frame)
 		self:ShowTooltip(owner, tooltipText)
@@ -2386,6 +2553,7 @@ function DamageMeter:CreateHeaderButton(frame, label, atlas, tooltipText, onClic
 		frame._damageMeterHeaderButtonHover = nil
 		DamageMeter:UpdateHeaderButtonAlpha(frame)
 		if GameTooltip then GameTooltip:Hide() end
+		DamageMeter:SetWindowHover(frame.index, false)
 	end)
 	button.icon = button:CreateTexture(nil, "ARTWORK")
 	button.icon:SetPoint("CENTER")
@@ -3178,11 +3346,17 @@ function DamageMeter:HideSourceTooltip()
 	if self.sourceTooltip then self.sourceTooltip:Hide() end
 end
 
+function DamageMeter:ClearPreviewTooltip(index)
+	if index and self.previewTooltipIndex ~= index then return end
+	if self.sourceTooltip then self.sourceTooltip:Hide() end
+	self.previewTooltipIndex = nil
+	self.previewTooltipOwner = nil
+end
+
 function DamageMeter:UpdatePreviewTooltip(index)
 	local config = self:GetConfig(index)
 	if self.previewTooltipIndex == index and (config.tooltipPreview ~= true or not self:IsInEditMode()) and self.sourceTooltip then
-		self.sourceTooltip:Hide()
-		self.previewTooltipIndex = nil
+		self:ClearPreviewTooltip(index)
 	end
 	local frame = self.windows and self.windows[index]
 	if not frame or config.tooltipPreview ~= true or not self:IsInEditMode() then return end
@@ -3209,10 +3383,12 @@ function DamageMeter:CreateRow(window, index, forceRankColumn)
 		end
 	end)
 	row:SetScript("OnEnter", function(owner)
+		DamageMeter:SetWindowHover(window.index, true)
 		DamageMeter:ShowSourceTooltip(owner, window.index, owner.sourceData)
 	end)
 	row:SetScript("OnLeave", function()
 		DamageMeter:HideSourceTooltip()
+		DamageMeter:SetWindowHover(window.index, false)
 	end)
 	row:SetHeight(effectiveRowHeight)
 	row:ClearAllPoints()
@@ -3314,6 +3490,12 @@ function DamageMeter:EnsureWindow(index)
 			DamageMeter:OpenContextMenu(owner, index)
 		end
 	end)
+	frame:SetScript("OnEnter", function()
+		DamageMeter:SetWindowHover(index, true)
+	end)
+	frame:SetScript("OnLeave", function()
+		DamageMeter:SetWindowHover(index, false)
+	end)
 	frame:Hide()
 	frame.index = index
 
@@ -3367,6 +3549,12 @@ function DamageMeter:EnsureWindow(index)
 		local nextScroll = (rowsViewport:GetVerticalScroll() or 0) - (delta * (effectiveRowHeight + spacing))
 		rowsViewport:SetVerticalScroll(clampNumber(nextScroll, 0, maxScroll, 0))
 	end)
+	rowsViewport:SetScript("OnEnter", function()
+		DamageMeter:SetWindowHover(index, true)
+	end)
+	rowsViewport:SetScript("OnLeave", function()
+		DamageMeter:SetWindowHover(index, false)
+	end)
 	frame.rowsViewport = rowsViewport
 
 	local rowsContainer = CreateFrame("Frame", nil, rowsViewport)
@@ -3399,6 +3587,12 @@ function DamageMeter:EnsureWindow(index)
 	status:SetScript("OnMouseWheel", function(_, delta)
 		if DamageMeter:GetConfig(index).showFooterQuickSwitch == false then return end
 		DamageMeter:CycleQuickDamageMeterType(index, delta and delta < 0 and -1 or 1)
+	end)
+	status:SetScript("OnEnter", function()
+		DamageMeter:SetWindowHover(index, true)
+	end)
+	status:SetScript("OnLeave", function()
+		DamageMeter:SetWindowHover(index, false)
 	end)
 	status:EnableMouseWheel(true)
 	local footerBackground = status:CreateTexture(nil, "ARTWORK")
@@ -3996,9 +4190,22 @@ end
 function DamageMeter:RefreshWindow(index, shared, sessionCache)
 	local state = self:BuildWindowRefreshState(index, shared)
 	local frame = self:EnsureWindow(index)
+	if not state.editMode then self:ClearPreviewTooltip(index) end
 	if not state.visible then
+		self:ClearPreviewTooltip(index)
+		self:ApplyVisibilityDriverToFrame(frame, nil)
+		self:ClearWindowRows(frame)
 		frame:Hide()
 		return
+	end
+	local driverActive = self:ApplyWindowVisibilityDriver(frame, state)
+	if driverActive and not state.editMode then
+		if not visibilityMatchesContext(state.config.visibility) then
+			self:ClearPreviewTooltip(index)
+			self:ClearWindowRows(frame)
+			self:UpdateWindowAlpha(index)
+			return
+		end
 	end
 
 	local config = state.config
@@ -4168,8 +4375,9 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 		frame.rows[rowIndex]:Hide()
 	end
 
-	frame.empty:SetShown(shown == 0)
-	frame:SetShown(true)
+	frame.empty:SetShown(shown == 0 and config.showNoData ~= false)
+	if not driverActive then frame:SetShown(true) end
+	self:UpdateWindowAlpha(index)
 	self:UpdatePreviewTooltip(index)
 end
 
@@ -4210,10 +4418,22 @@ function DamageMeter:RegisterLiveEvents()
 	frame:RegisterEvent("DAMAGE_METER_CURRENT_SESSION_UPDATED")
 	frame:RegisterEvent("DAMAGE_METER_RESET")
 	frame:RegisterEvent("GROUP_ROSTER_UPDATE")
+	frame:RegisterEvent("PLAYER_TARGET_CHANGED")
 	frame:RegisterEvent("PLAYER_REGEN_DISABLED")
 	frame:RegisterEvent("PLAYER_REGEN_ENABLED")
 	frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+	frame:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
+	frame:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
+	frame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 	frame:RegisterEvent("ADDON_RESTRICTION_STATE_CHANGED")
+	if frame.RegisterUnitEvent then
+		frame:RegisterUnitEvent("UNIT_SPELLCAST_START", "player")
+		frame:RegisterUnitEvent("UNIT_SPELLCAST_STOP", "player")
+		frame:RegisterUnitEvent("UNIT_SPELLCAST_FAILED", "player")
+		frame:RegisterUnitEvent("UNIT_SPELLCAST_INTERRUPTED", "player")
+		frame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_START", "player")
+		frame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_STOP", "player")
+	end
 	self.liveEventsRegistered = true
 end
 
@@ -4224,10 +4444,20 @@ function DamageMeter:UnregisterLiveEvents()
 	frame:UnregisterEvent("DAMAGE_METER_CURRENT_SESSION_UPDATED")
 	frame:UnregisterEvent("DAMAGE_METER_RESET")
 	frame:UnregisterEvent("GROUP_ROSTER_UPDATE")
+	frame:UnregisterEvent("PLAYER_TARGET_CHANGED")
 	frame:UnregisterEvent("PLAYER_REGEN_DISABLED")
 	frame:UnregisterEvent("PLAYER_REGEN_ENABLED")
 	frame:UnregisterEvent("PLAYER_ENTERING_WORLD")
+	frame:UnregisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
+	frame:UnregisterEvent("UPDATE_SHAPESHIFT_FORM")
+	frame:UnregisterEvent("ZONE_CHANGED_NEW_AREA")
 	frame:UnregisterEvent("ADDON_RESTRICTION_STATE_CHANGED")
+	frame:UnregisterEvent("UNIT_SPELLCAST_START")
+	frame:UnregisterEvent("UNIT_SPELLCAST_STOP")
+	frame:UnregisterEvent("UNIT_SPELLCAST_FAILED")
+	frame:UnregisterEvent("UNIT_SPELLCAST_INTERRUPTED")
+	frame:UnregisterEvent("UNIT_SPELLCAST_CHANNEL_START")
+	frame:UnregisterEvent("UNIT_SPELLCAST_CHANNEL_STOP")
 	self.liveEventsRegistered = false
 end
 
@@ -4619,6 +4849,8 @@ function DamageMeter:SetConfigValue(index, key, value)
 	if key == "quickTypes" then
 		config.quickTypes = normalizeQuickDamageMeterTypes(value, config.damageMeterType or DEFAULT_WINDOW.damageMeterType)
 		if self.quickTypeLabelCache then self.quickTypeLabelCache[index] = nil end
+	elseif key == "visibility" then
+		config.visibility = normalizeVisibilityConfig(value)
 	else
 		config[key] = copyValue(value)
 	end
@@ -4722,16 +4954,59 @@ function DamageMeter:BuildWindowSettings(index)
 			{ value = "overall", label = L["damageMeterOverall"] or "Overall" },
 		}, behaviorId, 110),
 		dropdownSetting(_G.TYPE or "Type", function() return normalizeDamageMeterTypeKey(cfg().damageMeterType) end, function(value) self:SetConfigValue(index, "damageMeterType", normalizeDamageMeterTypeKey(value)) end, buildDamageMeterTypeOptions, behaviorId, 180),
-		dropdownSetting(L["damageMeterVisibility"] or "Show when", function()
-			local visibility = cfg().visibility
-			return (visibility == "combat" or visibility == "outOfCombat") and visibility or "always"
-		end, function(value)
-			self:SetConfigValue(index, "visibility", (value == "combat" or value == "outOfCombat") and value or "always")
-		end, {
-			{ value = "always", label = L["Always show"] or "Always show" },
-			{ value = "combat", label = L["Always in combat"] or "Always in combat" },
-			{ value = "outOfCombat", label = L["Always out of combat"] or "Always out of combat" },
-		}, behaviorId, 120),
+		{
+			name = L["damageMeterVisibility"] or "Show when",
+			kind = SettingType.MultiDropdown,
+			field = "visibility",
+			parentId = behaviorId,
+			height = 170,
+			values = buildVisibilityOptions(),
+			hideSummary = true,
+			get = function() return normalizeVisibilityConfig(cfg().visibility) end,
+			set = function(_, selection)
+				local visibilityConfig
+				if type(selection) == "table" then
+					for key, selected in pairs(selection) do
+						if selected == true and isVisibilityOptionAllowed(key) then
+							if key == "ALWAYS_HIDDEN" then
+								visibilityConfig = { ALWAYS_HIDDEN = true }
+								break
+							end
+							visibilityConfig = visibilityConfig or {}
+							visibilityConfig[key] = true
+							visibilityConfig.ALWAYS_HIDDEN = nil
+						end
+					end
+				end
+				self:SetConfigValue(index, "visibility", visibilityConfig)
+			end,
+			isSelected = function(_, value)
+				local visibilityConfig = normalizeVisibilityConfig(cfg().visibility)
+				return visibilityConfig and visibilityConfig[value] == true or false
+			end,
+			setSelected = function(_, value, state)
+				if not isVisibilityOptionAllowed(value) then return end
+				local visibilityConfig = normalizeVisibilityConfig(cfg().visibility) or {}
+				if state then
+					if value == "ALWAYS_HIDDEN" then
+						self:SetConfigValue(index, "visibility", { ALWAYS_HIDDEN = true })
+						return
+					end
+					visibilityConfig[value] = true
+					visibilityConfig.ALWAYS_HIDDEN = nil
+				else
+					visibilityConfig[value] = nil
+				end
+				if not next(visibilityConfig) then visibilityConfig = nil end
+				self:SetConfigValue(index, "visibility", visibilityConfig)
+			end,
+		},
+		dropdownSetting(L["damageMeterVisibilityFadeMode"] or "Fade", function() return normalizeVisibilityFadeMode(cfg().visibilityFadeMode) end, function(value)
+			self:SetConfigValue(index, "visibilityFadeMode", normalizeVisibilityFadeMode(value))
+			requestEditModeSettingsRefresh()
+		end, buildVisibilityFadeOptions(), behaviorId, 120),
+		sliderSetting(L["damageMeterVisibilityFadeAlpha"] or "Faded opacity", function() return cfg().visibilityFadeAlpha end, function(value) self:SetConfigValue(index, "visibilityFadeAlpha", clampNumber(value, 0, 1, DEFAULT_WINDOW.visibilityFadeAlpha)) end, 0, 1, 0.05, behaviorId, function() return normalizeVisibilityFadeMode(cfg().visibilityFadeMode) == "mouseover" end, nil, formatAlphaSliderValue),
+		checkboxSetting(L["damageMeterShowNoData"] or "Show no data text", function() return cfg().showNoData ~= false end, function(value) self:SetConfigValue(index, "showNoData", value) end, behaviorId),
 		{ name = L["Layout"] or "Layout", kind = SettingType.Collapsible, id = layoutId, defaultCollapsed = false },
 		sliderSetting(L["damageMeterMaxRows"] or "Max rows", function() return cfg().maxRows end, function(value) self:SetConfigValue(index, "maxRows", clampNumber(value, 1, 30, DEFAULT_WINDOW.maxRows)) end, 1, 30, 1, layoutId),
 		sliderSetting(L["damageMeterVisibleRows"] or "Visible rows", function() return cfg().visibleRows end, function(value) self:SetConfigValue(index, "visibleRows", clampNumber(value, 1, 30, DEFAULT_WINDOW.visibleRows)) end, 1, 30, 1, layoutId),
@@ -4816,7 +5091,7 @@ function DamageMeter:BuildWindowSettings(index)
 			self:SetConfigValue(index, "showStatus", value)
 			requestEditModeSettingsRefresh()
 		end, statusId),
-		checkboxSetting(L["damageMeterShowFooterQuickSwitch"] or "Show quick switch", function() return cfg().showFooterQuickSwitch ~= false end, function(value) self:SetConfigValue(index, "showFooterQuickSwitch", value) end, statusId, statusEnabled),
+		checkboxSetting(L["damageMeterShowFooterQuickSwitch"] or "Show quick switch", function() return cfg().showFooterQuickSwitch ~= false end, function(value) self:SetConfigValue(index, "showFooterQuickSwitch", value) end, statusId, statusEnabled, L["damageMeterQuickSwitchTooltip"] or "Left-click cycles through selected quick switch favorites. Right-click opens the quick switch menu where favorites can be selected. Middle-click switches between Current and Overall."),
 		dropdownSetting(L["damageMeterFooterFont"] or "Footer font", function() return cfg().statusFontFace end, function(value) self:SetConfigValue(index, "statusFontFace", value) end, buildMediaOptions("font", true), statusId, 260, statusEnabled),
 		dropdownSetting(L["damageMeterFooterFontOutline"] or "Footer font outline", function() return cfg().statusFontOutline end, function(value) self:SetConfigValue(index, "statusFontOutline", normalizeStyle(value)) end, buildStyleOptions(), statusId, 180, statusEnabled),
 		sliderSetting(L["damageMeterFooterFontSize"] or "Footer font size", function() return cfg().statusFontSize end, function(value) self:SetConfigValue(index, "statusFontSize", clampNumber(value, 8, 24, DEFAULT_WINDOW.statusFontSize)) end, 8, 24, 1, statusId, statusEnabled),

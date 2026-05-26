@@ -2,6 +2,16 @@
 
 <!--@eqol-beta@-->
 
+## [10.21.0-beta8] - 2026-05-26
+
+### ✨ Added
+
+- Damage Meter / Visibility: Added an optional fade-until-mouseover mode with configurable faded opacity.
+- Damage Meter / Behavior: Added an option to hide the empty-state "No data" text.
+- Damage Meter / Footer: Added a settings tooltip for Quick Switch explaining left-click favorite cycling, right-click favorite selection, and middle-click Current/Overall switching.
+
+---
+
 ## [10.21.0-beta7] - 2026-05-26
 
 ### ✨ Added
