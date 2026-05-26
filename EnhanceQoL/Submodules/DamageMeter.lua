@@ -111,12 +111,12 @@ local DEFAULT_WINDOW = {
 	showStatus = true,
 	showNames = true,
 	showRanks = true,
-	prefixRankInName = false,
+	prefixRankInName = true,
 	rankGap = 2,
 	rankFontFace = GLOBAL_FONT_KEY,
 	rankFontOutline = GLOBAL_STYLE_KEY,
 	rankFontSize = 11,
-	showPercent = true,
+	showPercent = false,
 	hideRealmNames = true,
 	abbreviation = "short",
 	valueFormat = "slash",
@@ -891,7 +891,7 @@ local function getEffectiveRankWidth(config)
 	local rankFontSize = clampNumber(config.rankFontSize, 8, 24, DEFAULT_WINDOW.rankFontSize)
 	local maxRows = getEffectiveMaxRows(config)
 	local rankChars = #tostring(maxRows) + 1
-	return math.min(60, math.ceil(rankChars * rankFontSize * 0.52) + 3)
+	return math.min(80, math.max(18, math.ceil(rankChars * rankFontSize * 0.9) + 6))
 end
 
 local function getRowTextInsets(config)
@@ -2671,6 +2671,8 @@ function DamageMeter:CreateRow(window, index)
 	row.rank:SetPoint("LEFT", 4, 0)
 	row.rank:SetWidth(24)
 	row.rank:SetJustifyH("LEFT")
+	row.rank:SetWordWrap(false)
+	if row.rank.SetMaxLines then row.rank:SetMaxLines(1) end
 
 	row.iconFrame = CreateFrame("Frame", nil, row, "BackdropTemplate")
 	row.iconFrame:EnableMouse(false)
@@ -2785,9 +2787,8 @@ function DamageMeter:EnsureWindow(index)
 			return
 		end
 		if button == "MiddleButton" then
-			local config = DamageMeter:GetConfig(index)
-			config.sessionType = config.sessionType == "overall" and "current" or "overall"
-			DamageMeter:ScheduleRefresh()
+			local currentSessionType = DamageMeter:GetEffectiveSessionType(index) or DamageMeter:GetConfig(index).sessionType
+			DamageMeter:SetTemporarySessionType(index, currentSessionType == "overall" and "current" or "overall")
 			return
 		end
 		DamageMeter:CycleQuickDamageMeterType(index, 1)
@@ -3655,7 +3656,7 @@ function DamageMeter:BuildWindowSettings(index)
 		sliderSetting(L["damageMeterRaidMaxRows"] or "Raid max rows", function() return cfg().raidMaxRows end, function(value) self:SetConfigValue(index, "raidMaxRows", clampNumber(value, 1, 30, DEFAULT_WINDOW.raidMaxRows)) end, 1, 30, 1, layoutId, raidRowsEnabled),
 		sliderSetting(L["damageMeterRaidVisibleRows"] or "Raid visible rows", function() return cfg().raidVisibleRows end, function(value) self:SetConfigValue(index, "raidVisibleRows", clampNumber(value, 1, 30, DEFAULT_WINDOW.raidVisibleRows)) end, 1, 30, 1, layoutId, raidRowsEnabled),
 		dividerSetting(layoutId),
-		sliderSetting(L["Width"] or "Width", function() return cfg().width end, function(value) self:SetConfigValue(index, "width", clampNumber(value, 220, 700, DEFAULT_WINDOW.width)) end, 220, 700, 10, layoutId),
+		sliderSetting(L["Width"] or "Width", function() return cfg().width end, function(value) self:SetConfigValue(index, "width", clampNumber(value, 220, 700, DEFAULT_WINDOW.width)) end, 220, 700, 1, layoutId),
 		sliderSetting(L["damageMeterHeightOffset"] or "Height offset", function() return cfg().heightOffset end, function(value) self:SetConfigValue(index, "heightOffset", clampNumber(value, 0, 300, DEFAULT_WINDOW.heightOffset)) end, 0, 300, 1, layoutId),
 		dividerSetting(layoutId),
 		dropdownSetting(L["damageMeterHeaderPosition"] or "Header position", function() return normalizeHeaderPosition(cfg().headerPosition) end, function(value) self:SetConfigValue(index, "headerPosition", normalizeHeaderPosition(value)) end, buildHeaderPositionOptions(), layoutId, 120),
@@ -3684,11 +3685,11 @@ function DamageMeter:BuildWindowSettings(index)
 		dropdownSetting(L["damageMeterTitleFontOutline"] or "Title font outline", function() return cfg().titleFontOutline end, function(value) self:SetConfigValue(index, "titleFontOutline", normalizeStyle(value)) end, buildStyleOptions(), headerId, 180, headerEnabled),
 		sliderSetting(L["damageMeterTitleFontSize"] or "Title font size", function() return cfg().titleFontSize end, function(value) self:SetConfigValue(index, "titleFontSize", clampNumber(value, 8, 28, DEFAULT_WINDOW.titleFontSize)) end, 8, 28, 1, headerId, headerEnabled),
 		colorSetting(L["damageMeterHeaderColor"] or "Header color", function() return normalizeColor(cfg().titleColor, DEFAULT_WINDOW.titleColor) end, function(value) self:SetConfigValue(index, "titleColor", normalizeColor(value, DEFAULT_WINDOW.titleColor)) end, DEFAULT_WINDOW.titleColor, headerId, headerEnabled),
-		{ name = L["Status"] or "Status", kind = SettingType.Collapsible, id = statusId, defaultCollapsed = true },
-		checkboxSetting(L["damageMeterShowStatus"] or "Show status line", function() return cfg().showStatus ~= false end, function(value) self:SetConfigValue(index, "showStatus", value) end, statusId),
-		dropdownSetting(L["damageMeterStatusFont"] or "Status font", function() return cfg().statusFontFace end, function(value) self:SetConfigValue(index, "statusFontFace", value) end, buildMediaOptions("font", true), statusId, 260, statusEnabled),
-		dropdownSetting(L["damageMeterStatusFontOutline"] or "Status font outline", function() return cfg().statusFontOutline end, function(value) self:SetConfigValue(index, "statusFontOutline", normalizeStyle(value)) end, buildStyleOptions(), statusId, 180, statusEnabled),
-		sliderSetting(L["damageMeterStatusFontSize"] or "Status font size", function() return cfg().statusFontSize end, function(value) self:SetConfigValue(index, "statusFontSize", clampNumber(value, 8, 24, DEFAULT_WINDOW.statusFontSize)) end, 8, 24, 1, statusId, statusEnabled),
+		{ name = L["damageMeterQuickSwitch"] or "Quick switch", kind = SettingType.Collapsible, id = statusId, defaultCollapsed = true },
+		checkboxSetting(L["damageMeterShowStatus"] or "Show quick switch", function() return cfg().showStatus ~= false end, function(value) self:SetConfigValue(index, "showStatus", value) end, statusId),
+		dropdownSetting(L["damageMeterStatusFont"] or "Quick switch font", function() return cfg().statusFontFace end, function(value) self:SetConfigValue(index, "statusFontFace", value) end, buildMediaOptions("font", true), statusId, 260, statusEnabled),
+		dropdownSetting(L["damageMeterStatusFontOutline"] or "Quick switch font outline", function() return cfg().statusFontOutline end, function(value) self:SetConfigValue(index, "statusFontOutline", normalizeStyle(value)) end, buildStyleOptions(), statusId, 180, statusEnabled),
+		sliderSetting(L["damageMeterStatusFontSize"] or "Quick switch font size", function() return cfg().statusFontSize end, function(value) self:SetConfigValue(index, "statusFontSize", clampNumber(value, 8, 24, DEFAULT_WINDOW.statusFontSize)) end, 8, 24, 1, statusId, statusEnabled),
 		{ name = L["Bar"] or "Bar", kind = SettingType.Collapsible, id = barId, defaultCollapsed = true },
 		sliderSetting(L["damageMeterRowHeight"] or "Row height", function() return cfg().rowHeight end, function(value) self:SetConfigValue(index, "rowHeight", clampNumber(value, 10, 70, DEFAULT_WINDOW.rowHeight)) end, 10, 70, 1, barId),
 		dividerSetting(barId),

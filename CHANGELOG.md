@@ -2,6 +2,24 @@
 
 <!--@eqol-beta@-->
 
+## [10.21.0-beta3] - 2026-05-25
+
+### ✨ Added
+
+- Damage Meter / Profiles: Added a dedicated Damage Meter profile export/import section so players can share or restore only Damage Meter configuration without replacing the rest of the active profile.
+
+### 🔄 Changed
+
+- Damage Meter / Edit Mode: Renamed the status-line settings group to Quick switch and updated the related font controls to match what the setting actually controls.
+- Damage Meter: New default windows now prefix ranks in the name text and hide percent values by default.
+
+### 🐛 Fixed
+
+- Damage Meter / Edit Mode: Fixed the Layout width slider stepping in 10-pixel increments instead of single-pixel increments.
+- Damage Meter / Ranking: Fixed narrow rank columns abbreviating visible ranks with ellipses.
+
+---
+
 ## [10.21.0-beta2] - 2026-05-25
 
 ### ✨ Added
