@@ -8,6 +8,7 @@
 
 - Damage Meter / Header: Added optional header background texture and color controls.
 - Damage Meter / Rows: Added a unified row border around the icon and bar with texture, color, class-color, size, and offset controls.
+- Damage Meter / Tooltip: Added vertical anchor and grow-direction controls for row tooltips.
 - Damage Meter / Values: Added a delimiter selector for total/rate value text so players can choose separators such as `/`, `|`, `-`, or spacing.
 
 ### 🐛 Fixed

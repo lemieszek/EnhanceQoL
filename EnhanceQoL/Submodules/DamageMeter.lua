@@ -184,6 +184,8 @@ local DEFAULT_WINDOW = {
 	tooltipEnabled = true,
 	tooltipPreview = false,
 	tooltipAnchor = "RIGHT",
+	tooltipAnchorV = "CENTER",
+	tooltipGrow = "DOWN",
 	tooltipOffsetX = 8,
 	tooltipOffsetY = 0,
 	tooltipFontFace = GLOBAL_FONT_KEY,
@@ -411,6 +413,13 @@ local function buildTooltipAnchorOptions()
 		{ value = "LEFT", label = _G.LEFT or "Left" },
 		{ value = "TOP", label = _G.TOP or "Top" },
 		{ value = "BOTTOM", label = _G.BOTTOM or "Bottom" },
+	}
+end
+
+local function buildTooltipGrowOptions()
+	return {
+		{ value = "DOWN", label = L["damageMeterRowsGrowDown"] or "Down" },
+		{ value = "UP", label = L["damageMeterRowsGrowUp"] or "Up" },
 	}
 end
 
@@ -1027,6 +1036,10 @@ end
 local function normalizeTooltipAnchor(value)
 	if value == "LEFT" or value == "TOP" or value == "BOTTOM" then return value end
 	return "RIGHT"
+end
+
+local function normalizeTooltipGrow(value)
+	return value == "UP" and "UP" or "DOWN"
 end
 
 local function normalizeHeaderPosition(value)
@@ -2609,16 +2622,29 @@ end
 function DamageMeter:AnchorSourceTooltip(frame, owner, config)
 	frame:ClearAllPoints()
 	local anchor = normalizeTooltipAnchor(config.tooltipAnchor)
+	local anchorV = normalizeAnchorV(config.tooltipAnchorV)
 	local offsetX = clampNumber(config.tooltipOffsetX, -300, 300, DEFAULT_WINDOW.tooltipOffsetX)
 	local offsetY = clampNumber(config.tooltipOffsetY, -300, 300, DEFAULT_WINDOW.tooltipOffsetY)
 	if anchor == "LEFT" then
-		frame:SetPoint("RIGHT", owner, "LEFT", -offsetX, offsetY)
+		if anchorV == "TOP" then
+			frame:SetPoint("TOPRIGHT", owner, "TOPLEFT", -offsetX, offsetY)
+		elseif anchorV == "BOTTOM" then
+			frame:SetPoint("BOTTOMRIGHT", owner, "BOTTOMLEFT", -offsetX, offsetY)
+		else
+			frame:SetPoint("RIGHT", owner, "LEFT", -offsetX, offsetY)
+		end
 	elseif anchor == "TOP" then
 		frame:SetPoint("BOTTOMLEFT", owner, "TOPLEFT", offsetX, offsetY)
 	elseif anchor == "BOTTOM" then
 		frame:SetPoint("TOPLEFT", owner, "BOTTOMLEFT", offsetX, -offsetY)
 	else
-		frame:SetPoint("LEFT", owner, "RIGHT", offsetX, offsetY)
+		if anchorV == "TOP" then
+			frame:SetPoint("TOPLEFT", owner, "TOPRIGHT", offsetX, offsetY)
+		elseif anchorV == "BOTTOM" then
+			frame:SetPoint("BOTTOMLEFT", owner, "BOTTOMRIGHT", offsetX, offsetY)
+		else
+			frame:SetPoint("LEFT", owner, "RIGHT", offsetX, offsetY)
+		end
 	end
 end
 
@@ -2877,14 +2903,21 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 	frame.border:Show()
 	self:AnchorSourceTooltip(frame, owner, config)
 
+	local growUp = normalizeTooltipGrow(config.tooltipGrow) == "UP"
 	local yOffset = 5
 	for lineIndex = 1, shown do
 		local line = self:GetTooltipLine(frame, lineIndex)
 		local data = rows[lineIndex]
 		if data then
 			local currentLineHeight = lineHeight * (data.heightMultiplier or 1)
-			line:SetPoint("TOPLEFT", 0, -yOffset)
-			line:SetPoint("TOPRIGHT", 0, -yOffset)
+			line:ClearAllPoints()
+			if growUp then
+				line:SetPoint("BOTTOMLEFT", 0, yOffset)
+				line:SetPoint("BOTTOMRIGHT", 0, yOffset)
+			else
+				line:SetPoint("TOPLEFT", 0, -yOffset)
+				line:SetPoint("TOPRIGHT", 0, -yOffset)
+			end
 			line:SetHeight(currentLineHeight)
 			self:ApplyTooltipFontString(line.name, config)
 			self:ApplyTooltipFontString(line.amount, config)
@@ -4228,6 +4261,8 @@ function DamageMeter:BuildWindowSettings(index)
 		checkboxSetting(L["damageMeterTooltipPreview"] or "Preview tooltip", function() return cfg().tooltipPreview == true end, function(value) self:SetConfigValue(index, "tooltipPreview", value) end, tooltipId, tooltipEnabled),
 		dividerSetting(tooltipId),
 		dropdownSetting(L["damageMeterTooltipAnchor"] or "Tooltip anchor", function() return normalizeTooltipAnchor(cfg().tooltipAnchor) end, function(value) self:SetConfigValue(index, "tooltipAnchor", normalizeTooltipAnchor(value)) end, buildTooltipAnchorOptions(), tooltipId, 120, tooltipEnabled),
+		dropdownSetting(L["damageMeterTooltipVerticalAnchor"] or "Vertical anchor", function() return normalizeAnchorV(cfg().tooltipAnchorV) end, function(value) self:SetConfigValue(index, "tooltipAnchorV", normalizeAnchorV(value)) end, buildVerticalAnchorOptions(), tooltipId, 120, tooltipEnabled),
+		dropdownSetting(L["damageMeterTooltipGrow"] or "Grow", function() return normalizeTooltipGrow(cfg().tooltipGrow) end, function(value) self:SetConfigValue(index, "tooltipGrow", normalizeTooltipGrow(value)) end, buildTooltipGrowOptions(), tooltipId, 120, tooltipEnabled),
 		sliderSetting(L["damageMeterTooltipOffsetX"] or "Tooltip X offset", function() return cfg().tooltipOffsetX end, function(value) self:SetConfigValue(index, "tooltipOffsetX", clampNumber(value, -300, 300, DEFAULT_WINDOW.tooltipOffsetX)) end, -300, 300, 1, tooltipId, tooltipEnabled),
 		sliderSetting(L["damageMeterTooltipOffsetY"] or "Tooltip Y offset", function() return cfg().tooltipOffsetY end, function(value) self:SetConfigValue(index, "tooltipOffsetY", clampNumber(value, -300, 300, DEFAULT_WINDOW.tooltipOffsetY)) end, -300, 300, 1, tooltipId, tooltipEnabled),
 		sliderSetting(L["damageMeterTooltipWidth"] or "Tooltip width", function() return cfg().tooltipWidth end, function(value) self:SetConfigValue(index, "tooltipWidth", clampNumber(value, 220, 600, DEFAULT_WINDOW.tooltipWidth)) end, 220, 600, 10, tooltipId, tooltipEnabled),
