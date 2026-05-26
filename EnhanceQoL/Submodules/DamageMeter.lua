@@ -1,4 +1,4 @@
--- luacheck: globals C_DamageMeter C_DeathRecap C_LFGInfo C_Spell C_StringUtil C_CVar SetCVar StaticPopupDialogs StaticPopup_Show YES CANCEL MenuUtil GameTooltip SecondsToClock DAMAGE_METER_COMBAT_NUMBER CLASS_ICON_TCOORDS UnitClass UnitExists UnitGUID IsInRaid Ambiguate UISpecialFrames GetCursorPosition GetTime ACTION_SWING ACTION_ENVIRONMENTAL_DAMAGE_DROWNING ACTION_ENVIRONMENTAL_DAMAGE_FALLING ACTION_ENVIRONMENTAL_DAMAGE_FIRE ACTION_ENVIRONMENTAL_DAMAGE_LAVA ACTION_ENVIRONMENTAL_DAMAGE_SLIME ACTION_ENVIRONMENTAL_DAMAGE_FATIGUE DEATH_RECAP_TITLE CreateAbbreviateConfig
+-- luacheck: globals C_DamageMeter C_DeathRecap C_LFGInfo C_Spell C_StringUtil C_CVar C_RestrictedActions SetCVar StaticPopupDialogs StaticPopup_Show YES CANCEL OKAY MenuUtil GameTooltip SecondsToClock DAMAGE_METER_COMBAT_NUMBER CLASS_ICON_TCOORDS UnitClass UnitExists UnitGUID UnitAffectingCombat IsInRaid Ambiguate UISpecialFrames GetCursorPosition GetTime ACTION_SWING ACTION_ENVIRONMENTAL_DAMAGE_DROWNING ACTION_ENVIRONMENTAL_DAMAGE_FALLING ACTION_ENVIRONMENTAL_DAMAGE_FIRE ACTION_ENVIRONMENTAL_DAMAGE_LAVA ACTION_ENVIRONMENTAL_DAMAGE_SLIME ACTION_ENVIRONMENTAL_DAMAGE_FATIGUE DEATH_RECAP_TITLE CreateAbbreviateConfig
 local addonName, addon = ...
 
 local L = LibStub("AceLocale-3.0"):GetLocale(addonName)
@@ -117,6 +117,7 @@ local DEFAULT_WINDOW = {
 	showHeaderType = true,
 	showHeaderTime = true,
 	showHeaderButtons = true,
+	showHeaderReportButton = true,
 	headerButtonSize = 16,
 	headerButtonOffsetX = 0,
 	headerButtonOffsetY = 0,
@@ -127,6 +128,10 @@ local DEFAULT_WINDOW = {
 	headerBackgroundEnabled = false,
 	headerBackgroundTexture = "",
 	headerBackgroundColor = { r = 0, g = 0, b = 0, a = 0.35 },
+	headerBackgroundOffsetX = 0,
+	headerBackgroundOffsetY = 0,
+	headerBackgroundSizeOffsetX = 0,
+	headerBackgroundSizeOffsetY = 0,
 	headerTextOffsetX = 0,
 	headerTextOffsetY = 0,
 	headerFormat = "timeTypeDash",
@@ -859,6 +864,75 @@ local ROW_VALUE_FORMATTERS = {
 	death = formatDeathRowValueText,
 	perSecond = formatPerSecondRowValueText,
 }
+
+local function isReportFieldSafe(value)
+	return value ~= nil and not isSecret(value)
+end
+
+local function getReportValueMode(damageMeterType, config)
+	return getRowValueMode(damageMeterType, config)
+end
+
+local function isSourceReportable(source, damageMeterType, config, requirePercent)
+	if not source or isSecret(source.name) then return false end
+	local valueMode = getReportValueMode(damageMeterType, config)
+	if valueMode == "death" then
+		return isReportFieldSafe(source.deathTimeSeconds)
+	end
+	if valueMode == "perSecond" then
+		return isReportFieldSafe(source.amountPerSecond)
+	end
+	if valueMode == "amountAndRate" then
+		return isReportFieldSafe(source.totalAmount) and isReportFieldSafe(source.amountPerSecond)
+	end
+	if requirePercent then
+		return isReportFieldSafe(source.totalAmount)
+	end
+	return isReportFieldSafe(source.totalAmount)
+end
+
+local function getReportChannelLabel(chatType)
+	if chatType == "SAY" then return _G.SAY or "Say" end
+	if chatType == "PARTY" then return _G.PARTY or "Party" end
+	if chatType == "RAID" then return _G.RAID or "Raid" end
+	if chatType == "INSTANCE_CHAT" then return _G.INSTANCE_CHAT or "Instance" end
+	if chatType == "GUILD" then return _G.GUILD or "Guild" end
+	if chatType == "WHISPER" then return _G.WHISPER or "Whisper" end
+	return chatType
+end
+
+local function sanitizeReportChatMessage(message)
+	message = tostring(message or "")
+	message = message:gsub("|", "||")
+	if #message <= 255 then return message end
+	message = message:sub(1, 252)
+	while message:sub(-1) == "|" do
+		message = message:sub(1, -2)
+	end
+	return message .. "..."
+end
+
+local REPORT_CHANNELS = {
+	{ chatType = "SAY" },
+	{ chatType = "PARTY" },
+	{ chatType = "RAID" },
+	{ chatType = "INSTANCE_CHAT" },
+	{ chatType = "GUILD" },
+	{ chatType = "WHISPER" },
+}
+
+local function getRestrictionTypes()
+	local restrictionTypes = Enum and Enum.AddOnRestrictionType
+	if not restrictionTypes then return nil end
+	return {
+		restrictionTypes.Combat,
+		restrictionTypes.Encounter,
+		restrictionTypes.ChallengeMode,
+		restrictionTypes.PvPMatch,
+		restrictionTypes.Map,
+		restrictionTypes.Chat,
+	}
+end
 
 local function isInFollowerDungeon()
 	if C_LFGInfo and C_LFGInfo.IsInLFGFollowerDungeon then
@@ -2247,31 +2321,39 @@ function DamageMeter:UpdateHeaderButtonAlpha(frame)
 	if frame.headerButtons then frame.headerButtons:SetAlpha(alpha) end
 	if frame.resetButton then frame.resetButton:SetAlpha(alpha) end
 	if frame.historyButton then frame.historyButton:SetAlpha(alpha) end
+	if frame.reportButton then frame.reportButton:SetAlpha(alpha) end
 end
 
 function DamageMeter:ApplyHeaderButtons(frame, config, showHeaderButtons)
 	local buttonSize = clampNumber(config.headerButtonSize, 10, 32, DEFAULT_WINDOW.headerButtonSize)
 	local gap = math.max(2, math.floor(buttonSize / 4))
 	local iconSize = math.max(8, buttonSize - 2)
+	local showReportButton = showHeaderButtons and config.showHeaderReportButton ~= false
+	local buttonCount = showReportButton and 3 or 2
 	local color = normalizeColor(config.headerButtonColor, DEFAULT_WINDOW.headerButtonColor)
 	local alpha = clampNumber(config.headerButtonAlpha, 0, 1, DEFAULT_WINDOW.headerButtonAlpha)
 	local fadeAlpha = clampNumber(config.headerButtonFadeAlpha, 0, 1, DEFAULT_WINDOW.headerButtonFadeAlpha)
 	local fadeEnabled = config.headerButtonFadeEnabled == true
-	local signature = buttonSize .. ":" .. gap .. ":" .. iconSize .. ":" .. tostring(showHeaderButtons == true)
+	local signature = buttonSize .. ":" .. gap .. ":" .. iconSize .. ":" .. tostring(showHeaderButtons == true) .. ":" .. tostring(showReportButton == true)
 	if frame.headerButtons._damageMeterHeaderButtonsSignature ~= signature then
 		frame.headerButtons._damageMeterHeaderButtonsSignature = signature
-		frame.headerButtons:SetSize((buttonSize * 2) + gap, buttonSize)
+		frame.headerButtons:SetSize((buttonSize * buttonCount) + (gap * math.max(0, buttonCount - 1)), buttonSize)
 		frame.resetButton:SetSize(buttonSize, buttonSize)
 		frame.historyButton:SetSize(buttonSize, buttonSize)
+		frame.reportButton:SetSize(buttonSize, buttonSize)
 		frame.resetButton.icon:SetSize(iconSize, iconSize)
 		frame.historyButton.icon:SetSize(iconSize, iconSize)
+		frame.reportButton.icon:SetSize(iconSize, iconSize)
 		frame.resetButton:ClearAllPoints()
 		frame.resetButton:SetPoint("RIGHT", frame.headerButtons, "RIGHT", 0, 0)
 		frame.historyButton:ClearAllPoints()
 		frame.historyButton:SetPoint("RIGHT", frame.resetButton, "LEFT", -gap, 0)
+		frame.reportButton:ClearAllPoints()
+		frame.reportButton:SetPoint("RIGHT", frame.historyButton, "LEFT", -gap, 0)
 		setShownIfChanged(frame.headerButtons, showHeaderButtons)
 		setShownIfChanged(frame.resetButton, showHeaderButtons)
 		setShownIfChanged(frame.historyButton, showHeaderButtons)
+		setShownIfChanged(frame.reportButton, showReportButton)
 	end
 	if frame.headerButtons._damageMeterHeaderButtonColorR ~= color.r
 		or frame.headerButtons._damageMeterHeaderButtonColorG ~= color.g
@@ -2283,15 +2365,17 @@ function DamageMeter:ApplyHeaderButtons(frame, config, showHeaderButtons)
 		frame.headerButtons._damageMeterHeaderButtonColorA = color.a
 		frame.resetButton.icon:SetVertexColor(color.r, color.g, color.b, color.a)
 		frame.historyButton.icon:SetVertexColor(color.r, color.g, color.b, color.a)
+		frame.reportButton.icon:SetVertexColor(color.r, color.g, color.b, color.a)
 		frame.resetButton.text:SetTextColor(color.r, color.g, color.b, color.a)
 		frame.historyButton.text:SetTextColor(color.r, color.g, color.b, color.a)
+		frame.reportButton.text:SetTextColor(color.r, color.g, color.b, color.a)
 	end
 	frame._damageMeterHeaderButtonAlpha = alpha
 	frame._damageMeterHeaderButtonFadeAlpha = fadeAlpha
 	frame._damageMeterHeaderButtonFadeEnabled = fadeEnabled
 	if not showHeaderButtons then frame._damageMeterHeaderButtonHover = nil end
 	self:UpdateHeaderButtonAlpha(frame)
-	return showHeaderButtons and ((buttonSize * 2) + gap + 12) or 8
+	return showHeaderButtons and ((buttonSize * buttonCount) + (gap * math.max(0, buttonCount - 1)) + 12) or 8
 end
 
 function DamageMeter:EnsureContextMenu()
@@ -3161,6 +3245,9 @@ function DamageMeter:EnsureWindow(index)
 	local historyButton = self:CreateHeaderButton(frame, "H", "questlog-questtypeicon-clockyellow", L["damageMeterShowHistory"] or "Show history", function(owner) DamageMeter:OpenHistoryMenu(owner, index) end)
 	historyButton:SetPoint("RIGHT", resetButton, "LEFT", -4, 0)
 	frame.historyButton = historyButton
+	local reportButton = self:CreateHeaderButton(frame, "!", nil, L["damageMeterReport"] or "Report", function() DamageMeter:OpenReportDialog(index) end)
+	reportButton:SetPoint("RIGHT", historyButton, "LEFT", -4, 0)
+	frame.reportButton = reportButton
 
 	local rowsViewport = CreateFrame("ScrollFrame", nil, frame)
 	rowsViewport:SetPoint("TOPLEFT", 4, -28)
@@ -3305,6 +3392,10 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 	local headerTextOffsetY = clampNumber(config.headerTextOffsetY, -100, 100, DEFAULT_WINDOW.headerTextOffsetY)
 	local headerButtonOffsetX = clampNumber(config.headerButtonOffsetX, -100, 100, DEFAULT_WINDOW.headerButtonOffsetX)
 	local headerButtonOffsetY = clampNumber(config.headerButtonOffsetY, -100, 100, DEFAULT_WINDOW.headerButtonOffsetY)
+	local headerBackgroundOffsetX = clampNumber(config.headerBackgroundOffsetX, -200, 200, DEFAULT_WINDOW.headerBackgroundOffsetX)
+	local headerBackgroundOffsetY = clampNumber(config.headerBackgroundOffsetY, -200, 200, DEFAULT_WINDOW.headerBackgroundOffsetY)
+	local headerBackgroundSizeOffsetX = clampNumber(config.headerBackgroundSizeOffsetX, -200, 200, DEFAULT_WINDOW.headerBackgroundSizeOffsetX)
+	local headerBackgroundSizeOffsetY = clampNumber(config.headerBackgroundSizeOffsetY, -200, 200, DEFAULT_WINDOW.headerBackgroundSizeOffsetY)
 	frame.contentRows = contentRows
 
 	local texture = resolveMedia("statusbar", config.texture, DEFAULT_TEXTURE)
@@ -3320,16 +3411,16 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 	frame.headerButtons:ClearAllPoints()
 	frame.status:ClearAllPoints()
 	if headerPosition == "BOTTOM" then
-		frame.headerBackground:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 4, 4 + bottomOffset)
-		frame.headerBackground:SetPoint("TOPRIGHT", frame, "BOTTOMRIGHT", -4, 4 + bottomOffset + headerHeight)
+		frame.headerBackground:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 4 + headerBackgroundOffsetX - headerBackgroundSizeOffsetX, 4 + bottomOffset + headerBackgroundOffsetY - headerBackgroundSizeOffsetY)
+		frame.headerBackground:SetPoint("TOPRIGHT", frame, "BOTTOMRIGHT", -4 + headerBackgroundOffsetX + headerBackgroundSizeOffsetX, 4 + bottomOffset + headerHeight + headerBackgroundOffsetY + headerBackgroundSizeOffsetY)
 		frame.header:SetPoint("BOTTOMLEFT", 8 + headerTextOffsetX, 7 + bottomOffset + headerTextOffsetY)
 		frame.header:SetPoint("BOTTOMRIGHT", -headerButtonTextInset + headerTextOffsetX, 7 + bottomOffset + headerTextOffsetY)
 		frame.headerButtons:SetPoint("BOTTOMRIGHT", -8 + headerButtonOffsetX, 7 + bottomOffset + headerButtonOffsetY)
 		frame.status:SetPoint("BOTTOMLEFT", 4, 4 + bottomOffset + headerHeight)
 		frame.status:SetPoint("BOTTOMRIGHT", -4, 4 + bottomOffset + headerHeight)
 	else
-		frame.headerBackground:SetPoint("TOPLEFT", frame, "TOPLEFT", 4, -(topOffset + 4))
-		frame.headerBackground:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", -4, -(topOffset + headerHeight))
+		frame.headerBackground:SetPoint("TOPLEFT", frame, "TOPLEFT", 4 + headerBackgroundOffsetX - headerBackgroundSizeOffsetX, -(topOffset + 4) + headerBackgroundOffsetY + headerBackgroundSizeOffsetY)
+		frame.headerBackground:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", -4 + headerBackgroundOffsetX + headerBackgroundSizeOffsetX, -(topOffset + headerHeight) + headerBackgroundOffsetY - headerBackgroundSizeOffsetY)
 		frame.header:SetPoint("TOPLEFT", 8 + headerTextOffsetX, -(7 + topOffset) + headerTextOffsetY)
 		frame.header:SetPoint("TOPRIGHT", -headerButtonTextInset + headerTextOffsetX, -(7 + topOffset) + headerTextOffsetY)
 		frame.headerButtons:SetPoint("TOPRIGHT", -8 + headerButtonOffsetX, -(7 + topOffset) + headerButtonOffsetY)
@@ -3491,6 +3582,279 @@ function DamageMeter:UpdateHeader(index, session, state)
 	end
 end
 
+function DamageMeter:GetReportOrderedSources(session, damageMeterType)
+	local sources = session and type(session.combatSources) == "table" and session.combatSources or {}
+	if damageMeterType ~= "Deaths" or #sources <= 1 then return sources end
+	local orderedSources = {}
+	local hasComparableDeathTime = false
+	for _, source in ipairs(sources) do
+		if safeNumber(source and source.deathTimeSeconds) then
+			hasComparableDeathTime = true
+			break
+		end
+	end
+	if hasComparableDeathTime then
+		for sourceIndex, source in ipairs(sources) do
+			orderedSources[sourceIndex] = source
+		end
+		table.sort(orderedSources, function(left, right)
+			local leftTime = safeNumber(left and left.deathTimeSeconds) or math.huge
+			local rightTime = safeNumber(right and right.deathTimeSeconds) or math.huge
+			return leftTime < rightTime
+		end)
+	else
+		for sourceIndex = 1, #sources do
+			orderedSources[sourceIndex] = sources[#sources - sourceIndex + 1]
+		end
+	end
+	return orderedSources
+end
+
+function DamageMeter:IsReportDataAvailable(session, orderedSources, damageMeterType, config, lineLimit)
+	if self:IsReportRestricted() then return false end
+	if not session or type(orderedSources) ~= "table" or #orderedSources == 0 then return false end
+	local requirePercent = config.showPercent ~= false and damageMeterType ~= "Deaths"
+	if requirePercent and not isReportFieldSafe(session.totalAmount) then return false end
+	lineLimit = clampNumber(lineLimit, 1, 20, 10)
+	for sourceIndex = 1, math.min(lineLimit, #orderedSources) do
+		if not isSourceReportable(orderedSources[sourceIndex], damageMeterType, config, requirePercent) then
+			return false
+		end
+	end
+	return true
+end
+
+function DamageMeter:RefreshReportRestrictionState(restrictionType, state)
+	local restrictionStates = Enum and Enum.AddOnRestrictionState
+	if restrictionStates and (state == restrictionStates.Active or state == restrictionStates.Activating) then
+		self.reportRestrictionActive = true
+		return
+	end
+	self.reportRestrictionActive = false
+	if not C_RestrictedActions or not C_RestrictedActions.GetAddOnRestrictionState then return end
+	local restrictionTypes = getRestrictionTypes()
+	if not restrictionTypes then return end
+	for _, knownType in ipairs(restrictionTypes) do
+		if knownType ~= nil and (restrictionType == nil or knownType ~= restrictionType) then
+			local currentState = C_RestrictedActions.GetAddOnRestrictionState(knownType)
+			if restrictionStates and currentState ~= restrictionStates.Inactive then
+				self.reportRestrictionActive = true
+				return
+			end
+		end
+	end
+end
+
+function DamageMeter:IsReportRestricted()
+	if self.reportRestrictionActive == nil then
+		self:RefreshReportRestrictionState()
+	end
+	return self.reportRestrictionActive == true
+end
+
+function DamageMeter:FormatReportValue(source, session, damageMeterType, config)
+	local valueMode = getReportValueMode(damageMeterType, config)
+	if valueMode == "death" then return formatDeathTimeText(source) end
+	local abbreviation = config.abbreviation
+	local text
+	if valueMode == "count" or valueMode == "amount" then
+		text = formatNumber(source.totalAmount, abbreviation)
+	elseif valueMode == "perSecond" then
+		text = formatNumber(source.amountPerSecond, abbreviation)
+	else
+		local amountText = formatNumber(source.totalAmount, abbreviation)
+		local rateText = formatNumber(source.amountPerSecond, abbreviation)
+		text = config.valueFormat == "parentheses" and (amountText .. " (" .. rateText .. ")") or joinValueText(amountText, rateText, config.valueSeparator)
+	end
+	if config.showPercent ~= false then
+		local totalAmount = safeNumber(session and session.totalAmount)
+		local amount = safeNumber(source.totalAmount)
+		if totalAmount and totalAmount > 0 and amount then
+			text = string.format("%s (%.1f%%)", text, amount / totalAmount * 100)
+		end
+	end
+	return text
+end
+
+function DamageMeter:BuildReportLines(index, lineLimit)
+	local state = self:BuildWindowRefreshState(index)
+	if not state.visible then return nil, L["damageMeterReportNoData"] or "No reportable Damage Meter data." end
+	local config = state.config
+	local session = self:GetSessionForState(state)
+	local damageMeterType = state.damageMeterType
+	local orderedSources = self:GetReportOrderedSources(session, damageMeterType)
+	lineLimit = clampNumber(lineLimit, 1, 20, 10)
+	if not self:IsReportDataAvailable(session, orderedSources, damageMeterType, config, math.min(lineLimit, #orderedSources)) then
+		return nil, L["damageMeterReportRestricted"] or "Report data is restricted right now."
+	end
+	local sessionLabel = state.sessionID and (state.temporary and state.temporary.sessionName or L["damageMeterHistory"] or "History") or (state.sessionType == "overall" and (L["damageMeterOverall"] or "Overall") or (L["damageMeterCurrent"] or "Current"))
+	local duration = self:GetSessionDuration(index, session, state)
+	local typeLabel = getDamageMeterTypeLabel(damageMeterType)
+	local header = string.format("EnhanceQoL: %s - %s", sessionLabel or "", typeLabel or "")
+	local durationText = formatDuration(duration, "smart")
+	if durationText then header = string.format("%s (%s)", header, durationText) end
+	local lines = { header }
+	for sourceIndex = 1, math.min(lineLimit, #orderedSources) do
+		local source = orderedSources[sourceIndex]
+		local name = formatSourceName(source and source.name, config)
+		if isSecret(name) then return nil, L["damageMeterReportRestricted"] or "Report data is restricted right now." end
+		lines[#lines + 1] = string.format("%d. %s: %s", sourceIndex, tostring(name), self:FormatReportValue(source, session, damageMeterType, config))
+	end
+	if #lines <= 1 then return nil, L["damageMeterReportNoData"] or "No reportable Damage Meter data." end
+	return lines
+end
+
+function DamageMeter:IsReportChannelAvailable(chatType, target)
+	if chatType == "SAY" then return true end
+	if chatType == "PARTY" then return _G.IsInGroup and _G.IsInGroup() == true and not (IsInRaid and IsInRaid() == true) end
+	if chatType == "RAID" then return IsInRaid and IsInRaid() == true end
+	if chatType == "INSTANCE_CHAT" then return _G.IsInGroup and _G.IsInGroup(_G.LE_PARTY_CATEGORY_INSTANCE) == true end
+	if chatType == "GUILD" then return _G.IsInGuild and _G.IsInGuild() == true end
+	if chatType == "WHISPER" then return target and target ~= "" end
+	return false
+end
+
+function DamageMeter:GetAvailableReportChannels()
+	local channels = self.availableReportChannels
+	if not channels then
+		channels = {}
+		self.availableReportChannels = channels
+	else
+		for index = #channels, 1, -1 do
+			channels[index] = nil
+		end
+	end
+	for _, channel in ipairs(REPORT_CHANNELS) do
+		if channel.chatType == "WHISPER" or self:IsReportChannelAvailable(channel.chatType) then
+			channels[#channels + 1] = channel
+		end
+	end
+	return channels
+end
+
+function DamageMeter:SetReportDialogChannel(frame, chatType)
+	frame.selectedChatType = chatType or "SAY"
+	frame.channelButton:SetText(getReportChannelLabel(frame.selectedChatType))
+	local whisper = frame.selectedChatType == "WHISPER"
+	frame.targetLabel:SetShown(whisper)
+	frame.targetBox:SetShown(whisper)
+	frame:SetHeight(whisper and 220 or 184)
+end
+
+function DamageMeter:SendReport(index, chatType, lineLimit, target)
+	if not _G.SendChatMessage then return end
+	if not self:IsReportChannelAvailable(chatType, target) then
+		print(L["damageMeterReportChannelUnavailable"] or "That report channel is not available right now.")
+		return
+	end
+	local lines, errorText = self:BuildReportLines(index, lineLimit)
+	if not lines then
+		print(errorText or (L["damageMeterReportNoData"] or "No reportable Damage Meter data."))
+		return
+	end
+	for lineIndex, line in ipairs(lines) do
+		local message = sanitizeReportChatMessage(line)
+		local sendTarget = chatType == "WHISPER" and target or nil
+		if C_Timer and C_Timer.NewTimer then
+			C_Timer.NewTimer(lineIndex * 0.2, function()
+				_G.SendChatMessage(message, chatType, nil, sendTarget)
+			end)
+		else
+			_G.SendChatMessage(message, chatType, nil, sendTarget)
+		end
+	end
+end
+
+function DamageMeter:EnsureReportDialog()
+	if self.reportDialog then return self.reportDialog end
+	local frame = CreateFrame("Frame", "EnhanceQoLDamageMeterReportDialog", UIParent, "BackdropTemplate")
+	frame:SetFrameStrata("DIALOG")
+	frame:SetFrameLevel(90)
+	frame:SetSize(360, 270)
+	frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+	frame:SetClampedToScreen(true)
+	frame:SetToplevel(true)
+	frame:EnableMouse(true)
+	frame:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
+	frame:SetBackdropColor(0.02, 0.02, 0.025, 0.96)
+	frame:SetBackdropBorderColor(0.22, 0.24, 0.28, 1)
+	frame:Hide()
+	frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+	frame.title:SetPoint("TOPLEFT", 16, -14)
+	frame.title:SetText(L["damageMeterReportTitle"] or "Report Damage Meter")
+	frame.channelLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	frame.channelLabel:SetPoint("TOPLEFT", frame.title, "BOTTOMLEFT", 0, -18)
+	frame.channelLabel:SetText(L["damageMeterReportChannel"] or "Channel")
+	frame.channelButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+	frame.channelButton:SetSize(150, 24)
+	frame.channelButton:SetPoint("LEFT", frame.channelLabel, "RIGHT", 12, 0)
+	frame.channelButton:SetScript("OnClick", function(owner)
+		if not MenuUtil or not MenuUtil.CreateContextMenu then return end
+		MenuUtil.CreateContextMenu(owner, function(_, rootDescription)
+			for _, channel in ipairs(DamageMeter:GetAvailableReportChannels()) do
+				rootDescription:CreateButton(getReportChannelLabel(channel.chatType), function()
+					DamageMeter:SetReportDialogChannel(frame, channel.chatType)
+				end)
+			end
+		end)
+	end)
+	frame.linesLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	frame.linesLabel:SetPoint("TOPLEFT", frame.channelLabel, "BOTTOMLEFT", 0, -18)
+	frame.linesLabel:SetText(L["damageMeterReportLines"] or "Lines")
+	frame.linesBox = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
+	frame.linesBox:SetSize(54, 24)
+	frame.linesBox:SetPoint("LEFT", frame.linesLabel, "RIGHT", 12, 0)
+	frame.linesBox:SetAutoFocus(false)
+	frame.linesBox:SetNumeric(true)
+	frame.linesBox:SetNumber(5)
+	frame.targetLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	frame.targetLabel:SetPoint("TOPLEFT", frame.linesLabel, "BOTTOMLEFT", 0, -18)
+	frame.targetLabel:SetText(L["damageMeterReportTarget"] or "Whisper target")
+	frame.targetBox = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
+	frame.targetBox:SetSize(180, 24)
+	frame.targetBox:SetPoint("LEFT", frame.targetLabel, "RIGHT", 12, 0)
+	frame.targetBox:SetAutoFocus(false)
+	frame.send = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+	frame.send:SetSize(96, 24)
+	frame.send:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 16, 14)
+	frame.send:SetText(OKAY or "Okay")
+	frame.send:SetScript("OnClick", function()
+		local target = frame.targetBox:GetText()
+		local lines = clampNumber(frame.linesBox:GetNumber(), 1, 20, 5)
+		DamageMeter:SendReport(frame.index or 1, frame.selectedChatType or "SAY", lines, target)
+		frame:Hide()
+	end)
+	frame.cancel = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+	frame.cancel:SetSize(96, 24)
+	frame.cancel:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -16, 14)
+	frame.cancel:SetText(CANCEL or "Cancel")
+	frame.cancel:SetScript("OnClick", function() frame:Hide() end)
+	table.insert(UISpecialFrames, frame:GetName())
+	self.reportDialog = frame
+	return frame
+end
+
+function DamageMeter:OpenReportDialog(index)
+	local _, errorText = self:BuildReportLines(index, 1)
+	if errorText then
+		print(errorText)
+		return
+	end
+	local frame = self:EnsureReportDialog()
+	frame.index = index
+	frame.title:SetText(L["damageMeterReportTitle"] or "Report Damage Meter")
+	frame.channelLabel:SetText(L["damageMeterReportChannel"] or "Channel")
+	frame.linesLabel:SetText(L["damageMeterReportLines"] or "Lines")
+	frame.targetLabel:SetText(L["damageMeterReportTarget"] or "Whisper target")
+	if not frame.linesBox:GetNumber() or frame.linesBox:GetNumber() < 1 then frame.linesBox:SetNumber(5) end
+	local channels = self:GetAvailableReportChannels()
+	local selectedChatType = channels[1] and channels[1].chatType or "WHISPER"
+	self:SetReportDialogChannel(frame, selectedChatType)
+	frame:ClearAllPoints()
+	frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+	frame:Show()
+end
+
 function DamageMeter:RefreshWindow(index, shared, sessionCache)
 	local state = self:BuildWindowRefreshState(index, shared)
 	local frame = self:EnsureWindow(index)
@@ -3577,6 +3941,7 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 	end
 
 	local forceRankColumn = false
+	local reportAvailable = self:IsReportDataAvailable(session, orderedSources, damageMeterType, config, math.min(getEffectiveVisibleRows(config, maxRows), #orderedSources))
 	if config.showRanks ~= false and config.prefixRankInName == true then
 		for entryIndex = 1, contentRows do
 			local sourceIndex = displayIndices and displayIndices[entryIndex] or entryIndex
@@ -3590,6 +3955,9 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 
 	self:ApplyWindowStyle(index, contentRows, forceRankColumn)
 	self:UpdateHeader(index, session, state)
+	if frame.reportButton then
+		setShownIfChanged(frame.reportButton, config.showHeader == true and config.showHeaderButtons ~= false and config.showHeaderReportButton ~= false and reportAvailable == true)
+	end
 
 	local totalAmount = safeNumber(session and session.totalAmount)
 	local shown = 0
@@ -3707,6 +4075,7 @@ function DamageMeter:RegisterLiveEvents()
 	frame:RegisterEvent("PLAYER_REGEN_DISABLED")
 	frame:RegisterEvent("PLAYER_REGEN_ENABLED")
 	frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+	frame:RegisterEvent("ADDON_RESTRICTION_STATE_CHANGED")
 	self.liveEventsRegistered = true
 end
 
@@ -3720,6 +4089,7 @@ function DamageMeter:UnregisterLiveEvents()
 	frame:UnregisterEvent("PLAYER_REGEN_DISABLED")
 	frame:UnregisterEvent("PLAYER_REGEN_ENABLED")
 	frame:UnregisterEvent("PLAYER_ENTERING_WORLD")
+	frame:UnregisterEvent("ADDON_RESTRICTION_STATE_CHANGED")
 	self.liveEventsRegistered = false
 end
 
@@ -4237,6 +4607,7 @@ function DamageMeter:BuildWindowSettings(index)
 		checkboxSetting(L["damageMeterShowHeaderType"] or "Show type", function() return cfg().showHeaderType ~= false end, function(value) self:SetConfigValue(index, "showHeaderType", value) end, headerId, headerEnabled),
 		checkboxSetting(L["damageMeterShowHeaderTime"] or "Show combat time", function() return cfg().showHeaderTime ~= false end, function(value) self:SetConfigValue(index, "showHeaderTime", value) end, headerId, headerEnabled),
 		checkboxSetting(L["damageMeterShowHeaderButtons"] or "Show header buttons", function() return cfg().showHeaderButtons ~= false end, function(value) self:SetConfigValue(index, "showHeaderButtons", value) end, headerId, headerEnabled),
+		checkboxSetting(L["damageMeterShowReportButton"] or "Show report button", function() return cfg().showHeaderReportButton ~= false end, function(value) self:SetConfigValue(index, "showHeaderReportButton", value) end, headerId, function() return cfg().showHeader == true and cfg().showHeaderButtons ~= false end),
 		sliderSetting(L["damageMeterHeaderButtonSize"] or "Header button size", function() return cfg().headerButtonSize end, function(value) self:SetConfigValue(index, "headerButtonSize", clampNumber(value, 10, 32, DEFAULT_WINDOW.headerButtonSize)) end, 10, 32, 1, headerId, function() return cfg().showHeader == true and cfg().showHeaderButtons ~= false end),
 		sliderSetting(L["damageMeterHeaderButtonOffsetX"] or "Header button X offset", function() return cfg().headerButtonOffsetX end, function(value) self:SetConfigValue(index, "headerButtonOffsetX", clampNumber(value, -100, 100, DEFAULT_WINDOW.headerButtonOffsetX)) end, -100, 100, 1, headerId, function() return cfg().showHeader == true and cfg().showHeaderButtons ~= false end),
 		sliderSetting(L["damageMeterHeaderButtonOffsetY"] or "Header button Y offset", function() return cfg().headerButtonOffsetY end, function(value) self:SetConfigValue(index, "headerButtonOffsetY", clampNumber(value, -100, 100, DEFAULT_WINDOW.headerButtonOffsetY)) end, -100, 100, 1, headerId, function() return cfg().showHeader == true and cfg().showHeaderButtons ~= false end),
@@ -4251,6 +4622,10 @@ function DamageMeter:BuildWindowSettings(index)
 		end, headerId, headerEnabled),
 		dropdownSetting(L["damageMeterHeaderBackgroundTexture"] or "Header background texture", function() return cfg().headerBackgroundTexture end, function(value) self:SetConfigValue(index, "headerBackgroundTexture", value) end, buildMediaOptions("statusbar", false), headerId, 260, headerBackgroundEnabled),
 		colorSetting(L["damageMeterHeaderBackgroundColor"] or "Header background color", function() return normalizeColor(cfg().headerBackgroundColor, DEFAULT_WINDOW.headerBackgroundColor) end, function(value) self:SetConfigValue(index, "headerBackgroundColor", normalizeColor(value, DEFAULT_WINDOW.headerBackgroundColor)) end, DEFAULT_WINDOW.headerBackgroundColor, headerId, headerBackgroundEnabled),
+		sliderSetting(L["damageMeterHeaderBackgroundOffsetX"] or "X offset", function() return cfg().headerBackgroundOffsetX end, function(value) self:SetConfigValue(index, "headerBackgroundOffsetX", clampNumber(value, -200, 200, DEFAULT_WINDOW.headerBackgroundOffsetX)) end, -200, 200, 1, headerId, headerBackgroundEnabled),
+		sliderSetting(L["damageMeterHeaderBackgroundOffsetY"] or "Y offset", function() return cfg().headerBackgroundOffsetY end, function(value) self:SetConfigValue(index, "headerBackgroundOffsetY", clampNumber(value, -200, 200, DEFAULT_WINDOW.headerBackgroundOffsetY)) end, -200, 200, 1, headerId, headerBackgroundEnabled),
+		sliderSetting(L["damageMeterHeaderBackgroundSizeOffsetX"] or "Width offset", function() return cfg().headerBackgroundSizeOffsetX end, function(value) self:SetConfigValue(index, "headerBackgroundSizeOffsetX", clampNumber(value, -200, 200, DEFAULT_WINDOW.headerBackgroundSizeOffsetX)) end, -200, 200, 1, headerId, headerBackgroundEnabled),
+		sliderSetting(L["damageMeterHeaderBackgroundSizeOffsetY"] or "Height offset", function() return cfg().headerBackgroundSizeOffsetY end, function(value) self:SetConfigValue(index, "headerBackgroundSizeOffsetY", clampNumber(value, -200, 200, DEFAULT_WINDOW.headerBackgroundSizeOffsetY)) end, -200, 200, 1, headerId, headerBackgroundEnabled),
 		dividerSetting(headerId),
 		dropdownSetting(L["damageMeterHeaderFormat"] or "Header format", function() return normalizeHeaderFormat(cfg().headerFormat) end, function(value) self:SetConfigValue(index, "headerFormat", normalizeHeaderFormat(value)) end, buildHeaderFormatOptions(), headerId, 150, headerTimeEnabled),
 		dropdownSetting(L["damageMeterHeaderTimeFormat"] or "Time format", function() return normalizeHeaderTimeFormat(cfg().headerTimeFormat) end, function(value) self:SetConfigValue(index, "headerTimeFormat", normalizeHeaderTimeFormat(value)) end, buildHeaderTimeFormatOptions(), headerId, 120, headerTimeEnabled),
@@ -4492,11 +4867,15 @@ function DamageMeter:Init()
 		elseif event == "DAMAGE_METER_RESET" then
 			self:InvalidatePartyClassFallback()
 			self:MarkPartyClassFallbackCurrent()
+		elseif event == "ADDON_RESTRICTION_STATE_CHANGED" then
+			self:RefreshReportRestrictionState(damageMeterType, sessionID)
 		end
 		if event == "DAMAGE_METER_COMBAT_SESSION_UPDATED" then
 			self:RefreshFromLiveEvent(damageMeterType, sessionID)
 		elseif event == "DAMAGE_METER_CURRENT_SESSION_UPDATED" then
 			self:RefreshFromLiveEvent()
+		elseif event == "ADDON_RESTRICTION_STATE_CHANGED" then
+			self:Refresh()
 		else
 			self:ScheduleRefresh()
 		end

@@ -6,6 +6,8 @@
 
 ### ✨ Added
 
+- Damage Meter / Reporting: Added a header report button with a report popup for sending the current meter summary to Say, Party, Raid, Instance, Guild, or Whisper.
+- Damage Meter / Header: Added position and size offsets for the header background texture.
 - Damage Meter / Visibility: Added an out-of-combat visibility mode so windows can hide during combat and return after combat ends.
 
 ---
