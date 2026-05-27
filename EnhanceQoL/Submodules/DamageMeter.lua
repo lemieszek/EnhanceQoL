@@ -1,4 +1,4 @@
--- luacheck: globals C_DamageMeter C_DeathRecap C_LFGInfo C_Spell C_StringUtil C_CVar C_RestrictedActions SetCVar StaticPopupDialogs StaticPopup_Show YES CANCEL OKAY MenuUtil GameTooltip SecondsToClock DAMAGE_METER_COMBAT_NUMBER CLASS_ICON_TCOORDS UnitClass UnitExists UnitGUID UnitAffectingCombat IsInRaid Ambiguate UISpecialFrames GetCursorPosition GetTime ACTION_SWING ACTION_ENVIRONMENTAL_DAMAGE_DROWNING ACTION_ENVIRONMENTAL_DAMAGE_FALLING ACTION_ENVIRONMENTAL_DAMAGE_FIRE ACTION_ENVIRONMENTAL_DAMAGE_LAVA ACTION_ENVIRONMENTAL_DAMAGE_SLIME ACTION_ENVIRONMENTAL_DAMAGE_FATIGUE DEATH_RECAP_TITLE CreateAbbreviateConfig
+-- luacheck: globals C_DamageMeter C_DeathRecap C_LFGInfo C_Spell C_StringUtil C_CVar C_RestrictedActions SetCVar StaticPopupDialogs StaticPopup_Show YES CANCEL OKAY MenuUtil GameTooltip SecondsToClock DAMAGE_METER_COMBAT_NUMBER CLASS_ICON_TCOORDS UnitClass UnitExists UnitGUID UnitAffectingCombat IsInRaid IsInInstance GetInstanceInfo Ambiguate UISpecialFrames GetCursorPosition GetTime C_Timer ACTION_SWING ACTION_ENVIRONMENTAL_DAMAGE_DROWNING ACTION_ENVIRONMENTAL_DAMAGE_FALLING ACTION_ENVIRONMENTAL_DAMAGE_FIRE ACTION_ENVIRONMENTAL_DAMAGE_LAVA ACTION_ENVIRONMENTAL_DAMAGE_SLIME ACTION_ENVIRONMENTAL_DAMAGE_FATIGUE DEATH_RECAP_TITLE CreateAbbreviateConfig
 local addonName, addon = ...
 
 local L = LibStub("AceLocale-3.0"):GetLocale(addonName)
@@ -20,11 +20,13 @@ local GLOBAL_STYLE_KEY = "__EQOL_GLOBAL_FONT_STYLE__"
 local REMOVE_WINDOW_POPUP = "EQOL_DAMAGE_METER_REMOVE_WINDOW"
 local COPY_WINDOW_POPUP = "EQOL_DAMAGE_METER_COPY_WINDOW"
 local RESET_DATA_POPUP = "EQOL_DAMAGE_METER_RESET_DATA"
+local AUTO_CLEAR_POPUP = "EQOL_DAMAGE_METER_AUTO_CLEAR"
 local CONTEXT_MENU_WIDTH = 376
 local CONTEXT_MENU_PADDING = 8
 local CONTEXT_MENU_BUTTON_HEIGHT = 30
 local CONTEXT_MENU_BUTTON_GAP = 4
 local BLIZZARD_DAMAGE_METER_ENABLED_CVAR = "damageMeterEnabled"
+local TOOLTIP_TARGET_ATLAS = "Islands-AzeriteBoss"
 local getWindowCount
 local PARTY_UNIT_TOKENS = { "player", "party1", "party2", "party3", "party4" }
 local SESSION_TYPES = {
@@ -33,6 +35,8 @@ local SESSION_TYPES = {
 }
 local STATUSBAR_INTERP = Enum and Enum.StatusBarInterpolation
 local INTERP_EASE = STATUSBAR_INTERP and STATUSBAR_INTERP.Ease
+local AUTO_CLEAR_DELAY_SECONDS = 2
+local DERIVED_TARGET_SCAN_LIMIT = 80
 -- Keep Blizzard's localized abbreviation breakpoints, with one extra floor so sub-1000 DPS values do not show long decimals.
 local LOW_NUMBER_ABBREV_BREAKPOINT = { breakpoint = 1, abbreviation = "", significandDivisor = 1, fractionDivisor = 1, abbreviationIsGlobal = false }
 local FALLBACK_SHORT_NUMBER_ABBREV_BREAKPOINTS = {
@@ -181,6 +185,8 @@ local DEFAULT_WINDOW = {
 	valueOffsetX = -5,
 	valueOffsetY = 0,
 	useClassColors = true,
+	barColor = { r = 0.22, g = 0.56, b = 0.9, a = 1 },
+	barOpacity = 0.85,
 	nameUseClassColors = false,
 	nameColor = { r = 1, g = 1, b = 1, a = 1 },
 	texture = "",
@@ -222,6 +228,7 @@ local DEFAULT_WINDOW = {
 	statusFontOutline = GLOBAL_STYLE_KEY,
 	statusFontSize = 11,
 	tooltipEnabled = true,
+	tooltipClickToPin = false,
 	tooltipPreview = false,
 	tooltipAnchor = "RIGHT",
 	tooltipAnchorV = "CENTER",
@@ -1057,7 +1064,20 @@ local function applyClassIcon(texture, classFilename)
 	return true
 end
 
-local function applySourceIcon(texture, source, inFollowerDungeon)
+local function applyAtlasIcon(texture, atlas)
+	if not atlas or not texture.SetAtlas then return false end
+	if texture._damageMeterIconKind == "atlas" and texture._damageMeterIconValue == atlas then return true end
+	texture._damageMeterIconKind = "atlas"
+	texture._damageMeterIconValue = atlas
+	texture:SetTexCoord(0, 1, 0, 1)
+	texture:SetAtlas(atlas, false)
+	return true
+end
+
+local function applySourceIcon(texture, source, inFollowerDungeon, damageMeterType)
+	if damageMeterType == "EnemyDamageTaken" and applyAtlasIcon(texture, TOOLTIP_TARGET_ATLAS) then
+		return
+	end
 	if inFollowerDungeon and source.isLocalPlayer ~= true and applyClassIcon(texture, source.classFilename) then
 		return
 	end
@@ -1266,6 +1286,38 @@ end
 
 local function getUpdateRate()
 	return clampNumber(db().damageMeterUpdateRate, 0.1, 5, 0.1)
+end
+
+local function normalizeAutoClearMode(value)
+	if value == "ask" or value == "always" then return value end
+	return "never"
+end
+
+local function normalizeAutoClearInstances(value)
+	local normalized = {}
+	if type(value) ~= "table" then
+		normalized.party = true
+		normalized.raid = true
+		return normalized
+	end
+	if value.party == true then normalized.party = true end
+	if value.raid == true then normalized.raid = true end
+	return normalized
+end
+
+local function buildAutoClearOptions()
+	return {
+		{ value = "never", label = L["damageMeterAutomaticClearNever"] or "Never" },
+		{ value = "ask", label = L["damageMeterAutomaticClearAsk"] or "Ask" },
+		{ value = "always", label = L["damageMeterAutomaticClearAlways"] or "Always" },
+	}
+end
+
+local function buildAutoClearInstanceOptions()
+	return {
+		{ value = "party", text = L["Dungeon"] or "Dungeon" },
+		{ value = "raid", text = L["Raid"] or "Raid" },
+	}
 end
 
 function getWindowCount()
@@ -1858,6 +1910,10 @@ function DamageMeter:HasSourceSpellDetails(details)
 	return type(details) == "table" and type(details.combatSpells) == "table" and #details.combatSpells > 0
 end
 
+local getTooltipColumnVisibility
+local resolveTooltipUnitName
+local damageMeterNamesMatch
+
 function DamageMeter:GetSourceDetails(index, source)
 	if self:UsePreviewData() then return PREVIEW_SOURCE_DETAILS end
 	if not source or not self:IsAvailable() then return nil end
@@ -1919,6 +1975,239 @@ function DamageMeter:GetSourceDetails(index, source)
 	return nil
 end
 
+function DamageMeter:InvalidateDerivedTargetCache(liveSessionsOnly)
+	if liveSessionsOnly and self.derivedTargetCache then
+		for cacheKey in pairs(self.derivedTargetCache) do
+			if type(cacheKey) ~= "string" or cacheKey:find("\001type:", 1, true) then
+				self.derivedTargetCache[cacheKey] = nil
+			end
+		end
+		if self.derivedTargetSessionCache then
+			for cacheKey in pairs(self.derivedTargetSessionCache) do
+				if type(cacheKey) ~= "string" or cacheKey:find("\001type:", 1, true) then
+					self.derivedTargetSessionCache[cacheKey] = nil
+				end
+			end
+		end
+		return
+	end
+	self.derivedTargetCacheGeneration = (self.derivedTargetCacheGeneration or 0) + 1
+	self.derivedTargetCache = nil
+	self.derivedTargetSessionCache = nil
+end
+
+function DamageMeter:GetDerivedTargetSessionCacheKey(index)
+	local sessionID = self:GetEffectiveSessionID(index)
+	local sessionKey = sessionID and ("id:" .. tostring(sessionID)) or ("type:" .. tostring(self:GetEffectiveSessionType(index) or "current"))
+	return table.concat({
+		tostring(self.derivedTargetCacheGeneration or 0),
+		tostring(index),
+		sessionKey,
+	}, "\001")
+end
+
+function DamageMeter:GetDerivedTargetCacheKey(index, source, config, damageMeterType)
+	if not source or source.name == nil or isSecret(source.name) then return nil end
+	return table.concat({
+		self:GetDerivedTargetSessionCacheKey(index),
+		tostring(damageMeterType),
+		tostring(source.name),
+		tostring(config.abbreviation),
+		tostring(config.tooltipShowAmount ~= false),
+		tostring(config.tooltipShowDPS ~= false),
+		tostring(config.tooltipShowPercent ~= false),
+	}, "\001")
+end
+
+function DamageMeter:GetEnemyDamageTakenSourceDetails(index, enemySource)
+	if self:UsePreviewData() or not enemySource or not self:IsAvailable() then return nil end
+	local damageMeterType = getDamageMeterTypeValue("EnemyDamageTaken")
+	if damageMeterType == nil then return nil end
+	local rawSourceGUID = enemySource.sourceGUID
+	local rawSourceCreatureID = enemySource.sourceCreatureID
+	local sourceGUID = not isSecret(rawSourceGUID) and rawSourceGUID or nil
+	local sourceCreatureID = not isSecret(rawSourceCreatureID) and rawSourceCreatureID or nil
+	if sourceGUID == nil and sourceCreatureID == nil then return nil end
+	local sessionID = self:GetEffectiveSessionID(index)
+	if sessionID and C_DamageMeter.GetCombatSessionSourceFromID then
+		local details
+		if sourceCreatureID ~= nil then
+			details = C_DamageMeter.GetCombatSessionSourceFromID(sessionID, damageMeterType, nil, sourceCreatureID)
+			if self:HasSourceSpellDetails(details) then return details end
+		end
+		details = C_DamageMeter.GetCombatSessionSourceFromID(sessionID, damageMeterType, sourceGUID, sourceCreatureID)
+		if self:HasSourceSpellDetails(details) then return details end
+		if sourceGUID ~= nil then
+			details = C_DamageMeter.GetCombatSessionSourceFromID(sessionID, damageMeterType, sourceGUID, nil)
+		end
+		return details
+	end
+	local sessionType = SESSION_TYPES[self:GetEffectiveSessionType(index)] or SESSION_TYPES.current
+	if sessionType and C_DamageMeter.GetCombatSessionSourceFromType then
+		local details
+		if sourceCreatureID ~= nil then
+			details = C_DamageMeter.GetCombatSessionSourceFromType(sessionType, damageMeterType, nil, sourceCreatureID)
+			if self:HasSourceSpellDetails(details) then return details end
+		end
+		details = C_DamageMeter.GetCombatSessionSourceFromType(sessionType, damageMeterType, sourceGUID, sourceCreatureID)
+		if self:HasSourceSpellDetails(details) then return details end
+		if sourceGUID ~= nil then
+			details = C_DamageMeter.GetCombatSessionSourceFromType(sessionType, damageMeterType, sourceGUID, nil)
+		end
+		return details
+	end
+	return nil
+end
+
+function DamageMeter:AddDerivedTargetEntry(cache, actorName, targetName, amount, dps)
+	if actorName == nil or targetName == nil or isSecret(actorName) or isSecret(targetName) or not amount then return end
+	actorName = tostring(actorName)
+	targetName = tostring(targetName)
+	if actorName == "" or targetName == "" then return end
+	local actorTargets = cache.byActor[actorName]
+	if not actorTargets then
+		actorTargets = {}
+		cache.byActor[actorName] = actorTargets
+		if Ambiguate then
+			local shortName = Ambiguate(actorName, "short")
+			if shortName and shortName ~= "" and shortName ~= actorName and not cache.byActor[shortName] then
+				cache.byActor[shortName] = actorTargets
+			end
+		end
+	end
+	local target = actorTargets[targetName]
+	if not target then
+		target = { name = targetName, atlas = TOOLTIP_TARGET_ATLAS, amount = 0, dps = 0 }
+		actorTargets[targetName] = target
+	end
+	target.amount = target.amount + amount
+	target.dps = target.dps + (dps or 0)
+	return true
+end
+
+function DamageMeter:BuildDerivedTargetSessionCache(index)
+	local cacheKey = self:GetDerivedTargetSessionCacheKey(index)
+	self.derivedTargetSessionCache = self.derivedTargetSessionCache or {}
+	local cached = self.derivedTargetSessionCache[cacheKey]
+	if cached ~= nil then return cached ~= false and cached or nil end
+	if UnitAffectingCombat and UnitAffectingCombat("player") then return nil end
+	local enemyDamageTakenType = getDamageMeterTypeValue("EnemyDamageTaken")
+	if enemyDamageTakenType == nil or not self:IsAvailable() then
+		return nil
+	end
+	local session
+	local sessionID = self:GetEffectiveSessionID(index)
+	if sessionID and C_DamageMeter.GetCombatSessionFromID then
+		session = C_DamageMeter.GetCombatSessionFromID(sessionID, enemyDamageTakenType)
+	else
+		local sessionType = SESSION_TYPES[self:GetEffectiveSessionType(index)] or SESSION_TYPES.current
+		if sessionType and C_DamageMeter.GetCombatSessionFromType then
+			session = C_DamageMeter.GetCombatSessionFromType(sessionType, enemyDamageTakenType)
+		end
+	end
+	if type(session) ~= "table" or type(session.combatSources) ~= "table" then
+		return nil
+	end
+
+	local cache = { byActor = {} }
+	local addedAny = false
+	local scanCount = 0
+	for _, enemySource in ipairs(session.combatSources) do
+		scanCount = scanCount + 1
+		if scanCount > DERIVED_TARGET_SCAN_LIMIT then break end
+		local targetName = resolveTooltipUnitName(enemySource.name)
+		local enemyDetails = self:GetEnemyDamageTakenSourceDetails(index, enemySource)
+		if targetName ~= nil and not isSecret(targetName) and type(enemyDetails) == "table" and type(enemyDetails.combatSpells) == "table" then
+			for _, spell in ipairs(enemyDetails.combatSpells) do
+				local spellDetails = spell.combatSpellDetails
+				if type(spellDetails) == "table" then
+					local amount = safeNumber(spell.totalAmount)
+					if amount then
+						if self:AddDerivedTargetEntry(cache, spellDetails.unitName, targetName, amount, safeNumber(spell.amountPerSecond)) then
+							addedAny = true
+						end
+					end
+				end
+			end
+		end
+	end
+	if not addedAny then return nil end
+	self.derivedTargetSessionCache[cacheKey] = cache
+	return cache
+end
+
+function DamageMeter:GetDerivedTargetsForSource(index, source)
+	if not source or source.name == nil or isSecret(source.name) then return nil end
+	local cache = self:BuildDerivedTargetSessionCache(index)
+	if not cache or type(cache.byActor) ~= "table" then return nil end
+	local actorTargets = cache.byActor[tostring(source.name)]
+	if not actorTargets and Ambiguate then
+		local shortName = Ambiguate(source.name, "short")
+		if shortName and shortName ~= "" then actorTargets = cache.byActor[shortName] end
+	end
+	if not actorTargets then
+		for actorName, targets in pairs(cache.byActor) do
+			if damageMeterNamesMatch(actorName, source.name) then
+				actorTargets = targets
+				break
+			end
+		end
+	end
+	return actorTargets
+end
+
+function DamageMeter:BuildDerivedTargetRows(index, source, config, damageMeterType)
+	if damageMeterType ~= "DamageDone" and damageMeterType ~= "Dps" then return nil end
+	if not source or isSecret(source.name) then return nil end
+	local cacheKey = self:GetDerivedTargetCacheKey(index, source, config, damageMeterType)
+	if cacheKey then
+		self.derivedTargetCache = self.derivedTargetCache or {}
+		local cached = self.derivedTargetCache[cacheKey]
+		if cached ~= nil then return cached ~= false and cached or nil end
+	end
+	local actorTargets = self:GetDerivedTargetsForSource(index, source)
+	if type(actorTargets) ~= "table" then return nil end
+
+	local showAmount, showDPS, showPercent = getTooltipColumnVisibility(config, damageMeterType)
+	local targets = {}
+	for _, target in pairs(actorTargets) do targets[#targets + 1] = target end
+	table.sort(targets, function(a, b) return (a.amount or 0) > (b.amount or 0) end)
+	if #targets == 0 then
+		if cacheKey then self.derivedTargetCache[cacheKey] = false end
+		return nil
+	end
+
+	local rows = {}
+	local targetTotal = 0
+	local targetMaxAmount = 0
+	for _, target in ipairs(targets) do
+		targetTotal = targetTotal + (target.amount or 0)
+		if target.amount and target.amount > targetMaxAmount then targetMaxAmount = target.amount end
+	end
+	for _, target in ipairs(targets) do
+		local percent = targetTotal > 0 and (target.amount / targetTotal * 100) or nil
+		rows[#rows + 1] = {
+			name = target.name,
+			atlas = target.atlas,
+			icon = target.icon,
+			amount = showAmount and formatNumber(target.amount, config.abbreviation),
+			dps = showDPS and formatNumber(target.dps, config.abbreviation),
+			percent = showPercent and percent and string.format("%.1f%%", percent),
+			sortAmount = target.amount or 0,
+			barValue = target.amount,
+			barMax = targetMaxAmount,
+		}
+	end
+	table.sort(rows, function(a, b) return (a.sortAmount or 0) > (b.sortAmount or 0) end)
+	if targetMaxAmount > 0 then
+		for _, target in ipairs(rows) do
+			target.barMax = targetMaxAmount
+		end
+	end
+	if cacheKey then self.derivedTargetCache[cacheKey] = rows end
+	return rows
+end
+
 local function getRaidClassColor(classFilename)
 	if type(classFilename) == "string" and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFilename] then
 		return RAID_CLASS_COLORS[classFilename]
@@ -1934,13 +2223,15 @@ local function getClassOrCustomColor(classFilename, customColor, defaultColor, u
 	return r, g, b, a
 end
 
-function DamageMeter:GetClassColor(config, classFilename)
-	if config.useClassColors ~= true then return 0.22, 0.56, 0.9 end
+function DamageMeter:GetBarColor(config, classFilename)
+	local r, g, b = colorComponents(config.barColor, DEFAULT_WINDOW.barColor)
+	local a = clampNumber(config.barOpacity, 0, 1, DEFAULT_WINDOW.barOpacity)
+	if config.useClassColors ~= true then return r, g, b, a end
 	local color = getRaidClassColor(classFilename)
 	if color then
-		return color.r or 1, color.g or 1, color.b or 1
+		return color.r or 1, color.g or 1, color.b or 1, a
 	end
-	return 0.55, 0.55, 0.55
+	return 0.55, 0.55, 0.55, a
 end
 
 function DamageMeter:GetNameColor(config, classFilename)
@@ -1965,7 +2256,7 @@ function DamageMeter:GetRowColorState(frame, config, classFilename)
 	local classKey = type(classFilename) == "string" and classFilename ~= "" and classFilename or false
 	local entry = cache.byClass[classKey]
 	if entry then return entry end
-	local r, g, b = self:GetClassColor(config, classKey)
+	local r, g, b, a = self:GetBarColor(config, classKey)
 	local nr, ng, nb, na = self:GetNameColor(config, classKey)
 	local vr, vg, vb, va = self:GetValueColor(config, classKey)
 	local prr, prg, prb, pra = self:GetPrefixRankColor(config, classKey)
@@ -1973,7 +2264,7 @@ function DamageMeter:GetRowColorState(frame, config, classFilename)
 	local bbr, bbg, bbb, bba = getClassOrCustomColor(classKey, config.barBorderColor, DEFAULT_WINDOW.barBorderColor, config.barBorderUseClassColor)
 	local ibr, ibg, ibb, iba = getClassOrCustomColor(classKey, config.iconBorderColor, DEFAULT_WINDOW.iconBorderColor, config.iconBorderUseClassColor)
 	entry = {
-		r = r, g = g, b = b,
+		r = r, g = g, b = b, a = a,
 		nr = nr, ng = ng, nb = nb, na = na,
 		vr = vr, vg = vg, vb = vb, va = va,
 		prr = prr, prg = prg, prb = prb, pra = pra,
@@ -2431,7 +2722,7 @@ function DamageMeter:ApplyRowValueWidth(row, config, damageMeterType, forceRankC
 	row._damageMeterValueLayoutType = damageMeterType
 	row._damageMeterValueLayoutForceRankColumn = forceRankColumn == true
 
-	local frameWidth = clampNumber(config.width, 220, 700, DEFAULT_WINDOW.width)
+	local frameWidth = clampNumber(config.width, 100, 700, DEFAULT_WINDOW.width)
 	local leftInset, rightInset, _, rankWidth, rankGap = getRowTextInsets(config, forceRankColumn)
 	local availableWidth = math.max(1, (frameWidth - 8) - leftInset - rightInset)
 	local minNameWidth = config.showNames == false and 0 or 8
@@ -2956,20 +3247,24 @@ function DamageMeter:GetTooltipLine(frame, lineIndex)
 	line.icon:SetSize(14, 14)
 	line.icon:SetPoint("LEFT", 6, 0)
 	line.barBG = line:CreateTexture(nil, "BACKGROUND")
-	line.bar = line:CreateTexture(nil, "BORDER")
+	line.bar = CreateFrame("StatusBar", nil, line)
 	line.bar:SetPoint("TOPLEFT", line.icon, "TOPRIGHT", 4, 0)
 	line.bar:SetPoint("BOTTOMLEFT", line.icon, "BOTTOMRIGHT", 4, 0)
-	line.name = line:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	line.bar:SetFrameLevel(line:GetFrameLevel() + 1)
+	line.textLayer = CreateFrame("Frame", nil, line)
+	line.textLayer:SetAllPoints()
+	line.textLayer:SetFrameLevel(line.bar:GetFrameLevel() + 2)
+	line.name = line.textLayer:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	line.name:SetPoint("LEFT", line.icon, "RIGHT", 4, 0)
 	line.name:SetJustifyH("LEFT")
 	line.name:SetWordWrap(false)
-	line.amount = line:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	line.amount = line.textLayer:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	line.amount:SetJustifyH("RIGHT")
 	line.amount:SetWordWrap(false)
-	line.dps = line:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	line.dps = line.textLayer:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	line.dps:SetJustifyH("RIGHT")
 	line.dps:SetWordWrap(false)
-	line.percent = line:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	line.percent = line.textLayer:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	line.percent:SetJustifyH("RIGHT")
 	line.percent:SetWordWrap(false)
 	frame.lines[lineIndex] = line
@@ -3042,7 +3337,7 @@ local function resolveCombatSpellDisplay(spell)
 	return spellName, spellIcon or 136243
 end
 
-local function getTooltipColumnVisibility(config, damageMeterType)
+getTooltipColumnVisibility = function(config, damageMeterType)
 	local showAmount = config.tooltipShowAmount ~= false
 	local showDPS = config.tooltipShowDPS ~= false
 	local showPercent = config.tooltipShowPercent ~= false
@@ -3053,6 +3348,38 @@ local function getTooltipColumnVisibility(config, damageMeterType)
 		showAmount = false
 	end
 	return showAmount, showDPS, showPercent
+end
+
+resolveTooltipUnitName = function(value)
+	if value == nil then return nil end
+	if isSecret(value) then return value end
+	value = tostring(value)
+	if value == "" then return nil end
+	return value
+end
+
+damageMeterNamesMatch = function(left, right)
+	if left == nil or right == nil or isSecret(left) or isSecret(right) then return false end
+	left = tostring(left)
+	right = tostring(right)
+	if left == "" or right == "" then return false end
+	if left == right then return true end
+	if Ambiguate then
+		local shortLeft = Ambiguate(left, "short")
+		local shortRight = Ambiguate(right, "short")
+		return shortLeft ~= nil and shortLeft ~= "" and shortLeft == shortRight
+	end
+	return false
+end
+
+local function getTooltipBarValue(value)
+	if not isSecret(value) and value == nil then return 0 end
+	return value
+end
+
+local function getTooltipBarMax(value)
+	if not isSecret(value) and (value == nil or value <= 0) then return 1 end
+	return value
 end
 
 local function resolveDeathRecapEventDisplay(eventData)
@@ -3103,16 +3430,17 @@ function DamageMeter:BuildDeathRecapRows(source, config)
 	local showAmount, _, showPercent = getTooltipColumnVisibility(config, "Deaths")
 	rows[#rows + 1] = { header = true, name = DEATH_RECAP_TITLE or getDamageMeterTypeLabel("Deaths"), icon = getDamageMeterTypeIcon("Deaths"), amount = showAmount and (L["damageMeterTooltipAmount"] or "Amount"), percent = showPercent and "%" }
 	local deathTimestamp = 0
-	local maxAmount = 0
 	for _, eventData in ipairs(events) do
 		local timestamp = safeNumber(eventData.timestamp)
 		if timestamp and timestamp > deathTimestamp then deathTimestamp = timestamp end
-		local amount = safeNumber(eventData.amount)
-		if amount and amount > maxAmount then maxAmount = amount end
 	end
 	for eventIndex = #events, 1, -1 do
 		local eventData = events[eventIndex]
 		local spellName, spellIcon = resolveDeathRecapEventDisplay(eventData)
+		local sourceName = safeText(eventData.sourceName)
+		if sourceName then
+			spellName = string.format("%s (%s)", spellName, sourceName)
+		end
 		local timestamp = safeNumber(eventData.timestamp)
 		local seconds = timestamp and math.max(0, deathTimestamp - timestamp) or 0
 		local amount = safeNumber(eventData.amount)
@@ -3121,33 +3449,39 @@ function DamageMeter:BuildDeathRecapRows(source, config)
 		if amountText and overkill and overkill > 0 then
 			amountText = string.format("%s (%s %s)", amountText, formatNumber(overkill, config.abbreviation), _G.OVERKILL or "overkill")
 		end
-		local percent = amount and maxHealth and maxHealth > 0 and (amount / maxHealth * 100) or nil
+		local currentHP = safeNumber(eventData.currentHP)
+		local percent = currentHP and maxHealth and maxHealth > 0 and (currentHP / maxHealth * 100) or nil
 		rows[#rows + 1] = {
 			name = string.format("-%.1fs %s", seconds, spellName),
 			icon = spellIcon,
 			amount = showAmount and amountText,
 			percent = showPercent and percent and string.format("%.0f%%", percent),
 			sortAmount = amount or 0,
-			barValue = amount,
-			barMax = maxAmount,
+			barValue = currentHP,
+			barMax = maxHealth,
 		}
 	end
 	return rows
 end
 
-function DamageMeter:BuildTooltipRows(details, config, damageMeterType)
+function DamageMeter:BuildTooltipRows(details, config, damageMeterType, derivedTargetRows)
 	local rows = {}
-	if not details or type(details.combatSpells) ~= "table" then return rows end
+	if not details or type(details.combatSpells) ~= "table" then
+		if type(derivedTargetRows) ~= "table" or #derivedTargetRows == 0 then return rows end
+		details = { combatSpells = {} }
+	end
 	local showAmount, showDPS, showPercent = getTooltipColumnVisibility(config, damageMeterType)
-	local showTargets = config.tooltipShowTargets ~= false
+	local showTargets = config.tooltipShowTargets ~= false and not (UnitAffectingCombat and UnitAffectingCombat("player"))
 	local spellLimit = clampNumber(config.tooltipMaxLines, 4, 30, DEFAULT_WINDOW.tooltipMaxLines)
 	local totalAmount = safeNumber(details.totalAmount)
-	local showSpellSection = damageMeterType ~= "EnemyDamageTaken"
+	local showSpellSection = damageMeterType ~= "EnemyDamageTaken" and #details.combatSpells > 0
+	local detailsMaxAmount = details.maxAmount
 
 	if showSpellSection then
 		rows[#rows + 1] = { header = true, name = L["damageMeterTooltipSpellName"] or "Spell Name", icon = "Interface\\WORLDSTATEFRAME\\CombatSwords", amount = showAmount and (L["damageMeterTooltipAmount"] or "Amount"), dps = showDPS and (L["damageMeterTooltipDPS"] or "DPS"), percent = showPercent and "%" }
 	end
 	local targetMap = {}
+	local directTargetRows = {}
 	local spellMaxAmount = 0
 	local spellMaxScanRows = 0
 	for _, spell in ipairs(details.combatSpells) do
@@ -3163,22 +3497,42 @@ function DamageMeter:BuildTooltipRows(details, config, damageMeterType)
 		local dps = spell.amountPerSecond
 		local percent = totalAmount and totalAmount > 0 and safeNumber(amount) and (safeNumber(amount) / totalAmount * 100) or nil
 		if showSpellSection and spellRows < spellLimit then
-			rows[#rows + 1] = { name = spellName, icon = spellIcon, amount = showAmount and formatNumber(amount, config.abbreviation), dps = showDPS and formatNumber(dps, config.abbreviation), percent = showPercent and percent and string.format("%.1f%%", percent), sortAmount = safeNumber(amount) or 0, barValue = safeNumber(amount), barMax = spellMaxAmount }
+			rows[#rows + 1] = { name = spellName, icon = spellIcon, amount = showAmount and formatNumber(amount, config.abbreviation), dps = showDPS and formatNumber(dps, config.abbreviation), percent = showPercent and percent and string.format("%.1f%%", percent), sortAmount = safeNumber(amount) or 0, barValue = amount, barMax = detailsMaxAmount or spellMaxAmount }
 			spellRows = spellRows + 1
 		end
 
 		local target = spell.combatSpellDetails
 		if showTargets and type(target) == "table" then
-			local targetName = safeText(target.unitName, nil)
-			if targetName then
-				local entry = targetMap[targetName]
-				if not entry then
-					entry = { name = targetName, icon = target.specIconID ~= 0 and target.specIconID or 136243, amount = 0, dps = 0 }
-					targetMap[targetName] = entry
+			local targetName = resolveTooltipUnitName(target.unitName)
+			if targetName ~= nil then
+				local rawTargetAmount = damageMeterType == "EnemyDamageTaken" and spell.totalAmount or target.amount
+				local targetAmount = safeNumber(rawTargetAmount)
+				local targetDps = safeNumber(spell.amountPerSecond)
+				if not isSecret(targetName) and targetAmount then
+					local entry = targetMap[targetName]
+					if not entry then
+						entry = { name = targetName, amount = 0, dps = 0 }
+						if damageMeterType == "EnemyDamageTaken" then
+							entry.icon = target.specIconID ~= 0 and target.specIconID or 136243
+						else
+							entry.atlas = TOOLTIP_TARGET_ATLAS
+						end
+						targetMap[targetName] = entry
+					end
+					entry.amount = entry.amount + targetAmount
+					entry.dps = entry.dps + (targetDps or 0)
+				elseif not isSecret(targetName) and rawTargetAmount ~= nil and not isSecret(rawTargetAmount) then
+					directTargetRows[#directTargetRows + 1] = {
+						name = targetName,
+						atlas = damageMeterType ~= "EnemyDamageTaken" and TOOLTIP_TARGET_ATLAS or nil,
+						icon = damageMeterType == "EnemyDamageTaken" and (target.specIconID ~= 0 and target.specIconID or 136243) or nil,
+						amount = showAmount and formatNumber(rawTargetAmount, config.abbreviation),
+						dps = showDPS and formatNumber(spell.amountPerSecond, config.abbreviation),
+						sortAmount = safeNumber(spell.totalAmount) or 0,
+						barValue = rawTargetAmount,
+						barMax = detailsMaxAmount or spellMaxAmount,
+					}
 				end
-				local targetAmount = damageMeterType == "EnemyDamageTaken" and safeNumber(spell.totalAmount) or safeNumber(target.amount)
-				entry.amount = entry.amount + (targetAmount or 0)
-				entry.dps = entry.dps + (safeNumber(spell.amountPerSecond) or 0)
 			end
 		end
 	end
@@ -3187,24 +3541,50 @@ function DamageMeter:BuildTooltipRows(details, config, damageMeterType)
 	local targets = {}
 	for _, target in pairs(targetMap) do targets[#targets + 1] = target end
 	table.sort(targets, function(a, b) return (a.amount or 0) > (b.amount or 0) end)
-	if #targets > 0 then
+	local useDerivedTargets = type(derivedTargetRows) == "table" and #derivedTargetRows > 0
+	if useDerivedTargets or #targets > 0 or #directTargetRows > 0 then
 		if showSpellSection then addTooltipSectionGap(rows) end
-		rows[#rows + 1] = { header = true, name = L["damageMeterTooltipTargets"] or "Targets", icon = "Interface\\MINIMAP\\TRACKING\\Target", amount = showAmount and (L["damageMeterTooltipAmount"] or "Amount"), dps = showDPS and (L["damageMeterTooltipDPS"] or "DPS"), percent = showPercent and "%" }
-		local targetTotal = 0
-		local targetMaxAmount = 0
-		for _, target in ipairs(targets) do
-			targetTotal = targetTotal + (target.amount or 0)
-			if target.amount and target.amount > targetMaxAmount then targetMaxAmount = target.amount end
-		end
-		for _, target in ipairs(targets) do
-			local percent = targetTotal > 0 and (target.amount / targetTotal * 100) or nil
-			rows[#rows + 1] = { name = target.name, icon = target.icon, amount = showAmount and formatNumber(target.amount, config.abbreviation), dps = showDPS and formatNumber(target.dps, config.abbreviation), percent = showPercent and percent and string.format("%.1f%%", percent), sortAmount = target.amount or 0, barValue = target.amount, barMax = targetMaxAmount }
+		rows[#rows + 1] = { header = true, name = L["damageMeterTooltipTargets"] or "Targets", atlas = TOOLTIP_TARGET_ATLAS, amount = showAmount and (L["damageMeterTooltipAmount"] or "Amount"), dps = showDPS and (L["damageMeterTooltipDPS"] or "DPS"), percent = showPercent and "%" }
+		if useDerivedTargets then
+			for _, target in ipairs(derivedTargetRows) do
+				rows[#rows + 1] = target
+			end
+		else
+			local targetTotal = 0
+			local targetMaxAmount = 0
+			local targetRows = {}
+			for _, target in ipairs(targets) do
+				targetTotal = targetTotal + (target.amount or 0)
+				if target.amount and target.amount > targetMaxAmount then targetMaxAmount = target.amount end
+			end
+			for _, target in ipairs(targets) do
+				local percent = targetTotal > 0 and (target.amount / targetTotal * 100) or nil
+				targetRows[#targetRows + 1] = { name = target.name, atlas = target.atlas, icon = target.icon, amount = showAmount and formatNumber(target.amount, config.abbreviation), dps = showDPS and formatNumber(target.dps, config.abbreviation), percent = showPercent and percent and string.format("%.1f%%", percent), sortAmount = target.amount or 0, barValue = target.amount, barMax = targetMaxAmount }
+			end
+			for _, target in ipairs(directTargetRows) do
+				local sortAmount = target.sortAmount
+				if sortAmount and sortAmount > targetMaxAmount then targetMaxAmount = sortAmount end
+				targetRows[#targetRows + 1] = target
+			end
+			table.sort(targetRows, function(a, b) return (a.sortAmount or 0) > (b.sortAmount or 0) end)
+			if targetMaxAmount > 0 then
+				for _, target in ipairs(targetRows) do
+					target.barMax = targetMaxAmount
+				end
+			end
+			for _, target in ipairs(targetRows) do
+				rows[#rows + 1] = target
+			end
 		end
 	end
 	return rows
 end
 
 function DamageMeter:ShowSourceTooltip(owner, index, source)
+	if self.pinnedTooltipOwner and self.pinnedTooltipOwner ~= owner then
+		self.pinnedTooltipOwner = nil
+		self.pinnedTooltipIndex = nil
+	end
 	local config = self:GetConfig(index)
 	if config.tooltipEnabled ~= true then return end
 	local frame = self:EnsureSourceTooltip()
@@ -3212,7 +3592,8 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 	local rows = damageMeterType == "Deaths" and self:BuildDeathRecapRows(source, config) or nil
 	if not rows or #rows == 0 then
 		local details = self:GetSourceDetails(index, source)
-		rows = self:BuildTooltipRows(details, config, damageMeterType)
+		local derivedTargetRows = config.tooltipShowTargets ~= false and self:BuildDerivedTargetRows(index, source, config, damageMeterType) or nil
+		rows = self:BuildTooltipRows(details, config, damageMeterType, derivedTargetRows)
 	end
 	if #rows == 0 then
 		rows[1] = { name = L["damageMeterTooltipNoData"] or "No details available", icon = 136243 }
@@ -3233,7 +3614,7 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 	local dpsRight = percentRight - percentWidth
 	local amountRight = dpsRight - dpsWidth
 	local nameRight = amountRight - amountWidth - 8
-	local showBars = config.tooltipShowBars == true and damageMeterType ~= "Deaths"
+	local showBars = config.tooltipShowBars == true
 	local barTexture = resolveMedia("statusbar", config.tooltipBarTexture, DEFAULT_TEXTURE)
 	local barR, barG, barB, barA = getClassOrCustomColor(source and source.classFilename, config.tooltipBarColor, DEFAULT_WINDOW.tooltipBarColor, config.tooltipBarUseClassColor)
 	local shown = #rows
@@ -3289,26 +3670,37 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 			line.name:SetPoint("LEFT", line.icon, "RIGHT", 4, 0)
 			line.name:SetPoint("RIGHT", line, "RIGHT", nameRight, 0)
 			line.icon:SetShown(not data.spacer)
-			if not data.spacer then line.icon:SetTexture(data.icon or 136243) end
-			if showBars and not data.header and not data.spacer and data.barValue and data.barMax and data.barMax > 0 then
+			if not data.spacer then
+				if data.atlas and line.icon.SetAtlas then
+					line.icon:SetTexCoord(0, 1, 0, 1)
+					line.icon:SetAtlas(data.atlas, false)
+				else
+					line.icon:SetTexture(data.icon or 136243)
+					line.icon:SetTexCoord(0, 1, 0, 1)
+				end
+			end
+			if showBars and not data.header and not data.spacer and data.barValue ~= nil then
 				local availableBarWidth = math.max(1, width - rightPadding - barStartX)
-				local barWidth = math.max(1, availableBarWidth * math.min(1, data.barValue / data.barMax))
 				local barHeight = math.max(1, currentLineHeight - 3)
 				line.barBG:SetTexture(barTexture)
 				line.barBG:SetVertexColor(0, 0, 0, math.min(0.45, (barA or 1) * 0.6))
 				line.barBG:SetPoint("LEFT", line.icon, "RIGHT", 4, 0)
 				line.barBG:SetSize(availableBarWidth, barHeight)
 				line.barBG:Show()
-				line.bar:SetTexture(barTexture)
-				line.bar:SetVertexColor(barR, barG, barB, barA)
+				line.bar:SetStatusBarTexture(barTexture)
+				line.bar:SetStatusBarColor(barR, barG, barB, barA)
 				line.bar:SetPoint("LEFT", line.icon, "RIGHT", 4, 0)
-				line.bar:SetSize(barWidth, barHeight)
+				line.bar:SetSize(availableBarWidth, barHeight)
+				line.bar:SetMinMaxValues(0, getTooltipBarMax(data.barMax))
+				line.bar:SetValue(getTooltipBarValue(data.barValue))
 				line.bar:Show()
 			else
 				line.barBG:Hide()
 				line.bar:Hide()
 			end
-			line.name:SetText(data.spacer and "" or data.name or "")
+			local lineName = data.name
+			if data.spacer or lineName == nil then lineName = "" end
+			line.name:SetText(lineName)
 			line.amount:SetPoint("RIGHT", line, "RIGHT", amountRight, 0)
 			line.dps:SetPoint("RIGHT", line, "RIGHT", dpsRight, 0)
 			line.percent:SetPoint("RIGHT", line, "RIGHT", percentRight, 0)
@@ -3343,7 +3735,15 @@ end
 
 function DamageMeter:HideSourceTooltip()
 	if self.previewTooltipOwner then return end
+	if self.pinnedTooltipOwner then return end
 	if self.sourceTooltip then self.sourceTooltip:Hide() end
+end
+
+function DamageMeter:ClearPinnedTooltip(index)
+	if index and self.pinnedTooltipIndex ~= index then return end
+	if self.sourceTooltip and not self.previewTooltipOwner then self.sourceTooltip:Hide() end
+	self.pinnedTooltipOwner = nil
+	self.pinnedTooltipIndex = nil
 end
 
 function DamageMeter:ClearPreviewTooltip(index)
@@ -3351,6 +3751,23 @@ function DamageMeter:ClearPreviewTooltip(index)
 	if self.sourceTooltip then self.sourceTooltip:Hide() end
 	self.previewTooltipIndex = nil
 	self.previewTooltipOwner = nil
+	self.pinnedTooltipOwner = nil
+	self.pinnedTooltipIndex = nil
+end
+
+function DamageMeter:TogglePinnedTooltip(owner, index)
+	local config = self:GetConfig(index)
+	if config.tooltipEnabled ~= true or config.tooltipClickToPin ~= true or not owner or not owner.sourceData then return end
+	if self.pinnedTooltipOwner == owner then
+		self:ClearPinnedTooltip(index)
+		return
+	end
+	self.previewTooltipOwner = nil
+	self.pinnedTooltipOwner = owner
+	self.pinnedTooltipIndex = index
+	self:ShowSourceTooltip(owner, index, owner.sourceData)
+	self.pinnedTooltipOwner = owner
+	self.pinnedTooltipIndex = index
 end
 
 function DamageMeter:UpdatePreviewTooltip(index)
@@ -3380,10 +3797,13 @@ function DamageMeter:CreateRow(window, index, forceRankColumn)
 	row:SetScript("OnClick", function(owner, button)
 		if button == "RightButton" then
 			DamageMeter:OpenContextMenu(owner, window.index)
+		elseif button == "LeftButton" then
+			DamageMeter:TogglePinnedTooltip(owner, window.index)
 		end
 	end)
 	row:SetScript("OnEnter", function(owner)
 		DamageMeter:SetWindowHover(window.index, true)
+		if DamageMeter.pinnedTooltipOwner then return end
 		DamageMeter:ShowSourceTooltip(owner, window.index, owner.sourceData)
 	end)
 	row:SetScript("OnLeave", function()
@@ -3567,17 +3987,13 @@ function DamageMeter:EnsureWindow(index)
 	frame.empty = empty
 
 	local status = CreateFrame("Button", nil, frame)
-	status:RegisterForClicks("AnyUp")
+	status:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 	status:SetPoint("BOTTOMLEFT", 4, 4)
 	status:SetPoint("BOTTOMRIGHT", -4, 4)
 	status:SetHeight(16)
 	status:SetScript("OnClick", function(owner, button)
-		if button == "RightButton" then
-			DamageMeter:OpenContextMenu(owner, index)
-			return
-		end
 		if DamageMeter:GetConfig(index).showFooterQuickSwitch == false then return end
-		if button == "MiddleButton" then
+		if button == "RightButton" then
 			local currentSessionType = DamageMeter:GetEffectiveSessionType(index) or DamageMeter:GetConfig(index).sessionType
 			DamageMeter:SetTemporarySessionType(index, currentSessionType == "overall" and "current" or "overall")
 			return
@@ -3665,7 +4081,7 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 	frame._damageMeterWindowStyleGlobalFontVersion = globalFontVersion
 	frame._damageMeterWindowStyleForceRankColumn = forceRankColumn == true
 
-	local width = clampNumber(config.width, 220, 700, DEFAULT_WINDOW.width)
+	local width = clampNumber(config.width, 100, 700, DEFAULT_WINDOW.width)
 	local showHeader = config.showHeader == true
 	local showHeaderButtons = showHeader and config.showHeaderButtons ~= false
 	local showStatus = config.showStatus ~= false
@@ -4190,9 +4606,13 @@ end
 function DamageMeter:RefreshWindow(index, shared, sessionCache)
 	local state = self:BuildWindowRefreshState(index, shared)
 	local frame = self:EnsureWindow(index)
+	if not state.editMode and self.pinnedTooltipIndex == index and self.pinnedTooltipOwner and (not self.pinnedTooltipOwner:IsShown() or self.pinnedTooltipOwner.sourceData == nil) then
+		self:ClearPinnedTooltip(index)
+	end
 	if not state.editMode then self:ClearPreviewTooltip(index) end
 	if not state.visible then
 		self:ClearPreviewTooltip(index)
+		self:ClearPinnedTooltip(index)
 		self:ApplyVisibilityDriverToFrame(frame, nil)
 		self:ClearWindowRows(frame)
 		frame:Hide()
@@ -4202,6 +4622,7 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 	if driverActive and not state.editMode then
 		if not visibilityMatchesContext(state.config.visibility) then
 			self:ClearPreviewTooltip(index)
+			self:ClearPinnedTooltip(index)
 			self:ClearWindowRows(frame)
 			self:UpdateWindowAlpha(index)
 			return
@@ -4351,7 +4772,7 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 			self:ApplyRowBorder(row, config, source.classFilename, colors)
 			self:ApplyIconBorder(row, config, source.classFilename, colors)
 			self:ApplyBarBorder(row, config, source.classFilename, colors)
-			if config.showIcons ~= false then applySourceIcon(row.icon, source, inFollowerDungeon) end
+			if config.showIcons ~= false then applySourceIcon(row.icon, source, inFollowerDungeon, damageMeterType) end
 			row.name:SetText(formatDisplayName(source, config))
 			setTextColorIfChanged(row.name, colors.nr, colors.ng, colors.nb, colors.na)
 			if config.prefixRankInName == true then
@@ -4360,7 +4781,7 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 			row.value:SetText(valueText)
 			setTextColorIfChanged(row.value, colors.vr, colors.vg, colors.vb, colors.va)
 			self:ApplyRowValueWidth(row, config, damageMeterType, forceRankColumn)
-			row.bar:SetStatusBarColor(colors.r, colors.g, colors.b, 0.85)
+			row.bar:SetStatusBarColor(colors.r, colors.g, colors.b, colors.a)
 			row.bar:SetMinMaxValues(0, rawMaxAmount)
 			setStatusBarValue(row.bar, rawAmount, config.smoothBars == true)
 			row:Show()
@@ -4404,7 +4825,7 @@ end
 
 function DamageMeter:RefreshFromLiveEvent(damageMeterType, sessionID)
 	if not self:IsLiveEventRelevant(damageMeterType, sessionID) then return end
-	local now = GetTime and GetTime() or 0
+	local now = time and time() or (GetTime and GetTime() or 0)
 	local last = self.lastLiveRefreshTime or 0
 	if now - last < getUpdateRate() then return end
 	self.lastLiveRefreshTime = now
@@ -4610,6 +5031,17 @@ function DamageMeter:EnsureStaticPopups()
 		preferredIndex = 3,
 	}
 	StaticPopupDialogs[RESET_DATA_POPUP].OnAccept = function() DamageMeter:ResetData() end
+
+	StaticPopupDialogs[AUTO_CLEAR_POPUP] = StaticPopupDialogs[AUTO_CLEAR_POPUP] or {
+		text = L["damageMeterAutomaticClearConfirm"] or "Clear all Damage Meter data for this instance?",
+		button1 = YES or "Yes",
+		button2 = CANCEL or "Cancel",
+		timeout = 0,
+		whileDead = true,
+		hideOnEscape = true,
+		preferredIndex = 3,
+	}
+	StaticPopupDialogs[AUTO_CLEAR_POPUP].OnAccept = function() DamageMeter:ResetData() end
 end
 
 function DamageMeter:PromptRemoveWindow(index)
@@ -4646,6 +5078,60 @@ function DamageMeter:PromptResetData()
 		StaticPopup_Show(RESET_DATA_POPUP)
 	else
 		self:ResetData()
+	end
+end
+
+function DamageMeter:PromptAutoClearData()
+	self:EnsureStaticPopups()
+	if StaticPopup_Show then
+		StaticPopup_Show(AUTO_CLEAR_POPUP)
+	else
+		self:ResetData()
+	end
+end
+
+function DamageMeter:GetAutomaticClearInstanceKey()
+	if not (IsInInstance and GetInstanceInfo) then return nil end
+	local inInstance, instanceType = IsInInstance()
+	if not inInstance or (instanceType ~= "party" and instanceType ~= "raid") then return nil end
+	local instances = normalizeAutoClearInstances(db().damageMeterAutomaticClearInstances)
+	if instances[instanceType] ~= true then return nil end
+	local instanceID = select(8, GetInstanceInfo())
+	if not instanceID then return nil end
+	return instanceType .. ":" .. tostring(instanceID)
+end
+
+function DamageMeter:RunAutomaticClear(instanceKey)
+	if self.autoClearPendingInstanceKey ~= instanceKey then return end
+	self.autoClearPendingInstanceKey = nil
+	if not self:IsEnabled() or self:IsInEditMode() then return end
+	local mode = normalizeAutoClearMode(db().damageMeterAutomaticClear)
+	if mode == "never" then return end
+	if self:GetAutomaticClearInstanceKey() ~= instanceKey then return end
+	self.autoClearActiveInstanceKey = instanceKey
+	if mode == "ask" then
+		self:PromptAutoClearData()
+	else
+		self:ResetData()
+	end
+end
+
+function DamageMeter:CheckAutomaticClear()
+	if not self:IsEnabled() or self:IsInEditMode() then return end
+	local mode = normalizeAutoClearMode(db().damageMeterAutomaticClear)
+	if mode == "never" then return end
+	local instanceKey = self:GetAutomaticClearInstanceKey()
+	if not instanceKey then
+		self.autoClearActiveInstanceKey = nil
+		self.autoClearPendingInstanceKey = nil
+		return
+	end
+	if self.autoClearActiveInstanceKey == instanceKey or self.autoClearPendingInstanceKey == instanceKey then return end
+	self.autoClearPendingInstanceKey = instanceKey
+	if C_Timer and C_Timer.After then
+		C_Timer.After(AUTO_CLEAR_DELAY_SECONDS, function() DamageMeter:RunAutomaticClear(instanceKey) end)
+	else
+		self:RunAutomaticClear(instanceKey)
 	end
 end
 
@@ -4730,6 +5216,19 @@ local function colorSetting(name, getter, setter, default, parentId, isEnabled)
 		isEnabled = isEnabled,
 		default = default,
 		hasOpacity = true,
+		get = getter,
+		set = function(_, value) setter(value) end,
+	}
+end
+
+local function colorNoOpacitySetting(name, getter, setter, default, parentId, isEnabled)
+	return {
+		name = name,
+		kind = SettingType.Color,
+		parentId = parentId,
+		isEnabled = isEnabled,
+		default = default,
+		hasOpacity = false,
 		get = getter,
 		set = function(_, value) setter(value) end,
 	}
@@ -4863,8 +5362,11 @@ function DamageMeter:SetConfigValue(index, key, value)
 		if self.previewTooltipIndex == index then self.previewTooltipIndex = nil end
 	end
 	if key == "tooltipEnabled" and value ~= true and self.sourceTooltip then
-		self.sourceTooltip:Hide()
-		if self.previewTooltipIndex == index then self.previewTooltipIndex = nil end
+		self:ClearPreviewTooltip(index)
+		self:ClearPinnedTooltip(index)
+	end
+	if key == "tooltipClickToPin" and value ~= true then
+		self:ClearPinnedTooltip(index)
 	end
 	if key == "rowHeight" or key == "barHeight" or key == "changeBarSize" then
 		local rowHeight = clampNumber(config.rowHeight, 10, 70, DEFAULT_WINDOW.rowHeight)
@@ -4904,6 +5406,7 @@ function DamageMeter:BuildWindowSettings(index)
 	local function fixedRowBorderColorEnabled() return cfg().rowBorderEnabled == true and cfg().rowBorderUseClassColor ~= true end
 	local function barBorderEnabled() return cfg().barBorderEnabled == true end
 	local function fixedBarBorderColorEnabled() return cfg().barBorderEnabled == true and cfg().barBorderUseClassColor ~= true end
+	local function fixedBarColorEnabled() return cfg().useClassColors ~= true end
 	local function iconsEnabled() return cfg().showIcons ~= false end
 	local function customIconSizeEnabled() return cfg().showIcons ~= false and cfg().changeIconSize == true end
 	local function iconBorderEnabled() return cfg().showIcons ~= false and cfg().iconBorderEnabled == true end
@@ -4954,6 +5457,45 @@ function DamageMeter:BuildWindowSettings(index)
 			{ value = "overall", label = L["damageMeterOverall"] or "Overall" },
 		}, behaviorId, 110),
 		dropdownSetting(_G.TYPE or "Type", function() return normalizeDamageMeterTypeKey(cfg().damageMeterType) end, function(value) self:SetConfigValue(index, "damageMeterType", normalizeDamageMeterTypeKey(value)) end, buildDamageMeterTypeOptions, behaviorId, 180),
+		dividerSetting(behaviorId),
+		dropdownSetting(L["damageMeterAutomaticClear"] or "Automatic clear", function() return normalizeAutoClearMode(db().damageMeterAutomaticClear) end, function(value)
+			db().damageMeterAutomaticClear = normalizeAutoClearMode(value)
+			requestEditModeSettingsRefresh()
+		end, buildAutoClearOptions(), behaviorId, 120),
+		{
+			name = L["damageMeterAutomaticClearIn"] or "Clear in",
+			kind = SettingType.MultiDropdown,
+			field = "damageMeterAutomaticClearInstances",
+			parentId = behaviorId,
+			height = 90,
+			values = buildAutoClearInstanceOptions(),
+			hideSummary = true,
+			isEnabled = function() return normalizeAutoClearMode(db().damageMeterAutomaticClear) ~= "never" end,
+			get = function() return normalizeAutoClearInstances(db().damageMeterAutomaticClearInstances) end,
+			set = function(_, selection)
+				local instances = {}
+				if type(selection) == "table" then
+					if selection.party == true then instances.party = true end
+					if selection.raid == true then instances.raid = true end
+				end
+				db().damageMeterAutomaticClearInstances = instances
+			end,
+			isSelected = function(_, value)
+				local instances = normalizeAutoClearInstances(db().damageMeterAutomaticClearInstances)
+				return instances[value] == true
+			end,
+			setSelected = function(_, value, state)
+				if value ~= "party" and value ~= "raid" then return end
+				local instances = normalizeAutoClearInstances(db().damageMeterAutomaticClearInstances)
+				if state then
+					instances[value] = true
+				else
+					instances[value] = nil
+				end
+				db().damageMeterAutomaticClearInstances = instances
+			end,
+		},
+		dividerSetting(behaviorId),
 		{
 			name = L["damageMeterVisibility"] or "Show when",
 			kind = SettingType.MultiDropdown,
@@ -5015,7 +5557,7 @@ function DamageMeter:BuildWindowSettings(index)
 		sliderSetting(L["damageMeterRaidMaxRows"] or "Raid max rows", function() return cfg().raidMaxRows end, function(value) self:SetConfigValue(index, "raidMaxRows", clampNumber(value, 1, 30, DEFAULT_WINDOW.raidMaxRows)) end, 1, 30, 1, layoutId, raidRowsEnabled),
 		sliderSetting(L["damageMeterRaidVisibleRows"] or "Raid visible rows", function() return cfg().raidVisibleRows end, function(value) self:SetConfigValue(index, "raidVisibleRows", clampNumber(value, 1, 30, DEFAULT_WINDOW.raidVisibleRows)) end, 1, 30, 1, layoutId, raidRowsEnabled),
 		dividerSetting(layoutId),
-		sliderSetting(L["Width"] or "Width", function() return cfg().width end, function(value) self:SetConfigValue(index, "width", clampNumber(value, 220, 700, DEFAULT_WINDOW.width)) end, 220, 700, 1, layoutId),
+		sliderSetting(L["Width"] or "Width", function() return cfg().width end, function(value) self:SetConfigValue(index, "width", clampNumber(value, 100, 700, DEFAULT_WINDOW.width)) end, 100, 700, 1, layoutId),
 		sliderSetting(L["damageMeterHeightOffset"] or "Height offset", function() return cfg().heightOffset end, function(value) self:SetConfigValue(index, "heightOffset", clampNumber(value, 0, 300, DEFAULT_WINDOW.heightOffset)) end, 0, 300, 1, layoutId),
 		dividerSetting(layoutId),
 		dropdownSetting(L["damageMeterHeaderPosition"] or "Header position", function() return normalizeHeaderPosition(cfg().headerPosition) end, function(value) self:SetConfigValue(index, "headerPosition", normalizeHeaderPosition(value)) end, buildHeaderPositionOptions(), layoutId, 120),
@@ -5091,7 +5633,7 @@ function DamageMeter:BuildWindowSettings(index)
 			self:SetConfigValue(index, "showStatus", value)
 			requestEditModeSettingsRefresh()
 		end, statusId),
-		checkboxSetting(L["damageMeterShowFooterQuickSwitch"] or "Show quick switch", function() return cfg().showFooterQuickSwitch ~= false end, function(value) self:SetConfigValue(index, "showFooterQuickSwitch", value) end, statusId, statusEnabled, L["damageMeterQuickSwitchTooltip"] or "Left-click cycles through selected quick switch favorites. Right-click opens the quick switch menu where favorites can be selected. Middle-click switches between Current and Overall."),
+		checkboxSetting(L["damageMeterShowFooterQuickSwitch"] or "Show quick switch", function() return cfg().showFooterQuickSwitch ~= false end, function(value) self:SetConfigValue(index, "showFooterQuickSwitch", value) end, statusId, statusEnabled, L["damageMeterQuickSwitchTooltip"] or "Left-click cycles through selected quick switch favorites. Right-click switches between Current and Overall."),
 		dropdownSetting(L["damageMeterFooterFont"] or "Footer font", function() return cfg().statusFontFace end, function(value) self:SetConfigValue(index, "statusFontFace", value) end, buildMediaOptions("font", true), statusId, 260, statusEnabled),
 		dropdownSetting(L["damageMeterFooterFontOutline"] or "Footer font outline", function() return cfg().statusFontOutline end, function(value) self:SetConfigValue(index, "statusFontOutline", normalizeStyle(value)) end, buildStyleOptions(), statusId, 180, statusEnabled),
 		sliderSetting(L["damageMeterFooterFontSize"] or "Footer font size", function() return cfg().statusFontSize end, function(value) self:SetConfigValue(index, "statusFontSize", clampNumber(value, 8, 24, DEFAULT_WINDOW.statusFontSize)) end, 8, 24, 1, statusId, statusEnabled),
@@ -5122,6 +5664,12 @@ function DamageMeter:BuildWindowSettings(index)
 		dividerSetting(barId),
 		dropdownSetting(L["Texture"] or "Texture", function() return cfg().texture end, function(value) self:SetConfigValue(index, "texture", value) end, buildMediaOptions("statusbar", false), barId, 260),
 		checkboxSetting(L["damageMeterUseClassColors"] or "Use class colors", function() return cfg().useClassColors == true end, function(value) self:SetConfigValue(index, "useClassColors", value) end, barId),
+		colorNoOpacitySetting(L["damageMeterBarColor"] or "Color", function() return normalizeColor(cfg().barColor, DEFAULT_WINDOW.barColor) end, function(value)
+			local color = normalizeColor(value, DEFAULT_WINDOW.barColor)
+			color.a = 1
+			self:SetConfigValue(index, "barColor", color)
+		end, DEFAULT_WINDOW.barColor, barId, fixedBarColorEnabled),
+		sliderSetting(L["damageMeterBarOpacity"] or "Bar opacity", function() return cfg().barOpacity end, function(value) self:SetConfigValue(index, "barOpacity", clampNumber(value, 0, 1, DEFAULT_WINDOW.barOpacity)) end, 0, 1, 0.05, barId, nil, nil, formatAlphaSliderValue),
 		checkboxSetting(L["damageMeterSmoothBars"] or "Smooth bars", function() return cfg().smoothBars == true end, function(value) self:SetConfigValue(index, "smoothBars", value) end, barId),
 		checkboxSetting(L["damageMeterBarBackgroundUseCustomTexture"] or "Custom background texture", function() return cfg().barBackgroundUseCustomTexture == true end, function(value)
 			self:SetConfigValue(index, "barBackgroundUseCustomTexture", value)
@@ -5225,6 +5773,7 @@ function DamageMeter:BuildWindowSettings(index)
 		dropdownSetting(L["Delimiter"] or "Delimiter", function() return normalizeValueSeparator(cfg().valueSeparator) end, function(value) self:SetConfigValue(index, "valueSeparator", normalizeValueSeparator(value)) end, buildValueSeparatorOptions(), valuesId, 120, function() return cfg().valueFormat ~= "parentheses" end),
 		{ name = L["damageMeterTooltip"] or "Tooltip", kind = SettingType.Collapsible, id = tooltipId, defaultCollapsed = true },
 		checkboxSetting(L["damageMeterTooltipEnabled"] or "Show row tooltip", function() return cfg().tooltipEnabled == true end, function(value) self:SetConfigValue(index, "tooltipEnabled", value) end, tooltipId),
+		checkboxSetting(L["damageMeterTooltipClickToPin"] or "Click to pin tooltip", function() return cfg().tooltipClickToPin == true end, function(value) self:SetConfigValue(index, "tooltipClickToPin", value) end, tooltipId, tooltipEnabled),
 		checkboxSetting(L["damageMeterTooltipPreview"] or "Preview tooltip", function() return cfg().tooltipPreview == true end, function(value) self:SetConfigValue(index, "tooltipPreview", value) end, tooltipId, tooltipEnabled),
 		dividerSetting(tooltipId),
 		dropdownSetting(L["damageMeterTooltipAnchor"] or "Tooltip anchor", function() return normalizeTooltipAnchor(cfg().tooltipAnchor) end, function(value) self:SetConfigValue(index, "tooltipAnchor", normalizeTooltipAnchor(value)) end, buildTooltipAnchorOptions(), tooltipId, 120, tooltipEnabled),
@@ -5346,20 +5895,29 @@ function DamageMeter:Init()
 	self.eventFrame:SetScript("OnEvent", function(_, event, damageMeterType, sessionID)
 		if event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" then
 			self:InvalidatePartyClassFallback()
+			self:InvalidateDerivedTargetCache(true)
+			if event == "PLAYER_ENTERING_WORLD" then self:CheckAutomaticClear() end
 		elseif event == "PLAYER_REGEN_DISABLED" then
 			self:MarkPartyClassFallbackCurrent()
+			self:InvalidateDerivedTargetCache(true)
 		elseif event == "DAMAGE_METER_RESET" then
 			self:InvalidatePartyClassFallback()
 			self:MarkPartyClassFallbackCurrent()
+			self:InvalidateDerivedTargetCache()
 		elseif event == "ADDON_RESTRICTION_STATE_CHANGED" then
 			self:RefreshReportRestrictionState(damageMeterType, sessionID)
 		end
 		if event == "DAMAGE_METER_COMBAT_SESSION_UPDATED" then
+			self:InvalidateDerivedTargetCache(true)
 			self:RefreshFromLiveEvent(damageMeterType, sessionID)
 		elseif event == "DAMAGE_METER_CURRENT_SESSION_UPDATED" then
+			self:InvalidateDerivedTargetCache(true)
 			self:RefreshFromLiveEvent()
 		elseif event == "ADDON_RESTRICTION_STATE_CHANGED" then
 			self:Refresh()
+		elseif event == "ZONE_CHANGED_NEW_AREA" then
+			self:CheckAutomaticClear()
+			self:ScheduleRefresh()
 		else
 			self:ScheduleRefresh()
 		end
