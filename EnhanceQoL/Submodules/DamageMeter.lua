@@ -252,6 +252,8 @@ local DEFAULT_WINDOW = {
 	tooltipShowAmount = true,
 	tooltipShowDPS = true,
 	tooltipShowPercent = true,
+	tooltipShowCreatureName = true,
+	tooltipCreatureNameColor = { r = 0.72, g = 0.74, b = 0.78, a = 0.85 },
 	tooltipBackdropColor = { r = 0.02, g = 0.025, b = 0.03, a = 0.92 },
 	tooltipBorderColor = { r = 0.1, g = 0.12, b = 0.14, a = 0.95 },
 }
@@ -270,7 +272,7 @@ local PREVIEW_SESSION = {
 }
 local PREVIEW_SOURCE_DETAILS = {
 	combatSpells = {
-		{ spellID = 188196, totalAmount = 344000, amountPerSecond = 14400, combatSpellDetails = { unitName = "Dutiful Groundskeeper", amount = 489000, specIconID = 236157 } },
+		{ spellID = 188196, totalAmount = 344000, amountPerSecond = 14400, creatureName = "Ash", combatSpellDetails = { unitName = "Dutiful Groundskeeper", amount = 489000, specIconID = 236157 } },
 		{ spellID = 117014, totalAmount = 148000, amountPerSecond = 6000, combatSpellDetails = { unitName = "Restless Steward", amount = 223000, specIconID = 236157 } },
 		{ spellID = 51505, totalAmount = 91000, amountPerSecond = 3700, combatSpellDetails = { unitName = "Dutiful Groundskeeper", amount = 91000, specIconID = 236157 } },
 		{ spellID = 188389, totalAmount = 58000, amountPerSecond = 2300, combatSpellDetails = { unitName = "Restless Steward", amount = 58000, specIconID = 236157 } },
@@ -1118,6 +1120,11 @@ local function colorComponents(value, fallback)
 		clampNumber(value.g or value[2], 0, 1, fallback.g or fallback[2] or 0),
 		clampNumber(value.b or value[3], 0, 1, fallback.b or fallback[3] or 0),
 		clampNumber(value.a or value[4], 0, 1, fallback.a or fallback[4] or 1)
+end
+
+local function colorToHex(color, fallback)
+	local r, g, b, a = colorComponents(color, fallback)
+	return string.format("%02x%02x%02x%02x", math.floor((a * 255) + 0.5), math.floor((r * 255) + 0.5), math.floor((g * 255) + 0.5), math.floor((b * 255) + 0.5))
 end
 
 local function setStatusBarValue(bar, value, smooth)
@@ -2016,6 +2023,8 @@ function DamageMeter:GetDerivedTargetCacheKey(index, source, config, damageMeter
 		tostring(config.tooltipShowAmount ~= false),
 		tostring(config.tooltipShowDPS ~= false),
 		tostring(config.tooltipShowPercent ~= false),
+		tostring(config.tooltipShowCreatureName ~= false),
+		colorToHex(config.tooltipCreatureNameColor, DEFAULT_WINDOW.tooltipCreatureNameColor),
 	}, "\001")
 end
 
@@ -3304,7 +3313,7 @@ local function addTooltipSectionGap(rows)
 	rows[#rows + 1] = { spacer = true, heightMultiplier = 0.7 }
 end
 
-local function resolveCombatSpellDisplay(spell)
+local function resolveCombatSpellDisplay(spell, config)
 	if not spell then return L["Unknown"] or UNKNOWN or "Unknown", 136243 end
 	local spellID = spell.spellID
 	local spellName
@@ -3332,6 +3341,13 @@ local function resolveCombatSpellDisplay(spell)
 			spellName = tostring(creatureName)
 		else
 			spellName = L["Unknown"] or UNKNOWN or "Unknown"
+		end
+	end
+	if config and config.tooltipShowCreatureName ~= false and spellName and spell.creatureName ~= nil and not isSecret(spellName) and not isSecret(spell.creatureName) then
+		local creatureName = tostring(spell.creatureName)
+		if creatureName ~= "" then
+			local colorHex = colorToHex(config.tooltipCreatureNameColor, DEFAULT_WINDOW.tooltipCreatureNameColor)
+			spellName = string.format("%s |c%s(%s)|r", spellName, colorHex, creatureName)
 		end
 	end
 	return spellName, spellIcon or 136243
@@ -3492,7 +3508,7 @@ function DamageMeter:BuildTooltipRows(details, config, damageMeterType, derivedT
 	end
 	local spellRows = 0
 	for _, spell in ipairs(details.combatSpells) do
-		local spellName, spellIcon = resolveCombatSpellDisplay(spell)
+		local spellName, spellIcon = resolveCombatSpellDisplay(spell, config)
 		local amount = spell.totalAmount
 		local dps = spell.amountPerSecond
 		local percent = totalAmount and totalAmount > 0 and safeNumber(amount) and (safeNumber(amount) / totalAmount * 100) or nil
@@ -5792,6 +5808,8 @@ function DamageMeter:BuildWindowSettings(index)
 		checkboxSetting(L["damageMeterTooltipShowDPS"] or "Show DPS column", function() return cfg().tooltipShowDPS ~= false end, function(value) self:SetConfigValue(index, "tooltipShowDPS", value) end, tooltipId, tooltipEnabled),
 		checkboxSetting(L["damageMeterTooltipShowPercent"] or "Show percent column", function() return cfg().tooltipShowPercent ~= false end, function(value) self:SetConfigValue(index, "tooltipShowPercent", value) end, tooltipId, tooltipEnabled),
 		checkboxSetting(L["damageMeterTooltipShowTargets"] or "Show targets", function() return cfg().tooltipShowTargets ~= false end, function(value) self:SetConfigValue(index, "tooltipShowTargets", value) end, tooltipId, tooltipEnabled),
+		checkboxSetting(L["damageMeterTooltipShowCreatureName"] or "Show creature name", function() return cfg().tooltipShowCreatureName ~= false end, function(value) self:SetConfigValue(index, "tooltipShowCreatureName", value) end, tooltipId, tooltipEnabled),
+		colorSetting(L["damageMeterTooltipCreatureNameColor"] or "Creature name color", function() return normalizeColor(cfg().tooltipCreatureNameColor, DEFAULT_WINDOW.tooltipCreatureNameColor) end, function(value) self:SetConfigValue(index, "tooltipCreatureNameColor", normalizeColor(value, DEFAULT_WINDOW.tooltipCreatureNameColor)) end, DEFAULT_WINDOW.tooltipCreatureNameColor, tooltipId, function() return cfg().tooltipEnabled == true and cfg().tooltipShowCreatureName ~= false end),
 		dividerSetting(tooltipId),
 		checkboxSetting(L["damageMeterTooltipShowBars"] or "Show bars", function() return cfg().tooltipShowBars == true end, function(value) self:SetConfigValue(index, "tooltipShowBars", value) end, tooltipId, tooltipEnabled),
 		dropdownSetting(L["damageMeterTooltipBarTexture"] or "Tooltip bar texture", function() return cfg().tooltipBarTexture end, function(value) self:SetConfigValue(index, "tooltipBarTexture", value) end, buildMediaOptions("statusbar", false), tooltipId, 260, tooltipEnabled),
