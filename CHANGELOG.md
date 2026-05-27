@@ -10,9 +10,15 @@
 - Damage Meter / Behavior: Added Dungeon and Raid filters for Automatic clear so reset prompts only appear in selected instance types.
 - Damage Meter / Bars: Added independent bar opacity control that also applies when class-colored bars are enabled.
 - Damage Meter / Bars: Added a custom bar color picker for non-class-colored bars.
+- Damage Meter / Values: Added an explicit Columns/Combined value layout with configurable Amount, Rate, Percent, column gap, name/value gap, and minimum name widths.
+
+### 🔄 Changed
+
+- Damage Meter / Layout: Removed Max rows settings; windows now use all available session rows and Visible rows only controls the viewport height.
 
 ### 🐛 Fixed
 
+- Damage Meter / Bars: Fixed Bar border offset changing row height, icon size, and bar positioning instead of only expanding the bar border.
 - Damage Meter / Footer: Changed Quick Switch so right-click switches Current/Overall instead of opening the favorites menu; middle-click is no longer used.
 - Damage Meter / Tooltip: Fixed breakdown bars disappearing in combat by rendering them with StatusBar values instead of Lua-calculated widths.
 - Damage Meter / Tooltip: Improved target breakdown rows so restricted target names or amounts are still displayed instead of being dropped from aggregation.

@@ -1215,11 +1215,6 @@ local function getRowMetrics(config)
 	return rowHeight, barHeight, spacing
 end
 
-local function getBarBorderOutset(config)
-	if config.barBorderEnabled ~= true then return 0 end
-	return clampNumber(config.barBorderInset, 0, 24, DEFAULT_WINDOW.barBorderInset)
-end
-
 local function getIconBorderOutset(config)
 	if config.showIcons == false or config.iconBorderEnabled ~= true then return 0 end
 	return clampNumber(config.iconBorderInset, 0, 24, DEFAULT_WINDOW.iconBorderInset)
@@ -1227,7 +1222,7 @@ end
 
 local function getEffectiveRowHeight(config)
 	local rowHeight = getRowMetrics(config)
-	return rowHeight + (math.max(getBarBorderOutset(config), getIconBorderOutset(config)) * 2)
+	return rowHeight + (getIconBorderOutset(config) * 2)
 end
 
 local function getIconSize(config)
@@ -2693,7 +2688,6 @@ function DamageMeter:ApplyRowTextLayout(row, config, forceRankColumn)
 	row._damageMeterTextLayoutForceRankColumn = forceRankColumn == true
 
 	local _, barHeight = getRowMetrics(config)
-	local borderOutset = getBarBorderOutset(config)
 	local leftInset, rightInset, iconSize, rankWidth, rankGap = getRowTextInsets(config, forceRankColumn)
 	local iconGap = getIconGap(config)
 	local rankPrefixText = useTextRankPrefix(config)
@@ -2728,9 +2722,9 @@ function DamageMeter:ApplyRowTextLayout(row, config, forceRankColumn)
 	row.bar:SetPoint("RIGHT", row, "RIGHT", -4, 0)
 	row.bar:SetHeight(barHeight)
 	if normalizeAnchorV(config.barAnchor) == "TOP" then
-		row.bar:SetPoint("TOP", row, "TOP", 0, -borderOutset)
+		row.bar:SetPoint("TOP", row, "TOP", 0, 0)
 	elseif normalizeAnchorV(config.barAnchor) == "BOTTOM" then
-		row.bar:SetPoint("BOTTOM", row, "BOTTOM", 0, borderOutset)
+		row.bar:SetPoint("BOTTOM", row, "BOTTOM", 0, 0)
 	else
 		row.bar:SetPoint("CENTER", row, "CENTER", 0, 0)
 	end
