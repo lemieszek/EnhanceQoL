@@ -2068,11 +2068,17 @@ function DamageMeter:GetEnemyDamageTakenSourceDetails(index, enemySource)
 	return nil
 end
 
-function DamageMeter:AddDerivedTargetEntry(cache, actorName, targetName, amount, dps)
-	if actorName == nil or targetName == nil or isSecret(actorName) or isSecret(targetName) or not amount then return end
+function DamageMeter:AddDerivedTargetEntry(cache, actorName, targetKey, targetName, amount, dps)
+	if actorName == nil or targetKey == nil or isSecret(actorName) or isSecret(targetKey) or not amount then return end
 	actorName = tostring(actorName)
-	targetName = tostring(targetName)
-	if actorName == "" or targetName == "" then return end
+	targetKey = tostring(targetKey)
+	if actorName == "" or targetKey == "" then return end
+	if targetName == nil then
+		targetName = targetKey
+	elseif not isSecret(targetName) then
+		targetName = tostring(targetName)
+		if targetName == "" then targetName = targetKey end
+	end
 	local actorTargets = cache.byActor[actorName]
 	if not actorTargets then
 		actorTargets = {}
@@ -2084,10 +2090,12 @@ function DamageMeter:AddDerivedTargetEntry(cache, actorName, targetName, amount,
 			end
 		end
 	end
-	local target = actorTargets[targetName]
+	local target = actorTargets[targetKey]
 	if not target then
-		target = { name = targetName, atlas = TOOLTIP_TARGET_ATLAS, amount = 0, dps = 0 }
-		actorTargets[targetName] = target
+		target = { key = targetKey, name = targetName, atlas = TOOLTIP_TARGET_ATLAS, amount = 0, dps = 0 }
+		actorTargets[targetKey] = target
+	elseif target.name == nil or (not isSecret(target.name) and target.name == target.key) then
+		target.name = targetName
 	end
 	target.amount = target.amount + amount
 	target.dps = target.dps + (dps or 0)
@@ -2125,14 +2133,16 @@ function DamageMeter:BuildDerivedTargetSessionCache(index)
 		scanCount = scanCount + 1
 		if scanCount > DERIVED_TARGET_SCAN_LIMIT then break end
 		local targetName = resolveTooltipUnitName(enemySource.name)
+		local targetKey = enemySource.sourceCreatureID
+		if targetKey == nil or isSecret(targetKey) then targetKey = targetName end
 		local enemyDetails = self:GetEnemyDamageTakenSourceDetails(index, enemySource)
-		if targetName ~= nil and not isSecret(targetName) and type(enemyDetails) == "table" and type(enemyDetails.combatSpells) == "table" then
+		if targetKey ~= nil and not isSecret(targetKey) and type(enemyDetails) == "table" and type(enemyDetails.combatSpells) == "table" then
 			for _, spell in ipairs(enemyDetails.combatSpells) do
 				local spellDetails = spell.combatSpellDetails
 				if type(spellDetails) == "table" then
 					local amount = safeNumber(spell.totalAmount)
 					if amount then
-						if self:AddDerivedTargetEntry(cache, spellDetails.unitName, targetName, amount, safeNumber(spell.amountPerSecond)) then
+						if self:AddDerivedTargetEntry(cache, spellDetails.unitName, targetKey, targetName, amount, safeNumber(spell.amountPerSecond)) then
 							addedAny = true
 						end
 					end
