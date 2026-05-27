@@ -2,6 +2,25 @@
 
 <!--@eqol-beta@-->
 
+## [10.21.0-beta9] - 2026-05-26
+
+### ✨ Added
+
+- Damage Meter / Behavior: Added Automatic clear with Never, Ask, and Always modes using Blizzard's reset-all Damage Meter API.
+- Damage Meter / Behavior: Added Dungeon and Raid filters for Automatic clear so reset prompts only appear in selected instance types.
+- Damage Meter / Bars: Added independent bar opacity control that also applies when class-colored bars are enabled.
+- Damage Meter / Bars: Added a custom bar color picker for non-class-colored bars.
+
+### 🐛 Fixed
+
+- Damage Meter / Automatic clear: Fixed Ask only appearing once after leaving and re-entering the same dungeon by tracking only the current instance visit.
+- Damage Meter / Automatic clear: Delayed the reset prompt briefly after zoning so Blizzard session data is available before the reset runs.
+- Damage Meter / Footer: Changed Quick Switch so right-click switches Current/Overall instead of opening the favorites menu; middle-click is no longer used.
+- Damage Meter / Tooltip: Fixed breakdown bars disappearing in combat by rendering them with StatusBar values instead of Lua-calculated widths.
+- Damage Meter / Tooltip: Improved target breakdown rows so restricted target names or amounts are still displayed instead of being dropped from aggregation.
+
+---
+
 ## [10.21.0-beta8] - 2026-05-26
 
 ### ✨ Added
