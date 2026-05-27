@@ -57,10 +57,8 @@ local SYNC_EXCLUDED_KEYS = {
 	visibility = true,
 	visibilityFadeAlpha = true,
 	visibilityFadeMode = true,
-	maxRows = true,
 	visibleRows = true,
 	raidRowsEnabled = true,
-	raidMaxRows = true,
 	raidVisibleRows = true,
 	windowAnchorPoint = true,
 	windowRelativePoint = true,
@@ -81,10 +79,8 @@ local DEFAULT_WINDOW = {
 	visibility = "always",
 	visibilityFadeMode = "none",
 	visibilityFadeAlpha = 0.25,
-	maxRows = 8,
 	visibleRows = 8,
 	raidRowsEnabled = false,
-	raidMaxRows = 8,
 	raidVisibleRows = 8,
 	width = 320,
 	heightOffset = 0,
@@ -940,19 +936,11 @@ local function useRaidRows(config)
 	return config.raidRowsEnabled == true and IsInRaid and IsInRaid() == true
 end
 
-local function getEffectiveMaxRows(config)
+local function getEffectiveVisibleRows(config)
 	if useRaidRows(config) then
-		return clampNumber(config.raidMaxRows, 1, 30, DEFAULT_WINDOW.raidMaxRows)
+		return clampNumber(config.raidVisibleRows, 1, 30, DEFAULT_WINDOW.raidVisibleRows)
 	end
-	return clampNumber(config.maxRows, 1, 30, DEFAULT_WINDOW.maxRows)
-end
-
-local function getEffectiveVisibleRows(config, maxRows)
-	maxRows = maxRows or getEffectiveMaxRows(config)
-	if useRaidRows(config) then
-		return math.min(maxRows, clampNumber(config.raidVisibleRows, 1, 30, DEFAULT_WINDOW.raidVisibleRows))
-	end
-	return math.min(maxRows, clampNumber(config.visibleRows, 1, 30, DEFAULT_WINDOW.visibleRows))
+	return clampNumber(config.visibleRows, 1, 30, DEFAULT_WINDOW.visibleRows)
 end
 
 local function formatDeathTimeText(source)
@@ -1256,8 +1244,7 @@ end
 
 local function getEffectiveRankWidth(config)
 	if config.showRanks == false then return 0 end
-	local maxRows = getEffectiveMaxRows(config)
-	local rankChars = #tostring(maxRows) + 1
+	local rankChars = 3
 	if config.prefixRankInName == true then
 		local fontSize = clampNumber(config.fontSize, 8, 24, DEFAULT_WINDOW.fontSize)
 		return math.min(80, math.max(8, math.ceil(rankChars * fontSize * 0.62) + 2))
@@ -4174,9 +4161,8 @@ function DamageMeter:EnsureWindow(index)
 		local config = DamageMeter:GetConfig(index)
 		local _, _, spacing = getRowMetrics(config)
 		local effectiveRowHeight = getEffectiveRowHeight(config)
-		local maxRows = getEffectiveMaxRows(config)
-		local visibleRows = getEffectiveVisibleRows(config, maxRows)
-		local contentRows = math.min(maxRows, frame.contentRows or maxRows)
+		local visibleRows = getEffectiveVisibleRows(config)
+		local contentRows = frame.contentRows or visibleRows
 		local maxScroll = math.max(0, (contentRows - visibleRows) * (effectiveRowHeight + spacing))
 		local nextScroll = (rowsViewport:GetVerticalScroll() or 0) - (delta * (effectiveRowHeight + spacing))
 		rowsViewport:SetVerticalScroll(clampNumber(nextScroll, 0, maxScroll, 0))
@@ -4301,9 +4287,8 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 	local rowsGrowUp = normalizeRowGrowth(config.rowGrowth) == "UP"
 	local _, _, spacing = getRowMetrics(config)
 	local effectiveRowHeight = getEffectiveRowHeight(config)
-	local maxRows = getEffectiveMaxRows(config)
-	local visibleRows = getEffectiveVisibleRows(config, maxRows)
-	contentRows = math.min(maxRows, clampNumber(contentRows, 0, maxRows, maxRows))
+	local visibleRows = getEffectiveVisibleRows(config)
+	contentRows = math.max(0, tonumber(contentRows) or 0)
 	local viewportHeight = (visibleRows * effectiveRowHeight) + math.max(0, visibleRows - 1) * spacing
 	local titleFontSize = clampNumber(config.titleFontSize, 8, 28, DEFAULT_WINDOW.titleFontSize)
 	local statusFontSize = clampNumber(config.statusFontSize, 8, 24, DEFAULT_WINDOW.statusFontSize)
@@ -4846,7 +4831,6 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 	local config = state.config
 	local session = self:GetSessionForState(state, sessionCache)
 	local sources = session and type(session.combatSources) == "table" and session.combatSources or {}
-	local maxRows = getEffectiveMaxRows(config)
 	local damageMeterType = state.damageMeterType
 	local orderedSources = sources
 	if damageMeterType == "Deaths" and type(sources) == "table" and #sources > 1 then
@@ -4875,8 +4859,8 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 	end
 	local rowsGrowUp = normalizeRowGrowth(config.rowGrowth) == "UP"
 	local highestBottom = damageMeterType ~= "Deaths" and normalizeRowSort(config.rowSort) == "BOTTOM"
-	local visibleRows = getEffectiveVisibleRows(config, maxRows)
-	local contentRows = math.min(maxRows, #orderedSources)
+	local visibleRows = getEffectiveVisibleRows(config)
+	local contentRows = #orderedSources
 	local displayIndices
 	local playerSourceIndex
 	if config.alwaysShowPlayer == true then
@@ -4921,7 +4905,7 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 	end
 
 	local forceRankColumn = false
-	local reportAvailable = self:IsReportDataAvailable(session, orderedSources, damageMeterType, config, math.min(getEffectiveVisibleRows(config, maxRows), #orderedSources))
+	local reportAvailable = self:IsReportDataAvailable(session, orderedSources, damageMeterType, config, math.min(visibleRows, #orderedSources))
 	if config.showRanks ~= false and config.prefixRankInName == true then
 		for entryIndex = 1, contentRows do
 			local sourceIndex = displayIndices and displayIndices[entryIndex] or entryIndex
@@ -4949,7 +4933,7 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 	local valueUseParentheses = config.valueFormat == "parentheses"
 	local valueSeparator = normalizeValueSeparator(config.valueSeparator)
 
-	for rowIndex = 1, maxRows do
+	for rowIndex = 1, contentRows do
 		local visualTopIndex = rowsGrowUp and (contentRows - rowIndex + 1) or rowIndex
 		local entryIndex = highestBottom and (contentRows - visualTopIndex + 1) or visualTopIndex
 		local sourceIndex
@@ -5017,7 +5001,7 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 		end
 	end
 
-	for rowIndex = maxRows + 1, #frame.rows do
+	for rowIndex = contentRows + 1, #frame.rows do
 		frame.rows[rowIndex]:Hide()
 	end
 
@@ -5777,11 +5761,9 @@ function DamageMeter:BuildWindowSettings(index)
 		sliderSetting(L["damageMeterVisibilityFadeAlpha"] or "Faded opacity", function() return cfg().visibilityFadeAlpha end, function(value) self:SetConfigValue(index, "visibilityFadeAlpha", clampNumber(value, 0, 1, DEFAULT_WINDOW.visibilityFadeAlpha)) end, 0, 1, 0.05, behaviorId, function() return normalizeVisibilityFadeMode(cfg().visibilityFadeMode) == "mouseover" end, nil, formatAlphaSliderValue),
 		checkboxSetting(L["damageMeterShowNoData"] or "Show no data text", function() return cfg().showNoData ~= false end, function(value) self:SetConfigValue(index, "showNoData", value) end, behaviorId),
 		{ name = L["Layout"] or "Layout", kind = SettingType.Collapsible, id = layoutId, defaultCollapsed = false },
-		sliderSetting(L["damageMeterMaxRows"] or "Max rows", function() return cfg().maxRows end, function(value) self:SetConfigValue(index, "maxRows", clampNumber(value, 1, 30, DEFAULT_WINDOW.maxRows)) end, 1, 30, 1, layoutId),
 		sliderSetting(L["damageMeterVisibleRows"] or "Visible rows", function() return cfg().visibleRows end, function(value) self:SetConfigValue(index, "visibleRows", clampNumber(value, 1, 30, DEFAULT_WINDOW.visibleRows)) end, 1, 30, 1, layoutId),
 		dividerSetting(layoutId),
 		checkboxSetting(L["damageMeterDifferentRaidRows"] or "Different settings in raid", function() return cfg().raidRowsEnabled == true end, function(value) self:SetConfigValue(index, "raidRowsEnabled", value) end, layoutId),
-		sliderSetting(L["damageMeterRaidMaxRows"] or "Raid max rows", function() return cfg().raidMaxRows end, function(value) self:SetConfigValue(index, "raidMaxRows", clampNumber(value, 1, 30, DEFAULT_WINDOW.raidMaxRows)) end, 1, 30, 1, layoutId, raidRowsEnabled),
 		sliderSetting(L["damageMeterRaidVisibleRows"] or "Raid visible rows", function() return cfg().raidVisibleRows end, function(value) self:SetConfigValue(index, "raidVisibleRows", clampNumber(value, 1, 30, DEFAULT_WINDOW.raidVisibleRows)) end, 1, 30, 1, layoutId, raidRowsEnabled),
 		dividerSetting(layoutId),
 		sliderSetting(L["Width"] or "Width", function() return cfg().width end, function(value) self:SetConfigValue(index, "width", clampNumber(value, 100, 700, DEFAULT_WINDOW.width)) end, 100, 700, 1, layoutId),
