@@ -1,7 +1,14 @@
 -- luacheck: globals C_DamageMeter C_DeathRecap C_LFGInfo C_Spell C_StringUtil C_CVar C_RestrictedActions C_ChallengeMode SetCVar StaticPopupDialogs StaticPopup_Show YES CANCEL OKAY MenuUtil Menu GameTooltip SecondsToClock DAMAGE_METER_COMBAT_NUMBER CLASS_ICON_TCOORDS UnitClass UnitExists UnitGUID UnitAffectingCombat IsInRaid IsInInstance GetInstanceInfo Ambiguate UISpecialFrames GetCursorPosition GetTime C_Timer ACTION_SWING ACTION_ENVIRONMENTAL_DAMAGE_DROWNING ACTION_ENVIRONMENTAL_DAMAGE_FALLING ACTION_ENVIRONMENTAL_DAMAGE_FIRE ACTION_ENVIRONMENTAL_DAMAGE_LAVA ACTION_ENVIRONMENTAL_DAMAGE_SLIME ACTION_ENVIRONMENTAL_DAMAGE_FATIGUE DEATH_RECAP_TITLE CreateAbbreviateConfig
 local addonName, addon = ...
 
-local L = LibStub("AceLocale-3.0"):GetLocale(addonName)
+local host = addon.DamageMeterHost or {}
+host.displayName = host.displayName or "EnhanceQoL"
+host.framePrefix = host.framePrefix or "EnhanceQoLDamageMeter"
+host.editModePrefix = host.editModePrefix or "EQOL_DamageMeter"
+host.popupPrefix = host.popupPrefix or "EQOL_DAMAGE_METER"
+host.menuHistoryTag = host.menuHistoryTag or "MENU_EQOL_DAMAGE_METER_HISTORY"
+
+local L = LibStub("AceLocale-3.0"):GetLocale(host.localeName or addonName)
 local LSM = LibStub("LibSharedMedia-3.0", true)
 local EditMode = addon.EditMode
 local SettingType = EditMode and EditMode.lib and EditMode.lib.SettingType
@@ -25,7 +32,6 @@ DamageMeter.GENERIC_CLASS_ICON_TCOORDS = {
 	DEMONHUNTER = { 0.369140625, 0.5, 0.25, 0.375 },
 }
 
-local EDITMODE_ID_PREFIX = "EQOL_DamageMeter"
 local MAX_WINDOWS = 5
 local DEFAULT_TEXTURE = "Interface\\TargetingFrame\\UI-StatusBar"
 local DEFAULT_BORDER = "Interface\\Buttons\\WHITE8x8"
@@ -33,10 +39,10 @@ local DEFAULT_FONT = "Fonts\\FRIZQT__.TTF"
 local CLASS_ICON_TEXTURE = "Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES"
 local GLOBAL_FONT_KEY = "__EQOL_GLOBAL_FONT__"
 local GLOBAL_STYLE_KEY = "__EQOL_GLOBAL_FONT_STYLE__"
-local REMOVE_WINDOW_POPUP = "EQOL_DAMAGE_METER_REMOVE_WINDOW"
-local COPY_WINDOW_POPUP = "EQOL_DAMAGE_METER_COPY_WINDOW"
-local RESET_DATA_POPUP = "EQOL_DAMAGE_METER_RESET_DATA"
-local AUTO_CLEAR_POPUP = "EQOL_DAMAGE_METER_AUTO_CLEAR"
+local REMOVE_WINDOW_POPUP = host.popupPrefix .. "_REMOVE_WINDOW"
+local COPY_WINDOW_POPUP = host.popupPrefix .. "_COPY_WINDOW"
+local RESET_DATA_POPUP = host.popupPrefix .. "_RESET_DATA"
+local AUTO_CLEAR_POPUP = host.popupPrefix .. "_AUTO_CLEAR"
 local CONTEXT_MENU_WIDTH = 376
 local CONTEXT_MENU_PADDING = 8
 local CONTEXT_MENU_BUTTON_HEIGHT = 30
@@ -3280,7 +3286,7 @@ end
 
 function DamageMeter:EnsureContextMenu()
 	if self.contextMenu then return self.contextMenu end
-	local frame = CreateFrame("Frame", "EnhanceQoLDamageMeterContextMenu", UIParent, "BackdropTemplate")
+	local frame = CreateFrame("Frame", host.framePrefix .. "ContextMenu", UIParent, "BackdropTemplate")
 	frame:SetFrameStrata("DIALOG")
 	frame:SetFrameLevel(80)
 	frame:SetClampedToScreen(true)
@@ -3605,7 +3611,7 @@ function DamageMeter:OpenHistoryMenu(owner, index, hoverMode)
 		local menuVariants = _G.MenuVariants
 		local menuMixin = owner and owner.menuMixin or (menuVariants and menuVariants.GetDefaultContextMenuMixin and menuVariants.GetDefaultContextMenuMixin()) or nil
 		local rootDescription = MenuUtil.CreateRootMenuDescription(menuMixin)
-		rootDescription:SetTag("MENU_EQOL_DAMAGE_METER_HISTORY")
+		rootDescription:SetTag(host.menuHistoryTag)
 		self:BuildSessionMenu(index, rootDescription)
 
 		local anchor = AnchorUtil.CreateAnchor("TOPRIGHT", owner, "BOTTOMRIGHT", 0, -2)
@@ -3620,7 +3626,7 @@ function DamageMeter:OpenHistoryMenu(owner, index, hoverMode)
 	end
 
 	local menu = MenuUtil.CreateContextMenu(owner, function(_, rootDescription)
-		rootDescription:SetTag("MENU_EQOL_DAMAGE_METER_HISTORY")
+		rootDescription:SetTag(host.menuHistoryTag)
 		self:BuildSessionMenu(index, rootDescription)
 	end)
 	if hoverMode and menu then
@@ -3633,7 +3639,7 @@ end
 
 function DamageMeter:EnsureSourceTooltip()
 	if self.sourceTooltip then return self.sourceTooltip end
-	local frame = CreateFrame("Frame", "EnhanceQoLDamageMeterSourceTooltip", UIParent, "BackdropTemplate")
+	local frame = CreateFrame("Frame", host.framePrefix .. "SourceTooltip", UIParent, "BackdropTemplate")
 	frame:SetFrameStrata("TOOLTIP")
 	frame:SetFrameLevel(20)
 	if frame.SetClampedToScreen then frame:SetClampedToScreen(true) end
@@ -4376,7 +4382,7 @@ function DamageMeter:EnsureWindow(index)
 	local window = self.windows[index]
 	if window then return window end
 
-	local frame = CreateFrame("Frame", "EnhanceQoLDamageMeterFrame" .. index, UIParent, "BackdropTemplate")
+	local frame = CreateFrame("Frame", host.framePrefix .. "Frame" .. index, UIParent, "BackdropTemplate")
 	frame:SetFrameStrata("MEDIUM")
 	if frame.SetClampedToScreen then frame:SetClampedToScreen(true) end
 	frame:EnableMouse(true)
@@ -4524,7 +4530,7 @@ function DamageMeter:ApplyWindowAnchor(index)
 	local targetIndex = clampNumber(config.anchorToWindow, 0, index - 1, 0)
 	if targetIndex <= 0 then
 		if frame._damageMeterAnchored then
-			local id = EDITMODE_ID_PREFIX .. index
+			local id = host.editModePrefix .. index
 			local point = EditMode and EditMode.GetValue and EditMode:GetValue(id, "point") or "CENTER"
 			local relativePoint = EditMode and EditMode.GetValue and EditMode:GetValue(id, "relativePoint") or point
 			local x = EditMode and EditMode.GetValue and EditMode:GetValue(id, "x") or 300
@@ -4928,7 +4934,7 @@ function DamageMeter:BuildReportLines(index, lineLimit)
 	local sessionLabel = state.sessionID and (state.temporary and state.temporary.sessionName or L["damageMeterHistory"] or "History") or (state.sessionType == "overall" and (L["damageMeterOverall"] or "Overall") or (L["damageMeterCurrent"] or "Current"))
 	local duration = self:GetSessionDuration(index, session, state)
 	local typeLabel = getDamageMeterTypeLabel(damageMeterType)
-	local header = string.format("EnhanceQoL: %s - %s", sessionLabel or "", typeLabel or "")
+	local header = string.format("%s: %s - %s", host.displayName, sessionLabel or "", typeLabel or "")
 	local durationText = formatDuration(duration, "smart")
 	if durationText then header = string.format("%s (%s)", header, durationText) end
 	local lines = { header }
@@ -5005,7 +5011,7 @@ end
 
 function DamageMeter:EnsureReportDialog()
 	if self.reportDialog then return self.reportDialog end
-	local frame = CreateFrame("Frame", "EnhanceQoLDamageMeterReportDialog", UIParent, "BackdropTemplate")
+	local frame = CreateFrame("Frame", host.framePrefix .. "ReportDialog", UIParent, "BackdropTemplate")
 	frame:SetFrameStrata("DIALOG")
 	frame:SetFrameLevel(90)
 	frame:SetSize(360, 270)
@@ -5391,7 +5397,7 @@ function DamageMeter:ResetNewWindowPlacement(index)
 		frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 	end
 	if EditMode and EditMode.SetFramePosition then
-		EditMode:SetFramePosition(EDITMODE_ID_PREFIX .. index, "CENTER", 0, 0, nil, true, "CENTER")
+		EditMode:SetFramePosition(host.editModePrefix .. index, "CENTER", 0, 0, nil, true, "CENTER")
 	end
 end
 
@@ -5708,7 +5714,7 @@ end
 
 function DamageMeter:EnsureSyncSourceDialog()
 	if self.syncSourceDialog then return self.syncSourceDialog end
-	local frame = CreateFrame("Frame", "EnhanceQoLDamageMeterSyncSourceDialog", UIParent, "BackdropTemplate")
+	local frame = CreateFrame("Frame", host.framePrefix .. "SyncSourceDialog", UIParent, "BackdropTemplate")
 	frame:SetFrameStrata("DIALOG")
 	frame:SetFrameLevel(90)
 	frame:SetSize(360, 190)
@@ -6383,7 +6389,7 @@ end
 function DamageMeter:RegisterEditMode()
 	if self.editModeRegistered or not (EditMode and EditMode.RegisterFrame and SettingType) then return end
 	for index = 1, MAX_WINDOWS do
-		EditMode:RegisterFrame(EDITMODE_ID_PREFIX .. index, {
+		EditMode:RegisterFrame(host.editModePrefix .. index, {
 			frame = self:EnsureWindow(index),
 			title = string.format("%s %d", L["damageMeterTitle"] or "Damage Meter", index),
 			layoutDefaults = { point = "CENTER", relativePoint = "CENTER", x = 300, y = -120 - ((index - 1) * 30) },
