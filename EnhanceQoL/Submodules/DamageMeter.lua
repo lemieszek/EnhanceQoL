@@ -9,6 +9,22 @@ local SettingType = EditMode and EditMode.lib and EditMode.lib.SettingType
 local DamageMeter = {}
 addon.DamageMeter = DamageMeter
 
+DamageMeter.GENERIC_CLASS_ICON_TCOORDS = {
+	WARRIOR = { 0, 0.125, 0, 0.125 },
+	MAGE = { 0.125, 0.248046875, 0, 0.125 },
+	ROGUE = { 0.248046875, 0.37109375, 0, 0.125 },
+	DRUID = { 0.37109375, 0.494140625, 0, 0.125 },
+	EVOKER = { 0.50390625, 0.625, 0, 0.125 },
+	HUNTER = { 0, 0.125, 0.125, 0.25 },
+	SHAMAN = { 0.125, 0.248046875, 0.125, 0.25 },
+	PRIEST = { 0.248046875, 0.37109375, 0.125, 0.25 },
+	WARLOCK = { 0.37109375, 0.494140625, 0.125, 0.25 },
+	PALADIN = { 0, 0.125, 0.25, 0.375 },
+	DEATHKNIGHT = { 0.125, 0.25, 0.25, 0.375 },
+	MONK = { 0.25, 0.369140625, 0.25, 0.375 },
+	DEMONHUNTER = { 0.369140625, 0.5, 0.25, 0.375 },
+}
+
 local EDITMODE_ID_PREFIX = "EQOL_DamageMeter"
 local MAX_WINDOWS = 5
 local DEFAULT_TEXTURE = "Interface\\TargetingFrame\\UI-StatusBar"
@@ -112,6 +128,9 @@ local DEFAULT_WINDOW = {
 	changeIconSize = false,
 	iconSizeOffset = 0,
 	iconGap = 4,
+	iconType = "class",
+	iconUseCustomClassTexture = false,
+	iconCustomClassTexture = "",
 	iconBorderEnabled = false,
 	iconBorderTexture = "",
 	iconBorderColor = { r = 0, g = 0, b = 0, a = 0.9 },
@@ -163,6 +182,8 @@ local DEFAULT_WINDOW = {
 	prefixRankInName = true,
 	prefixRankUseClassColors = false,
 	prefixRankColor = { r = 1, g = 1, b = 1, a = 1 },
+	rankUseClassColors = false,
+	rankColor = { r = 1, g = 1, b = 1, a = 1 },
 	rankGap = 2,
 	rankFontFace = GLOBAL_FONT_KEY,
 	rankFontOutline = GLOBAL_STYLE_KEY,
@@ -281,16 +302,16 @@ local DEFAULT_WINDOW = {
 }
 local PREVIEW_SESSION = {
 	combatSources = {
-		{ totalAmount = 100000, amountPerSecond = 10000, name = "Khadgar", classFilename = "MAGE", specIconID = 135932 },
-		{ totalAmount = 83000, amountPerSecond = 8300, name = "Valeera", classFilename = "ROGUE", specIconID = 132320 },
-		{ totalAmount = 71000, amountPerSecond = 7100, name = "Thrall", classFilename = "SHAMAN", specIconID = 136048 },
-		{ totalAmount = 64000, amountPerSecond = 6400, name = "Liadrin", classFilename = "PALADIN", specIconID = 135920 },
-		{ totalAmount = 51000, amountPerSecond = 5100, name = "Alleria", classFilename = "HUNTER", specIconID = 461115 },
-		{ totalAmount = 42000, amountPerSecond = 4200, name = "Anduin", classFilename = "PRIEST", specIconID = 135940, isLocalPlayer = true },
+		{ totalAmount = 100820000, amountPerSecond = 1008200, name = "Shuja Grimaxe", classFilename = "WARRIOR", specIconID = 132355 },
+		{ totalAmount = 82640000, amountPerSecond = 826400, name = "Meredy Huntswell", classFilename = "HUNTER", specIconID = 461115 },
+		{ totalAmount = 71250000, amountPerSecond = 712500, name = "Austin Huxworth", classFilename = "MAGE", specIconID = 135932 },
+		{ totalAmount = 64890000, amountPerSecond = 648900, name = "Kjellsortera-TarrenMill", classFilename = "PALADIN", specIconID = 135920 },
+		{ totalAmount = 51120000, amountPerSecond = 511200, name = "Headhunter-Todeswache", classFilename = "HUNTER", specIconID = 236180 },
+		{ totalAmount = 42080000, amountPerSecond = 420800, name = "Raizord", classFilename = "DRUID", specIconID = 132276, isLocalPlayer = true },
 	},
-	maxAmount = 100000,
-	totalAmount = 411000,
-	durationSeconds = 10,
+	maxAmount = 100820000,
+	totalAmount = 412840000,
+	durationSeconds = 82,
 }
 local PREVIEW_SOURCE_DETAILS = {
 	combatSpells = {
@@ -1124,13 +1145,19 @@ local function isInFollowerDungeon()
 	return instanceType == "party" and difficultyID == 205
 end
 
-local function applyClassIcon(texture, classFilename)
+local trimTextureInput
+
+local function applyClassIcon(texture, classFilename, classTexture, classCoordLayout)
 	if type(classFilename) ~= "string" or classFilename == "" or not CLASS_ICON_TCOORDS or not CLASS_ICON_TCOORDS[classFilename] then return false end
-	if texture._damageMeterIconKind == "class" and texture._damageMeterIconValue == classFilename then return true end
+	classTexture = classTexture or CLASS_ICON_TEXTURE
+	if texture._damageMeterIconKind == "class" and texture._damageMeterIconValue == classFilename and texture._damageMeterIconTexture == classTexture and texture._damageMeterIconCoordLayout == classCoordLayout then return true end
 	texture._damageMeterIconKind = "class"
 	texture._damageMeterIconValue = classFilename
-	local coords = CLASS_ICON_TCOORDS[classFilename]
-	texture:SetTexture(CLASS_ICON_TEXTURE)
+	texture._damageMeterIconTexture = classTexture
+	texture._damageMeterIconCoordLayout = classCoordLayout
+	local coords = classCoordLayout == "generic" and DamageMeter.GENERIC_CLASS_ICON_TCOORDS[classFilename] or CLASS_ICON_TCOORDS[classFilename]
+	if not coords then coords = CLASS_ICON_TCOORDS[classFilename] end
+	texture:SetTexture(classTexture)
 	texture:SetTexCoord(coords[1], coords[2], coords[3], coords[4])
 	return true
 end
@@ -1140,35 +1167,57 @@ local function applyAtlasIcon(texture, atlas)
 	if texture._damageMeterIconKind == "atlas" and texture._damageMeterIconValue == atlas then return true end
 	texture._damageMeterIconKind = "atlas"
 	texture._damageMeterIconValue = atlas
+	texture._damageMeterIconTexture = nil
+	texture._damageMeterIconCoordLayout = nil
 	texture:SetTexCoord(0, 1, 0, 1)
 	texture:SetAtlas(atlas, false)
 	return true
 end
 
-local function applySourceIcon(texture, source, inFollowerDungeon, damageMeterType)
-	if damageMeterType == "EnemyDamageTaken" and applyAtlasIcon(texture, TOOLTIP_TARGET_ATLAS) then
-		return
-	end
-	if inFollowerDungeon and source.isLocalPlayer ~= true and applyClassIcon(texture, source.classFilename) then
-		return
-	end
-	local specIconID = source.specIconID
-	if specIconID and specIconID ~= 0 then
-		if texture._damageMeterIconKind ~= "spec" or texture._damageMeterIconValue ~= specIconID then
-			texture._damageMeterIconKind = "spec"
-			texture._damageMeterIconValue = specIconID
-			texture:SetTexture(specIconID)
-			texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-		end
-		return
-	end
-	if applyClassIcon(texture, source.classFilename) then return end
+function DamageMeter.ApplySpecIcon(texture, specIconID)
+	if not specIconID or specIconID == 0 then return false end
+	if texture._damageMeterIconKind == "spec" and texture._damageMeterIconValue == specIconID then return true end
+	texture._damageMeterIconKind = "spec"
+	texture._damageMeterIconValue = specIconID
+	texture._damageMeterIconTexture = nil
+	texture._damageMeterIconCoordLayout = nil
+	texture:SetTexture(specIconID)
+	texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	return true
+end
+
+function DamageMeter.ApplyFallbackIcon(texture)
 	if texture._damageMeterIconKind ~= "fallback" then
 		texture._damageMeterIconKind = "fallback"
 		texture._damageMeterIconValue = 136243
+		texture._damageMeterIconTexture = nil
+		texture._damageMeterIconCoordLayout = nil
 		texture:SetTexture(136243)
 		texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 	end
+end
+
+local function applySourceIcon(texture, source, inFollowerDungeon, damageMeterType, config)
+	if damageMeterType == "EnemyDamageTaken" and applyAtlasIcon(texture, TOOLTIP_TARGET_ATLAS) then
+		return
+	end
+	local useSpecIcon = config and config.iconType == "spec"
+	local customClassTexture = not useSpecIcon and config and config.iconUseCustomClassTexture == true and trimTextureInput(config.iconCustomClassTexture)
+	local classTexture = customClassTexture and customClassTexture ~= "" and customClassTexture or CLASS_ICON_TEXTURE
+	classTexture = tonumber(classTexture) or classTexture
+	local classCoordLayout = customClassTexture and customClassTexture ~= "" and "generic" or "blizzard"
+	if not useSpecIcon then
+		if inFollowerDungeon and source.isLocalPlayer ~= true and applyClassIcon(texture, source.classFilename, classTexture, classCoordLayout) then
+			return
+		end
+		if applyClassIcon(texture, source.classFilename, classTexture, classCoordLayout) then return end
+		if DamageMeter.ApplySpecIcon(texture, source.specIconID) then return end
+		DamageMeter.ApplyFallbackIcon(texture)
+		return
+	end
+	if DamageMeter.ApplySpecIcon(texture, source.specIconID) then return end
+	if applyClassIcon(texture, source.classFilename, classTexture, classCoordLayout) then return end
+	DamageMeter.ApplyFallbackIcon(texture)
 end
 
 local function normalizeColor(value, fallback)
@@ -1376,6 +1425,10 @@ local function getIconGap(config)
 	return clampNumber(config.iconGap, 0, 24, DEFAULT_WINDOW.iconGap)
 end
 
+local function getRankGap(config)
+	return clampNumber(config.rankGap, -50, 50, DEFAULT_WINDOW.rankGap)
+end
+
 local function getEffectiveRankWidth(config)
 	if config.showRanks == false then return 0 end
 	local rankChars = 3
@@ -1393,7 +1446,7 @@ end
 
 local function getRowTextInsets(config, forceRankColumn)
 	local rankWidth = getEffectiveRankWidth(config)
-	local rankGap = clampNumber(config.rankGap, 0, 24, DEFAULT_WINDOW.rankGap)
+	local rankGap = getRankGap(config)
 	local iconSize = getIconSize(config)
 	local iconGap = getIconGap(config)
 	local leftInset = 4
@@ -1401,7 +1454,7 @@ local function getRowTextInsets(config, forceRankColumn)
 		leftInset = leftInset + iconSize + iconGap
 	end
 	if rankWidth > 0 and not useTextRankPrefix(config) then
-		leftInset = leftInset + rankWidth + rankGap
+		leftInset = leftInset + math.max(0, rankWidth + rankGap)
 	end
 	return leftInset, 4, iconSize, rankWidth, rankGap
 end
@@ -2378,6 +2431,10 @@ function DamageMeter:GetPrefixRankColor(config, classFilename)
 	return getClassOrCustomColor(classFilename, config.prefixRankColor, DEFAULT_WINDOW.prefixRankColor, config.prefixRankUseClassColors)
 end
 
+function DamageMeter:GetRankColor(config, classFilename)
+	return getClassOrCustomColor(classFilename, config.rankColor, DEFAULT_WINDOW.rankColor, config.rankUseClassColors)
+end
+
 function DamageMeter:GetRowColorState(frame, config, classFilename)
 	local styleVersion = self:GetWindowStyleVersion(frame.index or 0)
 	local cache = frame._damageMeterRowColorCache
@@ -2392,6 +2449,7 @@ function DamageMeter:GetRowColorState(frame, config, classFilename)
 	local nr, ng, nb, na = self:GetNameColor(config, classKey)
 	local vr, vg, vb, va = self:GetValueColor(config, classKey)
 	local prr, prg, prb, pra = self:GetPrefixRankColor(config, classKey)
+	local rr, rg, rb, ra = self:GetRankColor(config, classKey)
 	local rbr, rbg, rbb, rba = getClassOrCustomColor(classKey, config.rowBorderColor, DEFAULT_WINDOW.rowBorderColor, config.rowBorderUseClassColor)
 	local bbr, bbg, bbb, bba = getClassOrCustomColor(classKey, config.barBorderColor, DEFAULT_WINDOW.barBorderColor, config.barBorderUseClassColor)
 	local ibr, ibg, ibb, iba = getClassOrCustomColor(classKey, config.iconBorderColor, DEFAULT_WINDOW.iconBorderColor, config.iconBorderUseClassColor)
@@ -2400,6 +2458,7 @@ function DamageMeter:GetRowColorState(frame, config, classFilename)
 		nr = nr, ng = ng, nb = nb, na = na,
 		vr = vr, vg = vg, vb = vb, va = va,
 		prr = prr, prg = prg, prb = prb, pra = pra,
+		rr = rr, rg = rg, rb = rb, ra = ra,
 		rbr = rbr, rbg = rbg, rbb = rbb, rba = rba,
 		bbr = bbr, bbg = bbg, bbb = bbb, bba = bba,
 		ibr = ibr, ibg = ibg, ibb = ibb, iba = iba,
@@ -2501,7 +2560,7 @@ local function applyTooltipBorder(border, enabled, textureKey, size, r, g, b, a)
 	end
 end
 
-local function trimTextureInput(value)
+function trimTextureInput(value)
 	if type(value) ~= "string" then return "" end
 	return (value:gsub("^%s+", ""):gsub("%s+$", ""))
 end
@@ -2898,12 +2957,12 @@ function DamageMeter:ApplyRowValueWidth(row, config, damageMeterType, forceRankC
 	local frameWidth = clampNumber(config.width, 100, 700, DEFAULT_WINDOW.width)
 	local leftInset, rightInset, _, rankWidth, rankGap = getRowTextInsets(config, forceRankColumn)
 	local availableWidth = math.max(1, (frameWidth - 8) - leftInset - rightInset)
-	local minNameWidth = config.showNames == false and 0 or clampNumber(config.minNameWidth, 0, 180, DEFAULT_WINDOW.minNameWidth)
 	local nameGap = config.showNames == false and 0 or 4
 	local rankPrefixText = useTextRankPrefix(config)
-	local rankPrefixWidth = rankPrefixText and (rankWidth + rankGap) or 0
+	local rankPrefixWidth = rankPrefixText and math.max(0, rankWidth + rankGap) or 0
 	local valueFontSize = clampNumber(config.valueFontSize, 8, 24, DEFAULT_WINDOW.valueFontSize)
 	local useValueColumns = getRowValueLayout(config) == "columns"
+	local minNameWidth = (config.showNames == false or useValueColumns) and 0 or clampNumber(config.minNameWidth, 0, 180, DEFAULT_WINDOW.minNameWidth)
 	row._damageMeterUseValueColumns = useValueColumns
 	if useValueColumns then
 		local showAmount, showRate, showPercent = getRowValueColumnVisibility(damageMeterType, config)
@@ -2953,18 +3012,24 @@ function DamageMeter:ApplyRowValueWidth(row, config, damageMeterType, forceRankC
 
 		local rightAnchor = row.textArea
 		local rightOffset = 0
+		local nameV = normalizeAnchorV(config.nameAnchorV)
+		local nameOffsetX = clampNumber(config.nameOffsetX, -200, 200, DEFAULT_WINDOW.nameOffsetX)
+		local nameOffsetY = clampNumber(config.nameOffsetY, -200, 200, DEFAULT_WINDOW.nameOffsetY)
+		local valueV = normalizeAnchorV(config.valueAnchorV)
+		local valueOffsetX = clampNumber(config.valueOffsetX, -200, 200, DEFAULT_WINDOW.valueOffsetX)
+		local valueOffsetY = clampNumber(config.valueOffsetY, -200, 200, DEFAULT_WINDOW.valueOffsetY)
 		local previousColumn
 		if showPercent and row.percentValue then
-			row.percentValue:SetPoint("RIGHT", rightAnchor, "RIGHT", rightOffset, 0)
+			row.percentValue:SetPoint(anchorPoint("RIGHT", valueV), rightAnchor, anchorPoint("RIGHT", valueV), rightOffset + valueOffsetX, valueOffsetY)
 			row.percentValue:SetJustifyH("RIGHT")
 			previousColumn = row.percentValue
 			rightOffset = -columnGap
 		end
 		if showRate and row.rateValue then
 			if previousColumn then
-				row.rateValue:SetPoint("RIGHT", previousColumn, "LEFT", rightOffset, 0)
+				row.rateValue:SetPoint(anchorPoint("RIGHT", valueV), previousColumn, anchorPoint("LEFT", valueV), rightOffset, 0)
 			else
-				row.rateValue:SetPoint("RIGHT", rightAnchor, "RIGHT", rightOffset, 0)
+				row.rateValue:SetPoint(anchorPoint("RIGHT", valueV), rightAnchor, anchorPoint("RIGHT", valueV), rightOffset + valueOffsetX, valueOffsetY)
 			end
 			row.rateValue:SetJustifyH("RIGHT")
 			previousColumn = row.rateValue
@@ -2972,23 +3037,23 @@ function DamageMeter:ApplyRowValueWidth(row, config, damageMeterType, forceRankC
 		end
 		if showAmount then
 			if previousColumn then
-				row.value:SetPoint("RIGHT", previousColumn, "LEFT", rightOffset, 0)
+				row.value:SetPoint(anchorPoint("RIGHT", valueV), previousColumn, anchorPoint("LEFT", valueV), rightOffset, 0)
 			else
-				row.value:SetPoint("RIGHT", rightAnchor, "RIGHT", rightOffset, 0)
+				row.value:SetPoint(anchorPoint("RIGHT", valueV), rightAnchor, anchorPoint("RIGHT", valueV), rightOffset + valueOffsetX, valueOffsetY)
 			end
 			row.value:SetJustifyH("RIGHT")
 			previousColumn = row.value
 		end
 		if rankPrefixText then
-			row.rank:SetPoint("LEFT", row.textArea, "LEFT", 0, 0)
+			row.rank:SetPoint(anchorPoint("LEFT", nameV), row.textArea, anchorPoint("LEFT", nameV), nameOffsetX, nameOffsetY)
 			row.name:SetPoint("LEFT", row.rank, "RIGHT", rankGap, 0)
 		else
-			row.name:SetPoint("LEFT", row.textArea, "LEFT", 0, 0)
+			row.name:SetPoint(anchorPoint("LEFT", nameV), row.textArea, anchorPoint("LEFT", nameV), nameOffsetX, nameOffsetY)
 		end
 		if previousColumn then
-			row.name:SetPoint("RIGHT", previousColumn, "LEFT", -nameValueGap, 0)
+			row.name:SetPoint(anchorPoint("RIGHT", nameV), previousColumn, anchorPoint("LEFT", nameV), -nameValueGap + nameOffsetX, nameOffsetY)
 		else
-			row.name:SetPoint("RIGHT", row.textArea, "RIGHT", -2, 0)
+			row.name:SetPoint(anchorPoint("RIGHT", nameV), row.textArea, anchorPoint("RIGHT", nameV), -2 + nameOffsetX, nameOffsetY)
 		end
 		row.name:SetJustifyH("LEFT")
 		return
@@ -3029,9 +3094,9 @@ function DamageMeter:ApplyRowValueWidth(row, config, damageMeterType, forceRankC
 	if row.rateValue then row.rateValue:ClearAllPoints() end
 	if row.percentValue then row.percentValue:ClearAllPoints() end
 	if rankPrefixText then row.rank:ClearAllPoints() end
-	local valueH = normalizeAnchorH(config.valueAnchorH)
+	local valueH = "RIGHT"
 	local valueV = normalizeAnchorV(config.valueAnchorV)
-	local nameH = normalizeAnchorH(config.nameAnchorH)
+	local nameH = "LEFT"
 	local nameV = normalizeAnchorV(config.nameAnchorV)
 	row.value:SetPoint(anchorPoint(valueH, valueV), row.textArea, anchorPoint(valueH, valueV), clampNumber(config.valueOffsetX, -200, 200, DEFAULT_WINDOW.valueOffsetX), clampNumber(config.valueOffsetY, -200, 200, DEFAULT_WINDOW.valueOffsetY))
 	row.value:SetJustifyH(justifyFromAnchor(valueH))
@@ -3878,7 +3943,8 @@ function DamageMeter:BuildTooltipRows(details, config, damageMeterType, derivedT
 	local useDerivedTargets = type(derivedTargetRows) == "table" and #derivedTargetRows > 0
 	if useDerivedTargets or #targets > 0 or #directTargetRows > 0 then
 		if showSpellSection then addTooltipSectionGap(rows) end
-		rows[#rows + 1] = { header = true, name = L["damageMeterTooltipTargets"] or "Targets", atlas = TOOLTIP_TARGET_ATLAS, amount = showAmount and (L["damageMeterTooltipAmount"] or "Amount"), dps = showDPS and (L["damageMeterTooltipDPS"] or "DPS"), percent = showPercent and "%" }
+		local targetHeaderName = damageMeterType == "EnemyDamageTaken" and (L["damageMeterTooltipPlayers"] or "Players") or (L["damageMeterTooltipTargets"] or "Targets")
+		rows[#rows + 1] = { header = true, name = targetHeaderName, atlas = damageMeterType ~= "EnemyDamageTaken" and TOOLTIP_TARGET_ATLAS or nil, icon = damageMeterType == "EnemyDamageTaken" and "Interface\\Icons\\Achievement_GuildPerk_EveryonesAFriend" or nil, amount = showAmount and (L["damageMeterTooltipAmount"] or "Amount"), dps = showDPS and (L["damageMeterTooltipDPS"] or "DPS"), percent = showPercent and "%" }
 		if useDerivedTargets then
 			for _, target in ipairs(derivedTargetRows) do
 				rows[#rows + 1] = target
@@ -5104,11 +5170,13 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 			self:ApplyRowBorder(row, config, source.classFilename, colors)
 			self:ApplyIconBorder(row, config, source.classFilename, colors)
 			self:ApplyBarBorder(row, config, source.classFilename, colors)
-			if config.showIcons ~= false then applySourceIcon(row.icon, source, inFollowerDungeon, damageMeterType) end
+			if config.showIcons ~= false then applySourceIcon(row.icon, source, inFollowerDungeon, damageMeterType, config) end
 			row.name:SetText(formatDisplayName(source, config))
 			setTextColorIfChanged(row.name, colors.nr, colors.ng, colors.nb, colors.na)
 				if config.prefixRankInName == true then
 					setTextColorIfChanged(row.rank, colors.prr, colors.prg, colors.prb, colors.pra)
+				else
+					setTextColorIfChanged(row.rank, colors.rr, colors.rg, colors.rb, colors.ra)
 				end
 				self:ApplyRowValueWidth(row, config, damageMeterType, forceRankColumn)
 				if row._damageMeterUseValueColumns then
@@ -5758,6 +5826,7 @@ function DamageMeter:BuildWindowSettings(index)
 	local function rankColumnEnabled() return cfg().showRanks ~= false and cfg().prefixRankInName ~= true end
 	local function prefixRankEnabled() return cfg().showRanks ~= false and cfg().prefixRankInName == true end
 	local function fixedPrefixRankColorEnabled() return cfg().showRanks ~= false and cfg().prefixRankInName == true and cfg().prefixRankUseClassColors ~= true end
+	local function fixedRankColorEnabled() return cfg().showRanks ~= false and cfg().prefixRankInName ~= true and cfg().rankUseClassColors ~= true end
 	local function fixedTooltipBarColorEnabled() return cfg().tooltipEnabled == true and cfg().tooltipBarUseClassColor ~= true end
 	local function tooltipRowBorderEnabled() return cfg().tooltipEnabled == true and cfg().tooltipRowBorderEnabled == true end
 	local function fixedTooltipRowBorderColorEnabled() return tooltipRowBorderEnabled() and cfg().tooltipRowBorderUseClassColor ~= true end
@@ -6050,6 +6119,19 @@ function DamageMeter:BuildWindowSettings(index)
 			self:SetConfigValue(index, "showIcons", value)
 			requestEditModeSettingsRefresh()
 		end, iconId),
+		dropdownSetting(L["damageMeterIconType"] or "Icon type", function() return cfg().iconType == "spec" and "spec" or "class" end, function(value)
+			self:SetConfigValue(index, "iconType", value == "spec" and "spec" or "class")
+			requestEditModeSettingsRefresh()
+		end, {
+			{ value = "class", label = L["damageMeterIconTypeClass"] or "Class icon" },
+			{ value = "spec", label = L["damageMeterIconTypeSpec"] or "Spec icon" },
+		}, iconId, 160, iconsEnabled),
+		checkboxSetting(L["damageMeterUseCustomClassIconTexture"] or "Use custom class icon texture", function() return cfg().iconUseCustomClassTexture == true end, function(value)
+			self:SetConfigValue(index, "iconUseCustomClassTexture", value)
+			requestEditModeSettingsRefresh()
+		end, iconId, function() return iconsEnabled() and cfg().iconType ~= "spec" end, L["damageMeterUseCustomClassIconTextureDesc"] or "Use a class icon sheet with the same coordinate layout as Blizzard class icons."),
+		inputSetting(L["damageMeterCustomClassIconTexture"] or "Class icon texture path", function() return cfg().iconCustomClassTexture or "" end, function(value) self:SetConfigValue(index, "iconCustomClassTexture", trimTextureInput(value)) end, iconId, function() return cfg().showIcons ~= false and cfg().iconType ~= "spec" and cfg().iconUseCustomClassTexture == true end, L["damageMeterCustomClassIconTextureDesc"] or "Enter a texture path for a class icon sheet. The sheet must match Blizzard class icon coordinates.", 180),
+		dividerSetting(iconId),
 		checkboxSetting(L["damageMeterChangeIconSize"] or "Change icon size", function() return cfg().changeIconSize == true end, function(value)
 			self:SetConfigValue(index, "changeIconSize", value)
 			requestEditModeSettingsRefresh()
@@ -6079,12 +6161,11 @@ function DamageMeter:BuildWindowSettings(index)
 		dropdownSetting(L["damageMeterNameFontOutline"] or "Name font outline", function() return cfg().fontOutline end, function(value) self:SetConfigValue(index, "fontOutline", normalizeStyle(value)) end, buildStyleOptions(), namesId, 180, namesEnabled),
 		sliderSetting(L["damageMeterNameFontSize"] or "Name font size", function() return cfg().fontSize end, function(value) self:SetConfigValue(index, "fontSize", clampNumber(value, 8, 24, DEFAULT_WINDOW.fontSize)) end, 8, 24, 1, namesId, namesEnabled),
 		dividerSetting(namesId),
-		sliderSetting(L["damageMeterMinimumNameWidth"] or "Minimum name width", function() return cfg().minNameWidth end, function(value) self:SetConfigValue(index, "minNameWidth", clampNumber(value, 0, 180, DEFAULT_WINDOW.minNameWidth)) end, 0, 180, 1, namesId, namesEnabled),
+		sliderSetting(L["damageMeterMinimumNameWidth"] or "Minimum name width", function() return cfg().minNameWidth end, function(value) self:SetConfigValue(index, "minNameWidth", clampNumber(value, 0, 180, DEFAULT_WINDOW.minNameWidth)) end, 0, 180, 1, namesId, function() return namesEnabled() and combinedValueLayoutEnabled() end, function() return namesEnabled() and combinedValueLayoutEnabled() end),
 		dividerSetting(namesId),
-		dropdownSetting(L["damageMeterNameAnchorH"] or "Name horizontal anchor", function() return normalizeAnchorH(cfg().nameAnchorH) end, function(value) self:SetConfigValue(index, "nameAnchorH", normalizeAnchorH(value)) end, buildHorizontalAnchorOptions(), namesId, 120, function() return namesEnabled() and combinedValueLayoutEnabled() end),
-		dropdownSetting(L["damageMeterNameAnchorV"] or "Name vertical anchor", function() return normalizeAnchorV(cfg().nameAnchorV) end, function(value) self:SetConfigValue(index, "nameAnchorV", normalizeAnchorV(value)) end, buildVerticalAnchorOptions(), namesId, 120, function() return namesEnabled() and combinedValueLayoutEnabled() end),
-		sliderSetting(L["damageMeterNameOffsetX"] or "Name X offset", function() return cfg().nameOffsetX end, function(value) self:SetConfigValue(index, "nameOffsetX", clampNumber(value, -200, 200, DEFAULT_WINDOW.nameOffsetX)) end, -200, 200, 1, namesId, function() return namesEnabled() and combinedValueLayoutEnabled() end),
-		sliderSetting(L["damageMeterNameOffsetY"] or "Name Y offset", function() return cfg().nameOffsetY end, function(value) self:SetConfigValue(index, "nameOffsetY", clampNumber(value, -200, 200, DEFAULT_WINDOW.nameOffsetY)) end, -200, 200, 1, namesId, function() return namesEnabled() and combinedValueLayoutEnabled() end),
+		dropdownSetting(L["damageMeterNameAnchorV"] or "Name vertical anchor", function() return normalizeAnchorV(cfg().nameAnchorV) end, function(value) self:SetConfigValue(index, "nameAnchorV", normalizeAnchorV(value)) end, buildVerticalAnchorOptions(), namesId, 120, namesEnabled, namesEnabled),
+		sliderSetting(L["damageMeterNameOffsetX"] or "Name X offset", function() return cfg().nameOffsetX end, function(value) self:SetConfigValue(index, "nameOffsetX", clampNumber(value, -200, 200, DEFAULT_WINDOW.nameOffsetX)) end, -200, 200, 1, namesId, namesEnabled, namesEnabled),
+		sliderSetting(L["damageMeterNameOffsetY"] or "Name Y offset", function() return cfg().nameOffsetY end, function(value) self:SetConfigValue(index, "nameOffsetY", clampNumber(value, -200, 200, DEFAULT_WINDOW.nameOffsetY)) end, -200, 200, 1, namesId, namesEnabled, namesEnabled),
 		{ name = L["damageMeterValues"] or "Values", kind = SettingType.Collapsible, id = valuesId, defaultCollapsed = true },
 		checkboxSetting(L["damageMeterShowPercent"] or "Show percent", function() return cfg().showPercent ~= false end, function(value) self:SetConfigValue(index, "showPercent", value) end, valuesId),
 		dividerSetting(valuesId),
@@ -6102,15 +6183,14 @@ function DamageMeter:BuildWindowSettings(index)
 			self:SetConfigValue(index, "valueLayout", normalizeValueLayout(value))
 			requestEditModeSettingsRefresh()
 		end, buildValueLayoutOptions(), valuesId, 120),
-		sliderSetting(L["damageMeterAmountColumnWidth"] or "Amount column width", function() return cfg().amountColumnWidth end, function(value) self:SetConfigValue(index, "amountColumnWidth", clampNumber(value, 24, 180, DEFAULT_WINDOW.amountColumnWidth)) end, 24, 180, 1, valuesId, valueColumnsEnabled),
-		sliderSetting(L["damageMeterRateColumnWidth"] or "Rate column width", function() return cfg().rateColumnWidth end, function(value) self:SetConfigValue(index, "rateColumnWidth", clampNumber(value, 24, 180, DEFAULT_WINDOW.rateColumnWidth)) end, 24, 180, 1, valuesId, valueColumnsEnabled),
-		sliderSetting(L["damageMeterPercentColumnWidth"] or "Percent column width", function() return cfg().percentColumnWidth end, function(value) self:SetConfigValue(index, "percentColumnWidth", clampNumber(value, 24, 120, DEFAULT_WINDOW.percentColumnWidth)) end, 24, 120, 1, valuesId, valueColumnsEnabled),
-		sliderSetting(L["damageMeterColumnGap"] or "Column gap", function() return cfg().valueColumnGap end, function(value) self:SetConfigValue(index, "valueColumnGap", clampNumber(value, 0, 24, DEFAULT_WINDOW.valueColumnGap)) end, 0, 24, 1, valuesId, valueColumnsEnabled),
-		sliderSetting(L["damageMeterNameValueGap"] or "Name/value gap", function() return cfg().nameValueGap end, function(value) self:SetConfigValue(index, "nameValueGap", clampNumber(value, 0, 32, DEFAULT_WINDOW.nameValueGap)) end, 0, 32, 1, valuesId, valueColumnsEnabled),
-		dropdownSetting(L["damageMeterValueAnchorH"] or "Value horizontal anchor", function() return normalizeAnchorH(cfg().valueAnchorH) end, function(value) self:SetConfigValue(index, "valueAnchorH", normalizeAnchorH(value)) end, buildHorizontalAnchorOptions(), valuesId, 120, combinedValueLayoutEnabled),
-		dropdownSetting(L["damageMeterValueAnchorV"] or "Value vertical anchor", function() return normalizeAnchorV(cfg().valueAnchorV) end, function(value) self:SetConfigValue(index, "valueAnchorV", normalizeAnchorV(value)) end, buildVerticalAnchorOptions(), valuesId, 120, combinedValueLayoutEnabled),
-		sliderSetting(L["damageMeterValueOffsetX"] or "Value X offset", function() return cfg().valueOffsetX end, function(value) self:SetConfigValue(index, "valueOffsetX", clampNumber(value, -200, 200, DEFAULT_WINDOW.valueOffsetX)) end, -200, 200, 1, valuesId, combinedValueLayoutEnabled),
-		sliderSetting(L["damageMeterValueOffsetY"] or "Value Y offset", function() return cfg().valueOffsetY end, function(value) self:SetConfigValue(index, "valueOffsetY", clampNumber(value, -200, 200, DEFAULT_WINDOW.valueOffsetY)) end, -200, 200, 1, valuesId, combinedValueLayoutEnabled),
+		sliderSetting(L["damageMeterAmountColumnWidth"] or "Amount column width", function() return cfg().amountColumnWidth end, function(value) self:SetConfigValue(index, "amountColumnWidth", clampNumber(value, 24, 180, DEFAULT_WINDOW.amountColumnWidth)) end, 24, 180, 1, valuesId, valueColumnsEnabled, valueColumnsEnabled),
+		sliderSetting(L["damageMeterRateColumnWidth"] or "Rate column width", function() return cfg().rateColumnWidth end, function(value) self:SetConfigValue(index, "rateColumnWidth", clampNumber(value, 24, 180, DEFAULT_WINDOW.rateColumnWidth)) end, 24, 180, 1, valuesId, valueColumnsEnabled, valueColumnsEnabled),
+		sliderSetting(L["damageMeterPercentColumnWidth"] or "Percent column width", function() return cfg().percentColumnWidth end, function(value) self:SetConfigValue(index, "percentColumnWidth", clampNumber(value, 24, 120, DEFAULT_WINDOW.percentColumnWidth)) end, 24, 120, 1, valuesId, valueColumnsEnabled, valueColumnsEnabled),
+		sliderSetting(L["damageMeterColumnGap"] or "Column gap", function() return cfg().valueColumnGap end, function(value) self:SetConfigValue(index, "valueColumnGap", clampNumber(value, 0, 24, DEFAULT_WINDOW.valueColumnGap)) end, 0, 24, 1, valuesId, valueColumnsEnabled, valueColumnsEnabled),
+		sliderSetting(L["damageMeterNameValueGap"] or "Name/value gap", function() return cfg().nameValueGap end, function(value) self:SetConfigValue(index, "nameValueGap", clampNumber(value, 0, 32, DEFAULT_WINDOW.nameValueGap)) end, 0, 32, 1, valuesId, valueColumnsEnabled, valueColumnsEnabled),
+		dropdownSetting(L["damageMeterValueAnchorV"] or "Value vertical anchor", function() return normalizeAnchorV(cfg().valueAnchorV) end, function(value) self:SetConfigValue(index, "valueAnchorV", normalizeAnchorV(value)) end, buildVerticalAnchorOptions(), valuesId, 120),
+		sliderSetting(L["damageMeterValueOffsetX"] or "Value X offset", function() return cfg().valueOffsetX end, function(value) self:SetConfigValue(index, "valueOffsetX", clampNumber(value, -200, 200, DEFAULT_WINDOW.valueOffsetX)) end, -200, 200, 1, valuesId),
+		sliderSetting(L["damageMeterValueOffsetY"] or "Value Y offset", function() return cfg().valueOffsetY end, function(value) self:SetConfigValue(index, "valueOffsetY", clampNumber(value, -200, 200, DEFAULT_WINDOW.valueOffsetY)) end, -200, 200, 1, valuesId),
 		dividerSetting(valuesId),
 		dropdownSetting(L["damageMeterValueMode"] or "Value display", function() return normalizeValueMode(cfg().valueMode) end, function(value) self:SetConfigValue(index, "valueMode", normalizeValueMode(value)) end, buildValueModeOptions(), valuesId, 160),
 		dividerSetting(valuesId),
@@ -6212,10 +6292,16 @@ function DamageMeter:BuildWindowSettings(index)
 		end, rankingId, prefixRankEnabled),
 		colorSetting(L["damageMeterPrefixRankColor"] or "Prefix rank color", function() return normalizeColor(cfg().prefixRankColor, DEFAULT_WINDOW.prefixRankColor) end, function(value) self:SetConfigValue(index, "prefixRankColor", normalizeColor(value, DEFAULT_WINDOW.prefixRankColor)) end, DEFAULT_WINDOW.prefixRankColor, rankingId, fixedPrefixRankColorEnabled),
 		dividerSetting(rankingId, rankingEnabled),
+		checkboxSetting(L["damageMeterRankUseClassColor"] or "Use class color for ranks", function() return cfg().rankUseClassColors == true end, function(value)
+			self:SetConfigValue(index, "rankUseClassColors", value)
+			requestEditModeSettingsRefresh()
+		end, rankingId, rankColumnEnabled),
+		colorSetting(L["damageMeterRankColor"] or "Rank color", function() return normalizeColor(cfg().rankColor, DEFAULT_WINDOW.rankColor) end, function(value) self:SetConfigValue(index, "rankColor", normalizeColor(value, DEFAULT_WINDOW.rankColor)) end, DEFAULT_WINDOW.rankColor, rankingId, fixedRankColorEnabled),
+		dividerSetting(rankingId, rankColumnEnabled),
 		dropdownSetting(L["damageMeterRankFont"] or "Rank font", function() return cfg().rankFontFace end, function(value) self:SetConfigValue(index, "rankFontFace", value) end, buildMediaOptions("font", true), rankingId, 260, rankColumnEnabled),
 		dropdownSetting(L["damageMeterRankFontOutline"] or "Rank font outline", function() return cfg().rankFontOutline end, function(value) self:SetConfigValue(index, "rankFontOutline", normalizeStyle(value)) end, buildStyleOptions(), rankingId, 180, rankColumnEnabled),
 		sliderSetting(L["damageMeterRankFontSize"] or "Rank font size", function() return cfg().rankFontSize end, function(value) self:SetConfigValue(index, "rankFontSize", clampNumber(value, 8, 24, DEFAULT_WINDOW.rankFontSize)) end, 8, 24, 1, rankingId, rankColumnEnabled),
-		sliderSetting(L["damageMeterRankGap"] or "Rank gap", function() return cfg().rankGap end, function(value) self:SetConfigValue(index, "rankGap", clampNumber(value, 0, 24, DEFAULT_WINDOW.rankGap)) end, 0, 24, 1, rankingId, rankingEnabled),
+		sliderSetting(L["damageMeterRankGap"] or "Rank gap", function() return cfg().rankGap end, function(value) self:SetConfigValue(index, "rankGap", clampNumber(value, -50, 50, DEFAULT_WINDOW.rankGap)) end, -50, 50, 1, rankingId, rankingEnabled),
 		{ name = L["Background"] or "Backdrop", kind = SettingType.Collapsible, id = mediaId, defaultCollapsed = true },
 		checkboxSetting(L["damageMeterBackdropUseCustomTexture"] or "Custom texture", function() return cfg().backdropUseCustomTexture == true end, function(value)
 			self:SetConfigValue(index, "backdropUseCustomTexture", value)
