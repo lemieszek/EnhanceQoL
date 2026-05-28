@@ -7,11 +7,15 @@
 ### ✨ Added
 
 - Damage Meter / Tooltip: Added row, bar, and icon border customization with texture, color, class-color, size, and offset controls.
+- Damage Meter / Visibility: Added manual Show when rules for Mouseover, In combat, Out of combat, Party, Raid, Party/Raid, Instance, Mythic+, Open World, and Not in instance.
 
 ### 🐛 Fixed
 
 - Bags / One Bag: Fixed moved item slots keeping the previous item's quality border color when using the default icon shape.
 - Damage Meter / Rows: Made Always show player respect the currently scrolled viewport instead of only the static Visible rows limit.
+- Damage Meter / Visibility: Replaced secure visibility drivers with a manual visibility path to avoid protected-frame layout errors during combat.
+- Damage Meter / Visibility: Debounced roster, zone, restriction, and instance-context refreshes so event bursts do not repeatedly refresh windows.
+- Damage Meter / Visibility: Changed faded opacity into the general inactive-state behavior: 0% hides, 100% stays fully visible, and values in between keep the window shown with reduced alpha; Mouseover still fades until hovered.
 
 ---
 

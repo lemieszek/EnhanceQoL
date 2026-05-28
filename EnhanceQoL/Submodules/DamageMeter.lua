@@ -1,4 +1,4 @@
--- luacheck: globals C_DamageMeter C_DeathRecap C_LFGInfo C_Spell C_StringUtil C_CVar C_RestrictedActions SetCVar StaticPopupDialogs StaticPopup_Show YES CANCEL OKAY MenuUtil Menu GameTooltip SecondsToClock DAMAGE_METER_COMBAT_NUMBER CLASS_ICON_TCOORDS UnitClass UnitExists UnitGUID UnitAffectingCombat IsInRaid IsInInstance GetInstanceInfo Ambiguate UISpecialFrames GetCursorPosition GetTime C_Timer ACTION_SWING ACTION_ENVIRONMENTAL_DAMAGE_DROWNING ACTION_ENVIRONMENTAL_DAMAGE_FALLING ACTION_ENVIRONMENTAL_DAMAGE_FIRE ACTION_ENVIRONMENTAL_DAMAGE_LAVA ACTION_ENVIRONMENTAL_DAMAGE_SLIME ACTION_ENVIRONMENTAL_DAMAGE_FATIGUE DEATH_RECAP_TITLE CreateAbbreviateConfig
+-- luacheck: globals C_DamageMeter C_DeathRecap C_LFGInfo C_Spell C_StringUtil C_CVar C_RestrictedActions C_ChallengeMode SetCVar StaticPopupDialogs StaticPopup_Show YES CANCEL OKAY MenuUtil Menu GameTooltip SecondsToClock DAMAGE_METER_COMBAT_NUMBER CLASS_ICON_TCOORDS UnitClass UnitExists UnitGUID UnitAffectingCombat IsInRaid IsInInstance GetInstanceInfo Ambiguate UISpecialFrames GetCursorPosition GetTime C_Timer ACTION_SWING ACTION_ENVIRONMENTAL_DAMAGE_DROWNING ACTION_ENVIRONMENTAL_DAMAGE_FALLING ACTION_ENVIRONMENTAL_DAMAGE_FIRE ACTION_ENVIRONMENTAL_DAMAGE_LAVA ACTION_ENVIRONMENTAL_DAMAGE_SLIME ACTION_ENVIRONMENTAL_DAMAGE_FATIGUE DEATH_RECAP_TITLE CreateAbbreviateConfig
 local addonName, addon = ...
 
 local L = LibStub("AceLocale-3.0"):GetLocale(addonName)
@@ -516,73 +516,87 @@ local function buildRowSortOptions()
 end
 
 local function buildVisibilityOptions()
-	local metadata = addon.functions and addon.functions.GetVisibilityRuleMetadata and addon.functions.GetVisibilityRuleMetadata()
-	if not metadata then return {} end
-	local frameKeys = addon.constants and addon.constants.FRAME_VISIBILITY_KEYS
-	local hiddenKeys = {
-		PLAYER_CASTING = true,
-		PLAYER_HAS_TARGET = true,
+	return {
+		{ value = "MOUSEOVER", label = L["Mouseover"] or "Mouseover", text = L["Mouseover"] or "Mouseover" },
+		{ value = "ALWAYS_IN_COMBAT", label = L["In combat"] or "In combat", text = L["In combat"] or "In combat" },
+		{ value = "ALWAYS_OUT_OF_COMBAT", label = L["Out of combat"] or "Out of combat", text = L["Out of combat"] or "Out of combat" },
+		{ value = "PLAYER_IN_PARTY", label = L["In party"] or "In party", text = L["In party"] or "In party" },
+		{ value = "PLAYER_IN_RAID", label = L["In raid"] or "In raid", text = L["In raid"] or "In raid" },
+		{ value = "PLAYER_IN_GROUP", label = L["In party/raid"] or "In party/raid", text = L["In party/raid"] or "In party/raid" },
+		{ value = "IN_INSTANCE", label = L["VisibilityCondInInstance"] or "In instance", text = L["VisibilityCondInInstance"] or "In instance" },
+		{ value = "IN_MYTHIC_PLUS", label = L["damageMeterVisibilityInMythicPlus"] or "In Mythic+", text = L["damageMeterVisibilityInMythicPlus"] or "In Mythic+" },
+		{ value = "OPEN_WORLD", label = L["World"] or "Open world", text = L["World"] or "Open world" },
+		{ value = "NOT_IN_INSTANCE", label = L["damageMeterVisibilityNotInInstance"] or "Not in instance", text = L["damageMeterVisibilityNotInInstance"] or "Not in instance" },
 	}
-	local options = {}
-	for key, data in pairs(metadata) do
-		if frameKeys and frameKeys[key] and key ~= "MOUSEOVER" and not hiddenKeys[key] then
-			options[#options + 1] = { value = key, label = data.label or key, text = data.label or key, order = data.order or 999 }
-		end
-	end
-	table.sort(options, function(a, b)
-		if a.order == b.order then
-			local left = tostring(a.label or a.value or "")
-			local right = tostring(b.label or b.value or "")
-			if strcmputf8i then return strcmputf8i(left, right) < 0 end
-			return left:lower() < right:lower()
-		end
-		return a.order < b.order
-	end)
-	return options
 end
 
+local DAMAGE_METER_VISIBILITY_KEYS = {
+	MOUSEOVER = true,
+	ALWAYS_IN_COMBAT = true,
+	ALWAYS_OUT_OF_COMBAT = true,
+	PLAYER_IN_PARTY = true,
+	PLAYER_IN_RAID = true,
+	PLAYER_IN_GROUP = true,
+	IN_INSTANCE = true,
+	IN_MYTHIC_PLUS = true,
+	OPEN_WORLD = true,
+	NOT_IN_INSTANCE = true,
+}
+
 local function isVisibilityOptionAllowed(value)
-	if type(value) ~= "string" then return false end
-	if value == "PLAYER_CASTING" or value == "PLAYER_HAS_TARGET" then return false end
-	local frameKeys = addon.constants and addon.constants.FRAME_VISIBILITY_KEYS
-	return frameKeys and frameKeys[value] == true and value ~= "MOUSEOVER"
+	return type(value) == "string" and DAMAGE_METER_VISIBILITY_KEYS[value] == true
 end
 
 local function normalizeVisibilityConfig(value)
-	local normalize = addon.functions and addon.functions.NormalizeUnitFrameVisibilityConfig
-	if normalize then return normalize(nil, value, { skipSave = true, ignoreOverride = true }) end
-	if type(value) == "table" then return value end
+	if type(value) == "table" then
+		local config
+		for key in pairs(value) do
+			if DAMAGE_METER_VISIBILITY_KEYS[key] then
+				config = config or {}
+				config[key] = true
+			end
+		end
+		return config
+	end
 	return nil
 end
 
-local function normalizeVisibilityFadeMode(value)
-	return value == "mouseover" and "mouseover" or "none"
-end
-
-local function buildVisibilityFadeOptions()
+local function getDamageMeterVisibilityContext()
+	local inInstance = IsInInstance and IsInInstance() == true
+	local inMythicPlus = C_ChallengeMode and C_ChallengeMode.IsChallengeModeActive and C_ChallengeMode.IsChallengeModeActive() == true
+	local inRaid = IsInRaid and IsInRaid() == true
+	local inGroup = _G.IsInGroup and _G.IsInGroup() == true
 	return {
-		{ value = "none", label = L["damageMeterVisibilityFadeNone"] or _G.NONE or "None" },
-		{ value = "mouseover", label = L["damageMeterVisibilityFadeMouseover"] or "Fade until mouseover" },
+		inCombat = UnitAffectingCombat and UnitAffectingCombat("player") == true,
+		inGroup = inGroup,
+		inInstance = inInstance,
+		inMythicPlus = inMythicPlus,
+		inParty = inGroup and not inRaid,
+		inRaid = inRaid,
+		openWorld = not inInstance,
 	}
 end
 
-local function visibilityMatchesContext(visibility)
+local function visibilityMatchesContext(visibility, isMouseOver)
 	local config = normalizeVisibilityConfig(visibility)
 	if not config then return true end
-	local shouldShow = addon.functions and addon.functions.ShouldShowVisibilityConfig
-	if shouldShow then
-		local visible = shouldShow(config, { isMouseOver = false })
-		return visible == true
-	end
-	return true
+	if config.MOUSEOVER and isMouseOver == true then return true end
+	local context = getDamageMeterVisibilityContext()
+	if config.ALWAYS_IN_COMBAT and context.inCombat then return true end
+	if config.ALWAYS_OUT_OF_COMBAT and not context.inCombat then return true end
+	if config.PLAYER_IN_PARTY and context.inParty then return true end
+	if config.PLAYER_IN_RAID and context.inRaid then return true end
+	if config.PLAYER_IN_GROUP and context.inGroup then return true end
+	if config.IN_INSTANCE and context.inInstance then return true end
+	if config.IN_MYTHIC_PLUS and context.inMythicPlus then return true end
+	if config.OPEN_WORLD and context.openWorld then return true end
+	if config.NOT_IN_INSTANCE and not context.inInstance then return true end
+	return false
 end
 
-local function buildDamageMeterVisibilityDriverExpression(visibility)
+local function visibilityUsesMouseover(visibility)
 	local config = normalizeVisibilityConfig(visibility)
-	if not config then return nil end
-	local build = addon.functions and addon.functions.BuildUnitFrameDriverExpression
-	if build then return build(config, { inactiveState = "hide" }) end
-	return nil
+	return config and config.MOUSEOVER == true
 end
 
 local DAMAGE_METER_TYPES = {
@@ -1713,14 +1727,17 @@ function DamageMeter:ShouldShow(index)
 	if not self:IsWindowEnabled(index) then return false end
 	if self:IsInEditMode() then return true end
 	if not self:IsAvailable() then return false end
-	return visibilityMatchesContext(self:GetConfig(index).visibility)
+	local visibility = self:GetConfig(index).visibility
+	return visibilityMatchesContext(visibility, false) or visibilityUsesMouseover(visibility) == true or self:GetWindowAlpha(index) > 0
 end
 
 function DamageMeter:GetWindowAlpha(index)
 	local config = self:GetConfig(index)
-	if normalizeVisibilityFadeMode(config.visibilityFadeMode) ~= "mouseover" or self:IsInEditMode() then return 1 end
+	if self:IsInEditMode() then return 1 end
+	if not normalizeVisibilityConfig(config.visibility) then return 1 end
 	local frame = self.windows and self.windows[index]
-	if frame and frame._damageMeterMouseOver == true then return 1 end
+	if visibilityMatchesContext(config.visibility, false) then return 1 end
+	if visibilityUsesMouseover(config.visibility) and frame and frame._damageMeterMouseOver == true then return 1 end
 	return clampNumber(config.visibilityFadeAlpha, 0, 1, DEFAULT_WINDOW.visibilityFadeAlpha)
 end
 
@@ -1741,62 +1758,6 @@ function DamageMeter:SetWindowHover(index, hovered)
 	end
 	frame._damageMeterMouseOver = hovered == true
 	self:UpdateWindowAlpha(index)
-end
-
-function DamageMeter:EnsureVisibilityDriverWatcher()
-	if self.visibilityDriverWatcher then return end
-	local watcher = CreateFrame("Frame")
-	watcher:RegisterEvent("PLAYER_REGEN_ENABLED")
-	watcher:SetScript("OnEvent", function()
-		local pending = DamageMeter.pendingVisibilityDrivers
-		if not pending then return end
-		DamageMeter.pendingVisibilityDrivers = nil
-		for frame, expression in pairs(pending) do
-			DamageMeter:ApplyVisibilityDriverToFrame(frame, expression ~= false and expression or nil)
-		end
-	end)
-	self.visibilityDriverWatcher = watcher
-end
-
-function DamageMeter:ApplyVisibilityDriverToFrame(frame, expression)
-	if not frame then return false end
-	if InCombatLockdown and InCombatLockdown() then
-		self.pendingVisibilityDrivers = self.pendingVisibilityDrivers or {}
-		self.pendingVisibilityDrivers[frame] = expression or false
-		self:EnsureVisibilityDriverWatcher()
-		return false
-	end
-	if not expression then
-		if frame._damageMeterVisibilityDriver and UnregisterStateDriver then
-			UnregisterStateDriver(frame, "visibility")
-		end
-		frame._damageMeterVisibilityDriver = nil
-		if frame.SetAttribute then frame:SetAttribute("state-visibility", nil) end
-		return true
-	end
-	if frame._damageMeterVisibilityDriver == expression then return true end
-	if not RegisterStateDriver then return false end
-	if frame._damageMeterVisibilityDriver and UnregisterStateDriver then
-		UnregisterStateDriver(frame, "visibility")
-		frame._damageMeterVisibilityDriver = nil
-	end
-	RegisterStateDriver(frame, "visibility", expression)
-	frame._damageMeterVisibilityDriver = expression
-	return true
-end
-
-function DamageMeter:ApplyWindowVisibilityDriver(frame, state)
-	if not frame or not state then return false end
-	if state.editMode then
-		self:ApplyVisibilityDriverToFrame(frame, nil)
-		return false
-	end
-	local expression = state.visibilityDriverExpression
-	if expression then
-		return self:ApplyVisibilityDriverToFrame(frame, expression)
-	end
-	self:ApplyVisibilityDriverToFrame(frame, nil)
-	return false
 end
 
 function DamageMeter:ClearWindowRows(frame)
@@ -1844,12 +1805,14 @@ function DamageMeter:BuildWindowRefreshState(index, shared)
 	local sessionID = temporary and temporary.sessionID or nil
 	local sessionType = sessionID and nil or ((temporary and temporary.sessionType) or config.sessionType)
 	local sessionEnum = sessionType and (SESSION_TYPES[sessionType] or SESSION_TYPES.current) or nil
-	local visibilityDriverExpression = buildDamageMeterVisibilityDriverExpression(config.visibility)
-	local canUseVisibilityDriver = RegisterStateDriver ~= nil and visibilityDriverExpression ~= nil
+	local usesMouseoverVisibility = visibilityUsesMouseover(config.visibility)
 	local visible = shared.enabled == true and index <= shared.windowCount
 	if visible and not shared.editMode then
 		visible = shared.available == true
-		if visible and not canUseVisibilityDriver then visible = visibilityMatchesContext(config.visibility) end
+		if visible then
+			local fadeAlpha = clampNumber(config.visibilityFadeAlpha, 0, 1, DEFAULT_WINDOW.visibilityFadeAlpha)
+			visible = visibilityMatchesContext(config.visibility, false) or usesMouseoverVisibility == true or fadeAlpha > 0
+		end
 	end
 	state.available = shared.available
 	state.config = config
@@ -1863,9 +1826,8 @@ function DamageMeter:BuildWindowRefreshState(index, shared)
 	state.sessionID = sessionID
 	state.sessionType = sessionType
 	state.temporary = temporary
-	state.usesVisibilityDriver = canUseVisibilityDriver
+	state.usesMouseoverVisibility = usesMouseoverVisibility
 	state.visible = visible
-	state.visibilityDriverExpression = visibilityDriverExpression
 	return state
 end
 
@@ -5035,20 +4997,9 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 	if not state.visible then
 		self:ClearPreviewTooltip(index)
 		self:ClearPinnedTooltip(index)
-		self:ApplyVisibilityDriverToFrame(frame, nil)
 		self:ClearWindowRows(frame)
 		frame:Hide()
 		return
-	end
-	local driverActive = self:ApplyWindowVisibilityDriver(frame, state)
-	if driverActive and not state.editMode then
-		if not visibilityMatchesContext(state.config.visibility) then
-			self:ClearPreviewTooltip(index)
-			self:ClearPinnedTooltip(index)
-			self:ClearWindowRows(frame)
-			self:UpdateWindowAlpha(index)
-			return
-		end
 	end
 
 	local config = state.config
@@ -5188,7 +5139,7 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 	end
 
 	frame.empty:SetShown(shown == 0 and config.showNoData ~= false)
-	if not driverActive then frame:SetShown(true) end
+	frame:SetShown(true)
 	self:UpdateWindowAlpha(index)
 	self:UpdatePreviewTooltip(index)
 end
@@ -5223,6 +5174,15 @@ function DamageMeter:RefreshFromLiveEvent(damageMeterType, sessionID)
 	self:Refresh()
 end
 
+function DamageMeter:ScheduleContextRefresh()
+	if self.contextRefreshPending then return end
+	self.contextRefreshPending = true
+	C_Timer.After(0.05, function()
+		DamageMeter.contextRefreshPending = nil
+		DamageMeter:ScheduleRefresh()
+	end)
+end
+
 function DamageMeter:RegisterLiveEvents()
 	local frame = self.eventFrame
 	if not frame or self.liveEventsRegistered then return end
@@ -5230,22 +5190,16 @@ function DamageMeter:RegisterLiveEvents()
 	frame:RegisterEvent("DAMAGE_METER_CURRENT_SESSION_UPDATED")
 	frame:RegisterEvent("DAMAGE_METER_RESET")
 	frame:RegisterEvent("GROUP_ROSTER_UPDATE")
-	frame:RegisterEvent("PLAYER_TARGET_CHANGED")
 	frame:RegisterEvent("PLAYER_REGEN_DISABLED")
 	frame:RegisterEvent("PLAYER_REGEN_ENABLED")
 	frame:RegisterEvent("PLAYER_ENTERING_WORLD")
 	frame:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
 	frame:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
 	frame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+	frame:RegisterEvent("CHALLENGE_MODE_START")
+	frame:RegisterEvent("CHALLENGE_MODE_COMPLETED")
+	frame:RegisterEvent("CHALLENGE_MODE_RESET")
 	frame:RegisterEvent("ADDON_RESTRICTION_STATE_CHANGED")
-	if frame.RegisterUnitEvent then
-		frame:RegisterUnitEvent("UNIT_SPELLCAST_START", "player")
-		frame:RegisterUnitEvent("UNIT_SPELLCAST_STOP", "player")
-		frame:RegisterUnitEvent("UNIT_SPELLCAST_FAILED", "player")
-		frame:RegisterUnitEvent("UNIT_SPELLCAST_INTERRUPTED", "player")
-		frame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_START", "player")
-		frame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_STOP", "player")
-	end
 	self.liveEventsRegistered = true
 end
 
@@ -5256,20 +5210,16 @@ function DamageMeter:UnregisterLiveEvents()
 	frame:UnregisterEvent("DAMAGE_METER_CURRENT_SESSION_UPDATED")
 	frame:UnregisterEvent("DAMAGE_METER_RESET")
 	frame:UnregisterEvent("GROUP_ROSTER_UPDATE")
-	frame:UnregisterEvent("PLAYER_TARGET_CHANGED")
 	frame:UnregisterEvent("PLAYER_REGEN_DISABLED")
 	frame:UnregisterEvent("PLAYER_REGEN_ENABLED")
 	frame:UnregisterEvent("PLAYER_ENTERING_WORLD")
 	frame:UnregisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
 	frame:UnregisterEvent("UPDATE_SHAPESHIFT_FORM")
 	frame:UnregisterEvent("ZONE_CHANGED_NEW_AREA")
+	frame:UnregisterEvent("CHALLENGE_MODE_START")
+	frame:UnregisterEvent("CHALLENGE_MODE_COMPLETED")
+	frame:UnregisterEvent("CHALLENGE_MODE_RESET")
 	frame:UnregisterEvent("ADDON_RESTRICTION_STATE_CHANGED")
-	frame:UnregisterEvent("UNIT_SPELLCAST_START")
-	frame:UnregisterEvent("UNIT_SPELLCAST_STOP")
-	frame:UnregisterEvent("UNIT_SPELLCAST_FAILED")
-	frame:UnregisterEvent("UNIT_SPELLCAST_INTERRUPTED")
-	frame:UnregisterEvent("UNIT_SPELLCAST_CHANNEL_START")
-	frame:UnregisterEvent("UNIT_SPELLCAST_CHANNEL_STOP")
 	self.liveEventsRegistered = false
 end
 
@@ -5942,11 +5892,7 @@ function DamageMeter:BuildWindowSettings(index)
 				self:SetConfigValue(index, "visibility", visibilityConfig)
 			end,
 		},
-		dropdownSetting(L["damageMeterVisibilityFadeMode"] or "Fade", function() return normalizeVisibilityFadeMode(cfg().visibilityFadeMode) end, function(value)
-			self:SetConfigValue(index, "visibilityFadeMode", normalizeVisibilityFadeMode(value))
-			requestEditModeSettingsRefresh()
-		end, buildVisibilityFadeOptions(), behaviorId, 120),
-		sliderSetting(L["damageMeterVisibilityFadeAlpha"] or "Faded opacity", function() return cfg().visibilityFadeAlpha end, function(value) self:SetConfigValue(index, "visibilityFadeAlpha", clampNumber(value, 0, 1, DEFAULT_WINDOW.visibilityFadeAlpha)) end, 0, 1, 0.05, behaviorId, function() return normalizeVisibilityFadeMode(cfg().visibilityFadeMode) == "mouseover" end, nil, formatAlphaSliderValue),
+		sliderSetting(L["damageMeterVisibilityFadeAlpha"] or "Faded opacity", function() return cfg().visibilityFadeAlpha end, function(value) self:SetConfigValue(index, "visibilityFadeAlpha", clampNumber(value, 0, 1, DEFAULT_WINDOW.visibilityFadeAlpha)) end, 0, 1, 0.05, behaviorId, function() return normalizeVisibilityConfig(cfg().visibility) ~= nil end, nil, formatAlphaSliderValue),
 		checkboxSetting(L["damageMeterShowNoData"] or "Show no data text", function() return cfg().showNoData ~= false end, function(value) self:SetConfigValue(index, "showNoData", value) end, behaviorId),
 		{ name = L["Layout"] or "Layout", kind = SettingType.Collapsible, id = layoutId, defaultCollapsed = false },
 		sliderSetting(L["damageMeterVisibleRows"] or "Visible rows", function() return cfg().visibleRows end, function(value) self:SetConfigValue(index, "visibleRows", clampNumber(value, 1, 30, DEFAULT_WINDOW.visibleRows)) end, 1, 30, 1, layoutId),
@@ -6365,12 +6311,12 @@ function DamageMeter:Init()
 			self:InvalidateDerivedTargetCache(true)
 			self:RefreshFromLiveEvent()
 		elseif event == "ADDON_RESTRICTION_STATE_CHANGED" then
-			self:Refresh()
+			self:ScheduleContextRefresh()
 		elseif event == "ZONE_CHANGED_NEW_AREA" then
 			self:CheckAutomaticClear()
-			self:ScheduleRefresh()
+			self:ScheduleContextRefresh()
 		else
-			self:ScheduleRefresh()
+			self:ScheduleContextRefresh()
 		end
 	end)
 	self:UpdateEventState()
