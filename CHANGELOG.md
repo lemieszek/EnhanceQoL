@@ -2,6 +2,19 @@
 
 <!--@eqol-beta@-->
 
+## [10.21.0-beta10] - 2026-05-28
+
+### ✨ Added
+
+- Damage Meter / Tooltip: Added row, bar, and icon border customization with texture, color, class-color, size, and offset controls.
+
+### 🐛 Fixed
+
+- Bags / One Bag: Fixed moved item slots keeping the previous item's quality border color when using the default icon shape.
+- Damage Meter / Rows: Made Always show player respect the currently scrolled viewport instead of only the static Visible rows limit.
+
+---
+
 ## [10.21.0-beta9] - 2026-05-26
 
 ### ✨ Added

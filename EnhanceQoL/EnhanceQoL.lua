@@ -5200,6 +5200,14 @@ local function initUI()
 			or btnName == "ZygorGuidesViewerMapIcon"
 	end
 
+	local function isFrameAnchoredThrough(frame, ancestor)
+		while frame do
+			if frame == ancestor then return true end
+			frame = frame.GetParent and frame:GetParent() or nil
+		end
+		return false
+	end
+
 	local function isButtonSinkMinimapToggleEnabled() return addon.db and addon.db["useMinimapButtonBinIcon"] == true end
 
 	local function isButtonSinkDetachedToggleEnabled() return addon.db and addon.db["useDetachedMinimapButtonBinIcon"] == true end
@@ -5387,7 +5395,12 @@ local function initUI()
 		end
 
 		-- Jetzt setzen wir den finalen Anker
-		bagFrame:SetPoint(pointOnBag, anchorButton, pointOnButton, 0, 0)
+		if isFrameAnchoredThrough(anchorButton, bagFrame) then
+			local anchorX, anchorY = getButtonPointCoords(pointOnButton)
+			bagFrame:SetPoint(pointOnBag, UIParent, "BOTTOMLEFT", anchorX or 0, anchorY or 0)
+		else
+			bagFrame:SetPoint(pointOnBag, anchorButton, pointOnButton, 0, 0)
+		end
 	end
 
 	local function removeButtonSink()
@@ -5776,7 +5789,19 @@ local function initUI()
 				end)
 				for _, name in ipairs(orderedNames) do
 					local button = addon.variables.bagButtons[name]
-					if addon.db["ignoreMinimapButtonBin_" .. name] then
+					if shouldIgnoreMinimapButton(name) then
+						button:ClearAllPoints()
+						button:SetParent(Minimap)
+						if addon.variables.bagButtonPoint[name] then
+							local pData = addon.variables.bagButtonPoint[name]
+							if pData.point and pData.relativePoint and pData.relativeTo and pData.xOfs and pData.yOfs then
+								button:SetPoint(pData.point, pData.relativeTo, pData.relativePoint, pData.xOfs, pData.yOfs)
+							end
+							button:SetFrameStrata(pData.strata or "MEDIUM")
+							if pData.level then button:SetFrameLevel(pData.level) end
+						end
+						clearTrackedMinimapButton(name)
+					elseif addon.db["ignoreMinimapButtonBin_" .. name] then
 						if addon.db.minimapButtonsMouseover then setLibDBIconMouseover(name, true, button) end
 						button:ClearAllPoints()
 						button:SetParent(Minimap)

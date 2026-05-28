@@ -253,6 +253,24 @@ local DEFAULT_WINDOW = {
 	tooltipBarTexture = "",
 	tooltipBarColor = { r = 0.1, g = 0.42, b = 0.78, a = 0.5 },
 	tooltipBarUseClassColor = false,
+	tooltipRowBorderEnabled = false,
+	tooltipRowBorderTexture = "",
+	tooltipRowBorderColor = { r = 0, g = 0, b = 0, a = 0.9 },
+	tooltipRowBorderUseClassColor = false,
+	tooltipRowBorderSize = 1,
+	tooltipRowBorderInset = 0,
+	tooltipBarBorderEnabled = false,
+	tooltipBarBorderTexture = "",
+	tooltipBarBorderColor = { r = 0, g = 0, b = 0, a = 0.9 },
+	tooltipBarBorderUseClassColor = false,
+	tooltipBarBorderSize = 1,
+	tooltipBarBorderInset = 0,
+	tooltipIconBorderEnabled = false,
+	tooltipIconBorderTexture = "",
+	tooltipIconBorderColor = { r = 0, g = 0, b = 0, a = 0.9 },
+	tooltipIconBorderUseClassColor = false,
+	tooltipIconBorderSize = 1,
+	tooltipIconBorderInset = 0,
 	tooltipShowAmount = true,
 	tooltipShowDPS = true,
 	tooltipShowPercent = true,
@@ -1233,6 +1251,113 @@ local function getIconSize(config)
 	return clampNumber(maxSize + offset, 8, maxSize, maxSize)
 end
 
+local function clearArray(array)
+	if not array then return end
+	for index = #array, 1, -1 do
+		array[index] = nil
+	end
+end
+
+local function findLocalPlayerSourceIndex(orderedSources)
+	for sourceIndex, source in ipairs(orderedSources) do
+		if source and source.isLocalPlayer == true then
+			return sourceIndex
+		end
+	end
+	return nil
+end
+
+local function getScrollViewportVisualRange(frame, config, contentRows)
+	contentRows = math.max(0, tonumber(contentRows) or 0)
+	if contentRows <= 0 then return 1, 0 end
+
+	local visibleRows = math.min(getEffectiveVisibleRows(config), contentRows)
+	if visibleRows <= 0 then return 1, 0 end
+
+	local _, _, spacing = getRowMetrics(config)
+	local rowPitch = getEffectiveRowHeight(config) + spacing
+	if rowPitch <= 0 then rowPitch = 1 end
+
+	local scroll = 0
+	if frame and frame.rowsViewport then
+		scroll = frame.rowsViewport:GetVerticalScroll() or 0
+	end
+	if scroll < 0 then scroll = 0 end
+
+	local maxStart = math.max(1, contentRows - visibleRows + 1)
+	local viewportStart = math.floor((scroll / rowPitch) + 0.0001) + 1
+	viewportStart = clampNumber(viewportStart, 1, maxStart, 1)
+	local viewportEnd = math.min(contentRows, viewportStart + visibleRows - 1)
+	return viewportStart, viewportEnd
+end
+
+local function sourceIndexToVisualIndex(sourceIndex, contentRows, highestBottom)
+	if highestBottom then
+		return contentRows - sourceIndex + 1
+	end
+	return sourceIndex
+end
+
+local function visualIndexToEntryIndex(visualIndex, contentRows, highestBottom)
+	if highestBottom then
+		return contentRows - visualIndex + 1
+	end
+	return visualIndex
+end
+
+local function buildViewportAwareDisplayIndices(frame, config, contentRows, playerSourceIndex, highestBottom)
+	local displayIndices = frame and frame._damageMeterDisplayIndices
+	if config.alwaysShowPlayer ~= true or not playerSourceIndex or contentRows <= 0 then
+		clearArray(displayIndices)
+		return nil
+	end
+
+	local viewportStart, viewportEnd = getScrollViewportVisualRange(frame, config, contentRows)
+	if viewportEnd < viewportStart then
+		clearArray(displayIndices)
+		return nil
+	end
+
+	local playerVisualIndex = sourceIndexToVisualIndex(playerSourceIndex, contentRows, highestBottom)
+	local injectVisualIndex
+	if playerVisualIndex < viewportStart then
+		injectVisualIndex = viewportStart
+	elseif playerVisualIndex > viewportEnd then
+		injectVisualIndex = viewportEnd
+	else
+		clearArray(displayIndices)
+		return nil
+	end
+
+	local injectEntryIndex = visualIndexToEntryIndex(injectVisualIndex, contentRows, highestBottom)
+	injectEntryIndex = clampNumber(injectEntryIndex, 1, contentRows, contentRows)
+	if not displayIndices then
+		displayIndices = {}
+		frame._damageMeterDisplayIndices = displayIndices
+	else
+		clearArray(displayIndices)
+	end
+
+	local writeIndex = 1
+	for sourceIndex = 1, contentRows do
+		if writeIndex == injectEntryIndex then
+			displayIndices[writeIndex] = playerSourceIndex
+			writeIndex = writeIndex + 1
+		end
+		if sourceIndex ~= playerSourceIndex then
+			if writeIndex <= contentRows then
+				displayIndices[writeIndex] = sourceIndex
+			end
+			writeIndex = writeIndex + 1
+		end
+	end
+	if writeIndex == injectEntryIndex and writeIndex <= contentRows then
+		displayIndices[writeIndex] = playerSourceIndex
+	end
+
+	return displayIndices
+end
+
 local function getIconGap(config)
 	return clampNumber(config.iconGap, 0, 24, DEFAULT_WINDOW.iconGap)
 end
@@ -2092,7 +2217,7 @@ function DamageMeter:GetEnemyDamageTakenSourceDetails(index, enemySource)
 	return nil
 end
 
-function DamageMeter:AddDerivedTargetEntry(cache, actorName, targetKey, targetName, amount, dps)
+function DamageMeter:AddDerivedTargetEntry(cache, actorName, targetKey, targetName, amount, dps, classFilename)
 	if actorName == nil or targetKey == nil or isSecret(actorName) or isSecret(targetKey) or not amount then return end
 	actorName = tostring(actorName)
 	targetKey = tostring(targetKey)
@@ -2116,11 +2241,12 @@ function DamageMeter:AddDerivedTargetEntry(cache, actorName, targetKey, targetNa
 	end
 	local target = actorTargets[targetKey]
 	if not target then
-		target = { key = targetKey, name = targetName, atlas = TOOLTIP_TARGET_ATLAS, amount = 0, dps = 0 }
+		target = { key = targetKey, name = targetName, atlas = TOOLTIP_TARGET_ATLAS, amount = 0, dps = 0, classFilename = classFilename }
 		actorTargets[targetKey] = target
 	elseif target.name == nil or (not isSecret(target.name) and target.name == target.key) then
 		target.name = targetName
 	end
+	if target.classFilename == nil then target.classFilename = classFilename end
 	target.amount = target.amount + amount
 	target.dps = target.dps + (dps or 0)
 	return true
@@ -2166,7 +2292,7 @@ function DamageMeter:BuildDerivedTargetSessionCache(index)
 				if type(spellDetails) == "table" then
 					local amount = safeNumber(spell.totalAmount)
 					if amount then
-						if self:AddDerivedTargetEntry(cache, spellDetails.unitName, targetKey, targetName, amount, safeNumber(spell.amountPerSecond)) then
+						if self:AddDerivedTargetEntry(cache, spellDetails.unitName, targetKey, targetName, amount, safeNumber(spell.amountPerSecond), spellDetails.unitClassFilename) then
 							addedAny = true
 						end
 					end
@@ -2239,6 +2365,7 @@ function DamageMeter:BuildDerivedTargetRows(index, source, config, damageMeterTy
 			sortAmount = target.amount or 0,
 			barValue = target.amount,
 			barMax = targetMaxAmount,
+			classFilename = target.classFilename,
 		}
 	end
 	table.sort(rows, function(a, b) return (a.sortAmount or 0) > (b.sortAmount or 0) end)
@@ -2370,6 +2497,46 @@ end
 
 function DamageMeter:ApplyTooltipFontString(fontString, config)
 	applyCachedFontString(fontString, config.tooltipFontFace, clampNumber(config.tooltipFontSize, 8, 24, DEFAULT_WINDOW.tooltipFontSize), config.tooltipFontOutline, "tooltip")
+end
+
+local function applyTooltipBorder(border, enabled, textureKey, size, r, g, b, a)
+	if not border or not border.SetBackdrop then return end
+	if enabled then
+		if border._damageMeterBackdropEnabled ~= true
+			or border._damageMeterBackdropTexture ~= textureKey
+			or border._damageMeterBackdropSize ~= size then
+			border._damageMeterBackdropEnabled = true
+			border._damageMeterBackdropTexture = textureKey
+			border._damageMeterBackdropSize = size
+			border:SetBackdrop({
+				edgeFile = resolveMedia("border", textureKey, DEFAULT_BORDER),
+				edgeSize = size,
+			})
+		end
+		if border._damageMeterBorderColorR ~= r
+			or border._damageMeterBorderColorG ~= g
+			or border._damageMeterBorderColorB ~= b
+			or border._damageMeterBorderColorA ~= a then
+			border._damageMeterBorderColorR = r
+			border._damageMeterBorderColorG = g
+			border._damageMeterBorderColorB = b
+			border._damageMeterBorderColorA = a
+			border:SetBackdropBorderColor(r, g, b, a)
+		end
+		setShownIfChanged(border, true)
+	else
+		if border._damageMeterBackdropEnabled ~= false then
+			border._damageMeterBackdropEnabled = false
+			border._damageMeterBackdropTexture = nil
+			border._damageMeterBackdropSize = nil
+			border._damageMeterBorderColorR = nil
+			border._damageMeterBorderColorG = nil
+			border._damageMeterBorderColorB = nil
+			border._damageMeterBorderColorA = nil
+			border:SetBackdrop(nil)
+		end
+		setShownIfChanged(border, false)
+	end
 end
 
 local function trimTextureInput(value)
@@ -3374,6 +3541,31 @@ end
 
 function DamageMeter:OpenHistoryMenu(owner, index, hoverMode)
 	if not MenuUtil or not MenuUtil.CreateContextMenu then return end
+
+	if hoverMode and self.historyHoverMenu and self.historyHoverOwner == owner then
+		self.historyHoverToken = (self.historyHoverToken or 0) + 1
+		self:ScheduleHistoryHoverMenuClose(self.historyHoverToken)
+		return
+	end
+
+	if hoverMode and Menu and Menu.GetManager and AnchorUtil and MenuUtil.CreateRootMenuDescription then
+		local menuVariants = _G.MenuVariants
+		local menuMixin = owner and owner.menuMixin or (menuVariants and menuVariants.GetDefaultContextMenuMixin and menuVariants.GetDefaultContextMenuMixin()) or nil
+		local rootDescription = MenuUtil.CreateRootMenuDescription(menuMixin)
+		rootDescription:SetTag("MENU_EQOL_DAMAGE_METER_HISTORY")
+		self:BuildSessionMenu(index, rootDescription)
+
+		local anchor = AnchorUtil.CreateAnchor("TOPRIGHT", owner, "BOTTOMRIGHT", 0, -2)
+		local menu = Menu.GetManager():OpenMenu(owner, rootDescription, anchor)
+		if menu then
+			self.historyHoverMenu = menu
+			self.historyHoverOwner = owner
+			self.historyHoverToken = (self.historyHoverToken or 0) + 1
+			self:ScheduleHistoryHoverMenuClose(self.historyHoverToken)
+		end
+		return
+	end
+
 	local menu = MenuUtil.CreateContextMenu(owner, function(_, rootDescription)
 		rootDescription:SetTag("MENU_EQOL_DAMAGE_METER_HISTORY")
 		self:BuildSessionMenu(index, rootDescription)
@@ -3409,14 +3601,23 @@ function DamageMeter:GetTooltipLine(frame, lineIndex)
 	line.icon = line:CreateTexture(nil, "ARTWORK")
 	line.icon:SetSize(14, 14)
 	line.icon:SetPoint("LEFT", 6, 0)
+	line.iconBorder = CreateFrame("Frame", nil, line, "BackdropTemplate")
+	line.iconBorder:EnableMouse(false)
 	line.barBG = line:CreateTexture(nil, "BACKGROUND")
 	line.bar = CreateFrame("StatusBar", nil, line)
 	line.bar:SetPoint("TOPLEFT", line.icon, "TOPRIGHT", 4, 0)
 	line.bar:SetPoint("BOTTOMLEFT", line.icon, "BOTTOMRIGHT", 4, 0)
 	line.bar:SetFrameLevel(line:GetFrameLevel() + 1)
+	line.rowBorder = CreateFrame("Frame", nil, line, "BackdropTemplate")
+	line.rowBorder:EnableMouse(false)
+	line.rowBorder:SetFrameLevel(line.bar:GetFrameLevel() + 2)
+	line.barBorder = CreateFrame("Frame", nil, line, "BackdropTemplate")
+	line.barBorder:EnableMouse(false)
+	line.barBorder:SetFrameLevel(line.bar:GetFrameLevel() + 3)
+	line.iconBorder:SetFrameLevel(line.bar:GetFrameLevel() + 3)
 	line.textLayer = CreateFrame("Frame", nil, line)
 	line.textLayer:SetAllPoints()
-	line.textLayer:SetFrameLevel(line.bar:GetFrameLevel() + 2)
+	line.textLayer:SetFrameLevel(line.bar:GetFrameLevel() + 4)
 	line.name = line.textLayer:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	line.name:SetPoint("LEFT", line.icon, "RIGHT", 4, 0)
 	line.name:SetJustifyH("LEFT")
@@ -3666,12 +3867,12 @@ function DamageMeter:BuildTooltipRows(details, config, damageMeterType, derivedT
 		local amount = spell.totalAmount
 		local dps = spell.amountPerSecond
 		local percent = totalAmount and totalAmount > 0 and safeNumber(amount) and (safeNumber(amount) / totalAmount * 100) or nil
+		local target = spell.combatSpellDetails
 		if showSpellSection and spellRows < spellLimit then
-			rows[#rows + 1] = { name = spellName, icon = spellIcon, amount = showAmount and formatNumber(amount, config.abbreviation), dps = showDPS and formatNumber(dps, config.abbreviation), percent = showPercent and percent and string.format("%.1f%%", percent), sortAmount = safeNumber(amount) or 0, barValue = amount, barMax = detailsMaxAmount or spellMaxAmount }
+			rows[#rows + 1] = { name = spellName, icon = spellIcon, classFilename = target and target.unitClassFilename, amount = showAmount and formatNumber(amount, config.abbreviation), dps = showDPS and formatNumber(dps, config.abbreviation), percent = showPercent and percent and string.format("%.1f%%", percent), sortAmount = safeNumber(amount) or 0, barValue = amount, barMax = detailsMaxAmount or spellMaxAmount }
 			spellRows = spellRows + 1
 		end
 
-		local target = spell.combatSpellDetails
 		if showTargets and type(target) == "table" then
 			local targetName = resolveTooltipUnitName(target.unitName)
 			if targetName ~= nil then
@@ -3681,7 +3882,7 @@ function DamageMeter:BuildTooltipRows(details, config, damageMeterType, derivedT
 				if not isSecret(targetName) and targetAmount then
 					local entry = targetMap[targetName]
 					if not entry then
-						entry = { name = targetName, amount = 0, dps = 0 }
+						entry = { name = targetName, amount = 0, dps = 0, classFilename = target.unitClassFilename }
 						if damageMeterType == "EnemyDamageTaken" then
 							entry.icon = target.specIconID ~= 0 and target.specIconID or 136243
 						else
@@ -3696,6 +3897,7 @@ function DamageMeter:BuildTooltipRows(details, config, damageMeterType, derivedT
 						name = targetName,
 						atlas = damageMeterType ~= "EnemyDamageTaken" and TOOLTIP_TARGET_ATLAS or nil,
 						icon = damageMeterType == "EnemyDamageTaken" and (target.specIconID ~= 0 and target.specIconID or 136243) or nil,
+						classFilename = target.unitClassFilename,
 						amount = showAmount and formatNumber(rawTargetAmount, config.abbreviation),
 						dps = showDPS and formatNumber(spell.amountPerSecond, config.abbreviation),
 						sortAmount = safeNumber(spell.totalAmount) or 0,
@@ -3729,7 +3931,7 @@ function DamageMeter:BuildTooltipRows(details, config, damageMeterType, derivedT
 			end
 			for _, target in ipairs(targets) do
 				local percent = targetTotal > 0 and (target.amount / targetTotal * 100) or nil
-				targetRows[#targetRows + 1] = { name = target.name, atlas = target.atlas, icon = target.icon, amount = showAmount and formatNumber(target.amount, config.abbreviation), dps = showDPS and formatNumber(target.dps, config.abbreviation), percent = showPercent and percent and string.format("%.1f%%", percent), sortAmount = target.amount or 0, barValue = target.amount, barMax = targetMaxAmount }
+				targetRows[#targetRows + 1] = { name = target.name, atlas = target.atlas, icon = target.icon, classFilename = target.classFilename, amount = showAmount and formatNumber(target.amount, config.abbreviation), dps = showDPS and formatNumber(target.dps, config.abbreviation), percent = showPercent and percent and string.format("%.1f%%", percent), sortAmount = target.amount or 0, barValue = target.amount, barMax = targetMaxAmount }
 			end
 			for _, target in ipairs(directTargetRows) do
 				local sortAmount = target.sortAmount
@@ -3786,7 +3988,6 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 	local nameRight = amountRight - amountWidth - 8
 	local showBars = config.tooltipShowBars == true
 	local barTexture = resolveMedia("statusbar", config.tooltipBarTexture, DEFAULT_TEXTURE)
-	local barR, barG, barB, barA = getClassOrCustomColor(source and source.classFilename, config.tooltipBarColor, DEFAULT_WINDOW.tooltipBarColor, config.tooltipBarUseClassColor)
 	local shown = #rows
 	local tooltipHeight = 10
 	for rowIndex = 1, shown do
@@ -3835,6 +4036,9 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 			line.amount:ClearAllPoints()
 			line.dps:ClearAllPoints()
 			line.percent:ClearAllPoints()
+			line.rowBorder:ClearAllPoints()
+			line.barBorder:ClearAllPoints()
+			line.iconBorder:ClearAllPoints()
 			line.barBG:ClearAllPoints()
 			line.bar:ClearAllPoints()
 			line.name:SetPoint("LEFT", line.icon, "RIGHT", 4, 0)
@@ -3849,6 +4053,8 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 					line.icon:SetTexCoord(0, 1, 0, 1)
 				end
 			end
+			local classFilename = data.classFilename or (source and source.classFilename)
+			local barR, barG, barB, barA = getClassOrCustomColor(classFilename, config.tooltipBarColor, DEFAULT_WINDOW.tooltipBarColor, config.tooltipBarUseClassColor)
 			if showBars and not data.header and not data.spacer and data.barValue ~= nil then
 				local availableBarWidth = math.max(1, width - rightPadding - barStartX)
 				local barHeight = math.max(1, currentLineHeight - 3)
@@ -3868,6 +4074,25 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 				line.barBG:Hide()
 				line.bar:Hide()
 			end
+			local showLineBorders = not data.header and not data.spacer
+			local rowBorderOffset = clampNumber(config.tooltipRowBorderInset, 0, 24, DEFAULT_WINDOW.tooltipRowBorderInset)
+			line.rowBorder:SetPoint("TOPLEFT", line.icon, "TOPLEFT", -rowBorderOffset, rowBorderOffset)
+			line.rowBorder:SetPoint("BOTTOMRIGHT", line, "BOTTOMRIGHT", -(rightPadding - rowBorderOffset), -rowBorderOffset)
+			local rbr, rbg, rbb, rba = getClassOrCustomColor(classFilename, config.tooltipRowBorderColor, DEFAULT_WINDOW.tooltipRowBorderColor, config.tooltipRowBorderUseClassColor)
+			applyTooltipBorder(line.rowBorder, showLineBorders and config.tooltipRowBorderEnabled == true, config.tooltipRowBorderTexture, clampNumber(config.tooltipRowBorderSize, 1, 32, DEFAULT_WINDOW.tooltipRowBorderSize), rbr, rbg, rbb, rba)
+
+			local barBorderOffset = clampNumber(config.tooltipBarBorderInset, 0, 24, DEFAULT_WINDOW.tooltipBarBorderInset)
+			line.barBorder:SetPoint("TOPLEFT", line.bar, "TOPLEFT", -barBorderOffset, barBorderOffset)
+			line.barBorder:SetPoint("BOTTOMRIGHT", line.bar, "BOTTOMRIGHT", barBorderOffset, -barBorderOffset)
+			local bbr, bbg, bbb, bba = getClassOrCustomColor(classFilename, config.tooltipBarBorderColor, DEFAULT_WINDOW.tooltipBarBorderColor, config.tooltipBarBorderUseClassColor)
+			applyTooltipBorder(line.barBorder, line.bar:IsShown() and config.tooltipBarBorderEnabled == true, config.tooltipBarBorderTexture, clampNumber(config.tooltipBarBorderSize, 1, 32, DEFAULT_WINDOW.tooltipBarBorderSize), bbr, bbg, bbb, bba)
+
+			local iconBorderOffset = clampNumber(config.tooltipIconBorderInset, 0, 24, DEFAULT_WINDOW.tooltipIconBorderInset)
+			line.iconBorder:SetPoint("TOPLEFT", line.icon, "TOPLEFT", -iconBorderOffset, iconBorderOffset)
+			line.iconBorder:SetPoint("BOTTOMRIGHT", line.icon, "BOTTOMRIGHT", iconBorderOffset, -iconBorderOffset)
+			local ibr, ibg, ibb, iba = getClassOrCustomColor(classFilename, config.tooltipIconBorderColor, DEFAULT_WINDOW.tooltipIconBorderColor, config.tooltipIconBorderUseClassColor)
+			applyTooltipBorder(line.iconBorder, line.icon:IsShown() and showLineBorders and config.tooltipIconBorderEnabled == true, config.tooltipIconBorderTexture, clampNumber(config.tooltipIconBorderSize, 1, 32, DEFAULT_WINDOW.tooltipIconBorderSize), ibr, ibg, ibb, iba)
+
 			local lineName = data.name
 			if data.spacer or lineName == nil then lineName = "" end
 			line.name:SetText(lineName)
@@ -4158,8 +4383,12 @@ function DamageMeter:EnsureWindow(index)
 		local visibleRows = getEffectiveVisibleRows(config)
 		local contentRows = frame.contentRows or visibleRows
 		local maxScroll = math.max(0, (contentRows - visibleRows) * (effectiveRowHeight + spacing))
-		local nextScroll = (rowsViewport:GetVerticalScroll() or 0) - (delta * (effectiveRowHeight + spacing))
-		rowsViewport:SetVerticalScroll(clampNumber(nextScroll, 0, maxScroll, 0))
+		local currentScroll = rowsViewport:GetVerticalScroll() or 0
+		local nextScroll = clampNumber(currentScroll - (delta * (effectiveRowHeight + spacing)), 0, maxScroll, 0)
+		rowsViewport:SetVerticalScroll(nextScroll)
+		if config.alwaysShowPlayer == true and nextScroll ~= currentScroll then
+			DamageMeter:RefreshWindow(index, DamageMeter:BuildRefreshSharedState())
+		end
 	end)
 	rowsViewport:SetScript("OnEnter", function()
 		DamageMeter:SetWindowHover(index, true)
@@ -4855,55 +5084,13 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 	local highestBottom = damageMeterType ~= "Deaths" and normalizeRowSort(config.rowSort) == "BOTTOM"
 	local visibleRows = getEffectiveVisibleRows(config)
 	local contentRows = #orderedSources
-	local displayIndices
-	local playerSourceIndex
-	if config.alwaysShowPlayer == true then
-		for sourceIndex, source in ipairs(orderedSources) do
-			if source and source.isLocalPlayer == true then
-				playerSourceIndex = sourceIndex
-				break
-			end
-		end
-	end
-	local playerVisibleLimit = highestBottom and math.max(1, contentRows - visibleRows + 1) or math.min(contentRows, visibleRows)
-	local forcePlayer = playerSourceIndex and contentRows > 0 and ((highestBottom and playerSourceIndex < playerVisibleLimit) or (not highestBottom and playerSourceIndex > playerVisibleLimit))
-	if forcePlayer then
-		displayIndices = frame._damageMeterDisplayIndices
-		if not displayIndices then
-			displayIndices = {}
-			frame._damageMeterDisplayIndices = displayIndices
-		end
-		for displayIndex = #displayIndices, 1, -1 do
-			displayIndices[displayIndex] = nil
-		end
-		local usedSourceIndices = frame._damageMeterUsedSourceIndices
-		if not usedSourceIndices then
-			usedSourceIndices = {}
-			frame._damageMeterUsedSourceIndices = usedSourceIndices
-		end
-		for sourceIndex in pairs(usedSourceIndices) do
-			usedSourceIndices[sourceIndex] = nil
-		end
-		usedSourceIndices[playerSourceIndex] = true
-		local playerSlot = playerVisibleLimit
-		for sourceIndex = 1, playerSlot - 1 do
-			displayIndices[#displayIndices + 1] = sourceIndex
-		end
-		displayIndices[#displayIndices + 1] = playerSourceIndex
-		for sourceIndex = playerSlot, #orderedSources do
-			if #displayIndices >= contentRows then break end
-			if not usedSourceIndices[sourceIndex] then
-				displayIndices[#displayIndices + 1] = sourceIndex
-			end
-		end
-	end
+	local playerSourceIndex = config.alwaysShowPlayer == true and findLocalPlayerSourceIndex(orderedSources) or nil
 
 	local forceRankColumn = false
 	local reportAvailable = self:IsReportDataAvailable(session, orderedSources, damageMeterType, config, math.min(visibleRows, #orderedSources))
 	if config.showRanks ~= false and config.prefixRankInName == true then
 		for entryIndex = 1, contentRows do
-			local sourceIndex = displayIndices and displayIndices[entryIndex] or entryIndex
-			local source = sourceIndex and orderedSources[sourceIndex]
+			local source = orderedSources[entryIndex]
 			if source and isSecret(source.name) then
 				forceRankColumn = true
 				break
@@ -4912,6 +5099,7 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 	end
 
 	self:ApplyWindowStyle(index, contentRows, forceRankColumn)
+	local displayIndices = buildViewportAwareDisplayIndices(frame, config, contentRows, playerSourceIndex, highestBottom)
 	self:UpdateHeader(index, session, state)
 	if frame.reportButton then
 		setShownIfChanged(frame.reportButton, config.showHeader == true and config.showHeaderButtons ~= false and config.showHeaderReportButton ~= false and reportAvailable == true)
@@ -5621,6 +5809,12 @@ function DamageMeter:BuildWindowSettings(index)
 	local function prefixRankEnabled() return cfg().showRanks ~= false and cfg().prefixRankInName == true end
 	local function fixedPrefixRankColorEnabled() return cfg().showRanks ~= false and cfg().prefixRankInName == true and cfg().prefixRankUseClassColors ~= true end
 	local function fixedTooltipBarColorEnabled() return cfg().tooltipEnabled == true and cfg().tooltipBarUseClassColor ~= true end
+	local function tooltipRowBorderEnabled() return cfg().tooltipEnabled == true and cfg().tooltipRowBorderEnabled == true end
+	local function fixedTooltipRowBorderColorEnabled() return tooltipRowBorderEnabled() and cfg().tooltipRowBorderUseClassColor ~= true end
+	local function tooltipBarBorderEnabled() return cfg().tooltipEnabled == true and cfg().tooltipBarBorderEnabled == true end
+	local function fixedTooltipBarBorderColorEnabled() return tooltipBarBorderEnabled() and cfg().tooltipBarBorderUseClassColor ~= true end
+	local function tooltipIconBorderEnabled() return cfg().tooltipEnabled == true and cfg().tooltipIconBorderEnabled == true end
+	local function fixedTooltipIconBorderColorEnabled() return tooltipIconBorderEnabled() and cfg().tooltipIconBorderUseClassColor ~= true end
 	local function windowAnchorVisible() return index > 1 end
 	local function windowAnchorEnabled() return index > 1 and clampNumber(cfg().anchorToWindow, 0, index - 1, 0) > 0 end
 	local function raidRowsEnabled() return cfg().raidRowsEnabled == true end
@@ -6017,6 +6211,46 @@ function DamageMeter:BuildWindowSettings(index)
 			requestEditModeSettingsRefresh()
 		end, tooltipId, tooltipEnabled),
 		colorSetting(L["damageMeterTooltipBarColor"] or "Tooltip bar color", function() return normalizeColor(cfg().tooltipBarColor, DEFAULT_WINDOW.tooltipBarColor) end, function(value) self:SetConfigValue(index, "tooltipBarColor", normalizeColor(value, DEFAULT_WINDOW.tooltipBarColor)) end, DEFAULT_WINDOW.tooltipBarColor, tooltipId, fixedTooltipBarColorEnabled),
+		dividerSetting(tooltipId),
+		checkboxSetting(L["damageMeterRowBorder"] or "Row border", function() return cfg().tooltipRowBorderEnabled == true end, function(value)
+			self:SetConfigValue(index, "tooltipRowBorderEnabled", value)
+			requestEditModeSettingsRefresh()
+		end, tooltipId, tooltipEnabled),
+		dropdownSetting(L["damageMeterRowBorderTexture"] or "Row border texture", function() return cfg().tooltipRowBorderTexture end, function(value) self:SetConfigValue(index, "tooltipRowBorderTexture", value) end, buildMediaOptions("border", false), tooltipId, 260, tooltipRowBorderEnabled),
+		checkboxSetting(L["damageMeterUseClassColor"] or "Use class color", function() return cfg().tooltipRowBorderUseClassColor == true end, function(value)
+			self:SetConfigValue(index, "tooltipRowBorderUseClassColor", value)
+			requestEditModeSettingsRefresh()
+		end, tooltipId, tooltipRowBorderEnabled),
+		colorSetting(L["damageMeterRowBorderColor"] or "Row border color", function() return normalizeColor(cfg().tooltipRowBorderColor, DEFAULT_WINDOW.tooltipRowBorderColor) end, function(value) self:SetConfigValue(index, "tooltipRowBorderColor", normalizeColor(value, DEFAULT_WINDOW.tooltipRowBorderColor)) end, DEFAULT_WINDOW.tooltipRowBorderColor, tooltipId, fixedTooltipRowBorderColorEnabled),
+		sliderSetting(L["damageMeterRowBorderSize"] or "Row border size", function() return cfg().tooltipRowBorderSize end, function(value) self:SetConfigValue(index, "tooltipRowBorderSize", clampNumber(value, 1, 32, DEFAULT_WINDOW.tooltipRowBorderSize)) end, 1, 32, 1, tooltipId, tooltipRowBorderEnabled),
+		sliderSetting(L["damageMeterRowBorderOffset"] or "Row border offset", function() return cfg().tooltipRowBorderInset end, function(value) self:SetConfigValue(index, "tooltipRowBorderInset", clampNumber(value, 0, 24, DEFAULT_WINDOW.tooltipRowBorderInset)) end, 0, 24, 1, tooltipId, tooltipRowBorderEnabled),
+		dividerSetting(tooltipId),
+		checkboxSetting(L["damageMeterBarBorder"] or "Bar border", function() return cfg().tooltipBarBorderEnabled == true end, function(value)
+			self:SetConfigValue(index, "tooltipBarBorderEnabled", value)
+			requestEditModeSettingsRefresh()
+		end, tooltipId, tooltipEnabled),
+		dropdownSetting(L["damageMeterBarBorderTexture"] or "Bar border texture", function() return cfg().tooltipBarBorderTexture end, function(value) self:SetConfigValue(index, "tooltipBarBorderTexture", value) end, buildMediaOptions("border", false), tooltipId, 260, tooltipBarBorderEnabled),
+		checkboxSetting(L["damageMeterUseClassColor"] or "Use class color", function() return cfg().tooltipBarBorderUseClassColor == true end, function(value)
+			self:SetConfigValue(index, "tooltipBarBorderUseClassColor", value)
+			requestEditModeSettingsRefresh()
+		end, tooltipId, tooltipBarBorderEnabled),
+		colorSetting(L["damageMeterBarBorderColor"] or "Bar border color", function() return normalizeColor(cfg().tooltipBarBorderColor, DEFAULT_WINDOW.tooltipBarBorderColor) end, function(value) self:SetConfigValue(index, "tooltipBarBorderColor", normalizeColor(value, DEFAULT_WINDOW.tooltipBarBorderColor)) end, DEFAULT_WINDOW.tooltipBarBorderColor, tooltipId, fixedTooltipBarBorderColorEnabled),
+		sliderSetting(L["damageMeterBarBorderSize"] or "Bar border size", function() return cfg().tooltipBarBorderSize end, function(value) self:SetConfigValue(index, "tooltipBarBorderSize", clampNumber(value, 1, 32, DEFAULT_WINDOW.tooltipBarBorderSize)) end, 1, 32, 1, tooltipId, tooltipBarBorderEnabled),
+		sliderSetting(L["damageMeterBarBorderOffset"] or "Bar border offset", function() return cfg().tooltipBarBorderInset end, function(value) self:SetConfigValue(index, "tooltipBarBorderInset", clampNumber(value, 0, 24, DEFAULT_WINDOW.tooltipBarBorderInset)) end, 0, 24, 1, tooltipId, tooltipBarBorderEnabled),
+		dividerSetting(tooltipId),
+		checkboxSetting(L["damageMeterIconBorder"] or "Icon border", function() return cfg().tooltipIconBorderEnabled == true end, function(value)
+			self:SetConfigValue(index, "tooltipIconBorderEnabled", value)
+			requestEditModeSettingsRefresh()
+		end, tooltipId, tooltipEnabled),
+		dropdownSetting(L["damageMeterIconBorderTexture"] or "Icon border texture", function() return cfg().tooltipIconBorderTexture end, function(value) self:SetConfigValue(index, "tooltipIconBorderTexture", value) end, buildMediaOptions("border", false), tooltipId, 260, tooltipIconBorderEnabled),
+		checkboxSetting(L["damageMeterUseClassColor"] or "Use class color", function() return cfg().tooltipIconBorderUseClassColor == true end, function(value)
+			self:SetConfigValue(index, "tooltipIconBorderUseClassColor", value)
+			requestEditModeSettingsRefresh()
+		end, tooltipId, tooltipIconBorderEnabled),
+		colorSetting(L["damageMeterIconBorderColor"] or "Icon border color", function() return normalizeColor(cfg().tooltipIconBorderColor, DEFAULT_WINDOW.tooltipIconBorderColor) end, function(value) self:SetConfigValue(index, "tooltipIconBorderColor", normalizeColor(value, DEFAULT_WINDOW.tooltipIconBorderColor)) end, DEFAULT_WINDOW.tooltipIconBorderColor, tooltipId, fixedTooltipIconBorderColorEnabled),
+		sliderSetting(L["damageMeterIconBorderSize"] or "Icon border size", function() return cfg().tooltipIconBorderSize end, function(value) self:SetConfigValue(index, "tooltipIconBorderSize", clampNumber(value, 1, 32, DEFAULT_WINDOW.tooltipIconBorderSize)) end, 1, 32, 1, tooltipId, tooltipIconBorderEnabled),
+		sliderSetting(L["damageMeterIconBorderOffset"] or "Icon border offset", function() return cfg().tooltipIconBorderInset end, function(value) self:SetConfigValue(index, "tooltipIconBorderInset", clampNumber(value, 0, 24, DEFAULT_WINDOW.tooltipIconBorderInset)) end, 0, 24, 1, tooltipId, tooltipIconBorderEnabled),
+		dividerSetting(tooltipId),
 		dropdownSetting(L["damageMeterTooltipBackgroundTexture"] or "Tooltip background texture", function() return cfg().tooltipBackdropTexture end, function(value) self:SetConfigValue(index, "tooltipBackdropTexture", value) end, buildMediaOptions("statusbar", false), tooltipId, 260, tooltipEnabled),
 		colorSetting(L["damageMeterTooltipBackgroundColor"] or "Tooltip background color", function() return normalizeColor(cfg().tooltipBackdropColor, DEFAULT_WINDOW.tooltipBackdropColor) end, function(value) self:SetConfigValue(index, "tooltipBackdropColor", normalizeColor(value, DEFAULT_WINDOW.tooltipBackdropColor)) end, DEFAULT_WINDOW.tooltipBackdropColor, tooltipId, tooltipEnabled),
 		dropdownSetting(L["damageMeterTooltipBorderTexture"] or "Tooltip border texture", function() return cfg().tooltipBorderTexture end, function(value) self:SetConfigValue(index, "tooltipBorderTexture", value) end, buildMediaOptions("border", false), tooltipId, 260, tooltipEnabled),

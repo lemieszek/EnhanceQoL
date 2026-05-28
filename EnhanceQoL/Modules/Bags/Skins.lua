@@ -712,7 +712,7 @@ local function ensureItemButtonShapeElements(button)
 	end
 end
 
-local function resetItemButtonShape(button, qualityOverride)
+local function resetItemButtonShape(button, qualityOverride, qualityOverrideProvided)
 	if not button then
 		return
 	end
@@ -808,6 +808,8 @@ local function resetItemButtonShape(button, qualityOverride)
 	if icon then
 		icon:ClearAllPoints()
 		icon:SetAllPoints(button)
+		icon:SetAlpha(1)
+		icon:Show()
 	end
 
 	for _, key in ipairs(ITEM_ICON_MASK_KEYS) do
@@ -841,10 +843,10 @@ local function resetItemButtonShape(button, qualityOverride)
 		button.IconBorder:SetTexture(DEFAULT_ICON_BORDER_TEXTURE)
 		button.IconBorder:SetAlpha(1)
 		local quality = qualityOverride
-		if quality == nil then
+		if quality == nil and not qualityOverrideProvided then
 			quality = button._bagsRenderQuality
 		end
-		if quality == nil then
+		if quality == nil and not qualityOverrideProvided then
 			quality = button._bagsWarbandRenderQuality
 		end
 		local hasQualityColor = ColorManager and ColorManager.GetColorDataForBagItemQuality and ColorManager.GetColorDataForBagItemQuality(quality)
@@ -1632,10 +1634,12 @@ function addon.ApplyFrameBackgroundSkin(frame, skin)
 	end
 end
 
-function addon.ApplyItemButtonSkin(button, quality)
+function addon.ApplyItemButtonSkin(button, ...)
+	local qualityProvided = select("#", ...) >= 1
+	local quality = ...
 	local shapeDefinition = addon.GetActiveIconShapeDefinition and addon.GetActiveIconShapeDefinition() or ICON_SHAPE_DEFINITIONS.default
 	if not shapeDefinition or shapeDefinition.useSystemStyle then
-		resetItemButtonShape(button, quality)
+		resetItemButtonShape(button, quality, qualityProvided)
 		return
 	end
 
