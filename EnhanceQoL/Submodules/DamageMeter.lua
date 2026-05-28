@@ -1769,13 +1769,7 @@ end
 function DamageMeter:SuppressBlizzardDamageMeter()
 	self.blizzardDamageMeterSuppressed = true
 	self:SetBlizzardDamageMeterEnabled(false)
-	local blizzardDamageMeter = _G.DamageMeter
-	if blizzardDamageMeter then
-		blizzardDamageMeter:Hide()
-		if blizzardDamageMeter.UpdateShownState then
-			blizzardDamageMeter:UpdateShownState()
-		end
-	end
+
 end
 
 function DamageMeter:IsInEditMode()

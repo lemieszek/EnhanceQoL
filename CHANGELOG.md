@@ -2,6 +2,14 @@
 
 <!--@eqol-beta@-->
 
+## [10.21.0-beta14] - 2026-05-28
+
+### 🐛 Fixed
+
+- Damage Meter: Reduced native Blizzard damage meter suppression to only set Blizzard's damage meter CVar instead of touching the native frame during login.
+
+---
+
 ## [10.21.0-beta13] - 2026-05-28
 
 ### 🐛 Fixed
