@@ -64,6 +64,7 @@ Submodules\ActionTracker.lua
 Submodules\ClassBuffReminder.lua
 Submodules\GCDBar.lua
 Submodules\CombatText.lua
+Submodules\DamageMeter.lua
 Submodules\GroupTools.lua
 Submodules\ChatIM\ChannelHistory.lua
 Submodules\ChatIM\UI.lua

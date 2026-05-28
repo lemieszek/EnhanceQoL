@@ -53,6 +53,61 @@ jobs:
           GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
           WOWI_API_TOKEN: ${{ secrets.WOWI }}
 
+      - name: Check Enhanced Damage Meter changes
+        id: enhanced_damage_meter_changes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          previous_tag="$(git describe --tags --abbrev=0 "${GITHUB_SHA}^" 2>/dev/null || true)"
+          if [ -z "${previous_tag}" ]; then
+            echo "No previous tag found; triggering Enhanced Damage Meter build."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          paths=(
+            "EnhanceQoL/Submodules/DamageMeter.lua"
+            "EnhanceQoL/Core/EditMode.lua"
+            "EnhanceQoL/Core/EditModeLib.lua"
+            "EnhanceQoL/Locales"
+            "EnhanceQoL/libs/LibEQOL"
+            "EnhanceQoL/libs/LibSharedMedia-3.0"
+            "EnhanceQoL/libs/AceLocale-3.0"
+            "EnhanceQoL/libs/AceSerializer-3.0"
+            "EnhanceQoL/libs/CallbackHandler-1.0"
+            "EnhanceQoL/libs/LibDeflate"
+            "EnhanceQoL/libs/LibStub"
+          )
+
+          if git diff --quiet "${previous_tag}" "${GITHUB_SHA}" -- "${paths[@]}"; then
+            echo "No Enhanced Damage Meter relevant changes since ${previous_tag}."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Enhanced Damage Meter relevant changes detected since ${previous_tag}."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Trigger Enhanced Damage Meter release
+        if: steps.enhanced_damage_meter_changes.outputs.changed == 'true'
+        shell: bash
+        env:
+          DISPATCH_TOKEN: ${{ secrets.ENHANCED_DAMAGE_METER_DISPATCH_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${DISPATCH_TOKEN}" ]; then
+            echo "ENHANCED_DAMAGE_METER_DISPATCH_TOKEN is not configured; skipping Enhanced Damage Meter dispatch." >&2
+            exit 0
+          fi
+
+          curl -sS -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${DISPATCH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/R41z0r/EnhancedDamageMeter/dispatches" \
+            -d '{"event_type":"enhanceqol_release","client_payload":{"source_ref":"'"${GITHUB_REF_NAME}"'","source_sha":"'"${GITHUB_SHA}"'"}}'
+
   discord_patchnotes:
     needs: release
     if: always() && (github.event_name == 'workflow_dispatch' || (startsWith(github.ref, 'refs/tags/') && needs.release.result == 'success'))

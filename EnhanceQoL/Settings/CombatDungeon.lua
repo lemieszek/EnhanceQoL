@@ -923,6 +923,10 @@ end
 
 local function isNameplateQuestMarkersActive() return nameplateQuestMarkersActive == true end
 
+function addon.functions.CanScanNameplateQuestMarkers()
+	return isNameplateQuestMarkersActive() and not IsInInstance()
+end
+
 local function isNameplateTargetMarkersActive() return nameplateTargetMarkersActive == true end
 
 local function isNameplateEliteMarkersActive() return nameplateEliteMarkersActive == true end
@@ -1006,7 +1010,7 @@ local function isQuestObjectiveLineIncomplete(text)
 end
 
 local function isNameplateQuestObjectiveUnit(unit)
-	if not isNameplateUnitToken(unit) or not isNameplateQuestMarkersActive() then return false end
+	if not isNameplateUnitToken(unit) or not addon.functions.CanScanNameplateQuestMarkers() then return false end
 	if nameplateQuestMarkerCache[unit] ~= nil then return nameplateQuestMarkerCache[unit] == true end
 	if unitIdentityIsSecret(unit) then
 		nameplateQuestMarkerCache[unit] = false
@@ -1070,14 +1074,19 @@ end
 
 local function updateNameplateQuestMarker(unitFrame, unit)
 	local marker = unitFrame and nameplateQuestMarkersByUnitFrame[unitFrame]
-	if not isNameplateQuestMarkersActive() or not isNameplateUnitToken(unit) then
+	if not addon.functions.CanScanNameplateQuestMarkers() or not isNameplateUnitToken(unit) then
 		if marker then marker:Hide() end
 		return
 	end
 
 	local shouldShow = isNameplateQuestObjectiveUnit(unit)
+	if not shouldShow then
+		if marker then marker:Hide() end
+		return
+	end
+
 	marker = getNameplateQuestMarker(unitFrame)
-	if marker then marker:SetShown(shouldShow) end
+	if marker then marker:Show() end
 end
 
 local function hideAllNameplateQuestMarkers()
@@ -1620,28 +1629,60 @@ local function applyNameplateBaseHealthColor(unitFrame)
 	return true
 end
 
-local function refreshNameplateMobColorUnitFrame(unitFrame)
+local function refreshNameplateMobColorUnitFrame(unitFrame, refreshKind)
 	if not unitFrame or isSecretValue(unitFrame) then return end
 	local unit = unitFrame.unit
 	if not isNameplateUnitToken(unit) then return end
 
+	if refreshKind == "quest" then
+		updateNameplateQuestMarker(unitFrame, unit)
+		return
+	elseif refreshKind == "elite" then
+		updateNameplateEliteMarker(unitFrame, unit)
+		return
+	elseif refreshKind == "target" then
+		updateNameplateTargetMarkers(unitFrame, unit)
+		return
+	elseif refreshKind == "focus" then
+		addon.functions.ApplyNameplateFocusHealthbarTexture(unitFrame, unit)
+		return
+	end
+
 	updateNameplateMobColorContext()
-	updateNameplateEliteMarker(unitFrame, unit)
-	updateNameplateQuestMarker(unitFrame, unit)
-	updateNameplateTargetMarkers(unitFrame, unit)
-	addon.functions.ApplyNameplateFocusHealthbarTexture(unitFrame, unit)
+	if refreshKind ~= "colors" then
+		updateNameplateEliteMarker(unitFrame, unit)
+		updateNameplateQuestMarker(unitFrame, unit)
+		updateNameplateTargetMarkers(unitFrame, unit)
+		addon.functions.ApplyNameplateFocusHealthbarTexture(unitFrame, unit)
+	end
 	if not isNameplateMobColorsActive() then return end
 
 	applyNameplateBaseHealthColor(unitFrame)
 	applyNameplateMobColor(unitFrame)
 end
 
-local function refreshAllNameplateMobColors()
+local function refreshAllNameplateMobColors(refreshKind)
 	if not (C_NamePlate and C_NamePlate.GetNamePlates) then return end
 	for _, namePlate in pairs(C_NamePlate.GetNamePlates() or {}) do
 		local unitFrame = namePlate and namePlate.UnitFrame
-		if unitFrame then refreshNameplateMobColorUnitFrame(unitFrame) end
+		if unitFrame then refreshNameplateMobColorUnitFrame(unitFrame, refreshKind) end
 	end
+end
+
+function addon.functions.ScheduleNameplateQuestMarkerRefresh()
+	local timer = addon.variables.nameplateQuestMarkerRefreshTimer
+	if timer and not timer._cancelled and timer.Cancel then
+		timer:Cancel()
+	end
+	if not (C_Timer and C_Timer.NewTimer) then
+		refreshAllNameplateMobColors("quest")
+		return
+	end
+
+	addon.variables.nameplateQuestMarkerRefreshTimer = C_Timer.NewTimer(1, function()
+		addon.variables.nameplateQuestMarkerRefreshTimer = nil
+		refreshAllNameplateMobColors("quest")
+	end)
 end
 
 local function ensureNameplateMobColorHooks()
@@ -1687,7 +1728,7 @@ local function ensureNameplateMobColorWatcher()
 			return
 		elseif event == "QUEST_LOG_UPDATE" then
 			clearNameplateQuestMarkerCache()
-			refreshAllNameplateMobColors()
+			addon.functions.ScheduleNameplateQuestMarkerRefresh()
 			return
 		elseif event == "PLAYER_TARGET_CHANGED" then
 			refreshCurrentAndPreviousNameplateTargetMarkers()
@@ -1699,9 +1740,9 @@ local function ensureNameplateMobColorWatcher()
 			if isNameplateUnitToken(unit) and C_NamePlate and C_NamePlate.GetNamePlateForUnit then
 				local namePlate = C_NamePlate.GetNamePlateForUnit(unit)
 				local unitFrame = namePlate and namePlate.UnitFrame
-				if unitFrame then refreshNameplateMobColorUnitFrame(unitFrame) end
+				if unitFrame then refreshNameplateMobColorUnitFrame(unitFrame, "colors") end
 			else
-				refreshAllNameplateMobColors()
+				refreshAllNameplateMobColors("colors")
 			end
 			return
 		end
@@ -1732,25 +1773,25 @@ local function syncNameplateQuestMarkers()
 	if not isNameplateQuestMarkersActive() then return end
 	ensureNameplateMobColorWatcher()
 	clearNameplateQuestMarkerCache()
-	refreshAllNameplateMobColors()
+	refreshAllNameplateMobColors("quest")
 end
 
 local function syncNameplateEliteMarkers()
 	if not isNameplateEliteMarkersActive() then return end
 	ensureNameplateMobColorWatcher()
-	refreshAllNameplateMobColors()
+	refreshAllNameplateMobColors("elite")
 end
 
 local function syncNameplateTargetMarkers()
 	if not isNameplateTargetMarkersActive() then return end
 	ensureNameplateMobColorWatcher()
-	refreshAllNameplateMobColors()
+	refreshAllNameplateMobColors("target")
 end
 
 function addon.functions.SyncNameplateFocusHealthbarTextures()
 	if nameplateFocusHealthbarTextureActive ~= true then return end
 	ensureNameplateMobColorWatcher()
-	refreshAllNameplateMobColors()
+	refreshAllNameplateMobColors("focus")
 end
 
 local function safeSetNameplateAuraButtonClicks(button, enabled)
@@ -2522,6 +2563,49 @@ if cChar and sectionDungeon then
 		parent = true,
 		element = keystoneEnable.element,
 		parentCheck = isKeystoneEnabled,
+		parentSection = sectionDungeon,
+	})
+
+	local damageMeterEnable = addon.functions.SettingsCreateCheckbox(cChar, {
+		var = "damageMeterEnabled",
+		text = L["damageMeterEnabled"],
+		desc = L["damageMeterEditModeHint"],
+		func = function(value)
+			addon.db["damageMeterEnabled"] = value == true
+			if addon.DamageMeter and addon.DamageMeter.UpdateEventState then addon.DamageMeter:UpdateEventState() end
+		end,
+		parentSection = sectionDungeon,
+	})
+	local function isDamageMeterEnabled() return damageMeterEnable and damageMeterEnable.setting and damageMeterEnable.setting:GetValue() == true end
+	addon.functions.SettingsCreateSlider(cChar, {
+		var = "damageMeterUpdateRate",
+		text = L["damageMeterUpdateRate"],
+		desc = L["damageMeterUpdateRateDesc"],
+		min = 0.1,
+		max = 5,
+		step = 0.1,
+		default = 0.1,
+		get = function() return (addon.db and addon.db["damageMeterUpdateRate"]) or 0.1 end,
+		set = function(value)
+			addon.db["damageMeterUpdateRate"] = value
+			if addon.DamageMeter and addon.DamageMeter.ScheduleRefresh then addon.DamageMeter:ScheduleRefresh() end
+		end,
+		parent = true,
+		element = damageMeterEnable.element,
+		parentCheck = isDamageMeterEnabled,
+		parentSection = sectionDungeon,
+	})
+	addon.functions.SettingsCreateCheckbox(cChar, {
+		var = "damageMeterEditModeSample",
+		text = L["damageMeterEditModeSample"],
+		desc = L["damageMeterEditModeSampleDesc"],
+		func = function(value)
+			addon.db["damageMeterEditModeSample"] = value == true
+			if addon.DamageMeter and addon.DamageMeter.Refresh then addon.DamageMeter:Refresh() end
+		end,
+		parent = true,
+		element = damageMeterEnable.element,
+		parentCheck = isDamageMeterEnabled,
 		parentSection = sectionDungeon,
 	})
 

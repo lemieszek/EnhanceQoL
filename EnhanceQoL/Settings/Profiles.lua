@@ -7,6 +7,7 @@ local serializer = LibStub("AceSerializer-3.0")
 local deflate = LibStub("LibDeflate")
 local PROFILE_EXPORT_KIND = "EQOL_PROFILE"
 local BAGS_CATEGORIES_EXPORT_KIND = "EQOL_BAGS_CATEGORIES"
+local DAMAGE_METER_EXPORT_KIND = "EQOL_DAMAGE_METER"
 local HBP_EXPORT_KIND = "EQOL_HBP"
 local IMPORT_PROTECTION_KEY = "importProtection"
 local IMPORT_PROTECTION = {
@@ -14,6 +15,7 @@ local IMPORT_PROTECTION = {
 	BAGS = "bags",
 	CASTBARS = "castbars",
 	COOLDOWN_PANELS = "cooldownPanels",
+	DAMAGE_METER = "damageMeter",
 	DATA_PANELS = "dataPanels",
 	DUNGEON_COMBAT = "dungeonCombat",
 	HBP = "hbp",
@@ -29,6 +31,7 @@ local IMPORT_PROTECTION_DEFS = {
 	{ key = IMPORT_PROTECTION.BAGS, labelKey = "ProfileImportProtectionBags", fallback = "Bags" },
 	{ key = IMPORT_PROTECTION.CASTBARS, labelKey = "ProfileImportProtectionCastbars", fallback = "Castbars" },
 	{ key = IMPORT_PROTECTION.COOLDOWN_PANELS, labelKey = "ProfileImportProtectionCooldownPanels", fallback = "Cooldown Panels" },
+	{ key = IMPORT_PROTECTION.DAMAGE_METER, labelKey = "ProfileImportProtectionDamageMeter", fallback = "Damage Meter" },
 	{ key = IMPORT_PROTECTION.DATA_PANELS, labelKey = "ProfileImportProtectionDataPanels", fallback = "Data Panels" },
 	{ key = IMPORT_PROTECTION.DUNGEON_COMBAT, labelKey = "ProfileImportProtectionDungeonCombat", fallback = "Dungeon & Combat Tools" },
 	{ key = IMPORT_PROTECTION.HBP, labelKey = "ProfileImportProtectionHBP", fallback = "Healer Buff Placement" },
@@ -50,6 +53,7 @@ local expandable = addon.functions.SettingsCreateExpandableSection(cProfiles, {
 })
 
 local bagsCategoriesExpandable
+local damageMeterExpandable
 local hbpExpandable
 
 local function isBagsCategoriesSectionVisible()
@@ -791,6 +795,10 @@ local function isDataPanelsProfileKey(key)
 	return key == "datapanel" or key == "dataPanels"
 end
 
+local function isDamageMeterProfileKey(key)
+	return profileKeyStartsWith(key, "damageMeter")
+end
+
 local function isDungeonCombatProfileKey(key)
 	return profileKeyStartsWith(key, "mythicPlus")
 		or profileKeyStartsWith(key, "combatText")
@@ -899,6 +907,7 @@ local function applyImportProtection(imported, current)
 	if isImportSectionProtected(IMPORT_PROTECTION.BAGS) then preserveProtectedKeys(imported, current, isBagsProfileKey) end
 	if isImportSectionProtected(IMPORT_PROTECTION.CASTBARS) then preserveProtectedKeys(imported, current, isCastbarProfileKey) end
 	if isImportSectionProtected(IMPORT_PROTECTION.COOLDOWN_PANELS) then preserveProtectedKeys(imported, current, isCooldownPanelsProfileKey) end
+	if isImportSectionProtected(IMPORT_PROTECTION.DAMAGE_METER) then preserveProtectedKeys(imported, current, isDamageMeterProfileKey) end
 	if isImportSectionProtected(IMPORT_PROTECTION.DATA_PANELS) then preserveProtectedKeys(imported, current, isDataPanelsProfileKey) end
 	if isImportSectionProtected(IMPORT_PROTECTION.DUNGEON_COMBAT) then preserveProtectedKeys(imported, current, isDungeonCombatProfileKey) end
 	if isImportSectionProtected(IMPORT_PROTECTION.INSTANCE_DIFFICULTY) then preserveProtectedKeys(imported, current, isInstanceDifficultyProfileKey) end
@@ -988,6 +997,52 @@ local function importBagsCategories(encoded)
 	local payload, reason = decodeExportPayload(encoded, BAGS_CATEGORIES_EXPORT_KIND)
 	if not payload then return false, reason end
 	return applyImportedBagsCategoriesState(payload.data)
+end
+
+local function captureDamageMeterState()
+	local profileName = getActiveProfileName()
+	local source = profileName and EnhanceQoLDB and EnhanceQoLDB.profiles and EnhanceQoLDB.profiles[profileName] or nil
+	if type(source) ~= "table" then return nil end
+	local data = {}
+	for key, value in pairs(source) do
+		if isDamageMeterProfileKey(key) then copyProtectedProfileValue(data, key, value) end
+	end
+	return next(data) and data or nil
+end
+
+local function applyImportedDamageMeterState(data)
+	if type(data) ~= "table" then return false, "NO_DATA" end
+	local profileName = getActiveProfileName()
+	local target = profileName and EnhanceQoLDB and EnhanceQoLDB.profiles and EnhanceQoLDB.profiles[profileName] or nil
+	if type(target) ~= "table" then return false, "NO_ACTIVE" end
+	local sanitized = sanitizeProfileData(data)
+	local applied = false
+	for key in pairs(target) do
+		if isDamageMeterProfileKey(key) then target[key] = nil end
+	end
+	for key, value in pairs(sanitized) do
+		if isDamageMeterProfileKey(key) then
+			target[key] = value
+			applied = true
+		end
+	end
+	if not applied then return false, "NO_DATA" end
+	if addon.db == target and addon.DamageMeter then
+		addon.DamageMeter.normalizedWindowsDB = nil
+		if addon.DamageMeter.UpdateEventState then addon.DamageMeter:UpdateEventState() end
+		if addon.DamageMeter.Refresh then addon.DamageMeter:Refresh() end
+	end
+	return true
+end
+
+local function exportDamageMeter()
+	return exportPayloadWithData(DAMAGE_METER_EXPORT_KIND, captureDamageMeterState(), 1)
+end
+
+local function importDamageMeter(encoded)
+	local payload, reason = decodeExportPayload(encoded, DAMAGE_METER_EXPORT_KIND)
+	if not payload then return false, reason end
+	return applyImportedDamageMeterState(payload.data)
 end
 
 local function captureHBPState()
@@ -1522,6 +1577,43 @@ addon.functions.SettingsCreateButton(cProfiles, {
 		)
 	end,
 	parentSection = isBagsCategoriesSectionVisible,
+})
+
+damageMeterExpandable = addon.functions.SettingsCreateExpandableSection(cProfiles, {
+	name = L["damageMeterTitle"] or "Damage Meter",
+	expanded = false,
+	colorizeTitle = false,
+	newTagID = "ProfilesDamageMeter",
+})
+
+addon.functions.SettingsCreateButton(cProfiles, {
+	var = "damageMeterExport",
+	text = string.format("%s %s", L["Export"] or "Export", L["damageMeterTitle"] or "Damage Meter"),
+	func = function()
+		local code, reason = exportDamageMeter()
+		if not code then
+			print("|cff00ff98Enhance QoL|r: " .. tostring(dataExportErrorMessage(reason)))
+			return
+		end
+		showExportCodeDialog("EQOL_DAMAGE_METER_EXPORT", string.format("%s %s", L["Export"] or "Export", L["damageMeterTitle"] or "Damage Meter"), code)
+	end,
+	parentSection = damageMeterExpandable,
+})
+
+addon.functions.SettingsCreateButton(cProfiles, {
+	var = "damageMeterImport",
+	text = string.format("%s %s", L["Import"] or "Import", L["damageMeterTitle"] or "Damage Meter"),
+	func = function()
+		showImportCodeDialog(
+			"EQOL_DAMAGE_METER_IMPORT",
+			string.format("%s %s", L["Import"] or "Import", L["damageMeterTitle"] or "Damage Meter"),
+			L["damageMeterImportConfirm"] or "Importing will overwrite your Damage Meter settings in the active profile.",
+			importDamageMeter,
+			L["damageMeterImportSuccess"] or "Damage Meter settings imported.",
+			false
+		)
+	end,
+	parentSection = damageMeterExpandable,
 })
 
 hbpExpandable = addon.functions.SettingsCreateExpandableSection(cProfiles, {

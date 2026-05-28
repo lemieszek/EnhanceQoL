@@ -1,13 +1,15 @@
 # Changelog
 
-## [10.21.0-beta1] - 2026-05-24
+## [10.21.0] - 2026-05-28
 
 ### ✨ Added
 
+- Damage Meter: Added a new fully customizable Damage Meter with extensive Edit Mode styling.
 - Instant Messenger: Added separate configurable text colors for incoming and outgoing messages.
 
 ### 🐛 Fixed
 
+- Bags / One Bag: Fixed moved item slots keeping the previous item's quality border color when using the default icon shape.
 - Cooldown Panels: Fixed spell tooltips for talent choice nodes showing the first choice instead of the currently selected spell.
 - Mythic Plus / BR & Bloodlust Tracker: Fixed Edit Mode X/Y fields not refreshing immediately after moving the tracker anchors.
 
