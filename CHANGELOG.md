@@ -2,6 +2,15 @@
 
 <!--@eqol-beta@-->
 
+## [10.21.0-beta13] - 2026-05-28
+
+### 🐛 Fixed
+
+- Damage Meter / Tooltip: Added an Icon gap control so tooltip row icons can be placed directly against the row/bar border like regular meter rows.
+- Damage Meter / Bars: Fixed Smooth bars using a non-existent status bar interpolation enum, so the setting now uses Blizzard's exponential ease-out interpolation.
+
+---
+
 ## [10.21.0-beta12] - 2026-05-28
 
 ### ✨ Added

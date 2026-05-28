@@ -56,7 +56,7 @@ local SESSION_TYPES = {
 	overall = Enum and Enum.DamageMeterSessionType and Enum.DamageMeterSessionType.Overall,
 }
 local STATUSBAR_INTERP = Enum and Enum.StatusBarInterpolation
-local INTERP_EASE = STATUSBAR_INTERP and STATUSBAR_INTERP.Ease
+local INTERP_EASE = STATUSBAR_INTERP and STATUSBAR_INTERP.ExponentialEaseOut
 local AUTO_CLEAR_DELAY_SECONDS = 2
 local DERIVED_TARGET_SCAN_LIMIT = 80
 -- Keep Blizzard's localized abbreviation breakpoints, with one extra floor so sub-1000 DPS values do not show long decimals.
@@ -301,6 +301,7 @@ local DEFAULT_WINDOW = {
 	tooltipIconBorderUseClassColor = false,
 	tooltipIconBorderSize = 1,
 	tooltipIconBorderInset = 0,
+	tooltipIconGap = 4,
 	tooltipShowAmount = true,
 	tooltipShowDPS = true,
 	tooltipShowPercent = true,
@@ -4034,12 +4035,13 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 	local tooltipFontSize = clampNumber(config.tooltipFontSize, 8, 24, DEFAULT_WINDOW.tooltipFontSize)
 	local lineHeight = tooltipFontSize + 7
 	local tooltipIconSize = math.max(16, math.min(24, lineHeight - 2))
+	local tooltipIconGap = clampNumber(config.tooltipIconGap, 0, 24, DEFAULT_WINDOW.tooltipIconGap)
 	local showAmount, showDPS, showPercent = getTooltipColumnVisibility(config, damageMeterType)
 	local percentWidth = showPercent and math.max(40, tooltipFontSize * 3.8) or 0
 	local dpsWidth = showDPS and math.max(42, tooltipFontSize * 4.5) or 0
 	local amountWidth = showAmount and (damageMeterType == "Deaths" and 110 or math.max(50, tooltipFontSize * 5.2)) or 0
 	local rightPadding = 10
-	local barStartX = 10 + tooltipIconSize
+	local barStartX = 10 + tooltipIconSize + tooltipIconGap
 	local minNameWidth = math.max(60, tooltipFontSize * 6)
 	local requiredWidth = barStartX + minNameWidth + amountWidth + dpsWidth + percentWidth + rightPadding + 8
 	width = math.min(600, math.max(width, requiredWidth))
@@ -4106,7 +4108,7 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 			if data.header then
 				line.name:SetPoint("LEFT", line, "LEFT", 6, 0)
 			else
-				line.name:SetPoint("LEFT", line.icon, "RIGHT", 4, 0)
+				line.name:SetPoint("LEFT", line.icon, "RIGHT", tooltipIconGap, 0)
 			end
 			line.name:SetPoint("RIGHT", line, "RIGHT", nameRight, 0)
 			local showLineIcon = not data.spacer and not data.header
@@ -4127,12 +4129,12 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 				local barHeight = math.max(1, currentLineHeight - 3)
 				line.barBG:SetTexture(barTexture)
 				line.barBG:SetVertexColor(0, 0, 0, math.min(0.45, (barA or 1) * 0.6))
-				line.barBG:SetPoint("LEFT", line.icon, "RIGHT", 4, 0)
+				line.barBG:SetPoint("LEFT", line.icon, "RIGHT", tooltipIconGap, 0)
 				line.barBG:SetSize(availableBarWidth, barHeight)
 				line.barBG:Show()
 				line.bar:SetStatusBarTexture(barTexture)
 				line.bar:SetStatusBarColor(barR, barG, barB, barA)
-				line.bar:SetPoint("LEFT", line.icon, "RIGHT", 4, 0)
+				line.bar:SetPoint("LEFT", line.icon, "RIGHT", tooltipIconGap, 0)
 				line.bar:SetSize(availableBarWidth, barHeight)
 				line.bar:SetMinMaxValues(0, getTooltipBarMax(data.barMax))
 				line.bar:SetValue(getTooltipBarValue(data.barValue))
@@ -6324,6 +6326,7 @@ function DamageMeter:BuildWindowSettings(index)
 		colorSetting(L["damageMeterIconBorderColor"] or "Icon border color", function() return normalizeColor(cfg().tooltipIconBorderColor, DEFAULT_WINDOW.tooltipIconBorderColor) end, function(value) self:SetConfigValue(index, "tooltipIconBorderColor", normalizeColor(value, DEFAULT_WINDOW.tooltipIconBorderColor)) end, DEFAULT_WINDOW.tooltipIconBorderColor, tooltipId, fixedTooltipIconBorderColorEnabled),
 		sliderSetting(L["damageMeterIconBorderSize"] or "Icon border size", function() return cfg().tooltipIconBorderSize end, function(value) self:SetConfigValue(index, "tooltipIconBorderSize", clampNumber(value, 1, 32, DEFAULT_WINDOW.tooltipIconBorderSize)) end, 1, 32, 1, tooltipId, tooltipIconBorderEnabled),
 		sliderSetting(L["damageMeterIconBorderOffset"] or "Icon border offset", function() return cfg().tooltipIconBorderInset end, function(value) self:SetConfigValue(index, "tooltipIconBorderInset", clampNumber(value, 0, 24, DEFAULT_WINDOW.tooltipIconBorderInset)) end, 0, 24, 1, tooltipId, tooltipIconBorderEnabled),
+		sliderSetting(L["damageMeterIconGap"] or "Icon gap", function() return cfg().tooltipIconGap end, function(value) self:SetConfigValue(index, "tooltipIconGap", clampNumber(value, 0, 24, DEFAULT_WINDOW.tooltipIconGap)) end, 0, 24, 1, tooltipId, tooltipEnabled),
 		dividerSetting(tooltipId),
 		dropdownSetting(L["damageMeterTooltipBackgroundTexture"] or "Tooltip background texture", function() return cfg().tooltipBackdropTexture end, function(value) self:SetConfigValue(index, "tooltipBackdropTexture", value) end, buildMediaOptions("statusbar", false), tooltipId, 260, tooltipEnabled),
 		colorSetting(L["damageMeterTooltipBackgroundColor"] or "Tooltip background color", function() return normalizeColor(cfg().tooltipBackdropColor, DEFAULT_WINDOW.tooltipBackdropColor) end, function(value) self:SetConfigValue(index, "tooltipBackdropColor", normalizeColor(value, DEFAULT_WINDOW.tooltipBackdropColor)) end, DEFAULT_WINDOW.tooltipBackdropColor, tooltipId, tooltipEnabled),
