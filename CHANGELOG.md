@@ -2,6 +2,19 @@
 
 <!--@eqol-beta@-->
 
+## [10.21.0-beta12] - 2026-05-28
+
+### ✨ Added
+
+- Damage Meter: Added host integration for the standalone Enhanced Damage Meter package so the same core meter can run independently from EnhanceQoL.
+- Release: Added a Damage Meter diff gate that triggers the standalone Enhanced Damage Meter repository only when relevant Damage Meter, Edit Mode, locale, or library paths changed.
+
+### 🐛 Fixed
+
+- Damage Meter: Namespaced runtime frame names, Edit Mode IDs, popup IDs, context menus, and report labels through the active host so EnhanceQoL and Enhanced Damage Meter can coexist.
+
+---
+
 ## [10.21.0-beta11] - 2026-05-28
 
 ### ✨ Added
