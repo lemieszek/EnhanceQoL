@@ -2,6 +2,33 @@
 
 <!--@eqol-beta@-->
 
+## [10.21.0-beta11] - 2026-05-28
+
+### ✨ Added
+
+- Damage Meter / Icons: Added a Class icon mode with optional custom class icon texture path support using a fixed class atlas coordinate layout.
+- Damage Meter / Ranking: Added horizontal and vertical anchors plus X/Y offsets for the standalone rank column.
+- Damage Meter / Ranking: Extended Rank gap to support negative spacing down to -50.
+
+### 🔄 Changed
+
+- Damage Meter / Defaults: Updated new-window default styling from the current first-window configuration, covering header, bars, tooltip, fonts, values, icons, and borders without copying window positions or anchors.
+- Damage Meter / Ranking: Unified prefix-rank and standalone-rank colors into the same Rank color and Use class color settings.
+- Damage Meter / Tooltip: Removed decorative section header icons from tooltip headers.
+- Damage Meter / Values: Only shows Value format and Delimiter controls when the Combined value layout is active.
+- Damage Meter / Values: Only shows Minimum name width where it is used by the Combined value layout.
+- Damage Meter / Edit Mode: Updated sample names and values to better stress longer names and larger formatted numbers.
+
+### 🐛 Fixed
+
+- Damage Meter / Icons: Fixed Spec icon mode still preferring disabled custom class icon texture settings.
+- Damage Meter / Ranking: Fixed rank class color and custom color settings not applying consistently when ranks are shown before the bar.
+- Damage Meter / Tooltip: Fixed class-colored tooltip bars using spell detail unit classes instead of the hovered source class.
+- Damage Meter / Tooltip: Increased tooltip row icon sizing so spell and target icons better match the tooltip line height.
+- Damage Meter / Borders: Fixed Bar, Row, Icon, and Tooltip border colors resetting to white after changing border size or texture until reload.
+
+---
+
 ## [10.21.0-beta10] - 2026-05-28
 
 ### ✨ Added
