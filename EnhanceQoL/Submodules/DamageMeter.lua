@@ -180,11 +180,13 @@ local DEFAULT_WINDOW = {
 	showIcons = true,
 	showRanks = true,
 	prefixRankInName = true,
-	prefixRankUseClassColors = false,
-	prefixRankColor = { r = 1, g = 1, b = 1, a = 1 },
 	rankUseClassColors = false,
 	rankColor = { r = 1, g = 1, b = 1, a = 1 },
 	rankGap = 2,
+	rankAnchorH = "LEFT",
+	rankAnchorV = "CENTER",
+	rankOffsetX = 0,
+	rankOffsetY = 0,
 	rankFontFace = GLOBAL_FONT_KEY,
 	rankFontOutline = GLOBAL_STYLE_KEY,
 	rankFontSize = 11,
@@ -2428,7 +2430,7 @@ function DamageMeter:GetValueColor(config, classFilename)
 end
 
 function DamageMeter:GetPrefixRankColor(config, classFilename)
-	return getClassOrCustomColor(classFilename, config.prefixRankColor, DEFAULT_WINDOW.prefixRankColor, config.prefixRankUseClassColors)
+	return self:GetRankColor(config, classFilename)
 end
 
 function DamageMeter:GetRankColor(config, classFilename)
@@ -2523,18 +2525,21 @@ end
 local function applyTooltipBorder(border, enabled, textureKey, size, r, g, b, a)
 	if not border or not border.SetBackdrop then return end
 	if enabled then
+		local backdropChanged = false
 		if border._damageMeterBackdropEnabled ~= true
 			or border._damageMeterBackdropTexture ~= textureKey
 			or border._damageMeterBackdropSize ~= size then
 			border._damageMeterBackdropEnabled = true
 			border._damageMeterBackdropTexture = textureKey
 			border._damageMeterBackdropSize = size
+			backdropChanged = true
 			border:SetBackdrop({
 				edgeFile = resolveMedia("border", textureKey, DEFAULT_BORDER),
 				edgeSize = size,
 			})
 		end
-		if border._damageMeterBorderColorR ~= r
+		if backdropChanged
+			or border._damageMeterBorderColorR ~= r
 			or border._damageMeterBorderColorG ~= g
 			or border._damageMeterBorderColorB ~= b
 			or border._damageMeterBorderColorA ~= a then
@@ -2703,19 +2708,22 @@ function DamageMeter:ApplyRowBorder(row, config, classFilename, colors)
 		else
 			br, bg, bb, ba = getClassOrCustomColor(classKey, config.rowBorderColor, DEFAULT_WINDOW.rowBorderColor, config.rowBorderUseClassColor)
 		end
+		local backdropChanged = false
 		if border._damageMeterBackdropEnabled ~= true
 			or border._damageMeterBackdropTexture ~= config.rowBorderTexture
 			or border._damageMeterBackdropSize ~= size then
 			border._damageMeterBackdropEnabled = true
 			border._damageMeterBackdropTexture = config.rowBorderTexture
 			border._damageMeterBackdropSize = size
+			backdropChanged = true
 			local borderTexture = resolveMedia("border", config.rowBorderTexture, DEFAULT_BORDER)
 			border:SetBackdrop({
 				edgeFile = borderTexture,
 				edgeSize = size,
 			})
 		end
-		if border._damageMeterBorderColorR ~= br
+		if backdropChanged
+			or border._damageMeterBorderColorR ~= br
 			or border._damageMeterBorderColorG ~= bg
 			or border._damageMeterBorderColorB ~= bb
 			or border._damageMeterBorderColorA ~= ba then
@@ -2764,19 +2772,22 @@ function DamageMeter:ApplyBarBorder(row, config, classFilename, colors)
 		else
 			br, bg, bb, ba = getClassOrCustomColor(classKey, config.barBorderColor, DEFAULT_WINDOW.barBorderColor, config.barBorderUseClassColor)
 		end
+		local backdropChanged = false
 		if border._damageMeterBackdropEnabled ~= true
 			or border._damageMeterBackdropTexture ~= config.barBorderTexture
 			or border._damageMeterBackdropSize ~= size then
 			border._damageMeterBackdropEnabled = true
 			border._damageMeterBackdropTexture = config.barBorderTexture
 			border._damageMeterBackdropSize = size
+			backdropChanged = true
 			local borderTexture = resolveMedia("border", config.barBorderTexture, DEFAULT_BORDER)
 			border:SetBackdrop({
 				edgeFile = borderTexture,
 				edgeSize = size,
 			})
 		end
-		if border._damageMeterBorderColorR ~= br
+		if backdropChanged
+			or border._damageMeterBorderColorR ~= br
 			or border._damageMeterBorderColorG ~= bg
 			or border._damageMeterBorderColorB ~= bb
 			or border._damageMeterBorderColorA ~= ba then
@@ -2825,19 +2836,22 @@ function DamageMeter:ApplyIconBorder(row, config, classFilename, colors)
 		else
 			br, bg, bb, ba = getClassOrCustomColor(classKey, config.iconBorderColor, DEFAULT_WINDOW.iconBorderColor, config.iconBorderUseClassColor)
 		end
+		local backdropChanged = false
 		if border._damageMeterBackdropEnabled ~= true
 			or border._damageMeterBackdropTexture ~= config.iconBorderTexture
 			or border._damageMeterBackdropSize ~= size then
 			border._damageMeterBackdropEnabled = true
 			border._damageMeterBackdropTexture = config.iconBorderTexture
 			border._damageMeterBackdropSize = size
+			backdropChanged = true
 			local borderTexture = resolveMedia("border", config.iconBorderTexture, DEFAULT_BORDER)
 			border:SetBackdrop({
 				edgeFile = borderTexture,
 				edgeSize = size,
 			})
 		end
-		if border._damageMeterBorderColorR ~= br
+		if backdropChanged
+			or border._damageMeterBorderColorR ~= br
 			or border._damageMeterBorderColorG ~= bg
 			or border._damageMeterBorderColorB ~= bb
 			or border._damageMeterBorderColorA ~= ba then
@@ -2931,8 +2945,19 @@ function DamageMeter:ApplyRowTextLayout(row, config, forceRankColumn)
 		if rankPrefixText then
 			row.rank:SetPoint("LEFT", row.textArea, "LEFT", 0, 0)
 		else
-			row.rank:SetPoint("LEFT", row, "LEFT", 4, 0)
+			local rankH = normalizeAnchorH(config.rankAnchorH)
+			local rankV = normalizeAnchorV(config.rankAnchorV)
+			local rankOffsetX = clampNumber(config.rankOffsetX, -200, 200, DEFAULT_WINDOW.rankOffsetX)
+			local rankOffsetY = clampNumber(config.rankOffsetY, -200, 200, DEFAULT_WINDOW.rankOffsetY)
+			local rankColumnOffset = 4
+			if rankH == "CENTER" then
+				rankColumnOffset = rankColumnOffset + (rankWidth / 2)
+			elseif rankH == "RIGHT" then
+				rankColumnOffset = rankColumnOffset + rankWidth
+			end
+			row.rank:SetPoint(anchorPoint(rankH, rankV), row, anchorPoint("LEFT", rankV), rankColumnOffset + rankOffsetX, rankOffsetY)
 		end
+		row.rank:SetJustifyH(justifyFromAnchor(rankPrefixText and "LEFT" or config.rankAnchorH))
 	end
 	setShownIfChanged(row.name, config.showNames == true)
 end
@@ -3626,7 +3651,7 @@ function DamageMeter:GetTooltipLine(frame, lineIndex)
 	line = CreateFrame("Frame", nil, frame)
 	line:SetHeight(18)
 	line.icon = line:CreateTexture(nil, "ARTWORK")
-	line.icon:SetSize(14, 14)
+	line.icon:SetSize(16, 16)
 	line.icon:SetPoint("LEFT", 6, 0)
 	line.iconBorder = CreateFrame("Frame", nil, line, "BackdropTemplate")
 	line.iconBorder:EnableMouse(false)
@@ -3896,7 +3921,7 @@ function DamageMeter:BuildTooltipRows(details, config, damageMeterType, derivedT
 		local percent = totalAmount and totalAmount > 0 and safeNumber(amount) and (safeNumber(amount) / totalAmount * 100) or nil
 		local target = spell.combatSpellDetails
 		if showSpellSection and spellRows < spellLimit then
-			rows[#rows + 1] = { name = spellName, icon = spellIcon, classFilename = target and target.unitClassFilename, amount = showAmount and formatNumber(amount, config.abbreviation), dps = showDPS and formatNumber(dps, config.abbreviation), percent = showPercent and percent and string.format("%.1f%%", percent), sortAmount = safeNumber(amount) or 0, barValue = amount, barMax = detailsMaxAmount or spellMaxAmount }
+			rows[#rows + 1] = { name = spellName, icon = spellIcon, amount = showAmount and formatNumber(amount, config.abbreviation), dps = showDPS and formatNumber(dps, config.abbreviation), percent = showPercent and percent and string.format("%.1f%%", percent), sortAmount = safeNumber(amount) or 0, barValue = amount, barMax = detailsMaxAmount or spellMaxAmount }
 			spellRows = spellRows + 1
 		end
 
@@ -4001,12 +4026,13 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 	local width = clampNumber(config.tooltipWidth, 100, 600, DEFAULT_WINDOW.tooltipWidth)
 	local tooltipFontSize = clampNumber(config.tooltipFontSize, 8, 24, DEFAULT_WINDOW.tooltipFontSize)
 	local lineHeight = tooltipFontSize + 7
+	local tooltipIconSize = math.max(16, math.min(24, lineHeight - 2))
 	local showAmount, showDPS, showPercent = getTooltipColumnVisibility(config, damageMeterType)
 	local percentWidth = showPercent and math.max(40, tooltipFontSize * 3.8) or 0
 	local dpsWidth = showDPS and math.max(42, tooltipFontSize * 4.5) or 0
 	local amountWidth = showAmount and (damageMeterType == "Deaths" and 110 or math.max(50, tooltipFontSize * 5.2)) or 0
 	local rightPadding = 10
-	local barStartX = 24
+	local barStartX = 10 + tooltipIconSize
 	local minNameWidth = math.max(60, tooltipFontSize * 6)
 	local requiredWidth = barStartX + minNameWidth + amountWidth + dpsWidth + percentWidth + rightPadding + 8
 	width = math.min(600, math.max(width, requiredWidth))
@@ -4069,10 +4095,16 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 			line.iconBorder:ClearAllPoints()
 			line.barBG:ClearAllPoints()
 			line.bar:ClearAllPoints()
-			line.name:SetPoint("LEFT", line.icon, "RIGHT", 4, 0)
+			line.icon:SetSize(tooltipIconSize, tooltipIconSize)
+			if data.header then
+				line.name:SetPoint("LEFT", line, "LEFT", 6, 0)
+			else
+				line.name:SetPoint("LEFT", line.icon, "RIGHT", 4, 0)
+			end
 			line.name:SetPoint("RIGHT", line, "RIGHT", nameRight, 0)
-			line.icon:SetShown(not data.spacer)
-			if not data.spacer then
+			local showLineIcon = not data.spacer and not data.header
+			line.icon:SetShown(showLineIcon)
+			if showLineIcon then
 				if data.atlas and line.icon.SetAtlas then
 					line.icon:SetTexCoord(0, 1, 0, 1)
 					line.icon:SetAtlas(data.atlas, false)
@@ -5824,9 +5856,7 @@ function DamageMeter:BuildWindowSettings(index)
 	local function fixedValueColorEnabled() return cfg().valueUseClassColors ~= true end
 	local function rankingEnabled() return cfg().showRanks ~= false end
 	local function rankColumnEnabled() return cfg().showRanks ~= false and cfg().prefixRankInName ~= true end
-	local function prefixRankEnabled() return cfg().showRanks ~= false and cfg().prefixRankInName == true end
-	local function fixedPrefixRankColorEnabled() return cfg().showRanks ~= false and cfg().prefixRankInName == true and cfg().prefixRankUseClassColors ~= true end
-	local function fixedRankColorEnabled() return cfg().showRanks ~= false and cfg().prefixRankInName ~= true and cfg().rankUseClassColors ~= true end
+	local function fixedRankColorEnabled() return cfg().showRanks ~= false and cfg().rankUseClassColors ~= true end
 	local function fixedTooltipBarColorEnabled() return cfg().tooltipEnabled == true and cfg().tooltipBarUseClassColor ~= true end
 	local function tooltipRowBorderEnabled() return cfg().tooltipEnabled == true and cfg().tooltipRowBorderEnabled == true end
 	local function fixedTooltipRowBorderColorEnabled() return tooltipRowBorderEnabled() and cfg().tooltipRowBorderUseClassColor ~= true end
@@ -6204,8 +6234,8 @@ function DamageMeter:BuildWindowSettings(index)
 		end, {
 			{ value = "slash", label = L["damageMeterValueFormatSlash"] or "<total> / <DPS>" },
 			{ value = "parentheses", label = L["damageMeterValueFormatParentheses"] or "<total> (<DPS>)" },
-		}, valuesId, 110),
-		dropdownSetting(L["Delimiter"] or "Delimiter", function() return normalizeValueSeparator(cfg().valueSeparator) end, function(value) self:SetConfigValue(index, "valueSeparator", normalizeValueSeparator(value)) end, buildValueSeparatorOptions(), valuesId, 120, function() return cfg().valueFormat ~= "parentheses" end),
+		}, valuesId, 110, combinedValueLayoutEnabled, combinedValueLayoutEnabled),
+		dropdownSetting(L["Delimiter"] or "Delimiter", function() return normalizeValueSeparator(cfg().valueSeparator) end, function(value) self:SetConfigValue(index, "valueSeparator", normalizeValueSeparator(value)) end, buildValueSeparatorOptions(), valuesId, 120, function() return combinedValueLayoutEnabled() and cfg().valueFormat ~= "parentheses" end, combinedValueLayoutEnabled),
 		{ name = L["damageMeterTooltip"] or "Tooltip", kind = SettingType.Collapsible, id = tooltipId, defaultCollapsed = true },
 		checkboxSetting(L["damageMeterTooltipEnabled"] or "Show row tooltip", function() return cfg().tooltipEnabled == true end, function(value) self:SetConfigValue(index, "tooltipEnabled", value) end, tooltipId),
 		checkboxSetting(L["damageMeterTooltipClickToPin"] or "Click to pin tooltip", function() return cfg().tooltipClickToPin == true end, function(value) self:SetConfigValue(index, "tooltipClickToPin", value) end, tooltipId, tooltipEnabled),
@@ -6286,21 +6316,19 @@ function DamageMeter:BuildWindowSettings(index)
 		{ name = L["Ranking"] or "Ranking", kind = SettingType.Collapsible, id = rankingId, defaultCollapsed = true },
 		checkboxSetting(L["damageMeterShowRanks"] or "Show ranks", function() return cfg().showRanks ~= false end, function(value) self:SetConfigValue(index, "showRanks", value) end, rankingId),
 		checkboxSetting(L["damageMeterPrefixRankInName"] or "Prefix rank in name", function() return cfg().prefixRankInName == true end, function(value) self:SetConfigValue(index, "prefixRankInName", value) end, rankingId, rankingEnabled),
-		checkboxSetting(L["damageMeterPrefixRankUseClassColor"] or "Use class color for prefix rank", function() return cfg().prefixRankUseClassColors == true end, function(value)
-			self:SetConfigValue(index, "prefixRankUseClassColors", value)
-			requestEditModeSettingsRefresh()
-		end, rankingId, prefixRankEnabled),
-		colorSetting(L["damageMeterPrefixRankColor"] or "Prefix rank color", function() return normalizeColor(cfg().prefixRankColor, DEFAULT_WINDOW.prefixRankColor) end, function(value) self:SetConfigValue(index, "prefixRankColor", normalizeColor(value, DEFAULT_WINDOW.prefixRankColor)) end, DEFAULT_WINDOW.prefixRankColor, rankingId, fixedPrefixRankColorEnabled),
-		dividerSetting(rankingId, rankingEnabled),
 		checkboxSetting(L["damageMeterRankUseClassColor"] or "Use class color for ranks", function() return cfg().rankUseClassColors == true end, function(value)
 			self:SetConfigValue(index, "rankUseClassColors", value)
 			requestEditModeSettingsRefresh()
-		end, rankingId, rankColumnEnabled),
+		end, rankingId, rankingEnabled),
 		colorSetting(L["damageMeterRankColor"] or "Rank color", function() return normalizeColor(cfg().rankColor, DEFAULT_WINDOW.rankColor) end, function(value) self:SetConfigValue(index, "rankColor", normalizeColor(value, DEFAULT_WINDOW.rankColor)) end, DEFAULT_WINDOW.rankColor, rankingId, fixedRankColorEnabled),
 		dividerSetting(rankingId, rankColumnEnabled),
 		dropdownSetting(L["damageMeterRankFont"] or "Rank font", function() return cfg().rankFontFace end, function(value) self:SetConfigValue(index, "rankFontFace", value) end, buildMediaOptions("font", true), rankingId, 260, rankColumnEnabled),
 		dropdownSetting(L["damageMeterRankFontOutline"] or "Rank font outline", function() return cfg().rankFontOutline end, function(value) self:SetConfigValue(index, "rankFontOutline", normalizeStyle(value)) end, buildStyleOptions(), rankingId, 180, rankColumnEnabled),
 		sliderSetting(L["damageMeterRankFontSize"] or "Rank font size", function() return cfg().rankFontSize end, function(value) self:SetConfigValue(index, "rankFontSize", clampNumber(value, 8, 24, DEFAULT_WINDOW.rankFontSize)) end, 8, 24, 1, rankingId, rankColumnEnabled),
+		dropdownSetting(L["damageMeterRankAnchorH"] or "Rank horizontal anchor", function() return normalizeAnchorH(cfg().rankAnchorH) end, function(value) self:SetConfigValue(index, "rankAnchorH", normalizeAnchorH(value)) end, buildHorizontalAnchorOptions(), rankingId, 120, rankColumnEnabled),
+		dropdownSetting(L["damageMeterRankAnchorV"] or "Rank vertical anchor", function() return normalizeAnchorV(cfg().rankAnchorV) end, function(value) self:SetConfigValue(index, "rankAnchorV", normalizeAnchorV(value)) end, buildVerticalAnchorOptions(), rankingId, 120, rankColumnEnabled),
+		sliderSetting(L["damageMeterRankOffsetX"] or "Rank X offset", function() return cfg().rankOffsetX end, function(value) self:SetConfigValue(index, "rankOffsetX", clampNumber(value, -200, 200, DEFAULT_WINDOW.rankOffsetX)) end, -200, 200, 1, rankingId, rankColumnEnabled),
+		sliderSetting(L["damageMeterRankOffsetY"] or "Rank Y offset", function() return cfg().rankOffsetY end, function(value) self:SetConfigValue(index, "rankOffsetY", clampNumber(value, -200, 200, DEFAULT_WINDOW.rankOffsetY)) end, -200, 200, 1, rankingId, rankColumnEnabled),
 		sliderSetting(L["damageMeterRankGap"] or "Rank gap", function() return cfg().rankGap end, function(value) self:SetConfigValue(index, "rankGap", clampNumber(value, -50, 50, DEFAULT_WINDOW.rankGap)) end, -50, 50, 1, rankingId, rankingEnabled),
 		{ name = L["Background"] or "Backdrop", kind = SettingType.Collapsible, id = mediaId, defaultCollapsed = true },
 		checkboxSetting(L["damageMeterBackdropUseCustomTexture"] or "Custom texture", function() return cfg().backdropUseCustomTexture == true end, function(value)
