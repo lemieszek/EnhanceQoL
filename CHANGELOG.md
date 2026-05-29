@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.21.2] - 2026-05-29
+
+### 🐛 Fixed
+
+- Cooldown Panels: Fixed Racial 1 and Racial 2 shared-panel entries duplicating the same racial cooldown on characters with only one racial cooldown.
+
+---
+
 ## [10.21.1] - 2026-05-29
 
 ### 🐛 Fixed

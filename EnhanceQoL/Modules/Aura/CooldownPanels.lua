@@ -3689,7 +3689,7 @@ function CooldownPanels:GetPlayerRacialSpellEntries()
 		Harronir = 1237885,
 	}
 	local seen = {}
-	local function addSpell(spellId)
+	local function addSpell(spellId, racialSlot)
 		local numericSpellId = tonumber(spellId)
 		if not numericSpellId then return end
 		local canonicalSpellId = self:NormalizePersistentSpellID(numericSpellId, { allowTalentChoiceCanonical = true }) or getBaseSpellId(numericSpellId) or numericSpellId
@@ -3700,18 +3700,19 @@ function CooldownPanels:GetPlayerRacialSpellEntries()
 				name = getSpellName(canonicalSpellId) or tostring(canonicalSpellId),
 				icon = (C_Spell and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(canonicalSpellId)) or nil,
 				order = #entries + 1,
+				racialSlot = tonumber(racialSlot) or (#entries + 1),
 			}
 		end
 	end
 	local candidates = racialCooldowns[raceTag]
 	if type(candidates) == "table" then
-		if classTag and candidates[classTag] then addSpell(candidates[classTag]) end
-		if candidates.default then addSpell(candidates.default) end
-		for _, spellId in ipairs(candidates) do
-			addSpell(spellId)
+		if classTag and candidates[classTag] then addSpell(candidates[classTag], 1) end
+		if candidates.default then addSpell(candidates.default, 1) end
+		for index, spellId in ipairs(candidates) do
+			addSpell(spellId, index)
 		end
 	else
-		addSpell(candidates)
+		addSpell(candidates, 1)
 	end
 	table.sort(entries, function(a, b)
 		return (a.order or 0) < (b.order or 0)
@@ -3723,6 +3724,7 @@ function CooldownPanels:GetPlayerRacialSpellEntries()
 			icon = Helper.PREVIEW_ICON,
 			isFallback = true,
 			order = 1,
+			racialSlot = 1,
 		}
 	end
 	if #entries == 1 then
@@ -3732,6 +3734,7 @@ function CooldownPanels:GetPlayerRacialSpellEntries()
 			icon = (C_Spell and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(368970)) or Helper.PREVIEW_ICON,
 			isFallback = true,
 			order = 2,
+			racialSlot = 2,
 		}
 	end
 	return entries
@@ -3771,10 +3774,15 @@ function CooldownPanels:GetCurrentPlayerRacialSpellIDs()
 	return ids
 end
 
-function CooldownPanels:NormalizePlayerRacialSpellID(spellId, currentPlayerRacialSpellIDs)
+function CooldownPanels:NormalizePlayerRacialSpellID(spellId, currentPlayerRacialSpellIDs, entry)
 	local numericSpellId = tonumber(spellId)
 	if not numericSpellId or not self:IsRacialSpellID(numericSpellId) then return spellId end
 	if type(currentPlayerRacialSpellIDs) ~= "table" or #currentPlayerRacialSpellIDs == 0 then return numericSpellId end
+	local racialSlot = tonumber(entry and entry.racialSlot)
+	if racialSlot and racialSlot >= 1 then
+		local slotSpellId = tonumber(currentPlayerRacialSpellIDs[math.floor(racialSlot)])
+		return slotSpellId or numericSpellId
+	end
 	for i = 1, #currentPlayerRacialSpellIDs do
 		if tonumber(currentPlayerRacialSpellIDs[i]) == numericSpellId then return numericSpellId end
 	end
@@ -3793,7 +3801,7 @@ function CooldownPanels:NormalizeActivePanelPlayerRacials(root)
 			for _, entry in pairs(panel.entries or {}) do
 				if entry and entry.type == "SPELL" and entry.spellID then
 					local normalizedSpellID = self:NormalizePersistentSpellID(entry.spellID, { allowTalentChoiceCanonical = false }) or entry.spellID
-					normalizedSpellID = self:NormalizePlayerRacialSpellID(normalizedSpellID, currentPlayerRacialSpellIDs)
+					normalizedSpellID = self:NormalizePlayerRacialSpellID(normalizedSpellID, currentPlayerRacialSpellIDs, entry)
 					if normalizedSpellID ~= entry.spellID then
 						entry.spellID = normalizedSpellID
 						changed = true
@@ -3804,6 +3812,7 @@ function CooldownPanels:NormalizeActivePanelPlayerRacials(root)
 			if panelChanged then Helper.InvalidateFixedLayoutCache(panel) end
 		end
 	end
+	if self:DedupeActivePanelPlayerRacials(root) then changed = true end
 	return changed
 end
 
@@ -3867,12 +3876,15 @@ function CooldownPanels:FindEquivalentSpellEntry(panelId, spellId)
 	return nil
 end
 
-function CooldownPanels:AddPlayerRacialEntry(panelId, spellId)
+function CooldownPanels:AddPlayerRacialEntry(panelId, spellId, racialSlot)
 	panelId = normalizeId(panelId)
 	local numericSpellId = tonumber(spellId)
 	if not (panelId and numericSpellId) then return nil, "INVALID" end
 	if self:FindEntryByValue(panelId, "SPELL", numericSpellId) or self:FindEquivalentSpellEntry(panelId, numericSpellId) then return nil, "DUPLICATE" end
-	return self:AddEntrySafe(panelId, "SPELL", numericSpellId)
+	local overrides = nil
+	local numericRacialSlot = tonumber(racialSlot)
+	if numericRacialSlot and numericRacialSlot >= 1 then overrides = { racialSlot = math.floor(numericRacialSlot) } end
+	return self:AddEntrySafe(panelId, "SPELL", numericSpellId, overrides)
 end
 
 function CooldownPanels:AddPlayerRacialEntries(panelId)
@@ -3884,7 +3896,7 @@ function CooldownPanels:AddPlayerRacialEntries(panelId)
 	for _, racial in ipairs(entries) do
 		local spellId = tonumber(racial and racial.spellID)
 		if spellId then
-			local entryId, reason = self:AddPlayerRacialEntry(panelId, spellId)
+			local entryId, reason = self:AddPlayerRacialEntry(panelId, spellId, racial.racialSlot)
 			if entryId then
 				stats.added = stats.added + 1
 			elseif reason == "DUPLICATE" then
@@ -5626,7 +5638,7 @@ function CooldownPanels:NormalizeAll()
 			Helper.NormalizeEntry(entry, root.defaults)
 			if entry and entry.type == "SPELL" and entry.spellID then
 				local normalizedSpellID = self:NormalizePersistentSpellID(entry.spellID, { allowTalentChoiceCanonical = false }) or entry.spellID
-				if normalizePlayerRacials then normalizedSpellID = self:NormalizePlayerRacialSpellID(normalizedSpellID, currentPlayerRacialSpellIDs) end
+				if normalizePlayerRacials then normalizedSpellID = self:NormalizePlayerRacialSpellID(normalizedSpellID, currentPlayerRacialSpellIDs, entry) end
 				entry.spellID = normalizedSpellID
 			end
 			if entry and entry.type == "ITEM" then
@@ -5660,6 +5672,7 @@ function CooldownPanels:NormalizeAll()
 		end
 		if Helper.IsFixedLayout(panel.layout) then Helper.EnsureFixedSlotAssignments(panel) end
 	end
+	self:DedupeActivePanelPlayerRacials(root)
 	self:RunStorageMigrations(root)
 	self:RebuildSpellIndex()
 end
@@ -10468,7 +10481,7 @@ local function showSlotMenu(owner, panelId)
 				local iconType = type(iconToken)
 				if (iconType == "string" and iconToken ~= "") or iconType == "number" then label = string.format("|T%s:14:14:0:0:64:64:4:60:4:60|t %s", tostring(iconToken), label) end
 				racialMenu:CreateButton(label, function()
-					CooldownPanels:AddPlayerRacialEntry(panelId, racial.spellID)
+					CooldownPanels:AddPlayerRacialEntry(panelId, racial.spellID, racial.racialSlot)
 					CooldownPanels:RefreshEditor()
 				end)
 			end
