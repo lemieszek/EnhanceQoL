@@ -1,5 +1,21 @@
 # Changelog
 
+<!--@eqol-beta@-->
+
+## [10.22.0-beta1] - 2026-05-29
+
+### ✨ Added
+
+- Data Panels: Added custom background textures with atlas, texture ID, path, and offset controls.
+
+### 🐛 Fixed
+
+- Cooldown Panels: Fixed Use highest rank for Midnight combat potions to prefer Fleeting ranks before normal ranks, including Light's Potential, Potion of Recklessness, and Potion of Devoured Dreams.
+
+---
+
+<!--@end-eqol-beta@-->
+
 ## [10.21.2] - 2026-05-29
 
 ### 🐛 Fixed

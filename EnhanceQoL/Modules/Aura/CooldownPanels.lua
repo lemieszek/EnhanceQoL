@@ -83,12 +83,21 @@ CooldownPanels.POWER_TYPE_TOKEN_BY_ID = CooldownPanels.POWER_TYPE_TOKEN_BY_ID
 
 CooldownPanels.itemHighestRankByID = CooldownPanels.itemHighestRankByID
 	or {
-		-- Potion of Recklessness (rank1 -> rank2)
-		[241289] = { 241289, 241288 },
-		[241288] = { 241289, 241288 },
-		-- Light's Potential (rank1 -> rank2)
-		[241309] = { 241309, 241308 },
-		[241308] = { 241309, 241308 },
+		-- Potion of Recklessness (normal rank1 -> rank2, fleeting rank1 -> rank2)
+		[241289] = { 241289, 241288, 245903, 245902 },
+		[241288] = { 241289, 241288, 245903, 245902 },
+		[245903] = { 241289, 241288, 245903, 245902 },
+		[245902] = { 241289, 241288, 245903, 245902 },
+		-- Potion of Devoured Dreams (normal rank1 -> rank2, fleeting rank1 -> rank2)
+		[241295] = { 241295, 241294, 245905, 245904 },
+		[241294] = { 241295, 241294, 245905, 245904 },
+		[245905] = { 241295, 241294, 245905, 245904 },
+		[245904] = { 241295, 241294, 245905, 245904 },
+		-- Light's Potential (normal rank1 -> rank2, fleeting rank1 -> rank2)
+		[241309] = { 241309, 241308, 245897, 245898 },
+		[241308] = { 241309, 241308, 245897, 245898 },
+		[245897] = { 241309, 241308, 245897, 245898 },
+		[245898] = { 241309, 241308, 245897, 245898 },
 		-- Lightfused Mana Potion (rank1 -> rank2)
 		[241301] = { 241301, 241300 },
 		[241300] = { 241301, 241300 },

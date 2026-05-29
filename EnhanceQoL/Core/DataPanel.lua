@@ -271,7 +271,9 @@ local function colorsEqual(a, b)
 	return ar == br and ag == bg and ab == bb and aa == ba
 end
 
-local function resolveBackgroundTexture(key)
+local CustomTexture = {}
+
+function CustomTexture.ResolveBackground(key)
 	if key == "SOLID" then return SOLID_TEXTURE end
 	if not key or key == "" or key == "DEFAULT" then return DEFAULT_BACKGROUND_TEXTURE end
 	if LSM and LSM.Fetch then
@@ -279,6 +281,42 @@ local function resolveBackgroundTexture(key)
 		if tex and tex ~= "" then return tex end
 	end
 	return key
+end
+
+function CustomTexture.Trim(value)
+	if type(value) ~= "string" then return "" end
+	return (value:gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
+function CustomTexture.GetInfo(value)
+	value = CustomTexture.Trim(value)
+	if value == "" then return nil end
+	local textureID = tonumber(value)
+	if textureID then return "texture", textureID end
+	if _G.C_Texture and _G.C_Texture.GetAtlasInfo and _G.C_Texture.GetAtlasInfo(value) then
+		return "atlas", value
+	end
+	return "texture", value
+end
+
+function CustomTexture.Apply(textureObject, textureKind, texture)
+	if not textureObject then return end
+	if textureObject._eqolDataPanelTextureKind == textureKind and textureObject._eqolDataPanelTexture == texture then return end
+	textureObject._eqolDataPanelTextureKind = textureKind
+	textureObject._eqolDataPanelTexture = texture
+	if textureKind == "atlas" and textureObject.SetAtlas then
+		textureObject:SetAtlas(texture)
+	else
+		textureObject:SetTexture(texture)
+		textureObject:SetTexCoord(0, 1, 0, 1)
+	end
+end
+
+function CustomTexture.NormalizeOffset(value, fallback)
+	local num = tonumber(value)
+	if not num then num = tonumber(fallback) end
+	if not num then return 0 end
+	return clamp(num, -200, 200)
 end
 
 local function resolveBorderTexture(key)
@@ -873,6 +911,12 @@ local function seedEditModeRecordFromPanelInfo(panel, defaults, record)
 	record.textColor = normalizeColorTable(info.textColor, defaults.textColor)
 	record.fontFace = normalizeFontSetting(info.fontFace, defaults.fontFace)
 	record.backgroundTexture = normalizeMediaKey(info.backgroundTexture, defaults.backgroundTexture)
+	record.backgroundUseCustomTexture = info.backgroundUseCustomTexture == true
+	record.backgroundCustomTexture = CustomTexture.Trim(info.backgroundCustomTexture)
+	record.backgroundOffsetX = CustomTexture.NormalizeOffset(info.backgroundOffsetX, defaults.backgroundOffsetX)
+	record.backgroundOffsetY = CustomTexture.NormalizeOffset(info.backgroundOffsetY, defaults.backgroundOffsetY)
+	record.backgroundSizeOffsetX = CustomTexture.NormalizeOffset(info.backgroundSizeOffsetX, defaults.backgroundSizeOffsetX)
+	record.backgroundSizeOffsetY = CustomTexture.NormalizeOffset(info.backgroundSizeOffsetY, defaults.backgroundSizeOffsetY)
 	record.backgroundColor = normalizeColorTable(info.backgroundColor, defaults.backgroundColor)
 	record.borderTexture = normalizeMediaKey(info.borderTexture, defaults.borderTexture)
 	record.borderColor = normalizeColorTable(info.borderColor, defaults.borderColor)
@@ -913,6 +957,12 @@ local function registerEditModePanel(panel)
 		textColor = normalizeColorTable(panel.info.textColor, DEFAULT_TEXT_COLOR),
 		fontFace = normalizeFontSetting(panel.info.fontFace, globalFontConfigKey()),
 		backgroundTexture = normalizeMediaKey(panel.info.backgroundTexture, "DEFAULT"),
+		backgroundUseCustomTexture = panel.info.backgroundUseCustomTexture == true,
+		backgroundCustomTexture = CustomTexture.Trim(panel.info.backgroundCustomTexture),
+		backgroundOffsetX = CustomTexture.NormalizeOffset(panel.info.backgroundOffsetX, 0),
+		backgroundOffsetY = CustomTexture.NormalizeOffset(panel.info.backgroundOffsetY, 0),
+		backgroundSizeOffsetX = CustomTexture.NormalizeOffset(panel.info.backgroundSizeOffsetX, 0),
+		backgroundSizeOffsetY = CustomTexture.NormalizeOffset(panel.info.backgroundSizeOffsetY, 0),
 		backgroundColor = normalizeColorTable(panel.info.backgroundColor, DEFAULT_BACKDROP_COLOR),
 		borderTexture = normalizeMediaKey(panel.info.borderTexture, "DEFAULT"),
 		borderColor = normalizeColorTable(panel.info.borderColor, DEFAULT_BORDER_COLOR),
@@ -928,6 +978,12 @@ local function registerEditModePanel(panel)
 	panel.info.fontFace = defaults.fontFace
 	panel.info.fontStyle = defaults.fontStyle
 	panel.info.backgroundTexture = defaults.backgroundTexture
+	panel.info.backgroundUseCustomTexture = defaults.backgroundUseCustomTexture
+	panel.info.backgroundCustomTexture = defaults.backgroundCustomTexture
+	panel.info.backgroundOffsetX = defaults.backgroundOffsetX
+	panel.info.backgroundOffsetY = defaults.backgroundOffsetY
+	panel.info.backgroundSizeOffsetX = defaults.backgroundSizeOffsetX
+	panel.info.backgroundSizeOffsetY = defaults.backgroundSizeOffsetY
 	panel.info.backgroundColor = defaults.backgroundColor
 	panel.info.borderTexture = defaults.borderTexture
 	panel.info.borderColor = defaults.borderColor
@@ -974,6 +1030,14 @@ local function registerEditModePanel(panel)
 				if useCustom ~= nil then return useCustom == true end
 			end
 			return panel.info and panel.info.useClassTextColor ~= true and panel.info.useCustomTextColor == true
+		end
+
+		local function isCustomBackgroundTextureEnabled(layoutName)
+			if EditMode and EditMode.GetValue then
+				local value = EditMode:GetValue(id, "backgroundUseCustomTexture", layoutName)
+				if value ~= nil then return value == true end
+			end
+			return panel.info and panel.info.backgroundUseCustomTexture == true
 		end
 
 		settings = {
@@ -1043,6 +1107,22 @@ local function registerEditModePanel(panel)
 						end)
 					end
 				end,
+				isEnabled = function(layoutName) return not isCustomBackgroundTextureEnabled(layoutName) end,
+			},
+			{
+				name = L["DataPanelBackgroundUseCustomTexture"] or "Custom texture",
+				kind = SettingType.Checkbox,
+				field = "backgroundUseCustomTexture",
+				default = defaults.backgroundUseCustomTexture,
+			},
+			{
+				name = L["DataPanelBackgroundCustomTexture"] or "Atlas name or texture ID",
+				kind = SettingType.Input,
+				field = "backgroundCustomTexture",
+				default = defaults.backgroundCustomTexture,
+				maxChars = 160,
+				tooltip = L["DataPanelBackgroundCustomTextureDesc"] or "Enter an atlas name, texture file ID, or texture path.",
+				isEnabled = isCustomBackgroundTextureEnabled,
 			},
 			{
 				name = L["Background color"] or "Background color",
@@ -1062,6 +1142,46 @@ local function registerEditModePanel(panel)
 						panel:ApplyBackdropAlpha()
 					end
 				end,
+			},
+			{
+				name = L["DataPanelBackgroundOffsetX"] or "X offset",
+				kind = SettingType.Slider,
+				field = "backgroundOffsetX",
+				default = defaults.backgroundOffsetX,
+				minValue = -200,
+				maxValue = 200,
+				valueStep = 1,
+				formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
+			},
+			{
+				name = L["DataPanelBackgroundOffsetY"] or "Y offset",
+				kind = SettingType.Slider,
+				field = "backgroundOffsetY",
+				default = defaults.backgroundOffsetY,
+				minValue = -200,
+				maxValue = 200,
+				valueStep = 1,
+				formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
+			},
+			{
+				name = L["DataPanelBackgroundSizeOffsetX"] or "Width offset",
+				kind = SettingType.Slider,
+				field = "backgroundSizeOffsetX",
+				default = defaults.backgroundSizeOffsetX,
+				minValue = -200,
+				maxValue = 200,
+				valueStep = 1,
+				formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
+			},
+			{
+				name = L["DataPanelBackgroundSizeOffsetY"] or "Height offset",
+				kind = SettingType.Slider,
+				field = "backgroundSizeOffsetY",
+				default = defaults.backgroundSizeOffsetY,
+				minValue = -200,
+				maxValue = 200,
+				valueStep = 1,
+				formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 			},
 			{
 				name = L["Hide border"],
@@ -1471,6 +1591,12 @@ local function ensureSettings(id, name)
 			textColor = { r = 1, g = 1, b = 1, a = 1 },
 			fontFace = globalFontConfigKey(),
 			backgroundTexture = "DEFAULT",
+			backgroundUseCustomTexture = false,
+			backgroundCustomTexture = "",
+			backgroundOffsetX = 0,
+			backgroundOffsetY = 0,
+			backgroundSizeOffsetX = 0,
+			backgroundSizeOffsetY = 0,
 			backgroundColor = { r = 0, g = 0, b = 0, a = DEFAULT_BACKDROP_ALPHA },
 			borderTexture = "DEFAULT",
 			borderColor = { r = 1, g = 1, b = 1, a = DEFAULT_BORDER_ALPHA },
@@ -1510,6 +1636,12 @@ local function ensureSettings(id, name)
 		info.textColor = normalizeColorTable(info.textColor, DEFAULT_TEXT_COLOR)
 		info.fontFace = normalizeFontSetting(info.fontFace, globalFontConfigKey())
 		info.backgroundTexture = normalizeMediaKey(info.backgroundTexture, "DEFAULT")
+		info.backgroundUseCustomTexture = info.backgroundUseCustomTexture == true
+		info.backgroundCustomTexture = CustomTexture.Trim(info.backgroundCustomTexture)
+		info.backgroundOffsetX = CustomTexture.NormalizeOffset(info.backgroundOffsetX, 0)
+		info.backgroundOffsetY = CustomTexture.NormalizeOffset(info.backgroundOffsetY, 0)
+		info.backgroundSizeOffsetX = CustomTexture.NormalizeOffset(info.backgroundSizeOffsetX, 0)
+		info.backgroundSizeOffsetY = CustomTexture.NormalizeOffset(info.backgroundSizeOffsetY, 0)
 		info.backgroundColor = normalizeColorTable(info.backgroundColor, DEFAULT_BACKDROP_COLOR)
 		info.borderTexture = normalizeMediaKey(info.borderTexture, "DEFAULT")
 		info.borderColor = normalizeColorTable(info.borderColor, DEFAULT_BORDER_COLOR)
@@ -1613,13 +1745,34 @@ function DataPanel.Create(id, name, existingOnly)
 		local bgFrame = self.frame.bg
 		local borderFrame = self.frame.border
 		if bgFrame and bgFrame.SetBackdrop then
-			bgFrame:SetBackdrop({
-				bgFile = resolveBackgroundTexture(i and i.backgroundTexture),
-				edgeFile = nil,
-				tile = true,
-				tileSize = 16,
-				insets = { left = BACKDROP_INSET, right = BACKDROP_INSET, top = BACKDROP_INSET, bottom = BACKDROP_INSET },
-			})
+			local customTextureKind, customTexture = CustomTexture.GetInfo(i and i.backgroundUseCustomTexture == true and i.backgroundCustomTexture or nil)
+			local offsetX = CustomTexture.NormalizeOffset(i and i.backgroundOffsetX, 0)
+			local offsetY = CustomTexture.NormalizeOffset(i and i.backgroundOffsetY, 0)
+			local sizeOffsetX = CustomTexture.NormalizeOffset(i and i.backgroundSizeOffsetX, 0)
+			local sizeOffsetY = CustomTexture.NormalizeOffset(i and i.backgroundSizeOffsetY, 0)
+			if customTextureKind then
+				bgFrame:SetBackdrop(nil)
+				if not bgFrame.customBackground then
+					local texture = bgFrame:CreateTexture(nil, "BACKGROUND")
+					bgFrame.customBackground = texture
+				end
+				bgFrame.customBackground:ClearAllPoints()
+				bgFrame.customBackground:SetPoint("TOPLEFT", bgFrame, "TOPLEFT", offsetX - sizeOffsetX, offsetY + sizeOffsetY)
+				bgFrame.customBackground:SetPoint("BOTTOMRIGHT", bgFrame, "BOTTOMRIGHT", offsetX + sizeOffsetX, offsetY - sizeOffsetY)
+				CustomTexture.Apply(bgFrame.customBackground, customTextureKind, customTexture)
+				bgFrame.customBackground:Show()
+			else
+				bgFrame:SetBackdrop(nil)
+				if not bgFrame.customBackground then
+					local texture = bgFrame:CreateTexture(nil, "BACKGROUND")
+					bgFrame.customBackground = texture
+				end
+				bgFrame.customBackground:ClearAllPoints()
+				bgFrame.customBackground:SetPoint("TOPLEFT", bgFrame, "TOPLEFT", offsetX + BACKDROP_INSET - sizeOffsetX, offsetY - BACKDROP_INSET + sizeOffsetY)
+				bgFrame.customBackground:SetPoint("BOTTOMRIGHT", bgFrame, "BOTTOMRIGHT", offsetX - BACKDROP_INSET + sizeOffsetX, offsetY + BACKDROP_INSET - sizeOffsetY)
+				CustomTexture.Apply(bgFrame.customBackground, "texture", CustomTexture.ResolveBackground(i and i.backgroundTexture))
+				bgFrame.customBackground:Show()
+			end
 			if bgFrame.SetBackdropBorderColor then bgFrame:SetBackdropBorderColor(0, 0, 0, 0) end
 			bgFrame:Show()
 		end
@@ -1646,6 +1799,12 @@ function DataPanel.Create(id, name, existingOnly)
 		self:ApplyBackdropAlpha(InCombatLockdown and InCombatLockdown() or false)
 		self:SyncEditModeValue("hideBorder", i and i.hideBorder or false)
 		self:SyncEditModeValue("backgroundTexture", i and i.backgroundTexture or "DEFAULT")
+		self:SyncEditModeValue("backgroundUseCustomTexture", i and i.backgroundUseCustomTexture == true)
+		self:SyncEditModeValue("backgroundCustomTexture", i and i.backgroundCustomTexture or "")
+		self:SyncEditModeValue("backgroundOffsetX", i and i.backgroundOffsetX or 0)
+		self:SyncEditModeValue("backgroundOffsetY", i and i.backgroundOffsetY or 0)
+		self:SyncEditModeValue("backgroundSizeOffsetX", i and i.backgroundSizeOffsetX or 0)
+		self:SyncEditModeValue("backgroundSizeOffsetY", i and i.backgroundSizeOffsetY or 0)
 		self:SyncEditModeValue("backgroundColor", i and i.backgroundColor or DEFAULT_BACKDROP_COLOR)
 		self:SyncEditModeValue("borderTexture", i and i.borderTexture or "DEFAULT")
 		self:SyncEditModeValue("borderColor", i and i.borderColor or DEFAULT_BORDER_COLOR)
@@ -1786,6 +1945,7 @@ function DataPanel.Create(id, name, existingOnly)
 		local bg = normalizeColorTable(self.info and self.info.backgroundColor, DEFAULT_BACKDROP_COLOR)
 		local bc = normalizeColorTable(self.info and self.info.borderColor, DEFAULT_BORDER_COLOR)
 		if bgFrame.SetBackdropColor then bgFrame:SetBackdropColor(bg.r or 0, bg.g or 0, bg.b or 0, (bg.a or DEFAULT_BACKDROP_ALPHA) * alpha) end
+		if bgFrame.customBackground and bgFrame.customBackground.SetVertexColor then bgFrame.customBackground:SetVertexColor(bg.r or 0, bg.g or 0, bg.b or 0, (bg.a or DEFAULT_BACKDROP_ALPHA) * alpha) end
 		if borderFrame.SetBackdropBorderColor then borderFrame:SetBackdropBorderColor(bc.r or 1, bc.g or 1, bc.b or 1, (bc.a or DEFAULT_BORDER_ALPHA) * alpha) end
 	end
 
@@ -1891,6 +2051,12 @@ function DataPanel.Create(id, name, existingOnly)
 			or field == "textAlphaInCombat"
 			or field == "textAlphaOutOfCombat"
 			or field == "backgroundTexture"
+			or field == "backgroundUseCustomTexture"
+			or field == "backgroundCustomTexture"
+			or field == "backgroundOffsetX"
+			or field == "backgroundOffsetY"
+			or field == "backgroundSizeOffsetX"
+			or field == "backgroundSizeOffsetY"
 			or field == "backgroundColor"
 			or field == "borderTexture"
 			or field == "borderColor"
@@ -1979,6 +2145,48 @@ function DataPanel.Create(id, name, existingOnly)
 			local desired = normalizeMediaKey(data.backgroundTexture, "DEFAULT")
 			if info.backgroundTexture ~= desired then
 				info.backgroundTexture = desired
+				backdropChanged = true
+			end
+		end
+		if data.backgroundUseCustomTexture ~= nil then
+			local desired = data.backgroundUseCustomTexture == true
+			if info.backgroundUseCustomTexture ~= desired then
+				info.backgroundUseCustomTexture = desired
+				backdropChanged = true
+			end
+		end
+		if data.backgroundCustomTexture ~= nil then
+			local desired = CustomTexture.Trim(data.backgroundCustomTexture)
+			if info.backgroundCustomTexture ~= desired then
+				info.backgroundCustomTexture = desired
+				backdropChanged = true
+			end
+		end
+		if data.backgroundOffsetX ~= nil then
+			local desired = CustomTexture.NormalizeOffset(data.backgroundOffsetX, info.backgroundOffsetX)
+			if info.backgroundOffsetX ~= desired then
+				info.backgroundOffsetX = desired
+				backdropChanged = true
+			end
+		end
+		if data.backgroundOffsetY ~= nil then
+			local desired = CustomTexture.NormalizeOffset(data.backgroundOffsetY, info.backgroundOffsetY)
+			if info.backgroundOffsetY ~= desired then
+				info.backgroundOffsetY = desired
+				backdropChanged = true
+			end
+		end
+		if data.backgroundSizeOffsetX ~= nil then
+			local desired = CustomTexture.NormalizeOffset(data.backgroundSizeOffsetX, info.backgroundSizeOffsetX)
+			if info.backgroundSizeOffsetX ~= desired then
+				info.backgroundSizeOffsetX = desired
+				backdropChanged = true
+			end
+		end
+		if data.backgroundSizeOffsetY ~= nil then
+			local desired = CustomTexture.NormalizeOffset(data.backgroundSizeOffsetY, info.backgroundSizeOffsetY)
+			if info.backgroundSizeOffsetY ~= desired then
+				info.backgroundSizeOffsetY = desired
 				backdropChanged = true
 			end
 		end
