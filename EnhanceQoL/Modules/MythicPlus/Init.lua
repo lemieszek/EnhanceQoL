@@ -263,7 +263,8 @@ function addon.MythicPlus.functions.addRCButton()
 				return
 			end
 			self.readyCheckRunning = true
-			DoReadyCheck()
+			local doReadyCheck = C_PartyInfo and C_PartyInfo.DoReadyCheck or DoReadyCheck
+			if doReadyCheck then doReadyCheck() end
 		end
 	end)
 	rcButton:RegisterEvent("READY_CHECK")

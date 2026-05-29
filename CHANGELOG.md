@@ -2,6 +2,14 @@
 
 <!--@eqol-beta@-->
 
+## [10.22.0-beta2] - 2026-05-29
+
+### 🐛 Fixed
+
+- Cooldown Panels / Bars: Fixed tracked aura display modes like Always show (desaturate when active) being reset to Only show when active from standalone entry bar settings.
+
+---
+
 ## [10.22.0-beta1] - 2026-05-29
 
 ### ✨ Added

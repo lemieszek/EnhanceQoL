@@ -4501,7 +4501,27 @@ local function setEntryBarBoolean(panelId, entryId, field, value)
 end
 
 local function setEntryBarField(panelId, entryId, field, value)
-	mutateBarEntry(panelId, entryId, function(entry) entry[field] = value end)
+	mutateBarEntry(panelId, entryId, function(entry, panel)
+		if field == "cdmAuraAlwaysShowUseGlobal" then
+			local wasUseGlobal = entry.cdmAuraAlwaysShowUseGlobal ~= false
+			entry[field] = value
+			if value == false then
+				local mode = entry.cdmAuraAlwaysShowMode
+				if wasUseGlobal then mode = panel and panel.layout and panel.layout.cdmAuraAlwaysShowMode or mode end
+				mode = type(mode) == "string" and string.upper(mode) or nil
+				if not (mode == "SHOW" or mode == "DESATURATE" or mode == "DESATURATE_ACTIVE" or mode == "HIDE" or mode == "HIDE_DESATURATE_ACTIVE") then mode = "HIDE" end
+				entry.cdmAuraAlwaysShowMode = mode
+				entry.alwaysShow = mode ~= "HIDE" and mode ~= "HIDE_DESATURATE_ACTIVE"
+			end
+		elseif field == "cdmAuraAlwaysShowMode" then
+			local mode = type(value) == "string" and string.upper(value) or nil
+			if not (mode == "SHOW" or mode == "DESATURATE" or mode == "DESATURATE_ACTIVE" or mode == "HIDE" or mode == "HIDE_DESATURATE_ACTIVE") then mode = "HIDE" end
+			entry[field] = mode
+			entry.alwaysShow = mode ~= "HIDE" and mode ~= "HIDE_DESATURATE_ACTIVE"
+		else
+			entry[field] = value
+		end
+	end)
 end
 
 Bars.SetTextAnchorWithFreshOffsets = function(panelId, entryId, anchorField, offsetXField, offsetYField, value, fallback)
@@ -4850,7 +4870,7 @@ end
 
 local function normalizeCDMAuraAlwaysShowModeValue(value, fallback)
 	local mode = type(value) == "string" and string.upper(value) or nil
-	if mode == "SHOW" or mode == "DESATURATE" or mode == "HIDE" then return mode end
+	if mode == "SHOW" or mode == "DESATURATE" or mode == "DESATURATE_ACTIVE" or mode == "HIDE" or mode == "HIDE_DESATURATE_ACTIVE" then return mode end
 	return fallback or "HIDE"
 end
 

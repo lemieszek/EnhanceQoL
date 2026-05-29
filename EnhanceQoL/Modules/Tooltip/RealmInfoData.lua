@@ -895,8 +895,9 @@ local function findRealm(name, region)
 end
 
 local function addAutoCompleteFallbacks(region)
-	if not GetAutoCompleteRealms then return end
-	local names = GetAutoCompleteRealms()
+	local getAutoCompleteRealms = C_AutoComplete and C_AutoComplete.GetAutoCompleteRealms or GetAutoCompleteRealms
+	if not getAutoCompleteRealms then return end
+	local names = getAutoCompleteRealms()
 	if type(names) ~= "table" or #names == 0 then return end
 	region = region or getCurrentRegionFromGUID()
 	local connections = {}
