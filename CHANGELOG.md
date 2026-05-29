@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.21.1] - 2026-05-29
+
+### 🐛 Fixed
+
+- Damage Meter: Fixed hidden realm names still appearing in tooltip breakdown rows.
+
+---
+
 ## [10.21.0] - 2026-05-28
 
 ### ✨ Added

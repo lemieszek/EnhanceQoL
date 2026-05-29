@@ -2192,6 +2192,7 @@ function DamageMeter:GetDerivedTargetCacheKey(index, source, config, damageMeter
 		tostring(config.tooltipShowDPS ~= false),
 		tostring(config.tooltipShowPercent ~= false),
 		tostring(config.tooltipShowCreatureName ~= false),
+		tostring(config.hideRealmNames ~= false),
 		colorToHex(config.tooltipCreatureNameColor, DEFAULT_WINDOW.tooltipCreatureNameColor),
 	}, "\001")
 end
@@ -2375,7 +2376,7 @@ function DamageMeter:BuildDerivedTargetRows(index, source, config, damageMeterTy
 	for _, target in ipairs(targets) do
 		local percent = targetTotal > 0 and (target.amount / targetTotal * 100) or nil
 		rows[#rows + 1] = {
-			name = target.name,
+			name = resolveTooltipUnitName(target.name, config) or target.name,
 			atlas = target.atlas,
 			icon = target.icon,
 			amount = showAmount and formatNumber(target.amount, config.abbreviation),
@@ -3775,12 +3776,12 @@ getTooltipColumnVisibility = function(config, damageMeterType)
 	return showAmount, showDPS, showPercent
 end
 
-resolveTooltipUnitName = function(value)
+resolveTooltipUnitName = function(value, config)
 	if value == nil then return nil end
 	if isSecret(value) then return value end
 	value = tostring(value)
 	if value == "" then return nil end
-	return value
+	return formatSourceName(value, config or DEFAULT_WINDOW)
 end
 
 damageMeterNamesMatch = function(left, right)
@@ -3928,7 +3929,7 @@ function DamageMeter:BuildTooltipRows(details, config, damageMeterType, derivedT
 		end
 
 		if showTargets and type(target) == "table" then
-			local targetName = resolveTooltipUnitName(target.unitName)
+			local targetName = resolveTooltipUnitName(target.unitName, config)
 			if targetName ~= nil then
 				local rawTargetAmount = damageMeterType == "EnemyDamageTaken" and spell.totalAmount or target.amount
 				local targetAmount = safeNumber(rawTargetAmount)
