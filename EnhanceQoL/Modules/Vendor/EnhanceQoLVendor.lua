@@ -2187,10 +2187,15 @@ local function addGeneralFrame(container)
 	end
 
 	local dropCSQuality
+	local cbCSWarband
 	local function refreshCraftShopperControls()
 		if not dropCSQuality then return end
 		dropCSQuality:SetDisabled(not addon.db["vendorCraftShopperEnable"])
 		if dropCSQuality:GetValue() ~= getCraftShopperQualityValue() then dropCSQuality:SetValue(getCraftShopperQualityValue()) end
+		if cbCSWarband then
+			cbCSWarband:SetDisabled(not addon.db["vendorCraftShopperEnable"])
+			cbCSWarband:SetValue(addon.db["vendorCraftShopperIncludeWarbandBank"] == true)
+		end
 	end
 
 	local cbCS = addon.functions.createCheckboxAce(L["vendorCraftShopperEnable"], addon.db["vendorCraftShopperEnable"], function(_, _, checked)
@@ -2215,6 +2220,16 @@ local function addGeneralFrame(container)
 	dropCSQuality:SetValue(getCraftShopperQualityValue())
 	groupCS:AddChild(dropCSQuality)
 	addon.Vendor.CraftShopper.settingsQualityDropdown = dropCSQuality
+
+	cbCSWarband = addon.functions.createCheckboxAce(L["vendorCraftShopperIncludeWarbandBank"], addon.db["vendorCraftShopperIncludeWarbandBank"] == true, function(_, _, checked)
+		if addon.Vendor.CraftShopper and addon.Vendor.CraftShopper.SetIncludeWarbandBank then
+			addon.Vendor.CraftShopper.SetIncludeWarbandBank(checked)
+		else
+			addon.db["vendorCraftShopperIncludeWarbandBank"] = checked == true
+		end
+		refreshCraftShopperControls()
+	end, L["vendorCraftShopperIncludeWarbandBankDesc"])
+	groupCS:AddChild(cbCSWarband)
 	refreshCraftShopperControls()
 
 	scroll:DoLayout()

@@ -3541,6 +3541,8 @@ L["vendorCraftShopperCheckListPrint"] = "［%s］ 缺少：%d — 去拍卖行�
 L["vendorCraftShopperConfirmPurchase"] = "确认购买"
 L["vendorCraftShopperEnable"] = "启用 Craft Shopper"
 L["vendorCraftShopperEnableDesc"] = "在拍卖行旁显示追踪配方所缺材料的购物清单。点击即可搜索并购买。"
+L["vendorCraftShopperIncludeWarbandBank"] = "包括战团银行"
+L["vendorCraftShopperIncludeWarbandBankDesc"] = "计算 Craft Shopper 缺少材料时计入战团银行中的物品。"
 L["vendorCraftShopperHideFromList"] = "从列表隐藏"
 L["vendorCraftShopperMissingGold"] = "金币不足。\
 缺少：%s"

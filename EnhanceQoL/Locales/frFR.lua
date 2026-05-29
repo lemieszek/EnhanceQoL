@@ -3542,6 +3542,8 @@ L["vendorCraftShopperCheckListPrint"] = "[%s] manquant : %d – acheter à l’H
 L["vendorCraftShopperConfirmPurchase"] = "Confirmer l’achat"
 L["vendorCraftShopperEnable"] = "Activer Craft Shopper"
 L["vendorCraftShopperEnableDesc"] = "Affiche, à côté de l’hôtel des ventes, la liste des composants manquants pour vos recettes suivies. Recherchez et achetez chaque objet en un clic."
+L["vendorCraftShopperIncludeWarbandBank"] = "Inclure la banque de bataillon"
+L["vendorCraftShopperIncludeWarbandBankDesc"] = "Compte les objets de la banque de bataillon lors du calcul des composants manquants de Craft Shopper."
 L["vendorCraftShopperHideFromList"] = "Masquer de la liste"
 L["vendorCraftShopperMissingGold"] = "Pas assez d’or.\
 Manque : %s"

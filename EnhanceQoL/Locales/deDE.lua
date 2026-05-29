@@ -3542,6 +3542,8 @@ L["vendorCraftShopperCheckListPrint"] = "[%s] fehlt: %d – im AH kaufen"
 L["vendorCraftShopperConfirmPurchase"] = "Kauf bestätigen"
 L["vendorCraftShopperEnable"] = "Craft Shopper aktivieren"
 L["vendorCraftShopperEnableDesc"] = "Zeigt neben dem Auktionshaus eine Einkaufsliste mit allen fehlenden Reagenzien aus deinen verfolgten Rezepten. Suche und kaufe jedes Item mit einem Klick."
+L["vendorCraftShopperIncludeWarbandBank"] = "Kriegsmeutenbank einbeziehen"
+L["vendorCraftShopperIncludeWarbandBankDesc"] = "Zählt Items in der Kriegsmeutenbank mit, wenn Craft Shopper fehlende Reagenzien berechnet."
 L["vendorCraftShopperHideFromList"] = "Aus Liste ausblenden"
 L["vendorCraftShopperMissingGold"] = "Nicht genug Gold.\
 Fehlt: %s"

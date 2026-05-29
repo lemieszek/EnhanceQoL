@@ -3549,6 +3549,8 @@ L["vendorCraftShopperCheckListPrint"] = "[%s] missing: %d - Buy in AH"
 L["vendorCraftShopperConfirmPurchase"] = "Confirm purchase"
 L["vendorCraftShopperEnable"] = "Enable Craft Shopper"
 L["vendorCraftShopperEnableDesc"] = "Displays a shopping list next to the Auction House with all missing reagents from your tracked recipes. Search and buy each item with a single click."
+L["vendorCraftShopperIncludeWarbandBank"] = "Include Warband Bank"
+L["vendorCraftShopperIncludeWarbandBankDesc"] = "Counts Warband Bank items when calculating missing Craft Shopper reagents."
 L["vendorCraftShopperHideFromList"] = "Hide from list"
 L["vendorCraftShopperMissingGold"] = "Not enough gold.\
 Missing %s."

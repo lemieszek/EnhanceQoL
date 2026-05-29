@@ -3542,6 +3542,8 @@ L["vendorCraftShopperCheckListPrint"] = "[%s] не хватает: %d – куп
 L["vendorCraftShopperConfirmPurchase"] = "Подтвердить покупку"
 L["vendorCraftShopperEnable"] = "Включить Craft Shopper"
 L["vendorCraftShopperEnableDesc"] = "Показывает рядом с аукционом список недостающих реагентов из отслеживаемых рецептов. Ищите и покупайте каждый предмет одним кликом."
+L["vendorCraftShopperIncludeWarbandBank"] = "Учитывать банк отряда"
+L["vendorCraftShopperIncludeWarbandBankDesc"] = "Учитывает предметы в банке отряда при расчёте недостающих реагентов Craft Shopper."
 L["vendorCraftShopperHideFromList"] = "Скрыть из списка"
 L["vendorCraftShopperMissingGold"] = "Недостаточно золота.\
 Не хватает: %s."

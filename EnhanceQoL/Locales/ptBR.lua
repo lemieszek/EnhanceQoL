@@ -3542,6 +3542,8 @@ L["vendorCraftShopperCheckListPrint"] = "[%s] faltando: %d – comprar na CL"
 L["vendorCraftShopperConfirmPurchase"] = "Confirmar compra"
 L["vendorCraftShopperEnable"] = "Ativar Craft Shopper"
 L["vendorCraftShopperEnableDesc"] = "Exibe, ao lado da Casa de Leilões, uma lista de reagentes em falta das receitas monitoradas. Pesquise e compre cada item com um clique."
+L["vendorCraftShopperIncludeWarbandBank"] = "Incluir banco do bando de guerra"
+L["vendorCraftShopperIncludeWarbandBankDesc"] = "Conta os itens do banco do bando de guerra ao calcular reagentes em falta no Craft Shopper."
 L["vendorCraftShopperHideFromList"] = "Ocultar da lista"
 L["vendorCraftShopperMissingGold"] = "Ouro insuficiente.\
 Faltam %s."

@@ -3542,6 +3542,8 @@ L["vendorCraftShopperCheckListPrint"] = "[%s] faltan: %d – comprar en AH"
 L["vendorCraftShopperConfirmPurchase"] = "Confirmar compra"
 L["vendorCraftShopperEnable"] = "Activar Craft Shopper"
 L["vendorCraftShopperEnableDesc"] = "Muestra junto a la Casa de Subastas una lista de materiales faltantes de tus recetas rastreadas. Busca y compra cada objeto con un solo clic."
+L["vendorCraftShopperIncludeWarbandBank"] = "Incluir banco de tropa"
+L["vendorCraftShopperIncludeWarbandBankDesc"] = "Cuenta los objetos del banco de tropa al calcular los materiales faltantes de Craft Shopper."
 L["vendorCraftShopperHideFromList"] = "Ocultar de la lista"
 L["vendorCraftShopperMissingGold"] = "No hay oro suficiente.\
 Faltan %s."
