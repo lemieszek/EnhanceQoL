@@ -4,6 +4,7 @@
 
 ### 🐛 Fixed
 
+- Damage Meter: Fixed the border offset slider not moving the window border.
 - Damage Meter: Fixed hidden realm names still appearing in tooltip breakdown rows.
 
 ---

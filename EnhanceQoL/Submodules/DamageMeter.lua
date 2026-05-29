@@ -4405,6 +4405,11 @@ function DamageMeter:EnsureWindow(index)
 	contentBackground:Hide()
 	frame.contentBackground = contentBackground
 
+	local windowBorder = CreateFrame("Frame", nil, frame, "BackdropTemplate")
+	windowBorder:SetFrameLevel(frame:GetFrameLevel() + 6)
+	windowBorder:Hide()
+	frame.windowBorder = windowBorder
+
 	local headerBackground = frame:CreateTexture(nil, "ARTWORK")
 	headerBackground:Hide()
 	frame.headerBackground = headerBackground
@@ -4596,7 +4601,6 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 	local bottomOffset = heightOffset - topOffset
 	local height = math.max(60, viewportHeight + topInset + bottomInset + heightOffset)
 	local contentHeight = contentRows > 0 and ((contentRows * effectiveRowHeight) + math.max(0, contentRows - 1) * spacing) or 1
-	local backdropR, backdropG, backdropB, backdropA = colorComponents(config.backdropColor, DEFAULT_WINDOW.backdropColor)
 	local borderR, borderG, borderB, borderA = colorComponents(config.borderColor, DEFAULT_WINDOW.borderColor)
 	local titleR, titleG, titleB, titleA = colorComponents(config.titleColor, DEFAULT_WINDOW.titleColor)
 	local backdropOffsetX = clampNumber(config.backdropOffsetX, -200, 200, DEFAULT_WINDOW.backdropOffsetX)
@@ -4664,22 +4668,26 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 	frame.footerBackground:SetPoint("BOTTOMRIGHT", frame.status, "BOTTOMRIGHT", footerBackgroundOffsetX + footerBackgroundSizeOffsetX, footerBackgroundOffsetY - footerBackgroundSizeOffsetY)
 	self:ApplyFooterBackground(frame, config, showStatus)
 
-	local backdropTexture = "Interface\\Buttons\\WHITE8x8"
 	local borderTexture = resolveMedia("border", config.borderTexture, DEFAULT_BORDER)
 	if config.borderEnabled == true then
 		local size = clampNumber(config.borderSize, 1, 32, DEFAULT_WINDOW.borderSize)
-		local inset = clampNumber(config.borderInset, 0, 24, DEFAULT_WINDOW.borderInset)
-		frame:SetBackdrop({
-			bgFile = backdropTexture,
+		local offset = clampNumber(config.borderInset, 0, 24, DEFAULT_WINDOW.borderInset)
+		frame.windowBorder:ClearAllPoints()
+		frame.windowBorder:SetPoint("TOPLEFT", frame, "TOPLEFT", -offset, offset)
+		frame.windowBorder:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", offset, -offset)
+		frame.windowBorder:SetBackdrop({
+			bgFile = nil,
 			edgeFile = borderTexture,
 			edgeSize = size,
-			insets = { left = inset, right = inset, top = inset, bottom = inset },
+			insets = { left = 0, right = 0, top = 0, bottom = 0 },
 		})
-		frame:SetBackdropBorderColor(borderR, borderG, borderB, borderA)
+		frame.windowBorder:SetBackdropBorderColor(borderR, borderG, borderB, borderA)
+		frame.windowBorder:Show()
 	else
-		frame:SetBackdrop(nil)
+		frame.windowBorder:Hide()
+		frame.windowBorder:SetBackdrop(nil)
 	end
-	frame:SetBackdropColor(backdropR, backdropG, backdropB, 0)
+	frame:SetBackdrop(nil)
 
 	frame.status:SetHeight(math.max(1, statusHeight))
 
