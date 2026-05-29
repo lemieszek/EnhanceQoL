@@ -600,6 +600,7 @@ globals = {
 	"C_AddOns.GetAddOnMetadata",
 	"C_AddOns.IsAddOnLoaded",
 	"C_AddOns.LoadAddOn",
+	"C_AutoComplete",
 	"PlayerSpellsMicroButton",
 	"TalentLoadoutEx",
 	"C_AdventureJournal",
