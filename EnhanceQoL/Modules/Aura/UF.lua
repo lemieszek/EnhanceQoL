@@ -6519,6 +6519,40 @@ local function getClassColor(class)
 	return nil
 end
 
+function UF.ApplyHealthBackdrop(st, unit, hc, defH, reverseHealth)
+	if not (st and st.health) then return end
+	hc = hc or {}
+	defH = defH or {}
+	local backdropCfg = hc.backdrop or {}
+	local useBackdropClassColor = backdropCfg.useClassColor
+	if useBackdropClassColor == nil and defH.backdrop then useBackdropClassColor = defH.backdrop.useClassColor end
+	local healthBackdropClampToFill = backdropCfg.clampToFill
+	if healthBackdropClampToFill == nil and defH.backdrop then healthBackdropClampToFill = defH.backdrop.clampToFill end
+	if healthBackdropClampToFill == nil then healthBackdropClampToFill = false end
+
+	local healthBackdropR, healthBackdropG, healthBackdropB, healthBackdropA
+	if useBackdropClassColor == true then
+		local class
+		if UnitIsPlayer and UnitIsPlayer(unit) then
+			class = select(2, UnitClass(unit))
+		elseif unit == UNIT.PET then
+			class = (addon.variables and addon.variables.unitClass) or select(2, UnitClass(UNIT.PLAYER))
+		end
+		local cr, cg, cb = getClassColor(class)
+		if cr then
+			local backdropColor = backdropCfg.color or (defH.backdrop and defH.backdrop.color) or { 0, 0, 0, 0.6 }
+			healthBackdropR, healthBackdropG, healthBackdropB = cr, cg, cb
+			healthBackdropA = backdropColor[4]
+			if healthBackdropA == nil then healthBackdropA = 0.6 end
+		end
+	end
+
+	applyBarBackdrop(st.health, hc, healthBackdropR, healthBackdropG, healthBackdropB, healthBackdropA, {
+		clampToFill = healthBackdropClampToFill == true,
+		reverseFill = reverseHealth == true,
+	})
+end
+
 local function configureCastStatic(unit, ccfg, defc)
 	local st = states[unit]
 	if not st or not st.castBar or not st.castInfo then return end
@@ -7572,6 +7606,9 @@ local function updateHealth(cfg, unit)
 	end
 	st.health:SetValue(cur or 0, interpolation)
 	local hc = cfg.health or {}
+	local reverseHealth = hc.reverseFill
+	if reverseHealth == nil then reverseHealth = defH.reverseFill == true end
+	UF.ApplyHealthBackdrop(st, unit, hc, defH, reverseHealth)
 	if st.tempMaxHealthLoss then
 		local showTempLoss = hc.tempMaxHealthLossEnabled
 		if showTempLoss == nil then showTempLoss = defH.tempMaxHealthLossEnabled ~= false end
@@ -9366,35 +9403,7 @@ local function applyBars(cfg, unit)
 		if st.tempMaxHealthLoss.SetAlpha then st.tempMaxHealthLoss:SetAlpha(0) end
 		st.tempMaxHealthLoss:SetShown(hc.tempMaxHealthLossEnabled ~= false)
 	end
-	local healthBackdropR, healthBackdropG, healthBackdropB, healthBackdropA
-	local healthBackdropClampToFill
-	do
-		local backdropCfg = hc.backdrop or {}
-		local useBackdropClassColor = backdropCfg.useClassColor
-		if useBackdropClassColor == nil and defH.backdrop then useBackdropClassColor = defH.backdrop.useClassColor end
-		healthBackdropClampToFill = backdropCfg.clampToFill
-		if healthBackdropClampToFill == nil and defH.backdrop then healthBackdropClampToFill = defH.backdrop.clampToFill end
-		if healthBackdropClampToFill == nil then healthBackdropClampToFill = false end
-		if useBackdropClassColor == true then
-			local class
-			if UnitIsPlayer and UnitIsPlayer(unit) then
-				class = select(2, UnitClass(unit))
-			elseif unit == UNIT.PET then
-				class = (addon.variables and addon.variables.unitClass) or select(2, UnitClass(UNIT.PLAYER))
-			end
-			local cr, cg, cb = getClassColor(class)
-			if cr then
-				local backdropColor = backdropCfg.color or (defH.backdrop and defH.backdrop.color) or { 0, 0, 0, 0.6 }
-				healthBackdropR, healthBackdropG, healthBackdropB = cr, cg, cb
-				healthBackdropA = backdropColor[4]
-				if healthBackdropA == nil then healthBackdropA = 0.6 end
-			end
-		end
-	end
-	applyBarBackdrop(st.health, hc, healthBackdropR, healthBackdropG, healthBackdropB, healthBackdropA, {
-		clampToFill = healthBackdropClampToFill == true,
-		reverseFill = reverseHealth,
-	})
+	UF.ApplyHealthBackdrop(st, unit, hc, defH, reverseHealth)
 	if allowAbsorb and st.incomingHeal then applyIncomingHealBar(st, hc, healthHeight, reverseHealth, interpolation) end
 	if powerEnabled then
 		st.power:SetStatusBarTexture(UFHelper.resolveTexture(pcfg.texture))

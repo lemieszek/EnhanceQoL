@@ -2,6 +2,18 @@
 
 <!--@eqol-beta@-->
 
+## [10.22.0-beta3] - 2026-05-29
+
+### ✨ Added
+
+- Damage Meter: Added negative bar spacing support for tighter bordered bar layouts.
+
+### 🐛 Fixed
+
+- Unit Frames: Fixed class-colored health backdrops not updating when target or target-of-target changed.
+
+---
+
 ## [10.22.0-beta2] - 2026-05-29
 
 ### 🐛 Fixed

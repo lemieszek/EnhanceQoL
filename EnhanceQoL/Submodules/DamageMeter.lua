@@ -1302,7 +1302,7 @@ end
 local function getRowMetrics(config)
 	local rowHeight = clampNumber(config.rowHeight, 10, 70, DEFAULT_WINDOW.rowHeight)
 	local barHeight = config.changeBarSize == true and math.min(rowHeight, clampNumber(config.barHeight, 1, rowHeight, DEFAULT_WINDOW.barHeight)) or rowHeight
-	local spacing = clampNumber(config.barSpacing, 0, 16, DEFAULT_WINDOW.barSpacing)
+	local spacing = clampNumber(config.barSpacing, -16, 16, DEFAULT_WINDOW.barSpacing)
 	return rowHeight, barHeight, spacing
 end
 
@@ -4456,11 +4456,12 @@ function DamageMeter:EnsureWindow(index)
 		local config = DamageMeter:GetConfig(index)
 		local _, _, spacing = getRowMetrics(config)
 		local effectiveRowHeight = getEffectiveRowHeight(config)
+		local rowPitch = math.max(1, effectiveRowHeight + spacing)
 		local visibleRows = getEffectiveVisibleRows(config)
 		local contentRows = frame.contentRows or visibleRows
-		local maxScroll = math.max(0, (contentRows - visibleRows) * (effectiveRowHeight + spacing))
+		local maxScroll = math.max(0, (contentRows - visibleRows) * rowPitch)
 		local currentScroll = rowsViewport:GetVerticalScroll() or 0
-		local nextScroll = clampNumber(currentScroll - (delta * (effectiveRowHeight + spacing)), 0, maxScroll, 0)
+		local nextScroll = clampNumber(currentScroll - (delta * rowPitch), 0, maxScroll, 0)
 		rowsViewport:SetVerticalScroll(nextScroll)
 		if config.alwaysShowPlayer == true and nextScroll ~= currentScroll then
 			DamageMeter:RefreshWindow(index, DamageMeter:BuildRefreshSharedState())
@@ -4588,7 +4589,7 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 	local effectiveRowHeight = getEffectiveRowHeight(config)
 	local visibleRows = getEffectiveVisibleRows(config)
 	contentRows = math.max(0, tonumber(contentRows) or 0)
-	local viewportHeight = (visibleRows * effectiveRowHeight) + math.max(0, visibleRows - 1) * spacing
+	local viewportHeight = math.max(1, (visibleRows * effectiveRowHeight) + (math.max(0, visibleRows - 1) * spacing))
 	local titleFontSize = clampNumber(config.titleFontSize, 8, 28, DEFAULT_WINDOW.titleFontSize)
 	local statusFontSize = clampNumber(config.statusFontSize, 8, 24, DEFAULT_WINDOW.statusFontSize)
 	local headerButtonSize = clampNumber(config.headerButtonSize, 10, 32, DEFAULT_WINDOW.headerButtonSize)
@@ -4600,7 +4601,7 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 	local topOffset = math.floor(heightOffset / 2)
 	local bottomOffset = heightOffset - topOffset
 	local height = math.max(60, viewportHeight + topInset + bottomInset + heightOffset)
-	local contentHeight = contentRows > 0 and ((contentRows * effectiveRowHeight) + math.max(0, contentRows - 1) * spacing) or 1
+	local contentHeight = contentRows > 0 and math.max(1, (contentRows * effectiveRowHeight) + (math.max(0, contentRows - 1) * spacing)) or 1
 	local borderR, borderG, borderB, borderA = colorComponents(config.borderColor, DEFAULT_WINDOW.borderColor)
 	local titleR, titleG, titleB, titleA = colorComponents(config.titleColor, DEFAULT_WINDOW.titleColor)
 	local backdropOffsetX = clampNumber(config.backdropOffsetX, -200, 200, DEFAULT_WINDOW.backdropOffsetX)
@@ -6126,7 +6127,7 @@ function DamageMeter:BuildWindowSettings(index)
 		sliderSetting(L["damageMeterBarHeight"] or "Bar height", function() return math.min(clampNumber(cfg().barHeight, 1, 70, DEFAULT_WINDOW.barHeight), clampNumber(cfg().rowHeight, 10, 70, DEFAULT_WINDOW.rowHeight)) end, function(value) self:SetConfigValue(index, "barHeight", clampNumber(value, 1, clampNumber(cfg().rowHeight, 10, 70, DEFAULT_WINDOW.rowHeight), DEFAULT_WINDOW.barHeight)) end, 1, 70, 1, barId, customBarSizeEnabled),
 		dropdownSetting(L["damageMeterBarAnchor"] or "Bar anchor", function() return normalizeAnchorV(cfg().barAnchor) end, function(value) self:SetConfigValue(index, "barAnchor", normalizeAnchorV(value)) end, buildVerticalAnchorOptions(), barId, 120, customBarSizeEnabled),
 		dividerSetting(barId),
-		sliderSetting(L["damageMeterBarSpacing"] or "Bar spacing", function() return cfg().barSpacing end, function(value) self:SetConfigValue(index, "barSpacing", clampNumber(value, 0, 16, DEFAULT_WINDOW.barSpacing)) end, 0, 16, 1, barId),
+		sliderSetting(L["damageMeterBarSpacing"] or "Bar spacing", function() return cfg().barSpacing end, function(value) self:SetConfigValue(index, "barSpacing", clampNumber(value, -16, 16, DEFAULT_WINDOW.barSpacing)) end, -16, 16, 1, barId),
 		dividerSetting(barId),
 		dropdownSetting(L["Texture"] or "Texture", function() return cfg().texture end, function(value) self:SetConfigValue(index, "texture", value) end, buildMediaOptions("statusbar", false), barId, 260),
 		checkboxSetting(L["damageMeterUseClassColors"] or "Use class colors", function() return cfg().useClassColors == true end, function(value) self:SetConfigValue(index, "useClassColors", value) end, barId),
