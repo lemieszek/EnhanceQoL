@@ -1,4 +1,4 @@
--- luacheck: globals C_Bank
+-- luacheck: globals C_Bank C_Container C_EquipmentSet
 local addonName, addon = ...
 addon = addon or {}
 _G[addonName] = addon
@@ -20,8 +20,10 @@ function addon.Bags.functions.Enable()
 	if addon.Bags.functions.EnableMain then
 		addon.Bags.functions.EnableMain()
 	end
-	if addon.Bags.functions.EnableBank then
+	if addon.Bags.functions.EnableBank and (addon.GetUseIntegratedBank == nil or addon.GetUseIntegratedBank()) then
 		addon.Bags.functions.EnableBank()
+	elseif addon.Bags.functions.RestoreDefaultBankFrames then
+		addon.Bags.functions.RestoreDefaultBankFrames()
 	end
 end
 
@@ -107,6 +109,7 @@ local defaultSettings = {
 	showCloseButton = true,
 	clearNewItemsOnHeaderClick = false,
 	rememberLastBankTab = true,
+	useIntegratedBank = true,
 	combineFreeSlots = true,
 	showFreeSlots = true,
 	combineUnstackableItems = true,
@@ -251,6 +254,21 @@ local MONEY_FORMAT_LOOKUP = {}
 for _, option in ipairs(MONEY_FORMAT_OPTIONS) do
 	MONEY_FORMAT_LOOKUP[option.value] = option
 end
+
+local EQUIPMENT_SET_TEXT_COLORS = {
+	{ 0.36, 0.78, 1.00 },
+	{ 0.50, 0.86, 0.45 },
+	{ 1.00, 0.78, 0.32 },
+	{ 1.00, 0.54, 0.42 },
+	{ 0.76, 0.62, 1.00 },
+	{ 0.42, 0.92, 0.82 },
+	{ 1.00, 0.62, 0.86 },
+	{ 0.68, 0.84, 1.00 },
+	{ 0.86, 0.90, 0.42 },
+	{ 0.98, 0.72, 0.52 },
+	{ 0.60, 0.74, 1.00 },
+	{ 0.72, 1.00, 0.68 },
+}
 
 local settingsDefaultsCache = {
 	table = nil,
@@ -1047,6 +1065,15 @@ local function normalizeBooleanSetting(value, defaultValue)
 	return not not value
 end
 
+local function getStableStringHash(value)
+	local hash = 0
+	value = tostring(value or "")
+	for index = 1, #value do
+		hash = (hash * 33 + value:byte(index)) % 2147483647
+	end
+	return hash
+end
+
 function addon.GetOutsideHeaderPadding()
 	local settings = addon.GetSettings()
 	settings.outsideHeaderPadding = clampPaddingValue(settings.outsideHeaderPadding, defaultSettings.outsideHeaderPadding)
@@ -1424,6 +1451,51 @@ function addon.SetRememberLastBankTab(enabled)
 
 	settings.rememberLastBankTab = enabled
 	return true
+end
+
+function addon.GetUseIntegratedBank()
+	local settings = addon.GetSettings()
+	settings.useIntegratedBank = normalizeBooleanSetting(settings.useIntegratedBank, defaultSettings.useIntegratedBank)
+	return settings.useIntegratedBank
+end
+
+function addon.SetUseIntegratedBank(enabled)
+	local settings = addon.GetSettings()
+	enabled = normalizeBooleanSetting(enabled, defaultSettings.useIntegratedBank)
+	if settings.useIntegratedBank == enabled then
+		return false
+	end
+
+	settings.useIntegratedBank = enabled
+	return true
+end
+
+function addon.GetEquipmentSetOverlayInfo(bagID, slotID)
+	if not (C_Container and C_Container.GetContainerItemEquipmentSetInfo) then
+		return nil
+	end
+
+	local inEquipmentSet, setList = C_Container.GetContainerItemEquipmentSetInfo(bagID, slotID)
+	if not inEquipmentSet then
+		return nil
+	end
+
+	local firstSetName = type(setList) == "string" and setList:match("^%s*([^,]+)") or nil
+	firstSetName = firstSetName and firstSetName:match("^%s*(.-)%s*$") or nil
+	local setID = firstSetName and C_EquipmentSet and C_EquipmentSet.GetEquipmentSetID and C_EquipmentSet.GetEquipmentSetID(firstSetName) or nil
+	local texture = setID and C_EquipmentSet.GetEquipmentSetInfo and select(2, C_EquipmentSet.GetEquipmentSetInfo(setID)) or nil
+	local colorIndex = ((tonumber(setID) or getStableStringHash(firstSetName or setList or "")) % #EQUIPMENT_SET_TEXT_COLORS) + 1
+	local color = EQUIPMENT_SET_TEXT_COLORS[colorIndex] or EQUIPMENT_SET_TEXT_COLORS[1]
+
+	return {
+		texture = texture,
+		setID = setID,
+		setName = firstSetName,
+		colorKey = tostring(setID or firstSetName or setList or colorIndex),
+		r = color[1],
+		g = color[2],
+		b = color[3],
+	}
 end
 
 function addon.GetShowFreeSlots()

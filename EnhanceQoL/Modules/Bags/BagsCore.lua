@@ -3337,20 +3337,12 @@ Core.HideButtonOverlayRegion = function(button, region, cacheField, hiddenKey)
 end
 
 Core.GetEquipmentSetOverlayTexture = function(bagID, slotID)
-	if not (C_Container and C_Container.GetContainerItemEquipmentSetInfo) then
+	local equipmentSetInfo = addon.GetEquipmentSetOverlayInfo and addon.GetEquipmentSetOverlayInfo(bagID, slotID) or nil
+	if not equipmentSetInfo then
 		return nil
 	end
 
-	local inEquipmentSet, setList = C_Container.GetContainerItemEquipmentSetInfo(bagID, slotID)
-	if not inEquipmentSet then
-		return nil
-	end
-
-	local firstSetName = type(setList) == "string" and setList:match("^%s*([^,]+)") or nil
-	firstSetName = firstSetName and firstSetName:match("^%s*(.-)%s*$") or nil
-	local setID = firstSetName and C_EquipmentSet and C_EquipmentSet.GetEquipmentSetID and C_EquipmentSet.GetEquipmentSetID(firstSetName) or nil
-	local texture = setID and C_EquipmentSet.GetEquipmentSetInfo and select(2, C_EquipmentSet.GetEquipmentSetInfo(setID)) or nil
-	return texture or Core.EQUIPMENT_SET_OVERLAY_FALLBACK_TEXTURE
+	return equipmentSetInfo.texture or Core.EQUIPMENT_SET_OVERLAY_FALLBACK_TEXTURE, equipmentSetInfo
 end
 
 Core.UpdateEquipmentSetOverlay = function(button, bagID, slotID, info, overlayRuntime)
@@ -3381,7 +3373,7 @@ Core.UpdateEquipmentSetOverlay = function(button, bagID, slotID, info, overlayRu
 		return
 	end
 
-	local texture = Core.GetEquipmentSetOverlayTexture(bagID, slotID)
+	local texture, equipmentSetInfo = Core.GetEquipmentSetOverlayTexture(bagID, slotID)
 	if not texture then
 		Core.HideButtonOverlayRegion(button, icon, "_bagsEquipmentSetEvalKey", "none:" .. evalKey)
 		text:SetText("")
@@ -3389,7 +3381,7 @@ Core.UpdateEquipmentSetOverlay = function(button, bagID, slotID, info, overlayRu
 		return
 	end
 
-	local setEvalKey = tostring(texture) .. ":" .. evalKey
+	local setEvalKey = tostring(texture) .. ":" .. tostring(equipmentSetInfo and equipmentSetInfo.colorKey or "") .. ":" .. evalKey
 	if button._bagsEquipmentSetEvalKey == setEvalKey then
 		return
 	end
@@ -3397,7 +3389,11 @@ Core.UpdateEquipmentSetOverlay = function(button, bagID, slotID, info, overlayRu
 	if displayMode == "text" then
 		icon:Hide()
 		text:SetText(addon.FormatTextElement and addon.FormatTextElement("overlays", "SET") or "SET")
-		text:SetTextColor(0.36, 0.78, 1)
+		text:SetTextColor(
+			(equipmentSetInfo and equipmentSetInfo.r) or 0.36,
+			(equipmentSetInfo and equipmentSetInfo.g) or 0.78,
+			(equipmentSetInfo and equipmentSetInfo.b) or 1
+		)
 		text:Show()
 	else
 		text:SetText("")

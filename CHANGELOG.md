@@ -6,10 +6,12 @@
 
 ### ✨ Added
 
+- Bags: Added distinct colors for equipment-set text overlays and an option to keep Blizzard's bank and Warband Bank windows instead of the integrated Bags bank.
 - Damage Meter: Added negative bar spacing support for tighter bordered bar layouts.
 
 ### 🐛 Fixed
 
+- Nameplates: Fixed default nameplate text customization forcing the global font when only outline or size changes were wanted, preserving Blizzard's locale font for Cyrillic names unless the new font override is enabled.
 - Unit Frames: Fixed class-colored health backdrops not updating when target or target-of-target changed.
 
 ---

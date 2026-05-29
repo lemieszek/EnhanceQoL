@@ -53,6 +53,7 @@ local DEFAULT_NAMEPLATE_FEATURE_KEYS = constants.DEFAULT_NAMEPLATE_FEATURE_KEYS
 	or {
 		auraClickthrough = "nameplateAuraClickthrough",
 		slugOutline = "nameplateSlugOutline",
+		textCustomFont = "nameplateTextCustomFont",
 		textFont = "nameplateTextFont",
 		textOutline = "nameplateTextOutline",
 		textSize = "nameplateTextSize",
@@ -1719,6 +1720,11 @@ local function createNameplatesCategory()
 	})
 
 	local function isNameplateTextEnabled() return nameplateTextToggle and nameplateTextToggle.setting and nameplateTextToggle.setting:GetValue() == true end
+	local function isNameplateCustomFontEnabled()
+		if not isNameplateTextEnabled() then return false end
+		if addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.textCustomFont] ~= nil then return addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.textCustomFont] == true end
+		return addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.textFont] ~= nil
+	end
 	local globalFontStyleKey = addon.functions.GetGlobalFontStyleConfigKey and addon.functions.GetGlobalFontStyleConfigKey() or "__EQOL_GLOBAL_FONT_STYLE__"
 		local nameplateTextOutlineOptions, nameplateTextOutlineOrder = addon.functions.GetFontStyleOptions and addon.functions.GetFontStyleOptions(true) or {
 			[globalFontStyleKey] = L["useGlobalFontStyleConfig"] or "Use global font styling",
@@ -1741,6 +1747,22 @@ local function createNameplatesCategory()
 			if addon.functions.RefreshDefaultNameplateTextStyle then addon.functions.RefreshDefaultNameplateTextStyle() end
 		end
 
+		addon.functions.SettingsCreateCheckbox(category, {
+			var = DEFAULT_NAMEPLATE_FEATURE_KEYS.textCustomFont,
+			text = L["nameplateTextCustomFont"] or "Override nameplate text font",
+			desc = L["nameplateTextCustomFontDesc"] or "Changes the font used by default nameplate text. Disable this to keep Blizzard's locale font while still applying outline or size changes.",
+			default = false,
+			get = function() return isNameplateCustomFontEnabled() end,
+			set = function(value)
+				addon.db[DEFAULT_NAMEPLATE_FEATURE_KEYS.textCustomFont] = value and true or false
+				refreshNameplateTextStyle()
+			end,
+			parent = true,
+			element = nameplateTextToggle.element,
+			parentCheck = isNameplateTextEnabled,
+			parentSection = expandable,
+		})
+
 		addon.functions.SettingsCreateScrollDropdown(category, {
 			var = DEFAULT_NAMEPLATE_FEATURE_KEYS.textFont,
 			text = L["nameplateTextFont"] or "Nameplate text font",
@@ -1762,7 +1784,7 @@ local function createNameplatesCategory()
 			end,
 			parent = true,
 			element = nameplateTextToggle.element,
-			parentCheck = isNameplateTextEnabled,
+			parentCheck = isNameplateCustomFontEnabled,
 			parentSection = expandable,
 		})
 

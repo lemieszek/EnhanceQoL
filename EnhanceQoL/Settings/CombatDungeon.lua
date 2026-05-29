@@ -36,6 +36,7 @@ local NAMEPLATE_MOB_COLORS_DB_KEY = "nameplateMobColors"
 local NAMEPLATE_MOB_COLORS_DUNGEONS_DB_KEY = "nameplateMobColorsInDungeons"
 local NAMEPLATE_MOB_COLORS_OUTSIDE_DUNGEONS_DB_KEY = "nameplateMobColorsOutsideDungeons"
 local NAMEPLATE_SLUG_OUTLINE_DB_KEY = "nameplateSlugOutline"
+local NAMEPLATE_TEXT_CUSTOM_FONT_DB_KEY = "nameplateTextCustomFont"
 local NAMEPLATE_TEXT_FONT_DB_KEY = "nameplateTextFont"
 local NAMEPLATE_TEXT_OUTLINE_DB_KEY = "nameplateTextOutline"
 local NAMEPLATE_TEXT_SIZE_DB_KEY = "nameplateTextSize"
@@ -124,6 +125,7 @@ addon.constants = addon.constants or {}
 addon.constants.DEFAULT_NAMEPLATE_FEATURE_KEYS = {
 	auraClickthrough = NAMEPLATE_AURA_CLICKTHROUGH_DB_KEY,
 	slugOutline = NAMEPLATE_SLUG_OUTLINE_DB_KEY,
+	textCustomFont = NAMEPLATE_TEXT_CUSTOM_FONT_DB_KEY,
 	textFont = NAMEPLATE_TEXT_FONT_DB_KEY,
 	textOutline = NAMEPLATE_TEXT_OUTLINE_DB_KEY,
 	textSize = NAMEPLATE_TEXT_SIZE_DB_KEY,
@@ -624,6 +626,11 @@ local function getNameplateTextSizeOverride(fallbackSize)
 end
 
 local function getNameplateTextFontFace(fallbackFont)
+	if not addon.db then return fallbackFont end
+	local customFont = addon.db[NAMEPLATE_TEXT_CUSTOM_FONT_DB_KEY]
+	if customFont == nil then customFont = addon.db[NAMEPLATE_TEXT_FONT_DB_KEY] ~= nil end
+	if customFont ~= true then return fallbackFont end
+
 	local globalFontKey = addon.functions.GetGlobalFontConfigKey and addon.functions.GetGlobalFontConfigKey() or "__EQOL_GLOBAL_FONT__"
 	local configured = addon.db and addon.db[NAMEPLATE_TEXT_FONT_DB_KEY] or globalFontKey
 	if addon.functions.ResolveFontFace then return addon.functions.ResolveFontFace(configured, fallbackFont) end
@@ -680,6 +687,11 @@ local function setNameplateTextFont(fontElement, font, size, flags)
 	if not (fontElement and font and size and type(fontElement.SetFont) == "function") then return end
 	if not flags or flags == "" then flags = "OUTLINE" end
 	if flags == "SLUG" then flags = "OUTLINE,SLUG" end
+	local ufHelper = addon.Aura and addon.Aura.UFHelper
+	if ufHelper and ufHelper.setFontWithFallback then
+		local ok = ufHelper.setFontWithFallback(fontElement, font, size, flags)
+		if ok then return end
+	end
 	fontElement:SetFont(font, size, flags)
 end
 

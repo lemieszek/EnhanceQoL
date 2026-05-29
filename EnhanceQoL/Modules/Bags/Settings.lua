@@ -3490,9 +3490,30 @@ local function createLayoutPage(parent)
 		end
 	)
 
+	page.UseIntegratedBank = createCheckbox(
+		contentParent,
+		L["settingsUseIntegratedBank"] or "Use integrated bank",
+		L["settingsUseIntegratedBankTooltip"] or "",
+		0,
+		-308,
+		function(value)
+			if addon.SetUseIntegratedBank and addon.SetUseIntegratedBank(value) then
+				if value then
+					if Bags.functions and Bags.functions.EnableBank then
+						Bags.functions.EnableBank()
+					end
+				elseif Bags.functions and Bags.functions.HideBankFrame then
+					Bags.functions.HideBankFrame()
+				end
+				addon.RefreshSettingsFrame("layout")
+				requestBagRefresh(true, true)
+			end
+		end
+	)
+
 	local compactGapRow = CreateFrame("Frame", nil, contentParent)
 	compactGapRow:SetHeight(22)
-	compactGapRow:SetPoint("TOPLEFT", page.RememberLastBankTab, "BOTTOMLEFT", 24, -14)
+	compactGapRow:SetPoint("TOPLEFT", page.UseIntegratedBank, "BOTTOMLEFT", 24, -14)
 	compactGapRow:SetPoint("RIGHT", contentParent, "RIGHT", -14, 0)
 	page.CompactCategoryGapRow = compactGapRow
 
@@ -4552,6 +4573,9 @@ refreshLayoutPage = function(page)
 	if page.RememberLastBankTab then
 		page.RememberLastBankTab:SetChecked(addon.GetRememberLastBankTab == nil or addon.GetRememberLastBankTab())
 	end
+	if page.UseIntegratedBank then
+		page.UseIntegratedBank:SetChecked(addon.GetUseIntegratedBank == nil or addon.GetUseIntegratedBank())
+	end
 	if page.OutsideHeaderPaddingControl and page.OutsideHeaderPaddingControl.Value then
 		local outsideHeaderPadding = addon.GetOutsideHeaderPadding and addon.GetOutsideHeaderPadding() or 0
 		page.OutsideHeaderPaddingControl.Value:SetText(tostring(outsideHeaderPadding))
@@ -5176,6 +5200,7 @@ applyLayoutPageMode = function(page)
 	placeLayoutCheckbox(page.CategoryTreeView, not oneBagMode)
 	placeLayoutCheckbox(page.ShowCloseButton, true)
 	placeLayoutCheckbox(page.RememberLastBankTab, true)
+	placeLayoutCheckbox(page.UseIntegratedBank, true)
 
 	if page.CompactCategoryGapControl and page.CompactCategoryGapControl.Row then
 		page.CompactCategoryGapControl.Row:SetShown(not oneBagMode)

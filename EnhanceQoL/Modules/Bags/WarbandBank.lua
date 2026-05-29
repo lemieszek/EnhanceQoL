@@ -606,6 +606,19 @@ local function detachDefaultBankFrames()
 	end
 end
 
+function Bags.functions.RestoreDefaultBankFrames()
+	for index = 7, 13 do
+		local frame = _G["ContainerFrame" .. index]
+		if frame and frame:GetParent() == hiddenBankFrameParent then
+			frame:SetParent(UIParent)
+		end
+	end
+
+	if BankFrame and BankFrame:GetParent() == hiddenBankFrameParent then
+		BankFrame:SetParent(UIParent)
+	end
+end
+
 local function syncBlizzardBankState(context, forceReset)
 	detachDefaultBankFrames()
 
@@ -1487,20 +1500,12 @@ local function hideButtonOverlayRegion(button, region, cacheField, hiddenKey)
 end
 
 local function getEquipmentSetOverlayTexture(bagID, slotID)
-	if not (C_Container and C_Container.GetContainerItemEquipmentSetInfo) then
+	local equipmentSetInfo = addon.GetEquipmentSetOverlayInfo and addon.GetEquipmentSetOverlayInfo(bagID, slotID) or nil
+	if not equipmentSetInfo then
 		return nil
 	end
 
-	local inEquipmentSet, setList = C_Container.GetContainerItemEquipmentSetInfo(bagID, slotID)
-	if not inEquipmentSet then
-		return nil
-	end
-
-	local firstSetName = type(setList) == "string" and setList:match("^%s*([^,]+)") or nil
-	firstSetName = firstSetName and firstSetName:match("^%s*(.-)%s*$") or nil
-	local setID = firstSetName and C_EquipmentSet and C_EquipmentSet.GetEquipmentSetID and C_EquipmentSet.GetEquipmentSetID(firstSetName) or nil
-	local texture = setID and C_EquipmentSet.GetEquipmentSetInfo and select(2, C_EquipmentSet.GetEquipmentSetInfo(setID)) or nil
-	return texture or EQUIPMENT_SET_OVERLAY_FALLBACK_TEXTURE
+	return equipmentSetInfo.texture or EQUIPMENT_SET_OVERLAY_FALLBACK_TEXTURE, equipmentSetInfo
 end
 
 local function updateEquipmentSetOverlay(button, bagID, slotID, info, overlayRuntime)
@@ -1531,7 +1536,7 @@ local function updateEquipmentSetOverlay(button, bagID, slotID, info, overlayRun
 		return
 	end
 
-	local texture = getEquipmentSetOverlayTexture(bagID, slotID)
+	local texture, equipmentSetInfo = getEquipmentSetOverlayTexture(bagID, slotID)
 	if not texture then
 		hideButtonOverlayRegion(button, icon, "_bagsWarbandEquipmentSetEvalKey", "none:" .. evalKey)
 		text:SetText("")
@@ -1539,7 +1544,7 @@ local function updateEquipmentSetOverlay(button, bagID, slotID, info, overlayRun
 		return
 	end
 
-	local setEvalKey = tostring(texture) .. ":" .. evalKey
+	local setEvalKey = tostring(texture) .. ":" .. tostring(equipmentSetInfo and equipmentSetInfo.colorKey or "") .. ":" .. evalKey
 	if button._bagsWarbandEquipmentSetEvalKey == setEvalKey then
 		return
 	end
@@ -1547,7 +1552,11 @@ local function updateEquipmentSetOverlay(button, bagID, slotID, info, overlayRun
 	if displayMode == "text" then
 		icon:Hide()
 		text:SetText(addon.FormatTextElement and addon.FormatTextElement("overlays", "SET") or "SET")
-		text:SetTextColor(0.36, 0.78, 1)
+		text:SetTextColor(
+			(equipmentSetInfo and equipmentSetInfo.r) or 0.36,
+			(equipmentSetInfo and equipmentSetInfo.g) or 0.78,
+			(equipmentSetInfo and equipmentSetInfo.b) or 1
+		)
 		text:Show()
 	else
 		text:SetText("")
@@ -4811,10 +4820,21 @@ function Bags.functions.HideBankFrame()
 		state.frame:Hide()
 	end
 	setActiveEventRegistration(false)
+	Bags.functions.RestoreDefaultBankFrames()
 end
 
 function Bags.functions.EnableBank()
-	if state.initialized or not (addon.Bags and addon.Bags.IsEnabled and addon.Bags.IsEnabled()) then
+	if not (addon.Bags and addon.Bags.IsEnabled and addon.Bags.IsEnabled()) then
+		return
+	end
+	if addon.GetUseIntegratedBank and not addon.GetUseIntegratedBank() then
+		Bags.functions.RestoreDefaultBankFrames()
+		return
+	end
+	if state.initialized then
+		detachDefaultBankFrames()
+		setActiveEventRegistration(shouldProcessVisibleUpdates())
+		scheduleUpdate(true, true, true, "EnableBank")
 		return
 	end
 
@@ -4838,6 +4858,11 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 			addon.Bags.functions.Enable()
 		end
 		eventFrame:UnregisterEvent("PLAYER_LOGIN")
+		return
+	end
+
+	if addon.GetUseIntegratedBank and not addon.GetUseIntegratedBank() then
+		Bags.functions.RestoreDefaultBankFrames()
 		return
 	end
 
