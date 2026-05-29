@@ -749,6 +749,7 @@ function EditMode:UnregisterFrame(id, purgeData)
 	if self:IsAvailable() and entry.frame and self.lib then
 		local frame = entry.frame
 		local lib = self.lib
+		if lib.HideSettingsDialog then lib:HideSettingsDialog(frame) end
 		local selection = getSelection(lib, frame)
 		if selection then
 			if lib.internal and lib.internal.magnetismManager and lib.internal.magnetismManager.UnregisterFrame then lib.internal.magnetismManager:UnregisterFrame(selection) end
