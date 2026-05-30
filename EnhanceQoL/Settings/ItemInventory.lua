@@ -2280,27 +2280,56 @@ local function setMerchantKnownIcon(itemButton, state)
 	end
 end
 
+local function merchantKnownTextMatches(text)
+	if not text then return false end
+	if ITEM_SPELL_KNOWN and text:find(ITEM_SPELL_KNOWN, 1, true) then return true end
+	if ERR_COSMETIC_KNOWN and text:find(ERR_COSMETIC_KNOWN, 1, true) then return true end
+	return false
+end
+
+local function merchantHousingOwnedTextMatches(text)
+	if not text or not HOUSING_DECOR_OWNED_COUNT_FORMAT then return false end
+
+	local prefix = HOUSING_DECOR_OWNED_COUNT_FORMAT:match("^(.-)%%[%d%$%.%-]*d")
+	if not prefix or prefix == "" or not text:find(prefix, 1, true) then return false end
+
+	local totalOwned = tonumber(text:match("(%d+)"))
+	return totalOwned ~= nil and totalOwned > 0
+end
+
+local ITEM_CLASS_HOUSING = Enum and Enum.ItemClass and Enum.ItemClass.Housing or 20
+
+local function merchantTooltipHasKnownState(tooltipData, isHousingItem)
+	if not tooltipData then return false end
+	if TooltipUtil and TooltipUtil.SurfaceArgs then TooltipUtil.SurfaceArgs(tooltipData) end
+	if not tooltipData.lines then return false end
+
+	local isOwnedHousingDecor = false
+	for _, line in ipairs(tooltipData.lines) do
+		if TooltipUtil and TooltipUtil.SurfaceArgs then TooltipUtil.SurfaceArgs(line) end
+		local text = line.leftText or line.rightText
+		if merchantKnownTextMatches(text) then return true end
+		if merchantHousingOwnedTextMatches(text) then isOwnedHousingDecor = true end
+	end
+
+	return isHousingItem and isOwnedHousingDecor
+end
+
 local function merchantItemIsKnown(itemIndex)
 	if not itemIndex or itemIndex <= 0 then return false end
 	if not C_TooltipInfo or (not C_TooltipInfo.GetMerchantItem and not C_TooltipInfo.GetHyperlink) then return false end
 
+	local itemLink = GetMerchantItemLink and GetMerchantItemLink(itemIndex) or nil
+	local itemClassID = itemLink and C_Item and C_Item.GetItemInfoInstant and select(6, C_Item.GetItemInfoInstant(itemLink)) or nil
+	local isHousingItem = itemClassID == ITEM_CLASS_HOUSING
 	local tooltipData
 	if C_TooltipInfo.GetMerchantItem then tooltipData = C_TooltipInfo.GetMerchantItem(itemIndex) end
 
 	if not tooltipData and C_TooltipInfo.GetHyperlink and GetMerchantItemLink then
-		local itemLink = GetMerchantItemLink(itemIndex)
 		if itemLink then tooltipData = C_TooltipInfo.GetHyperlink(itemLink) end
 	end
 
-	if not tooltipData then return false end
-	if TooltipUtil and TooltipUtil.SurfaceArgs then TooltipUtil.SurfaceArgs(tooltipData) end
-	if not tooltipData.lines then return false end
-	for _, line in ipairs(tooltipData.lines) do
-		if TooltipUtil and TooltipUtil.SurfaceArgs then TooltipUtil.SurfaceArgs(line) end
-		local text = line.leftText or line.rightText
-		if text and text:find(ITEM_SPELL_KNOWN, 1, true) then return true end
-	end
-	return false
+	return merchantTooltipHasKnownState(tooltipData, isHousingItem)
 end
 
 local petCollectedCache = {}

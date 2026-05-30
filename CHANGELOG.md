@@ -2,6 +2,14 @@
 
 <!--@eqol-beta@-->
 
+## [10.22.0-beta4] - 2026-05-30
+
+### 🐛 Fixed
+
+- Vendor: Fixed Already-Known merchant highlighting for known cosmetic appearances and owned Housing decor items.
+
+---
+
 ## [10.22.0-beta3] - 2026-05-29
 
 ### ✨ Added
