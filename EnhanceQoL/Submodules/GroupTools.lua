@@ -34,7 +34,7 @@ end
 
 local HEALER_MANA_FRAME_WIDTH = 220
 local HEALER_MANA_PERCENT_WIDTH = 54
-local HEALER_MANA_NAME_GAP = 8
+local HEALER_MANA_TEXT_PADDING = 4
 local DEATH_ALERT_FRAME_WIDTH = 320
 local NO_TARGET_FRAME_WIDTH = 220
 
@@ -75,6 +75,7 @@ local DB = {
 	healerGrowUp = "groupToolsHealerManaGrowUp",
 	healerShowName = "groupToolsHealerManaShowName",
 	healerNameMaxChars = "groupToolsHealerManaNameMaxChars",
+	healerNameNoEllipsis = "groupToolsHealerManaNameNoEllipsis",
 	healerColor = "groupToolsHealerManaColor",
 	healerFontFace = "groupToolsHealerManaFontFace",
 	healerFontStyle = "groupToolsHealerManaFontStyle",
@@ -203,15 +204,30 @@ end
 
 local function isInEditMode() return EditMode and EditMode.IsInEditMode and EditMode:IsInEditMode() end
 
-local function classColoredUnitName(unit)
+local function getUnitDisplayName(unit, hideRealm)
 	local name = UnitName(unit)
+	if not name then return nil end
+	if hideRealm == true and _G.Ambiguate then
+		local shortName = _G.Ambiguate(name, "short")
+		if shortName and shortName ~= "" then name = shortName end
+	end
+	return name
+end
+
+local function colorUnitName(unit, name)
 	if not name then return nil end
 	local _, class = UnitClass(unit)
 	local color = class and C_ClassColor and C_ClassColor.GetClassColor and C_ClassColor.GetClassColor(class)
-	if color and color.WrapTextInColorCode then return color:WrapTextInColorCode(name), name end
+	if color and color.WrapTextInColorCode then return color:WrapTextInColorCode(name) end
 	local classColor = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
-	if classColor and classColor.colorStr then return ("|c%s%s|r"):format(classColor.colorStr, name), name end
-	return name, name
+	if classColor and classColor.colorStr then return ("|c%s%s|r"):format(classColor.colorStr, name) end
+	return name
+end
+
+local function classColoredUnitName(unit, hideRealm)
+	local name = getUnitDisplayName(unit, hideRealm)
+	if not name then return nil end
+	return colorUnitName(unit, name), name
 end
 
 local function getGroupUnits()
@@ -264,6 +280,17 @@ local function applyFontString(fontString, fontFaceKey, fontSize, fontStyleKey)
 		local fallback = (addon.variables and addon.variables.defaultFont) or STANDARD_TEXT_FONT
 		fontString:SetFont(fallback, fontSize or 14, "OUTLINE")
 	end
+end
+
+local function measureTextWidth(fontFace, fontSize, fontStyle, text)
+	if type(text) ~= "string" or text == "" or not (UIParent and UIParent.CreateFontString) then return 0 end
+	GroupTools.measureText = GroupTools.measureText or UIParent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	local measure = GroupTools.measureText
+	if not measure then return 0 end
+	measure:Hide()
+	applyFontString(measure, fontFace, fontSize, fontStyle)
+	measure:SetText(text)
+	return measure:GetStringWidth() or 0
 end
 
 local function buildFontFaceOptions()
@@ -523,9 +550,27 @@ function HealerMana:GetLineWidth()
 	local helper = addon.Aura and addon.Aura.UFHelper
 	if not (helper and helper.getNameLimitWidth) then return HEALER_MANA_FRAME_WIDTH end
 	local fontSize = clamp(getDB(DB.healerFontSize, 14), 8, 64, 14)
-	local width = helper.getNameLimitWidth(getDB(DB.healerFontFace, globalFontKey()), fontSize, getDB(DB.healerFontStyle, globalStyleKey()), maxChars)
-	if width and width > 0 then return HEALER_MANA_PERCENT_WIDTH + HEALER_MANA_NAME_GAP + width end
+	local fontFace = getDB(DB.healerFontFace, globalFontKey())
+	local fontStyle = getDB(DB.healerFontStyle, globalStyleKey())
+	local width = helper.getNameLimitWidth(fontFace, fontSize, fontStyle, maxChars)
+	if width and width > 0 then return measureTextWidth(fontFace, fontSize, fontStyle, "100% - ") + width + HEALER_MANA_TEXT_PADDING end
 	return HEALER_MANA_FRAME_WIDTH
+end
+
+function HealerMana:FormatDisplayName(unit)
+	local displayName = getUnitDisplayName(unit, true) or unit
+	if addon.db and addon.db[DB.healerNameNoEllipsis] == true then
+		local maxChars = clamp(getDB(DB.healerNameMaxChars, 0), 0, 100, 0)
+		local helper = addon.Aura and addon.Aura.UFHelper
+		if maxChars > 0 and helper and helper.getNameLimitWidth and helper.truncateTextToWidth then
+			local fontFace = getDB(DB.healerFontFace, globalFontKey())
+			local fontStyle = getDB(DB.healerFontStyle, globalStyleKey())
+			local fontSize = clamp(getDB(DB.healerFontSize, 14), 8, 64, 14)
+			local maxWidth = helper.getNameLimitWidth(fontFace, fontSize, fontStyle, maxChars)
+			if maxWidth and maxWidth > 0 then displayName = helper.truncateTextToWidth(fontFace, fontSize, fontStyle, displayName, maxWidth) end
+		end
+	end
+	return colorUnitName(unit, displayName) or displayName
 end
 
 function HealerMana:PositionTexts(count)
@@ -582,8 +627,7 @@ function HealerMana:SetManaText(index, unit, overridePercent)
 	if addon.db and addon.db[DB.healerShowName] == false then
 		text:SetText(("%s%%"):format(formatPercentValue(percent)))
 	else
-		local displayName = classColoredUnitName(unit) or UnitName(unit) or unit
-		text:SetText(("%s%% - %s"):format(formatPercentValue(percent), displayName))
+		text:SetText(("%s%% - %s"):format(formatPercentValue(percent), self:FormatDisplayName(unit)))
 	end
 	text:Show()
 end
@@ -1079,6 +1123,8 @@ local function applyHealerSetting(field, value)
 		setDB(DB.healerShowName, value == true)
 	elseif field == "nameMaxChars" then
 		setDB(DB.healerNameMaxChars, clamp(value, 0, 100, 0))
+	elseif field == "nameNoEllipsis" then
+		setDB(DB.healerNameNoEllipsis, value == true)
 	elseif field == "color" then
 		setDB(DB.healerColor, normalizeColor(value, { r = 1, g = 1, b = 1, a = 1 }))
 	elseif field == "fontFace" then
@@ -1210,6 +1256,13 @@ function HealerMana:RegisterEditMode()
 		get = function() return clamp(getDB(DB.healerNameMaxChars, 0), 0, 100, 0) end,
 		set = function(_, value) applyHealerSetting("nameMaxChars", value) end,
 		isEnabled = function() return not (addon.db and addon.db[DB.healerShowName] == false) end,
+	}
+	settings[#settings + 1] = {
+		name = L["Hide ellipsis"] or "Hide ellipsis",
+		kind = SettingType.Checkbox,
+		get = function() return addon.db and addon.db[DB.healerNameNoEllipsis] == true end,
+		set = function(_, value) applyHealerSetting("nameNoEllipsis", value) end,
+		isEnabled = function() return not (addon.db and addon.db[DB.healerShowName] == false) and clamp(getDB(DB.healerNameMaxChars, 0), 0, 100, 0) > 0 end,
 	}
 	settings[#settings + 1] = { name = "", kind = SettingType.Divider }
 	settings[#settings + 1] = {
@@ -1456,6 +1509,7 @@ function GroupTools.functions.InitDB()
 	initDBValue(DB.healerGrowUp, false)
 	initDBValue(DB.healerShowName, true)
 	initDBValue(DB.healerNameMaxChars, 0)
+	initDBValue(DB.healerNameNoEllipsis, false)
 	initDBValue(DB.healerColor, { r = 1, g = 1, b = 1, a = 1 })
 	initDBValue(DB.healerFontFace, globalFontKey())
 	initDBValue(DB.healerFontStyle, globalStyleKey())
