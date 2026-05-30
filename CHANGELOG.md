@@ -1,64 +1,26 @@
 # Changelog
 
-<!--@eqol-beta@-->
-
-## [10.22.0-beta5] - 2026-05-30
-
-### 🐛 Fixed
-
-- Damage Meter: Fixed a secret-value error when using name truncation without ellipsis in restricted combat data.
-
----
-
-## [10.22.0-beta4] - 2026-05-30
-
-### ✨ Added
-
-- Damage Meter: Added optional role-specific meter types so windows can switch their Type for tank, healer, or DPS specs.
-
-### 🐛 Fixed
-
-- Damage Meter: Added right-click Quick Switch access on empty window areas and improved border, bar width, unclamp window, and name truncation controls.
-- Damage Meter: Fixed top and bottom bar borders clipping when using bar border offset.
-- Vendor: Fixed Already-Known merchant highlighting for known cosmetic appearances and owned Housing decor items.
-
----
-
-## [10.22.0-beta3] - 2026-05-29
+## [10.22.0] - 2026-05-30
 
 ### ✨ Added
 
 - Bags: Added distinct colors for equipment-set text overlays and an option to keep Blizzard's bank and Warband Bank windows instead of the integrated Bags bank.
+- Damage Meter: Added optional role-specific meter types so windows can switch their Type for tank, healer, or DPS specs.
 - Damage Meter: Added negative bar spacing support for tighter bordered bar layouts.
-
-### 🐛 Fixed
-
-- Nameplates: Fixed default nameplate text customization forcing the global font when only outline or size changes were wanted, preserving Blizzard's locale font for Cyrillic names unless the new font override is enabled.
-- Unit Frames: Fixed class-colored health backdrops not updating when target or target-of-target changed.
-
----
-
-## [10.22.0-beta2] - 2026-05-29
-
-### 🐛 Fixed
-
-- Cooldown Panels / Bars: Fixed tracked aura display modes like Always show (desaturate when active) being reset to Only show when active from standalone entry bar settings.
-
----
-
-## [10.22.0-beta1] - 2026-05-29
-
-### ✨ Added
-
 - Data Panels: Added custom background textures with atlas, texture ID, path, and offset controls.
 
 ### 🐛 Fixed
 
+- Cooldown Panels / Bars: Fixed tracked aura display modes like Always show (desaturate when active) being reset to Only show when active from standalone entry bar settings.
 - Cooldown Panels: Fixed Use highest rank for Midnight combat potions to prefer Fleeting ranks before normal ranks, including Light's Potential, Potion of Recklessness, and Potion of Devoured Dreams.
+- Damage Meter: Added right-click Quick Switch access on empty window areas and improved border, bar width, unclamp window, and name truncation controls.
+- Damage Meter: Fixed a secret-value error when using name truncation without ellipsis in restricted combat data.
+- Damage Meter: Fixed top and bottom bar borders clipping when using bar border offset.
+- Nameplates: Fixed default nameplate text customization forcing the global font when only outline or size changes were wanted, preserving Blizzard's locale font for Cyrillic names unless the new font override is enabled.
+- Unit Frames: Fixed class-colored health backdrops not updating when target or target-of-target changed.
+- Vendor: Fixed Already-Known merchant highlighting for known cosmetic appearances and owned Housing decor items.
 
 ---
-
-<!--@end-eqol-beta@-->
 
 ## [10.21.2] - 2026-05-29
 
