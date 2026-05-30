@@ -114,6 +114,7 @@ local DEFAULT_WINDOW = {
 	changeBarSize = true,
 	barHeight = 20,
 	barAnchor = "CENTER",
+	barWidthOffset = 0,
 	barSpacing = 4,
 	smoothBars = true,
 	barBackgroundUseCustomTexture = false,
@@ -199,6 +200,7 @@ local DEFAULT_WINDOW = {
 	rankFontSize = 10,
 	showPercent = false,
 	hideRealmNames = true,
+	nameNoEllipsis = false,
 	abbreviation = "short",
 	valueLayout = "combined",
 	amountColumnWidth = 65,
@@ -246,6 +248,12 @@ local DEFAULT_WINDOW = {
 	borderColor = { r = 1, g = 0.8196079134941101, b = 0, a = 1 },
 	borderSize = 8,
 	borderInset = 2,
+	borderUseAdvancedOffsets = false,
+	borderOffsetX = 0,
+	borderOffsetY = 0,
+	borderSizeOffsetX = 0,
+	borderSizeOffsetY = 0,
+	unclampWindow = false,
 	fontFace = GLOBAL_FONT_KEY,
 	fontOutline = GLOBAL_STYLE_KEY,
 	fontSize = 14,
@@ -971,6 +979,24 @@ end
 local function formatDisplayName(source, config)
 	local name = formatSourceName(source and source.name, config)
 	if isSecret(name) then return name end
+	return name
+end
+
+function DamageMeter:TruncateNameWithoutEllipsis(name, fontString, config)
+	if config.nameNoEllipsis ~= true or isSecret(name) then return name end
+	if type(name) ~= "string" or name == "" or not fontString or not fontString.GetWidth then return name end
+	local width = fontString:GetWidth() or 0
+	if width <= 0 then return name end
+	local fontSize = clampNumber(config.fontSize, 8, 24, DEFAULT_WINDOW.fontSize)
+	local maxChars = math.floor(width / math.max(1, fontSize * 0.58))
+	if maxChars <= 0 then return "" end
+	local pos = 1
+	local count = 0
+	for char in name:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+		count = count + 1
+		if count > maxChars then return name:sub(1, pos - 1) end
+		pos = pos + #char
+	end
 	return name
 end
 
@@ -2924,7 +2950,8 @@ function DamageMeter:ApplyRowTextLayout(row, config, forceRankColumn)
 	else
 		row.bar:SetPoint("LEFT", row, "LEFT", 4, 0)
 	end
-	row.bar:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+	local barWidthOffset = clampNumber(config.barWidthOffset, -200, 200, DEFAULT_WINDOW.barWidthOffset)
+	row.bar:SetPoint("RIGHT", row, "RIGHT", -4 + barWidthOffset, 0)
 	row.bar:SetHeight(barHeight)
 	if normalizeAnchorV(config.barAnchor) == "TOP" then
 		row.bar:SetPoint("TOP", row, "TOP", 0, 0)
@@ -4451,6 +4478,12 @@ function DamageMeter:EnsureWindow(index)
 	local rowsViewport = CreateFrame("ScrollFrame", nil, frame)
 	rowsViewport:SetPoint("TOPLEFT", 4, -28)
 	rowsViewport:SetPoint("BOTTOMRIGHT", -4, 22)
+	rowsViewport:EnableMouse(true)
+	rowsViewport:SetScript("OnMouseUp", function(owner, button)
+		if button == "RightButton" then
+			DamageMeter:OpenContextMenu(owner, index)
+		end
+	end)
 	rowsViewport:EnableMouseWheel(true)
 	rowsViewport:SetScript("OnMouseWheel", function(_, delta)
 		local config = DamageMeter:GetConfig(index)
@@ -4476,6 +4509,12 @@ function DamageMeter:EnsureWindow(index)
 	frame.rowsViewport = rowsViewport
 
 	local rowsContainer = CreateFrame("Frame", nil, rowsViewport)
+	rowsContainer:EnableMouse(true)
+	rowsContainer:SetScript("OnMouseUp", function(owner, button)
+		if button == "RightButton" then
+			DamageMeter:OpenContextMenu(owner, index)
+		end
+	end)
 	rowsViewport:SetScrollChild(rowsContainer)
 	frame.rowsContainer = rowsContainer
 
@@ -4627,6 +4666,7 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 	frame.contentRows = contentRows
 
 	local texture = resolveMedia("statusbar", config.texture, DEFAULT_TEXTURE)
+	if frame.SetClampedToScreen then frame:SetClampedToScreen(config.unclampWindow ~= true) end
 	frame:SetSize(width, height)
 	self:ApplyWindowAnchor(index)
 	local headerButtonTextInset = self:ApplyHeaderButtons(frame, config, showHeaderButtons)
@@ -4673,9 +4713,19 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 	if config.borderEnabled == true then
 		local size = clampNumber(config.borderSize, 1, 32, DEFAULT_WINDOW.borderSize)
 		local offset = clampNumber(config.borderInset, 0, 24, DEFAULT_WINDOW.borderInset)
+		local borderOffsetX = 0
+		local borderOffsetY = 0
+		local borderSizeOffsetX = 0
+		local borderSizeOffsetY = 0
+		if config.borderUseAdvancedOffsets == true then
+			borderOffsetX = clampNumber(config.borderOffsetX, -200, 200, DEFAULT_WINDOW.borderOffsetX)
+			borderOffsetY = clampNumber(config.borderOffsetY, -200, 200, DEFAULT_WINDOW.borderOffsetY)
+			borderSizeOffsetX = clampNumber(config.borderSizeOffsetX, -200, 200, DEFAULT_WINDOW.borderSizeOffsetX)
+			borderSizeOffsetY = clampNumber(config.borderSizeOffsetY, -200, 200, DEFAULT_WINDOW.borderSizeOffsetY)
+		end
 		frame.windowBorder:ClearAllPoints()
-		frame.windowBorder:SetPoint("TOPLEFT", frame, "TOPLEFT", -offset, offset)
-		frame.windowBorder:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", offset, -offset)
+		frame.windowBorder:SetPoint("TOPLEFT", frame, "TOPLEFT", -offset + borderOffsetX - borderSizeOffsetX, offset + borderOffsetY + borderSizeOffsetY)
+		frame.windowBorder:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", offset + borderOffsetX + borderSizeOffsetX, -offset + borderOffsetY - borderSizeOffsetY)
 		frame.windowBorder:SetBackdrop({
 			bgFile = nil,
 			edgeFile = borderTexture,
@@ -5223,14 +5273,15 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 			self:ApplyIconBorder(row, config, source.classFilename, colors)
 			self:ApplyBarBorder(row, config, source.classFilename, colors)
 			if config.showIcons ~= false then applySourceIcon(row.icon, source, inFollowerDungeon, damageMeterType, config) end
-			row.name:SetText(formatDisplayName(source, config))
+			self:ApplyRowValueWidth(row, config, damageMeterType, forceRankColumn)
+			local displayName = formatDisplayName(source, config)
+			row.name:SetText(self:TruncateNameWithoutEllipsis(displayName, row.name, config))
 			setTextColorIfChanged(row.name, colors.nr, colors.ng, colors.nb, colors.na)
 				if config.prefixRankInName == true then
 					setTextColorIfChanged(row.rank, colors.prr, colors.prg, colors.prb, colors.pra)
 				else
 					setTextColorIfChanged(row.rank, colors.rr, colors.rg, colors.rb, colors.ra)
 				end
-				self:ApplyRowValueWidth(row, config, damageMeterType, forceRankColumn)
 				if row._damageMeterUseValueColumns then
 					row.value:SetText(amountText)
 					if row.rateValue then row.rateValue:SetText(rateText) end
@@ -6025,6 +6076,7 @@ function DamageMeter:BuildWindowSettings(index)
 		dividerSetting(layoutId),
 		sliderSetting(L["Width"] or "Width", function() return cfg().width end, function(value) self:SetConfigValue(index, "width", clampNumber(value, 100, 700, DEFAULT_WINDOW.width)) end, 100, 700, 1, layoutId),
 		sliderSetting(L["damageMeterHeightOffset"] or "Height offset", function() return cfg().heightOffset end, function(value) self:SetConfigValue(index, "heightOffset", clampNumber(value, 0, 300, DEFAULT_WINDOW.heightOffset)) end, 0, 300, 1, layoutId),
+		checkboxSetting(L["damageMeterUnclampWindow"] or "Unclamp window", function() return cfg().unclampWindow == true end, function(value) self:SetConfigValue(index, "unclampWindow", value) end, layoutId),
 		dividerSetting(layoutId),
 		dropdownSetting(L["damageMeterHeaderPosition"] or "Header position", function() return normalizeHeaderPosition(cfg().headerPosition) end, function(value) self:SetConfigValue(index, "headerPosition", normalizeHeaderPosition(value)) end, buildHeaderPositionOptions(), layoutId, 120),
 		dropdownSetting(L["damageMeterRowGrowth"] or "Rows grow", function() return normalizeRowGrowth(cfg().rowGrowth) end, function(value) self:SetConfigValue(index, "rowGrowth", normalizeRowGrowth(value)) end, buildRowGrowthOptions(), layoutId, 120),
@@ -6126,6 +6178,7 @@ function DamageMeter:BuildWindowSettings(index)
 		checkboxSetting(L["damageMeterChangeBarSize"] or "Change bar size", function() return cfg().changeBarSize == true end, function(value) self:SetConfigValue(index, "changeBarSize", value) end, barId),
 		sliderSetting(L["damageMeterBarHeight"] or "Bar height", function() return math.min(clampNumber(cfg().barHeight, 1, 70, DEFAULT_WINDOW.barHeight), clampNumber(cfg().rowHeight, 10, 70, DEFAULT_WINDOW.rowHeight)) end, function(value) self:SetConfigValue(index, "barHeight", clampNumber(value, 1, clampNumber(cfg().rowHeight, 10, 70, DEFAULT_WINDOW.rowHeight), DEFAULT_WINDOW.barHeight)) end, 1, 70, 1, barId, customBarSizeEnabled),
 		dropdownSetting(L["damageMeterBarAnchor"] or "Bar anchor", function() return normalizeAnchorV(cfg().barAnchor) end, function(value) self:SetConfigValue(index, "barAnchor", normalizeAnchorV(value)) end, buildVerticalAnchorOptions(), barId, 120, customBarSizeEnabled),
+		sliderSetting(L["damageMeterBarWidthOffset"] or "Bar width offset", function() return cfg().barWidthOffset end, function(value) self:SetConfigValue(index, "barWidthOffset", clampNumber(value, -200, 200, DEFAULT_WINDOW.barWidthOffset)) end, -200, 200, 1, barId),
 		dividerSetting(barId),
 		sliderSetting(L["damageMeterBarSpacing"] or "Bar spacing", function() return cfg().barSpacing end, function(value) self:SetConfigValue(index, "barSpacing", clampNumber(value, -16, 16, DEFAULT_WINDOW.barSpacing)) end, -16, 16, 1, barId),
 		dividerSetting(barId),
@@ -6208,6 +6261,7 @@ function DamageMeter:BuildWindowSettings(index)
 		{ name = L["damageMeterNames"] or "Names", kind = SettingType.Collapsible, id = namesId, defaultCollapsed = true },
 		checkboxSetting(L["damageMeterShowNames"] or "Show names", function() return cfg().showNames == true end, function(value) self:SetConfigValue(index, "showNames", value) end, namesId),
 		checkboxSetting(L["damageMeterHideRealmNames"] or "Hide realm names", function() return cfg().hideRealmNames ~= false end, function(value) self:SetConfigValue(index, "hideRealmNames", value) end, namesId, namesEnabled),
+		checkboxSetting(L["damageMeterNameNoEllipsis"] or "Truncate without ellipsis", function() return cfg().nameNoEllipsis == true end, function(value) self:SetConfigValue(index, "nameNoEllipsis", value) end, namesId, namesEnabled),
 		checkboxSetting(L["damageMeterNameUseClassColor"] or "Use class color for names", function() return cfg().nameUseClassColors == true end, function(value) self:SetConfigValue(index, "nameUseClassColors", value) end, namesId, namesEnabled),
 		colorSetting(L["damageMeterNameColor"] or "Name color", function() return normalizeColor(cfg().nameColor, DEFAULT_WINDOW.nameColor) end, function(value) self:SetConfigValue(index, "nameColor", normalizeColor(value, DEFAULT_WINDOW.nameColor)) end, DEFAULT_WINDOW.nameColor, namesId, fixedNameColorEnabled),
 		dividerSetting(namesId),
@@ -6372,7 +6426,15 @@ function DamageMeter:BuildWindowSettings(index)
 		dropdownSetting(L["Border texture"] or "Border texture", function() return cfg().borderTexture end, function(value) self:SetConfigValue(index, "borderTexture", value) end, buildMediaOptions("border", false), borderId, 260, windowBorderEnabled),
 		colorSetting(L["Border color"] or "Border color", function() return normalizeColor(cfg().borderColor, DEFAULT_WINDOW.borderColor) end, function(value) self:SetConfigValue(index, "borderColor", normalizeColor(value, DEFAULT_WINDOW.borderColor)) end, DEFAULT_WINDOW.borderColor, borderId, windowBorderEnabled),
 		sliderSetting(L["Border size"] or "Border size", function() return cfg().borderSize end, function(value) self:SetConfigValue(index, "borderSize", clampNumber(value, 1, 32, DEFAULT_WINDOW.borderSize)) end, 1, 32, 1, borderId, windowBorderEnabled),
-		sliderSetting(L["Border offset"] or "Border offset", function() return cfg().borderInset end, function(value) self:SetConfigValue(index, "borderInset", clampNumber(value, 0, 24, DEFAULT_WINDOW.borderInset)) end, 0, 24, 1, borderId, windowBorderEnabled),
+		sliderSetting(L["Border offset"] or "Border offset", function() return cfg().borderInset end, function(value) self:SetConfigValue(index, "borderInset", clampNumber(value, 0, 24, DEFAULT_WINDOW.borderInset)) end, 0, 24, 1, borderId, function() return windowBorderEnabled() and cfg().borderUseAdvancedOffsets ~= true end),
+		checkboxSetting(L["damageMeterBorderAdvancedOffsets"] or "Separate border offsets", function() return cfg().borderUseAdvancedOffsets == true end, function(value)
+			self:SetConfigValue(index, "borderUseAdvancedOffsets", value)
+			requestEditModeSettingsRefresh()
+		end, borderId, windowBorderEnabled),
+		sliderSetting(L["damageMeterBorderOffsetX"] or "Border X offset", function() return cfg().borderOffsetX end, function(value) self:SetConfigValue(index, "borderOffsetX", clampNumber(value, -200, 200, DEFAULT_WINDOW.borderOffsetX)) end, -200, 200, 1, borderId, function() return windowBorderEnabled() and cfg().borderUseAdvancedOffsets == true end),
+		sliderSetting(L["damageMeterBorderOffsetY"] or "Border Y offset", function() return cfg().borderOffsetY end, function(value) self:SetConfigValue(index, "borderOffsetY", clampNumber(value, -200, 200, DEFAULT_WINDOW.borderOffsetY)) end, -200, 200, 1, borderId, function() return windowBorderEnabled() and cfg().borderUseAdvancedOffsets == true end),
+		sliderSetting(L["damageMeterBorderWidthOffset"] or "Border width offset", function() return cfg().borderSizeOffsetX end, function(value) self:SetConfigValue(index, "borderSizeOffsetX", clampNumber(value, -200, 200, DEFAULT_WINDOW.borderSizeOffsetX)) end, -200, 200, 1, borderId, function() return windowBorderEnabled() and cfg().borderUseAdvancedOffsets == true end),
+		sliderSetting(L["damageMeterBorderHeightOffset"] or "Border height offset", function() return cfg().borderSizeOffsetY end, function(value) self:SetConfigValue(index, "borderSizeOffsetY", clampNumber(value, -200, 200, DEFAULT_WINDOW.borderSizeOffsetY)) end, -200, 200, 1, borderId, function() return windowBorderEnabled() and cfg().borderUseAdvancedOffsets == true end),
 	}
 	return settings
 end

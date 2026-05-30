@@ -6,6 +6,7 @@
 
 ### 🐛 Fixed
 
+- Damage Meter: Added right-click Quick Switch access on empty window areas and improved border, bar width, unclamp window, and name truncation controls.
 - Vendor: Fixed Already-Known merchant highlighting for known cosmetic appearances and owned Housing decor items.
 
 ---
