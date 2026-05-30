@@ -992,8 +992,8 @@ end
 
 function DamageMeter:TruncateNameWithoutEllipsis(name, fontString, config)
 	if config.nameNoEllipsis ~= true or isSecret(name) then return name end
-	if type(name) ~= "string" or name == "" or not fontString or not fontString.GetWidth then return name end
-	local width = fontString:GetWidth() or 0
+	if type(name) ~= "string" or name == "" or not fontString then return name end
+	local width = tonumber(fontString._damageMeterNameLayoutWidth) or 0
 	if width <= 0 then return name end
 	local fontSize = clampNumber(config.fontSize, 8, 24, DEFAULT_WINDOW.fontSize)
 	local maxChars = math.floor(width / math.max(1, fontSize * 0.58))
@@ -3075,6 +3075,7 @@ function DamageMeter:ApplyRowValueWidth(row, config, damageMeterType, forceRankC
 		local nameWidth = math.max(0, availableWidth - columnsWidth - nameValueGap - rankPrefixWidth)
 		row.value:SetWidth(amountWidth)
 		row.name:SetWidth(nameWidth)
+		row.name._damageMeterNameLayoutWidth = nameWidth
 		row.rank:SetWidth(rankWidth)
 		if row.rateValue then row.rateValue:SetWidth(rateWidth) end
 		if row.percentValue then row.percentValue:SetWidth(percentWidth) end
@@ -3162,6 +3163,7 @@ function DamageMeter:ApplyRowValueWidth(row, config, damageMeterType, forceRankC
 	local nameWidth = math.max(minNameWidth, availableWidth - valueWidth - nameGap - rankPrefixWidth)
 	row.value:SetWidth(valueWidth)
 	row.name:SetWidth(nameWidth)
+	row.name._damageMeterNameLayoutWidth = nameWidth
 	row.rank:SetWidth(rankWidth)
 	row.value:SetShown(true)
 	if row.rateValue then row.rateValue:Hide() end

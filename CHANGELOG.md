@@ -2,6 +2,14 @@
 
 <!--@eqol-beta@-->
 
+## [10.22.0-beta5] - 2026-05-30
+
+### 🐛 Fixed
+
+- Damage Meter: Fixed a secret-value error when using name truncation without ellipsis in restricted combat data.
+
+---
+
 ## [10.22.0-beta4] - 2026-05-30
 
 ### ✨ Added
