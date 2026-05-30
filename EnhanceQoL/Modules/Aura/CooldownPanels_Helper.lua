@@ -164,6 +164,9 @@ end
 
 Helper.PANEL_LAYOUT_DEFAULTS = {
 	iconSize = 36,
+	iconSizeSeparate = false,
+	iconWidth = 36,
+	iconHeight = 36,
 	spacing = 2,
 	layoutMode = "GRID",
 	fixedSlotCount = 0,
@@ -253,6 +256,9 @@ Helper.ENTRY_DEFAULTS = {
 	hideIcon = false,
 	iconSizeUseGlobal = true,
 	iconSize = 36,
+	iconSizeSeparate = false,
+	iconWidth = 36,
+	iconHeight = 36,
 	iconOffsetX = 0,
 	iconOffsetY = 0,
 	showCooldown = true,
@@ -674,6 +680,10 @@ function Helper.NormalizeFixedGroupIconSize(value)
 	return size
 end
 
+function Helper.NormalizeFixedGroupIconDimension(value, fallback)
+	return Helper.ClampInt(value, 12, 128, fallback)
+end
+
 function Helper.NormalizeFixedGroupLayoutOverrides(value)
 	if type(value) ~= "table" then return nil end
 	local normalized = {}
@@ -1006,6 +1016,9 @@ function Helper.NormalizeFixedGroups(layout)
 				group.dynamicStartPoint = Helper.NormalizeFixedGroupStartPoint(group.dynamicStartPoint, "TOPLEFT")
 				group.dynamicDirection = Helper.NormalizeFixedGroupDynamicDirection(group.dynamicStartPoint, group.dynamicDirection, nil)
 				group.iconSize = Helper.NormalizeFixedGroupIconSize(group.iconSize)
+				group.iconSizeSeparate = group.iconSizeSeparate == true
+				if group.iconSizeSeparate or group.iconWidth ~= nil then group.iconWidth = Helper.NormalizeFixedGroupIconDimension(group.iconWidth, group.iconSize or Helper.PANEL_LAYOUT_DEFAULTS.iconWidth or 36) end
+				if group.iconSizeSeparate or group.iconHeight ~= nil then group.iconHeight = Helper.NormalizeFixedGroupIconDimension(group.iconHeight, group.iconSize or Helper.PANEL_LAYOUT_DEFAULTS.iconHeight or 36) end
 				group.layoutOverrides = Helper.NormalizeFixedGroupLayoutOverrides(group.layoutOverrides)
 				seen[id] = true
 				writeIndex = writeIndex + 1
@@ -1111,13 +1124,22 @@ function Helper.SyncEntryFixedGroupIconState(panelOrLayout, entry, resolvedGroup
 	if type(entry) ~= "table" then return nil end
 	local group = type(resolvedGroup) == "table" and resolvedGroup or Helper.GetFixedGroupById(panelOrLayout, entry.fixedGroupId)
 	local groupIconSize = group and Helper.NormalizeFixedGroupIconSize(group.iconSize) or nil
-	if group and groupIconSize ~= nil then
+	local groupIconSizeSeparate = group and group.iconSizeSeparate == true
+	if group and (groupIconSize ~= nil or groupIconSizeSeparate) then
 		if entry.fixedGroupIconSizeInherited ~= true then
 			entry.fixedGroupIconSizePrevUseGlobal = entry.iconSizeUseGlobal
 			entry.fixedGroupIconSizePrev = entry.iconSize
+			entry.fixedGroupIconSizePrevSeparate = entry.iconSizeSeparate
+			entry.fixedGroupIconSizePrevWidth = entry.iconWidth
+			entry.fixedGroupIconSizePrevHeight = entry.iconHeight
 		end
 		entry.iconSizeUseGlobal = false
-		entry.iconSize = groupIconSize
+		entry.iconSizeSeparate = groupIconSizeSeparate
+		entry.iconSize = groupIconSize or entry.iconSize
+		if groupIconSizeSeparate then
+			entry.iconWidth = Helper.NormalizeFixedGroupIconDimension(group.iconWidth, entry.iconSize or Helper.ENTRY_DEFAULTS.iconSize)
+			entry.iconHeight = Helper.NormalizeFixedGroupIconDimension(group.iconHeight, entry.iconSize or Helper.ENTRY_DEFAULTS.iconSize)
+		end
 		entry.fixedGroupIconSizeInherited = true
 	elseif entry.fixedGroupIconSizeInherited == true then
 		local previousUseGlobal = entry.fixedGroupIconSizePrevUseGlobal
@@ -1127,13 +1149,22 @@ function Helper.SyncEntryFixedGroupIconState(panelOrLayout, entry, resolvedGroup
 			entry.iconSizeUseGlobal = true
 		end
 		entry.iconSize = entry.fixedGroupIconSizePrev
+		entry.iconSizeSeparate = entry.fixedGroupIconSizePrevSeparate
+		entry.iconWidth = entry.fixedGroupIconSizePrevWidth
+		entry.iconHeight = entry.fixedGroupIconSizePrevHeight
 		entry.fixedGroupIconSizeInherited = nil
 		entry.fixedGroupIconSizePrevUseGlobal = nil
 		entry.fixedGroupIconSizePrev = nil
+		entry.fixedGroupIconSizePrevSeparate = nil
+		entry.fixedGroupIconSizePrevWidth = nil
+		entry.fixedGroupIconSizePrevHeight = nil
 	else
 		entry.fixedGroupIconSizeInherited = nil
 		entry.fixedGroupIconSizePrevUseGlobal = nil
 		entry.fixedGroupIconSizePrev = nil
+		entry.fixedGroupIconSizePrevSeparate = nil
+		entry.fixedGroupIconSizePrevWidth = nil
+		entry.fixedGroupIconSizePrevHeight = nil
 	end
 	return group
 end
@@ -2211,6 +2242,9 @@ function Helper.NormalizePanel(panel, defaults)
 	panel.layout.fixedGridColumns = Helper.NormalizeFixedGridSize(panel.layout.fixedGridColumns, layoutDefaults.fixedGridColumns or Helper.PANEL_LAYOUT_DEFAULTS.fixedGridColumns or 0)
 	panel.layout.fixedGridRows = Helper.NormalizeFixedGridSize(panel.layout.fixedGridRows, layoutDefaults.fixedGridRows or Helper.PANEL_LAYOUT_DEFAULTS.fixedGridRows or 0)
 	Helper.NormalizeFixedGroups(panel.layout)
+	panel.layout.iconSizeSeparate = panel.layout.iconSizeSeparate == true
+	panel.layout.iconWidth = Helper.ClampInt(panel.layout.iconWidth, 12, 128, panel.layout.iconSize or layoutDefaults.iconWidth or Helper.PANEL_LAYOUT_DEFAULTS.iconWidth or 36)
+	panel.layout.iconHeight = Helper.ClampInt(panel.layout.iconHeight, 12, 128, panel.layout.iconSize or layoutDefaults.iconHeight or Helper.PANEL_LAYOUT_DEFAULTS.iconHeight or 36)
 	panel.layout.spacing = Helper.ClampInt(panel.layout.spacing, 0, Helper.SPACING_RANGE or 200, layoutDefaults.spacing or Helper.PANEL_LAYOUT_DEFAULTS.spacing or 2)
 	panel.layout.radialArcDegrees = Helper.ClampInt(
 		panel.layout.radialArcDegrees,
@@ -2341,6 +2375,9 @@ function Helper.NormalizeEntry(entry, defaults)
 	entry.customIconID = nil
 	if type(entry.iconSizeUseGlobal) ~= "boolean" then entry.iconSizeUseGlobal = true end
 	entry.iconSize = Helper.ClampInt(entry.iconSize, 12, 128, Helper.ENTRY_DEFAULTS.iconSize or Helper.PANEL_LAYOUT_DEFAULTS.iconSize or 36)
+	entry.iconSizeSeparate = entry.iconSizeSeparate == true
+	if entry.iconSizeSeparate or entry.iconWidth ~= nil then entry.iconWidth = Helper.ClampInt(entry.iconWidth, 12, 128, entry.iconSize or Helper.ENTRY_DEFAULTS.iconWidth or Helper.PANEL_LAYOUT_DEFAULTS.iconWidth or 36) end
+	if entry.iconSizeSeparate or entry.iconHeight ~= nil then entry.iconHeight = Helper.ClampInt(entry.iconHeight, 12, 128, entry.iconSize or Helper.ENTRY_DEFAULTS.iconHeight or Helper.PANEL_LAYOUT_DEFAULTS.iconHeight or 36) end
 	entry.iconOffsetX = Helper.ClampInt(entry.iconOffsetX, -Helper.OFFSET_RANGE, Helper.OFFSET_RANGE, Helper.ENTRY_DEFAULTS.iconOffsetX or 0)
 	entry.iconOffsetY = Helper.ClampInt(entry.iconOffsetY, -Helper.OFFSET_RANGE, Helper.OFFSET_RANGE, Helper.ENTRY_DEFAULTS.iconOffsetY or 0)
 	if type(entry.showIconTextureUseGlobal) ~= "boolean" then entry.showIconTextureUseGlobal = true end

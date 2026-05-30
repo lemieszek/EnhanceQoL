@@ -1577,6 +1577,9 @@ local function clearRuntimeLayoutShapeCache(runtime)
 	if not runtime then return end
 	runtime._eqolLastLayoutCount = nil
 	runtime._eqolLayoutIconSize = nil
+	runtime._eqolLayoutIconSizeSeparate = nil
+	runtime._eqolLayoutIconWidth = nil
+	runtime._eqolLayoutIconHeight = nil
 	runtime._eqolLayoutSpacing = nil
 	runtime._eqolLayoutMode = nil
 	runtime._eqolLayoutDirection = nil
@@ -1648,6 +1651,9 @@ local function didLayoutShapeChange(runtime, layout, layoutCount)
 	if
 		runtime._eqolLastLayoutCount == layoutCount
 		and runtime._eqolLayoutIconSize == layout.iconSize
+		and runtime._eqolLayoutIconSizeSeparate == layout.iconSizeSeparate
+		and runtime._eqolLayoutIconWidth == layout.iconWidth
+		and runtime._eqolLayoutIconHeight == layout.iconHeight
 		and runtime._eqolLayoutSpacing == layout.spacing
 		and runtime._eqolLayoutMode == layout.layoutMode
 		and runtime._eqolLayoutDirection == layout.direction
@@ -1678,6 +1684,9 @@ local function didLayoutShapeChange(runtime, layout, layoutCount)
 	end
 	runtime._eqolLastLayoutCount = layoutCount
 	runtime._eqolLayoutIconSize = layout.iconSize
+	runtime._eqolLayoutIconSizeSeparate = layout.iconSizeSeparate
+	runtime._eqolLayoutIconWidth = layout.iconWidth
+	runtime._eqolLayoutIconHeight = layout.iconHeight
 	runtime._eqolLayoutSpacing = layout.spacing
 	runtime._eqolLayoutMode = layout.layoutMode
 	runtime._eqolLayoutDirection = layout.direction
@@ -2817,8 +2826,53 @@ function CooldownPanels:SetFixedGroupIconSize(panelId, groupId, iconSize)
 	if not (panel and group) then return false end
 	local normalizedSize = Helper.NormalizeFixedGroupIconSize(iconSize)
 	local currentSize = Helper.NormalizeFixedGroupIconSize(group.iconSize)
-	if currentSize == normalizedSize then return false end
+	if currentSize == normalizedSize and group.iconSizeSeparate ~= true then return false end
 	group.iconSize = normalizedSize
+	group.iconSizeSeparate = false
+	for _, entryId in ipairs(panel.order or {}) do
+		local entry = panel.entries and panel.entries[entryId]
+		if entry and Helper.NormalizeFixedGroupId(entry.fixedGroupId) == group.id then self:SyncEntryFixedGroupState(panel, entry) end
+	end
+	Helper.NormalizeFixedGroups(panel.layout)
+	self:InvalidateLayoutEditGrid(panelId)
+	return true
+end
+
+function CooldownPanels:SetFixedGroupSeparateIconSize(panelId, groupId, enabled)
+	panelId = normalizeId(panelId)
+	groupId = Helper.NormalizeFixedGroupId(groupId)
+	local panel = panelId and self:GetPanel(panelId) or nil
+	local group = panel and CooldownPanels.GetFixedGroupById(panel, groupId) or nil
+	if not (panel and group) then return false end
+	local normalized = enabled == true
+	if group.iconSizeSeparate == normalized then return false end
+	group.iconSizeSeparate = normalized
+	if normalized then
+		local fallback = Helper.NormalizeFixedGroupIconSize(group.iconSize) or Helper.ClampInt(panel.layout and panel.layout.iconSize, 12, 128, Helper.PANEL_LAYOUT_DEFAULTS.iconSize)
+		group.iconWidth = Helper.NormalizeFixedGroupIconDimension(group.iconWidth, fallback)
+		group.iconHeight = Helper.NormalizeFixedGroupIconDimension(group.iconHeight, fallback)
+	end
+	for _, entryId in ipairs(panel.order or {}) do
+		local entry = panel.entries and panel.entries[entryId]
+		if entry and Helper.NormalizeFixedGroupId(entry.fixedGroupId) == group.id then self:SyncEntryFixedGroupState(panel, entry) end
+	end
+	Helper.NormalizeFixedGroups(panel.layout)
+	self:InvalidateLayoutEditGrid(panelId)
+	return true
+end
+
+function CooldownPanels:SetFixedGroupIconDimension(panelId, groupId, field, value)
+	panelId = normalizeId(panelId)
+	groupId = Helper.NormalizeFixedGroupId(groupId)
+	if field ~= "iconWidth" and field ~= "iconHeight" then return false end
+	local panel = panelId and self:GetPanel(panelId) or nil
+	local group = panel and CooldownPanels.GetFixedGroupById(panel, groupId) or nil
+	if not (panel and group) then return false end
+	local fallback = Helper.NormalizeFixedGroupIconSize(group.iconSize) or Helper.ClampInt(panel.layout and panel.layout.iconSize, 12, 128, Helper.PANEL_LAYOUT_DEFAULTS.iconSize)
+	local nextValue = Helper.NormalizeFixedGroupIconDimension(value, fallback)
+	if group[field] == nextValue then return false end
+	group[field] = nextValue
+	group.iconSizeSeparate = true
 	for _, entryId in ipairs(panel.order or {}) do
 		local entry = panel.entries and panel.entries[entryId]
 		if entry and Helper.NormalizeFixedGroupId(entry.fixedGroupId) == group.id then self:SyncEntryFixedGroupState(panel, entry) end
@@ -6899,34 +6953,54 @@ function CooldownPanels:ResolveEntryIconVisualLayout(layout, entry, baseSize)
 		layout = nil
 	end
 	local fallbackSize = Helper.ClampInt(baseSize, 12, 128, Helper.PANEL_LAYOUT_DEFAULTS.iconSize)
+	local fallbackWidth = Helper.ClampInt(layout and layout.iconSizeSeparate == true and layout.iconWidth, 12, 128, fallbackSize)
+	local fallbackHeight = Helper.ClampInt(layout and layout.iconSizeSeparate == true and layout.iconHeight, 12, 128, fallbackSize)
 	local layoutOffsetX = Helper.ClampInt(layout and layout.iconOffsetX, -Helper.OFFSET_RANGE, Helper.OFFSET_RANGE, 0)
 	local layoutOffsetY = Helper.ClampInt(layout and layout.iconOffsetY, -Helper.OFFSET_RANGE, Helper.OFFSET_RANGE, 0)
-	if not entry then return fallbackSize, layoutOffsetX, layoutOffsetY end
+	if not entry then return fallbackSize, layoutOffsetX, layoutOffsetY, fallbackWidth, fallbackHeight end
 	local cache = CooldownPanels._styleCacheRoots.iconLayoutEntry[entry]
 	if
 		not cache
 		or cache.baseSize ~= fallbackSize
+		or cache.baseWidth ~= fallbackWidth
+		or cache.baseHeight ~= fallbackHeight
 		or cache.layoutOffsetX ~= layoutOffsetX
 		or cache.layoutOffsetY ~= layoutOffsetY
 		or cache.iconSizeUseGlobal ~= entry.iconSizeUseGlobal
 		or cache.iconSize ~= entry.iconSize
+		or cache.iconSizeSeparate ~= entry.iconSizeSeparate
+		or cache.iconWidth ~= entry.iconWidth
+		or cache.iconHeight ~= entry.iconHeight
 		or cache.iconOffsetX ~= entry.iconOffsetX
 		or cache.iconOffsetY ~= entry.iconOffsetY
 	then
 		cache = cache or {}
 		cache.baseSize = fallbackSize
+		cache.baseWidth = fallbackWidth
+		cache.baseHeight = fallbackHeight
 		cache.layoutOffsetX = layoutOffsetX
 		cache.layoutOffsetY = layoutOffsetY
 		cache.iconSizeUseGlobal = entry.iconSizeUseGlobal
 		cache.iconSize = entry.iconSize
+		cache.iconSizeSeparate = entry.iconSizeSeparate
+		cache.iconWidth = entry.iconWidth
+		cache.iconHeight = entry.iconHeight
 		cache.iconOffsetX = entry.iconOffsetX
 		cache.iconOffsetY = entry.iconOffsetY
-		cache.size = entry.iconSizeUseGlobal == false and Helper.ClampInt(entry.iconSize, 12, 128, fallbackSize) or fallbackSize
+		if entry.iconSizeUseGlobal == false and entry.iconSizeSeparate == true then
+			cache.width = Helper.ClampInt(entry.iconWidth, 12, 128, fallbackWidth)
+			cache.height = Helper.ClampInt(entry.iconHeight, 12, 128, fallbackHeight)
+			cache.size = math.max(cache.width, cache.height)
+		else
+			cache.size = entry.iconSizeUseGlobal == false and Helper.ClampInt(entry.iconSize, 12, 128, fallbackSize) or fallbackSize
+			cache.width = entry.iconSizeUseGlobal == false and cache.size or fallbackWidth
+			cache.height = entry.iconSizeUseGlobal == false and cache.size or fallbackHeight
+		end
 		cache.offsetX = layoutOffsetX + Helper.ClampInt(entry.iconOffsetX, -Helper.OFFSET_RANGE, Helper.OFFSET_RANGE, 0)
 		cache.offsetY = layoutOffsetY + Helper.ClampInt(entry.iconOffsetY, -Helper.OFFSET_RANGE, Helper.OFFSET_RANGE, 0)
 		CooldownPanels._styleCacheRoots.iconLayoutEntry[entry] = cache
 	end
-	return cache.size, cache.offsetX, cache.offsetY
+	return cache.size, cache.offsetX, cache.offsetY, cache.width, cache.height
 end
 
 CooldownPanels._eqolFixedVisualCacheUtil = CooldownPanels._eqolFixedVisualCacheUtil or {}
@@ -7219,7 +7293,9 @@ function CooldownPanels:ApplyEntryIconVisualLayout(icon, layout, entry, panel, f
 	if not icon then return end
 	local slotAnchor = icon.slotAnchor
 	local baseSize = Helper.ClampInt(icon._eqolBaseSlotSize, 12, 128, Helper.PANEL_LAYOUT_DEFAULTS.iconSize)
-	local size, offsetX, offsetY = self:ResolveEntryIconVisualLayout(layout, entry, baseSize)
+	local size, offsetX, offsetY, width, height = self:ResolveEntryIconVisualLayout(layout, entry, baseSize)
+	width = width or size
+	height = height or size
 	local fixedOffsetX, fixedOffsetY = 0, 0
 	if panel and entry then
 		fixedOffsetX, fixedOffsetY = self:ResolveFixedGroupSlotSpacingOffset(
@@ -7230,7 +7306,7 @@ function CooldownPanels:ApplyEntryIconVisualLayout(icon, layout, entry, panel, f
 			fixedGridColumns,
 			slotColumn or icon._eqolPreviewCellColumn or icon._eqolLayoutSlotColumn,
 			slotRow or icon._eqolPreviewCellRow or icon._eqolLayoutSlotRow,
-			size,
+			math.max(width, height),
 			fixedContext,
 			fixedLayoutCache
 		)
@@ -7241,8 +7317,10 @@ function CooldownPanels:ApplyEntryIconVisualLayout(icon, layout, entry, panel, f
 	local previewBlingSize = icon.previewBling and (size * 1.5) or nil
 	if
 		icon._eqolVisualSize == size
-		and currentWidth == size
-		and currentHeight == size
+		and icon._eqolVisualWidth == width
+		and icon._eqolVisualHeight == height
+		and currentWidth == width
+		and currentHeight == height
 		and icon._eqolVisualAnchor == slotAnchor
 		and icon._eqolVisualOffsetX == offsetX
 		and icon._eqolVisualOffsetY == offsetY
@@ -7251,9 +7329,11 @@ function CooldownPanels:ApplyEntryIconVisualLayout(icon, layout, entry, panel, f
 	then
 		return
 	end
-	if icon._eqolVisualSize ~= size or currentWidth ~= size or currentHeight ~= size then
-		icon:SetSize(size, size)
+	if icon._eqolVisualWidth ~= width or icon._eqolVisualHeight ~= height or currentWidth ~= width or currentHeight ~= height then
+		icon:SetSize(width, height)
 		icon._eqolVisualSize = size
+		icon._eqolVisualWidth = width
+		icon._eqolVisualHeight = height
 	end
 	if slotAnchor then
 		local point, relativeTo, relativePoint, currentX, currentY = icon:GetPoint(1)
@@ -7468,11 +7548,17 @@ function cdp.RUNTIME.HasPlacementChange(icon, snapshot, data, fixedLayoutCache, 
 		or snapshot.layoutEditActive ~= (layoutEditActive == true)
 		or snapshot.entryIconSizeUseGlobal ~= (entry and entry.iconSizeUseGlobal)
 		or snapshot.entryIconSize ~= (entry and entry.iconSize)
+		or snapshot.entryIconSizeSeparate ~= (entry and entry.iconSizeSeparate)
+		or snapshot.entryIconWidth ~= (entry and entry.iconWidth)
+		or snapshot.entryIconHeight ~= (entry and entry.iconHeight)
 		or snapshot.entryIconOffsetX ~= (entry and entry.iconOffsetX)
 		or snapshot.entryIconOffsetY ~= (entry and entry.iconOffsetY)
 		or snapshot.entryFixedGroupId ~= (entry and entry.fixedGroupId)
 		or snapshot.layoutIconOffsetX ~= (layout and layout.iconOffsetX)
 		or snapshot.layoutIconOffsetY ~= (layout and layout.iconOffsetY)
+		or snapshot.layoutIconSizeSeparate ~= (layout and layout.iconSizeSeparate)
+		or snapshot.layoutIconWidth ~= (layout and layout.iconWidth)
+		or snapshot.layoutIconHeight ~= (layout and layout.iconHeight)
 		or snapshot.layoutSpacing ~= (layout and layout.spacing)
 		or snapshot.fixedLocalIndex ~= fixedLocalIndex
 		or snapshot.fixedCount ~= fixedCount
@@ -7492,11 +7578,17 @@ function cdp.RUNTIME.WritePlacementSnapshot(icon, snapshot, data, fixedLayoutCac
 	snapshot.layoutEditActive = layoutEditActive == true
 	snapshot.entryIconSizeUseGlobal = entry and entry.iconSizeUseGlobal or nil
 	snapshot.entryIconSize = entry and entry.iconSize or nil
+	snapshot.entryIconSizeSeparate = entry and entry.iconSizeSeparate or nil
+	snapshot.entryIconWidth = entry and entry.iconWidth or nil
+	snapshot.entryIconHeight = entry and entry.iconHeight or nil
 	snapshot.entryIconOffsetX = entry and entry.iconOffsetX or nil
 	snapshot.entryIconOffsetY = entry and entry.iconOffsetY or nil
 	snapshot.entryFixedGroupId = entry and entry.fixedGroupId or nil
 	snapshot.layoutIconOffsetX = layout and layout.iconOffsetX or nil
 	snapshot.layoutIconOffsetY = layout and layout.iconOffsetY or nil
+	snapshot.layoutIconSizeSeparate = layout and layout.iconSizeSeparate or nil
+	snapshot.layoutIconWidth = layout and layout.iconWidth or nil
+	snapshot.layoutIconHeight = layout and layout.iconHeight or nil
 	snapshot.layoutSpacing = layout and layout.spacing or nil
 	snapshot.fixedLocalIndex = fixedLocalIndex
 	snapshot.fixedCount = fixedCount
@@ -9803,6 +9895,8 @@ end
 local function applyIconLayout(frame, count, layout)
 	if not frame then return end
 	local iconSize = Helper.ClampInt(layout.iconSize, 12, 128, Helper.PANEL_LAYOUT_DEFAULTS.iconSize)
+	local iconWidth = layout.iconSizeSeparate == true and Helper.ClampInt(layout.iconWidth, 12, 128, iconSize) or iconSize
+	local iconHeight = layout.iconSizeSeparate == true and Helper.ClampInt(layout.iconHeight, 12, 128, iconSize) or iconSize
 	local spacing = Helper.ClampInt(layout.spacing, 0, Helper.SPACING_RANGE or 200, Helper.PANEL_LAYOUT_DEFAULTS.spacing)
 	local layoutMode = Helper.NormalizeLayoutMode(layout.layoutMode, Helper.PANEL_LAYOUT_DEFAULTS.layoutMode)
 	local direction = Helper.NormalizeDirection(layout.direction, Helper.PANEL_LAYOUT_DEFAULTS.direction)
@@ -9831,6 +9925,8 @@ local function applyIconLayout(frame, count, layout)
 
 	local cols, rows = 1, 1
 	local baseIconSize = iconSize
+	local baseIconWidth = iconWidth
+	local baseIconHeight = iconHeight
 	local rowSizes = {}
 	local rowOffsets = {}
 	local rowWidths = {}
@@ -9866,6 +9962,8 @@ local function applyIconLayout(frame, count, layout)
 				end
 				rowSizes[rowIndex] = rowSize
 				rowOffsets[rowIndex] = totalHeight
+				local rowIconWidth = layout.iconSizeSeparate == true and baseIconWidth or rowSize
+				local rowIconHeight = layout.iconSizeSeparate == true and baseIconHeight or rowSize
 				local rowCols = cols
 				if wrapCount and wrapCount > 0 then
 					local fillIndex = rowIndex
@@ -9873,16 +9971,16 @@ local function applyIconLayout(frame, count, layout)
 					rowCols = math.min(wrapCount, count - ((fillIndex - 1) * wrapCount))
 					if rowCols < 1 then rowCols = 1 end
 				end
-				local rowWidth = (rowCols * rowSize) + ((rowCols - 1) * spacing)
+				local rowWidth = (rowCols * rowIconWidth) + ((rowCols - 1) * spacing)
 				rowWidths[rowIndex] = rowWidth
 				if rowWidth > width then width = rowWidth end
-				totalHeight = totalHeight + rowSize + spacing
+				totalHeight = totalHeight + rowIconHeight + spacing
 			end
 			if rows > 0 then height = totalHeight - spacing end
 		else
-			local step = baseIconSize + spacing
-			width = (cols * baseIconSize) + ((cols - 1) * spacing)
-			height = (rows * baseIconSize) + ((rows - 1) * spacing)
+			local step = baseIconHeight + spacing
+			width = (cols * baseIconWidth) + ((cols - 1) * spacing)
+			height = (rows * baseIconHeight) + ((rows - 1) * spacing)
 			for rowIndex = 1, rows do
 				rowSizes[rowIndex] = baseIconSize
 				rowOffsets[rowIndex] = (rowIndex - 1) * step
@@ -9891,8 +9989,8 @@ local function applyIconLayout(frame, count, layout)
 		end
 	end
 
-	if width <= 0 then width = baseIconSize end
-	if height <= 0 then height = baseIconSize end
+	if width <= 0 then width = baseIconWidth end
+	if height <= 0 then height = baseIconHeight end
 
 	frame:SetSize(width, height)
 	ensureIconCount(frame, count)
@@ -9942,14 +10040,18 @@ local function applyIconLayout(frame, count, layout)
 
 	local function applyIconCommon(icon, rowSize)
 		local slotAnchor = icon.slotAnchor or icon
-		slotAnchor:SetSize(rowSize, rowSize)
+		local rowWidth = layout.iconSizeSeparate == true and baseIconWidth or rowSize
+		local rowHeight = layout.iconSizeSeparate == true and baseIconHeight or rowSize
+		slotAnchor:SetSize(rowWidth, rowHeight)
 		icon._eqolBaseSlotSize = rowSize
-		icon:SetSize(rowSize, rowSize)
+		icon:SetSize(rowWidth, rowHeight)
 		if slotAnchor ~= icon then
 			icon:ClearAllPoints()
 			icon:SetPoint("CENTER", slotAnchor, "CENTER", 0, 0)
 		end
 		icon._eqolVisualSize = nil
+		icon._eqolVisualWidth = nil
+		icon._eqolVisualHeight = nil
 		icon._eqolVisualAnchor = nil
 		icon._eqolVisualOffsetX = nil
 		icon._eqolVisualOffsetY = nil
@@ -10130,6 +10232,8 @@ local function applyIconLayout(frame, count, layout)
 
 		local rowIndex = row + 1
 		local rowSize = rowSizes[rowIndex] or baseIconSize
+		local rowIconWidth = layout.iconSizeSeparate == true and baseIconWidth or rowSize
+		local rowHeight = layout.iconSizeSeparate == true and baseIconHeight or rowSize
 		local rowOffset = rowOffsets[rowIndex] or (row * (baseIconSize + spacing))
 		local rowWidth = rowWidths[rowIndex] or width
 		local rowAlignOffset = 0
@@ -10142,17 +10246,17 @@ local function applyIconLayout(frame, count, layout)
 		end
 		local anchorXAdjust = 0
 		if anchorH == "CENTER" then
-			anchorXAdjust = rowSize / 2
+			anchorXAdjust = rowIconWidth / 2
 		elseif anchorH == "RIGHT" then
-			anchorXAdjust = rowSize
+			anchorXAdjust = rowIconWidth
 		end
 		local anchorYAdjust = 0
 		if anchorV == "CENTER" then
-			anchorYAdjust = -(rowSize / 2)
+			anchorYAdjust = -(rowHeight / 2)
 		elseif anchorV == "BOTTOM" then
-			anchorYAdjust = -rowSize
+			anchorYAdjust = -rowHeight
 		end
-		local stepX = primaryHorizontal and (rowSize + spacing) or (baseIconSize + spacing)
+		local stepX = primaryHorizontal and (rowIconWidth + spacing) or (baseIconWidth + spacing)
 
 		applyIconCommon(icon, rowSize)
 		slotAnchor:ClearAllPoints()
@@ -11372,6 +11476,24 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		local useGlobal = value ~= true
 		if currentEntry.iconSizeUseGlobal == useGlobal then return end
 		currentEntry.iconSizeUseGlobal = useGlobal
+		if not useGlobal then
+			currentEntry.iconWidth = Helper.ClampInt(currentEntry.iconWidth, 12, 128, currentEntry.iconSize or Helper.ENTRY_DEFAULTS.iconSize)
+			currentEntry.iconHeight = Helper.ClampInt(currentEntry.iconHeight, 12, 128, currentEntry.iconSize or Helper.ENTRY_DEFAULTS.iconSize)
+		end
+		refreshEntryViews()
+	end
+
+	local function setEntrySeparateIconSizeEnabled(value)
+		local _, currentEntry = getEntry()
+		if not currentEntry then return end
+		local enabled = value == true
+		if currentEntry.iconSizeSeparate == enabled then return end
+		currentEntry.iconSizeSeparate = enabled
+		if enabled then
+			currentEntry.iconSizeUseGlobal = false
+			currentEntry.iconWidth = Helper.ClampInt(currentEntry.iconWidth, 12, 128, currentEntry.iconSize or Helper.ENTRY_DEFAULTS.iconSize)
+			currentEntry.iconHeight = Helper.ClampInt(currentEntry.iconHeight, 12, 128, currentEntry.iconSize or Helper.ENTRY_DEFAULTS.iconSize)
+		end
 		refreshEntryViews()
 	end
 
@@ -11687,6 +11809,15 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		local size = CooldownPanels:ResolveEntryIconVisualLayout(layout, currentEntry, baseSize)
 		return size
 	end
+	local function getResolvedIconDimensions()
+		local layout = getLayout()
+		local runtimeState = getRuntime(panelId)
+		local currentIcon = runtimeState and runtimeState.entryToIcon and runtimeState.entryToIcon[entryId] or nil
+		local baseSize = currentIcon and currentIcon._eqolBaseSlotSize or Helper.ClampInt(layout and layout.iconSize, 12, 128, Helper.PANEL_LAYOUT_DEFAULTS.iconSize)
+		local _, currentEntry = getEntry()
+		local size, _, _, width, height = CooldownPanels:ResolveEntryIconVisualLayout(layout, currentEntry, baseSize)
+		return width or size, height or size
+	end
 
 	local initialEffectiveType = getEffectiveType()
 	local settings = {
@@ -11902,7 +12033,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			allowInput = true,
 			disabled = function()
 				local _, currentEntry = getEntry()
-				return not (currentEntry and currentEntry.iconSizeUseGlobal == false)
+				return not (currentEntry and currentEntry.iconSizeUseGlobal == false) or (currentEntry and currentEntry.iconSizeSeparate == true)
 			end,
 			get = function() return getResolvedIconSize() end,
 			set = function(_, value)
@@ -11911,6 +12042,72 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 				local size = Helper.ClampInt(value, 12, 128, getResolvedIconSize())
 				if currentEntry.iconSize == size then return end
 				currentEntry.iconSize = size
+				refreshEntryViews()
+			end,
+			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
+		},
+		{
+			name = L["CooldownPanelSeparateIconSize"] or "Separate icon width/height",
+			kind = SettingType.Checkbox,
+			parentId = "cooldownPanelStandaloneDisplay",
+			disabled = function()
+				local _, currentEntry = getEntry()
+				return not (currentEntry and currentEntry.iconSizeUseGlobal == false)
+			end,
+			get = function()
+				local _, currentEntry = getEntry()
+				return currentEntry and currentEntry.iconSizeSeparate == true or false
+			end,
+			set = function(_, value) setEntrySeparateIconSizeEnabled(value) end,
+		},
+		{
+			name = L["CooldownPanelIconWidth"] or "Icon width",
+			kind = SettingType.Slider,
+			parentId = "cooldownPanelStandaloneDisplay",
+			minValue = 12,
+			maxValue = 128,
+			valueStep = 1,
+			allowInput = true,
+			isShown = function()
+				local _, currentEntry = getEntry()
+				return currentEntry and currentEntry.iconSizeUseGlobal == false and currentEntry.iconSizeSeparate == true or false
+			end,
+			get = function()
+				local width = getResolvedIconDimensions()
+				return width
+			end,
+			set = function(_, value)
+				local _, currentEntry = getEntry()
+				if not currentEntry then return end
+				local width = Helper.ClampInt(value, 12, 128, currentEntry.iconWidth or currentEntry.iconSize or Helper.ENTRY_DEFAULTS.iconWidth)
+				if currentEntry.iconWidth == width then return end
+				currentEntry.iconWidth = width
+				refreshEntryViews()
+			end,
+			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
+		},
+		{
+			name = L["CooldownPanelIconHeight"] or "Icon height",
+			kind = SettingType.Slider,
+			parentId = "cooldownPanelStandaloneDisplay",
+			minValue = 12,
+			maxValue = 128,
+			valueStep = 1,
+			allowInput = true,
+			isShown = function()
+				local _, currentEntry = getEntry()
+				return currentEntry and currentEntry.iconSizeUseGlobal == false and currentEntry.iconSizeSeparate == true or false
+			end,
+			get = function()
+				local _, height = getResolvedIconDimensions()
+				return height
+			end,
+			set = function(_, value)
+				local _, currentEntry = getEntry()
+				if not currentEntry then return end
+				local height = Helper.ClampInt(value, 12, 128, currentEntry.iconHeight or currentEntry.iconSize or Helper.ENTRY_DEFAULTS.iconHeight)
+				if currentEntry.iconHeight == height then return end
+				currentEntry.iconHeight = height
 				refreshEntryViews()
 			end,
 			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
@@ -13942,7 +14139,7 @@ function CooldownPanels:BuildLayoutFixedGroupStandaloneSettings(panelId, groupId
 			parentId = "cooldownPanelStandaloneFixedGroupGeneral",
 			get = function()
 				local _, group = getPanelAndGroup()
-				return group and Helper.NormalizeFixedGroupIconSize(group.iconSize) ~= nil or false
+				return group and (Helper.NormalizeFixedGroupIconSize(group.iconSize) ~= nil or group.iconSizeSeparate == true) or false
 			end,
 			set = function(_, value)
 				local panel, group = getPanelAndGroup()
@@ -13964,7 +14161,7 @@ function CooldownPanels:BuildLayoutFixedGroupStandaloneSettings(panelId, groupId
 			allowInput = true,
 			disabled = function()
 				local _, group = getPanelAndGroup()
-				return not (group and Helper.NormalizeFixedGroupIconSize(group.iconSize) ~= nil)
+				return not (group and Helper.NormalizeFixedGroupIconSize(group.iconSize) ~= nil) or (group and group.iconSizeSeparate == true)
 			end,
 			get = function()
 				local panel, group = getPanelAndGroup()
@@ -13973,6 +14170,66 @@ function CooldownPanels:BuildLayoutFixedGroupStandaloneSettings(panelId, groupId
 			end,
 			set = function(_, value)
 				if CooldownPanels:SetFixedGroupIconSize(panelId, groupId, value) then refreshLivePreview() end
+			end,
+			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
+		},
+		{
+			name = L["CooldownPanelSeparateIconSize"] or "Separate icon width/height",
+			kind = SettingType.Checkbox,
+			parentId = "cooldownPanelStandaloneFixedGroupGeneral",
+			disabled = function()
+				local _, group = getPanelAndGroup()
+				return group == nil or (Helper.NormalizeFixedGroupIconSize(group.iconSize) == nil and group.iconSizeSeparate ~= true)
+			end,
+			get = function()
+				local _, group = getPanelAndGroup()
+				return group and group.iconSizeSeparate == true or false
+			end,
+			set = function(_, value)
+				if CooldownPanels:SetFixedGroupSeparateIconSize(panelId, groupId, value) then refresh() end
+			end,
+		},
+		{
+			name = L["CooldownPanelIconWidth"] or "Icon width",
+			kind = SettingType.Slider,
+			parentId = "cooldownPanelStandaloneFixedGroupGeneral",
+			minValue = 12,
+			maxValue = 128,
+			valueStep = 1,
+			allowInput = true,
+			isShown = function()
+				local _, group = getPanelAndGroup()
+				return group and group.iconSizeSeparate == true or false
+			end,
+			get = function()
+				local panel, group = getPanelAndGroup()
+				local fallback = Helper.NormalizeFixedGroupIconSize(group and group.iconSize) or Helper.ClampInt(panel and panel.layout and panel.layout.iconSize, 12, 128, Helper.PANEL_LAYOUT_DEFAULTS.iconSize)
+				return Helper.NormalizeFixedGroupIconDimension(group and group.iconWidth, fallback)
+			end,
+			set = function(_, value)
+				if CooldownPanels:SetFixedGroupIconDimension(panelId, groupId, "iconWidth", value) then refreshLivePreview() end
+			end,
+			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
+		},
+		{
+			name = L["CooldownPanelIconHeight"] or "Icon height",
+			kind = SettingType.Slider,
+			parentId = "cooldownPanelStandaloneFixedGroupGeneral",
+			minValue = 12,
+			maxValue = 128,
+			valueStep = 1,
+			allowInput = true,
+			isShown = function()
+				local _, group = getPanelAndGroup()
+				return group and group.iconSizeSeparate == true or false
+			end,
+			get = function()
+				local panel, group = getPanelAndGroup()
+				local fallback = Helper.NormalizeFixedGroupIconSize(group and group.iconSize) or Helper.ClampInt(panel and panel.layout and panel.layout.iconSize, 12, 128, Helper.PANEL_LAYOUT_DEFAULTS.iconSize)
+				return Helper.NormalizeFixedGroupIconDimension(group and group.iconHeight, fallback)
+			end,
+			set = function(_, value)
+				if CooldownPanels:SetFixedGroupIconDimension(panelId, groupId, "iconHeight", value) then refreshLivePreview() end
 			end,
 			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 		},
@@ -15594,7 +15851,7 @@ function CooldownPanels:ShowFixedGroupMenu(owner, panelId, groupId)
 			end
 		end)
 		local sizeMenu = rootDescription:CreateButton(L["Icon size"] or "Icon size")
-		sizeMenu:CreateRadio(L["CooldownPanelUsePanelSize"] or "Use panel size", function() return Helper.NormalizeFixedGroupIconSize(group.iconSize) == nil end, function()
+		sizeMenu:CreateRadio(L["CooldownPanelUsePanelSize"] or "Use panel size", function() return Helper.NormalizeFixedGroupIconSize(group.iconSize) == nil and group.iconSizeSeparate ~= true end, function()
 			if CooldownPanels:SetFixedGroupIconSize(panelId, groupId, nil) then
 				CooldownPanels:RefreshPanel(panelId)
 				CooldownPanels:RefreshEditor()
@@ -15602,7 +15859,7 @@ function CooldownPanels:ShowFixedGroupMenu(owner, panelId, groupId)
 		end)
 		for _, preset in ipairs({ 24, 30, 36, 42, 48, 56 }) do
 			local size = preset
-			sizeMenu:CreateRadio(tostring(size), function() return Helper.NormalizeFixedGroupIconSize(group.iconSize) == size end, function()
+			sizeMenu:CreateRadio(tostring(size), function() return Helper.NormalizeFixedGroupIconSize(group.iconSize) == size and group.iconSizeSeparate ~= true end, function()
 				if CooldownPanels:SetFixedGroupIconSize(panelId, groupId, size) then
 					CooldownPanels:RefreshPanel(panelId)
 					CooldownPanels:RefreshEditor()
@@ -18618,7 +18875,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				CooldownPanels:HideEditorGhostIcon(icon)
 				icon:Hide()
 			else
-				CooldownPanels:ApplyEntryIconVisualLayout(icon, nil, nil)
+				CooldownPanels:ApplyEntryIconVisualLayout(icon, layout, nil)
 				CooldownPanels:HideEditorGhostIcon(icon)
 				clearPreviewCooldown(icon.cooldown)
 				icon.cooldown:Clear()
@@ -19860,6 +20117,16 @@ applyEditLayout = function(panelId, field, value, skipRefresh)
 
 	if field == "iconSize" then
 		layout.iconSize = Helper.ClampInt(value, 12, 128, layout.iconSize)
+	elseif field == "iconSizeSeparate" then
+		layout.iconSizeSeparate = value == true
+		if layout.iconSizeSeparate then
+			layout.iconWidth = Helper.ClampInt(layout.iconWidth, 12, 128, layout.iconSize or Helper.PANEL_LAYOUT_DEFAULTS.iconSize)
+			layout.iconHeight = Helper.ClampInt(layout.iconHeight, 12, 128, layout.iconSize or Helper.PANEL_LAYOUT_DEFAULTS.iconSize)
+		end
+	elseif field == "iconWidth" then
+		layout.iconWidth = Helper.ClampInt(value, 12, 128, layout.iconWidth or layout.iconSize or Helper.PANEL_LAYOUT_DEFAULTS.iconWidth)
+	elseif field == "iconHeight" then
+		layout.iconHeight = Helper.ClampInt(value, 12, 128, layout.iconHeight or layout.iconSize or Helper.PANEL_LAYOUT_DEFAULTS.iconHeight)
 	elseif field == "spacing" then
 		layout.spacing = Helper.ClampInt(value, 0, Helper.SPACING_RANGE or 200, layout.spacing)
 	elseif field == "layoutMode" then
@@ -20248,8 +20515,9 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 	end
 	local function isRadialLayout() return Helper.NormalizeLayoutMode(layout.layoutMode, Helper.PANEL_LAYOUT_DEFAULTS.layoutMode) == "RADIAL" end
 	local function isFixedLayout() return Helper.NormalizeLayoutMode(layout.layoutMode, Helper.PANEL_LAYOUT_DEFAULTS.layoutMode) == "FIXED" end
+	local function usesSeparateIconSize() return layout.iconSizeSeparate == true end
 	local function shouldShowRowSize(index)
-		if isRadialLayout() then return false end
+		if isRadialLayout() or usesSeparateIconSize() then return false end
 		local rows, primaryHorizontal = getPanelRowCount(panel, layout)
 		return primaryHorizontal and rows >= index
 	end
@@ -20525,8 +20793,49 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				minValue = 12,
 				maxValue = 128,
 				valueStep = 1,
+				disabled = usesSeparateIconSize,
 				get = function() return layout.iconSize end,
 				set = function(_, value) applyEditLayout(panelId, "iconSize", value) end,
+				formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
+			},
+			{
+				name = L["CooldownPanelSeparateIconSize"] or "Separate icon width/height",
+				kind = SettingType.Checkbox,
+				field = "iconSizeSeparate",
+				parentId = "cooldownPanelLayout",
+				get = usesSeparateIconSize,
+				set = function(_, value) applyEditLayout(panelId, "iconSizeSeparate", value) end,
+			},
+			{
+				name = L["CooldownPanelIconWidth"] or "Icon width",
+				kind = SettingType.Slider,
+				field = "iconWidth",
+				parentId = "cooldownPanelLayout",
+				default = layout.iconWidth or layout.iconSize,
+				minValue = 12,
+				maxValue = 128,
+				valueStep = 1,
+				allowInput = true,
+				isShown = usesSeparateIconSize,
+				disabled = function() return not usesSeparateIconSize() end,
+				get = function() return Helper.ClampInt(layout.iconWidth, 12, 128, layout.iconSize or Helper.PANEL_LAYOUT_DEFAULTS.iconSize) end,
+				set = function(_, value) applyEditLayout(panelId, "iconWidth", value) end,
+				formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
+			},
+			{
+				name = L["CooldownPanelIconHeight"] or "Icon height",
+				kind = SettingType.Slider,
+				field = "iconHeight",
+				parentId = "cooldownPanelLayout",
+				default = layout.iconHeight or layout.iconSize,
+				minValue = 12,
+				maxValue = 128,
+				valueStep = 1,
+				allowInput = true,
+				isShown = usesSeparateIconSize,
+				disabled = function() return not usesSeparateIconSize() end,
+				get = function() return Helper.ClampInt(layout.iconHeight, 12, 128, layout.iconSize or Helper.PANEL_LAYOUT_DEFAULTS.iconSize) end,
+				set = function(_, value) applyEditLayout(panelId, "iconHeight", value) end,
 				formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 			},
 			{
