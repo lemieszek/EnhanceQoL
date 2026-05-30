@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.22.2] - 2026-05-30
+
+### 🐛 Fixed
+
+- Data Panels: Fixed the Edit Mode settings window becoming too large by grouping panel controls into exclusive collapsible sections.
+
+---
+
 ## [10.22.1] - 2026-05-30
 
 ### 🐛 Fixed

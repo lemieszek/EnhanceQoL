@@ -997,6 +997,15 @@ local function registerEditModePanel(panel)
 
 	local settings
 	if SettingType then
+		local section = {
+			layout = "dataPanelLayout",
+			background = "dataPanelBackground",
+			border = "dataPanelBorder",
+			display = "dataPanelDisplay",
+			text = "dataPanelText",
+			tooltip = "dataPanelTooltip",
+		}
+
 		local function isBorderVisible(layoutName)
 			if EditMode and EditMode.GetValue then
 				local value = EditMode:GetValue(id, "hideBorder", layoutName)
@@ -1041,10 +1050,12 @@ local function registerEditModePanel(panel)
 		end
 
 		settings = {
+			{ name = L["Layout"] or "Layout", kind = SettingType.Collapsible, id = section.layout, defaultCollapsed = false },
 			{
 				name = L["DataPanelWidth"],
 				kind = SettingType.Slider,
 				field = "width",
+				parentId = section.layout,
 				default = defaults.width,
 				minValue = PANEL_WIDTH_MIN,
 				maxValue = PANEL_WIDTH_MAX,
@@ -1077,15 +1088,18 @@ local function registerEditModePanel(panel)
 				name = L["DataPanelHeight"],
 				kind = SettingType.Slider,
 				field = "height",
+				parentId = section.layout,
 				default = defaults.height,
 				minValue = PANEL_HEIGHT_MIN,
 				maxValue = PANEL_HEIGHT_MAX,
 				valueStep = 1,
 			},
+			{ name = L["Background"] or "Background", kind = SettingType.Collapsible, id = section.background, defaultCollapsed = true },
 			{
 				name = L["Background texture"] or "Background texture",
 				kind = SettingType.Dropdown,
 				field = "backgroundTexture",
+				parentId = section.background,
 				default = defaults.backgroundTexture,
 				height = 200,
 				get = function(layoutName)
@@ -1113,12 +1127,14 @@ local function registerEditModePanel(panel)
 				name = L["DataPanelBackgroundUseCustomTexture"] or "Custom texture",
 				kind = SettingType.Checkbox,
 				field = "backgroundUseCustomTexture",
+				parentId = section.background,
 				default = defaults.backgroundUseCustomTexture,
 			},
 			{
 				name = L["DataPanelBackgroundCustomTexture"] or "Atlas name or texture ID",
 				kind = SettingType.Input,
 				field = "backgroundCustomTexture",
+				parentId = section.background,
 				default = defaults.backgroundCustomTexture,
 				maxChars = 160,
 				tooltip = L["DataPanelBackgroundCustomTextureDesc"] or "Enter an atlas name, texture file ID, or texture path.",
@@ -1128,6 +1144,7 @@ local function registerEditModePanel(panel)
 				name = L["Background color"] or "Background color",
 				kind = SettingType.Color,
 				field = "backgroundColor",
+				parentId = section.background,
 				default = defaults.backgroundColor,
 				hasOpacity = true,
 				get = function(layoutName)
@@ -1147,6 +1164,7 @@ local function registerEditModePanel(panel)
 				name = L["DataPanelBackgroundOffsetX"] or "X offset",
 				kind = SettingType.Slider,
 				field = "backgroundOffsetX",
+				parentId = section.background,
 				default = defaults.backgroundOffsetX,
 				minValue = -200,
 				maxValue = 200,
@@ -1157,6 +1175,7 @@ local function registerEditModePanel(panel)
 				name = L["DataPanelBackgroundOffsetY"] or "Y offset",
 				kind = SettingType.Slider,
 				field = "backgroundOffsetY",
+				parentId = section.background,
 				default = defaults.backgroundOffsetY,
 				minValue = -200,
 				maxValue = 200,
@@ -1167,6 +1186,7 @@ local function registerEditModePanel(panel)
 				name = L["DataPanelBackgroundSizeOffsetX"] or "Width offset",
 				kind = SettingType.Slider,
 				field = "backgroundSizeOffsetX",
+				parentId = section.background,
 				default = defaults.backgroundSizeOffsetX,
 				minValue = -200,
 				maxValue = 200,
@@ -1177,22 +1197,26 @@ local function registerEditModePanel(panel)
 				name = L["DataPanelBackgroundSizeOffsetY"] or "Height offset",
 				kind = SettingType.Slider,
 				field = "backgroundSizeOffsetY",
+				parentId = section.background,
 				default = defaults.backgroundSizeOffsetY,
 				minValue = -200,
 				maxValue = 200,
 				valueStep = 1,
 				formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 			},
+			{ name = L["Border"] or "Border", kind = SettingType.Collapsible, id = section.border, defaultCollapsed = true },
 			{
 				name = L["Hide border"],
 				kind = SettingType.Checkbox,
 				field = "hideBorder",
+				parentId = section.border,
 				default = defaults.hideBorder,
 			},
 			{
 				name = L["Border texture"] or "Border texture",
 				kind = SettingType.Dropdown,
 				field = "borderTexture",
+				parentId = section.border,
 				default = defaults.borderTexture,
 				height = 200,
 				get = function(layoutName)
@@ -1220,6 +1244,7 @@ local function registerEditModePanel(panel)
 				name = L["Border size"] or "Border size",
 				kind = SettingType.Slider,
 				field = "borderSize",
+				parentId = section.border,
 				default = defaults.borderSize,
 				minValue = 1,
 				maxValue = 64,
@@ -1231,6 +1256,7 @@ local function registerEditModePanel(panel)
 				name = L["Border offset"] or "Border offset",
 				kind = SettingType.Slider,
 				field = "borderOffset",
+				parentId = section.border,
 				default = defaults.borderOffset,
 				minValue = -20,
 				maxValue = 20,
@@ -1242,6 +1268,7 @@ local function registerEditModePanel(panel)
 				name = EMBLEM_BORDER_COLOR,
 				kind = SettingType.Color,
 				field = "borderColor",
+				parentId = section.border,
 				default = defaults.borderColor,
 				hasOpacity = true,
 				get = function(layoutName)
@@ -1258,16 +1285,19 @@ local function registerEditModePanel(panel)
 				end,
 				isEnabled = isBorderVisible,
 			},
+			{ name = L["Tooltip"] or "Tooltip", kind = SettingType.Collapsible, id = section.tooltip, defaultCollapsed = true },
 			{
 				name = L["Click-through"] or "Click-through",
 				kind = SettingType.Checkbox,
 				field = "clickThrough",
+				parentId = section.tooltip,
 				default = defaults.clickThrough,
 			},
 			{
 				name = L["DataPanelShowTooltips"] or "Show tooltips",
 				kind = SettingType.Checkbox,
 				field = "showTooltips",
+				parentId = section.tooltip,
 				default = defaults.showTooltips,
 				isEnabled = function(layoutName) return not isClickThrough(layoutName) end,
 			},
@@ -1275,6 +1305,7 @@ local function registerEditModePanel(panel)
 				name = L["Tooltip growth"] or "Tooltip growth",
 				kind = SettingType.Dropdown,
 				field = "tooltipGrowth",
+				parentId = section.tooltip,
 				default = defaults.tooltipGrowth,
 				values = TOOLTIP_GROWTH_OPTIONS,
 				isEnabled = function(layoutName)
@@ -1286,10 +1317,12 @@ local function registerEditModePanel(panel)
 					return panel.info and panel.info.showTooltips ~= false
 				end,
 			},
+			{ name = L["Display"] or "Display", kind = SettingType.Collapsible, id = section.display, defaultCollapsed = true },
 			{
 				name = L["Frame strata"],
 				kind = SettingType.Dropdown,
 				field = "strata",
+				parentId = section.display,
 				default = defaults.strata,
 				values = STRATA_DROPDOWN_VALUES,
 			},
@@ -1297,6 +1330,7 @@ local function registerEditModePanel(panel)
 				name = L["DataPanelStreams"],
 				kind = SettingType.Dropdown,
 				field = "streams",
+				parentId = section.display,
 				default = copyList(defaults.streams),
 				height = 240,
 				get = function() return copyList(panel.info.streams) end,
@@ -1322,6 +1356,7 @@ local function registerEditModePanel(panel)
 				name = L["DataPanelStreamGap"] or "Stream gap",
 				kind = SettingType.Slider,
 				field = "streamGap",
+				parentId = section.display,
 				default = defaults.streamGap,
 				minValue = 0,
 				maxValue = 100,
@@ -1331,6 +1366,7 @@ local function registerEditModePanel(panel)
 				name = L["DataPanelContentAlignment"] or "Content alignment",
 				kind = SettingType.Dropdown,
 				field = "contentAnchor",
+				parentId = section.display,
 				default = defaults.contentAnchor,
 				get = function(layoutName)
 					if EditMode and EditMode.GetValue then return EditMode:GetValue(id, "contentAnchor", layoutName) end
@@ -1352,10 +1388,12 @@ local function registerEditModePanel(panel)
 					end
 				end,
 			},
+			{ name = L["Text"] or "Text", kind = SettingType.Collapsible, id = section.text, defaultCollapsed = true },
 			{
 				name = L["Font"] or "Font",
 				kind = SettingType.Dropdown,
 				field = "fontFace",
+				parentId = section.text,
 				default = defaults.fontFace,
 				height = 200,
 				get = function(layoutName)
@@ -1382,6 +1420,7 @@ local function registerEditModePanel(panel)
 				name = L["DataPanelFontStyle"] or "Font style",
 				kind = SettingType.Dropdown,
 				field = "fontStyle",
+				parentId = section.text,
 				default = defaults.fontStyle,
 				height = 220,
 				get = function(layoutName) return getEditModeFontStyle(layoutName) end,
@@ -1406,6 +1445,7 @@ local function registerEditModePanel(panel)
 				name = L["Text scale"] or "Text scale",
 				kind = SettingType.Slider,
 				field = "streamFontScale",
+				parentId = section.text,
 				default = defaults.streamFontScale,
 				minValue = 50,
 				maxValue = 200,
@@ -1416,12 +1456,14 @@ local function registerEditModePanel(panel)
 				name = L["DataPanelUseClassTextColor"] or "Use class text color",
 				kind = SettingType.Checkbox,
 				field = "useClassTextColor",
+				parentId = section.text,
 				default = defaults.useClassTextColor,
 			},
 			{
 				name = L["Use custom text color"] or "Use custom text color",
 				kind = SettingType.Checkbox,
 				field = "useCustomTextColor",
+				parentId = section.text,
 				default = defaults.useCustomTextColor,
 				isEnabled = function(layoutName)
 					if EditMode and EditMode.GetValue then
@@ -1435,6 +1477,7 @@ local function registerEditModePanel(panel)
 				name = L["Text color"] or "Text color",
 				kind = SettingType.Color,
 				field = "textColor",
+				parentId = section.text,
 				default = defaults.textColor,
 				get = function(layoutName)
 					if EditMode and EditMode.GetValue then return normalizeColorTable(EditMode:GetValue(id, "textColor", layoutName), defaults.textColor) end
@@ -1456,6 +1499,7 @@ local function registerEditModePanel(panel)
 				name = L["DataPanelOpacityInCombat"] or "Opacity in combat",
 				kind = SettingType.Slider,
 				field = "textAlphaInCombat",
+				parentId = section.text,
 				default = defaults.textAlphaInCombat,
 				minValue = 0,
 				maxValue = 100,
@@ -1466,6 +1510,7 @@ local function registerEditModePanel(panel)
 				name = L["DataPanelOpacityOutOfCombat"] or "Opacity out of combat",
 				kind = SettingType.Slider,
 				field = "textAlphaOutOfCombat",
+				parentId = section.text,
 				default = defaults.textAlphaOutOfCombat,
 				minValue = 0,
 				maxValue = 100,
@@ -1503,8 +1548,10 @@ local function registerEditModePanel(panel)
 		buttons = buttons,
 		showOutsideEditMode = true,
 		enableOverlayToggle = true,
+		collapseExclusive = true,
 		showReset = false,
 		showSettingsReset = false,
+		settingsMaxHeight = 430,
 	})
 	panel.editModeRegistered = true
 	panel.editModeId = id
