@@ -4,6 +4,10 @@
 
 ## [10.22.0-beta4] - 2026-05-30
 
+### ✨ Added
+
+- Damage Meter: Added optional role-specific meter types so windows can switch their Type for tank, healer, or DPS specs.
+
 ### 🐛 Fixed
 
 - Damage Meter: Added right-click Quick Switch access on empty window areas and improved border, bar width, unclamp window, and name truncation controls.

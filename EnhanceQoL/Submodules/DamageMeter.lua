@@ -76,6 +76,10 @@ local SYNC_EXCLUDED_KEYS = {
 	anchorToWindow = true,
 	sessionType = true,
 	damageMeterType = true,
+	roleSpecificType = true,
+	tankDamageMeterType = true,
+	healerDamageMeterType = true,
+	damagerDamageMeterType = true,
 	visibility = true,
 	visibilityFadeAlpha = true,
 	visibilityFadeMode = true,
@@ -98,6 +102,10 @@ local DEFAULT_WINDOW = {
 	windowOffsetY = 0,
 	sessionType = "current",
 	damageMeterType = "DamageDone",
+	roleSpecificType = false,
+	tankDamageMeterType = "DamageDone",
+	healerDamageMeterType = "HealingDone",
+	damagerDamageMeterType = "DamageDone",
 	quickTypes = { "DamageDone", "DamageTaken" },
 	visibility = "always",
 	visibilityFadeMode = "none",
@@ -1629,9 +1637,19 @@ function DamageMeter:GetTemporarySelection(index)
 	return self.temporarySelections[index]
 end
 
+function DamageMeter:GetRoleSpecificDamageMeterType(config)
+	if not config or config.roleSpecificType ~= true then return nil end
+	local role = addon.variables.unitRole
+	if role == "TANK" then return config.tankDamageMeterType end
+	if role == "HEALER" then return config.healerDamageMeterType end
+	if role == "DAMAGER" then return config.damagerDamageMeterType end
+	return nil
+end
+
 function DamageMeter:GetEffectiveDamageMeterType(index)
 	local temporary = self:GetTemporarySelection(index)
-	return normalizeDamageMeterTypeKey(temporary.damageMeterType or self:GetConfig(index).damageMeterType)
+	local config = self:GetConfig(index)
+	return normalizeDamageMeterTypeKey(self:GetRoleSpecificDamageMeterType(config) or temporary.damageMeterType or config.damageMeterType)
 end
 
 function DamageMeter:GetQuickDamageMeterTypes(index)
@@ -1883,7 +1901,7 @@ function DamageMeter:BuildWindowRefreshState(index, shared)
 	end
 	local config = self:GetConfig(index)
 	local temporary = self.temporarySelections and self.temporarySelections[index]
-	local damageMeterType = normalizeDamageMeterTypeKey((temporary and temporary.damageMeterType) or config.damageMeterType)
+	local damageMeterType = self:GetEffectiveDamageMeterType(index)
 	local damageMeterEnum = getDamageMeterTypeValue(damageMeterType)
 	local sessionID = temporary and temporary.sessionID or nil
 	local sessionType = sessionID and nil or ((temporary and temporary.sessionType) or config.sessionType)
@@ -5394,6 +5412,37 @@ function DamageMeter:UnregisterLiveEvents()
 	self.liveEventsRegistered = false
 end
 
+function DamageMeter:HasRoleSpecificTypeWindows()
+	if not self:IsEnabled() then return false end
+	local windows = self:GetWindowsDB()
+	for index = 1, getWindowCount() do
+		if windows[index] and windows[index].roleSpecificType == true then return true end
+	end
+	return false
+end
+
+function DamageMeter:RegisterRoleTypeEvents()
+	local frame = self.eventFrame
+	if not frame or self.roleTypeEventsRegistered then return end
+	frame:RegisterEvent("PLAYER_ROLES_ASSIGNED")
+	if frame.RegisterUnitEvent then
+		frame:RegisterUnitEvent("PLAYER_SPECIALIZATION_CHANGED", "player")
+	else
+		frame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
+	end
+	frame:RegisterEvent("ACTIVE_PLAYER_SPECIALIZATION_CHANGED")
+	self.roleTypeEventsRegistered = true
+end
+
+function DamageMeter:UnregisterRoleTypeEvents()
+	local frame = self.eventFrame
+	if not frame or not self.roleTypeEventsRegistered then return end
+	frame:UnregisterEvent("PLAYER_ROLES_ASSIGNED")
+	frame:UnregisterEvent("PLAYER_SPECIALIZATION_CHANGED")
+	frame:UnregisterEvent("ACTIVE_PLAYER_SPECIALIZATION_CHANGED")
+	self.roleTypeEventsRegistered = false
+end
+
 function DamageMeter:UpdateEventState()
 	self:InvalidateLiveEventWatch()
 	local enabled = self:IsEnabled()
@@ -5406,6 +5455,11 @@ function DamageMeter:UpdateEventState()
 		self:RegisterLiveEvents()
 	else
 		self:UnregisterLiveEvents()
+	end
+	if self:HasRoleSpecificTypeWindows() then
+		self:RegisterRoleTypeEvents()
+	else
+		self:UnregisterRoleTypeEvents()
 	end
 	self:ScheduleRefresh()
 end
@@ -5865,9 +5919,10 @@ function DamageMeter:SetConfigValue(index, key, value)
 	else
 		config[key] = copyValue(value)
 	end
-	if key == "damageMeterType" or key == "sessionType" then
+	if key == "damageMeterType" or key == "sessionType" or key == "roleSpecificType" or key == "tankDamageMeterType" or key == "healerDamageMeterType" or key == "damagerDamageMeterType" then
 		self:InvalidateLiveEventWatch()
 	end
+	if key == "roleSpecificType" then self:UpdateEventState() end
 	self:MarkWindowStyleDirty(index)
 	if self:IsInEditMode() and config.tooltipPreview == true then
 		self.activePreviewTooltipIndex = index
@@ -5929,6 +5984,7 @@ function DamageMeter:BuildWindowSettings(index)
 	local function fixedIconBorderColorEnabled() return cfg().showIcons ~= false and cfg().iconBorderEnabled == true and cfg().iconBorderUseClassColor ~= true end
 	local function windowBorderEnabled() return cfg().borderEnabled == true end
 	local function fixedValueColorEnabled() return cfg().valueUseClassColors ~= true end
+	local function roleSpecificTypeEnabled() return cfg().roleSpecificType == true end
 	local function rankingEnabled() return cfg().showRanks ~= false end
 	local function rankColumnEnabled() return cfg().showRanks ~= false and cfg().prefixRankInName ~= true end
 	local function fixedRankColorEnabled() return cfg().showRanks ~= false and cfg().rankUseClassColors ~= true end
@@ -5979,7 +6035,14 @@ function DamageMeter:BuildWindowSettings(index)
 			{ value = "current", label = L["damageMeterCurrent"] or "Current" },
 			{ value = "overall", label = L["damageMeterOverall"] or "Overall" },
 		}, behaviorId, 110),
-		dropdownSetting(_G.TYPE or "Type", function() return normalizeDamageMeterTypeKey(cfg().damageMeterType) end, function(value) self:SetConfigValue(index, "damageMeterType", normalizeDamageMeterTypeKey(value)) end, buildDamageMeterTypeOptions, behaviorId, 180),
+		dropdownSetting(_G.TYPE or "Type", function() return normalizeDamageMeterTypeKey(cfg().damageMeterType) end, function(value) self:SetConfigValue(index, "damageMeterType", normalizeDamageMeterTypeKey(value)) end, buildDamageMeterTypeOptions, behaviorId, 180, function() return cfg().roleSpecificType ~= true end),
+		checkboxSetting(L["damageMeterRoleSpecificType"] or "Role-specific type", function() return cfg().roleSpecificType == true end, function(value)
+			self:SetConfigValue(index, "roleSpecificType", value)
+			requestEditModeSettingsRefresh()
+		end, behaviorId),
+		dropdownSetting(L["damageMeterTankType"] or "Tank type", function() return normalizeDamageMeterTypeKey(cfg().tankDamageMeterType) end, function(value) self:SetConfigValue(index, "tankDamageMeterType", normalizeDamageMeterTypeKey(value)) end, buildDamageMeterTypeOptions, behaviorId, 180, roleSpecificTypeEnabled),
+		dropdownSetting(L["damageMeterHealerType"] or "Healer type", function() return normalizeDamageMeterTypeKey(cfg().healerDamageMeterType) end, function(value) self:SetConfigValue(index, "healerDamageMeterType", normalizeDamageMeterTypeKey(value)) end, buildDamageMeterTypeOptions, behaviorId, 180, roleSpecificTypeEnabled),
+		dropdownSetting(L["damageMeterDpsType"] or "DPS type", function() return normalizeDamageMeterTypeKey(cfg().damagerDamageMeterType) end, function(value) self:SetConfigValue(index, "damagerDamageMeterType", normalizeDamageMeterTypeKey(value)) end, buildDamageMeterTypeOptions, behaviorId, 180, roleSpecificTypeEnabled),
 		dividerSetting(behaviorId),
 		dropdownSetting(L["damageMeterAutomaticClear"] or "Automatic clear", function() return normalizeAutoClearMode(db().damageMeterAutomaticClear) end, function(value)
 			db().damageMeterAutomaticClear = normalizeAutoClearMode(value)
@@ -6495,6 +6558,8 @@ function DamageMeter:Init()
 			self:InvalidatePartyClassFallback()
 			self:InvalidateDerivedTargetCache(true)
 			if event == "PLAYER_ENTERING_WORLD" then self:CheckAutomaticClear() end
+		elseif event == "PLAYER_ROLES_ASSIGNED" or event == "PLAYER_SPECIALIZATION_CHANGED" or event == "ACTIVE_PLAYER_SPECIALIZATION_CHANGED" then
+			self:InvalidateLiveEventWatch()
 		elseif event == "PLAYER_REGEN_DISABLED" then
 			self:MarkPartyClassFallbackCurrent()
 			self:InvalidateDerivedTargetCache(true)
