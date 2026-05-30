@@ -2283,14 +2283,16 @@ end
 local function merchantKnownTextMatches(text)
 	if not text then return false end
 	if ITEM_SPELL_KNOWN and text:find(ITEM_SPELL_KNOWN, 1, true) then return true end
-	if ERR_COSMETIC_KNOWN and text:find(ERR_COSMETIC_KNOWN, 1, true) then return true end
+	local cosmeticKnownText = _G.ERR_COSMETIC_KNOWN
+	if cosmeticKnownText and text:find(cosmeticKnownText, 1, true) then return true end
 	return false
 end
 
 local function merchantHousingOwnedTextMatches(text)
-	if not text or not HOUSING_DECOR_OWNED_COUNT_FORMAT then return false end
+	local decorOwnedCountFormat = _G.HOUSING_DECOR_OWNED_COUNT_FORMAT
+	if not text or not decorOwnedCountFormat then return false end
 
-	local prefix = HOUSING_DECOR_OWNED_COUNT_FORMAT:match("^(.-)%%[%d%$%.%-]*d")
+	local prefix = decorOwnedCountFormat:match("^(.-)%%[%d%$%.%-]*d")
 	if not prefix or prefix == "" or not text:find(prefix, 1, true) then return false end
 
 	local totalOwned = tonumber(text:match("(%d+)"))

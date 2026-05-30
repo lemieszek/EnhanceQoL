@@ -1611,6 +1611,11 @@ function DamageMeter:GetConfig(index)
 	return self:GetWindowsDB()[index]
 end
 
+function DamageMeter:GetRowViewportPadding(config)
+	if config.barBorderEnabled ~= true then return 0 end
+	return clampNumber(config.barBorderInset, 0, 24, DEFAULT_WINDOW.barBorderInset)
+end
+
 function DamageMeter:GetWindowStyleVersion(index)
 	self.windowStyleVersions = self.windowStyleVersions or {}
 	return self.windowStyleVersions[index] or 0
@@ -4301,6 +4306,7 @@ function DamageMeter:CreateRow(window, index, forceRankColumn)
 	local config = self:GetConfig(window.index)
 	local _, _, spacing = getRowMetrics(config)
 	local effectiveRowHeight = getEffectiveRowHeight(config)
+	local viewportPadding = self:GetRowViewportPadding(config)
 	local texture = resolveMedia("statusbar", config.texture, DEFAULT_TEXTURE)
 	local row = CreateFrame("Button", nil, window.rowsContainer)
 	row.windowIndex = window.index
@@ -4328,16 +4334,16 @@ function DamageMeter:CreateRow(window, index, forceRankColumn)
 			row:SetPoint("BOTTOMLEFT", window.rows[index - 1], "TOPLEFT", 0, spacing)
 			row:SetPoint("BOTTOMRIGHT", window.rows[index - 1], "TOPRIGHT", 0, spacing)
 		else
-			row:SetPoint("BOTTOMLEFT", window.rowsContainer, "BOTTOMLEFT")
-			row:SetPoint("BOTTOMRIGHT", window.rowsContainer, "BOTTOMRIGHT")
+			row:SetPoint("BOTTOMLEFT", window.rowsContainer, "BOTTOMLEFT", 0, viewportPadding)
+			row:SetPoint("BOTTOMRIGHT", window.rowsContainer, "BOTTOMRIGHT", 0, viewportPadding)
 		end
 	else
 		if index > 1 and window.rows[index - 1] then
 			row:SetPoint("TOPLEFT", window.rows[index - 1], "BOTTOMLEFT", 0, -spacing)
 			row:SetPoint("TOPRIGHT", window.rows[index - 1], "BOTTOMRIGHT", 0, -spacing)
 		else
-			row:SetPoint("TOPLEFT", window.rowsContainer, "TOPLEFT")
-			row:SetPoint("TOPRIGHT", window.rowsContainer, "TOPRIGHT")
+			row:SetPoint("TOPLEFT", window.rowsContainer, "TOPLEFT", 0, -viewportPadding)
+			row:SetPoint("TOPRIGHT", window.rowsContainer, "TOPRIGHT", 0, -viewportPadding)
 		end
 	end
 
@@ -4644,9 +4650,10 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 	local rowsGrowUp = normalizeRowGrowth(config.rowGrowth) == "UP"
 	local _, _, spacing = getRowMetrics(config)
 	local effectiveRowHeight = getEffectiveRowHeight(config)
+	local viewportPadding = self:GetRowViewportPadding(config)
 	local visibleRows = getEffectiveVisibleRows(config)
 	contentRows = math.max(0, tonumber(contentRows) or 0)
-	local viewportHeight = math.max(1, (visibleRows * effectiveRowHeight) + (math.max(0, visibleRows - 1) * spacing))
+	local viewportHeight = math.max(1, (visibleRows * effectiveRowHeight) + (math.max(0, visibleRows - 1) * spacing) + (viewportPadding * 2))
 	local titleFontSize = clampNumber(config.titleFontSize, 8, 28, DEFAULT_WINDOW.titleFontSize)
 	local statusFontSize = clampNumber(config.statusFontSize, 8, 24, DEFAULT_WINDOW.statusFontSize)
 	local headerButtonSize = clampNumber(config.headerButtonSize, 10, 32, DEFAULT_WINDOW.headerButtonSize)
@@ -4658,7 +4665,7 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 	local topOffset = math.floor(heightOffset / 2)
 	local bottomOffset = heightOffset - topOffset
 	local height = math.max(60, viewportHeight + topInset + bottomInset + heightOffset)
-	local contentHeight = contentRows > 0 and math.max(1, (contentRows * effectiveRowHeight) + (math.max(0, contentRows - 1) * spacing)) or 1
+	local contentHeight = contentRows > 0 and math.max(1, (contentRows * effectiveRowHeight) + (math.max(0, contentRows - 1) * spacing) + (viewportPadding * 2)) or math.max(1, viewportPadding * 2)
 	local borderR, borderG, borderB, borderA = colorComponents(config.borderColor, DEFAULT_WINDOW.borderColor)
 	local titleR, titleG, titleB, titleA = colorComponents(config.titleColor, DEFAULT_WINDOW.titleColor)
 	local backdropOffsetX = clampNumber(config.backdropOffsetX, -200, 200, DEFAULT_WINDOW.backdropOffsetX)
@@ -4784,16 +4791,16 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 				row:SetPoint("BOTTOMLEFT", previous, "TOPLEFT", 0, spacing)
 				row:SetPoint("BOTTOMRIGHT", previous, "TOPRIGHT", 0, spacing)
 			else
-				row:SetPoint("BOTTOMLEFT", frame.rowsContainer, "BOTTOMLEFT")
-				row:SetPoint("BOTTOMRIGHT", frame.rowsContainer, "BOTTOMRIGHT")
+				row:SetPoint("BOTTOMLEFT", frame.rowsContainer, "BOTTOMLEFT", 0, viewportPadding)
+				row:SetPoint("BOTTOMRIGHT", frame.rowsContainer, "BOTTOMRIGHT", 0, viewportPadding)
 			end
 		else
 			if previous then
 				row:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, -spacing)
 				row:SetPoint("TOPRIGHT", previous, "BOTTOMRIGHT", 0, -spacing)
 			else
-				row:SetPoint("TOPLEFT", frame.rowsContainer, "TOPLEFT")
-				row:SetPoint("TOPRIGHT", frame.rowsContainer, "TOPRIGHT")
+				row:SetPoint("TOPLEFT", frame.rowsContainer, "TOPLEFT", 0, -viewportPadding)
+				row:SetPoint("TOPRIGHT", frame.rowsContainer, "TOPRIGHT", 0, -viewportPadding)
 			end
 		end
 		if row.bar._damageMeterTexture ~= texture then
