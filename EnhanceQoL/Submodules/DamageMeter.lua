@@ -152,7 +152,8 @@ local DEFAULT_WINDOW = {
 	iconBorderColor = { r = 0, g = 0, b = 0, a = 0.9 },
 	iconBorderUseClassColor = true,
 	iconBorderSize = 8,
-	iconBorderInset = 1,
+	iconBorderInset = 0,
+	borderAlignmentVersion = 2,
 	showHeader = true,
 	showHeaderSession = false,
 	showHeaderType = true,
@@ -384,6 +385,15 @@ end
 
 local function applyWindowDefaults(target, index)
 	local hadSessionType = target.sessionType ~= nil
+	local borderAlignmentVersion = tonumber(target.borderAlignmentVersion) or 1
+	if borderAlignmentVersion < 2 then
+		local barBorderInset = target.barBorderInset
+		if barBorderInset == nil then barBorderInset = DEFAULT_WINDOW.barBorderInset end
+		if barBorderInset == 0 and target.iconBorderInset == 1 then
+			target.iconBorderInset = DEFAULT_WINDOW.iconBorderInset
+		end
+		target.borderAlignmentVersion = 2
+	end
 	copyDefaults(target, DEFAULT_WINDOW)
 	if index > 1 and not hadSessionType then
 		target.sessionType = index % 2 == 0 and "overall" or "current"

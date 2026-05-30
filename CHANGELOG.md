@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.22.1] - 2026-05-30
+
+### 🐛 Fixed
+
+- Damage Meter: Fixed icon and bar borders using mismatched default offsets when both borders are enabled.
+
+---
+
 ## [10.22.0] - 2026-05-30
 
 ### ✨ Added
@@ -15,6 +23,7 @@
 - Cooldown Panels: Fixed Use highest rank for Midnight combat potions to prefer Fleeting ranks before normal ranks, including Light's Potential, Potion of Recklessness, and Potion of Devoured Dreams.
 - Damage Meter: Added right-click Quick Switch access on empty window areas and improved border, bar width, unclamp window, and name truncation controls.
 - Damage Meter: Fixed a secret-value error when using name truncation without ellipsis in restricted combat data.
+- Damage Meter: Fixed icon and bar borders using mismatched default offsets when both borders are enabled.
 - Damage Meter: Fixed top and bottom bar borders clipping when using bar border offset.
 - Nameplates: Fixed default nameplate text customization forcing the global font when only outline or size changes were wanted, preserving Blizzard's locale font for Cyrillic names unless the new font override is enabled.
 - Unit Frames: Fixed class-colored health backdrops not updating when target or target-of-target changed.
