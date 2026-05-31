@@ -1,5 +1,15 @@
 # Changelog
 
+<!--@eqol-beta@-->
+## [10.23.0-beta2] - 2026-05-31
+
+### ✨ Added
+
+- Tooltips: Improved player tooltip details with cleaner white values, compact Mythic+ score best-run display, modifier-gated Mythic+ dungeon details, and an optional Chat & Social setting for item tooltips when hovering item links in chat.
+
+---
+<!--@end-eqol-beta@-->
+
 ## [10.23.0-beta1] - 2026-05-31
 
 ### ✨ Added

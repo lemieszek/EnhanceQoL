@@ -9,6 +9,9 @@ end
 
 local L = LibStub("AceLocale-3.0"):GetLocale("EnhanceQoL")
 local WHITE_FONT_COLOR = _G.WHITE_FONT_COLOR
+local TOOLTIP_LABEL_COLOR = "|cffffd200"
+local TOOLTIP_WHITE_COLOR = "|cffffffff"
+local TOOLTIP_COLOR_CLOSE = "|r"
 
 local frameLoad = CreateFrame("Frame")
 
@@ -117,7 +120,34 @@ local function GetUnitTokenFromTooltip(tt)
 	return nil, hadTooltipUnit
 end
 
--- no compact score formatting needed anymore
+local function ColorText(text, color)
+	if text == nil then return nil end
+	return (color or TOOLTIP_WHITE_COLOR) .. tostring(text) .. TOOLTIP_COLOR_CLOSE
+end
+
+local function ColorTextRGB(text, r, g, b)
+	if text == nil then return nil end
+	return ("|cff%02x%02x%02x%s|r"):format((r or 1) * 255, (g or 1) * 255, (b or 1) * 255, tostring(text))
+end
+
+local function FormatDungeonRunLevel(run)
+	if not run or not run.bestRunLevel or run.bestRunLevel <= 0 then return nil end
+	local stars = ""
+	if run.finishedSuccess then
+		local timeLimit = select(3, C_ChallengeMode.GetMapUIInfo(run.challengeModeID))
+		if timeLimit and run.bestRunDurationMS then
+			local bestRunDuration = run.bestRunDurationMS / 1000
+			if bestRunDuration <= timeLimit * 0.6 then
+				stars = "+++"
+			elseif bestRunDuration <= timeLimit * 0.8 then
+				stars = "++"
+			elseif bestRunDuration <= timeLimit then
+				stars = "+"
+			end
+		end
+	end
+	return stars .. tostring(run.bestRunLevel)
+end
 
 local pendingGUID, pendingUnit, pendingRequestedAt
 local EnsureUnitData -- forward declaration
@@ -251,20 +281,23 @@ local function RefreshTooltipForGUID(guid)
 	if showSpec then
 		if haveSpecLine then
 			local right = _G[tt:GetName() .. "TextRight" .. haveSpecLine]
-			if right then right:SetText(c.specName) end
+			if right then right:SetText(ColorText(c.specName)) end
 		else
 			if not (haveSpecLine or haveIlvlLine) then tt:AddLine(" ") end
-			tt:AddDoubleLine("|cffffd200" .. labelSpec .. "|r", c.specName)
+			tt:AddDoubleLine(TOOLTIP_LABEL_COLOR .. labelSpec .. TOOLTIP_COLOR_CLOSE, ColorText(c.specName))
 			addedAny = true
 		end
 	end
 	if showIlvl then
 		if haveIlvlLine then
 			local right = _G[tt:GetName() .. "TextRight" .. haveIlvlLine]
-			if right then right:SetText(tostring(c.ilvl)) end
+			if right then
+				right:SetText(tostring(c.ilvl))
+				right:SetTextColor(1, 1, 1)
+			end
 		else
 			if not (haveSpecLine or haveIlvlLine) and not addedAny and not showSpec then tt:AddLine(" ") end
-			tt:AddDoubleLine("|cffffd200" .. labelIlvl .. "|r", tostring(c.ilvl))
+			tt:AddDoubleLine(TOOLTIP_LABEL_COLOR .. labelIlvl .. TOOLTIP_COLOR_CLOSE, tostring(c.ilvl), 1, 1, 0, 1, 1, 1)
 			addedAny = true
 		end
 	end
@@ -528,7 +561,7 @@ local function AddRealmInfo(tooltip, realm)
 			local flag = GetRealmFlagPlaceholder(info, not isTooltipRestricted())
 			if flag then language = flag .. " " .. language end
 			ensureHeader()
-			tooltip:AddDoubleLine(L["TooltipRealmLanguage"], language)
+			tooltip:AddDoubleLine(L["TooltipRealmLanguage"], ColorText(language))
 		end
 	end
 
@@ -536,7 +569,7 @@ local function AddRealmInfo(tooltip, realm)
 		local realmType = realmData.FormatRealmType(info)
 		if realmType then
 			ensureHeader()
-			tooltip:AddDoubleLine(L["TooltipRealmType"], realmType)
+			tooltip:AddDoubleLine(L["TooltipRealmType"], ColorText(realmType))
 		end
 	end
 
@@ -544,7 +577,7 @@ local function AddRealmInfo(tooltip, realm)
 		local timezone = realmData.FormatRealmTimezone(info)
 		if timezone then
 			ensureHeader()
-			tooltip:AddDoubleLine(L["TooltipRealmTimezone"], timezone)
+			tooltip:AddDoubleLine(L["TooltipRealmTimezone"], ColorText(timezone))
 		end
 	end
 
@@ -553,7 +586,7 @@ local function AddRealmInfo(tooltip, realm)
 		if names and #names > 1 then
 			ensureHeader()
 			if #names <= 4 then
-				tooltip:AddDoubleLine(L["TooltipRealmConnected"], table.concat(names, ", "))
+				tooltip:AddDoubleLine(L["TooltipRealmConnected"], ColorText(table.concat(names, ", ")))
 			else
 				tooltip:AddLine(L["TooltipRealmConnected"] .. ":")
 				tooltip:AddLine(table.concat(names, ", "), 1, 1, 1, true)
@@ -845,7 +878,7 @@ local function IsModifierTooltipRefreshNeeded()
 	local db = addon.db
 	if not db then return false end
 	if db["TooltipHideOverrideEnabled"] then return true end
-	if db["TooltipShowMythicScore"] and db["TooltipMythicScoreRequireModifier"] then return true end
+	if db["TooltipShowMythicScore"] then return true end
 	if db["TooltipUnitInspectRequireModifier"] and (db["TooltipUnitShowSpec"] or db["TooltipUnitShowItemLevel"]) then return true end
 	if db["TooltipIDRequireModifier"] and HasTooltipIDOptions() then return true end
 	return false
@@ -1015,7 +1048,7 @@ local function checkAdditionalTooltip(tooltip)
 		local targetUnit = unit .. "target"
 		if UnitExists(targetUnit) then
 			local targetName = FormatUnitName(targetUnit)
-			if targetName then tooltip:AddDoubleLine(L["TooltipTargeting"] or "Targeting", targetName) end
+			if targetName then tooltip:AddDoubleLine(L["TooltipTargeting"] or "Targeting", ColorText(targetName)) end
 		end
 	end
 
@@ -1024,14 +1057,13 @@ local function checkAdditionalTooltip(tooltip)
 		if mountName then
 			if mountIcon then mountName = ("|T%d:16:16:0:0|t %s"):format(mountIcon, mountName) end
 			if mountCollected then mountName = ("|TInterface\\RaidFrame\\ReadyCheck-Ready:14:14:0:0|t %s"):format(mountName) end
-			tooltip:AddDoubleLine(L["TooltipMount"] or "Mount", mountName)
+			tooltip:AddDoubleLine(L["TooltipMount"] or "Mount", ColorText(mountName))
 		end
 	end
 
 	if unit then AddUnitRealmInfo(tooltip, unit) end
 
 	local showMythic = addon.db["TooltipShowMythicScore"] and SafeUnitExists(unit) and UnitCanAttack("player", unit) == false and addon.Tooltip.variables.maxLevel == UnitLevel(unit)
-	if showMythic and addon.db["TooltipMythicScoreRequireModifier"] and not IsConfiguredModifierDown() then showMythic = false end
 	if showMythic then
 		local timeLimit
 		local rating = C_PlayerInfo.GetPlayerMythicPlusRatingSummary(unit)
@@ -1045,16 +1077,11 @@ local function checkAdditionalTooltip(tooltip)
 			local parts = addon.db["TooltipMythicScoreParts"]
 			local wantScore = type(parts) ~= "table" and true or parts.score == true
 			local wantBest = type(parts) ~= "table" and true or parts.best == true
+			local detailsRequireModifier = addon.db["TooltipMythicScoreRequireModifier"] == true
 			local wantDungeons = type(parts) ~= "table" and true or parts.dungeons == true
+			if detailsRequireModifier and not IsConfiguredModifierDown() then wantDungeons = false end
 
 			local printedAny = false
-			if wantScore then
-				r, g, b = C_ChallengeMode.GetDungeonScoreRarityColor(rating.currentSeasonScore):GetRGB()
-				tooltip:AddLine(" ")
-				tooltip:AddDoubleLine(DUNGEON_SCORE, rating.currentSeasonScore, 1, 1, 0, r, g, b)
-				printedAny = true
-			end
-
 			if rating.currentSeasonScore > 0 and (wantBest or wantDungeons) then
 				for _, key in pairs(rating.runs) do
 					ratingInfo[key.challengeModeID] = key
@@ -1115,41 +1142,31 @@ local function checkAdditionalTooltip(tooltip)
 						b = b,
 					})
 				end
-				if wantBest and bestDungeon and bestDungeon.mapScore > 0 then
-					timeLimit = select(3, C_ChallengeMode.GetMapUIInfo(bestDungeon.challengeModeID))
-					r, g, b = 1, 1, 1
-					local stars = ""
-					local hexColor = string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255)
-					local bestName = challengeLabel(bestDungeon.challengeModeID)
-					if bestDungeon.finishedSuccess then
-						local bestRunDuration = bestDungeon.bestRunDurationMS / 1000
-						local timeForPlus3 = timeLimit * 0.6
-						local timeForPlus2 = timeLimit * 0.8
-						local timeForPlus1 = timeLimit
-						if bestRunDuration <= timeForPlus3 then
-							stars = "+++"
-						elseif bestRunDuration <= timeForPlus2 then
-							stars = "++"
-						elseif bestRunDuration <= timeForPlus1 then
-							stars = "+"
-						end
-						stars = stars .. bestDungeon.bestRunLevel
-					else
-						stars = bestDungeon.bestRunLevel
-						r, g, b = 0.5, 0.5, 0.5
-					end
+			end
+
+			if wantScore then
+				r, g, b = C_ChallengeMode.GetDungeonScoreRarityColor(rating.currentSeasonScore):GetRGB()
+				local scoreText = ColorTextRGB(rating.currentSeasonScore or 0, r, g, b)
+				local bestLevel = wantBest and bestDungeon and bestDungeon.mapScore > 0 and FormatDungeonRunLevel(bestDungeon) or nil
+				if bestLevel then scoreText = ("%s %s"):format(scoreText, ColorText("(" .. bestLevel .. ")")) end
+				tooltip:AddLine(" ")
+				tooltip:AddDoubleLine(TOOLTIP_LABEL_COLOR .. DUNGEON_SCORE .. TOOLTIP_COLOR_CLOSE, scoreText, 1, 1, 1, 1, 1, 1)
+				printedAny = true
+			elseif wantBest and bestDungeon and bestDungeon.mapScore > 0 then
+				local stars = FormatDungeonRunLevel(bestDungeon)
+				local bestName = challengeLabel(bestDungeon.challengeModeID)
+				if stars then
 					if not printedAny then tooltip:AddLine(" ") end
-					tooltip:AddDoubleLine(L["BestMythic+run"], hexColor .. stars .. "|r " .. bestName, 1, 1, 0, r, g, b)
+					tooltip:AddDoubleLine(TOOLTIP_LABEL_COLOR .. L["BestMythic+run"] .. TOOLTIP_COLOR_CLOSE, ("%s %s"):format(stars, bestName), 1, 1, 1, 1, 1, 1)
 					printedAny = true
 				end
+			end
 
-				if wantDungeons and #dungeonList > 0 then
-					table.sort(dungeonList, function(a, b) return a.score > b.score end)
-					-- Add a spacer before the dungeon list (always one blank line)
-					tooltip:AddLine(" ")
-					for _, dungeon in ipairs(dungeonList) do
-						tooltip:AddDoubleLine(dungeon.text, dungeon.level, 1, 1, 1, dungeon.r, dungeon.g, dungeon.b)
-					end
+			if wantDungeons and #dungeonList > 0 then
+				table.sort(dungeonList, function(a, b) return a.score > b.score end)
+				tooltip:AddLine(" ")
+				for _, dungeon in ipairs(dungeonList) do
+					tooltip:AddDoubleLine(dungeon.text, dungeon.level, 1, 1, 1, dungeon.r, dungeon.g, dungeon.b)
 				end
 			end
 		end
@@ -1489,10 +1506,10 @@ local function checkAdditionalUnit(tt)
 		showIlvl = false
 	end
 	if showSpec or showIlvl then tt:AddLine(" ") end
-	if showSpec then tt:AddDoubleLine("|cffffd200" .. SPECIALIZATION .. "|r", c.specName) end
+	if showSpec then tt:AddDoubleLine(TOOLTIP_LABEL_COLOR .. SPECIALIZATION .. TOOLTIP_COLOR_CLOSE, ColorText(c.specName)) end
 	if showIlvl then
 		local label = STAT_AVERAGE_ITEM_LEVEL or ITEM_LEVEL or "Item Level"
-		tt:AddDoubleLine("|cffffd200" .. label .. "|r", tostring(c.ilvl))
+		tt:AddDoubleLine(TOOLTIP_LABEL_COLOR .. label .. TOOLTIP_COLOR_CLOSE, tostring(c.ilvl), 1, 1, 0, 1, 1, 1)
 	end
 	if showSpec or showIlvl then tt:Show() end
 end

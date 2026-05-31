@@ -84,6 +84,16 @@ local data = {
 		default = false,
 	},
 	{
+		var = "chatShowItemTooltipsOnHover",
+		text = L["chatItemTooltipOnHover"],
+		desc = L["chatItemTooltipOnHoverDesc"],
+		func = function(key)
+			addon.db["chatShowItemTooltipsOnHover"] = key
+			if addon.ChatIcons and addon.ChatIcons.SetItemTooltipOnHoverEnabled then addon.ChatIcons:SetItemTooltipOnHoverEnabled(key) end
+		end,
+		default = false,
+	},
+	{
 		var = "chatShowItemLevelInLinks",
 		text = L["chatItemLevelInLink"],
 		desc = L["chatItemLevelInLinkDesc"],
