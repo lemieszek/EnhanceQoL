@@ -638,6 +638,7 @@ local classResourceFramesByClass = {
 local totemFrameClasses = {
 	DEATHKNIGHT = true,
 	DRUID = true,
+	EVOKER = true,
 	MAGE = true,
 	MONK = true,
 	PALADIN = true,

@@ -5,8 +5,10 @@
 ### 🐛 Fixed
 
 - Data Panels: Fixed the Talent loadout click menu using an unsorted order.
+- Damage Meter: Fixed icon, bar, and row borders using mismatched vertical bounds when borders are enabled together.
 - Unit Frames: Fixed Player, Target, and Focus leader indicators not showing raid assistants in the same icon slot.
 - Unit Frames: Fixed Player, Target, and Focus leader/assist indicators staying hidden when the status container had no other visible status elements.
+- Unit Frames: Fixed Evoker missing Totem Tracker.
 
 ---
 
