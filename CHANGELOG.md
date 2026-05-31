@@ -1,5 +1,14 @@
 # Changelog
 
+## [10.22.3] - 2026-05-31
+
+### 🐛 Fixed
+
+- Unit Frames: Fixed Player, Target, and Focus leader indicators not showing raid assistants in the same icon slot.
+- Unit Frames: Fixed Player, Target, and Focus leader/assist indicators staying hidden when the status container had no other visible status elements.
+
+---
+
 ## [10.22.2] - 2026-05-30
 
 ### 🐛 Fixed

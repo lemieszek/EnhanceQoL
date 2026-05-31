@@ -8332,10 +8332,13 @@ local function updateStatus(cfg, unit)
 	local showUnitStatus = usCfg.enabled == true
 	local showCombatIndicator = UF.SupportsCombatIndicator(unit) and ciCfg.enabled ~= false
 	local showStatus = showName or showLevel or showUnitStatus or showCombatIndicator
+	local leaderCfg = cfg.leaderIcon or (def and def.leaderIcon) or {}
+	local showLeaderIndicator = (unit == UNIT.PLAYER or unit == UNIT.TARGET or unit == UNIT.FOCUS) and leaderCfg.enabled == true
+	local showStatusFrame = showStatus or showLeaderIndicator
 	local statusHeight = UF.ResolveStatusHeight(cfg, def, showStatus)
 	if statusHeight <= 0 then statusHeight = 0.001 end
 	st.status:SetHeight(statusHeight)
-	st.status:SetShown(showStatus)
+	st.status:SetShown(showStatusFrame)
 	local nameFontSize = scfg.nameFontSize or scfg.fontSize or 14
 	local levelFontSize = scfg.levelFontSize or scfg.fontSize or 14
 	local statusFontSize = scfg.fontSize or nameFontSize or levelFontSize or 14

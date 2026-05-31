@@ -3620,7 +3620,13 @@ function H.updateLeaderIndicator(st, unit, cfg, def, skipDisabled)
 		st.leaderIcon:SetAtlas("UI-HUD-UnitFrame-Player-Group-LeaderIcon", false)
 		st.leaderIcon:Show()
 	else
-		st.leaderIcon:Hide()
+		local showAssist = UnitIsGroupAssistant and UnitIsGroupAssistant(unit)
+		if showAssist then
+			st.leaderIcon:SetTexture("Interface\\GroupFrame\\UI-Group-AssistantIcon")
+			st.leaderIcon:Show()
+		else
+			st.leaderIcon:Hide()
+		end
 	end
 end
 
