@@ -5,7 +5,12 @@
 
 ### ✨ Added
 
+- Damage Meter: Added an optional raid encounter-start trigger for automatic clear.
 - Tooltips: Improved player tooltip details with cleaner white values, compact Mythic+ score best-run display, modifier-gated Mythic+ dungeon details, and an optional Chat & Social setting for item tooltips when hovering item links in chat.
+
+### 🐛 Fixed
+
+- Damage Meter: Fixed healing breakdown tooltips labeling the rate column as DPS instead of HPS.
 
 ---
 <!--@end-eqol-beta@-->

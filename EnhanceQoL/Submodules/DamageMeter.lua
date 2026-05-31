@@ -1591,6 +1591,7 @@ local function normalizeAutoClearInstances(value)
 	end
 	if value.party == true then normalized.party = true end
 	if value.raid == true then normalized.raid = true end
+	if value.raidEncounter == true then normalized.raidEncounter = true end
 	return normalized
 end
 
@@ -1606,6 +1607,7 @@ local function buildAutoClearInstanceOptions()
 	return {
 		{ value = "party", text = L["Dungeon"] or "Dungeon" },
 		{ value = "raid", text = L["Raid"] or "Raid" },
+		{ value = "raidEncounter", text = L["damageMeterAutomaticClearRaidEncounterStart"] or "Raid encounter start" },
 	}
 end
 
@@ -3971,6 +3973,13 @@ getTooltipColumnVisibility = function(config, damageMeterType)
 	return showAmount, showDPS, showPercent
 end
 
+function DamageMeter:GetTooltipRateColumnLabel(damageMeterType)
+	if damageMeterType == "HealingDone" or damageMeterType == "Hps" then
+		return getDamageMeterTypeLabel("Hps") or "HPS"
+	end
+	return L["damageMeterTooltipDPS"] or "DPS"
+end
+
 resolveTooltipUnitName = function(value, config)
 	if value == nil then return nil end
 	if isSecret(value) then return value end
@@ -4097,9 +4106,10 @@ function DamageMeter:BuildTooltipRows(details, config, damageMeterType, derivedT
 	local totalAmount = safeNumber(details.totalAmount)
 	local showSpellSection = damageMeterType ~= "EnemyDamageTaken" and #details.combatSpells > 0
 	local detailsMaxAmount = details.maxAmount
+	local rateColumnLabel = self:GetTooltipRateColumnLabel(damageMeterType)
 
 	if showSpellSection then
-		rows[#rows + 1] = { header = true, name = L["damageMeterTooltipSpellName"] or "Spell Name", icon = "Interface\\WORLDSTATEFRAME\\CombatSwords", amount = showAmount and (L["damageMeterTooltipAmount"] or "Amount"), dps = showDPS and (L["damageMeterTooltipDPS"] or "DPS"), percent = showPercent and "%" }
+		rows[#rows + 1] = { header = true, name = L["damageMeterTooltipSpellName"] or "Spell Name", icon = "Interface\\WORLDSTATEFRAME\\CombatSwords", amount = showAmount and (L["damageMeterTooltipAmount"] or "Amount"), dps = showDPS and rateColumnLabel, percent = showPercent and "%" }
 	end
 	local targetMap = {}
 	local directTargetRows = {}
@@ -4167,7 +4177,7 @@ function DamageMeter:BuildTooltipRows(details, config, damageMeterType, derivedT
 	if useDerivedTargets or #targets > 0 or #directTargetRows > 0 then
 		if showSpellSection then addTooltipSectionGap(rows) end
 		local targetHeaderName = damageMeterType == "EnemyDamageTaken" and (L["damageMeterTooltipPlayers"] or "Players") or (L["damageMeterTooltipTargets"] or "Targets")
-		rows[#rows + 1] = { header = true, name = targetHeaderName, atlas = damageMeterType ~= "EnemyDamageTaken" and TOOLTIP_TARGET_ATLAS or nil, icon = damageMeterType == "EnemyDamageTaken" and "Interface\\Icons\\Achievement_GuildPerk_EveryonesAFriend" or nil, amount = showAmount and (L["damageMeterTooltipAmount"] or "Amount"), dps = showDPS and (L["damageMeterTooltipDPS"] or "DPS"), percent = showPercent and "%" }
+		rows[#rows + 1] = { header = true, name = targetHeaderName, atlas = damageMeterType ~= "EnemyDamageTaken" and TOOLTIP_TARGET_ATLAS or nil, icon = damageMeterType == "EnemyDamageTaken" and "Interface\\Icons\\Achievement_GuildPerk_EveryonesAFriend" or nil, amount = showAmount and (L["damageMeterTooltipAmount"] or "Amount"), dps = showDPS and rateColumnLabel, percent = showPercent and "%" }
 		if useDerivedTargets then
 			for _, target in ipairs(derivedTargetRows) do
 				rows[#rows + 1] = target
@@ -5561,6 +5571,7 @@ function DamageMeter:RegisterLiveEvents()
 	frame:RegisterEvent("PLAYER_REGEN_DISABLED")
 	frame:RegisterEvent("PLAYER_REGEN_ENABLED")
 	frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+	frame:RegisterEvent("ENCOUNTER_START")
 	frame:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
 	frame:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
 	frame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
@@ -5581,6 +5592,7 @@ function DamageMeter:UnregisterLiveEvents()
 	frame:UnregisterEvent("PLAYER_REGEN_DISABLED")
 	frame:UnregisterEvent("PLAYER_REGEN_ENABLED")
 	frame:UnregisterEvent("PLAYER_ENTERING_WORLD")
+	frame:UnregisterEvent("ENCOUNTER_START")
 	frame:UnregisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
 	frame:UnregisterEvent("UPDATE_SHAPESHIFT_FORM")
 	frame:UnregisterEvent("ZONE_CHANGED_NEW_AREA")
@@ -5910,6 +5922,42 @@ function DamageMeter:CheckAutomaticClear()
 		C_Timer.After(AUTO_CLEAR_DELAY_SECONDS, function() DamageMeter:RunAutomaticClear(instanceKey) end)
 	else
 		self:RunAutomaticClear(instanceKey)
+	end
+end
+
+function DamageMeter:RunEncounterStartAutomaticClear(clearKey)
+	if self.autoClearPendingEncounterKey ~= clearKey then return end
+	self.autoClearPendingEncounterKey = nil
+	if not self:IsEnabled() or self:IsInEditMode() then return end
+	local mode = normalizeAutoClearMode(db().damageMeterAutomaticClear)
+	if mode == "never" then return end
+	local instances = normalizeAutoClearInstances(db().damageMeterAutomaticClearInstances)
+	if instances.raidEncounter ~= true then return end
+	local inInstance, instanceType
+	if IsInInstance then inInstance, instanceType = IsInInstance() end
+	if not inInstance or instanceType ~= "raid" then return end
+	if mode == "ask" then
+		self:PromptAutoClearData()
+	else
+		self:ResetData()
+	end
+end
+
+function DamageMeter:CheckEncounterStartAutomaticClear(encounterID)
+	if not self:IsEnabled() or self:IsInEditMode() then return end
+	local mode = normalizeAutoClearMode(db().damageMeterAutomaticClear)
+	if mode == "never" then return end
+	local instances = normalizeAutoClearInstances(db().damageMeterAutomaticClearInstances)
+	if instances.raidEncounter ~= true then return end
+	local inInstance, instanceType
+	if IsInInstance then inInstance, instanceType = IsInInstance() end
+	if not inInstance or instanceType ~= "raid" then return end
+	local clearKey = table.concat({ "encounter", tostring(select(8, GetInstanceInfo()) or "0"), tostring(encounterID or "0"), tostring(GetTime and GetTime() or 0) }, "\001")
+	self.autoClearPendingEncounterKey = clearKey
+	if C_Timer and C_Timer.After then
+		C_Timer.After(0.1, function() DamageMeter:RunEncounterStartAutomaticClear(clearKey) end)
+	else
+		self:RunEncounterStartAutomaticClear(clearKey)
 	end
 end
 
@@ -6265,7 +6313,7 @@ function DamageMeter:BuildWindowSettings(index)
 			kind = SettingType.MultiDropdown,
 			field = "damageMeterAutomaticClearInstances",
 			parentId = behaviorId,
-			height = 90,
+			height = 115,
 			values = buildAutoClearInstanceOptions(),
 			hideSummary = true,
 			isEnabled = function() return normalizeAutoClearMode(db().damageMeterAutomaticClear) ~= "never" end,
@@ -6275,6 +6323,7 @@ function DamageMeter:BuildWindowSettings(index)
 				if type(selection) == "table" then
 					if selection.party == true then instances.party = true end
 					if selection.raid == true then instances.raid = true end
+					if selection.raidEncounter == true then instances.raidEncounter = true end
 				end
 				db().damageMeterAutomaticClearInstances = instances
 			end,
@@ -6283,7 +6332,7 @@ function DamageMeter:BuildWindowSettings(index)
 				return instances[value] == true
 			end,
 			setSelected = function(_, value, state)
-				if value ~= "party" and value ~= "raid" then return end
+				if value ~= "party" and value ~= "raid" and value ~= "raidEncounter" then return end
 				local instances = normalizeAutoClearInstances(db().damageMeterAutomaticClearInstances)
 				if state then
 					instances[value] = true
@@ -6791,6 +6840,9 @@ function DamageMeter:Init()
 		elseif event == "UNIT_THREAT_LIST_UPDATE" or event == "UNIT_THREAT_SITUATION_UPDATE" or event == "UNIT_TARGET" or event == "PLAYER_TARGET_CHANGED" then
 			self:ScheduleThreatRefresh()
 		elseif event == "ADDON_RESTRICTION_STATE_CHANGED" then
+			self:ScheduleContextRefresh()
+		elseif event == "ENCOUNTER_START" then
+			self:CheckEncounterStartAutomaticClear(damageMeterType)
 			self:ScheduleContextRefresh()
 		elseif event == "ZONE_CHANGED_NEW_AREA" then
 			self:CheckAutomaticClear()

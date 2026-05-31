@@ -6,3 +6,4 @@ news/*
 scripts/locale_payloads/*
 wow-ui-retail.skill
 docs/CooldownPanelAutoDurationReview.json
+.codex/environments/environment.toml
