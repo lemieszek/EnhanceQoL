@@ -1,6 +1,10 @@
 # Changelog
 
-## [10.22.3] - 2026-05-31
+## [10.23.0] - 2026-05-31
+
+### ✨ Added
+
+- Damage Meter: Added a Threat meter type for the current target.
 
 ### 🐛 Fixed
 

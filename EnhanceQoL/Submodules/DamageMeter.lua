@@ -1,4 +1,4 @@
--- luacheck: globals C_DamageMeter C_DeathRecap C_LFGInfo C_Spell C_StringUtil C_CVar C_RestrictedActions C_ChallengeMode SetCVar StaticPopupDialogs StaticPopup_Show YES CANCEL OKAY MenuUtil Menu GameTooltip SecondsToClock DAMAGE_METER_COMBAT_NUMBER CLASS_ICON_TCOORDS UnitClass UnitExists UnitGUID UnitAffectingCombat IsInRaid IsInInstance GetInstanceInfo Ambiguate UISpecialFrames GetCursorPosition GetTime C_Timer ACTION_SWING ACTION_ENVIRONMENTAL_DAMAGE_DROWNING ACTION_ENVIRONMENTAL_DAMAGE_FALLING ACTION_ENVIRONMENTAL_DAMAGE_FIRE ACTION_ENVIRONMENTAL_DAMAGE_LAVA ACTION_ENVIRONMENTAL_DAMAGE_SLIME ACTION_ENVIRONMENTAL_DAMAGE_FATIGUE DEATH_RECAP_TITLE CreateAbbreviateConfig
+-- luacheck: globals C_DamageMeter C_DeathRecap C_LFGInfo C_Spell C_StringUtil C_CVar C_RestrictedActions C_ChallengeMode SetCVar StaticPopupDialogs StaticPopup_Show YES CANCEL OKAY MenuUtil Menu GameTooltip SecondsToClock DAMAGE_METER_COMBAT_NUMBER CLASS_ICON_TCOORDS UnitClass UnitExists UnitGUID UnitName UnitCanAttack UnitIsPlayer UnitAffectingCombat UnitDetailedThreatSituation GetNumGroupMembers GetNumSubgroupMembers IsInRaid IsInInstance GetInstanceInfo Ambiguate UISpecialFrames GetCursorPosition GetTime C_Timer ACTION_SWING ACTION_ENVIRONMENTAL_DAMAGE_DROWNING ACTION_ENVIRONMENTAL_DAMAGE_FALLING ACTION_ENVIRONMENTAL_DAMAGE_FIRE ACTION_ENVIRONMENTAL_DAMAGE_LAVA ACTION_ENVIRONMENTAL_DAMAGE_SLIME ACTION_ENVIRONMENTAL_DAMAGE_FATIGUE DEATH_RECAP_TITLE CreateAbbreviateConfig
 local addonName, addon = ...
 
 local host = addon.DamageMeterHost or {}
@@ -668,6 +668,7 @@ local DAMAGE_METER_TYPES = {
 	{ key = "HealingDone", global = "DAMAGE_METER_TYPE_HEALING_DONE", enum = "HealingDone" },
 	{ key = "Hps", global = "DAMAGE_METER_TYPE_HPS", enum = "Hps" },
 	{ key = "Interrupts", global = "DAMAGE_METER_TYPE_INTERRUPTS", enum = "Interrupts" },
+	{ key = "Threat", global = "THREAT" },
 }
 
 local DAMAGE_METER_TYPE_ICONS = {
@@ -682,6 +683,7 @@ local DAMAGE_METER_TYPE_ICONS = {
 	HealingDone = "Interface\\Icons\\Spell_Holy_HolyBolt",
 	Hps = "Interface\\Icons\\Spell_Holy_HolyBolt",
 	Interrupts = "Interface\\Icons\\Ability_Kick",
+	Threat = "Interface\\Icons\\Ability_Warrior_Incite",
 }
 
 local function getDamageMeterTypeInfo(key)
@@ -707,13 +709,14 @@ end
 
 local function getDamageMeterTypeValue(key)
 	local info = getDamageMeterTypeInfo(key)
+	if not info.enum then return nil end
 	return Enum and Enum.DamageMeterType and Enum.DamageMeterType[info.enum]
 end
 
 local function buildDamageMeterTypeOptions()
 	local options = {}
 	for _, info in ipairs(DAMAGE_METER_TYPES) do
-		if Enum and Enum.DamageMeterType and Enum.DamageMeterType[info.enum] ~= nil then
+		if not info.enum or (Enum and Enum.DamageMeterType and Enum.DamageMeterType[info.enum] ~= nil) then
 			options[#options + 1] = { value = info.key, label = getDamageMeterTypeLabel(info.key) }
 		end
 	end
@@ -1030,6 +1033,7 @@ end
 
 local function getRowValueMode(damageMeterType, config)
 	if damageMeterType == "Deaths" then return "death" end
+	if damageMeterType == "Threat" then return "threat" end
 	if damageMeterType == "Dispels" or damageMeterType == "Interrupts" then return "count" end
 	local valueMode = normalizeValueMode(config and config.valueMode)
 	if valueMode == "both" then return "amountAndRate" end
@@ -1094,13 +1098,18 @@ local ROW_VALUE_FORMATTERS = {
 	count = formatCountRowValueText,
 	death = formatDeathRowValueText,
 	perSecond = formatPerSecondRowValueText,
+	threat = function(source)
+		local value = safeNumber(source and source.totalAmount)
+		if not value then return "" end
+		return string.format("%.1f%%", value)
+	end,
 }
 
 local function getRowValueColumnVisibility(damageMeterType, config)
 	local mode = getRowValueMode(damageMeterType, config)
-	local showAmount = mode == "amount" or mode == "amountAndRate" or mode == "count" or mode == "death"
+	local showAmount = mode == "amount" or mode == "amountAndRate" or mode == "count" or mode == "death" or mode == "threat"
 	local showRate = mode == "perSecond" or mode == "amountAndRate"
-	local showPercent = config.showPercent ~= false
+	local showPercent = mode ~= "threat" and config.showPercent ~= false
 	return showAmount, showRate, showPercent, mode
 end
 
@@ -1111,6 +1120,9 @@ local function formatRowValueColumnTexts(source, percent, damageMeterType, confi
 	local rateText
 	if mode == "death" then
 		amountText = formatDeathTimeText(source)
+	elseif mode == "threat" then
+		local value = safeNumber(source and source.totalAmount)
+		amountText = value and string.format("%.1f%%", value) or ""
 	elseif mode == "count" or mode == "amount" then
 		amountText = formatNumber(source.totalAmount, abbreviation)
 	elseif mode == "perSecond" then
@@ -1622,8 +1634,14 @@ function DamageMeter:GetConfig(index)
 end
 
 function DamageMeter:GetRowViewportPadding(config)
-	if config.barBorderEnabled ~= true then return 0 end
-	return clampNumber(config.barBorderInset, 0, 24, DEFAULT_WINDOW.barBorderInset)
+	local padding = 0
+	if config.barBorderEnabled == true then
+		padding = math.max(padding, clampNumber(config.barBorderInset, 0, 24, DEFAULT_WINDOW.barBorderInset))
+	end
+	if config.rowBorderEnabled == true then
+		padding = math.max(padding, clampNumber(config.rowBorderInset, 0, 24, DEFAULT_WINDOW.rowBorderInset))
+	end
+	return padding
 end
 
 function DamageMeter:GetWindowStyleVersion(index)
@@ -1949,6 +1967,7 @@ end
 
 function DamageMeter:GetSessionForState(state, sessionCache)
 	if state.preview then return PREVIEW_SESSION end
+	if state.damageMeterType == "Threat" then return self:BuildThreatSession(state) end
 	if not state.available or state.damageMeterEnum == nil then return nil end
 	if state.sessionID and C_DamageMeter.GetCombatSessionFromID then
 		if sessionCache then
@@ -1981,6 +2000,103 @@ function DamageMeter:GetSessionForState(state, sessionCache)
 		return session
 	end
 	return C_DamageMeter.GetCombatSessionFromType(state.sessionEnum, state.damageMeterEnum)
+end
+
+function DamageMeter:GetThreatMobUnit()
+	if UnitExists("target") and UnitCanAttack("player", "target") and not UnitIsPlayer("target") then
+		return "target"
+	end
+	if UnitExists("targettarget") and UnitCanAttack("player", "targettarget") and not UnitIsPlayer("targettarget") then
+		return "targettarget"
+	end
+	if UnitExists("focus") and UnitCanAttack("player", "focus") and not UnitIsPlayer("focus") then
+		return "focus"
+	end
+	if UnitExists("focustarget") and UnitCanAttack("player", "focustarget") and not UnitIsPlayer("focustarget") then
+		return "focustarget"
+	end
+end
+
+function DamageMeter:AddThreatUnit(threatSession, seen, unitToken, mobToken)
+	if not unitToken or not UnitExists(unitToken) then return end
+	local guid = UnitGUID(unitToken)
+	if guid == nil or isSecret(guid) or seen[guid] then return end
+	local _, classFilename = UnitClass(unitToken)
+	local isTanking, status, scaledPercent, rawPercent, rawThreat = UnitDetailedThreatSituation(unitToken, mobToken)
+	if rawThreat == nil or isSecret(rawThreat) then return end
+	rawThreat = tonumber(rawThreat)
+	if not rawThreat then return end
+	if isTanking ~= nil and isSecret(isTanking) then isTanking = false end
+	seen[guid] = true
+	if rawThreat > threatSession.topThreat then threatSession.topThreat = rawThreat end
+	if isTanking == true then threatSession.tankThreat = rawThreat end
+	if rawPercent ~= nil and isSecret(rawPercent) then rawPercent = nil end
+	if scaledPercent ~= nil and isSecret(scaledPercent) then scaledPercent = nil end
+	if status ~= nil and isSecret(status) then status = nil end
+	local name = UnitName(unitToken)
+	if name == nil or isSecret(name) then name = unitToken end
+	if classFilename ~= nil and isSecret(classFilename) then classFilename = nil end
+	threatSession.pending[#threatSession.pending + 1] = {
+		name = name,
+		classFilename = classFilename,
+		guid = guid,
+		isLocalPlayer = unitToken == "player",
+		rawThreat = rawThreat,
+		rawPercent = tonumber(rawPercent),
+		scaledPercent = tonumber(scaledPercent),
+		threatStatus = tonumber(status),
+		isTanking = isTanking == true,
+	}
+end
+
+function DamageMeter:ScanThreatGroup(threatSession, seen, mobToken)
+	if IsInRaid and IsInRaid() == true then
+		for unitIndex = 1, GetNumGroupMembers() do
+			self:AddThreatUnit(threatSession, seen, "raid" .. unitIndex, mobToken)
+			self:AddThreatUnit(threatSession, seen, "raidpet" .. unitIndex, mobToken)
+		end
+	else
+		for unitIndex = 1, GetNumSubgroupMembers() do
+			self:AddThreatUnit(threatSession, seen, "party" .. unitIndex, mobToken)
+			self:AddThreatUnit(threatSession, seen, "partypet" .. unitIndex, mobToken)
+		end
+	end
+	self:AddThreatUnit(threatSession, seen, "player", mobToken)
+	self:AddThreatUnit(threatSession, seen, "pet", mobToken)
+end
+
+function DamageMeter:BuildThreatSession(state)
+	if not state or state.preview then return PREVIEW_SESSION end
+	if not UnitDetailedThreatSituation then return nil end
+	local mobToken = self:GetThreatMobUnit()
+	if not mobToken then return nil end
+	local threatSession = {
+		combatSources = {},
+		durationSeconds = 0,
+		maxAmount = 1,
+		pending = {},
+		tankThreat = nil,
+		topThreat = 0,
+		totalAmount = 100,
+	}
+	self:ScanThreatGroup(threatSession, {}, mobToken)
+	local tankThreat = threatSession.tankThreat or threatSession.topThreat
+	if not tankThreat or tankThreat <= 0 or #threatSession.pending == 0 then return nil end
+	table.sort(threatSession.pending, function(left, right)
+		return (left.rawThreat or 0) > (right.rawThreat or 0)
+	end)
+	local maxPercent = 1
+	for sourceIndex, source in ipairs(threatSession.pending) do
+		local threatPercent = source.rawThreat / tankThreat * 100
+		if threatPercent > maxPercent then maxPercent = threatPercent end
+		source.totalAmount = threatPercent
+		source.amountPerSecond = source.rawThreat
+		source.sourceGUID = source.guid
+		threatSession.combatSources[sourceIndex] = source
+	end
+	threatSession.maxAmount = maxPercent
+	threatSession.pending = nil
+	return threatSession
 end
 
 function DamageMeter:GetSession(index)
@@ -2734,16 +2850,33 @@ function DamageMeter:ApplyContentBackground(frame, config)
 	applyTextureColor(frame.contentBackground, r, g, b, a)
 end
 
+function DamageMeter:GetRowBorderLeftOffset(row, config)
+	local _, _, iconSize, rankWidth, rankGap = getRowTextInsets(config)
+	local showRankColumn = config.showRanks ~= false and rankWidth > 0
+	local rankPrefixText = useTextRankPrefix(config)
+	local leftOffset = 4
+	if showRankColumn and not rankPrefixText then
+		local rankOffsetX = clampNumber(config.rankOffsetX, -200, 200, DEFAULT_WINDOW.rankOffsetX)
+		leftOffset = leftOffset + rankOffsetX + rankWidth + rankGap
+	end
+	if config.showIcons ~= false and iconSize > 0 and row.iconFrame and row.iconFrame:IsShown() then
+		return leftOffset
+	end
+	if showRankColumn and not rankPrefixText then
+		return leftOffset
+	end
+	return 4
+end
+
 function DamageMeter:PositionRowBorder(row, config)
 	if not row.rowBorder then return end
 	row.rowBorder:ClearAllPoints()
 	local borderOffset = clampNumber(config.rowBorderInset, 0, 24, DEFAULT_WINDOW.rowBorderInset)
-	local leftOwner = row.bar
-	if config.showIcons ~= false and row.iconFrame and row.iconFrame:IsShown() then
-		leftOwner = row.iconFrame
-	end
-	row.rowBorder:SetPoint("TOPLEFT", leftOwner, "TOPLEFT", -borderOffset, borderOffset)
-	row.rowBorder:SetPoint("BOTTOMRIGHT", row.bar, "BOTTOMRIGHT", borderOffset, -borderOffset)
+	local barWidthOffset = clampNumber(config.barWidthOffset, -200, 200, DEFAULT_WINDOW.barWidthOffset)
+	local leftOffset = self:GetRowBorderLeftOffset(row, config) - borderOffset
+	local rightOffset = -4 + barWidthOffset + borderOffset
+	row.rowBorder:SetPoint("TOPLEFT", row, "TOPLEFT", leftOffset, borderOffset)
+	row.rowBorder:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", rightOffset, -borderOffset)
 	row.rowBorder:SetFrameLevel(row.bar:GetFrameLevel() + 2)
 end
 
@@ -2890,7 +3023,7 @@ function DamageMeter:ApplyIconBorder(row, config, classFilename, colors)
 	border._damageMeterApplyVersion = styleVersion
 	border._damageMeterApplyEnabled = enabled
 	border._damageMeterApplyClassKey = classKey
-	if config.iconBorderEnabled == true then
+	if enabled then
 		local size = clampNumber(config.iconBorderSize, 1, 32, DEFAULT_WINDOW.iconBorderSize)
 		local br, bg, bb, ba
 		if colors then
@@ -4075,10 +4208,11 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 		self.pinnedTooltipOwner = nil
 		self.pinnedTooltipIndex = nil
 	end
+	local damageMeterType = self:GetEffectiveDamageMeterType(index)
+	if normalizeDamageMeterTypeKey(damageMeterType) == "Threat" then return end
 	local config = self:GetConfig(index)
 	if config.tooltipEnabled ~= true then return end
 	local frame = self:EnsureSourceTooltip()
-	local damageMeterType = self:GetEffectiveDamageMeterType(index)
 	local rows = damageMeterType == "Deaths" and self:BuildDeathRecapRows(source, config) or nil
 	if not rows or #rows == 0 then
 		local details = self:GetSourceDetails(index, source)
@@ -4281,7 +4415,7 @@ end
 
 function DamageMeter:TogglePinnedTooltip(owner, index)
 	local config = self:GetConfig(index)
-	if config.tooltipEnabled ~= true or config.tooltipClickToPin ~= true or not owner or not owner.sourceData then return end
+	if normalizeDamageMeterTypeKey(self:GetEffectiveDamageMeterType(index)) == "Threat" or config.tooltipEnabled ~= true or config.tooltipClickToPin ~= true or not owner or not owner.sourceData then return end
 	if self.pinnedTooltipOwner == owner then
 		self:ClearPinnedTooltip(index)
 		return
@@ -4296,6 +4430,10 @@ end
 
 function DamageMeter:UpdatePreviewTooltip(index)
 	local config = self:GetConfig(index)
+	if normalizeDamageMeterTypeKey(self:GetEffectiveDamageMeterType(index)) == "Threat" then
+		if self.previewTooltipIndex == index then self:ClearPreviewTooltip(index) end
+		return
+	end
 	if self.previewTooltipIndex == index and (config.tooltipPreview ~= true or not self:IsInEditMode()) and self.sourceTooltip then
 		self:ClearPreviewTooltip(index)
 	end
@@ -4635,6 +4773,7 @@ end
 function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 	local frame = self:EnsureWindow(index)
 	local config = self:GetConfig(index)
+	local damageMeterType = self:GetEffectiveDamageMeterType(index)
 	local rowMode = config.raidRowsEnabled == true and IsInRaid() and "raid" or "default"
 	local styleVersion = self:GetWindowStyleVersion(index)
 	local rowCount = #frame.rows
@@ -4644,6 +4783,7 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 		and frame._damageMeterWindowStyleRowCount == rowCount
 		and frame._damageMeterWindowStyleRowMode == rowMode
 		and frame._damageMeterWindowStyleGlobalFontVersion == globalFontVersion
+		and frame._damageMeterWindowStyleDamageMeterType == damageMeterType
 		and frame._damageMeterWindowStyleForceRankColumn == (forceRankColumn == true) then
 		return
 	end
@@ -4652,11 +4792,12 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 	frame._damageMeterWindowStyleRowCount = rowCount
 	frame._damageMeterWindowStyleRowMode = rowMode
 	frame._damageMeterWindowStyleGlobalFontVersion = globalFontVersion
+	frame._damageMeterWindowStyleDamageMeterType = damageMeterType
 	frame._damageMeterWindowStyleForceRankColumn = forceRankColumn == true
 
 	local width = clampNumber(config.width, 100, 700, DEFAULT_WINDOW.width)
 	local showHeader = config.showHeader == true
-	local showHeaderButtons = showHeader and config.showHeaderButtons ~= false
+	local showHeaderButtons = showHeader and config.showHeaderButtons ~= false and normalizeDamageMeterTypeKey(damageMeterType) ~= "Threat"
 	local showStatus = config.showStatus ~= false
 	local headerPosition = normalizeHeaderPosition(config.headerPosition)
 	local rowsGrowUp = normalizeRowGrowth(config.rowGrowth) == "UP"
@@ -5019,6 +5160,7 @@ function DamageMeter:BuildReportLines(index, lineLimit)
 	local config = state.config
 	local session = self:GetSessionForState(state)
 	local damageMeterType = state.damageMeterType
+	if normalizeDamageMeterTypeKey(damageMeterType) == "Threat" then return nil, L["damageMeterReportNoData"] or "No reportable Damage Meter data." end
 	local orderedSources = self:GetReportOrderedSources(session, damageMeterType)
 	lineLimit = clampNumber(lineLimit, 1, 20, 10)
 	if not self:IsReportDataAvailable(session, orderedSources, damageMeterType, config, math.min(lineLimit, #orderedSources)) then
@@ -5258,7 +5400,7 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 	local displayIndices = buildViewportAwareDisplayIndices(frame, config, contentRows, playerSourceIndex, highestBottom)
 	self:UpdateHeader(index, session, state)
 	if frame.reportButton then
-		setShownIfChanged(frame.reportButton, config.showHeader == true and config.showHeaderButtons ~= false and config.showHeaderReportButton ~= false and reportAvailable == true)
+		setShownIfChanged(frame.reportButton, normalizeDamageMeterTypeKey(damageMeterType) ~= "Threat" and config.showHeader == true and config.showHeaderButtons ~= false and config.showHeaderReportButton ~= false and reportAvailable == true)
 	end
 
 	local totalAmount = safeNumber(session and session.totalAmount)
@@ -5391,6 +5533,24 @@ function DamageMeter:ScheduleContextRefresh()
 	end)
 end
 
+function DamageMeter:ScheduleThreatRefresh()
+	local now = GetTime and GetTime() or 0
+	local interval = getUpdateRate()
+	local elapsed = now - (self.lastThreatRefreshTime or 0)
+	if elapsed >= interval then
+		self.lastThreatRefreshTime = now
+		self:Refresh()
+		return
+	end
+	if self.threatRefreshPending then return end
+	self.threatRefreshPending = true
+	C_Timer.After(math.max(0.05, interval - elapsed), function()
+		DamageMeter.threatRefreshPending = nil
+		DamageMeter.lastThreatRefreshTime = GetTime and GetTime() or 0
+		DamageMeter:Refresh()
+	end)
+end
+
 function DamageMeter:RegisterLiveEvents()
 	local frame = self.eventFrame
 	if not frame or self.liveEventsRegistered then return end
@@ -5440,6 +5600,14 @@ function DamageMeter:HasRoleSpecificTypeWindows()
 	return false
 end
 
+function DamageMeter:HasThreatWindows()
+	if not self:IsEnabled() then return false end
+	for index = 1, getWindowCount() do
+		if self:GetEffectiveDamageMeterType(index) == "Threat" then return true end
+	end
+	return false
+end
+
 function DamageMeter:RegisterRoleTypeEvents()
 	local frame = self.eventFrame
 	if not frame or self.roleTypeEventsRegistered then return end
@@ -5462,6 +5630,26 @@ function DamageMeter:UnregisterRoleTypeEvents()
 	self.roleTypeEventsRegistered = false
 end
 
+function DamageMeter:RegisterThreatEvents()
+	local frame = self.eventFrame
+	if not frame or self.threatEventsRegistered then return end
+	frame:RegisterEvent("PLAYER_TARGET_CHANGED")
+	frame:RegisterEvent("UNIT_THREAT_LIST_UPDATE")
+	frame:RegisterEvent("UNIT_THREAT_SITUATION_UPDATE")
+	frame:RegisterUnitEvent("UNIT_TARGET", "focus", "target")
+	self.threatEventsRegistered = true
+end
+
+function DamageMeter:UnregisterThreatEvents()
+	local frame = self.eventFrame
+	if not frame or not self.threatEventsRegistered then return end
+	frame:UnregisterEvent("PLAYER_TARGET_CHANGED")
+	frame:UnregisterEvent("UNIT_THREAT_LIST_UPDATE")
+	frame:UnregisterEvent("UNIT_THREAT_SITUATION_UPDATE")
+	frame:UnregisterEvent("UNIT_TARGET")
+	self.threatEventsRegistered = false
+end
+
 function DamageMeter:UpdateEventState()
 	self:InvalidateLiveEventWatch()
 	local enabled = self:IsEnabled()
@@ -5479,6 +5667,11 @@ function DamageMeter:UpdateEventState()
 		self:RegisterRoleTypeEvents()
 	else
 		self:UnregisterRoleTypeEvents()
+	end
+	if self:HasThreatWindows() then
+		self:RegisterThreatEvents()
+	else
+		self:UnregisterThreatEvents()
 	end
 	self:ScheduleRefresh()
 end
@@ -5941,7 +6134,7 @@ function DamageMeter:SetConfigValue(index, key, value)
 	if key == "damageMeterType" or key == "sessionType" or key == "roleSpecificType" or key == "tankDamageMeterType" or key == "healerDamageMeterType" or key == "damagerDamageMeterType" then
 		self:InvalidateLiveEventWatch()
 	end
-	if key == "roleSpecificType" then self:UpdateEventState() end
+	if key == "damageMeterType" or key == "roleSpecificType" or key == "tankDamageMeterType" or key == "healerDamageMeterType" or key == "damagerDamageMeterType" then self:UpdateEventState() end
 	self:MarkWindowStyleDirty(index)
 	if self:IsInEditMode() and config.tooltipPreview == true then
 		self.activePreviewTooltipIndex = index
@@ -6595,6 +6788,8 @@ function DamageMeter:Init()
 		elseif event == "DAMAGE_METER_CURRENT_SESSION_UPDATED" then
 			self:InvalidateDerivedTargetCache(true)
 			self:RefreshFromLiveEvent()
+		elseif event == "UNIT_THREAT_LIST_UPDATE" or event == "UNIT_THREAT_SITUATION_UPDATE" or event == "UNIT_TARGET" or event == "PLAYER_TARGET_CHANGED" then
+			self:ScheduleThreatRefresh()
 		elseif event == "ADDON_RESTRICTION_STATE_CHANGED" then
 			self:ScheduleContextRefresh()
 		elseif event == "ZONE_CHANGED_NEW_AREA" then
