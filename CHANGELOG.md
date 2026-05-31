@@ -1,6 +1,6 @@
 # Changelog
 
-## [10.23.0] - 2026-05-31
+## [10.23.0-beta1] - 2026-05-31
 
 ### ✨ Added
 
@@ -12,7 +12,7 @@
 - Damage Meter: Fixed icon, bar, and row borders using mismatched vertical bounds when borders are enabled together.
 - Unit Frames: Fixed Player, Target, and Focus leader indicators not showing raid assistants in the same icon slot.
 - Unit Frames: Fixed Player, Target, and Focus leader/assist indicators staying hidden when the status container had no other visible status elements.
-- Unit Frames: Fixed Evoker missing Totem Tracker.
+- Unit Frames: Fixed Evoker missing Totem Tracker support for Augmentation's Apex talent.
 
 ---
 
