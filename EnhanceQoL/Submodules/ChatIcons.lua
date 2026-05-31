@@ -155,7 +155,7 @@ end
 local function RegisterChatItemTooltipHooks()
 	if ChatIcons.itemTooltipHooksInitialized then return end
 	ChatIcons.itemTooltipHooksInitialized = true
-	for i = 1, NUM_CHAT_WINDOWS or 10 do
+	for i = 1, _G.NUM_CHAT_WINDOWS or 10 do
 		local chatFrame = _G["ChatFrame" .. i]
 		if chatFrame and chatFrame.HookScript then
 			chatFrame:HookScript("OnHyperlinkEnter", ShowChatItemTooltip)
