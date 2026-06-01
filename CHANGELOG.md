@@ -1,6 +1,14 @@
 # Changelog
 
 <!--@eqol-beta@-->
+## [10.24.0-beta2] - 2026-06-01
+
+### ✨ Added
+
+- Damage Meter: Added a bar spacing control for tooltip rows.
+
+---
+
 ## [10.24.0-beta1] - 2026-06-01
 
 ### ✨ Added

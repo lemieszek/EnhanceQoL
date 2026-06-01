@@ -300,6 +300,7 @@ local DEFAULT_WINDOW = {
 	tooltipBarTexture = "Blizzard Raid Bar",
 	tooltipBarColor = { r = 0.7686275243759155, g = 0.168627455830574, b = 0.2823529541492462, a = 1 },
 	tooltipBarUseClassColor = false,
+	tooltipBarSpacing = 0,
 	tooltipRowBorderEnabled = false,
 	tooltipRowBorderTexture = "",
 	tooltipRowBorderColor = { r = 0, g = 0, b = 0, a = 0.9 },
@@ -4253,10 +4254,12 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 	local showBars = config.tooltipShowBars == true
 	local barTexture = resolveMedia("statusbar", config.tooltipBarTexture, DEFAULT_TEXTURE)
 	local shown = #rows
+	local tooltipBarSpacing = clampNumber(config.tooltipBarSpacing, -16, 16, DEFAULT_WINDOW.tooltipBarSpacing)
 	local tooltipHeight = 10
 	for rowIndex = 1, shown do
 		local multiplier = rows[rowIndex].heightMultiplier or 1
 		tooltipHeight = tooltipHeight + (lineHeight * multiplier)
+		if rowIndex < shown then tooltipHeight = tooltipHeight + tooltipBarSpacing end
 	end
 
 	local backdropTexture = resolveMedia("statusbar", config.tooltipBackdropTexture, "Interface\\Buttons\\WHITE8x8")
@@ -4387,7 +4390,7 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 				line.percent:SetTextColor(1, 1, 1, 1)
 			end
 			line:Show()
-			yOffset = yOffset + currentLineHeight
+			yOffset = yOffset + currentLineHeight + tooltipBarSpacing
 		elseif line then
 			line:Hide()
 		end
@@ -6669,6 +6672,7 @@ function DamageMeter:BuildWindowSettings(index)
 			requestEditModeSettingsRefresh()
 		end, tooltipId, tooltipEnabled),
 		colorSetting(L["damageMeterTooltipBarColor"] or "Tooltip bar color", function() return normalizeColor(cfg().tooltipBarColor, DEFAULT_WINDOW.tooltipBarColor) end, function(value) self:SetConfigValue(index, "tooltipBarColor", normalizeColor(value, DEFAULT_WINDOW.tooltipBarColor)) end, DEFAULT_WINDOW.tooltipBarColor, tooltipId, fixedTooltipBarColorEnabled),
+		sliderSetting(L["damageMeterBarSpacing"] or "Bar spacing", function() return cfg().tooltipBarSpacing end, function(value) self:SetConfigValue(index, "tooltipBarSpacing", clampNumber(value, -16, 16, DEFAULT_WINDOW.tooltipBarSpacing)) end, -16, 16, 1, tooltipId, tooltipEnabled),
 		dividerSetting(tooltipId),
 		checkboxSetting(L["damageMeterRowBorder"] or "Row border", function() return cfg().tooltipRowBorderEnabled == true end, function(value)
 			self:SetConfigValue(index, "tooltipRowBorderEnabled", value)
