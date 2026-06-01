@@ -3075,6 +3075,7 @@ if bindDesc then bindDesc = bindDesc:format(_G.ITEM_BIND_ON_EQUIP, _G.ITEM_ACCOU
 
 local bagDisplayDropdown = gateNativeBagSetting(addon.functions.SettingsCreateMultiDropdown(cInventory, {
 	var = "bagDisplayOptions",
+	storage = false,
 	text = L["bagDisplayElements"] or "Bag indicators",
 	options = {
 		{ value = "ilvl", text = L["showIlvlOnBagItems"], tooltip = L["showIlvlOnBagItemsDesc"] },
@@ -3196,6 +3197,7 @@ end
 
 gateNativeBagSetting(addon.functions.SettingsCreateMultiDropdown(cInventory, {
 	var = "bagItemLevelTargets",
+	storage = false,
 	text = L["bagItemLevelTargets"] or "Item level targets",
 	options = {
 		{ value = "bank", text = BANK, tooltip = L["showIlvlOnBankFrameDesc"] },

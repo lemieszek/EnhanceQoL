@@ -14,7 +14,6 @@ addon.LSounds = addon.LSounds or {} -- Locales for aura
 function addon.Sounds.functions.InitDB()
 	if not addon.db or not addon.functions or not addon.functions.InitDBValue then return end
 	addon.functions.InitDBValue("keepAudioSynced", false)
-	addon.functions.InitDBValue("soundMutedSounds", {})
 	addon.functions.InitDBValue("soundExtraEnabled", false)
 	addon.functions.InitDBValue("soundExtraEvents", {})
 end

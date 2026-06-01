@@ -636,6 +636,7 @@ end
 
 addon.functions.SettingsCreateMultiDropdown(cTooltip, {
 	var = "TooltipPlayerDetailsLabel",
+	storage = false,
 	text = L["TooltipPlayerDetailsLabel"],
 	options = BuildTooltipPlayerDetailOptions(),
 	optionfunc = BuildTooltipPlayerDetailOptions,

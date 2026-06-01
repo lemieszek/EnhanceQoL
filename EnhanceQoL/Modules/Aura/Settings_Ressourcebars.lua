@@ -5105,6 +5105,7 @@ local function buildSpecToggles(specIndex, specName, available, expandable)
 	return {
 		sType = "multidropdown",
 		var = varKey,
+		storage = false,
 		text = specName,
 		options = options,
 		isSelectedFunc = function(key)
@@ -5261,6 +5262,7 @@ local function buildSettings()
 	end
 	addon.functions.SettingsCreateMultiDropdown(cat, {
 		var = "resourceBarsSharedEnabled",
+		storage = false,
 		text = L["ResourceBarsModeShared"] or "Shared",
 		options = sharedEnableOptions,
 		order = sharedEnableOrder,

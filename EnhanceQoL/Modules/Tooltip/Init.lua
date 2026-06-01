@@ -81,11 +81,6 @@ function addon.Tooltip.functions.InitDB()
 	init("TooltipBuffHideInCombat", false)
 	init("TooltipBuffHideInDungeon", false)
 
-	-- Debuff
-	init("TooltipDebuffHideType", 1)
-	init("TooltipDebuffHideInCombat", false)
-	init("TooltipDebuffHideInDungeon", false)
-
 	-- Currency
 	init("TooltipShowCurrencyAccountWide", false)
 	init("TooltipShowCurrencyID", false)

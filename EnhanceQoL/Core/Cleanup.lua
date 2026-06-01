@@ -70,6 +70,65 @@ local LEGACY_RESOURCE_BAR_EDIT_MODE_IDS = {
 	resourceBar_VOID_METAMORPHOSIS = true,
 }
 
+local LEGACY_PROFILE_KEYS = {
+	"TooltipDebuffHideType",
+	"TooltipDebuffHideInCombat",
+	"TooltipDebuffHideInDungeon",
+	"mythicPlusCurrentPull",
+	"mythicPlusCurrentPullLocked",
+	"mythicPlusCurrentPullFontSize",
+	"mythicPlusCurrentPullPoint",
+	"mythicPlusCurrentPullX",
+	"mythicPlusCurrentPullY",
+	"talentReminderActiveBuildLocked",
+	"soundMutedSounds",
+	"unclampDamageMeter",
+	"confirmReplaceEnchant",
+	"optionsFrameScale",
+	"showLeaderIconRaidFrame",
+	"unitFrameMaxNameLength",
+	"unitFrameTruncateNames",
+}
+
+local MULTIDROPDOWN_SCRATCH_PROFILE_KEYS = {
+	"bagDisplayOptions",
+	"bagItemLevelTargets",
+	"lootToastFilters_3",
+	"lootToastFilters_4",
+	"lootToastFilters_5",
+	"resourceBarsSharedEnabled",
+	"rb_spec_1",
+	"rb_spec_2",
+	"rb_spec_3",
+	"rb_spec_4",
+	"TooltipPlayerDetailsLabel",
+	"mouseoverActionBar1_visibility",
+	"mouseoverActionBar2_visibility",
+	"mouseoverActionBar3_visibility",
+	"mouseoverActionBar4_visibility",
+	"mouseoverActionBar5_visibility",
+	"mouseoverActionBar6_visibility",
+	"mouseoverActionBar7_visibility",
+	"mouseoverActionBar8_visibility",
+	"mouseoverActionBarPet_visibility",
+	"mouseoverActionBarStanceBar_visibility",
+	"unitframeSettingBagsBar_visibility",
+	"unitframeSettingBuffFrame_visibility",
+	"unitframeSettingDebuffFrame_visibility",
+	"unitframeSettingFocusFrame_visibility",
+	"unitframeSettingMicroMenu_visibility",
+	"unitframeSettingMinimap_visibility",
+	"unitframeSettingPlayerFrame_visibility",
+	"unitframeSettingTargetFrame_visibility",
+}
+
+local function cleanupListedProfileKeys(profile, keys)
+	if type(profile) ~= "table" then return end
+	for i = 1, #keys do
+		profile[keys[i]] = nil
+	end
+end
+
 local function cleanupDebugArtifactsProfile(profile)
 	if type(profile) ~= "table" then return end
 
@@ -175,6 +234,11 @@ local function cleanupResourceBarProfile(profile)
 	end
 end
 
+local function cleanupLegacyProfileKeys(profile)
+	cleanupListedProfileKeys(profile, LEGACY_PROFILE_KEYS)
+	cleanupListedProfileKeys(profile, MULTIDROPDOWN_SCRATCH_PROFILE_KEYS)
+end
+
 local function cleanupCooldownPanelsStorageProfile(profile)
 	if type(profile) ~= "table" then return end
 	local root = profile.cooldownPanels
@@ -245,6 +309,25 @@ function addon.functions.CleanupResourceBarStorage()
 	if addon.db and addon.db ~= db then cleanup(addon.db) end
 end
 
+function addon.functions.CleanupLegacyProfileStorage()
+	local db = _G.EnhanceQoLDB
+	local seen = {}
+	local function cleanup(profile)
+		if type(profile) ~= "table" or seen[profile] then return end
+		seen[profile] = true
+		cleanupLegacyProfileKeys(profile)
+	end
+	if type(db) == "table" then
+		cleanup(db)
+		if type(db.profiles) == "table" then
+			for _, profile in pairs(db.profiles) do
+				cleanup(profile)
+			end
+		end
+	end
+	if addon.db and addon.db ~= db then cleanup(addon.db) end
+end
+
 function addon.functions.CleanupCooldownPanelsStorage()
 	local db = _G.EnhanceQoLDB
 	local seen = {}
@@ -268,6 +351,7 @@ function addon.functions.CleanupOldStuff()
 	addon.functions.CleanupCombatMeterSettings()
 	addon.functions.CleanupBuffTrackerSettings()
 	addon.functions.CleanupDebugArtifacts()
+	addon.functions.CleanupLegacyProfileStorage()
 	addon.functions.CleanupResourceBarStorage()
 	addon.functions.CleanupTransientProfileCaches()
 end

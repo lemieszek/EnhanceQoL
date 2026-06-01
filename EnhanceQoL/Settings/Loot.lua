@@ -314,7 +314,7 @@ for i = 3, 5 do
 
 	addon.functions.SettingsCreateMultiDropdown(cLoot, {
 		var = "lootToastFilters_" .. i,
-		subvar = i,
+		storage = false,
 		text = L["lootToastAlwaysShow"],
 		parentSection = expandable,
 		parent = true,
@@ -329,6 +329,13 @@ for i = 3, 5 do
 			{ value = "pets", text = L["lootToastAlwaysShowPets"] },
 			{ value = "upgrade", text = L["lootToastAlwaysShowUpgrades"] },
 		},
+		getSelection = function()
+			return addon.db and addon.db.lootToastFilters and addon.db.lootToastFilters[i] or {}
+		end,
+		setSelection = function(selection)
+			addon.db.lootToastFilters = addon.db.lootToastFilters or {}
+			addon.db.lootToastFilters[i] = type(selection) == "table" and selection or {}
+		end,
 	})
 end
 

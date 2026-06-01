@@ -279,6 +279,7 @@ end
 function addon.functions.SettingsCreateMultiDropdown(cat, cbData)
 	addon.db = addon.db or {}
 	local explicitStorageDB = type(cbData.db) == "table" and cbData.db or nil
+	local storageDisabled = cbData.storage == false
 
 	-- Resolve addon.db lazily so profile-backed settings do not capture the pre-init placeholder table.
 	local function resolveStorageDB()
@@ -314,9 +315,49 @@ function addon.functions.SettingsCreateMultiDropdown(cat, cbData)
 		if cbData.callback then cbData.callback(map) end
 	end
 
+	local function iterateOptionValues(func)
+		local values = nil
+		if cbData.optionfunc or cbData.listFunc then
+			local ok, result = pcall(cbData.optionfunc or cbData.listFunc)
+			if ok then values = result end
+		end
+		values = values or cbData.options or cbData.list
+		if type(values) ~= "table" then return end
+
+		for key, option in pairs(values) do
+			local value = key
+			if type(option) == "table" then value = option.value or option.key or option[1] or key end
+			if value ~= nil then func(value) end
+		end
+	end
+
+	local function getSelectionFromSelected()
+		local selection = {}
+		if type(cbData.isSelectedFunc) ~= "function" then return selection end
+		iterateOptionValues(function(value)
+			local ok, selected = pcall(cbData.isSelectedFunc, value)
+			if ok and selected == true then selection[value] = true end
+		end)
+		return selection
+	end
+
+	local function setSelectionFromSelected(map)
+		if type(cbData.setSelectedFunc) ~= "function" then return end
+		if type(map) ~= "table" then map = {} end
+		local seen = {}
+		iterateOptionValues(function(value)
+			seen[value] = true
+			cbData.setSelectedFunc(value, map[value] == true)
+		end)
+		for value, selected in pairs(map) do
+			if selected == true and not seen[value] then cbData.setSelectedFunc(value, true) end
+		end
+		if cbData.callback then cbData.callback(map) end
+	end
+
 	local initializer = SettingsLib:CreateMultiDropdown(cat, {
 		key = cbData.var,
-		db = explicitStorageDB or addon.db,
+		db = explicitStorageDB or (not storageDisabled and addon.db) or nil,
 		name = cbData.text,
 		values = cbData.options or cbData.list,
 		optionfunc = cbData.optionfunc or cbData.listFunc,
@@ -328,8 +369,8 @@ function addon.functions.SettingsCreateMultiDropdown(cat, cbData)
 		customDefaultText = cbData.customDefaultText,
 		isSelected = cbData.isSelectedFunc,
 		setSelected = cbData.setSelectedFunc,
-		getSelection = cbData.getSelection or cbData.get or getSelection,
-		setSelection = cbData.setSelection or cbData.set or setSelection,
+		getSelection = cbData.getSelection or cbData.get or (storageDisabled and getSelectionFromSelected or getSelection),
+		setSelection = cbData.setSelection or cbData.set or (storageDisabled and setSelectionFromSelected or setSelection),
 		summary = cbData.summary,
 		searchtags = cbData.searchtags,
 		parent = cbData.element or cbData.parent,

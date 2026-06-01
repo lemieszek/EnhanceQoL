@@ -317,6 +317,7 @@ local function createActionBarVisibility(category, expandable)
 
 			addon.functions.SettingsCreateMultiDropdown(category, {
 				var = info.var .. "_visibility",
+				storage = false,
 				text = info.text or info.name or info.var,
 				options = ABRule,
 				isSelectedFunc = function(key)
@@ -1442,6 +1443,7 @@ local function createFrameCategory()
 				local function shouldShow() return shouldShowBlizzardFrameVisibility(info) end
 				local init = addon.functions.SettingsCreateMultiDropdown(category, {
 					var = info.var .. "_visibility",
+					storage = false,
 					text = info.text or info.name or info.var,
 					options = options,
 					isSelectedFunc = function(key)
