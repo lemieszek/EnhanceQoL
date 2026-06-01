@@ -130,6 +130,24 @@ local function ColorTextRGB(text, r, g, b)
 	return ("|cff%02x%02x%02x%s|r"):format((r or 1) * 255, (g or 1) * 255, (b or 1) * 255, tostring(text))
 end
 
+local function EnsureItemLevelColorFunc()
+	if GetItemLevelColor then return end
+	if C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.LoadAddOn then
+		if not C_AddOns.IsAddOnLoaded("Blizzard_UIPanels_Game") then C_AddOns.LoadAddOn("Blizzard_UIPanels_Game") end
+	elseif UIParentLoadAddOn then
+		UIParentLoadAddOn("Blizzard_UIPanels_Game")
+	end
+end
+
+local function GetTooltipItemLevelColor()
+	EnsureItemLevelColorFunc()
+	if GetItemLevelColor then
+		local r, g, b = GetItemLevelColor()
+		if r then return r, g, b end
+	end
+	return 1, 1, 1
+end
+
 local function FormatDungeonRunLevel(run)
 	if not run or not run.bestRunLevel or run.bestRunLevel <= 0 then return nil end
 	local stars = ""
@@ -283,21 +301,20 @@ local function RefreshTooltipForGUID(guid)
 			local right = _G[tt:GetName() .. "TextRight" .. haveSpecLine]
 			if right then right:SetText(ColorText(c.specName)) end
 		else
-			if not (haveSpecLine or haveIlvlLine) then tt:AddLine(" ") end
 			tt:AddDoubleLine(TOOLTIP_LABEL_COLOR .. labelSpec .. TOOLTIP_COLOR_CLOSE, ColorText(c.specName))
 			addedAny = true
 		end
 	end
 	if showIlvl then
+		local r, g, b = GetTooltipItemLevelColor()
 		if haveIlvlLine then
 			local right = _G[tt:GetName() .. "TextRight" .. haveIlvlLine]
 			if right then
 				right:SetText(tostring(c.ilvl))
-				right:SetTextColor(1, 1, 1)
+				right:SetTextColor(r, g, b)
 			end
 		else
-			if not (haveSpecLine or haveIlvlLine) and not addedAny and not showSpec then tt:AddLine(" ") end
-			tt:AddDoubleLine(TOOLTIP_LABEL_COLOR .. labelIlvl .. TOOLTIP_COLOR_CLOSE, tostring(c.ilvl), 1, 1, 0, 1, 1, 1)
+			tt:AddDoubleLine(TOOLTIP_LABEL_COLOR .. labelIlvl .. TOOLTIP_COLOR_CLOSE, tostring(c.ilvl), 1, 1, 0, r, g, b)
 			addedAny = true
 		end
 	end
@@ -1081,7 +1098,6 @@ local function checkAdditionalTooltip(tooltip)
 			local wantDungeons = type(parts) ~= "table" and true or parts.dungeons == true
 			if detailsRequireModifier and not IsConfiguredModifierDown() then wantDungeons = false end
 
-			local printedAny = false
 			if rating.currentSeasonScore > 0 and (wantBest or wantDungeons) then
 				for _, key in pairs(rating.runs) do
 					ratingInfo[key.challengeModeID] = key
@@ -1149,22 +1165,17 @@ local function checkAdditionalTooltip(tooltip)
 				local scoreText = ColorTextRGB(rating.currentSeasonScore or 0, r, g, b)
 				local bestLevel = wantBest and bestDungeon and bestDungeon.mapScore > 0 and FormatDungeonRunLevel(bestDungeon) or nil
 				if bestLevel then scoreText = ("%s %s"):format(scoreText, ColorText("(" .. bestLevel .. ")")) end
-				tooltip:AddLine(" ")
 				tooltip:AddDoubleLine(TOOLTIP_LABEL_COLOR .. DUNGEON_SCORE .. TOOLTIP_COLOR_CLOSE, scoreText, 1, 1, 1, 1, 1, 1)
-				printedAny = true
 			elseif wantBest and bestDungeon and bestDungeon.mapScore > 0 then
 				local stars = FormatDungeonRunLevel(bestDungeon)
 				local bestName = challengeLabel(bestDungeon.challengeModeID)
 				if stars then
-					if not printedAny then tooltip:AddLine(" ") end
 					tooltip:AddDoubleLine(TOOLTIP_LABEL_COLOR .. L["BestMythic+run"] .. TOOLTIP_COLOR_CLOSE, ("%s %s"):format(stars, bestName), 1, 1, 1, 1, 1, 1)
-					printedAny = true
 				end
 			end
 
 			if wantDungeons and #dungeonList > 0 then
 				table.sort(dungeonList, function(a, b) return a.score > b.score end)
-				tooltip:AddLine(" ")
 				for _, dungeon in ipairs(dungeonList) do
 					tooltip:AddDoubleLine(dungeon.text, dungeon.level, 1, 1, 1, dungeon.r, dungeon.g, dungeon.b)
 				end
@@ -1505,11 +1516,11 @@ local function checkAdditionalUnit(tt)
 		showSpec = false
 		showIlvl = false
 	end
-	if showSpec or showIlvl then tt:AddLine(" ") end
 	if showSpec then tt:AddDoubleLine(TOOLTIP_LABEL_COLOR .. SPECIALIZATION .. TOOLTIP_COLOR_CLOSE, ColorText(c.specName)) end
 	if showIlvl then
 		local label = STAT_AVERAGE_ITEM_LEVEL or ITEM_LEVEL or "Item Level"
-		tt:AddDoubleLine(TOOLTIP_LABEL_COLOR .. label .. TOOLTIP_COLOR_CLOSE, tostring(c.ilvl), 1, 1, 0, 1, 1, 1)
+		local r, g, b = GetTooltipItemLevelColor()
+		tt:AddDoubleLine(TOOLTIP_LABEL_COLOR .. label .. TOOLTIP_COLOR_CLOSE, tostring(c.ilvl), 1, 1, 0, r, g, b)
 	end
 	if showSpec or showIlvl then tt:Show() end
 end
