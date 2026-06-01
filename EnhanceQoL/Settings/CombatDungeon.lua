@@ -2653,6 +2653,40 @@ if cChar and sectionDungeon then
 		parentSection = sectionDungeon,
 	})
 
+	local objectiveTrackerDefaultScope = "dungeonMythicPlus"
+	local objectiveTrackerScopeOptions = {
+		{ value = "dungeonNormal", text = DUNGEONS .. " - " .. PLAYER_DIFFICULTY1 },
+		{ value = "dungeonHeroic", text = DUNGEONS .. " - " .. PLAYER_DIFFICULTY2 },
+		{ value = "dungeonMythic", text = DUNGEONS .. " - " .. PLAYER_DIFFICULTY6 },
+		{ value = objectiveTrackerDefaultScope, text = DUNGEONS .. " - " .. PLAYER_DIFFICULTY_MYTHIC_PLUS },
+		{ value = "dungeonTimewalking", text = DUNGEONS .. " - " .. PLAYER_DIFFICULTY_TIMEWALKER },
+		{ value = "raidLfr", text = RAID .. " - " .. PLAYER_DIFFICULTY3 },
+		{ value = "raidNormal", text = RAID .. " - " .. PLAYER_DIFFICULTY1 },
+		{ value = "raidHeroic", text = RAID .. " - " .. PLAYER_DIFFICULTY2 },
+		{ value = "raidMythic", text = RAID .. " - " .. PLAYER_DIFFICULTY6 },
+		{ value = "raidTimewalking", text = RAID .. " - " .. PLAYER_DIFFICULTY_TIMEWALKER },
+		{ value = "scenarioDelve", text = L["objectiveTrackerScopeScenarioDelve"] },
+	}
+	local function getObjectiveTrackerScopes()
+		if type(addon.db["mythicPlusObjectiveTrackerScopes"]) ~= "table" then addon.db["mythicPlusObjectiveTrackerScopes"] = { [objectiveTrackerDefaultScope] = true } end
+		return addon.db["mythicPlusObjectiveTrackerScopes"]
+	end
+	addon.functions.SettingsCreateMultiDropdown(cChar, {
+		var = "mythicPlusObjectiveTrackerScopes",
+		text = L["objectiveTrackerScope"],
+		desc = L["objectiveTrackerScopeDesc"],
+		options = objectiveTrackerScopeOptions,
+		get = getObjectiveTrackerScopes,
+		set = function(value)
+			addon.db["mythicPlusObjectiveTrackerScopes"] = type(value) == "table" and value or { [objectiveTrackerDefaultScope] = true }
+			if addon.MythicPlus and addon.MythicPlus.functions and addon.MythicPlus.functions.setObjectiveFrames then addon.MythicPlus.functions.setObjectiveFrames() end
+		end,
+		parent = true,
+		element = objEnable.element,
+		parentCheck = isObjectiveEnabled,
+		parentSection = sectionDungeon,
+	})
+
 	-- BR Tracker
 	addon.functions.SettingsCreateCheckbox(cChar, {
 		var = "mythicPlusBRTrackerEnabled",
