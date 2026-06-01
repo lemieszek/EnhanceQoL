@@ -12,6 +12,8 @@ local PROFILE_DEBUG_KEYS = {
 	"classBuffReminderSoundDebugTrace",
 	"_focusInterruptTrackerTraceEnabled",
 	"_focusInterruptTrackerTrace",
+	"resourceBarsDebugTraceEnabled",
+	"resourceBarsDebugTraceMaxEntries",
 }
 
 local TRANSIENT_PROFILE_KEYS = {
@@ -28,6 +30,44 @@ local TRANSIENT_PROFILE_KEYS = {
 	["_resolvedDefaultPowerColor"] = true,
 	["_autoEnabledRuntime"] = true,
 	["_autoEnableInProgress"] = true,
+}
+
+local STAGGER_HIDDEN_COLOR_OVERRIDE_KEYS = {
+	"useBarColor",
+	"barColor",
+	"useClassColor",
+	"useMaxColor",
+	"maxColor",
+	"useGradient",
+	"gradientStartColor",
+	"gradientEndColor",
+	"gradientDirection",
+}
+
+local LEGACY_RESOURCE_BAR_EDIT_MODE_IDS = {
+	resourceBar_ARCANE_CHARGES = true,
+	resourceBar_CHI = true,
+	resourceBar_COMBO_POINTS = true,
+	resourceBar_EBON_MIGHT = true,
+	resourceBar_ENERGY = true,
+	resourceBar_ESSENCE = true,
+	resourceBar_FOCUS = true,
+	resourceBar_FURY = true,
+	resourceBar_HEALTH = true,
+	resourceBar_HOLY_POWER = true,
+	resourceBar_ICICLES = true,
+	resourceBar_INSANITY = true,
+	resourceBar_LUNAR_POWER = true,
+	resourceBar_MAELSTROM = true,
+	resourceBar_MAELSTROM_WEAPON = true,
+	resourceBar_MANA = true,
+	resourceBar_RAGE = true,
+	resourceBar_RUNES = true,
+	resourceBar_RUNIC_POWER = true,
+	resourceBar_SOUL_SHARDS = true,
+	resourceBar_STAGGER = true,
+	resourceBar_TIP_OF_THE_SPEAR = true,
+	resourceBar_VOID_METAMORPHOSIS = true,
 }
 
 local function cleanupDebugArtifactsProfile(profile)
@@ -94,6 +134,47 @@ local function cleanupTransientProfileCaches(root, seen)
 	end
 end
 
+local function cleanupStaggerHiddenColorOverrides(cfg)
+	if type(cfg) ~= "table" then return end
+	for i = 1, #STAGGER_HIDDEN_COLOR_OVERRIDE_KEYS do
+		cfg[STAGGER_HIDDEN_COLOR_OVERRIDE_KEYS[i]] = nil
+	end
+end
+
+local function cleanupResourceBarProfile(profile)
+	if type(profile) ~= "table" then return end
+	profile.personalResourceBarAnchors = nil
+
+	local editData = profile.editModeData
+	if type(editData) == "table" then
+		for id in pairs(LEGACY_RESOURCE_BAR_EDIT_MODE_IDS) do
+			editData[id] = nil
+		end
+	end
+
+	local personal = profile.personalResourceBarSettings
+	if type(personal) == "table" then
+		for _, classCfg in pairs(personal) do
+			if type(classCfg) == "table" then
+				for _, specCfg in pairs(classCfg) do
+					if type(specCfg) == "table" then cleanupStaggerHiddenColorOverrides(specCfg.STAGGER) end
+				end
+			end
+		end
+	end
+
+	local global = profile.globalResourceBarSettings
+	if type(global) == "table" then cleanupStaggerHiddenColorOverrides(global.STAGGER) end
+
+	local shared = profile.sharedResourceBarSettings
+	if type(shared) == "table" then
+		for _, slotCfg in pairs(shared) do
+			local overrides = type(slotCfg) == "table" and slotCfg.powerTypeOverrides or nil
+			if type(overrides) == "table" then cleanupStaggerHiddenColorOverrides(overrides.STAGGER) end
+		end
+	end
+end
+
 local function cleanupCooldownPanelsStorageProfile(profile)
 	if type(profile) ~= "table" then return end
 	local root = profile.cooldownPanels
@@ -145,6 +226,25 @@ function addon.functions.CleanupTransientProfileCaches()
 	if addon.db and addon.db ~= db then cleanupTransientProfileCaches(addon.db, seen) end
 end
 
+function addon.functions.CleanupResourceBarStorage()
+	local db = _G.EnhanceQoLDB
+	local seen = {}
+	local function cleanup(profile)
+		if type(profile) ~= "table" or seen[profile] then return end
+		seen[profile] = true
+		cleanupResourceBarProfile(profile)
+	end
+	if type(db) == "table" then
+		cleanup(db)
+		if type(db.profiles) == "table" then
+			for _, profile in pairs(db.profiles) do
+				cleanup(profile)
+			end
+		end
+	end
+	if addon.db and addon.db ~= db then cleanup(addon.db) end
+end
+
 function addon.functions.CleanupCooldownPanelsStorage()
 	local db = _G.EnhanceQoLDB
 	local seen = {}
@@ -168,6 +268,7 @@ function addon.functions.CleanupOldStuff()
 	addon.functions.CleanupCombatMeterSettings()
 	addon.functions.CleanupBuffTrackerSettings()
 	addon.functions.CleanupDebugArtifacts()
+	addon.functions.CleanupResourceBarStorage()
 	addon.functions.CleanupTransientProfileCaches()
 end
 

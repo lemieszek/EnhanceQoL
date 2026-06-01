@@ -1205,6 +1205,55 @@ local function copyCosmeticBarSettings(source, dest)
 	end
 end
 
+RB.STAGGER_HIDDEN_COLOR_OVERRIDE_KEYS = {
+	"useBarColor",
+	"barColor",
+	"useClassColor",
+	"useMaxColor",
+	"maxColor",
+	"useGradient",
+	"gradientStartColor",
+	"gradientEndColor",
+	"gradientDirection",
+}
+
+function ResourceBars.SanitizeStaggerColorOverrides(cfg)
+	if type(cfg) ~= "table" then return false end
+	local changed = false
+	for _, key in ipairs(RB.STAGGER_HIDDEN_COLOR_OVERRIDE_KEYS) do
+		if cfg[key] ~= nil then
+			cfg[key] = nil
+			changed = true
+		end
+	end
+	return changed
+end
+
+function ResourceBars.SanitizeSavedStaggerColorOverrides(db)
+	if type(db) ~= "table" then return false end
+	local changed = false
+	local personal = db.personalResourceBarSettings
+	if type(personal) == "table" then
+		for _, classCfg in pairs(personal) do
+			if type(classCfg) == "table" then
+				for _, specCfg in pairs(classCfg) do
+					if type(specCfg) == "table" and ResourceBars.SanitizeStaggerColorOverrides(specCfg.STAGGER) then changed = true end
+				end
+			end
+		end
+	end
+	local global = db.globalResourceBarSettings
+	if type(global) == "table" and ResourceBars.SanitizeStaggerColorOverrides(global.STAGGER) then changed = true end
+	local shared = db.sharedResourceBarSettings
+	if type(shared) == "table" then
+		for _, slotCfg in pairs(shared) do
+			local overrides = type(slotCfg) == "table" and slotCfg.powerTypeOverrides or nil
+			if type(overrides) == "table" and ResourceBars.SanitizeStaggerColorOverrides(overrides.STAGGER) then changed = true end
+		end
+	end
+	return changed
+end
+
 local function ensureMaelstromWeaponDefaults(cfg)
 	if not cfg then return end
 	if cfg.useMaelstromFiveColor == nil then cfg.useMaelstromFiveColor = true end
@@ -1811,6 +1860,7 @@ local function applyGlobalProfile(barType, specIndex, cosmeticOnly, sourceKey)
 		local unsupportedRelative = relType and relType ~= "HEALTH" and specInfo and not (specInfo.MAIN == relType or specInfo[relType])
 		if crossTypeTemplate or unsupportedRelative then copied.anchor = nil end
 		specCfg[barType] = copied
+		if barType == "STAGGER" then ResourceBars.SanitizeStaggerColorOverrides(specCfg[barType]) end
 		-- Chain secondary anchors if we are applying to second or later secondary
 		if secondaryIdx and secondaryIdx > 1 then
 			local prevType = specSecondaries(getSpecInfo(specIndex))[secondaryIdx - 1]
@@ -1823,6 +1873,7 @@ local function applyGlobalProfile(barType, specIndex, cosmeticOnly, sourceKey)
 			specCfg[barType].separatorColor = specCfg[barType].separatorColor or globalCfg.separatorColor or RB.SEP_DEFAULT
 		end
 	end
+	if barType == "STAGGER" then ResourceBars.SanitizeStaggerColorOverrides(specCfg[barType]) end
 	if specCfg[barType] then ResourceBars.SetRuntimeCfgField(specCfg[barType], "rbType", barType) end
 	return true
 end
@@ -2282,6 +2333,7 @@ local function importResourceProfile(encoded, scopeKey)
 		if not normalized then return false, "NO_SPECS" end
 		addon.db.personalResourceBarSettings = normalized
 		applyGlobalSettings(data.globalSettings or data.global)
+		ResourceBars.SanitizeSavedStaggerColorOverrides(addon.db)
 		return true, {}, enableState, appliedMode or "ALL_CLASSES"
 	end
 
@@ -2305,6 +2357,7 @@ local function importResourceProfile(encoded, scopeKey)
 		if not okApply then return false, reason end
 	end
 
+	ResourceBars.SanitizeSavedStaggerColorOverrides(addon.db)
 	tsort(applied)
 	return true, applied, enableState, appliedMode or scopeKey
 end
@@ -4116,6 +4169,7 @@ end
 
 function ResourceBars.PrepareBarConfigForRuntime(cfg, pType, specInfo)
 	if type(cfg) ~= "table" then return cfg end
+	if pType == "STAGGER" then ResourceBars.SanitizeStaggerColorOverrides(cfg) end
 
 	local stamp = tostring(addon.variables.unitClass or "") .. "|" .. tostring(addon.variables.unitSpec or "") .. "|" .. tostring(specInfo and specInfo.MAIN or "") .. "|" .. tostring(pType or "")
 	if ResourceBars.GetRuntimeCfgField(cfg, "runtimePrepareStamp") == stamp then return cfg end
@@ -4918,6 +4972,7 @@ function getBarSettings(pType)
 				local unsupportedRelative = relType and relType ~= "HEALTH" and specInfo and not (specInfo.MAIN == relType or specInfo[relType])
 				if crossTypeTemplate or unsupportedRelative then copied.anchor = nil end
 				specCfg[pType] = copied
+				if pType == "STAGGER" then ResourceBars.SanitizeStaggerColorOverrides(specCfg[pType]) end
 				ResourceBars.PrepareBarConfigForRuntime(specCfg[pType], pType, specInfo)
 				if secondaryIdx and secondaryIdx > 1 then
 					local prevType = specSecondaries(specInfo)[secondaryIdx - 1]
@@ -5412,6 +5467,7 @@ function updatePowerBar(type, runeSlot)
 	end
 	if type == "STAGGER" then
 		local cfg = ResourceBars.GetRuntimeBarConfig(type, bar) or {}
+		ResourceBars.SanitizeStaggerColorOverrides(cfg)
 		local maxHealth = UnitHealthMax("player") or 1
 		if maxHealth <= 0 then return end
 		local maxPercent = cfg.useStaggerMaxOverride == true and (tonumber(cfg.staggerMaxPercent) or 200) or 100

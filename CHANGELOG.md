@@ -1,11 +1,18 @@
 # Changelog
 
-## [10.24.0] - 2026-06-01
+<!--@eqol-beta@-->
+## [10.24.0-beta1] - 2026-06-01
 
 ### ✨ Added
 
 - Mythic Plus / Objective Tracker: Added selectable instance scopes for Objective Tracker automation, allowing it to run in chosen dungeon, raid, timewalking, scenario, and delve difficulties instead of only Mythic+.
 - Unit Frames: Added a text color option for the data bar.
+
+### 🐛 Fixed
+
+- Resource Bars: Fixed Brewmaster Stagger bars staying on imported custom colors instead of using the configured Stagger thresholds, and cleaned up legacy Resource Bar profile keys from SavedVariables.
+
+<!--@end-eqol-beta@-->
 
 ---
 
