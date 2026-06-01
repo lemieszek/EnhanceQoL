@@ -1,36 +1,17 @@
 # Changelog
 
-<!--@eqol-beta@-->
-## [10.23.0-beta3] - 2026-06-01
-
-### 🐛 Fixed
-
-- Damage Meter: Fixed the live update rate ignoring sub-second settings and refreshing roughly once per second.
-
----
-
-## [10.23.0-beta2] - 2026-05-31
+## [10.23.0] - 2026-06-01
 
 ### ✨ Added
 
 - Damage Meter: Added an optional raid encounter-start trigger for automatic clear.
+- Damage Meter: Added a Threat meter type for the current target.
 - Tooltips: Improved player tooltip details with cleaner white values, compact Mythic+ score best-run display, modifier-gated Mythic+ dungeon details, and an optional Chat & Social setting for item tooltips when hovering item links in chat.
 
 ### 🐛 Fixed
 
 - Damage Meter: Fixed healing breakdown tooltips labeling the rate column as DPS instead of HPS.
-
----
-<!--@end-eqol-beta@-->
-
-## [10.23.0-beta1] - 2026-05-31
-
-### ✨ Added
-
-- Damage Meter: Added a Threat meter type for the current target.
-
-### 🐛 Fixed
-
+- Damage Meter: Fixed the live update rate ignoring sub-second settings and refreshing roughly once per second.
 - Data Panels: Fixed the Talent loadout click menu using an unsorted order.
 - Damage Meter: Fixed icon, bar, and row borders using mismatched vertical bounds when borders are enabled together.
 - Unit Frames: Fixed Player, Target, and Focus leader indicators not showing raid assistants in the same icon slot.
