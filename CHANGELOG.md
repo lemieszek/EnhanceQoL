@@ -1,5 +1,14 @@
 # Changelog
 
+## [10.24.0] - 2026-06-01
+
+### ✨ Added
+
+- Mythic Plus / Objective Tracker: Added selectable instance scopes for Objective Tracker automation, allowing it to run in chosen dungeon, raid, timewalking, scenario, and delve difficulties instead of only Mythic+.
+- Unit Frames: Added a text color option for the data bar.
+
+---
+
 ## [10.23.0] - 2026-06-01
 
 ### ✨ Added

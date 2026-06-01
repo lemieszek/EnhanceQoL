@@ -1714,6 +1714,7 @@ local defaults = {
 			fontSize = 12,
 			font = nil,
 			fontOutline = "OUTLINE",
+			textColor = { 1, 1, 1, 1 },
 			offsetLeft = { x = 6, y = 0 },
 			offsetCenter = { x = 0, y = 0 },
 			offsetRight = { x = -6, y = 0 },
@@ -9591,6 +9592,11 @@ local function applyBars(cfg, unit)
 			UFHelper.applyFont(st.dataBarTextLeft, dcfg.font, dcfg.fontSize or ddef.fontSize or 12, dcfg.fontOutline or ddef.fontOutline)
 			UFHelper.applyFont(st.dataBarTextCenter, dcfg.font, dcfg.fontSize or ddef.fontSize or 12, dcfg.fontOutline or ddef.fontOutline)
 			UFHelper.applyFont(st.dataBarTextRight, dcfg.font, dcfg.fontSize or ddef.fontSize or 12, dcfg.fontOutline or ddef.fontOutline)
+			local textColor = dcfg.textColor or ddef.textColor or { 1, 1, 1, 1 }
+			local tr, tg, tb, ta = textColor[1] or 1, textColor[2] or 1, textColor[3] or 1, textColor[4] or 1
+			if st.dataBarTextLeft then st.dataBarTextLeft:SetTextColor(tr, tg, tb, ta) end
+			if st.dataBarTextCenter then st.dataBarTextCenter:SetTextColor(tr, tg, tb, ta) end
+			if st.dataBarTextRight then st.dataBarTextRight:SetTextColor(tr, tg, tb, ta) end
 			UF.DataBar.Update(cfg, unit)
 		else
 			UF.DataBar.Hide(st)

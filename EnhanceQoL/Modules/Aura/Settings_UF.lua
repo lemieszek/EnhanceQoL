@@ -3507,6 +3507,34 @@ function UF.ui.appendDataBarSettings(list, unit, def, refresh, refreshSelf, addD
 	dataBarFontOutline.isEnabled = isDataBarEnabled
 	list[#list + 1] = dataBarFontOutline
 
+	list[#list + 1] = {
+		name = L["UFDataBarTextColor"] or "Data bar text color",
+		kind = UF.ui.settingType.Color,
+		parentId = "dataBar",
+		hasOpacity = true,
+		default = dataBarDef.textColor or { 1, 1, 1, 1 },
+		get = function() return getValue(unit, { "dataBar", "textColor" }, dataBarDef.textColor or { 1, 1, 1, 1 }) end,
+		set = function(_, color)
+			setColor(unit, { "dataBar", "textColor" }, color.r, color.g, color.b, color.a)
+			refresh()
+		end,
+		colorGet = function()
+			local r, g, b, a = toRGBA(getValue(unit, { "dataBar", "textColor" }, dataBarDef.textColor), dataBarDef.textColor or { 1, 1, 1, 1 })
+			return { r = r, g = g, b = b, a = a }
+		end,
+		colorSet = function(_, color)
+			setColor(unit, { "dataBar", "textColor" }, color.r, color.g, color.b, color.a)
+			refresh()
+		end,
+		colorDefault = {
+			r = (dataBarDef.textColor and dataBarDef.textColor[1]) or 1,
+			g = (dataBarDef.textColor and dataBarDef.textColor[2]) or 1,
+			b = (dataBarDef.textColor and dataBarDef.textColor[3]) or 1,
+			a = (dataBarDef.textColor and dataBarDef.textColor[4]) or 1,
+		},
+		isEnabled = isDataBarEnabled,
+	}
+
 	local function showDataBarTextOffsets(key, fallback)
 		local mode = normalizeTextMode(getValue(unit, { "dataBar", key }, fallback))
 		return mode ~= "NONE"
