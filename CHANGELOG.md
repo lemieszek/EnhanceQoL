@@ -7,6 +7,8 @@
 
 - Damage Meter: Added a bar spacing control for tooltip rows.
 - Group Frames / Dispel Indicator: Added an optional Blizzard private-aura dispel overlay for the custom Dispel renderer, including the Blizzard indicator mode selector with tooltip and separated Edit Mode controls.
+- Unit Frames / Healer Buff Placement: Added Strata and Level controls for bar indicators, allowing bar layering to be adjusted independently from the unit frame.
+- Unit Frames / Group Frames: Added the Blizzard Raid Frame healthbar fill as a built-in texture option for EnhanceQoL frame texture dropdowns.
 
 ---
 

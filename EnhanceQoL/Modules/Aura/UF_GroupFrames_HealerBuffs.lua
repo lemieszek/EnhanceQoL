@@ -713,6 +713,8 @@ function HB.CreateDefaultGroup(id)
 		barAlpha = 0.9,
 		barDrainAnimation = false,
 		barFillFrame = false,
+		barStrata = nil,
+		barFrameLevelOffset = 3,
 		barReverseFill = false,
 		inset = 0,
 		borderSize = 2,
@@ -772,6 +774,8 @@ local function normalizeGroup(group, id)
 	group.barAlpha = clamp(group.barAlpha, 0, 1, nil)
 	group.barDrainAnimation = group.barDrainAnimation == true
 	group.barFillFrame = group.barFillFrame == true
+	group.barStrata = normalizeFrameStrataToken(group.barStrata)
+	group.barFrameLevelOffset = roundInt(clamp(group.barFrameLevelOffset, -20, 1000, 3))
 	group.barReverseFill = normalizeBarReverseFill(group.barReverseFill)
 	group.inset = roundInt(clamp(group.inset, 0, 60, 0))
 	group.borderSize = roundInt(clamp(group.borderSize, 1, 24, 2))
@@ -2181,6 +2185,8 @@ local function didBarRenderStateChange(cache, group, groupId, layoutRevision, tr
 		or cache.barThickness ~= group.barThickness
 		or cache.barDrainAnimation ~= group.barDrainAnimation
 		or cache.barFillFrame ~= group.barFillFrame
+		or cache.barStrata ~= group.barStrata
+		or cache.barFrameLevelOffset ~= group.barFrameLevelOffset
 		or cache.barReverseFill ~= group.barReverseFill
 		or cache.inset ~= group.inset
 		or cache.anchorPoint ~= group.anchorPoint
@@ -2201,6 +2207,8 @@ local function didBarRenderStateChange(cache, group, groupId, layoutRevision, tr
 	cache.barThickness = group.barThickness
 	cache.barDrainAnimation = group.barDrainAnimation
 	cache.barFillFrame = group.barFillFrame
+	cache.barStrata = group.barStrata
+	cache.barFrameLevelOffset = group.barFrameLevelOffset
 	cache.barReverseFill = group.barReverseFill
 	cache.inset = group.inset
 	cache.anchorPoint = group.anchorPoint
@@ -2539,6 +2547,15 @@ local function renderBar(st, group, trackedAura, colorRule)
 			Pixel.SetStatusBarValue(bar, 1, false, true)
 		else
 			bar:SetValue(1)
+		end
+	end
+	if root then
+		local targetStrata = normalizeFrameStrataToken(group.barStrata)
+		if not targetStrata and root.GetFrameStrata then targetStrata = root:GetFrameStrata() end
+		if targetStrata then setFrameStrataCached(bar, targetStrata) end
+		if root.GetFrameLevel then
+			local levelOffset = roundInt(clamp(group.barFrameLevelOffset, -20, 1000, 3))
+			setFrameLevelCached(bar, (root:GetFrameLevel() or 0) + levelOffset)
 		end
 	end
 	bar:Show()

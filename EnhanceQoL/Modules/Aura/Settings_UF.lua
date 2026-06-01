@@ -1875,6 +1875,7 @@ local function textureOptions()
 	end
 	add("DEFAULT", "Default (Blizzard)")
 	add("SOLID", "Solid")
+	if UFHelper and UFHelper.BLIZZARD_RAID_FRAME_TEX_KEY then add(UFHelper.BLIZZARD_RAID_FRAME_TEX_KEY, L["Blizzard Raid Frame"] or "Blizzard Raid Frame") end
 	local names, hash = getCachedLSMMedia("statusbar")
 	for i = 1, #names do
 		local name = names[i]

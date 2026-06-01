@@ -17,6 +17,8 @@ addon.variables = addon.variables or {}
 local LSM = LibStub("LibSharedMedia-3.0")
 local EnumPowerType = Enum and Enum.PowerType
 local BLIZZARD_TEX = "Interface\\TargetingFrame\\UI-StatusBar"
+H.BLIZZARD_RAID_FRAME_TEX_KEY = "EQOL_BLIZZARD_RAID_FRAME_HP_FILL"
+H.BLIZZARD_RAID_FRAME_TEX = "RaidFrame-Hp-Fill"
 local BLIZZARD_CAST_STANDARD_TEX = "ui-castingbar-full-standard"
 local BLIZZARD_CAST_INTERRUPTED_TEX = "ui-castingbar-interrupted"
 local BLIZZARD_CAST_ICON_FALLBACK_TEX = 134400 -- Interface\\Icons\\INV_Misc_QuestionMark
@@ -1757,6 +1759,7 @@ end
 function H.resolveTexture(key)
 	if key == "SOLID" then return "Interface\\Buttons\\WHITE8x8" end
 	if not key or key == "DEFAULT" then return BLIZZARD_TEX end
+	if key == H.BLIZZARD_RAID_FRAME_TEX_KEY then return H.BLIZZARD_RAID_FRAME_TEX end
 	if LSM then
 		local tex = LSM:Fetch("statusbar", key)
 		if tex then return tex end
@@ -1767,6 +1770,7 @@ end
 function H.resolveSeparatorTexture(key)
 	if not key or key == "" or key == "SOLID" then return "Interface\\Buttons\\WHITE8x8" end
 	if key == "DEFAULT" then return BLIZZARD_TEX end
+	if key == H.BLIZZARD_RAID_FRAME_TEX_KEY then return H.BLIZZARD_RAID_FRAME_TEX end
 	if LSM then
 		local tex = LSM:Fetch("statusbar", key)
 		if tex then return tex end
@@ -1777,6 +1781,7 @@ end
 function H.resolveCastTexture(key)
 	if key == "SOLID" then return "Interface\\Buttons\\WHITE8x8" end
 	if not key or key == "DEFAULT" then return BLIZZARD_CAST_STANDARD_TEX or BLIZZARD_TEX end
+	if key == H.BLIZZARD_RAID_FRAME_TEX_KEY then return H.BLIZZARD_RAID_FRAME_TEX end
 	if LSM then
 		local tex = LSM:Fetch("statusbar", key)
 		if tex then return tex end

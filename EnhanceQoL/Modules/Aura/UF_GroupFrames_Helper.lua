@@ -7,6 +7,7 @@ addon.Aura.UF = addon.Aura.UF or {}
 local UF = addon.Aura.UF
 UF.GroupFramesHelper = UF.GroupFramesHelper or {}
 local H = UF.GroupFramesHelper
+local L = LibStub("AceLocale-3.0"):GetLocale(parentAddonName)
 
 H.COLOR_WHITE = { 1, 1, 1, 1 }
 H.COLOR_WHITE_90 = { 1, 1, 1, 0.9 }
@@ -1975,6 +1976,7 @@ function H.TextureOptions(LSM)
 	end
 	add("DEFAULT", "Default (Blizzard)")
 	add("SOLID", "Solid")
+	if addon.Aura and addon.Aura.UFHelper and addon.Aura.UFHelper.BLIZZARD_RAID_FRAME_TEX_KEY then add(addon.Aura.UFHelper.BLIZZARD_RAID_FRAME_TEX_KEY, L["Blizzard Raid Frame"] or "Blizzard Raid Frame") end
 	local names = addon.functions and addon.functions.GetLSMMediaNames and addon.functions.GetLSMMediaNames("statusbar") or {}
 	local hash = addon.functions and addon.functions.GetLSMMediaHash and addon.functions.GetLSMMediaHash("statusbar") or {}
 	for i = 1, #names do
