@@ -3148,6 +3148,7 @@ L["UFAuraRendererBlizzardDispelBorderIcons"] = "Ícones de borda de dissipação
 L["UFAuraRendererBlizzardDispelMode"] = "Modo do indicador de dissipação"
 L["UFAuraRendererBlizzardDispelModeAll"] = "Todos"
 L["UFAuraRendererBlizzardDispelModeByMe"] = "Dissipáveis por mim"
+L["UFAuraRendererBlizzardDispelModeTooltip"] = "Afeta apenas o indicador de dissipação da Blizzard para dissipações de auras privadas."
 L["UFAuraRendererBlizzardDispelOverlay"] = "Sobreposição de dissipação"
 L["UFAuraRendererBlizzardHideDuration"] = "Ocultar duração"
 L["UFAuraRendererBlizzardMaxDispelDebuffs"] = "Máx. ícones de dissipação"

@@ -3148,6 +3148,7 @@ L["UFAuraRendererBlizzardDispelBorderIcons"] = "Значки рамки расс
 L["UFAuraRendererBlizzardDispelMode"] = "Режим индикатора рассеивания"
 L["UFAuraRendererBlizzardDispelModeAll"] = "Все"
 L["UFAuraRendererBlizzardDispelModeByMe"] = "Рассеиваемые мной"
+L["UFAuraRendererBlizzardDispelModeTooltip"] = "Влияет только на индикатор рассеивания Blizzard для рассеивания приватных аур."
 L["UFAuraRendererBlizzardDispelOverlay"] = "Наложение рассеивания"
 L["UFAuraRendererBlizzardHideDuration"] = "Скрывать длительность"
 L["UFAuraRendererBlizzardMaxDispelDebuffs"] = "Макс. значков рассеивания"

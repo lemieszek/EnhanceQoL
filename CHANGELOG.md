@@ -6,6 +6,7 @@
 ### ✨ Added
 
 - Damage Meter: Added a bar spacing control for tooltip rows.
+- Group Frames / Dispel Indicator: Added an optional Blizzard private-aura dispel overlay for the custom Dispel renderer, including the Blizzard indicator mode selector with tooltip and separated Edit Mode controls.
 
 ---
 

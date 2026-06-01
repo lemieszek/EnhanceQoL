@@ -8930,6 +8930,35 @@ function GF.GetBlizzardDispelIndicatorOption(cfg, def)
 	return (Enum and Enum.RaidDispelDisplayType and Enum.RaidDispelDisplayType.DisplayAll) or 2
 end
 
+function GF.GetDispelTintBlizzardDispelIndicatorMode(cfg, def)
+	local sc = cfg and cfg.status
+	local dcfg = sc and sc.dispelTint
+	local mode = GF.NormalizeBlizzardDispelIndicatorMode(dcfg and dcfg.blizzardDispelIndicatorMode)
+	if mode then return mode end
+	local defSc = def and def.status
+	local defDispel = defSc and defSc.dispelTint
+	mode = GF.NormalizeBlizzardDispelIndicatorMode(defDispel and defDispel.blizzardDispelIndicatorMode)
+	return mode or GF.GetBlizzardDispelIndicatorMode(cfg, def)
+end
+
+function GF.GetDispelTintBlizzardDispelIndicatorOption(cfg, def)
+	local mode = GF.GetDispelTintBlizzardDispelIndicatorMode(cfg, def)
+	if mode == GF.BLIZZARD_DISPEL_MODE_BY_ME then
+		return (Enum and Enum.RaidDispelDisplayType and Enum.RaidDispelDisplayType.DispellableByMe) or 1
+	end
+	return (Enum and Enum.RaidDispelDisplayType and Enum.RaidDispelDisplayType.DisplayAll) or 2
+end
+
+function GF.ResolveBlizzardPrivateAuraDispelsEnabled(cfg, def)
+	local sc = cfg and cfg.status
+	local dcfg = sc and sc.dispelTint
+	local enabled = dcfg and dcfg.blizzardPrivateAuraDispels
+	if enabled ~= nil then return enabled == true end
+	local defSc = def and def.status
+	local defDispel = defSc and defSc.dispelTint
+	return defDispel and defDispel.blizzardPrivateAuraDispels == true
+end
+
 function GF.NormalizeBlizzardAuraOrganization(value)
 	if value == nil then return nil end
 	if type(value) == "number" then
@@ -9057,6 +9086,89 @@ function GF:ClearBlizzardAuraContainer(self)
 		if removed == false then GF.MarkEditModeReloadRequired() end
 	end
 	if container.Hide then container:Hide() end
+end
+
+function GF:ClearPrivateAuraDispelContainer(self)
+	local st = getState(self)
+	local container = st and st.privateAuraDispels
+	if not container then return end
+	if UFHelper and UFHelper.ClearDeferredPrivateAuraMutation then UFHelper.ClearDeferredPrivateAuraMutation(container) end
+	if UFHelper and UFHelper.RemoveBlizzardAuraContainer then
+		local removed = UFHelper.RemoveBlizzardAuraContainer(container)
+		if removed == false then GF.MarkEditModeReloadRequired() end
+	elseif UFHelper and UFHelper.RemovePrivateAuras then
+		local removed = UFHelper.RemovePrivateAuras(container)
+		if removed == false then GF.MarkEditModeReloadRequired() end
+	end
+	if container.Hide then container:Hide() end
+end
+
+function GF:UpdatePrivateAuraDispelContainerVisibility(self)
+	local st = getState(self)
+	local container = st and st.privateAuraDispels
+	if not (container and container.SetAlpha) then return end
+	if st._dispelTintShown == true or st._dispelGlowActive == true then
+		container:SetAlpha(0)
+		return
+	end
+	if C_Timer and C_Timer.After then
+		C_Timer.After(0, function()
+			local current = getState(self)
+			local currentContainer = current and current.privateAuraDispels
+			if not (currentContainer and currentContainer.SetAlpha) then return end
+			if current._dispelTintShown == true or current._dispelGlowActive == true then return end
+			currentContainer:SetAlpha(1)
+		end)
+	else
+		container:SetAlpha(1)
+	end
+end
+
+function GF:UpdatePrivateAuraDispelContainer(self)
+	if not (self and UFHelper and UFHelper.ApplyBlizzardAuraContainer) then return end
+	local st = getState(self)
+	if not st then return end
+	local kind = self._eqolGroupKind or "party"
+	local cfg = self._eqolCfg or getCfg(kind)
+	local def = DEFAULTS[kind] or EMPTY
+	if GF.IsBlizzardAuraRenderTypeEnabled(cfg, def, "dispels") or not GF.ResolveBlizzardPrivateAuraDispelsEnabled(cfg, def) then
+		GF:ClearPrivateAuraDispelContainer(self)
+		return
+	end
+	local unit = getUnit(self)
+	if not unit then
+		GF:ClearPrivateAuraDispelContainer(self)
+		return
+	end
+	local parent = st.barGroup or st.health or GF.GetLayoutAnchorFrame(st, self) or self
+	local levelParent = st.statusIconLayer or st.healthTextLayer or st.dispelTint or parent
+	if not st.privateAuraDispels then
+		st.privateAuraDispels = CreateFrame("Frame", nil, parent)
+		st.privateAuraDispels:EnableMouse(false)
+	elseif st.privateAuraDispels.GetParent and parent and st.privateAuraDispels:GetParent() ~= parent then
+		st.privateAuraDispels:SetParent(parent)
+	end
+	UFHelper.ApplyBlizzardAuraContainer(st.privateAuraDispels, unit, {
+		showBuffs = false,
+		showDebuffs = false,
+		showDispels = true,
+		showDispelOverlay = true,
+		showBigDefensive = false,
+		maxBuffs = 0,
+		maxDebuffs = 0,
+		maxDispelDebuffs = 1,
+		iconSize = 10,
+		organizationType = GF.GetBlizzardAuraOrganization(cfg, def),
+		dispelIndicatorOption = GF.GetDispelTintBlizzardDispelIndicatorOption(cfg, def),
+		powerBarUsedHeight = 0,
+		groupType = (kind == "party") and 4 or 5,
+		displayLargerRoleSpecificDebuffs = false,
+		showCountdownFrame = false,
+		showCountdownNumbers = false,
+		alwaysHideDuration = true,
+		suppressDispelBorderIcons = true,
+	}, parent, levelParent, false)
+	GF:UpdatePrivateAuraDispelContainerVisibility(self)
 end
 
 function GF:UpdateBlizzardAuraContainer(self)
@@ -9349,9 +9461,11 @@ function GF:UpdateAuras(self, updateInfo)
 	if blizzardRenderer then
 		local blizzardContainerReady = st.blizzardAuras and st.blizzardAuras._eqolBlizzardAuraAnchorID
 		if not updateInfo or updateInfo.isFullUpdate or not blizzardContainerReady then GF:UpdateBlizzardAuraContainer(self) end
+		if blizzardDispels then GF:ClearPrivateAuraDispelContainer(self) end
 	elseif st.blizzardAuras then
 		GF:ClearBlizzardAuraContainer(self)
 	end
+	if not blizzardDispels then GF:UpdatePrivateAuraDispelContainer(self) end
 	local ac = (cfg and cfg.auras) or EMPTY
 	if cfg then GFH.SyncAurasEnabled(cfg) end
 	local wantsAuras = st._wantsAuras
@@ -9662,10 +9776,12 @@ function GF:UpdateSampleAuras(self)
 	local blizzardExternals = blizzardRenderer and GF.IsBlizzardAuraRenderTypeEnabled(cfg, def, "externals")
 	if blizzardRenderer then
 		GF:UpdateBlizzardAuraContainer(self)
+		if blizzardDispels then GF:ClearPrivateAuraDispelContainer(self) end
 	elseif st.blizzardAuras and UFHelper and UFHelper.RemovePrivateAuras then
 		UFHelper.RemovePrivateAuras(st.blizzardAuras)
 		if st.blizzardAuras.Hide then st.blizzardAuras:Hide() end
 	end
+	if not blizzardDispels then GF:UpdatePrivateAuraDispelContainer(self) end
 	local ac = (cfg and cfg.auras) or EMPTY
 	local scfg = (cfg and cfg.status) or EMPTY
 	local wantsDispelTint = resolveDispelIndicatorEnabled(cfg, kind) and not blizzardDispels
@@ -10246,6 +10362,7 @@ function GF:UpdateDispelTint(self, cache, dispelFilter, allowSample, requiredFla
 	if not overlayEnabled and not glowEnabled then
 		hideDispelTint(st)
 		stopDispelGlow(st.barGroup or self, nil, st)
+		GF:UpdatePrivateAuraDispelContainerVisibility(self)
 		return
 	end
 	if allowSample then
@@ -10254,6 +10371,7 @@ function GF:UpdateDispelTint(self, cache, dispelFilter, allowSample, requiredFla
 		if not showSample then
 			hideDispelTint(st)
 			stopDispelGlow(st.barGroup or self, nil, st)
+			GF:UpdatePrivateAuraDispelContainerVisibility(self)
 			return
 		end
 	end
@@ -10345,6 +10463,7 @@ function GF:UpdateDispelTint(self, cache, dispelFilter, allowSample, requiredFla
 	else
 		stopDispelGlow(st.barGroup or self, nil, st)
 	end
+	GF:UpdatePrivateAuraDispelContainerVisibility(self)
 end
 
 function GF:UpdateDispelGlow(self, r, g, b)
@@ -10487,6 +10606,11 @@ function GF:UpdatePrivateAuras(self)
 		else
 			GF:UpdateBlizzardAuraContainer(self)
 		end
+		if GF.IsBlizzardAuraRenderTypeEnabled(cfg, def, "dispels") then
+			GF:ClearPrivateAuraDispelContainer(self)
+		else
+			GF:UpdatePrivateAuraDispelContainer(self)
+		end
 		return
 	end
 	local pcfg = (cfg and cfg.privateAuras) or def.privateAuras
@@ -10494,7 +10618,10 @@ function GF:UpdatePrivateAuras(self)
 	local privateAuraParent = GF.GetLayoutAnchorFrame(st, st.health or self) or self
 	local privateAuraLevelParent = st.statusIconLayer or st.healthTextLayer or privateAuraParent or st.health or st.barGroup or self
 	if not st.privateAuras then
-		if not (pcfg and pcfg.enabled == true) then return end
+		if not (pcfg and pcfg.enabled == true) then
+			GF:UpdatePrivateAuraDispelContainer(self)
+			return
+		end
 		st.privateAuras = CreateFrame("Frame", nil, privateAuraParent)
 		st.privateAuras:EnableMouse(false)
 	end
@@ -10503,6 +10630,7 @@ function GF:UpdatePrivateAuras(self)
 		if UFHelper and UFHelper.RemovePrivateAuras then UFHelper.RemovePrivateAuras(st.privateAuras) end
 		if UFHelper and UFHelper.UpdatePrivateAuraSound then UFHelper.UpdatePrivateAuraSound(st.privateAuras, nil, runtimePrivateCfg or pcfg or {}) end
 		if st.privateAuras and st.privateAuras.Hide then st.privateAuras:Hide() end
+		GF:UpdatePrivateAuraDispelContainer(self)
 		return
 	end
 	local inEditMode = isEditModeActive()
@@ -10511,9 +10639,11 @@ function GF:UpdatePrivateAuras(self)
 		if UFHelper and UFHelper.RemovePrivateAuras then UFHelper.RemovePrivateAuras(st.privateAuras) end
 		if UFHelper and UFHelper.UpdatePrivateAuraSound then UFHelper.UpdatePrivateAuraSound(st.privateAuras, nil, runtimePrivateCfg or pcfg or {}) end
 		if st.privateAuras and st.privateAuras.Hide then st.privateAuras:Hide() end
+		GF:UpdatePrivateAuraDispelContainer(self)
 		return
 	end
 	UFHelper.ApplyPrivateAuras(st.privateAuras, self.unit, runtimePrivateCfg or pcfg, privateAuraParent, privateAuraLevelParent, showSample)
+	GF:UpdatePrivateAuraDispelContainer(self)
 end
 
 function GF:UpdateHealthValue(self, unit, st)
@@ -11381,6 +11511,7 @@ function GF:UnitButton_ClearUnit(self)
 		UFHelper.RemovePrivateAuras(st.blizzardAuras)
 		if st.blizzardAuras.Hide then st.blizzardAuras:Hide() end
 	end
+	GF:ClearPrivateAuraDispelContainer(self)
 end
 
 function GF:UnitButton_RegisterUnitEvents(self, unit)
@@ -13039,13 +13170,17 @@ function GF:RefreshDispelTint()
 					local cache = st and getAuraCache(st, "debuff")
 					GF:UpdateDispelTint(child, cache, AURA_FILTERS.dispellable, nil, AURA_KIND_DISPEL)
 				end
+				GF:UpdatePrivateAuraDispelContainer(child)
 			end
 		end)
 	end
 	if GF._previewFrames then
 		for _, frames in pairs(GF._previewFrames) do
 			for _, btn in ipairs(frames) do
-				if btn then GF:UpdateDispelTint(btn, nil, nil, true) end
+				if btn then
+					GF:UpdateDispelTint(btn, nil, nil, true)
+					GF:UpdatePrivateAuraDispelContainer(btn)
+				end
 			end
 		end
 	end
@@ -21847,6 +21982,61 @@ local function buildEditModeSettings(kind, editModeId)
 			end,
 		},
 		{
+			name = "",
+			kind = SettingType.Divider,
+			parentId = "dispeltint",
+			isShown = function() return not GF.IsBlizzardAuraRenderTypeEnabled(getCfg(kind), DEFAULTS[kind] or EMPTY, "dispels") end,
+		},
+		{
+			name = (L["Blizzard"] or "Blizzard") .. " " .. (L["UFAuraRendererBlizzardDispelOverlay"] or "Dispel overlay"),
+			kind = SettingType.Checkbox,
+			field = "dispelTintBlizzardPrivateAuraDispels",
+			parentId = "dispeltint",
+			get = function()
+				return GF.ResolveBlizzardPrivateAuraDispelsEnabled(getCfg(kind), DEFAULTS[kind] or EMPTY)
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.status = cfg.status or {}
+				cfg.status.dispelTint = cfg.status.dispelTint or {}
+				cfg.status.dispelTint.blizzardPrivateAuraDispels = value and true or false
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dispelTintBlizzardPrivateAuraDispels", cfg.status.dispelTint.blizzardPrivateAuraDispels, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+				GF:RefreshDispelTint()
+			end,
+			isShown = function() return not GF.IsBlizzardAuraRenderTypeEnabled(getCfg(kind), DEFAULTS[kind] or EMPTY, "dispels") end,
+		},
+		{
+			name = L["UFAuraRendererBlizzardDispelMode"] or "Dispel indicator mode",
+			kind = SettingType.Dropdown,
+			field = "dispelTintBlizzardDispelMode",
+			parentId = "dispeltint",
+			values = GF.blizzardDispelIndicatorModeOptions,
+			tooltip = L["UFAuraRendererBlizzardDispelModeTooltip"] or "Only affects the Blizzard dispel indicator for private aura dispels.",
+			customDefaultText = GF.DropdownOptionLabel(GF.blizzardDispelIndicatorModeOptions, GF.GetDispelTintBlizzardDispelIndicatorMode(getCfg(kind), DEFAULTS[kind] or EMPTY), L["UFAuraRendererBlizzardDispelModeAll"] or "All"),
+			get = function() return GF.GetDispelTintBlizzardDispelIndicatorMode(getCfg(kind), DEFAULTS[kind] or EMPTY) end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.status = cfg.status or {}
+				cfg.status.dispelTint = cfg.status.dispelTint or {}
+				cfg.status.dispelTint.blizzardDispelIndicatorMode = GF.NormalizeBlizzardDispelIndicatorMode(value) or GF.BLIZZARD_DISPEL_MODE_ALL
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dispelTintBlizzardDispelMode", cfg.status.dispelTint.blizzardDispelIndicatorMode, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+				GF:RefreshDispelTint()
+			end,
+			generator = GF.DropdownRadioGenerator(GF.blizzardDispelIndicatorModeOptions),
+			isEnabled = function() return GF.ResolveBlizzardPrivateAuraDispelsEnabled(getCfg(kind), DEFAULTS[kind] or EMPTY) end,
+			isShown = function() return not GF.IsBlizzardAuraRenderTypeEnabled(getCfg(kind), DEFAULTS[kind] or EMPTY, "dispels") end,
+		},
+		{
+			name = "",
+			kind = SettingType.Divider,
+			parentId = "dispeltint",
+			isShown = function() return not GF.IsBlizzardAuraRenderTypeEnabled(getCfg(kind), DEFAULTS[kind] or EMPTY, "dispels") end,
+		},
+		{
 			name = L["Background color change"] or "Background color change",
 			kind = SettingType.Checkbox,
 			field = "dispelTintFillEnabled",
@@ -28747,6 +28937,8 @@ local function applyEditModeData(kind, data)
 		or data.rangeFadeAlpha ~= nil
 		or data.rangeFadeOfflineAlpha ~= nil
 		or data.dispelTintEnabled ~= nil
+		or data.dispelTintBlizzardPrivateAuraDispels ~= nil
+		or data.dispelTintBlizzardDispelMode ~= nil
 		or data.dispelTintAlpha ~= nil
 		or data.dispelTintFillEnabled ~= nil
 		or data.dispelTintFillAlpha ~= nil
@@ -28888,6 +29080,8 @@ local function applyEditModeData(kind, data)
 	end
 	if
 		data.dispelTintEnabled ~= nil
+		or data.dispelTintBlizzardPrivateAuraDispels ~= nil
+		or data.dispelTintBlizzardDispelMode ~= nil
 		or data.dispelTintAlpha ~= nil
 		or data.dispelTintFillEnabled ~= nil
 		or data.dispelTintFillAlpha ~= nil
@@ -28907,6 +29101,8 @@ local function applyEditModeData(kind, data)
 	then
 		cfg.status.dispelTint = cfg.status.dispelTint or {}
 		if data.dispelTintEnabled ~= nil then cfg.status.dispelTint.enabled = data.dispelTintEnabled and true or false end
+		if data.dispelTintBlizzardPrivateAuraDispels ~= nil then cfg.status.dispelTint.blizzardPrivateAuraDispels = data.dispelTintBlizzardPrivateAuraDispels and true or false end
+		if data.dispelTintBlizzardDispelMode ~= nil then cfg.status.dispelTint.blizzardDispelIndicatorMode = GF.NormalizeBlizzardDispelIndicatorMode(data.dispelTintBlizzardDispelMode) or GF.BLIZZARD_DISPEL_MODE_ALL end
 		if data.dispelTintAlpha ~= nil then cfg.status.dispelTint.alpha = clampNumber(data.dispelTintAlpha, 0, 1, cfg.status.dispelTint.alpha or 0.25) end
 		if data.dispelTintFillEnabled ~= nil then cfg.status.dispelTint.fillEnabled = data.dispelTintFillEnabled and true or false end
 		if data.dispelTintFillAlpha ~= nil then cfg.status.dispelTint.fillAlpha = clampNumber(data.dispelTintFillAlpha, 0, 1, cfg.status.dispelTint.fillAlpha or 0.2) end
@@ -29880,6 +30076,8 @@ function GF:EnsureEditMode()
 				end)(),
 				dispelTintEnabled = (sc.dispelTint and sc.dispelTint.enabled ~= nil) and (sc.dispelTint.enabled ~= false)
 					or ((sc.dispelTint == nil or sc.dispelTint.enabled == nil) and defDispel.enabled ~= false),
+				dispelTintBlizzardPrivateAuraDispels = GF.ResolveBlizzardPrivateAuraDispelsEnabled(cfg, def),
+				dispelTintBlizzardDispelMode = GF.GetDispelTintBlizzardDispelIndicatorMode(cfg, def),
 				dispelTintAlpha = (sc.dispelTint and sc.dispelTint.alpha) or defDispel.alpha or 0.25,
 				dispelTintFillEnabled = (sc.dispelTint and sc.dispelTint.fillEnabled ~= nil) and (sc.dispelTint.fillEnabled == true)
 					or ((sc.dispelTint == nil or sc.dispelTint.fillEnabled == nil) and defDispel.fillEnabled ~= false),
