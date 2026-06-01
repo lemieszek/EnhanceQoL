@@ -5527,7 +5527,7 @@ end
 
 function DamageMeter:RefreshFromLiveEvent(damageMeterType, sessionID)
 	if not self:IsLiveEventRelevant(damageMeterType, sessionID) then return end
-	local now = time and time() or (GetTime and GetTime() or 0)
+	local now = GetTime and GetTime() or (time and time() or 0)
 	local last = self.lastLiveRefreshTime or 0
 	if now - last < getUpdateRate() then return end
 	self.lastLiveRefreshTime = now

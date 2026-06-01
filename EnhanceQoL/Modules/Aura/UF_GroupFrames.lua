@@ -7142,6 +7142,9 @@ function GF:LayoutButton(self)
 		local nameFontOutline = tc.fontOutline or hc.fontOutline
 		local scaledNameFontSize = GF.ScaleContentValue(self, nameFontSize, cfg, 1)
 		if UFHelper and UFHelper.applyFont then UFHelper.applyFont(st.nameText, nameFont, scaledNameFontSize, nameFontOutline) end
+		if Pixel and Pixel.DisableSnap then Pixel.DisableSnap(st.nameText) end
+		local nameMetricScale = (st.nameText.GetEffectiveScale and st.nameText:GetEffectiveScale()) or scale
+		if not nameMetricScale or nameMetricScale <= 0 then nameMetricScale = scale end
 		local nameAnchor = tc.nameAnchor or "LEFT"
 		local baseOffset = (cfg.health and cfg.health.offsetLeft) or {}
 		if nameAnchor and nameAnchor:find("RIGHT") then
@@ -7153,6 +7156,8 @@ function GF:LayoutButton(self)
 		local namePad = (nameAnchor == "LEFT") and rolePad or 0
 		local nameX = ((nameOffset.x ~= nil and nameOffset.x or baseOffset.x or 6) * contentScale) + namePad
 		local nameY = (nameOffset.y ~= nil and nameOffset.y or baseOffset.y or 0) * contentScale
+		nameX = roundToPixel(nameX, nameMetricScale)
+		nameY = roundToPixel(nameY, nameMetricScale)
 		local nameAnchorFrame = layoutAnchor or st.health
 		if nameAnchor and nameAnchor:find("BOTTOM") then nameAnchorFrame = st.health or nameAnchorFrame end
 		local nameMaxChars = tonumber(tc.nameMaxChars) or 0
@@ -7164,6 +7169,7 @@ function GF:LayoutButton(self)
 				nameFrameWidth = max(1, (tonumber(w) or 1) + (tonumber(layoutOffsetLeft) or 0) + (tonumber(layoutOffsetRight) or 0))
 			end
 		end
+		nameFrameWidth = roundToPixel(nameFrameWidth, nameMetricScale)
 		st.nameText:ClearAllPoints()
 		local justifyV = "MIDDLE"
 		if nameAnchor and nameAnchor:find("TOP") then
@@ -7174,8 +7180,8 @@ function GF:LayoutButton(self)
 		if nameMaxChars <= 0 then
 			local vert = justifyV == "MIDDLE" and "CENTER" or justifyV
 			local leftPoint = (vert == "CENTER") and "LEFT" or (vert .. "LEFT")
-			local rightPad = 4 * contentScale
-			local nameWidth = max(1, nameFrameWidth - nameX - rightPad)
+			local rightPad = roundToPixel(4 * contentScale, nameMetricScale)
+			local nameWidth = max(1, roundToPixel(nameFrameWidth - nameX - rightPad, nameMetricScale))
 			if Pixel and Pixel.SetPoint then
 				Pixel.SetPoint(st.nameText, leftPoint, nameAnchorFrame, leftPoint, nameX, nameY)
 			else

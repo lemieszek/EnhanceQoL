@@ -1,6 +1,14 @@
 # Changelog
 
 <!--@eqol-beta@-->
+## [10.23.0-beta3] - 2026-06-01
+
+### 🐛 Fixed
+
+- Damage Meter: Fixed the live update rate ignoring sub-second settings and refreshing roughly once per second.
+
+---
+
 ## [10.23.0-beta2] - 2026-05-31
 
 ### ✨ Added
