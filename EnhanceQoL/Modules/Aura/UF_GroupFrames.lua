@@ -2197,13 +2197,7 @@ local function applyGroupIndicatorAnchor(fs, anchor, offset, scale, parent)
 	if justify and fs.SetJustifyH then fs:SetJustifyH(justify) end
 end
 
-local function stopDispelGlow(frame, effect, st)
-	if st then
-		if not st._dispelGlowActive then return end
-		effect = effect or st._dispelGlowEffect
-		st._dispelGlowActive = nil
-		st._dispelGlowEffect = nil
-	end
+function GF.StopDispelGlowFrame(frame, effect)
 	if addon.Glow and addon.Glow.Stop and frame then
 		addon.Glow.Stop(frame, DISPEL_GLOW_KEY)
 		return
@@ -2218,6 +2212,52 @@ local function stopDispelGlow(frame, effect, st)
 	else
 		if LCG.PixelGlow_Stop then LCG.PixelGlow_Stop(frame, DISPEL_GLOW_KEY) end
 	end
+end
+
+function GF.StopDispelGlow(frame, effect, st)
+	local previousFrame = st and st._dispelGlowTarget
+	if st then
+		if not st._dispelGlowActive then return end
+		effect = effect or st._dispelGlowEffect
+		st._dispelGlowActive = nil
+		st._dispelGlowEffect = nil
+		st._dispelGlowTarget = nil
+	end
+	if previousFrame and previousFrame ~= frame then GF.StopDispelGlowFrame(previousFrame, effect) end
+	GF.StopDispelGlowFrame(frame, effect)
+end
+
+function GF.ResolveDispelGlowTarget(self, st, glowOverOverlay)
+	local target = st and (st.barGroup or self) or self
+	if glowOverOverlay ~= true then return target, 8 end
+	local blizzardContainer = st and st.privateAuraDispels
+	local overlayFrame = blizzardContainer
+	local overlayLevelOffset = 210
+	if not (overlayFrame and overlayFrame.GetFrameLevel) or (overlayFrame.IsShown and not overlayFrame:IsShown()) then
+		overlayFrame = st and st.dispelTint
+		overlayLevelOffset = 1
+	end
+	if not (target and overlayFrame and overlayFrame.GetFrameLevel) then return target, 8 end
+	if overlayFrame.IsShown and not overlayFrame:IsShown() then return target, 8 end
+	local host = st.dispelGlowHost
+	if not host then
+		host = CreateFrame("Frame", nil, target)
+		host:EnableMouse(false)
+		st.dispelGlowHost = host
+	end
+	if host.GetParent and host:GetParent() ~= target then host:SetParent(target) end
+	if host.SetAllPoints then
+		host:ClearAllPoints()
+		host:SetAllPoints(target)
+	end
+	if host.SetFrameStrata then
+		local strata = (overlayFrame.GetFrameStrata and overlayFrame:GetFrameStrata()) or (target.GetFrameStrata and target:GetFrameStrata())
+		if strata then host:SetFrameStrata(strata) end
+	end
+	if host.SetFrameLevel then
+		host:SetFrameLevel(GF.ClampFrameLevel((overlayFrame:GetFrameLevel() or 0) + overlayLevelOffset))
+	end
+	return host, 8
 end
 
 local function resolveDispelIndicatorEnabled(cfg, kind)
@@ -3102,6 +3142,7 @@ local DEFAULTS = {
 				glowFrequency = 0.25,
 				glowInset = 33,
 				glowLines = 8,
+				glowOverOverlay = false,
 				glowThickness = 3,
 				glowX = 0,
 				glowY = 0,
@@ -3876,6 +3917,7 @@ local DEFAULTS = {
 				glowEnabled = false,
 				glowFrequency = 0.25,
 				glowLines = 8,
+				glowOverOverlay = false,
 				glowThickness = 3,
 				glowX = 0,
 				glowY = 0,
@@ -4515,6 +4557,7 @@ local DEFAULTS = {
 				glowEnabled = false,
 				glowFrequency = 0.25,
 				glowLines = 8,
+				glowOverOverlay = false,
 				glowThickness = 3,
 				glowX = 0,
 				glowY = 0,
@@ -5152,6 +5195,7 @@ local DEFAULTS = {
 				glowEnabled = false,
 				glowFrequency = 0.25,
 				glowLines = 8,
+				glowOverOverlay = false,
 				glowThickness = 3,
 				glowX = 0,
 				glowY = 0,
@@ -6594,7 +6638,7 @@ function GF:BuildButton(self)
 		self:HookScript("OnHide", function(btn)
 			local s = getState(btn)
 			hideDispelTint(s)
-			stopDispelGlow((s and s.barGroup) or btn, nil, s)
+			GF.StopDispelGlow((s and s.barGroup) or btn, nil, s)
 		end)
 	end
 
@@ -9167,6 +9211,7 @@ function GF:UpdatePrivateAuraDispelContainer(self)
 		showCountdownNumbers = false,
 		alwaysHideDuration = true,
 		suppressDispelBorderIcons = true,
+		privateAuraFrameLevelWorkaround = false,
 	}, parent, levelParent, false)
 	GF:UpdatePrivateAuraDispelContainerVisibility(self)
 end
@@ -10361,7 +10406,7 @@ function GF:UpdateDispelTint(self, cache, dispelFilter, allowSample, requiredFla
 	if glowEnabled == nil then glowEnabled = defDispel.glowEnabled == true end
 	if not overlayEnabled and not glowEnabled then
 		hideDispelTint(st)
-		stopDispelGlow(st.barGroup or self, nil, st)
+		GF.StopDispelGlow(st.barGroup or self, nil, st)
 		GF:UpdatePrivateAuraDispelContainerVisibility(self)
 		return
 	end
@@ -10370,7 +10415,7 @@ function GF:UpdateDispelTint(self, cache, dispelFilter, allowSample, requiredFla
 		if showSample == nil then showSample = defDispel.showSample == true end
 		if not showSample then
 			hideDispelTint(st)
-			stopDispelGlow(st.barGroup or self, nil, st)
+			GF.StopDispelGlow(st.barGroup or self, nil, st)
 			GF:UpdatePrivateAuraDispelContainerVisibility(self)
 			return
 		end
@@ -10461,7 +10506,7 @@ function GF:UpdateDispelTint(self, cache, dispelFilter, allowSample, requiredFla
 	if glowEnabled then
 		GF:UpdateDispelGlow(self, r, g, b)
 	else
-		stopDispelGlow(st.barGroup or self, nil, st)
+		GF.StopDispelGlow(st.barGroup or self, nil, st)
 	end
 	GF:UpdatePrivateAuraDispelContainerVisibility(self)
 end
@@ -10477,11 +10522,11 @@ function GF:UpdateDispelGlow(self, r, g, b)
 	local glowEnabled = dcfg.glowEnabled
 	if glowEnabled == nil then glowEnabled = defDispel.glowEnabled == true end
 	if not glowEnabled then
-		stopDispelGlow(st.barGroup or self, nil, st)
+		GF.StopDispelGlow(st.barGroup or self, nil, st)
 		return
 	end
 	if not (r and g and b) then
-		stopDispelGlow(st.barGroup or self, nil, st)
+		GF.StopDispelGlow(st.barGroup or self, nil, st)
 		return
 	end
 
@@ -10497,6 +10542,7 @@ function GF:UpdateDispelGlow(self, r, g, b)
 	local xoff = clampNumber(dcfg.glowX or defDispel.glowX or 0, -10, 10, 0)
 	local yoff = clampNumber(dcfg.glowY or defDispel.glowY or 0, -10, 10, 0)
 	local effect = dcfg.glowEffect or defDispel.glowEffect or "PIXEL"
+	local glowOverOverlay = (dcfg.glowOverOverlay ~= nil) and (dcfg.glowOverOverlay == true) or (defDispel.glowOverOverlay == true)
 	if effect ~= "PIXEL" and effect ~= "SHINE" and effect ~= "BLIZZARD" then effect = "PIXEL" end
 	local scale = thickness / 3
 	if scale < 0.5 then
@@ -10505,7 +10551,7 @@ function GF:UpdateDispelGlow(self, r, g, b)
 		scale = 4
 	end
 
-	local target = st.barGroup or self
+	local target, glowFrameLevel = GF.ResolveDispelGlowTarget(self, st, glowOverOverlay)
 	local usingGlow = addon.Glow and addon.Glow.Start and addon.Glow.Stop
 	local canPixel = LCG and LCG.PixelGlow_Start
 	local canShine = LCG and LCG.AutoCastGlow_Start
@@ -10517,10 +10563,10 @@ function GF:UpdateDispelGlow(self, r, g, b)
 		appliedEffect = "PIXEL"
 	end
 	if appliedEffect == "PIXEL" and not canPixel then
-		stopDispelGlow(target, nil, st)
+		GF.StopDispelGlow(target, nil, st)
 		return
 	end
-	if st._dispelGlowActive and st._dispelGlowEffect ~= appliedEffect then stopDispelGlow(target, nil, st) end
+	if st._dispelGlowActive and (st._dispelGlowEffect ~= appliedEffect or st._dispelGlowTarget ~= target) then GF.StopDispelGlow(target, nil, st) end
 	local glowColor = { cr, cg, cb, 1 }
 	if usingGlow then
 		addon.Glow.Start(target, DISPEL_GLOW_KEY, appliedEffect, {
@@ -10531,17 +10577,18 @@ function GF:UpdateDispelGlow(self, r, g, b)
 			thickness = thickness,
 			xOffset = xoff,
 			yOffset = yoff,
-			frameLevel = 8,
+			frameLevel = glowFrameLevel,
 		})
 	elseif appliedEffect == "SHINE" and canShine then
-		LCG.AutoCastGlow_Start(target, glowColor, lines, freq, scale, xoff, yoff, DISPEL_GLOW_KEY)
+		LCG.AutoCastGlow_Start(target, glowColor, lines, freq, scale, xoff, yoff, DISPEL_GLOW_KEY, glowFrameLevel)
 	elseif appliedEffect == "BLIZZARD" and canButton then
-		LCG.ButtonGlow_Start(target, glowColor, freq)
+		LCG.ButtonGlow_Start(target, glowColor, freq, glowFrameLevel)
 	else
-		LCG.PixelGlow_Start(target, glowColor, lines, freq, nil, thickness, xoff, yoff, nil, DISPEL_GLOW_KEY)
+		LCG.PixelGlow_Start(target, glowColor, lines, freq, nil, thickness, xoff, yoff, nil, DISPEL_GLOW_KEY, glowFrameLevel)
 	end
 	st._dispelGlowActive = true
 	st._dispelGlowEffect = appliedEffect
+	st._dispelGlowTarget = target
 end
 
 function GF:UpdateRange(self, inRange)
@@ -11476,7 +11523,7 @@ function GF:UnitButton_ClearUnit(self)
 	if st then
 		GFH.CancelReadyCheckIconTimer(st)
 		hideDispelTint(st)
-		stopDispelGlow(st.barGroup or self, nil, st)
+		GF.StopDispelGlow(st.barGroup or self, nil, st)
 		st._guid = nil
 		st._unitToken = nil
 		st._class = nil
@@ -22298,6 +22345,42 @@ local function buildEditModeSettings(kind, editModeId)
 			end,
 		},
 		{
+			name = L["UFDispelGlowOverOverlay"] or "Glow over overlay",
+			kind = SettingType.Checkbox,
+			field = "dispelTintGlowOverOverlay",
+			parentId = "dispeltint",
+			get = function()
+				local cfg = getCfg(kind)
+				local sc = cfg and cfg.status or {}
+				local dt = sc.dispelTint or {}
+				local def = (DEFAULTS[kind] and DEFAULTS[kind].status and DEFAULTS[kind].status.dispelTint) or {}
+				if dt.glowOverOverlay == nil then return def.glowOverOverlay == true end
+				return dt.glowOverOverlay == true
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.status = cfg.status or {}
+				cfg.status.dispelTint = cfg.status.dispelTint or {}
+				cfg.status.dispelTint.glowOverOverlay = value and true or false
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dispelTintGlowOverOverlay", cfg.status.dispelTint.glowOverOverlay, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+				GF:RefreshDispelTint()
+			end,
+			isEnabled = function()
+				local cfg = getCfg(kind)
+				local sc = cfg and cfg.status or {}
+				local dt = sc.dispelTint or {}
+				local def = (DEFAULTS[kind] and DEFAULTS[kind].status and DEFAULTS[kind].status.dispelTint) or {}
+				local glowEnabled = dt.glowEnabled
+				if glowEnabled == nil then glowEnabled = def.glowEnabled == true end
+				if glowEnabled ~= true then return false end
+				local overlayEnabled = dt.enabled
+				if overlayEnabled == nil then overlayEnabled = def.enabled ~= false end
+				return overlayEnabled == true or GF.ResolveBlizzardPrivateAuraDispelsEnabled(cfg, DEFAULTS[kind] or EMPTY)
+			end,
+		},
+		{
 			name = L["Glow color"] or "Glow color",
 			kind = SettingType.Dropdown,
 			field = "dispelTintGlowColorMode",
@@ -28947,6 +29030,7 @@ local function applyEditModeData(kind, data)
 		or data.dispelTintFrameLevelOffset ~= nil
 		or data.dispelTintSample ~= nil
 		or data.dispelTintGlowEnabled ~= nil
+		or data.dispelTintGlowOverOverlay ~= nil
 		or data.dispelTintGlowColorMode ~= nil
 		or data.dispelTintGlowColor ~= nil
 		or data.dispelTintGlowEffect ~= nil
@@ -29090,6 +29174,7 @@ local function applyEditModeData(kind, data)
 		or data.dispelTintFrameLevelOffset ~= nil
 		or data.dispelTintSample ~= nil
 		or data.dispelTintGlowEnabled ~= nil
+		or data.dispelTintGlowOverOverlay ~= nil
 		or data.dispelTintGlowColorMode ~= nil
 		or data.dispelTintGlowColor ~= nil
 		or data.dispelTintGlowEffect ~= nil
@@ -29115,6 +29200,7 @@ local function applyEditModeData(kind, data)
 		end
 		if data.dispelTintSample ~= nil then cfg.status.dispelTint.showSample = data.dispelTintSample and true or false end
 		if data.dispelTintGlowEnabled ~= nil then cfg.status.dispelTint.glowEnabled = data.dispelTintGlowEnabled and true or false end
+		if data.dispelTintGlowOverOverlay ~= nil then cfg.status.dispelTint.glowOverOverlay = data.dispelTintGlowOverOverlay and true or false end
 		if data.dispelTintGlowColorMode ~= nil then cfg.status.dispelTint.glowColorMode = data.dispelTintGlowColorMode end
 		if data.dispelTintGlowColor ~= nil then cfg.status.dispelTint.glowColor = data.dispelTintGlowColor end
 		if data.dispelTintGlowEffect ~= nil then cfg.status.dispelTint.glowEffect = data.dispelTintGlowEffect end
@@ -30089,6 +30175,8 @@ function GF:EnsureEditMode()
 					or ((sc.dispelTint == nil or sc.dispelTint.showSample == nil) and defDispel.showSample == true),
 				dispelTintGlowEnabled = (sc.dispelTint and sc.dispelTint.glowEnabled ~= nil) and (sc.dispelTint.glowEnabled == true)
 					or ((sc.dispelTint == nil or sc.dispelTint.glowEnabled == nil) and defDispel.glowEnabled == true),
+				dispelTintGlowOverOverlay = (sc.dispelTint and sc.dispelTint.glowOverOverlay ~= nil) and (sc.dispelTint.glowOverOverlay == true)
+					or ((sc.dispelTint == nil or sc.dispelTint.glowOverOverlay == nil) and defDispel.glowOverOverlay == true),
 				dispelTintGlowColorMode = (sc.dispelTint and sc.dispelTint.glowColorMode) or defDispel.glowColorMode or "DISPEL",
 				dispelTintGlowColor = (sc.dispelTint and sc.dispelTint.glowColor) or defDispel.glowColor or { 1, 1, 1, 1 },
 				dispelTintGlowEffect = (sc.dispelTint and sc.dispelTint.glowEffect) or defDispel.glowEffect or "PIXEL",

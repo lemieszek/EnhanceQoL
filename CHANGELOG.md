@@ -1,29 +1,20 @@
 # Changelog
 
-<!--@eqol-beta@-->
-## [10.24.0-beta2] - 2026-06-01
+## [10.24.0] - 2026-06-02
 
 ### ✨ Added
 
 - Damage Meter: Added a bar spacing control for tooltip rows.
 - Group Frames / Dispel Indicator: Added an optional Blizzard private-aura dispel overlay for the custom Dispel renderer, including the Blizzard indicator mode selector with tooltip and separated Edit Mode controls.
-- Unit Frames / Healer Buff Placement: Added Strata and Level controls for bar indicators, allowing bar layering to be adjusted independently from the unit frame.
-- Unit Frames / Group Frames: Added the Blizzard Raid Frame healthbar fill as a built-in texture option for EnhanceQoL frame texture dropdowns.
-
----
-
-## [10.24.0-beta1] - 2026-06-01
-
-### ✨ Added
-
+- Group Frames / Dispel Indicator: Added a Glow over overlay option so custom dispel glows can render above the EQOL or Blizzard dispel overlay when needed.
 - Mythic Plus / Objective Tracker: Added selectable instance scopes for Objective Tracker automation, allowing it to run in chosen dungeon, raid, timewalking, scenario, and delve difficulties instead of only Mythic+.
 - Unit Frames: Added a text color option for the data bar.
+- Unit Frames / Healer Buff Placement: Added Strata and Level controls for bar indicators, allowing bar layering to be adjusted independently from the unit frame.
+- Unit Frames / Group Frames: Added the Blizzard Raid Frame healthbar fill as a built-in texture option for EnhanceQoL frame texture dropdowns.
 
 ### 🐛 Fixed
 
 - Resource Bars: Fixed Brewmaster Stagger bars staying on imported custom colors instead of using the configured Stagger thresholds, and cleaned up legacy Resource Bar profile keys from SavedVariables.
-
-<!--@end-eqol-beta@-->
 
 ---
 

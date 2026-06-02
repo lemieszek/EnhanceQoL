@@ -899,14 +899,21 @@ H._privateAuraStrataFix = H._privateAuraStrataFix or {
 	FULLSCREEN_DIALOG = "TOOLTIP",
 }
 
-function H.ApplyPrivateAuraContainerFrameLevel(container, parent, levelFrame)
+function H.ApplyPrivateAuraContainerFrameLevel(container, parent, levelFrame, usePrivateAuraWorkaround)
 	if not container then return end
 	local strataSource = (levelFrame and levelFrame.GetFrameStrata and levelFrame) or (parent and parent.GetFrameStrata and parent)
 	if container.SetFrameStrata and strataSource then
 		local strata = strataSource:GetFrameStrata()
-		container:SetFrameStrata(H._privateAuraStrataFix[strata] or "DIALOG")
+		if usePrivateAuraWorkaround ~= false then
+			container:SetFrameStrata(H._privateAuraStrataFix[strata] or "DIALOG")
+		else
+			container:SetFrameStrata(strata or "MEDIUM")
+		end
 	end
-	if levelFrame and container.SetFrameLevel and levelFrame.GetFrameLevel then container:SetFrameLevel((levelFrame:GetFrameLevel() or 0) + 100) end
+	if levelFrame and container.SetFrameLevel and levelFrame.GetFrameLevel then
+		local offset = (usePrivateAuraWorkaround ~= false) and 100 or 10
+		container:SetFrameLevel((levelFrame:GetFrameLevel() or 0) + offset)
+	end
 end
 
 function H.UpdatePrivateAuraDeferredEvent()
@@ -1236,7 +1243,7 @@ function H.ApplyBlizzardAuraContainer(container, unit, cfg, parent, levelFrame, 
 
 	local effectiveUnit = resolvePrivateAuraUnitToken(unit)
 	if parent and container.GetParent and container:GetParent() ~= parent then container:SetParent(parent) end
-	H.ApplyPrivateAuraContainerFrameLevel(container, parent, levelFrame)
+	H.ApplyPrivateAuraContainerFrameLevel(container, parent, levelFrame, cfg.privateAuraFrameLevelWorkaround)
 	container:ClearAllPoints()
 	if parent then
 		container:SetAllPoints(parent)
