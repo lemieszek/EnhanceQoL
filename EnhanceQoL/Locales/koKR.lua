@@ -3407,6 +3407,7 @@ L["UFProfileCreateExists"] = "같은 이름의 유닛 프레임 프로필이 이
 L["UFProfileCreateInvalid"] = "유효한 유닛 프레임 프로필 이름을 입력하세요."
 L["UFProfileCreatePrompt"] = "새 유닛 프레임 프로필 이름을 입력하세요."
 L["UFProfileCreateSuccess"] = "유닛 프레임 프로필이 생성되었습니다."
+L["UFProfileDataPanelClickHint"] = "왼쪽 클릭: 유닛 프레임 프로필 전환"
 L["UFProfileDeleteBlocked"] = "활성 또는 전역 유닛 프레임 프로필은 삭제할 수 없습니다."
 L["UFProfileDeleteConfirm"] = "유닛 프레임 프로필 \"%s\"을(를) 삭제할까요?"
 L["UFProfileDeleteSuccess"] = "유닛 프레임 프로필 \"%s\"을(를) 삭제했습니다."

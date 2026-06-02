@@ -3407,6 +3407,7 @@ L["UFProfileCreateExists"] = "Esiste già un profilo dei frame unità con quel n
 L["UFProfileCreateInvalid"] = "Inserisci un nome valido per il profilo dei frame unità."
 L["UFProfileCreatePrompt"] = "Inserisci un nome per il nuovo profilo dei frame unità."
 L["UFProfileCreateSuccess"] = "Profilo dei frame unità creato."
+L["UFProfileDataPanelClickHint"] = "Clic sinistro per cambiare il profilo dei frame unità"
 L["UFProfileDeleteBlocked"] = "Non puoi eliminare il profilo attivo o globale dei frame unità."
 L["UFProfileDeleteConfirm"] = "Eliminare il profilo dei frame unità \"%s\"?"
 L["UFProfileDeleteSuccess"] = "Profilo dei frame unità \"%s\" eliminato."

@@ -3407,6 +3407,7 @@ L["UFProfileCreateExists"] = "Ya existe un perfil de marcos de unidad con ese no
 L["UFProfileCreateInvalid"] = "Introduce un nombre válido para el perfil de marcos de unidad."
 L["UFProfileCreatePrompt"] = "Introduce un nombre para el nuevo perfil de marcos de unidad."
 L["UFProfileCreateSuccess"] = "Perfil de marcos de unidad creado."
+L["UFProfileDataPanelClickHint"] = "Clic izquierdo para cambiar el perfil de marcos de unidad"
 L["UFProfileDeleteBlocked"] = "No puedes eliminar el perfil activo o global de marcos de unidad."
 L["UFProfileDeleteConfirm"] = "¿Eliminar el perfil de marcos de unidad \"%s\"?"
 L["UFProfileDeleteSuccess"] = "Perfil de marcos de unidad \"%s\" eliminado."

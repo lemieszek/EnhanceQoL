@@ -9,6 +9,7 @@
 - Group Frames / Dispel Indicator: Added a Glow over overlay option so custom dispel glows can render above the EQOL or Blizzard dispel overlay when needed.
 - Mythic Plus / Objective Tracker: Added selectable instance scopes for Objective Tracker automation, allowing it to run in chosen dungeon, raid, timewalking, scenario, and delve difficulties instead of only Mythic+.
 - Unit Frames: Added a text color option for the data bar.
+- Unit Frames / Data Panels: Added a Unit Frames profile stream that shows the active profile and allows switching profiles from the Data Panel.
 - Unit Frames / Healer Buff Placement: Added Strata and Level controls for bar indicators, allowing bar layering to be adjusted independently from the unit frame.
 - Unit Frames / Group Frames: Added the Blizzard Raid Frame healthbar fill as a built-in texture option for EnhanceQoL frame texture dropdowns.
 

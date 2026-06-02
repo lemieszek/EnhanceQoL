@@ -3407,6 +3407,7 @@ L["UFProfileCreateExists"] = "Ein Unit-Frames-Profil mit diesem Namen existiert 
 L["UFProfileCreateInvalid"] = "Bitte einen gültigen Namen für das Unit-Frames-Profil eingeben."
 L["UFProfileCreatePrompt"] = "Name für das neue Unit-Frames-Profil eingeben."
 L["UFProfileCreateSuccess"] = "Unit-Frames-Profil erstellt."
+L["UFProfileDataPanelClickHint"] = "Linksklick: Unit-Frames-Profil wechseln"
 L["UFProfileDeleteBlocked"] = "Das aktive oder globale Unit-Frames-Profil kann nicht gelöscht werden."
 L["UFProfileDeleteConfirm"] = "Unit-Frames-Profil \"%s\" löschen?"
 L["UFProfileDeleteSuccess"] = "Unit-Frames-Profil \"%s\" gelöscht."

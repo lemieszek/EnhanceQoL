@@ -3407,6 +3407,7 @@ L["UFProfileCreateExists"] = "Un profil de cadres d'unité portant ce nom existe
 L["UFProfileCreateInvalid"] = "Veuillez saisir un nom de profil de cadres d'unité valide."
 L["UFProfileCreatePrompt"] = "Saisissez un nom pour le nouveau profil de cadres d'unité."
 L["UFProfileCreateSuccess"] = "Profil de cadres d'unité créé."
+L["UFProfileDataPanelClickHint"] = "Clic gauche pour changer le profil des cadres d'unité"
 L["UFProfileDeleteBlocked"] = "Vous ne pouvez pas supprimer le profil actif ou global de cadres d'unité."
 L["UFProfileDeleteConfirm"] = "Supprimer le profil de cadres d'unité \"%s\" ?"
 L["UFProfileDeleteSuccess"] = "Profil de cadres d'unité \"%s\" supprimé."

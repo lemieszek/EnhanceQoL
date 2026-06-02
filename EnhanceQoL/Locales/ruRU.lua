@@ -3407,6 +3407,7 @@ L["UFProfileCreateExists"] = "Профиль фреймов юнитов с та
 L["UFProfileCreateInvalid"] = "Введите корректное имя профиля фреймов юнитов."
 L["UFProfileCreatePrompt"] = "Введите имя для нового профиля фреймов юнитов."
 L["UFProfileCreateSuccess"] = "Профиль фреймов юнитов создан."
+L["UFProfileDataPanelClickHint"] = "ЛКМ: сменить профиль фреймов юнитов"
 L["UFProfileDeleteBlocked"] = "Нельзя удалить активный или глобальный профиль фреймов юнитов."
 L["UFProfileDeleteConfirm"] = "Удалить профиль фреймов юнитов \"%s\"?"
 L["UFProfileDeleteSuccess"] = "Профиль фреймов юнитов \"%s\" удалён."
