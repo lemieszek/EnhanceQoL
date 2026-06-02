@@ -23,6 +23,7 @@ local PAGE_GAP = 16
 local GRID_GAP = 12
 
 local FONT_TITLE = "GameFontNormalLarge"
+local FONT_HERO = "GameFontNormalHuge"
 local FONT_HEADER = "GameFontNormal"
 local FONT_TEXT = "GameFontHighlight"
 local FONT_MUTED = "GameFontDisableSmall"
@@ -35,6 +36,9 @@ local CARD_BG = { 0.080, 0.073, 0.061, 0.92 }
 local CARD_BG_HOVER = { 0.125, 0.101, 0.062, 0.98 }
 local CARD_BORDER = { 0.46, 0.36, 0.20, 0.62 }
 local CARD_BORDER_HOVER = { 0.94, 0.67, 0.25, 0.90 }
+local DASHBOARD_CARD_BG = { 0.145, 0.145, 0.132, 0.96 }
+local DASHBOARD_CARD_BG_HOVER = { 0.178, 0.170, 0.142, 0.99 }
+local DASHBOARD_CARD_BORDER = { 0.43, 0.40, 0.32, 0.88 }
 local SELECTED_BG = { 0.24, 0.17, 0.065, 0.96 }
 local SIDEBAR_BG = { 0.030, 0.031, 0.030, 0.78 }
 local MUTED = { 0.67, 0.64, 0.58 }
@@ -45,6 +49,10 @@ local WARNING = { 1.0, 0.55, 0.18 }
 
 local FALLBACK_ICON = "Interface\\Icons\\INV_Misc_Gear_01"
 local SETTINGS_COG_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Cogwheel.tga"
+local SETTINGS_EXPORT_IMPORT_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\ExportImport.tga"
+local SETTINGS_QUESTION_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Question.tga"
+local SETTINGS_QUICK_REFERENCE_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\QuickReference.tga"
+local SETTINGS_REVERT_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Revert.tga"
 local ICON_TEXTURES = {
 	actionbar = "Interface\\Icons\\INV_Sword_04",
 	actiontracker = "Interface\\Icons\\Ability_Hunter_MarkedForDeath",
@@ -62,19 +70,19 @@ local ICON_TEXTURES = {
 	economy = "Interface\\Icons\\INV_Misc_Coin_01",
 	gameplay = "Interface\\Icons\\Ability_DualWield",
 	general = "Interface\\Icons\\Trade_BlackSmithing",
-	help = "Interface\\Icons\\INV_Misc_Book_09",
+	help = SETTINGS_QUICK_REFERENCE_ICON,
 	interface = "Interface\\Icons\\INV_Misc_Monitor_01",
 	map = "Interface\\Icons\\INV_Misc_Map_01",
 	mover = "Interface\\Icons\\Ability_Hunter_MasterMarksman",
 	nameplate = "Interface\\Icons\\INV_Misc_Tournaments_banner_Human",
 	popups = "Interface\\Icons\\INV_Misc_Note_01",
-	profiles = "Interface\\Icons\\INV_Misc_GroupNeedMore",
-	reset = "Interface\\Icons\\Ability_Rogue_FeignDeath",
+	profiles = SETTINGS_EXPORT_IMPORT_ICON,
+	reset = SETTINGS_REVERT_ICON,
 	resource = "Interface\\Icons\\INV_Misc_Food_100",
 	skinner = "Interface\\Icons\\INV_Misc_EngGizmos_17",
 	social = "Interface\\Icons\\INV_Misc_GroupLooking",
 	sound = "Interface\\Icons\\INV_Misc_Note_01",
-	support = "Interface\\Icons\\INV_Misc_QuestionMark",
+	support = SETTINGS_QUESTION_ICON,
 	tooltip = "Interface\\Icons\\INV_Misc_Note_03",
 	unitframes = "Interface\\Icons\\INV_Misc_GroupLooking",
 	vendor = "Interface\\Icons\\INV_Misc_Coin_02",
@@ -799,42 +807,114 @@ local function addStatusChip(parent, text, color, width)
 	return chip
 end
 
+local function getDashboardIconSize(iconSource)
+	if iconSource == SETTINGS_QUICK_REFERENCE_ICON then
+		return 58, 60
+	elseif iconSource == SETTINGS_EXPORT_IMPORT_ICON then
+		return 58, 64
+	elseif iconSource == SETTINGS_REVERT_ICON then
+		return 58, 66
+	end
+	return 58, 58
+end
+
+local function createDashboardIcon(parent, iconSource)
+	local icon = parent:CreateTexture(nil, "OVERLAY")
+	local width, height = getDashboardIconSize(iconSource)
+	icon:SetSize(width, height)
+	icon:SetTexture(iconSource or FALLBACK_ICON)
+	return icon
+end
+
+local function applyDashboardCardBackground(card, bgColor)
+	if card.SetBackdrop then
+		card:SetBackdrop({
+			bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+			tile = true,
+			tileSize = 16,
+			insets = { left = 0, right = 0, top = 0, bottom = 0 },
+		})
+		card:SetBackdropColor(bgColor[1], bgColor[2], bgColor[3], bgColor[4])
+	end
+end
+
+local function createDashboardCardBorder(card)
+	if card.BorderTop then return end
+	card.BorderTop = card:CreateTexture(nil, "OVERLAY", nil, 1)
+	card.BorderTop:SetPoint("TOPLEFT", card, "TOPLEFT", 0, 0)
+	card.BorderTop:SetPoint("TOPRIGHT", card, "TOPRIGHT", 0, 0)
+	card.BorderTop:SetHeight(1)
+
+	card.BorderBottom = card:CreateTexture(nil, "OVERLAY", nil, 1)
+	card.BorderBottom:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", 0, 0)
+	card.BorderBottom:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", 0, 0)
+	card.BorderBottom:SetHeight(1)
+
+	card.BorderLeft = card:CreateTexture(nil, "OVERLAY", nil, 1)
+	card.BorderLeft:SetPoint("TOPLEFT", card, "TOPLEFT", 0, 0)
+	card.BorderLeft:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", 0, 0)
+	card.BorderLeft:SetWidth(1)
+
+	card.BorderRight = card:CreateTexture(nil, "OVERLAY", nil, 1)
+	card.BorderRight:SetPoint("TOPRIGHT", card, "TOPRIGHT", 0, 0)
+	card.BorderRight:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", 0, 0)
+	card.BorderRight:SetWidth(1)
+end
+
+local function setDashboardCardBorder(card, borderColor)
+	createDashboardCardBorder(card)
+	card.BorderTop:SetColorTexture(borderColor[1], borderColor[2], borderColor[3], borderColor[4])
+	card.BorderBottom:SetColorTexture(borderColor[1], borderColor[2], borderColor[3], borderColor[4])
+	card.BorderLeft:SetColorTexture(borderColor[1], borderColor[2], borderColor[3], borderColor[4])
+	card.BorderRight:SetColorTexture(borderColor[1], borderColor[2], borderColor[3], borderColor[4])
+end
+
 local function addDashboardCard(row, index, title, description, iconSource, onClick)
-	local card = createGridCard({ contentWidth = row.contentWidth or CONTENT_WIDTH }, row, index, 2, 84)
+	local card = createGridCard({ contentWidth = row.contentWidth or CONTENT_WIDTH }, row, index, 2, 96)
+	applyDashboardCardBackground(card, DASHBOARD_CARD_BG)
+	setDashboardCardBorder(card, DASHBOARD_CARD_BORDER)
 	if onClick then
 		card:SetScript("OnMouseUp", onClick)
 	end
-	local icon = createIconPlate(card, iconSource, 42, false)
-	icon:SetPoint("LEFT", card, "LEFT", 14, 0)
+	card:SetScript("OnEnter", function(self)
+		applyDashboardCardBackground(self, DASHBOARD_CARD_BG_HOVER)
+		setDashboardCardBorder(self, CARD_BORDER_HOVER)
+	end)
+	card:SetScript("OnLeave", function(self)
+		applyDashboardCardBackground(self, DASHBOARD_CARD_BG)
+		setDashboardCardBorder(self, DASHBOARD_CARD_BORDER)
+	end)
+	local icon = createDashboardIcon(card, iconSource)
+	icon:SetPoint("LEFT", card, "LEFT", 24, 0)
 
-	local titleText = createText(card, FONT_HEADER, title or "", WHITE)
-	titleText:SetPoint("TOPLEFT", icon, "TOPRIGHT", 14, -4)
-	titleText:SetPoint("RIGHT", card, "RIGHT", -14, 0)
-	titleText:SetHeight(20)
+	local titleText = createText(card, FONT_TITLE, title or "", WHITE)
+	titleText:SetPoint("TOPLEFT", icon, "TOPRIGHT", 22, -6)
+	titleText:SetPoint("RIGHT", card, "RIGHT", -18, 0)
+	titleText:SetHeight(24)
 
-	local desc = createText(card, FONT_MUTED, description or "", MUTED)
-	desc:SetPoint("TOPLEFT", titleText, "BOTTOMLEFT", 0, -6)
-	desc:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -14, 12)
+	local desc = createText(card, FONT_TEXT, description or "", MUTED)
+	desc:SetPoint("TOPLEFT", titleText, "BOTTOMLEFT", 0, -7)
+	desc:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -18, 15)
 	return card
 end
 
 local function addDashboardHero(state, title, subtitle)
-	local hero = createContentFrame(state, 104)
-	applyBackdrop(hero, { 0.058, 0.052, 0.043, 0.94 }, CARD_BORDER)
+	local hero = createContentFrame(state, 128)
 
-	local titleText = createText(hero, FONT_TITLE, title or "", WHITE)
-	titleText:SetPoint("TOPLEFT", hero, "TOPLEFT", 22, -18)
-	titleText:SetPoint("RIGHT", hero, "RIGHT", -116, 0)
-	titleText:SetHeight(26)
+	local titleText = createText(hero, FONT_HERO, title or "", WHITE)
+	titleText:SetPoint("TOPLEFT", hero, "TOPLEFT", 4, -10)
+	titleText:SetPoint("RIGHT", hero, "RIGHT", -146, 0)
+	titleText:SetHeight(36)
 
-	local subText = createText(hero, FONT_MUTED, subtitle or "", MUTED)
-	subText:SetPoint("TOPLEFT", titleText, "BOTTOMLEFT", 0, -8)
-	subText:SetPoint("RIGHT", hero, "RIGHT", -130, 0)
-	subText:SetHeight(40)
+	local subText = createText(hero, FONT_TEXT, subtitle or "", MUTED)
+	subText:SetPoint("TOPLEFT", titleText, "BOTTOMLEFT", 0, -10)
+	subText:SetPoint("RIGHT", hero, "RIGHT", -166, 0)
+	subText:SetHeight(48)
 
-	local icon = createIconPlate(hero, SETTINGS_COG_ICON, 64, false)
-	icon:SetPoint("RIGHT", hero, "RIGHT", -24, 0)
-	state.y = state.y - 12
+	local icon = createDashboardIcon(hero, SETTINGS_COG_ICON)
+	icon:SetSize(92, 92)
+	icon:SetPoint("RIGHT", hero, "RIGHT", -36, -4)
+	state.y = state.y - 8
 	return hero
 end
 
@@ -1258,7 +1338,7 @@ local function renderDashboard(state)
 		L["configCenterIntro"] or "A modern overview of your settings, quick actions, and enabled features."
 	)
 
-	local quickRow = createGridRow(state, 84)
+	local quickRow = createGridRow(state, 96)
 	local legacyLabel = L["configCenterLegacyBlizzard"] or "Legacy Blizzard Settings"
 	addDashboardCard(
 		quickRow,
@@ -1278,7 +1358,7 @@ local function renderDashboard(state)
 		end
 	)
 
-	local quickRow2 = createGridRow(state, 84)
+	local quickRow2 = createGridRow(state, 96)
 	addDashboardCard(
 		quickRow2,
 		1,
