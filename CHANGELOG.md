@@ -1,10 +1,15 @@
 # Changelog
 
-## [10.24.1-beta1] - 2026-06-02
+## [10.25.0-beta1] - 2026-06-02
+
+### ✨ Added
+
+- Unit Frames / Castbar and Resource Bars: Added configurable text anchors for cast names, cast durations, and resource bar values so text can stay pinned to the desired position while bars resize.
 
 ### 🐛 Fixed
 
 - Unit Frames: Exposed custom player, target, focus, and pet portrait fields on the EQOL unit frames.
+- Bags: Fixed new characters without purchased character bank tabs being unable to switch to the character bank purchase view when the integrated bank is enabled.
 
 ---
 

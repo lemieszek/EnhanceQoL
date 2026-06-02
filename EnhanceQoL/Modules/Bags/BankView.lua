@@ -47,6 +47,14 @@ local function addBankTabIDs(tabIDs, startBagID, endBagID)
 	end
 end
 
+local function canPurchaseBankTab(bankType)
+	if not bankType or not C_Bank or not C_Bank.CanPurchaseBankTab or not C_Bank.HasMaxBankTabs then
+		return false
+	end
+
+	return C_Bank.CanPurchaseBankTab(bankType) and not C_Bank.HasMaxBankTabs(bankType)
+end
+
 local function getPurchasedBankTabIDs(bankType, fallbackStartBagID, fallbackEndBagID)
 	local tabIDs = {}
 	local seen = {}
@@ -92,16 +100,20 @@ local function getContextCache(bankType)
 end
 
 local function getCachedBankContext(bankType, contextID, label, color, columnCount, fallbackStartBagID, fallbackEndBagID)
-	if not isBankTypeViewable(bankType) then
+	local canPurchaseTabs = canPurchaseBankTab(bankType)
+	if not isBankTypeViewable(bankType) and not canPurchaseTabs then
 		return nil
 	end
 
 	local bagIDs = getPurchasedBankTabIDs(bankType, fallbackStartBagID, fallbackEndBagID)
-	if #bagIDs == 0 then
+	if #bagIDs == 0 and not canPurchaseTabs then
 		return nil
 	end
 
 	local signature, totalSlotCount = buildBankContextSignature(contextID, bagIDs)
+	if canPurchaseTabs then
+		signature = signature .. "|purchase"
+	end
 	local cache = getContextCache(bankType)
 	local context = cache.context
 	if context and context.signature == signature and context.label == label then
@@ -116,6 +128,7 @@ local function getCachedBankContext(bankType, contextID, label, color, columnCou
 	context.bagIDs = bagIDs
 	context.signature = signature
 	context.totalSlotCount = totalSlotCount
+	context.canPurchaseTabs = canPurchaseTabs
 	cache.context = context
 	return context
 end

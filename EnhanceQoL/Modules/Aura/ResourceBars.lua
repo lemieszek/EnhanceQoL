@@ -113,6 +113,17 @@ local ResourcebarVars = {
 		{ value = 20, color = { 0.20, 0.90, 0.40, 1.0 } },
 	},
 	WHITE = { 1, 1, 1, 1 },
+	VALID_TEXT_ANCHORS = {
+		TOPLEFT = true,
+		TOP = true,
+		TOPRIGHT = true,
+		LEFT = true,
+		CENTER = true,
+		RIGHT = true,
+		BOTTOMLEFT = true,
+		BOTTOM = true,
+		BOTTOMRIGHT = true,
+	},
 	DEFAULT_MAX_COLOR = { 0, 1, 0, 1 },
 	DEFAULT_RB_TEX = "Interface\\Buttons\\WHITE8x8", -- historical default (Solid)
 	DEFAULT_HEALTH_WIDTH = 200,
@@ -3141,16 +3152,33 @@ local function ensureTextOffsetTable(cfg)
 	return cfg.textOffset
 end
 
+function ResourceBars.NormalizeTextAnchor(value, fallback)
+	local fallbackAnchor = tostring(fallback or "CENTER"):upper()
+	if not RB.VALID_TEXT_ANCHORS[fallbackAnchor] then fallbackAnchor = "CENTER" end
+	local anchor = tostring(value or fallbackAnchor):upper()
+	if RB.VALID_TEXT_ANCHORS[anchor] then return anchor end
+	return fallbackAnchor
+end
+
+function ResourceBars.GetTextJustifyH(anchor)
+	anchor = ResourceBars.NormalizeTextAnchor(anchor, "CENTER")
+	if anchor == "LEFT" or anchor == "TOPLEFT" or anchor == "BOTTOMLEFT" then return "LEFT" end
+	if anchor == "RIGHT" or anchor == "TOPRIGHT" or anchor == "BOTTOMRIGHT" then return "RIGHT" end
+	return "CENTER"
+end
+
 local function applyTextPosition(bar, cfg, baseX, baseY)
 	if not bar or not bar.text then return end
 	local offset = ensureTextOffsetTable(cfg)
 	local ox = (baseX or 0) + (offset.x or 0)
 	local oy = (baseY or 0) + (offset.y or 0)
+	local anchor = ResourceBars.NormalizeTextAnchor(cfg and cfg.textAnchor, "CENTER")
 	local textParent = ensureTextOverlayFrame(bar) or bar
 	if bar.text:GetParent() ~= textParent then bar.text:SetParent(textParent) end
 	bar.text:SetDrawLayer("OVERLAY")
 	bar.text:ClearAllPoints()
-	bar.text:SetPoint("CENTER", bar, "CENTER", ox, oy)
+	bar.text:SetPoint(anchor, bar, anchor, ox, oy)
+	if bar.text.SetJustifyH then bar.text:SetJustifyH(ResourceBars.GetTextJustifyH(anchor)) end
 end
 
 function ResourceBars.GetThresholdColorModeAndCap(pType)

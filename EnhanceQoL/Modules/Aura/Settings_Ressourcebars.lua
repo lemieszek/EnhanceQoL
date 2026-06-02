@@ -99,6 +99,29 @@ for _, strata in ipairs(FRAME_STRATA_ORDER) do
 	VALID_FRAME_STRATA[strata] = true
 	FRAME_STRATA_VALUES[#FRAME_STRATA_VALUES + 1] = { value = strata, text = strata }
 end
+local TEXT_ANCHOR_OPTIONS = {
+	{ value = "TOPLEFT", label = L["settingsAnchorTopLeft"] or "Top left" },
+	{ value = "TOP", label = L["settingsAnchorTop"] or "Top" },
+	{ value = "TOPRIGHT", label = L["settingsAnchorTopRight"] or "Top right" },
+	{ value = "LEFT", label = L["settingsAnchorLeft"] or "Left" },
+	{ value = "CENTER", label = L["settingsAnchorCenter"] or "Center" },
+	{ value = "RIGHT", label = L["settingsAnchorRight"] or "Right" },
+	{ value = "BOTTOMLEFT", label = L["settingsAnchorBottomLeft"] or "Bottom left" },
+	{ value = "BOTTOM", label = L["settingsAnchorBottom"] or "Bottom" },
+	{ value = "BOTTOMRIGHT", label = L["settingsAnchorBottomRight"] or "Bottom right" },
+}
+local VALID_TEXT_ANCHORS = {}
+for _, entry in ipairs(TEXT_ANCHOR_OPTIONS) do
+	VALID_TEXT_ANCHORS[entry.value] = true
+end
+
+local function normalizeTextAnchor(value, fallback)
+	local fallbackAnchor = tostring(fallback or "CENTER"):upper()
+	if not VALID_TEXT_ANCHORS[fallbackAnchor] then fallbackAnchor = "CENTER" end
+	local anchor = tostring(value or fallbackAnchor):upper()
+	if VALID_TEXT_ANCHORS[anchor] then return anchor end
+	return fallbackAnchor
+end
 
 local function getCachedLSMMedia(mediaType)
 	local names = addon.functions and addon.functions.GetLSMMediaNames and addon.functions.GetLSMMediaNames(mediaType)
@@ -2859,6 +2882,40 @@ registerEditModeBars = function()
 						queueRefresh()
 					end,
 					default = 16,
+				}
+
+				settingsList[#settingsList + 1] = {
+					name = (L["Text"] or "Text") .. " " .. (L["Anchor"] or "Anchor"),
+					kind = settingType.Dropdown,
+					field = "textAnchor",
+					parentId = "textsettings",
+					get = function()
+						local c = curSpecCfg()
+						return normalizeTextAnchor(c and c.textAnchor, "CENTER")
+					end,
+					set = function(_, value)
+						local c = curSpecCfg()
+						if not c then return end
+						local anchor = normalizeTextAnchor(value, "CENTER")
+						if c.textAnchor == anchor then return end
+						c.textAnchor = anchor
+						queueRefresh()
+					end,
+					default = "CENTER",
+					generator = function(_, root)
+						for _, entry in ipairs(TEXT_ANCHOR_OPTIONS) do
+							root:CreateRadio(entry.label, function()
+								local c = curSpecCfg()
+								return normalizeTextAnchor(c and c.textAnchor, "CENTER") == entry.value
+							end, function()
+								local c = curSpecCfg()
+								if not c then return end
+								if c.textAnchor == entry.value then return end
+								c.textAnchor = entry.value
+								queueRefresh()
+							end)
+						end
+					end,
 				}
 
 				settingsList[#settingsList + 1] = {

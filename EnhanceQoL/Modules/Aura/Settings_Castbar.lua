@@ -99,15 +99,15 @@ function CastbarSettings.BuildStandaloneCastbarSettings(ctx)
 	local function isCastNameEnabled() return getCast({ "cast", "showName" }, castDef.showName ~= false) ~= false end
 	local function isCastDurationEnabled() return getCast({ "cast", "showDuration" }, castDef.showDuration ~= false) ~= false end
 	local anchorPointOptions = {
-		{ value = "TOPLEFT", label = "TOPLEFT" },
-		{ value = "TOP", label = "TOP" },
-		{ value = "TOPRIGHT", label = "TOPRIGHT" },
-		{ value = "LEFT", label = "LEFT" },
-		{ value = "CENTER", label = "CENTER" },
-		{ value = "RIGHT", label = "RIGHT" },
-		{ value = "BOTTOMLEFT", label = "BOTTOMLEFT" },
-		{ value = "BOTTOM", label = "BOTTOM" },
-		{ value = "BOTTOMRIGHT", label = "BOTTOMRIGHT" },
+		{ value = "TOPLEFT", label = L["settingsAnchorTopLeft"] or "Top left" },
+		{ value = "TOP", label = L["settingsAnchorTop"] or "Top" },
+		{ value = "TOPRIGHT", label = L["settingsAnchorTopRight"] or "Top right" },
+		{ value = "LEFT", label = L["settingsAnchorLeft"] or "Left" },
+		{ value = "CENTER", label = L["settingsAnchorCenter"] or "Center" },
+		{ value = "RIGHT", label = L["settingsAnchorRight"] or "Right" },
+		{ value = "BOTTOMLEFT", label = L["settingsAnchorBottomLeft"] or "Bottom left" },
+		{ value = "BOTTOM", label = L["settingsAnchorBottom"] or "Bottom" },
+		{ value = "BOTTOMRIGHT", label = L["settingsAnchorBottomRight"] or "Bottom right" },
 	}
 	local validAnchorPoints = {}
 	for _, entry in ipairs(anchorPointOptions) do
@@ -519,6 +519,15 @@ function CastbarSettings.BuildStandaloneCastbarSettings(ctx)
 		refreshSettingsUI()
 	end, castDef.showCastTarget == true, section.spellName, isCastNameEnabled)
 
+	local castNameAnchor = radioDropdown(L["UFCastNameAnchor"] or ((L["Text"] or "Text") .. " " .. (L["Anchor"] or "Anchor")), anchorPointOptions, function()
+		return getCast({ "cast", "nameAnchor" }, castDef.nameAnchor or "LEFT")
+	end, function(val)
+		setCast({ "cast", "nameAnchor" }, normalizeAnchorPoint(val, castDef.nameAnchor or "LEFT"))
+		refreshCastbar()
+	end, castDef.nameAnchor or "LEFT", section.spellName)
+	castNameAnchor.isEnabled = isCastNameEnabled
+	list[#list + 1] = castNameAnchor
+
 	local castNameX = slider(
 		L["Name X Offset"] or "Name X Offset",
 		-OFFSET_RANGE,
@@ -653,6 +662,15 @@ function CastbarSettings.BuildStandaloneCastbarSettings(ctx)
 	)
 	castDurationFormat.isEnabled = isCastDurationEnabled
 	list[#list + 1] = castDurationFormat
+
+	local castDurationAnchor = radioDropdown((L["Duration"] or "Duration") .. " " .. (L["Anchor"] or "Anchor"), anchorPointOptions, function()
+		return getCast({ "cast", "durationAnchor" }, castDef.durationAnchor or "RIGHT")
+	end, function(val)
+		setCast({ "cast", "durationAnchor" }, normalizeAnchorPoint(val, castDef.durationAnchor or "RIGHT"))
+		refreshCastbar()
+	end, castDef.durationAnchor or "RIGHT", section.duration)
+	castDurationAnchor.isEnabled = isCastDurationEnabled
+	list[#list + 1] = castDurationAnchor
 
 	local castDurX = slider(
 		L["Duration X Offset"] or "Duration X Offset",

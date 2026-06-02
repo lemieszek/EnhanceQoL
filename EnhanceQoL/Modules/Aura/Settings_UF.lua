@@ -8560,6 +8560,13 @@ local function buildStandaloneCastbarSettings()
 		checkboxColor = checkboxColor,
 	})
 	if type(list) ~= "table" then return {} end
+	do
+		local anchorName = L["UFCastNameAnchor"] or "Cast name anchor"
+		for i = 1, #list do
+			local entry = list[i]
+			if type(entry) == "table" and entry.parentId == "castSpellName" and entry.name == anchorName then return list end
+		end
+	end
 
 	local function normalizeCastNameAnchor(value, fallback)
 		local anchor = type(value) == "string" and string.upper(value) or nil
