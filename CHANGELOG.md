@@ -9,6 +9,7 @@
 
 ### 🐛 Fixed
 
+- Mythic Plus / Dungeon Finder: Fixed the Mythic+ score frame hover highlight for current-season dungeons whose Group Finder map IDs were not present in the teleport compendium data.
 - Unit Frames: Exposed custom player, target, focus, and pet portrait fields on the EQOL unit frames.
 - Bags: Fixed new characters without purchased character bank tabs being unable to switch to the character bank purchase view when the integrated bank is enabled.
 
