@@ -1,5 +1,15 @@
 # Changelog
 
+<!--@eqol-beta@-->
+## [10.25.0-beta2] - 2026-06-02
+
+### 🐛 Fixed
+
+- Mythic Plus / Dungeon Finder: Fixed the Mythic+ score frame hover highlight for current-season dungeons whose Group Finder map IDs were not present in the teleport compendium data.
+
+---
+<!--@end-eqol-beta@-->
+
 ## [10.25.0-beta1] - 2026-06-02
 
 ### ✨ Added
