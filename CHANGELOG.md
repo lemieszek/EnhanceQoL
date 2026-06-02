@@ -1,5 +1,13 @@
 # Changelog
 
+## [10.24.1-beta1] - 2026-06-02
+
+### 🐛 Fixed
+
+- Unit Frames: Exposed custom player, target, focus, and pet portrait fields on the EQOL unit frames.
+
+---
+
 ## [10.24.0] - 2026-06-02
 
 ### ✨ Added

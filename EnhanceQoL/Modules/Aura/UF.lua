@@ -9225,6 +9225,10 @@ local function ensureFrames(unit)
 	if st.portraitBg and st.portraitBg:GetParent() ~= st.portraitHolder then st.portraitBg:SetParent(st.portraitHolder) end
 	if st.portraitHolder and st.barGroup and st.portraitHolder:GetParent() ~= st.barGroup then st.portraitHolder:SetParent(st.barGroup) end
 	if st.portraitSeparator and st.barGroup and st.portraitSeparator:GetParent() ~= st.barGroup then st.portraitSeparator:SetParent(st.barGroup) end
+	if st.portrait and st.portraitHolder then
+		st.frame.portrait = st.portrait
+		st.frame.portraitHolder = st.portraitHolder
+	end
 
 	local allowAbsorb = not (info and info.disableAbsorb)
 	if allowAbsorb then
