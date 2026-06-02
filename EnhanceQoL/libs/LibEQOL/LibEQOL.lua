@@ -6,6 +6,8 @@ assert(LibStub, "LibEQOL requires LibStub")
 
 local GLOBAL_NAME = "LibEQOL"
 local EditModeMajor = "LibEQOLEditMode-1.0"
+local ConfigMajor = "LibEQOLConfig-1.0"
+local ConfigUIMajor = "LibEQOLConfigUI-1.0"
 local SettingsModeMajor = "LibEQOLSettingsMode-1.0"
 
 local umbrella = _G[GLOBAL_NAME] or {}
@@ -16,11 +18,17 @@ local function bindModule(key, major)
 end
 
 bindModule("EditMode", EditModeMajor)
+bindModule("Config", ConfigMajor)
+bindModule("ConfigUI", ConfigUIMajor)
 bindModule("SettingsMode", SettingsModeMajor)
 
 function umbrella.GetModule(_, name)
 	if name == "EditMode" then
 		return LibStub:GetLibrary(EditModeMajor, true)
+	elseif name == "Config" then
+		return LibStub:GetLibrary(ConfigMajor, true)
+	elseif name == "ConfigUI" then
+		return LibStub:GetLibrary(ConfigUIMajor, true)
 	elseif name == "SettingsMode" then
 		return LibStub:GetLibrary(SettingsModeMajor, true)
 	end

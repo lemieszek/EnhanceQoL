@@ -2,6 +2,8 @@
 local addonName, addon = ...
 local L = LibStub("AceLocale-3.0"):GetLocale(addonName)
 local SettingsLib = LibStub("LibEQOLSettingsMode-1.0")
+local ConfigLib = LibStub("LibEQOLConfig-1.0", true)
+local ConfigUILib = LibStub("LibEQOLConfigUI-1.0", true)
 
 -- Optional: Prefix für Settings-Variablen
 local prefix = "EQOL_"
@@ -12,6 +14,93 @@ SettingsLib:SetNewTagResolverForPrefix(prefix, function(idOrVar) return addon.va
 
 addon.SettingsLayout = addon.SettingsLayout or {}
 addon.functions = addon.functions or {}
+
+local rootCategoryMap = {
+	UI = "interface",
+	GENERAL = "general",
+	GAMEPLAY = "gameplay",
+	SOCIAL = "social",
+	ECONOMY = "economy",
+	SOUND = "sound",
+	PROFILES = "profiles",
+}
+
+local function ensureConfigApp()
+	if addon.ConfigApp or not ConfigLib then return addon.ConfigApp end
+
+	local app = ConfigLib:RegisterAddOn(addonName, {
+		title = "Enhance QoL",
+		icon = "Interface\\AddOns\\EnhanceQoL\\Icons\\Icon.tga",
+		db = function() return addon.db end,
+		profile = function() return addon.db end,
+		locale = L,
+		openLegacySettings = function()
+			if Settings and Settings.OpenToCategory and addon.SettingsLayout and addon.SettingsLayout.rootCategory then
+				Settings.OpenToCategory(addon.SettingsLayout.rootCategory:GetID())
+			end
+		end,
+	})
+
+	app:RegisterCategory({ id = "interface", title = _G["INTERFACE_LABEL"] or "Interface", order = 100, iconAtlas = "hud-microbutton-character-up" })
+	app:RegisterCategory({ id = "general", title = _G["GENERAL"] or "General", order = 200, iconAtlas = "communities-icon-chat" })
+	app:RegisterCategory({ id = "gameplay", title = _G["SETTING_GROUP_GAMEPLAY"] or "Gameplay", order = 300, iconAtlas = "bags-button-autosort-up" })
+	app:RegisterCategory({ id = "social", title = _G["SOCIAL_LABEL"] or L["configCenterChatSocial"] or "Chat & Social", order = 400, iconAtlas = "socialqueuing-icon-group" })
+	app:RegisterCategory({ id = "economy", title = L["Economy"] or "Economy", order = 500, iconAtlas = "auctionhouse-icon-favorite" })
+	app:RegisterCategory({ id = "sound", title = _G["SOUND"] or "Sound", order = 600, iconAtlas = "poi-door-arrow-down" })
+	app:RegisterCategory({ id = "profiles", title = L["Profiles"] or "Profiles", order = 700, iconAtlas = "services-icon-warning" })
+	app:RegisterCategory({ id = "advanced", title = L["configCenterAdvanced"] or "Advanced", order = 800, iconAtlas = "common-icon-rotateright" })
+	app:SetDefaultPage("dashboard")
+
+	addon.ConfigApp = app
+	return app
+end
+
+function addon.functions.OpenConfigCenter(pageID)
+	local app = ensureConfigApp()
+	if ConfigUILib and app then
+		ConfigUILib:Open(app, pageID)
+		return
+	end
+	if Settings and Settings.OpenToCategory and addon.SettingsLayout and addon.SettingsLayout.rootCategory then
+		Settings.OpenToCategory(addon.SettingsLayout.rootCategory:GetID())
+	end
+end
+
+local function registerLegacyCategory(category, title, newTagID)
+	local app = ensureConfigApp()
+	if not app then return end
+	local categoryID = rootCategoryMap[newTagID] or ConfigLib:NormalizeID(title or newTagID or "advanced")
+	app:RegisterLegacyCategory(category, {
+		categoryID = categoryID,
+		title = title,
+		order = categoryID == "advanced" and 800 or nil,
+	})
+end
+
+local function registerLegacyControl(category, cbData, controlType, setting)
+	local app = ensureConfigApp()
+	if not app or type(cbData) ~= "table" then return end
+	local key = cbData.var or cbData.key
+	if not key then return end
+	app:RegisterLegacyControl({
+		legacyCategory = category,
+		parentSection = cbData.parentSection,
+		id = cbData.id or key,
+		key = key,
+		type = controlType,
+		label = cbData.text or cbData.label or cbData.name,
+		description = cbData.desc,
+		default = cbData.default,
+		keywords = cbData.searchtags,
+		level = cbData.level,
+		order = cbData.order,
+		setting = setting,
+		getValue = cbData.get,
+		setValue = cbData.func or cbData.set,
+		parentCheck = cbData.parentCheck,
+		isEnabled = cbData.isEnabled,
+	})
+end
 
 local function getCVarOptionData(cvarKey) return addon.variables and addon.variables.cvarOptions and addon.variables.cvarOptions[cvarKey] end
 
@@ -44,6 +133,7 @@ function addon.functions.SettingsCreateCategory(parent, treeName, sort, newTagID
 	local cat, layout = SettingsLib:CreateCategory(parent, treeName, sort, newTagID, prefix)
 	addon.SettingsLayout.knownCategoryID = addon.SettingsLayout.knownCategoryID or {}
 	addon.SettingsLayout.knownCategoryID[cat:GetID()] = true
+	registerLegacyCategory(cat, treeName, newTagID)
 	return cat, layout
 end
 
@@ -69,6 +159,7 @@ function addon.functions.SettingsCreateCheckbox(cat, cbData)
 	})
 	addon.SettingsLayout.elements = addon.SettingsLayout.elements or {}
 	addon.SettingsLayout.elements[cbData.var] = { setting = setting, element = element }
+	registerLegacyControl(cat, cbData, "toggle", setting)
 
 	if cbData.notify then SettingsLib:AttachNotify(setting, cbData.notify) end
 	-- Children (rekursiv)
@@ -139,6 +230,7 @@ function addon.functions.SettingsCreateCheckboxDropdown(cat, cbData)
 	addon.SettingsLayout.elements = addon.SettingsLayout.elements or {}
 	addon.SettingsLayout.elements[cbData.var] = { initializer = initializer, setting = checkboxSetting, dropdownSetting = dropdownSetting }
 	if dropdownKey then addon.SettingsLayout.elements[dropdownKey] = { initializer = initializer, setting = dropdownSetting, checkboxSetting = checkboxSetting } end
+	registerLegacyControl(cat, cbData, "toggle", checkboxSetting)
 	return addon.SettingsLayout.elements[cbData.var]
 end
 
@@ -170,6 +262,7 @@ function addon.functions.SettingsCreateSlider(cat, cbData)
 	})
 	addon.SettingsLayout.elements = addon.SettingsLayout.elements or {}
 	addon.SettingsLayout.elements[cbData.var] = { setting = setting, element = element }
+	registerLegacyControl(cat, cbData, "slider", setting)
 	return addon.SettingsLayout.elements[cbData.var]
 end
 
@@ -207,6 +300,7 @@ function addon.functions.SettingsCreateInput(cat, cbData)
 	addon.SettingsLayout.elements = addon.SettingsLayout.elements or {}
 	addon.SettingsLayout.elements[cbData.var] = { setting = setting, element = element }
 	if cbData.notify then SettingsLib:AttachNotify(setting, cbData.notify) end
+	registerLegacyControl(cat, cbData, "input", setting)
 	return addon.SettingsLayout.elements[cbData.var]
 end
 
@@ -233,6 +327,7 @@ function addon.functions.SettingsCreateDropdown(cat, cbData)
 	addon.SettingsLayout.elements = addon.SettingsLayout.elements or {}
 	addon.SettingsLayout.elements[cbData.var] = { setting = setting, element = element }
 	if cbData.notify then SettingsLib:AttachNotify(setting, cbData.notify) end
+	registerLegacyControl(cat, cbData, "dropdown", setting)
 	return addon.SettingsLayout.elements[cbData.var]
 end
 
@@ -266,6 +361,7 @@ function addon.functions.SettingsCreateScrollDropdown(cat, cbData)
 	addon.SettingsLayout.elements = addon.SettingsLayout.elements or {}
 	addon.SettingsLayout.elements[key] = { initializer = initializer, setting = setting }
 	if cbData.notify then SettingsLib:AttachNotify(setting, cbData.notify) end
+	registerLegacyControl(cat, cbData, "dropdown", setting)
 	return initializer
 end
 
@@ -384,6 +480,7 @@ function addon.functions.SettingsCreateMultiDropdown(cat, cbData)
 
 	addon.SettingsLayout.elements = addon.SettingsLayout.elements or {}
 	addon.SettingsLayout.elements[cbData.var] = { initializer = initializer }
+	registerLegacyControl(cat, cbData, "multidropdown", nil)
 	return initializer
 end
 
@@ -419,6 +516,7 @@ function addon.functions.SettingsCreateSoundDropdown(cat, cbData)
 	addon.SettingsLayout.elements = addon.SettingsLayout.elements or {}
 	addon.SettingsLayout.elements[cbData.var] = { initializer = initializer, setting = setting }
 	if cbData.notify then SettingsLib:AttachNotify(setting, cbData.notify) end
+	registerLegacyControl(cat, cbData, "sounddropdown", setting)
 
 	return initializer
 end
@@ -449,6 +547,7 @@ function addon.functions.SettingsCreateColorOverrides(cat, cbData)
 	})
 	addon.SettingsLayout.elements = addon.SettingsLayout.elements or {}
 	addon.SettingsLayout.elements[cbData.var or cbData.key or "ColorOverrides"] = { initializer = initializer }
+	registerLegacyControl(cat, cbData, "colorpicker", nil)
 	return initializer
 end
 
@@ -473,6 +572,7 @@ function addon.functions.SettingsCreateButton(cat, cbData)
 	})
 	addon.SettingsLayout.elements = addon.SettingsLayout.elements or {}
 	addon.SettingsLayout.elements[cbData.var or cbData.text] = { element = btn }
+	registerLegacyControl(cat, cbData, "button", nil)
 	return btn
 end
 
@@ -514,6 +614,7 @@ function addon.functions.SettingsCreateColorPicker(cat, cbData)
 	addon.SettingsLayout = addon.SettingsLayout or {}
 	addon.SettingsLayout.elements = addon.SettingsLayout.elements or {}
 	addon.SettingsLayout.elements[cbData.var] = { initializer = initializer }
+	registerLegacyControl(cat, cbData, "colorpicker", nil)
 	return initializer
 end
 
@@ -533,6 +634,16 @@ function addon.functions.SettingsCreateExpandableSection(cat, cbData)
 		addon.SettingsLayout.elements = addon.SettingsLayout.elements or {}
 		addon.SettingsLayout.elements[cbData.var] = { initializer = section }
 	end
+	local app = ensureConfigApp()
+	if app then
+		app:RegisterLegacySection(section, {
+			category = cat,
+			title = cbData.name,
+			pageID = cbData.configPageID,
+			order = cbData.order,
+			description = cbData.description or cbData.desc,
+		})
+	end
 	return section
 end
 
@@ -540,3 +651,12 @@ local cat, layout = SettingsLib:CreateRootCategory(addonName, false)
 
 addon.SettingsLayout.rootCategory = cat
 addon.SettingsLayout.rootLayout = layout
+
+ensureConfigApp()
+addon.functions.SettingsCreateButton(cat, {
+	var = "configCenterOpenButton",
+	label = L["configCenterOpen"] or "Open EnhanceQoL Settings",
+	text = L["configCenterOpen"] or "Open EnhanceQoL Settings",
+	desc = L["configCenterOpenDesc"] or "Opens the modern EnhanceQoL settings center.",
+	func = function() addon.functions.OpenConfigCenter() end,
+})

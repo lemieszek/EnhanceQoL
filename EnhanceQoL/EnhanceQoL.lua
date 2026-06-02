@@ -6177,6 +6177,10 @@ end
 local function initCharacter() addon.functions.initItemInventory() end
 
 local function OpenSettingsRoot()
+	if addon.functions and addon.functions.OpenConfigCenter then
+		addon.functions.OpenConfigCenter()
+		return
+	end
 	if not (Settings and Settings.OpenToCategory) then return end
 	if not (addon.SettingsLayout and addon.SettingsLayout.rootCategory) then return end
 

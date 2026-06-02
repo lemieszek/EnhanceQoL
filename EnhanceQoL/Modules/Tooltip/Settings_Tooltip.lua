@@ -13,6 +13,9 @@ local cTooltip = addon.SettingsLayout.rootUI
 
 local expandable = addon.functions.SettingsCreateExpandableSection(cTooltip, {
 	name = L["Tooltip"],
+	description = L["configCenterTooltipDesc"] or "Customize tooltip content, IDs, icons, realms and visibility.",
+	configPageID = "interface.tooltips",
+	searchtags = { "tooltip", "item id", "spell id", "npc id", "realm", "guild" },
 	newTagID = "Tooltip",
 	expanded = false,
 	colorizeTitle = false,
