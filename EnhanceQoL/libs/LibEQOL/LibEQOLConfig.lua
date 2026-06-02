@@ -88,6 +88,68 @@ end
 
 local AppMixin = {}
 
+local LEGACY_CONTROL_METADATA_FIELDS = {
+	"buttonText",
+	"callback",
+	"clampToRange",
+	"colorizeLabel",
+	"customDefaultText",
+	"customText",
+	"entries",
+	"formatter",
+	"frameHeight",
+	"frameWidth",
+	"generator",
+	"getColor",
+	"getDefaultColor",
+	"getPlaybackChannel",
+	"getSelection",
+	"groupID",
+	"groupTitle",
+	"hasOpacity",
+	"height",
+	"hideSummary",
+	"inputWidth",
+	"isMainToggle",
+	"isSelected",
+	"isSelectedFunc",
+	"justifyH",
+	"list",
+	"listFunc",
+	"max",
+	"maxChars",
+	"menuHeight",
+	"min",
+	"modernGroup",
+	"multiline",
+	"multilineHeight",
+	"numeric",
+	"onClick",
+	"optionfunc",
+	"options",
+	"placeholder",
+	"placeholderText",
+	"playbackChannel",
+	"previewSoundFunc",
+	"previewTooltip",
+	"readOnly",
+	"orderList",
+	"rowHeight",
+	"setColor",
+	"setSelected",
+	"setSelectedFunc",
+	"setSelection",
+	"soundResolver",
+	"step",
+	"subvar",
+	"suffix",
+	"summary",
+	"tooltip",
+	"uiRole",
+	"valueFormatter",
+	"values",
+}
+
 local function sortByOrderAndTitle(a, b)
 	local ao = tonumber(a.order) or 1000
 	local bo = tonumber(b.order) or 1000
@@ -230,6 +292,8 @@ function AppMixin:RegisterLegacySection(section, data)
 		title = data.title or data.name or pageID,
 		description = data.description,
 		iconAtlas = data.iconAtlas,
+		icon = data.icon,
+		mainToggleID = data.mainToggleID,
 		order = data.order or 500,
 		legacy = true,
 	})
@@ -286,6 +350,14 @@ function AppMixin:RegisterLegacyControl(data)
 		isEnabled = data.isEnabled,
 		legacy = true,
 	}
+	for _, field in ipairs(LEGACY_CONTROL_METADATA_FIELDS) do
+		if data[field] ~= nil then
+			control[field] = data[field]
+		end
+	end
+	if control.modernGroup and not control.groupID then
+		control.groupID = control.modernGroup
+	end
 	if not control.id or control.id == "" then
 		control.id = pageID .. "." .. tostring(#self.controls + 1)
 	end

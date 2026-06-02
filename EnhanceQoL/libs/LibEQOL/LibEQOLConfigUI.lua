@@ -11,49 +11,67 @@ lib.MINOR = MINOR
 local CreateFrame = _G.CreateFrame
 local UIParent = _G.UIParent
 local C_Texture = _G.C_Texture
+local MenuUtil = _G.MenuUtil
+local ColorPickerFrame = _G.ColorPickerFrame
 
-local WINDOW_WIDTH = 980
-local WINDOW_HEIGHT = 660
-local SIDEBAR_WIDTH = 220
-local CONTENT_WIDTH = 690
-local GRID_GAP = 10
+local WINDOW_WIDTH = 1080
+local WINDOW_HEIGHT = 700
+local SIDEBAR_WIDTH = 236
+local CONTENT_WIDTH = 790
+local PAGE_RIGHT_WIDTH = 248
+local PAGE_GAP = 16
+local GRID_GAP = 12
 
 local FONT_TITLE = "GameFontNormalLarge"
 local FONT_HEADER = "GameFontNormal"
 local FONT_TEXT = "GameFontHighlight"
 local FONT_MUTED = "GameFontDisableSmall"
 
-local PANEL_BG = { 0.025, 0.025, 0.03, 0.92 }
-local PANEL_BORDER = { 0.35, 0.30, 0.20, 0.70 }
-local CARD_BG = { 0.045, 0.045, 0.055, 0.88 }
-local CARD_BG_HOVER = { 0.075, 0.065, 0.045, 0.94 }
-local CARD_BORDER = { 0.42, 0.36, 0.23, 0.55 }
-local SELECTED_BG = { 0.18, 0.13, 0.045, 0.94 }
-local MUTED = { 0.62, 0.62, 0.58 }
-local WHITE = { 0.92, 0.90, 0.84 }
+local PANEL_BG = { 0.055, 0.049, 0.043, 0.94 }
+local PANEL_BORDER = { 0.43, 0.34, 0.19, 0.74 }
+local TOPBAR_BG = { 0.075, 0.064, 0.049, 0.96 }
+local CONTENT_BG = { 0.035, 0.033, 0.031, 0.88 }
+local CARD_BG = { 0.080, 0.073, 0.061, 0.92 }
+local CARD_BG_HOVER = { 0.125, 0.101, 0.062, 0.98 }
+local CARD_BORDER = { 0.46, 0.36, 0.20, 0.62 }
+local CARD_BORDER_HOVER = { 0.94, 0.67, 0.25, 0.90 }
+local SELECTED_BG = { 0.24, 0.17, 0.065, 0.96 }
+local SIDEBAR_BG = { 0.030, 0.031, 0.030, 0.78 }
+local MUTED = { 0.67, 0.64, 0.58 }
+local WHITE = { 0.94, 0.91, 0.84 }
 local GOLD = { 1.0, 0.82, 0.36 }
 local GREEN = { 0.36, 0.82, 0.36 }
 local WARNING = { 1.0, 0.55, 0.18 }
 
 local FALLBACK_ICON = "Interface\\Icons\\INV_Misc_Gear_01"
+local SETTINGS_COG_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Cogwheel.tga"
 local ICON_TEXTURES = {
 	actionbar = "Interface\\Icons\\INV_Sword_04",
+	actiontracker = "Interface\\Icons\\Ability_Hunter_MarkedForDeath",
 	advanced = "Interface\\Icons\\INV_Misc_Gear_01",
 	bags = "Interface\\Icons\\INV_Misc_Bag_08",
+	bars = "Interface\\Icons\\INV_Misc_Desecrated_PlateBelt",
+	buff = "Interface\\Icons\\Spell_Holy_BlessingOfKings",
+	castbar = "Interface\\Icons\\Spell_Nature_TimeStop",
 	chat = "Interface\\Icons\\INV_Letter_15",
 	combat = "Interface\\Icons\\Ability_Warrior_BattleShout",
+	data = "Interface\\Icons\\INV_Misc_Note_05",
+	diagnostics = "Interface\\Icons\\INV_Gizmo_02",
 	cooldown = "Interface\\Icons\\INV_Misc_PocketWatch_01",
-	dashboard = "Interface\\Icons\\INV_Misc_Gear_01",
+	dashboard = SETTINGS_COG_ICON,
 	economy = "Interface\\Icons\\INV_Misc_Coin_01",
 	gameplay = "Interface\\Icons\\Ability_DualWield",
 	general = "Interface\\Icons\\Trade_BlackSmithing",
 	help = "Interface\\Icons\\INV_Misc_Book_09",
 	interface = "Interface\\Icons\\INV_Misc_Monitor_01",
 	map = "Interface\\Icons\\INV_Misc_Map_01",
+	mover = "Interface\\Icons\\Ability_Hunter_MasterMarksman",
 	nameplate = "Interface\\Icons\\INV_Misc_Tournaments_banner_Human",
+	popups = "Interface\\Icons\\INV_Misc_Note_01",
 	profiles = "Interface\\Icons\\INV_Misc_GroupNeedMore",
 	reset = "Interface\\Icons\\Ability_Rogue_FeignDeath",
 	resource = "Interface\\Icons\\INV_Misc_Food_100",
+	skinner = "Interface\\Icons\\INV_Misc_EngGizmos_17",
 	social = "Interface\\Icons\\INV_Misc_GroupLooking",
 	sound = "Interface\\Icons\\INV_Misc_Note_01",
 	support = "Interface\\Icons\\INV_Misc_QuestionMark",
@@ -75,19 +93,66 @@ local CATEGORY_ICON_KEYS = {
 }
 
 local PAGE_ICON_KEYS = {
+	actiontracker = "actiontracker",
 	actionbars = "actionbar",
+	action = "actionbar",
 	bags = "bags",
+	buff = "buff",
+	castbar = "castbar",
+	castbars = "castbar",
 	chat = "chat",
+	combat = "combat",
 	cooldown = "cooldown",
 	cooldowns = "cooldown",
+	data = "data",
+	diagnostic = "diagnostics",
+	loot = "bags",
 	map = "map",
+	minimap = "map",
+	mover = "mover",
 	nameplates = "nameplate",
+	nameplate = "nameplate",
+	popup = "popups",
+	profile = "profiles",
 	resource = "resource",
+	skinner = "skinner",
 	tooltips = "tooltip",
 	tooltip = "tooltip",
 	unitframes = "unitframes",
 	unit = "unitframes",
+	ui = "interface",
 	vendor = "vendor",
+	sell = "vendor",
+}
+
+local PAGE_DESCRIPTION_FALLBACKS = {
+	actionbars = "Adjust action bar visibility, size, text and button behavior.",
+	actiontracker = "Track important actions, cooldowns and combat state.",
+	bars = "Customize resource bars, class bars and status displays.",
+	castbars = "Configure cast bars, cooldown displays and timing helpers.",
+	chat = "Improve chat history, whispers and message handling.",
+	classbuff = "Track missing buffs and class-specific reminders.",
+	combat = "Show important combat warnings and reminders.",
+	cooldownpanels = "Manage cooldown panels, layout and visibility.",
+	data = "Customize compact data and information panels.",
+	death = "Customize death, resurrection and release helpers.",
+	dungeons = "Configure dungeon, Mythic+ and teleport helpers.",
+	groupfinder = "Improve group finder and group workflow helpers.",
+	includelists = "Manage items that should always or never be handled.",
+	loot = "Configure loot, item handling and inventory helpers.",
+	map = "Configure map, minimap and navigation helpers.",
+	minimap = "Configure map, minimap and navigation helpers.",
+	mover = "Move and position supported UI elements.",
+	nameplates = "Adjust nameplates, names and related display options.",
+	popups = "Tweak dialogs, popups and small UI behaviors.",
+	questing = "Automate quest handling and cinematic convenience options.",
+	skinner = "Customize the appearance of supported Blizzard UI frames.",
+	standaloneprivateaura = "Configure standalone private aura display.",
+	tooltips = "Customize tooltip content, IDs, icons and extra information.",
+	tooltip = "Customize tooltip content, IDs, icons and extra information.",
+	unitframes = "Adjust player, target and party frame options.",
+	vendor = "Add convenient vendor and merchant shortcuts.",
+	autosell = "Automatically sell configured items and junk at vendors.",
 }
 
 local frames = lib.frames or {}
@@ -111,6 +176,15 @@ local BASIC_FRAME_BORDER_REGIONS = {
 	"InsetBorderBottomLeft",
 	"InsetBorderBottomRight",
 }
+
+local function setBasicFrameBorderAlpha(frame, alpha)
+	for _, key in ipairs(BASIC_FRAME_BORDER_REGIONS) do
+		local region = frame[key]
+		if region and region.SetAlpha then
+			region:SetAlpha(alpha)
+		end
+	end
+end
 
 local function applyBackdrop(frame, bg, border)
 	if not frame.SetBackdrop then
@@ -140,14 +214,54 @@ local function applyBackdrop(frame, bg, border)
 	frame:SetBackdropBorderColor(border[1], border[2], border[3], border[4])
 end
 
+local function applyWindowBorder(frame)
+	if not frame or frame.WindowBorder then
+		return
+	end
+	local atlas = "AdventureMap-InsetMapBorder"
+	if C_Texture and C_Texture.GetAtlasInfo and not C_Texture.GetAtlasInfo(atlas) then
+		return
+	end
+	local border = frame:CreateTexture(nil, "BORDER", nil, 1)
+	border:SetPoint("TOPLEFT", frame, "TOPLEFT", -22, 22)
+	border:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 22, -22)
+	local ok = border.SetAtlas and pcall(border.SetAtlas, border, atlas, false)
+	if not ok then
+		border:Hide()
+		return
+	end
+	frame.WindowBorder = border
+	setBasicFrameBorderAlpha(frame, 0)
+end
+
 local function setBackdropColor(frame, color)
 	frame:SetBackdropColor(color[1], color[2], color[3], color[4])
+end
+
+local function setBackdropBorderColor(frame, color)
+	if frame and frame.SetBackdropBorderColor then
+		frame:SetBackdropBorderColor(color[1], color[2], color[3], color[4] or 1)
+	end
+end
+
+local function setFrameBackdrop(frame, bg, border)
+	setBackdropColor(frame, bg)
+	setBackdropBorderColor(frame, border)
 end
 
 local function setTextColor(fontString, color)
 	if fontString and color then
 		fontString:SetTextColor(color[1], color[2], color[3], color[4] or 1)
 	end
+end
+
+local function applyHoverState(frame, normalBg, hoverBg, normalBorder, hoverBorder)
+	frame:SetScript("OnEnter", function(self)
+		setFrameBackdrop(self, hoverBg or CARD_BG_HOVER, hoverBorder or CARD_BORDER_HOVER)
+	end)
+	frame:SetScript("OnLeave", function(self)
+		setFrameBackdrop(self, normalBg or CARD_BG, normalBorder or CARD_BORDER)
+	end)
 end
 
 local function getAddonIcon(app)
@@ -260,6 +374,18 @@ local function getLocale(app)
 	return app and app.opts and app.opts.locale or {}
 end
 
+local function getSettingCountText(app, count)
+	local L = getLocale(app)
+	local label = count == 1 and (L["configCenterSetting"] or "setting") or (L["configCenterSettings"] or "settings")
+	return tostring(count) .. " " .. label
+end
+
+local function getFeatureCountText(app, count)
+	local L = getLocale(app)
+	local label = count == 1 and (L["configCenterFeature"] or "feature") or (L["configCenterFeatures"] or "features")
+	return tostring(count) .. " " .. label
+end
+
 local function getAppTitle(app)
 	return (app and app.opts and app.opts.title) or (app and app.id) or "Settings"
 end
@@ -274,6 +400,166 @@ end
 
 local function getControlPath(app, control)
 	return getPagePath(app, app:GetPage(control.pageID))
+end
+
+local function normalizePageLookupText(page)
+	return tostring((page and page.id or "") .. " " .. (page and page.title or "")):lower():gsub("[^%w]+", "")
+end
+
+local function getPageDescription(app, page)
+	if page and page.description and page.description ~= "" then
+		return page.description
+	end
+	local lookup = normalizePageLookupText(page)
+	for keyword, description in pairs(PAGE_DESCRIPTION_FALLBACKS) do
+		if lookup:find(keyword, 1, true) then
+			return description
+		end
+	end
+	if page then
+		return getSettingCountText(app, #(page.controls or {}))
+	end
+	return ""
+end
+
+local function getControlType(control)
+	local controlType = tostring(control and (control.type or control.sType) or "text"):lower()
+	if controlType == "checkbox" then
+		return "toggle"
+	elseif controlType == "scrolldropdown" then
+		return "dropdown"
+	end
+	return controlType
+end
+
+local function getControlTypeLabel(app, control)
+	local L = getLocale(app)
+	local controlType = getControlType(control)
+	if controlType == "toggle" then
+		return _G.ENABLE or "Toggle"
+	elseif controlType == "slider" then
+		return L["configCenterControlSlider"] or "Slider"
+	elseif controlType == "dropdown" or controlType == "sounddropdown" then
+		return L["configCenterControlDropdown"] or "Dropdown"
+	elseif controlType == "input" then
+		return _G.EDIT or "Input"
+	elseif controlType == "button" then
+		return _G.ACTION or "Action"
+	elseif controlType == "colorpicker" then
+		return _G.COLOR or "Color"
+	end
+	return _G.SETTINGS or "Settings"
+end
+
+local function callFormatter(formatter, value, control)
+	if type(formatter) ~= "function" then
+		return nil
+	end
+	local ok, text = pcall(formatter, value, control)
+	if ok and text ~= nil then
+		return tostring(text)
+	end
+	ok, text = pcall(formatter, value)
+	if ok and text ~= nil then
+		return tostring(text)
+	end
+	return nil
+end
+
+local function formatControlValue(control, value)
+	local text = callFormatter(control.valueFormatter or control.formatter, value, control)
+	if not text then
+		if type(value) == "number" then
+			text = string.format("%.2f", value):gsub("(%..-)0+$", "%1"):gsub("%.$", "")
+		elseif type(value) == "boolean" then
+			text = value and (_G.ENABLED or "Enabled") or (_G.DISABLED or "Disabled")
+		elseif value ~= nil then
+			text = tostring(value)
+		else
+			text = ""
+		end
+	end
+	if control.suffix and text ~= "" then
+		text = text .. tostring(control.suffix)
+	end
+	return text
+end
+
+local function getOptionLabel(option, key)
+	if type(option) == "table" then
+		return option.text or option.label or option.name or option.title or option[2] or option.value or option.key or key
+	end
+	return option
+end
+
+local function getOptionValue(option, key)
+	if type(option) == "table" then
+		local value = option.value
+		if value == nil then value = option.key end
+		if value == nil then value = option[1] end
+		if value ~= nil then return value end
+	end
+	return key
+end
+
+local function getControlOptions(control)
+	local list = control.values or control.options or control.list
+	local optionfunc = control.optionfunc or control.listFunc
+	if type(optionfunc) == "function" then
+		local ok, result = pcall(optionfunc)
+		if ok and type(result) == "table" then
+			list = result
+		end
+	end
+	local options = {}
+	local order = type(control.orderList) == "table" and control.orderList
+		or type(control.order) == "table" and control.order
+	local seen
+	if type(list) ~= "table" then
+		return options
+	end
+	if order then
+		seen = {}
+		for _, key in ipairs(order) do
+			if key ~= "_order" and list[key] ~= nil then
+				local option = list[key]
+				options[#options + 1] = {
+					value = getOptionValue(option, key),
+					label = tostring(getOptionLabel(option, key) or key),
+				}
+				seen[key] = true
+			end
+		end
+	end
+	for key, option in pairs(list) do
+		if key ~= "_order" and (not seen or not seen[key]) then
+			options[#options + 1] = {
+				value = getOptionValue(option, key),
+				label = tostring(getOptionLabel(option, key) or key),
+			}
+		end
+	end
+	if not order then
+		table.sort(options, function(a, b)
+			return tostring(a.label) < tostring(b.label)
+		end)
+	end
+	return options
+end
+
+local function getDropdownValueText(control, value)
+	for _, option in ipairs(getControlOptions(control)) do
+		if tostring(option.value) == tostring(value) then
+			return option.label
+		end
+	end
+	return formatControlValue(control, value)
+end
+
+local function openLegacySettingsForControl(app, control)
+	if app.opts and type(app.opts.openLegacySettings) == "function" then
+		app.opts.openLegacySettings(control)
+	end
 end
 
 local function getCategoryStats(app, categoryID)
@@ -307,12 +593,12 @@ local function makeFlatButton(parent, text, width, height, iconSource, iconIsAtl
 	button.Text:SetJustifyH("CENTER")
 	button.Text:SetText(text or "")
 	setTextColor(button.Text, WHITE)
-	button:SetScript("OnEnter", function(self) setBackdropColor(self, CARD_BG_HOVER) end)
+	button:SetScript("OnEnter", function(self) setFrameBackdrop(self, CARD_BG_HOVER, CARD_BORDER_HOVER) end)
 	button:SetScript("OnLeave", function(self)
 		if self.selected then
-			setBackdropColor(self, SELECTED_BG)
+			setFrameBackdrop(self, SELECTED_BG, CARD_BORDER_HOVER)
 		else
-			setBackdropColor(self, { 0.07, 0.065, 0.055, 0.92 })
+			setFrameBackdrop(self, { 0.07, 0.065, 0.055, 0.92 }, CARD_BORDER)
 		end
 	end)
 	return button
@@ -322,24 +608,113 @@ local function refreshControlRow(app, control, row)
 	local enabled = app:IsControlEnabled(control)
 	row:SetAlpha(enabled and 1 or 0.48)
 	if row.check then
-		row.check:SetEnabled(enabled)
-		row.check:SetChecked(app:GetControlValue(control) == true)
+		if row.check.SetEnabled then
+			row.check:SetEnabled(enabled)
+		elseif enabled and row.check.Enable then
+			row.check:Enable()
+		elseif row.check.Disable then
+			row.check:Disable()
+		end
+		if row.check.SetChecked then
+			row.check:SetChecked(app:GetControlValue(control) == true)
+		end
+	end
+	if row.slider then
+		local value = tonumber(app:GetControlValue(control)) or tonumber(control.default) or tonumber(control.min) or 0
+		if row.slider.SetEnabled then
+			row.slider:SetEnabled(enabled)
+		elseif enabled and row.slider.Enable then
+			row.slider:Enable()
+		elseif row.slider.Disable then
+			row.slider:Disable()
+		end
+		row.slider.updating = true
+		row.slider:SetValue(value)
+		row.slider.updating = false
+	end
+	if row.editBox then
+		local editEnabled = enabled and not control.readOnly
+		if row.editBox.SetEnabled then
+			row.editBox:SetEnabled(editEnabled)
+		elseif editEnabled and row.editBox.Enable then
+			row.editBox:Enable()
+		elseif row.editBox.Disable then
+			row.editBox:Disable()
+		end
+		row.editBox:SetText(formatControlValue(control, app:GetControlValue(control)))
 	end
 	if row.value then
 		local value = app:GetControlValue(control)
-		if type(value) == "boolean" then
-			row.value.Text:SetText(value and (_G.ENABLED or "Enabled") or (_G.DISABLED or "Disabled"))
-		elseif value ~= nil then
-			row.value.Text:SetText(tostring(value))
+		if getControlType(control) == "dropdown" or getControlType(control) == "sounddropdown" then
+			row.value.Text:SetText(getDropdownValueText(control, value))
 		else
-			row.value.Text:SetText("")
+			row.value.Text:SetText(formatControlValue(control, value))
+		end
+	end
+	if row.swatch and type(control.getColor) == "function" then
+		local key = control.key or control.id
+		local ok, r, g, b, a = pcall(control.getColor, key)
+		if ok then
+			row.swatch.Texture:SetColorTexture(r or 1, g or 1, b or 1, a or 1)
 		end
 	end
 end
 
+local updateScrollFrameVisibility
+
 local function setScrollHeight(state)
 	local height = math.max(1, math.abs(state.y) + 24)
 	state.content:SetHeight(height)
+	updateScrollFrameVisibility(state.frame.Scroll)
+end
+
+local function updateContentMetrics(state)
+	local scrollWidth = state.frame.Scroll and state.frame.Scroll:GetWidth() or 0
+	local width = math.max(640, math.floor((scrollWidth > 0 and scrollWidth or CONTENT_WIDTH) - 26))
+	state.contentWidth = width
+	state.pageRightWidth = math.min(PAGE_RIGHT_WIDTH, math.floor(width * 0.32))
+	state.pageGap = PAGE_GAP
+	state.pageLeftWidth = math.max(420, width - state.pageRightWidth - state.pageGap)
+	state.content:SetWidth(width)
+end
+
+local function skinScrollFrame(scrollFrame)
+	if not scrollFrame then return end
+	local scrollBar = scrollFrame.ScrollBar or _G[scrollFrame:GetName() and (scrollFrame:GetName() .. "ScrollBar") or ""]
+	local up = scrollFrame.ScrollBar and scrollFrame.ScrollBar.ScrollUpButton or scrollFrame.ScrollUpButton
+	local down = scrollFrame.ScrollBar and scrollFrame.ScrollBar.ScrollDownButton or scrollFrame.ScrollDownButton
+	local buttons = {}
+	if scrollBar then
+		up = up or scrollBar.ScrollUpButton or scrollBar.Back
+		down = down or scrollBar.ScrollDownButton or scrollBar.Forward
+		if scrollBar.SetAlpha then scrollBar:SetAlpha(0.55) end
+	end
+	buttons[1] = up
+	buttons[2] = down
+	if scrollBar then
+		buttons[3] = scrollBar.Back
+		buttons[4] = scrollBar.Forward
+		buttons[5] = scrollBar.ScrollUpButton
+		buttons[6] = scrollBar.ScrollDownButton
+	end
+	for _, button in ipairs(buttons) do
+		if button and button.Hide then
+			button:Hide()
+			if button.SetAlpha then button:SetAlpha(0) end
+			if button.EnableMouse then button:EnableMouse(false) end
+			if button.HookScript then
+				button:HookScript("OnShow", function(self) self:Hide() end)
+			end
+		end
+	end
+end
+
+updateScrollFrameVisibility = function(scrollFrame)
+	if not scrollFrame then return end
+	local scrollBar = scrollFrame.ScrollBar or _G[scrollFrame:GetName() and (scrollFrame:GetName() .. "ScrollBar") or ""]
+	if not scrollBar or not scrollBar.SetShown then return end
+	local range = scrollFrame.GetVerticalScrollRange and scrollFrame:GetVerticalScrollRange() or 0
+	scrollBar:SetShown(range and range > 1)
 end
 
 local function clearContent(state)
@@ -400,9 +775,16 @@ local function createGridCard(state, row, index, columns, height)
 	card:SetPoint("TOPLEFT", row, "TOPLEFT", (index - 1) * (width + GRID_GAP), 0)
 	applyBackdrop(card, CARD_BG, CARD_BORDER)
 	card:EnableMouse(true)
-	card:SetScript("OnEnter", function(self) setBackdropColor(self, CARD_BG_HOVER) end)
-	card:SetScript("OnLeave", function(self) setBackdropColor(self, CARD_BG) end)
+	applyHoverState(card)
 	return card, width
+end
+
+local function createPageLeftFrame(state, height)
+	local frame = trackFrame(state.contentFrames, CreateFrame("Frame", nil, state.content, "BackdropTemplate"))
+	frame:SetPoint("TOPLEFT", state.content, "TOPLEFT", 0, state.y)
+	frame:SetSize(state.pageLeftWidth or 420, height)
+	state.y = state.y - height
+	return frame
 end
 
 local function addStatusChip(parent, text, color, width)
@@ -436,10 +818,275 @@ local function addDashboardCard(row, index, title, description, iconSource, onCl
 	return card
 end
 
-local function addSettingRow(state, control, pathText)
+local function addDashboardHero(state, title, subtitle)
+	local hero = createContentFrame(state, 104)
+	applyBackdrop(hero, { 0.058, 0.052, 0.043, 0.94 }, CARD_BORDER)
+
+	local titleText = createText(hero, FONT_TITLE, title or "", WHITE)
+	titleText:SetPoint("TOPLEFT", hero, "TOPLEFT", 22, -18)
+	titleText:SetPoint("RIGHT", hero, "RIGHT", -116, 0)
+	titleText:SetHeight(26)
+
+	local subText = createText(hero, FONT_MUTED, subtitle or "", MUTED)
+	subText:SetPoint("TOPLEFT", titleText, "BOTTOMLEFT", 0, -8)
+	subText:SetPoint("RIGHT", hero, "RIGHT", -130, 0)
+	subText:SetHeight(40)
+
+	local icon = createIconPlate(hero, SETTINGS_COG_ICON, 64, false)
+	icon:SetPoint("RIGHT", hero, "RIGHT", -24, 0)
+	state.y = state.y - 12
+	return hero
+end
+
+local function addConfigureFallback(row, app, control, text)
+	local L = getLocale(app)
+	local button = makeFlatButton(row, text or L["configCenterConfigure"] or "Configure", 138, 26, ICON_TEXTURES.advanced)
+	button:SetPoint("RIGHT", row, "RIGHT", -14, 0)
+	button:SetScript("OnClick", function()
+		openLegacySettingsForControl(app, control)
+	end)
+	return button
+end
+
+local function commitInputValue(app, control, editBox, row)
+	local value = editBox:GetText() or ""
+	if control.numeric then
+		value = tonumber(value)
+		if value == nil then
+			value = tonumber(control.default) or 0
+		end
+		if control.clampToRange then
+			if control.min and value < control.min then value = control.min end
+			if control.max and value > control.max then value = control.max end
+		end
+	end
+	app:SetControlValue(control, value)
+	refreshControlRow(app, control, row)
+end
+
+local function addSliderWidget(row, app, control)
+	local valueText = createText(row, FONT_TEXT, "", GOLD, "RIGHT")
+	valueText:SetPoint("RIGHT", row, "RIGHT", -14, 10)
+	valueText:SetSize(62, 18)
+	row.value = valueText
+
+	local slider = CreateFrame("Slider", nil, row, "OptionsSliderTemplate")
+	slider:SetPoint("RIGHT", valueText, "LEFT", -12, -7)
+	slider:SetSize(168, 18)
+	local minValue = tonumber(control.min) or 0
+	local maxValue = tonumber(control.max) or 1
+	slider:SetMinMaxValues(minValue, maxValue)
+	slider:SetValueStep(tonumber(control.step) or 1)
+	if slider.SetObeyStepOnDrag then slider:SetObeyStepOnDrag(true) end
+	if slider.Low then slider.Low:Hide() end
+	if slider.High then slider.High:Hide() end
+	if slider.Text then slider.Text:Hide() end
+	if slider.Left then slider.Left:Hide() end
+	if slider.Middle then slider.Middle:Hide() end
+	if slider.Right then slider.Right:Hide() end
+	slider.Track = CreateFrame("Frame", nil, row, "BackdropTemplate")
+	slider.Track:SetSize(168, 6)
+	slider.Track:SetPoint("CENTER", slider, "CENTER", 0, 0)
+	applyBackdrop(slider.Track, { 0.025, 0.024, 0.022, 0.95 }, { 0.28, 0.24, 0.17, 0.75 })
+	slider.Fill = slider.Track:CreateTexture(nil, "OVERLAY")
+	slider.Fill:SetPoint("LEFT", slider.Track, "LEFT", 1, 0)
+	slider.Fill:SetHeight(4)
+	slider.Fill:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.68)
+	if slider.Thumb then
+		slider.Thumb:SetVertexColor(1.0, 0.84, 0.46, 1)
+	end
+	local function updateFill(value)
+		local span = maxValue - minValue
+		local percent = span ~= 0 and ((tonumber(value) or minValue) - minValue) / span or 0
+		percent = math.max(0, math.min(1, percent))
+		slider.Fill:SetWidth(math.max(1, 166 * percent))
+	end
+	slider:SetScript("OnValueChanged", function(self, value)
+		updateFill(value)
+		if self.updating then
+			valueText.Text:SetText(formatControlValue(control, value))
+			return
+		end
+		local step = tonumber(control.step) or 1
+		if step > 0 then
+			value = math.floor((value / step) + 0.5) * step
+		end
+		valueText.Text:SetText(formatControlValue(control, value))
+		app:SetControlValue(control, value)
+	end)
+	row.slider = slider
+	return slider
+end
+
+local function addDropdownWidget(row, app, control)
+	local options = getControlOptions(control)
+	if #options == 0 or not MenuUtil or not MenuUtil.CreateContextMenu then
+		addConfigureFallback(row, app, control)
+		return
+	end
+	local button = makeFlatButton(row, "", 188, 26)
+	button:SetPoint("RIGHT", row, "RIGHT", -14, 0)
+	row.value = createText(button, FONT_TEXT, "", WHITE, "LEFT")
+	row.value:SetPoint("LEFT", button, "LEFT", 10, 0)
+	row.value:SetPoint("RIGHT", button, "RIGHT", -22, 0)
+	row.value:SetHeight(18)
+	local arrow = createText(button, FONT_TEXT, "v", GOLD, "RIGHT")
+	arrow:SetPoint("RIGHT", button, "RIGHT", -8, 1)
+	arrow:SetSize(14, 18)
+	button:SetScript("OnClick", function(owner)
+		MenuUtil.CreateContextMenu(owner, function(_, rootDescription)
+			for _, option in ipairs(getControlOptions(control)) do
+				rootDescription:CreateButton(option.label, function()
+					app:SetControlValue(control, option.value)
+					refreshControlRow(app, control, row)
+				end)
+			end
+		end)
+	end)
+	return button
+end
+
+local function addInputWidget(row, app, control)
+	local editBox = CreateFrame("EditBox", nil, row, "InputBoxTemplate")
+	editBox:SetSize(math.min(tonumber(control.inputWidth) or 178, 220), control.multiline and 48 or 26)
+	editBox:SetPoint("RIGHT", row, "RIGHT", -14, 0)
+	editBox:SetAutoFocus(false)
+	editBox:SetNumeric(control.numeric == true)
+	if control.maxChars then editBox:SetMaxLetters(control.maxChars) end
+	if control.readOnly then editBox:SetEnabled(false) end
+	editBox:SetScript("OnEnterPressed", function(self)
+		commitInputValue(app, control, self, row)
+		self:ClearFocus()
+	end)
+	editBox:SetScript("OnEditFocusLost", function(self)
+		commitInputValue(app, control, self, row)
+	end)
+	row.editBox = editBox
+	return editBox
+end
+
+local function addToggleWidget(row, app, control)
+	local switch = CreateFrame("Button", nil, row, "BackdropTemplate")
+	switch:SetSize(48, 24)
+	switch:SetPoint("RIGHT", row, "RIGHT", -16, 0)
+	applyBackdrop(switch, { 0.050, 0.046, 0.038, 0.95 }, CARD_BORDER)
+
+	switch.Knob = CreateFrame("Frame", nil, switch, "BackdropTemplate")
+	switch.Knob:SetSize(18, 18)
+	applyBackdrop(switch.Knob, { 0.62, 0.58, 0.49, 1.00 }, { 0.92, 0.82, 0.58, 0.80 })
+
+	function switch:SetChecked(checked)
+		self.checked = checked == true
+		self.Knob:ClearAllPoints()
+		if self.checked then
+			setFrameBackdrop(self, { 0.105, 0.205, 0.095, 0.96 }, { GREEN[1], GREEN[2], GREEN[3], 0.70 })
+			setFrameBackdrop(self.Knob, { 0.78, 0.92, 0.66, 1.00 }, { GREEN[1], GREEN[2], GREEN[3], 0.85 })
+			self.Knob:SetPoint("RIGHT", self, "RIGHT", -3, 0)
+		else
+			setFrameBackdrop(self, { 0.050, 0.046, 0.038, 0.95 }, CARD_BORDER)
+			setFrameBackdrop(self.Knob, { 0.62, 0.58, 0.49, 1.00 }, { 0.92, 0.82, 0.58, 0.80 })
+			self.Knob:SetPoint("LEFT", self, "LEFT", 3, 0)
+		end
+	end
+
+	function switch:GetChecked()
+		return self.checked == true
+	end
+
+	switch:SetScript("OnEnter", function(self)
+		setBackdropBorderColor(self, CARD_BORDER_HOVER)
+	end)
+	switch:SetScript("OnLeave", function(self)
+		self:SetChecked(self.checked)
+	end)
+	switch:SetScript("OnClick", function(self)
+		if not app:IsControlEnabled(control) then
+			self:SetChecked(app:GetControlValue(control) == true)
+			return
+		end
+		app:SetControlValue(control, not self:GetChecked())
+		refreshControlRow(app, control, row)
+	end)
+
+	row.check = switch
+	return switch
+end
+
+local function addColorWidget(row, app, control)
+	local swatch = CreateFrame("Button", nil, row, "BackdropTemplate")
+	swatch:SetSize(34, 24)
+	swatch:SetPoint("RIGHT", row, "RIGHT", -112, 0)
+	applyBackdrop(swatch, { 0.02, 0.02, 0.02, 0.92 }, CARD_BORDER)
+	swatch.Texture = swatch:CreateTexture(nil, "OVERLAY")
+	swatch.Texture:SetPoint("TOPLEFT", swatch, "TOPLEFT", 4, -4)
+	swatch.Texture:SetPoint("BOTTOMRIGHT", swatch, "BOTTOMRIGHT", -4, 4)
+	row.swatch = swatch
+
+	local button = makeFlatButton(row, _G.COLOR or "Color", 92, 26)
+	button:SetPoint("RIGHT", row, "RIGHT", -14, 0)
+	local function openPicker()
+		if type(control.getColor) ~= "function" or type(control.setColor) ~= "function" or not ColorPickerFrame then
+			openLegacySettingsForControl(app, control)
+			return
+		end
+		local key = control.key or control.id
+		local ok, r, g, b, a = pcall(control.getColor, key)
+		if not ok then
+			r, g, b, a = 1, 1, 1, 1
+		end
+		r, g, b, a = r or 1, g or 1, b or 1, a or 1
+		local function applyColor()
+			local nr, ng, nb = ColorPickerFrame:GetColorRGB()
+			local na = ColorPickerFrame.GetColorAlpha and ColorPickerFrame:GetColorAlpha() or a
+			control.setColor(key, nr, ng, nb, na)
+			refreshControlRow(app, control, row)
+		end
+		if ColorPickerFrame.SetupColorPickerAndShow then
+			ColorPickerFrame:SetupColorPickerAndShow({
+				r = r,
+				g = g,
+				b = b,
+				opacity = a,
+				hasOpacity = control.hasOpacity,
+				swatchFunc = applyColor,
+				opacityFunc = applyColor,
+				cancelFunc = function(previous)
+					if previous then control.setColor(key, previous.r, previous.g, previous.b, previous.opacity) end
+					refreshControlRow(app, control, row)
+				end,
+			})
+		else
+			ColorPickerFrame.func = applyColor
+			ColorPickerFrame.opacityFunc = applyColor
+			ColorPickerFrame.hasOpacity = control.hasOpacity
+			ColorPickerFrame.opacity = a
+			ColorPickerFrame.previousValues = { r = r, g = g, b = b, opacity = a }
+			ColorPickerFrame.cancelFunc = function(previous)
+				if previous then control.setColor(key, previous.r, previous.g, previous.b, previous.opacity) end
+				refreshControlRow(app, control, row)
+			end
+			ColorPickerFrame:SetColorRGB(r, g, b)
+			ColorPickerFrame:Show()
+		end
+	end
+	button:SetScript("OnClick", openPicker)
+	swatch:SetScript("OnClick", openPicker)
+	return button
+end
+
+local function addSettingRow(state, control, pathText, parent, yOffset, width)
 	local app = state.app
-	local row = createContentFrame(state, 66)
+	local row
+	if parent then
+		row = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+		row:SetPoint("TOPLEFT", parent, "TOPLEFT", 12, yOffset or -42)
+		row:SetSize(width or parent:GetWidth() - 24, 66)
+	else
+		row = createContentFrame(state, 66)
+	end
 	applyBackdrop(row, CARD_BG, CARD_BORDER)
+	row:EnableMouse(true)
+	applyHoverState(row, CARD_BG, CARD_BG_HOVER, CARD_BORDER, CARD_BORDER_HOVER)
 
 	local iconKey = getKeywordIconKey((control.id or "") .. " " .. (control.label or "")) or "advanced"
 	local rowIcon = createIcon(row, ICON_TEXTURES[iconKey], 18, false)
@@ -456,20 +1103,16 @@ local function addSettingRow(state, control, pathText)
 	desc:SetPoint("RIGHT", row, "RIGHT", -150, 0)
 	desc:SetHeight(28)
 
-	if control.type == "toggle" or control.type == "checkbox" then
-		local check = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
-		check:SetPoint("RIGHT", row, "RIGHT", -16, 0)
-		check:SetSize(28, 28)
-		check:SetScript("OnClick", function(self)
-			if not app:IsControlEnabled(control) then
-				self:SetChecked(app:GetControlValue(control) == true)
-				return
-			end
-			app:SetControlValue(control, self:GetChecked() == true)
-			refreshControlRow(app, control, row)
-		end)
-		row.check = check
-	elseif control.type == "button" then
+	local controlType = getControlType(control)
+	if controlType == "toggle" then
+		addToggleWidget(row, app, control)
+	elseif controlType == "slider" then
+		addSliderWidget(row, app, control)
+	elseif controlType == "dropdown" or controlType == "sounddropdown" then
+		addDropdownWidget(row, app, control)
+	elseif controlType == "input" then
+		addInputWidget(row, app, control)
+	elseif controlType == "button" then
 		local button = makeFlatButton(row, control.buttonText or (_G.OKAY or "OK"), 112, 26)
 		button:SetPoint("RIGHT", row, "RIGHT", -14, 0)
 		button:SetScript("OnClick", function()
@@ -479,15 +1122,18 @@ local function addSettingRow(state, control, pathText)
 				control.setValue()
 			end
 		end)
+	elseif controlType == "colorpicker" then
+		addColorWidget(row, app, control)
+	elseif controlType == "multidropdown" or controlType == "sortablelist" or controlType == "coloroverrides" then
+		addConfigureFallback(row, app, control)
 	else
-		local value = createText(row, FONT_MUTED, "", MUTED, "RIGHT")
-		value:SetPoint("RIGHT", row, "RIGHT", -16, 0)
-		value:SetSize(130, 24)
-		row.value = value
+		addConfigureFallback(row, app, control)
 	end
 
 	refreshControlRow(app, control, row)
-	state.y = state.y - 8
+	if not parent then
+		state.y = state.y - 8
+	end
 	return row
 end
 
@@ -519,8 +1165,7 @@ local function addCategoryCard(state, category, row, index, columns)
 	local card = row and createGridCard(state, row, index, columns or 2, 86) or createContentFrame(state, 84)
 	applyBackdrop(card, CARD_BG, CARD_BORDER)
 	card:EnableMouse(true)
-	card:SetScript("OnEnter", function(self) setBackdropColor(self, CARD_BG_HOVER) end)
-	card:SetScript("OnLeave", function(self) setBackdropColor(self, CARD_BG) end)
+	applyHoverState(card)
 	card:SetScript("OnMouseUp", function()
 		state:SetCategory(category.id)
 	end)
@@ -534,8 +1179,7 @@ local function addCategoryCard(state, category, row, index, columns)
 	title:SetPoint("RIGHT", card, "RIGHT", -88, 0)
 	title:SetHeight(22)
 
-	local settingsLabel = getLocale(app)["configCenterAllSettings"] or "All settings"
-	local categoryDetails = settingsLabel .. ": " .. ("%d / %d"):format(pageCount, controlCount)
+	local categoryDetails = getFeatureCountText(app, pageCount) .. " · " .. getSettingCountText(app, controlCount)
 	local details = createText(card, FONT_MUTED, categoryDetails, MUTED)
 	details:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
 	details:SetPoint("RIGHT", card, "RIGHT", -88, 0)
@@ -550,13 +1194,11 @@ local function addCategoryCard(state, category, row, index, columns)
 end
 
 local function addPageCard(state, page, row, index, columns)
-	local app = state.app
 	local controlCount = #(page.controls or {})
 	local card = row and createGridCard(state, row, index, columns or 2, 90) or createContentFrame(state, 88)
 	applyBackdrop(card, CARD_BG, CARD_BORDER)
 	card:EnableMouse(true)
-	card:SetScript("OnEnter", function(self) setBackdropColor(self, CARD_BG_HOVER) end)
-	card:SetScript("OnLeave", function(self) setBackdropColor(self, CARD_BG) end)
+	applyHoverState(card)
 	card:SetScript("OnMouseUp", function()
 		state:SetPage(page.id)
 	end)
@@ -570,14 +1212,17 @@ local function addPageCard(state, page, row, index, columns)
 	title:SetPoint("RIGHT", card, "RIGHT", -42, 0)
 	title:SetHeight(22)
 
-	local desc = page.description
-	if not desc or desc == "" then
-		desc = (getLocale(app)["configCenterAllSettings"] or "All settings") .. ": " .. tostring(controlCount)
-	end
+	local desc = getPageDescription(state.app, page)
 	local descText = createText(card, FONT_MUTED, desc, MUTED)
 	descText:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
 	descText:SetPoint("RIGHT", card, "RIGHT", -42, 0)
-	descText:SetHeight(36)
+	descText:SetHeight(32)
+
+	local metaText = getSettingCountText(state.app, controlCount)
+	local meta = createText(card, FONT_MUTED, metaText, GOLD)
+	meta:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", 70, 11)
+	meta:SetPoint("RIGHT", card, "RIGHT", -42, 0)
+	meta:SetHeight(16)
 
 	local open = createText(card, FONT_TITLE, ">", GOLD, "RIGHT")
 	open:SetPoint("RIGHT", card, "RIGHT", -16, 0)
@@ -587,35 +1232,71 @@ local function addPageCard(state, page, row, index, columns)
 	end
 end
 
+local function collectEnabledPages(app, limit)
+	local result = {}
+	local seen = {}
+	for _, control in ipairs(app.controls or {}) do
+		if getControlType(control) == "toggle" and app:GetControlValue(control) == true and not seen[control.pageID] then
+			local page = app:GetPage(control.pageID)
+			if page then
+				result[#result + 1] = page
+				seen[control.pageID] = true
+				if limit and #result >= limit then break end
+			end
+		end
+	end
+	return result
+end
+
 local function renderDashboard(state)
 	local app = state.app
 	local L = getLocale(app)
 	local stats = app:GetStats()
-	addSectionTitle(state, L["configCenterDashboard"] or "Dashboard", getAppTitle(app))
+	addDashboardHero(
+		state,
+		L["configCenterTitle"] or (getAppTitle(app) .. " Settings"),
+		L["configCenterIntro"] or "A modern overview of your settings, quick actions, and enabled features."
+	)
 
 	local quickRow = createGridRow(state, 84)
 	local legacyLabel = L["configCenterLegacyBlizzard"] or "Legacy Blizzard Settings"
 	addDashboardCard(
 		quickRow,
 		1,
-		_G.HELP_LABEL or _G.HELP or "Help",
-		L["configCenterAllSettings"] or "All settings",
+		L["configCenterQuickReference"] or (_G.HELP_LABEL or _G.HELP or "Help"),
+		L["configCenterQuickReferenceDesc"] or "Useful links, slash commands and information.",
 		ICON_TEXTURES.help
 	)
 	addDashboardCard(
 		quickRow,
 		2,
-		L["configCenterQuickActions"] or "Quick actions",
-		legacyLabel,
+		L["configCenterSupportFeedback"] or "Support & Feedback",
+		L["configCenterSupportFeedbackDesc"] or "Report bugs, request features or get help.",
 		ICON_TEXTURES.support,
 		function()
 			openLegacySettings(app)
 		end
 	)
 
+	local quickRow2 = createGridRow(state, 84)
+	addDashboardCard(
+		quickRow2,
+		1,
+		L["configCenterImportExport"] or "Import / Export",
+		L["configCenterImportExportDesc"] or "Import or export your settings and profiles.",
+		ICON_TEXTURES.profiles
+	)
+	addDashboardCard(
+		quickRow2,
+		2,
+		L["configCenterResetDefaults"] or "Reset & Defaults",
+		L["configCenterResetDefaultsDesc"] or "Reset settings or restore default values.",
+		ICON_TEXTURES.reset
+	)
+
 	local status = createContentFrame(state, 76)
 	applyBackdrop(status, CARD_BG, CARD_BORDER)
-	local statusTitle = createText(status, FONT_HEADER, _G.STATUS or "Status", GOLD)
+	local statusTitle = createText(status, FONT_HEADER, L["configCenterAddOnStatus"] or (_G.STATUS or "Status"), GOLD)
 	statusTitle:SetPoint("TOPLEFT", status, "TOPLEFT", 14, -11)
 	statusTitle:SetSize(220, 20)
 
@@ -625,9 +1306,78 @@ local function renderDashboard(state)
 	local enabledLabel = (L["configCenterEnabledFeatures"] or "Enabled features") .. ": " .. tostring(stats.enabled)
 	local enabled = addStatusChip(status, enabledLabel, GREEN, 190)
 	enabled:SetPoint("LEFT", allSettings, "RIGHT", 10, 0)
-	local pages = addStatusChip(status, (_G.CATEGORY or "Category") .. ": " .. tostring(stats.pages), WARNING, 138)
-	pages:SetPoint("LEFT", enabled, "RIGHT", 10, 0)
+	local version = app.opts and app.opts.version
+	version = type(version) == "function" and version() or version
+	local previousChip = enabled
+	if version then
+		local versionLabel = (L["configCenterVersion"] or "Version") .. ": " .. tostring(version)
+		local versionChip = addStatusChip(status, versionLabel, WARNING, 138)
+		versionChip:SetPoint("LEFT", previousChip, "RIGHT", 10, 0)
+		previousChip = versionChip
+	end
+	local newCount = app.opts and app.opts.newCount
+	newCount = type(newCount) == "function" and newCount() or newCount
+	if tonumber(newCount) and tonumber(newCount) > 0 then
+		local newLabel = (L["configCenterNewInVersion"] or "New in this Version") .. ": " .. tostring(newCount)
+		local newChip = addStatusChip(status, newLabel, GOLD, 160)
+		newChip:SetPoint("LEFT", previousChip, "RIGHT", 10, 0)
+	end
 	state.y = state.y - 12
+
+	local enabledPages = collectEnabledPages(app, 5)
+	local panelRow = createContentFrame(state, 250)
+	local leftWidth = math.floor(((state.contentWidth or CONTENT_WIDTH) - GRID_GAP) * 0.62)
+	local rightWidth = (state.contentWidth or CONTENT_WIDTH) - leftWidth - GRID_GAP
+	local enabledPanel = CreateFrame("Frame", nil, panelRow, "BackdropTemplate")
+	enabledPanel:SetPoint("TOPLEFT", panelRow, "TOPLEFT", 0, 0)
+	enabledPanel:SetSize(leftWidth, 250)
+	applyBackdrop(enabledPanel, CARD_BG, CARD_BORDER)
+	local enabledTitle = createText(
+		enabledPanel,
+		FONT_HEADER,
+		L["configCenterRecentlyEnabled"] or "Recently Enabled Features",
+		GOLD
+	)
+	enabledTitle:SetPoint("TOPLEFT", enabledPanel, "TOPLEFT", 14, -12)
+	enabledTitle:SetPoint("RIGHT", enabledPanel, "RIGHT", -14, 0)
+	enabledTitle:SetHeight(20)
+	if #enabledPages == 0 then
+		local emptyText = createText(enabledPanel, FONT_MUTED, L["configCenterNoResults"] or "No settings found.", MUTED)
+		emptyText:SetPoint("TOPLEFT", enabledTitle, "BOTTOMLEFT", 0, -12)
+		emptyText:SetPoint("BOTTOMRIGHT", enabledPanel, "BOTTOMRIGHT", -14, 14)
+	else
+		for index, page in ipairs(enabledPages) do
+			local mini = CreateFrame("Button", nil, enabledPanel, "BackdropTemplate")
+			mini:SetPoint("TOPLEFT", enabledPanel, "TOPLEFT", 14, -38 - ((index - 1) * 39))
+			mini:SetPoint("RIGHT", enabledPanel, "RIGHT", -14, 0)
+			mini:SetHeight(34)
+			applyBackdrop(mini, { 0.058, 0.052, 0.044, 0.90 }, CARD_BORDER)
+			applyHoverState(mini, { 0.058, 0.052, 0.044, 0.90 }, CARD_BG_HOVER, CARD_BORDER, CARD_BORDER_HOVER)
+			mini:SetScript("OnClick", function() state:SetPage(page.id) end)
+			local iconSource, iconIsAtlas = resolvePageIcon(page)
+			local icon = createIcon(mini, iconSource, 20, iconIsAtlas)
+			icon:SetPoint("LEFT", mini, "LEFT", 9, 0)
+			local label = createText(mini, FONT_TEXT, page.title or page.id, WHITE)
+			label:SetPoint("LEFT", icon, "RIGHT", 9, 0)
+			label:SetPoint("RIGHT", mini, "RIGHT", -96, 0)
+			label:SetHeight(18)
+			local badge = addStatusChip(mini, _G.ENABLED or "Enabled", GREEN, 76)
+			badge:SetPoint("RIGHT", mini, "RIGHT", -8, 0)
+		end
+	end
+
+	local actionsPanel = CreateFrame("Frame", nil, panelRow, "BackdropTemplate")
+	actionsPanel:SetPoint("TOPRIGHT", panelRow, "TOPRIGHT", 0, 0)
+	actionsPanel:SetSize(rightWidth, 250)
+	applyBackdrop(actionsPanel, CARD_BG, CARD_BORDER)
+	local actionsTitle = createText(actionsPanel, FONT_HEADER, L["configCenterQuickActions"] or "Quick actions", GOLD)
+	actionsTitle:SetPoint("TOPLEFT", actionsPanel, "TOPLEFT", 14, -12)
+	actionsTitle:SetPoint("RIGHT", actionsPanel, "RIGHT", -14, 0)
+	actionsTitle:SetHeight(20)
+	local legacy = makeFlatButton(actionsPanel, legacyLabel, math.max(180, rightWidth - 28), 28, ICON_TEXTURES.advanced)
+	legacy:SetPoint("TOPLEFT", actionsTitle, "BOTTOMLEFT", 0, -12)
+	legacy:SetScript("OnClick", function() openLegacySettings(app) end)
+	state.y = state.y - 14
 
 	addSectionTitle(state, _G.CATEGORY or "Category", nil)
 	local categories = app:GetCategories()
@@ -662,15 +1412,189 @@ local function renderCategoryOverview(state, categoryID)
 	end
 end
 
+local function isReliableMainToggle(page, control, candidateCount)
+	if not control or getControlType(control) ~= "toggle" then
+		return false
+	end
+	if page.mainToggleID and control.id == page.mainToggleID then
+		return true
+	end
+	if control.isMainToggle == true or control.uiRole == "mainToggle" then
+		return true
+	end
+	if candidateCount ~= 1 then
+		return false
+	end
+	local label = tostring(control.label or "")
+	local key = tostring(control.key or control.id or ""):lower()
+	local pageKey = tostring(page.id or page.title or ""):lower():gsub("[^%w]+", "")
+	if label:match("^Enable%s+") then
+		return true
+	end
+	if key:match("^enable") and (pageKey == "" or key:find(pageKey, 1, true)) then
+		return true
+	end
+	return false
+end
+
+local function findMainToggle(app, page)
+	local explicit
+	local candidates = {}
+	for _, control in ipairs(page.controls or {}) do
+		if getControlType(control) == "toggle" then
+			if page.mainToggleID and control.id == page.mainToggleID then
+				explicit = control
+				break
+			end
+			if control.isMainToggle == true or control.uiRole == "mainToggle" then
+				explicit = control
+				break
+			end
+			local label = tostring(control.label or "")
+			local key = tostring(control.key or control.id or ""):lower()
+			if label:match("^Enable%s+") or key:match("^enable") then
+				candidates[#candidates + 1] = control
+			end
+		end
+	end
+	if explicit then return explicit end
+	if #candidates == 1 and isReliableMainToggle(page, candidates[1], 1) then
+		return candidates[1]
+	end
+	local _ = app
+	return nil
+end
+
+local function collectPageGroups(app, page, mainToggle)
+	local groups = {}
+	local groupsByID = {}
+	for _, group in ipairs(page.groups or {}) do
+		local entry = {
+			id = group.id,
+			title = group.title or group.id,
+			order = group.order,
+			controls = {},
+			collapsed = group.collapsed,
+		}
+		groups[#groups + 1] = entry
+		groupsByID[group.id] = entry
+	end
+	for _, control in ipairs(page.controls or {}) do
+		if control ~= mainToggle then
+			local groupID = control.groupID or "settings"
+			local entry = groupsByID[groupID]
+			if not entry then
+				entry = {
+					id = groupID,
+					title = control.groupTitle or (_G.SETTINGS or "Settings"),
+					order = 100000,
+					controls = {},
+				}
+				groups[#groups + 1] = entry
+				groupsByID[groupID] = entry
+			end
+			entry.controls[#entry.controls + 1] = control
+		end
+	end
+	for index = #groups, 1, -1 do
+		if #groups[index].controls == 0 then
+			table.remove(groups, index)
+		end
+	end
+	table.sort(groups, function(a, b)
+		local ao = tonumber(a.order) or 1000
+		local bo = tonumber(b.order) or 1000
+		if ao ~= bo then return ao < bo end
+		return tostring(a.title) < tostring(b.title)
+	end)
+	local _ = app
+	return groups
+end
+
+local function addPageSidePanel(state, page, category)
+	local L = getLocale(state.app)
+	local panel = trackFrame(state.contentFrames, CreateFrame("Frame", nil, state.content, "BackdropTemplate"))
+	panel:SetPoint("TOPRIGHT", state.content, "TOPRIGHT", 0, state.y)
+	panel:SetSize(state.pageRightWidth or PAGE_RIGHT_WIDTH, 248)
+	applyBackdrop(panel, CARD_BG, CARD_BORDER)
+
+	local aboutTitle = createText(panel, FONT_HEADER, L["configCenterAbout"] or "About", GOLD)
+	aboutTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", 14, -14)
+	aboutTitle:SetPoint("RIGHT", panel, "RIGHT", -14, 0)
+	aboutTitle:SetHeight(20)
+
+	local aboutText = createText(panel, FONT_MUTED, getPageDescription(state.app, page), MUTED)
+	aboutText:SetPoint("TOPLEFT", aboutTitle, "BOTTOMLEFT", 0, -8)
+	aboutText:SetPoint("RIGHT", panel, "RIGHT", -14, 0)
+	aboutText:SetHeight(58)
+
+	local divider = panel:CreateTexture(nil, "OVERLAY")
+	divider:SetColorTexture(CARD_BORDER[1], CARD_BORDER[2], CARD_BORDER[3], 0.55)
+	divider:SetPoint("TOPLEFT", aboutText, "BOTTOMLEFT", 0, -10)
+	divider:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -14, -104)
+	divider:SetHeight(1)
+
+	local relatedTitle = createText(panel, FONT_HEADER, L["configCenterRelated"] or "Related", GOLD)
+	relatedTitle:SetPoint("TOPLEFT", divider, "BOTTOMLEFT", 0, -12)
+	relatedTitle:SetPoint("RIGHT", panel, "RIGHT", -14, 0)
+	relatedTitle:SetHeight(20)
+	local relatedLines = {
+		category and (category.title or category.id) or "",
+		getSettingCountText(state.app, #(page.controls or {})),
+	}
+	local relatedText = createText(panel, FONT_MUTED, table.concat(relatedLines, "\n"), MUTED)
+	relatedText:SetPoint("TOPLEFT", relatedTitle, "BOTTOMLEFT", 0, -8)
+	relatedText:SetPoint("RIGHT", panel, "RIGHT", -14, 0)
+	relatedText:SetHeight(48)
+	return panel
+end
+
+local function addGroupSection(state, group, pagePath)
+	local collapsed = state.collapsedGroups and state.collapsedGroups[group.id] == true
+	local rowCount = collapsed and 0 or #group.controls
+	local height = 42 + (rowCount * 74) + 12
+	local section = createPageLeftFrame(state, height)
+	applyBackdrop(section, { 0.036, 0.036, 0.044, 0.90 }, CARD_BORDER)
+
+	local header = CreateFrame("Button", nil, section, "BackdropTemplate")
+	header:SetPoint("TOPLEFT", section, "TOPLEFT", 0, 0)
+	header:SetPoint("TOPRIGHT", section, "TOPRIGHT", 0, 0)
+	header:SetHeight(38)
+	header.Text = header:CreateFontString(nil, "OVERLAY", FONT_HEADER)
+	header.Text:SetPoint("LEFT", header, "LEFT", 14, 0)
+	header.Text:SetPoint("RIGHT", header, "RIGHT", -34, 0)
+	header.Text:SetJustifyH("LEFT")
+	header.Text:SetText(group.title or group.id)
+	setTextColor(header.Text, WHITE)
+	header.Chevron = header:CreateFontString(nil, "OVERLAY", FONT_TEXT)
+	header.Chevron:SetPoint("RIGHT", header, "RIGHT", -14, 0)
+	header.Chevron:SetText(collapsed and ">" or "v")
+	setTextColor(header.Chevron, GOLD)
+	header:SetScript("OnClick", function()
+		state.collapsedGroups[group.id] = not collapsed
+		state:RenderContent()
+	end)
+
+	if not collapsed then
+		local y = -42
+		for _, control in ipairs(group.controls) do
+			addSettingRow(state, control, pagePath, section, y, (state.pageLeftWidth or 420) - 24)
+			y = y - 74
+		end
+	end
+	state.y = state.y - 12
+	return section
+end
+
 local function renderPage(state, pageID)
 	local app = state.app
-	local L = getLocale(app)
 	local page = app:GetPage(pageID)
 	if not page then
 		renderDashboard(state)
 		return
 	end
 	local category = app.categoriesByID[page.category or ""]
+	local pagePath = getPagePath(app, page)
 	local breadcrumb = createText(createContentFrame(state, 22), FONT_MUTED, getPagePath(app, page), MUTED)
 	breadcrumb:SetAllPoints(breadcrumb:GetParent())
 	state.y = state.y - 4
@@ -683,7 +1607,7 @@ local function renderPage(state, pageID)
 	title:SetPoint("TOPLEFT", icon, "TOPRIGHT", 16, -1)
 	title:SetPoint("RIGHT", header, "RIGHT", -190, 0)
 	title:SetHeight(25)
-	local desc = createText(header, FONT_MUTED, page.description or "", MUTED)
+	local desc = createText(header, FONT_MUTED, getPageDescription(app, page), MUTED)
 	desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
 	desc:SetPoint("RIGHT", header, "RIGHT", -190, 0)
 	desc:SetHeight(36)
@@ -692,45 +1616,27 @@ local function renderPage(state, pageID)
 	status:SetPoint("TOPRIGHT", header, "TOPRIGHT", 0, -7)
 	state.y = state.y - 8
 
-	local mainToggle
-	for _, control in ipairs(page.controls or {}) do
-		if not mainToggle and (control.type == "toggle" or control.type == "checkbox") then
-			mainToggle = control
-		end
-	end
+	local mainToggle = findMainToggle(app, page)
 	if mainToggle then
-		addSettingRow(state, mainToggle, getPagePath(app, page))
+		addSettingRow(state, mainToggle, pagePath)
 	end
 
-	local infoRow = createGridRow(state, 82)
-	local about = createGridCard(state, infoRow, 1, 2, 82)
-	local aboutTitle = createText(about, FONT_HEADER, page.title or page.id, GOLD)
-	aboutTitle:SetPoint("TOPLEFT", about, "TOPLEFT", 14, -12)
-	aboutTitle:SetPoint("RIGHT", about, "RIGHT", -14, 0)
-	aboutTitle:SetHeight(20)
-	local aboutDescription = (page.description ~= "" and page.description) or getPagePath(app, page)
-	local aboutText = createText(about, FONT_MUTED, aboutDescription, MUTED)
-	aboutText:SetPoint("TOPLEFT", aboutTitle, "BOTTOMLEFT", 0, -7)
-	aboutText:SetPoint("BOTTOMRIGHT", about, "BOTTOMRIGHT", -14, 12)
-	local related = createGridCard(state, infoRow, 2, 2, 82)
-	local relatedTitle = createText(related, FONT_HEADER, L["configCenterAllSettings"] or "All settings", GOLD)
-	relatedTitle:SetPoint("TOPLEFT", related, "TOPLEFT", 14, -12)
-	relatedTitle:SetPoint("RIGHT", related, "RIGHT", -14, 0)
-	relatedTitle:SetHeight(20)
-	local relatedDescription = tostring(#(page.controls or {})) .. " / " .. getPagePath(app, page)
-	local relatedText = createText(related, FONT_MUTED, relatedDescription, MUTED)
-	relatedText:SetPoint("TOPLEFT", relatedTitle, "BOTTOMLEFT", 0, -7)
-	relatedText:SetPoint("BOTTOMRIGHT", related, "BOTTOMRIGHT", -14, 12)
-
-	local section = createContentFrame(state, 28)
-	local sectionTitle = createText(section, FONT_HEADER, _G.SETTINGS or "Settings", GOLD)
-	sectionTitle:SetAllPoints(section)
-
-	for _, control in ipairs(page.controls or {}) do
-		if control ~= mainToggle then
-			addSettingRow(state, control, getPagePath(app, page))
+	local groupsStartY = state.y
+	addPageSidePanel(state, page, category)
+	local groups = collectPageGroups(app, page, mainToggle)
+	if #groups == 0 then
+		local empty = createPageLeftFrame(state, 72)
+		applyBackdrop(empty, CARD_BG, CARD_BORDER)
+		local emptyLabel = getLocale(app)["configCenterNoResults"] or "No settings found."
+		local emptyText = createText(empty, FONT_MUTED, emptyLabel, MUTED)
+		emptyText:SetPoint("TOPLEFT", empty, "TOPLEFT", 14, -14)
+		emptyText:SetPoint("BOTTOMRIGHT", empty, "BOTTOMRIGHT", -14, 14)
+	else
+		for _, group in ipairs(groups) do
+			addGroupSection(state, group, pagePath)
 		end
 	end
+	state.y = math.min(state.y, groupsStartY - 230)
 
 	local footer = createContentFrame(state, 42)
 	local reset = makeFlatButton(footer, _G.RESET or "Reset", 118, 28, ICON_TEXTURES.reset)
@@ -751,20 +1657,50 @@ local function renderSearch(state, query)
 		return
 	end
 	for _, control in ipairs(results) do
-		local row = addSettingRow(state, control, getControlPath(app, control))
-		if row.check then
-			local openButton = makeFlatButton(row, _G.OPEN or "Open", 66, 24)
-			openButton:SetPoint("RIGHT", row, "RIGHT", -56, 0)
-			openButton:SetScript("OnClick", function()
-				state:SetPage(control.pageID)
-			end)
-		end
+		local page = app:GetPage(control.pageID)
+		local card = createContentFrame(state, 78)
+		applyBackdrop(card, CARD_BG, CARD_BORDER)
+		card:EnableMouse(true)
+		applyHoverState(card)
+		card:SetScript("OnMouseUp", function()
+			state:SetPage(control.pageID)
+		end)
+
+		local iconSource, iconIsAtlas = resolvePageIcon(page)
+		local icon = createIconPlate(card, iconSource, 38, iconIsAtlas)
+		icon:SetPoint("LEFT", card, "LEFT", 14, 0)
+
+		local title = createText(card, FONT_HEADER, control.label or control.id, WHITE)
+		title:SetPoint("TOPLEFT", icon, "TOPRIGHT", 14, -5)
+		title:SetPoint("RIGHT", card, "RIGHT", -190, 0)
+		title:SetHeight(20)
+
+		local descText = control.description or getPageDescription(app, page)
+		local desc = createText(card, FONT_MUTED, descText, MUTED)
+		desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -5)
+		desc:SetPoint("RIGHT", card, "RIGHT", -190, 0)
+		desc:SetHeight(22)
+
+		local path = createText(card, FONT_MUTED, getControlPath(app, control), GOLD)
+		path:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", 0, -4)
+		path:SetPoint("RIGHT", card, "RIGHT", -190, 0)
+		path:SetHeight(16)
+
+		local badge = addStatusChip(card, getControlTypeLabel(app, control), GOLD, 86)
+		badge:SetPoint("RIGHT", card, "RIGHT", -92, 8)
+		local openButton = makeFlatButton(card, _G.OPEN or "Open", 74, 24)
+		openButton:SetPoint("RIGHT", card, "RIGHT", -14, -12)
+		openButton:SetScript("OnClick", function()
+			state:SetPage(control.pageID)
+		end)
+		state.y = state.y - 8
 	end
 end
 
 local StateMixin = {}
 
 function StateMixin:RenderContent()
+	updateContentMetrics(self)
 	clearContent(self)
 	local query = self.frame.SearchBox:GetText() or ""
 	if query ~= "" then
@@ -789,8 +1725,9 @@ function StateMixin:RefreshSidebarSelection()
 			selected = self.selectedCategoryID == row.categoryID and self.view ~= "dashboard"
 		end
 		row.selected = selected
-		setBackdropColor(row, selected and SELECTED_BG or PANEL_BG)
+		setFrameBackdrop(row, selected and SELECTED_BG or SIDEBAR_BG, selected and CARD_BORDER_HOVER or { 0, 0, 0, 0 })
 		setTextColor(row.Text, selected and GOLD or WHITE)
+		if row.Accent then row.Accent:SetShown(selected) end
 	end
 end
 
@@ -800,9 +1737,14 @@ function StateMixin:RenderSidebar()
 	local frame = self.frame
 	local L = getLocale(self.app)
 
-	local dashboard = createSidebarFrame(self, 42)
-	applyBackdrop(dashboard, PANEL_BG, { 0, 0, 0, 0 })
-	dashboard.Icon = createIcon(dashboard, ICON_TEXTURES.dashboard, 20, false)
+	local dashboard = createSidebarFrame(self, 44)
+	applyBackdrop(dashboard, SIDEBAR_BG, { 0, 0, 0, 0 })
+	dashboard.Accent = dashboard:CreateTexture(nil, "OVERLAY")
+	dashboard.Accent:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.85)
+	dashboard.Accent:SetPoint("TOPLEFT", dashboard, "TOPLEFT", 0, -6)
+	dashboard.Accent:SetPoint("BOTTOMLEFT", dashboard, "BOTTOMLEFT", 0, 6)
+	dashboard.Accent:SetWidth(2)
+	dashboard.Icon = createIcon(dashboard, ICON_TEXTURES.dashboard, 22, false)
 	dashboard.Icon:SetPoint("LEFT", dashboard, "LEFT", 12, 0)
 	dashboard.Text = dashboard:CreateFontString(nil, "OVERLAY", FONT_TEXT)
 	dashboard.Text:SetPoint("LEFT", dashboard.Icon, "RIGHT", 10, 0)
@@ -810,8 +1752,16 @@ function StateMixin:RenderSidebar()
 	dashboard.Text:SetJustifyH("LEFT")
 	dashboard.Text:SetText(L["configCenterDashboard"] or "Dashboard")
 	dashboard.view = "dashboard"
-	dashboard:SetScript("OnEnter", function(row) if not row.selected then setBackdropColor(row, CARD_BG_HOVER) end end)
-	dashboard:SetScript("OnLeave", function(row) setBackdropColor(row, row.selected and SELECTED_BG or PANEL_BG) end)
+	dashboard:SetScript("OnEnter", function(row)
+		if not row.selected then setFrameBackdrop(row, CARD_BG_HOVER, CARD_BORDER) end
+	end)
+	dashboard:SetScript("OnLeave", function(row)
+		setFrameBackdrop(
+			row,
+			row.selected and SELECTED_BG or SIDEBAR_BG,
+			row.selected and CARD_BORDER_HOVER or { 0, 0, 0, 0 }
+		)
+	end)
 	dashboard:SetScript("OnClick", function()
 		frame.SearchBox:SetText("")
 		self:SetDashboard()
@@ -819,10 +1769,15 @@ function StateMixin:RenderSidebar()
 	self.sidebarRows.dashboard = dashboard
 
 	for _, category in ipairs(self.app:GetCategories()) do
-		local row = createSidebarFrame(self, 42)
-		applyBackdrop(row, PANEL_BG, { 0, 0, 0, 0 })
+		local row = createSidebarFrame(self, 44)
+		applyBackdrop(row, SIDEBAR_BG, { 0, 0, 0, 0 })
+		row.Accent = row:CreateTexture(nil, "OVERLAY")
+		row.Accent:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.85)
+		row.Accent:SetPoint("TOPLEFT", row, "TOPLEFT", 0, -6)
+		row.Accent:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, 6)
+		row.Accent:SetWidth(2)
 		local iconSource, iconIsAtlas = resolveCategoryIcon(category)
-		row.Icon = createIcon(row, iconSource, 20, iconIsAtlas)
+		row.Icon = createIcon(row, iconSource, 22, iconIsAtlas)
 		row.Icon:SetPoint("LEFT", row, "LEFT", 12, 0)
 		row.Text = row:CreateFontString(nil, "OVERLAY", FONT_TEXT)
 		row.Text:SetPoint("LEFT", row.Icon, "RIGHT", 10, 0)
@@ -831,10 +1786,14 @@ function StateMixin:RenderSidebar()
 		row.Text:SetText(category.title or category.id)
 		row.categoryID = category.id
 		row:SetScript("OnEnter", function(sidebarRow)
-			if not sidebarRow.selected then setBackdropColor(sidebarRow, CARD_BG_HOVER) end
+			if not sidebarRow.selected then setFrameBackdrop(sidebarRow, CARD_BG_HOVER, CARD_BORDER) end
 		end)
 		row:SetScript("OnLeave", function(sidebarRow)
-			setBackdropColor(sidebarRow, sidebarRow.selected and SELECTED_BG or PANEL_BG)
+			setFrameBackdrop(
+				sidebarRow,
+				sidebarRow.selected and SELECTED_BG or SIDEBAR_BG,
+				sidebarRow.selected and CARD_BORDER_HOVER or { 0, 0, 0, 0 }
+			)
 		end)
 		row:SetScript("OnClick", function()
 			frame.SearchBox:SetText("")
@@ -843,6 +1802,7 @@ function StateMixin:RenderSidebar()
 		self.sidebarRows[category.id] = row
 	end
 	frame.Sidebar:SetHeight(math.max(1, math.abs(self.sidebarY) + 8))
+	updateScrollFrameVisibility(frame.SidebarScroll)
 	self:RefreshSidebarSelection()
 end
 
@@ -878,6 +1838,7 @@ local function initializeState(frame, app)
 		contentFrames = {},
 		sidebarFrames = {},
 		sidebarRows = {},
+		collapsedGroups = {},
 		contentWidth = CONTENT_WIDTH,
 		view = "dashboard",
 		selectedCategoryID = nil,
@@ -904,40 +1865,69 @@ local function createFrame(app)
 	frame:SetScript("OnDragStart", frame.StartMoving)
 	frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
 	applyBackdrop(frame, PANEL_BG, PANEL_BORDER)
+	applyWindowBorder(frame)
 	frame:Hide()
 
-	frame.HeaderIcon = createIconPlate(frame, getAddonIcon(app), 34, false)
-	frame.HeaderIcon:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, -11)
+	frame.TopBar = CreateFrame("Frame", nil, frame, "BackdropTemplate")
+	frame.TopBar:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -8)
+	frame.TopBar:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -10, -8)
+	frame.TopBar:SetHeight(54)
+	applyBackdrop(frame.TopBar, TOPBAR_BG, { 0.52, 0.39, 0.19, 0.52 })
+
+	frame.TopBarAccent = frame.TopBar:CreateTexture(nil, "OVERLAY")
+	frame.TopBarAccent:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.38)
+	frame.TopBarAccent:SetPoint("BOTTOMLEFT", frame.TopBar, "BOTTOMLEFT", 10, 0)
+	frame.TopBarAccent:SetPoint("BOTTOMRIGHT", frame.TopBar, "BOTTOMRIGHT", -10, 0)
+	frame.TopBarAccent:SetHeight(1)
+
+	frame.HeaderIcon = createIconPlate(frame.TopBar, getAddonIcon(app), 34, false)
+	frame.HeaderIcon:SetPoint("LEFT", frame.TopBar, "LEFT", 12, 0)
 
 	frame.Title = frame:CreateFontString(nil, "OVERLAY", FONT_TITLE)
 	frame.Title:SetPoint("LEFT", frame.HeaderIcon, "RIGHT", 10, 0)
-	frame.Title:SetPoint("RIGHT", frame, "RIGHT", -410, 0)
+	frame.Title:SetPoint("RIGHT", frame.TopBar, "RIGHT", -470, 0)
 	frame.Title:SetJustifyH("LEFT")
 	frame.Title:SetText(L["configCenterTitle"] or (getAppTitle(app) .. " Settings"))
 	setTextColor(frame.Title, GOLD)
 
 	frame.ResetButton = makeFlatButton(frame, _G.DEFAULTS or _G.RESET or "Defaults", 104, 28)
-	frame.ResetButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -86, -28)
+	frame.ResetButton:SetPoint("RIGHT", frame.TopBar, "RIGHT", -46, 0)
 
 	frame.SearchBox = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
-	frame.SearchBox:SetSize(260, 28)
-	frame.SearchBox:SetPoint("TOPRIGHT", frame.ResetButton, "TOPLEFT", -10, 0)
+	frame.SearchBox:SetSize(286, 28)
+	frame.SearchBox:SetPoint("RIGHT", frame.ResetButton, "LEFT", -12, 0)
 	frame.SearchBox:SetAutoFocus(false)
 	frame.SearchBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
 	frame.SearchBox:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
 
+	frame.SearchPlaceholder = frame:CreateFontString(nil, "OVERLAY", FONT_MUTED)
+	frame.SearchPlaceholder:SetPoint("LEFT", frame.SearchBox, "LEFT", 10, 1)
+	frame.SearchPlaceholder:SetPoint("RIGHT", frame.SearchBox, "RIGHT", -30, 1)
+	frame.SearchPlaceholder:SetJustifyH("LEFT")
+	frame.SearchPlaceholder:SetText((L["configCenterSearchPlaceholder"] or "Search settings") .. "...")
+	setTextColor(frame.SearchPlaceholder, MUTED)
+
+	frame.SearchClearButton = makeFlatButton(frame, "x", 24, 22)
+	frame.SearchClearButton:SetPoint("RIGHT", frame.SearchBox, "RIGHT", -4, 0)
+	frame.SearchClearButton:SetScript("OnClick", function()
+		frame.SearchBox:SetText("")
+		frame.SearchBox:ClearFocus()
+	end)
+	frame.SearchClearButton:Hide()
+
 	frame.SidebarShell = CreateFrame("Frame", nil, frame, "BackdropTemplate")
-	frame.SidebarShell:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -64)
-	frame.SidebarShell:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 16, 16)
+	frame.SidebarShell:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, -72)
+	frame.SidebarShell:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 18, 18)
 	frame.SidebarShell:SetWidth(SIDEBAR_WIDTH)
-	applyBackdrop(frame.SidebarShell, { 0.018, 0.018, 0.022, 0.86 }, PANEL_BORDER)
+	applyBackdrop(frame.SidebarShell, SIDEBAR_BG, PANEL_BORDER)
 
 	frame.SidebarScroll = CreateFrame("ScrollFrame", nil, frame.SidebarShell, "UIPanelScrollFrameTemplate")
 	frame.SidebarScroll:SetPoint("TOPLEFT", frame.SidebarShell, "TOPLEFT", 8, -8)
 	frame.SidebarScroll:SetPoint("BOTTOMRIGHT", frame.SidebarShell, "BOTTOMRIGHT", -28, 54)
+	skinScrollFrame(frame.SidebarScroll)
 
 	frame.Sidebar = CreateFrame("Frame", nil, frame.SidebarScroll)
-	frame.Sidebar:SetWidth(180)
+	frame.Sidebar:SetWidth(SIDEBAR_WIDTH - 44)
 	frame.Sidebar:SetHeight(1)
 	frame.Sidebar:SetPoint("TOPLEFT", frame.SidebarScroll, "TOPLEFT", 0, 0)
 	frame.SidebarScroll:SetScrollChild(frame.Sidebar)
@@ -947,9 +1937,15 @@ local function createFrame(app)
 	frame.LegacyButton:SetPoint("BOTTOMLEFT", frame.SidebarShell, "BOTTOMLEFT", 8, 11)
 	frame.LegacyButton:SetScript("OnClick", function() openLegacySettings(app) end)
 
-	frame.Scroll = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
-	frame.Scroll:SetPoint("TOPLEFT", frame.SidebarShell, "TOPRIGHT", 18, 0)
-	frame.Scroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -34, 18)
+	frame.ContentShell = CreateFrame("Frame", nil, frame, "BackdropTemplate")
+	frame.ContentShell:SetPoint("TOPLEFT", frame.SidebarShell, "TOPRIGHT", 18, 0)
+	frame.ContentShell:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -20, 18)
+	applyBackdrop(frame.ContentShell, CONTENT_BG, { 0.24, 0.20, 0.14, 0.54 })
+
+	frame.Scroll = CreateFrame("ScrollFrame", nil, frame.ContentShell, "UIPanelScrollFrameTemplate")
+	frame.Scroll:SetPoint("TOPLEFT", frame.ContentShell, "TOPLEFT", 12, -12)
+	frame.Scroll:SetPoint("BOTTOMRIGHT", frame.ContentShell, "BOTTOMRIGHT", -14, 12)
+	skinScrollFrame(frame.Scroll)
 
 	frame.Content = CreateFrame("Frame", nil, frame.Scroll)
 	frame.Content:SetWidth(CONTENT_WIDTH)
@@ -959,12 +1955,24 @@ local function createFrame(app)
 
 	local state = initializeState(frame, app)
 	frame._LibEQOLConfigState = state
+	updateContentMetrics(state)
 
 	frame.SearchBox:SetScript("OnTextChanged", function()
+		if frame.SearchPlaceholder then
+			frame.SearchPlaceholder:SetShown(frame.SearchBox:GetText() == "")
+		end
+		if frame.SearchClearButton then
+			frame.SearchClearButton:SetShown(frame.SearchBox:GetText() ~= "")
+		end
 		state:RenderContent()
 	end)
 	frame.ResetButton:SetScript("OnClick", function()
 		resetCurrentPage(state)
+	end)
+	frame:SetScript("OnSizeChanged", function()
+		if frame:IsShown() then
+			state:RenderContent()
+		end
 	end)
 
 	state:RenderSidebar()

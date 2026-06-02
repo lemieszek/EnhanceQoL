@@ -14,6 +14,10 @@ SettingsLib:SetNewTagResolverForPrefix(prefix, function(idOrVar) return addon.va
 
 addon.SettingsLayout = addon.SettingsLayout or {}
 addon.functions = addon.functions or {}
+addon.ConfigCurrentGroupByPageID = addon.ConfigCurrentGroupByPageID or {}
+addon.ConfigGroupTitleByPageID = addon.ConfigGroupTitleByPageID or {}
+addon.ConfigGroupOrderByPageID = addon.ConfigGroupOrderByPageID or {}
+addon.ConfigControlOrder = addon.ConfigControlOrder or 0
 
 local rootCategoryMap = {
 	UI = "interface",
@@ -34,6 +38,16 @@ local function ensureConfigApp()
 		db = function() return addon.db end,
 		profile = function() return addon.db end,
 		locale = L,
+		version = function()
+			return C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(addonName, "Version")
+		end,
+		newCount = function()
+			local count = 0
+			for _, value in pairs(addon.variables and addon.variables.NewVersionTableEQOL or {}) do
+				if value then count = count + 1 end
+			end
+			return count
+		end,
 		openLegacySettings = function()
 			if Settings and Settings.OpenToCategory and addon.SettingsLayout and addon.SettingsLayout.rootCategory then
 				Settings.OpenToCategory(addon.SettingsLayout.rootCategory:GetID())
@@ -53,6 +67,60 @@ local function ensureConfigApp()
 
 	addon.ConfigApp = app
 	return app
+end
+
+local function resolveLegacyPageID(app, cbData, category)
+	if not app then return nil end
+	if cbData and cbData.pageID then return cbData.pageID end
+	if cbData and cbData.parentSection and app.legacySections then return app.legacySections[cbData.parentSection] end
+	if category and app.legacyCategories then
+		local key
+		if type(category) == "table" and category.GetID then
+			local ok, id = pcall(category.GetID, category)
+			if ok and id ~= nil then key = "id:" .. tostring(id) end
+		end
+		if not key and type(category) == "table" and category.GetName then
+			local ok, name = pcall(category.GetName, category)
+			if ok and name ~= nil then key = "name:" .. tostring(name) end
+		end
+		key = key or tostring(category)
+		local categoryID = app.legacyCategories[key]
+		if categoryID then return categoryID .. ".settings" end
+	end
+	return nil
+end
+
+local function getDefaultGroupID(app, pageID)
+	if not app or not pageID then return nil end
+	local groupID = "settings"
+	if not app:GetPage(pageID).groupsByID[groupID] then
+		app:RegisterGroup(pageID, {
+			id = groupID,
+			title = _G.SETTINGS or "Settings",
+			order = 100000,
+		})
+	end
+	return groupID, _G.SETTINGS or "Settings"
+end
+
+local function getLegacyControlGroup(app, category, cbData)
+	local pageID = resolveLegacyPageID(app, cbData, category)
+	if not pageID or not app:GetPage(pageID) then return nil, nil, pageID end
+	if cbData.groupID or cbData.modernGroup then
+		local groupID = cbData.groupID or cbData.modernGroup
+		local groupTitle = cbData.groupTitle or cbData.groupName or groupID
+		app:RegisterGroup(pageID, {
+			id = groupID,
+			title = groupTitle,
+			order = cbData.groupOrder,
+		})
+		return groupID, groupTitle, pageID
+	end
+	local groupID = addon.ConfigCurrentGroupByPageID[pageID]
+	if groupID then return groupID, addon.ConfigGroupTitleByPageID[pageID], pageID end
+	local groupTitle
+	groupID, groupTitle = getDefaultGroupID(app, pageID)
+	return groupID, groupTitle, pageID
 end
 
 function addon.functions.OpenConfigCenter(pageID)
@@ -81,11 +149,15 @@ local function registerLegacyControl(category, cbData, controlType, setting)
 	local app = ensureConfigApp()
 	if not app or type(cbData) ~= "table" then return end
 	local key = cbData.var or cbData.key
-	if not key then return end
+	local id = cbData.id or key or cbData.text or cbData.label or cbData.name
+	if not id then return end
+	addon.ConfigControlOrder = (addon.ConfigControlOrder or 0) + 1
+	local groupID, groupTitle, pageID = getLegacyControlGroup(app, category, cbData)
 	app:RegisterLegacyControl({
 		legacyCategory = category,
 		parentSection = cbData.parentSection,
-		id = cbData.id or key,
+		pageID = pageID,
+		id = id,
 		key = key,
 		type = controlType,
 		label = cbData.text or cbData.label or cbData.name,
@@ -93,12 +165,59 @@ local function registerLegacyControl(category, cbData, controlType, setting)
 		default = cbData.default,
 		keywords = cbData.searchtags,
 		level = cbData.level,
-		order = cbData.order,
+		order = type(cbData.order) == "number" and cbData.order or addon.ConfigControlOrder,
+		groupID = groupID,
+		groupTitle = groupTitle,
 		setting = setting,
 		getValue = cbData.get,
 		setValue = cbData.func or cbData.set,
 		parentCheck = cbData.parentCheck,
 		isEnabled = cbData.isEnabled,
+		isMainToggle = cbData.isMainToggle,
+		uiRole = cbData.uiRole,
+		min = cbData.min,
+		max = cbData.max,
+		step = cbData.step,
+		formatter = cbData.formatter,
+		suffix = cbData.suffix,
+		valueFormatter = cbData.valueFormatter,
+		values = cbData.values,
+		options = cbData.options,
+		list = cbData.list,
+		optionfunc = cbData.optionfunc,
+		listFunc = cbData.listFunc,
+		orderList = type(cbData.order) == "table" and cbData.order or nil,
+		customText = cbData.customText,
+		customDefaultText = cbData.customDefaultText,
+		menuHeight = cbData.menuHeight or cbData.height,
+		generator = cbData.generator,
+		numeric = cbData.numeric,
+		placeholder = cbData.placeholder,
+		placeholderText = cbData.placeholderText,
+		maxChars = cbData.maxChars,
+		readOnly = cbData.readOnly,
+		multiline = cbData.multiline,
+		multilineHeight = cbData.multilineHeight,
+		inputWidth = cbData.inputWidth,
+		clampToRange = cbData.clampToRange,
+		height = cbData.height,
+		buttonText = cbData.buttonText or cbData.buttonLabel or cbData.label,
+		onClick = cbData.onClick or cbData.func,
+		entries = cbData.entries,
+		getColor = cbData.getColor,
+		setColor = cbData.setColor,
+		getDefaultColor = cbData.getDefaultColor,
+		hasOpacity = cbData.hasOpacity,
+		colorizeLabel = cbData.colorizeLabel,
+		isSelectedFunc = cbData.isSelectedFunc,
+		setSelectedFunc = cbData.setSelectedFunc,
+		getSelection = cbData.getSelection,
+		setSelection = cbData.setSelection,
+		summary = cbData.summary,
+		soundResolver = cbData.soundResolver,
+		previewSoundFunc = cbData.previewSoundFunc,
+		playbackChannel = cbData.playbackChannel,
+		getPlaybackChannel = cbData.getPlaybackChannel,
 	})
 end
 
@@ -551,10 +670,27 @@ function addon.functions.SettingsCreateColorOverrides(cat, cbData)
 	return initializer
 end
 
----------------------------------------------------------
 -- Text / Header / Button / Notify
 ---------------------------------------------------------
-function addon.functions.SettingsCreateHeadline(cat, text, extra) return SettingsLib:CreateHeader(cat, text, extra) end
+function addon.functions.SettingsCreateHeadline(cat, text, extra)
+	local header = SettingsLib:CreateHeader(cat, text, extra)
+	local app = ensureConfigApp()
+	if app and extra and extra.parentSection then
+		local pageID = app.legacySections and app.legacySections[extra.parentSection]
+		if pageID and app:GetPage(pageID) then
+			addon.ConfigGroupOrderByPageID[pageID] = (addon.ConfigGroupOrderByPageID[pageID] or 0) + 10
+			local groupID = extra.groupID or extra.modernGroup or ConfigLib:NormalizeID(text or "settings")
+			app:RegisterGroup(pageID, {
+				id = groupID,
+				title = text,
+				order = extra.order or addon.ConfigGroupOrderByPageID[pageID],
+			})
+			addon.ConfigCurrentGroupByPageID[pageID] = groupID
+			addon.ConfigGroupTitleByPageID[pageID] = text
+		end
+	end
+	return header
+end
 
 function addon.functions.SettingsCreateText(cat, text, extra) return SettingsLib:CreateText(cat, text, extra) end
 
@@ -577,30 +713,34 @@ function addon.functions.SettingsCreateButton(cat, cbData)
 end
 
 function addon.functions.SettingsCreateColorPicker(cat, cbData)
+	local entries = { { key = cbData.var, label = cbData.text, tooltip = cbData.tooltip } }
+	local function getColor(_)
+		local db = addon.db[cbData.var]
+		if cbData.subvar and db then db = db[cbData.subvar] end
+		local default = type(cbData.default) == "function" and cbData.default() or cbData.default
+		local col = db or default or { r = 0, g = 0, b = 0, a = 1 }
+		return col.r or 0, col.g or 0, col.b or 0, col.a or 1
+	end
+	local function setColor(_, r, g, b, a)
+		addon.db[cbData.var] = addon.db[cbData.var] or {}
+		if cbData.subvar then
+			addon.db[cbData.var][cbData.subvar] = { r = r, g = g, b = b, a = a }
+		else
+			addon.db[cbData.var] = { r = r, g = g, b = b, a = a }
+		end
+		if cbData.callback then cbData.callback(r, g, b, a) end
+	end
+	local function getDefaultColor()
+		local default = type(cbData.default) == "function" and cbData.default() or cbData.default
+		return default and default.r or 1, default and default.g or 1, default and default.b or 1, default and default.a or 1
+	end
 	local initializer = SettingsLib:CreateColorOverrides(cat, {
 		key = cbData.var, -- eindeutiger Key
 		headerText = cbData.text, -- Überschrift (optional)
-		entries = { { key = cbData.var, label = cbData.text, tooltip = cbData.tooltip } },
-		getColor = function(key)
-			local db = addon.db[cbData.var]
-			if cbData.subvar and db then db = db[cbData.subvar] end
-			local default = type(cbData.default) == "function" and cbData.default() or cbData.default
-			local col = db or default or { r = 0, g = 0, b = 0, a = 1 }
-			return col.r or 0, col.g or 0, col.b or 0, col.a or 1
-		end,
-		setColor = function(key, r, g, b, a)
-			addon.db[cbData.var] = addon.db[cbData.var] or {}
-			if cbData.subvar then
-				addon.db[cbData.var][cbData.subvar] = { r = r, g = g, b = b, a = a }
-			else
-				addon.db[cbData.var] = { r = r, g = g, b = b, a = a }
-			end
-			if cbData.callback then cbData.callback(r, g, b, a) end
-		end,
-		getDefaultColor = function()
-			local default = type(cbData.default) == "function" and cbData.default() or cbData.default
-			return default and default.r or 1, default and default.g or 1, default and default.b or 1, default and default.a or 1
-		end,
+		entries = entries,
+		getColor = getColor,
+		setColor = setColor,
+		getDefaultColor = getDefaultColor,
 		parent = cbData.element,
 		parentCheck = cbData.parentCheck,
 		searchtags = cbData.searchtags,
@@ -614,6 +754,10 @@ function addon.functions.SettingsCreateColorPicker(cat, cbData)
 	addon.SettingsLayout = addon.SettingsLayout or {}
 	addon.SettingsLayout.elements = addon.SettingsLayout.elements or {}
 	addon.SettingsLayout.elements[cbData.var] = { initializer = initializer }
+	cbData.entries = entries
+	cbData.getColor = getColor
+	cbData.setColor = setColor
+	cbData.getDefaultColor = getDefaultColor
 	registerLegacyControl(cat, cbData, "colorpicker", nil)
 	return initializer
 end
@@ -636,13 +780,21 @@ function addon.functions.SettingsCreateExpandableSection(cat, cbData)
 	end
 	local app = ensureConfigApp()
 	if app then
-		app:RegisterLegacySection(section, {
+		local pageID = app:RegisterLegacySection(section, {
 			category = cat,
 			title = cbData.name,
 			pageID = cbData.configPageID,
 			order = cbData.order,
 			description = cbData.description or cbData.desc,
+			icon = cbData.icon,
+			iconAtlas = cbData.iconAtlas,
+			mainToggleID = cbData.mainToggleID,
 		})
+		if pageID then
+			addon.ConfigCurrentGroupByPageID[pageID] = nil
+			addon.ConfigGroupTitleByPageID[pageID] = nil
+			addon.ConfigGroupOrderByPageID[pageID] = 0
+		end
 	end
 	return section
 end
