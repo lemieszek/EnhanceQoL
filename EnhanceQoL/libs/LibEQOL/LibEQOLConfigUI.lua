@@ -23,10 +23,13 @@ local PAGE_GAP = 16
 local GRID_GAP = 12
 
 local FONT_TITLE = "GameFontNormalLarge"
-local FONT_HERO = "GameFontNormalHuge"
+local FONT_HERO = "GameFontNormalHuge2"
 local FONT_HEADER = "GameFontNormal"
 local FONT_TEXT = "GameFontHighlight"
 local FONT_MUTED = "GameFontDisableSmall"
+
+local DEFAULT_DASHBOARD_INTRO = "Welcome! EnhanceQoL improves your World of Warcraft experience "
+	.. "with quality of life features and customization options."
 
 local PANEL_BG = { 0.055, 0.049, 0.043, 0.94 }
 local PANEL_BORDER = { 0.43, 0.34, 0.19, 0.74 }
@@ -45,7 +48,6 @@ local MUTED = { 0.67, 0.64, 0.58 }
 local WHITE = { 0.94, 0.91, 0.84 }
 local GOLD = { 1.0, 0.82, 0.36 }
 local GREEN = { 0.36, 0.82, 0.36 }
-local WARNING = { 1.0, 0.55, 0.18 }
 
 local FALLBACK_ICON = "Interface\\Icons\\INV_Misc_Gear_01"
 local SETTINGS_COG_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Cogwheel.tga"
@@ -53,6 +55,10 @@ local SETTINGS_EXPORT_IMPORT_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewS
 local SETTINGS_QUESTION_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Question.tga"
 local SETTINGS_QUICK_REFERENCE_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\QuickReference.tga"
 local SETTINGS_REVERT_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Revert.tga"
+local STATUS_ENABLED_ICON = "Interface\\RaidFrame\\ReadyCheck-Ready"
+local STATUS_PROFILE_ICON = "Interface\\Icons\\INV_Misc_GroupNeedMore"
+local STATUS_VERSION_ATLAS = "worldquest-tracker-questmarker"
+local STATUS_NEW_ATLAS = "collections-icon-favorites"
 local ICON_TEXTURES = {
 	actionbar = "Interface\\Icons\\INV_Sword_04",
 	actiontracker = "Interface\\Icons\\Ability_Hunter_MarkedForDeath",
@@ -98,6 +104,10 @@ local CATEGORY_ICON_KEYS = {
 	profiles = "profiles",
 	social = "social",
 	sound = "sound",
+}
+
+local CATEGORY_ICON_ATLASES = {
+	gameplay = "icons_64x64_damage",
 }
 
 local PAGE_ICON_KEYS = {
@@ -292,6 +302,9 @@ local function resolveCategoryIcon(category)
 	end
 	if category and category.iconAtlas then
 		return category.iconAtlas, true
+	end
+	if category and CATEGORY_ICON_ATLASES[category.id] then
+		return CATEGORY_ICON_ATLASES[category.id], true
 	end
 	local iconKey = category and CATEGORY_ICON_KEYS[category.id]
 	return ICON_TEXTURES[iconKey or "advanced"] or FALLBACK_ICON
@@ -809,13 +822,13 @@ end
 
 local function getDashboardIconSize(iconSource)
 	if iconSource == SETTINGS_QUICK_REFERENCE_ICON then
-		return 58, 60
+		return 48, 50
 	elseif iconSource == SETTINGS_EXPORT_IMPORT_ICON then
-		return 58, 64
+		return 48, 54
 	elseif iconSource == SETTINGS_REVERT_ICON then
-		return 58, 66
+		return 48, 56
 	end
-	return 58, 58
+	return 48, 48
 end
 
 local function createDashboardIcon(parent, iconSource)
@@ -869,26 +882,31 @@ local function setDashboardCardBorder(card, borderColor)
 	card.BorderRight:SetColorTexture(borderColor[1], borderColor[2], borderColor[3], borderColor[4])
 end
 
-local function addDashboardCard(row, index, title, description, iconSource, onClick)
-	local card = createGridCard({ contentWidth = row.contentWidth or CONTENT_WIDTH }, row, index, 2, 96)
-	applyDashboardCardBackground(card, DASHBOARD_CARD_BG)
-	setDashboardCardBorder(card, DASHBOARD_CARD_BORDER)
-	if onClick then
-		card:SetScript("OnMouseUp", onClick)
-	end
-	card:SetScript("OnEnter", function(self)
+local function styleDashboardTile(tile)
+	applyDashboardCardBackground(tile, DASHBOARD_CARD_BG)
+	setDashboardCardBorder(tile, DASHBOARD_CARD_BORDER)
+	tile:EnableMouse(true)
+	tile:SetScript("OnEnter", function(self)
 		applyDashboardCardBackground(self, DASHBOARD_CARD_BG_HOVER)
 		setDashboardCardBorder(self, CARD_BORDER_HOVER)
 	end)
-	card:SetScript("OnLeave", function(self)
+	tile:SetScript("OnLeave", function(self)
 		applyDashboardCardBackground(self, DASHBOARD_CARD_BG)
 		setDashboardCardBorder(self, DASHBOARD_CARD_BORDER)
 	end)
+end
+
+local function addDashboardCard(row, index, title, description, iconSource, onClick)
+	local card = createGridCard({ contentWidth = row.contentWidth or CONTENT_WIDTH }, row, index, 2, 96)
+	styleDashboardTile(card)
+	if onClick then
+		card:SetScript("OnMouseUp", onClick)
+	end
 	local icon = createDashboardIcon(card, iconSource)
 	icon:SetPoint("LEFT", card, "LEFT", 24, 0)
 
 	local titleText = createText(card, FONT_TITLE, title or "", WHITE)
-	titleText:SetPoint("TOPLEFT", icon, "TOPRIGHT", 22, -6)
+	titleText:SetPoint("TOPLEFT", icon, "TOPRIGHT", 18, -6)
 	titleText:SetPoint("RIGHT", card, "RIGHT", -18, 0)
 	titleText:SetHeight(24)
 
@@ -899,15 +917,15 @@ local function addDashboardCard(row, index, title, description, iconSource, onCl
 end
 
 local function addDashboardHero(state, title, subtitle)
-	local hero = createContentFrame(state, 128)
+	local hero = createContentFrame(state, 138)
 
 	local titleText = createText(hero, FONT_HERO, title or "", WHITE)
 	titleText:SetPoint("TOPLEFT", hero, "TOPLEFT", 4, -10)
 	titleText:SetPoint("RIGHT", hero, "RIGHT", -146, 0)
-	titleText:SetHeight(36)
+	titleText:SetHeight(42)
 
 	local subText = createText(hero, FONT_TEXT, subtitle or "", MUTED)
-	subText:SetPoint("TOPLEFT", titleText, "BOTTOMLEFT", 0, -10)
+	subText:SetPoint("TOPLEFT", titleText, "BOTTOMLEFT", 0, -9)
 	subText:SetPoint("RIGHT", hero, "RIGHT", -166, 0)
 	subText:SetHeight(48)
 
@@ -916,6 +934,101 @@ local function addDashboardHero(state, title, subtitle)
 	icon:SetPoint("RIGHT", hero, "RIGHT", -36, -4)
 	state.y = state.y - 8
 	return hero
+end
+
+local function getOptionalNumber(app, key)
+	local value = app.opts and app.opts[key]
+	value = type(value) == "function" and value() or value
+	value = tonumber(value)
+	return value
+end
+
+local function addDashboardStatusTile(parent, index, iconSource, iconAtlas, title, value)
+	local width = math.floor((parent.tileWidth or 160))
+	local tile = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+	tile:SetSize(width, 72)
+	tile:SetPoint("TOPLEFT", parent, "TOPLEFT", 14 + ((index - 1) * (width + GRID_GAP)), -44)
+	styleDashboardTile(tile)
+
+	local icon = tile:CreateTexture(nil, "OVERLAY")
+	icon:SetSize(32, 32)
+	icon:SetPoint("LEFT", tile, "LEFT", 14, -1)
+	if iconAtlas and icon.SetAtlas then
+		local hasAtlas = not C_Texture or not C_Texture.GetAtlasInfo or C_Texture.GetAtlasInfo(iconAtlas)
+		local ok = hasAtlas and pcall(icon.SetAtlas, icon, iconAtlas, false)
+		if not ok then
+			icon:SetTexture(iconSource or FALLBACK_ICON)
+		end
+	else
+		icon:SetTexture(iconSource or FALLBACK_ICON)
+	end
+
+	local titleText = createText(tile, FONT_MUTED, title or "", GOLD)
+	titleText:SetPoint("TOPLEFT", icon, "TOPRIGHT", 12, 4)
+	titleText:SetPoint("RIGHT", tile, "RIGHT", -10, 0)
+	titleText:SetHeight(28)
+	titleText.Text:SetWordWrap(true)
+
+	local valueText = createText(tile, FONT_TITLE, tostring(value or ""), WHITE)
+	valueText:SetPoint("TOPLEFT", icon, "TOPRIGHT", 12, -27)
+	valueText:SetPoint("RIGHT", tile, "RIGHT", -10, 0)
+	valueText:SetHeight(26)
+	return tile
+end
+
+local function addDashboardStatusPanel(state, stats)
+	local app = state.app
+	local L = getLocale(app)
+	local tiles = {
+		{
+			icon = STATUS_ENABLED_ICON,
+			title = L["configCenterEnabledFeatures"] or "Enabled features",
+			value = tostring(stats.enabled) .. " / " .. tostring(stats.controls),
+		},
+	}
+
+	local profileCount = getOptionalNumber(app, "profileCount")
+	if profileCount then
+		tiles[#tiles + 1] = {
+			icon = STATUS_PROFILE_ICON,
+			title = L["Profiles"] or "Profiles",
+			value = tostring(profileCount),
+		}
+	end
+
+	local version = app.opts and app.opts.version
+	version = type(version) == "function" and version() or version
+	if version then
+		tiles[#tiles + 1] = {
+			atlas = STATUS_VERSION_ATLAS,
+			title = L["configCenterVersion"] or "Version",
+			value = tostring(version),
+		}
+	end
+
+	local newCount = getOptionalNumber(app, "newCount")
+	if newCount and newCount > 0 then
+		tiles[#tiles + 1] = {
+			atlas = STATUS_NEW_ATLAS,
+			title = L["configCenterNewInVersion"] or "New in this Version",
+			value = tostring(newCount),
+		}
+	end
+
+	local panel = createContentFrame(state, 130)
+	applyBackdrop(panel, { 0.070, 0.068, 0.060, 0.90 }, DASHBOARD_CARD_BORDER)
+	local title = createText(panel, FONT_TITLE, L["configCenterAddOnStatus"] or (_G.STATUS or "Status"), GOLD)
+	title:SetPoint("TOPLEFT", panel, "TOPLEFT", 14, -13)
+	title:SetPoint("RIGHT", panel, "RIGHT", -14, 0)
+	title:SetHeight(24)
+
+	local contentWidth = state.contentWidth or CONTENT_WIDTH
+	panel.tileWidth = math.floor((contentWidth - 28 - ((#tiles - 1) * GRID_GAP)) / math.max(#tiles, 1))
+	for index, tile in ipairs(tiles) do
+		addDashboardStatusTile(panel, index, tile.icon, tile.atlas, tile.title, tile.value)
+	end
+	state.y = state.y - 12
+	return panel
 end
 
 local function addConfigureFallback(row, app, control, text)
@@ -1335,7 +1448,7 @@ local function renderDashboard(state)
 	addDashboardHero(
 		state,
 		L["configCenterTitle"] or (getAppTitle(app) .. " Settings"),
-		L["configCenterIntro"] or "A modern overview of your settings, quick actions, and enabled features."
+		L["configCenterIntro"] or DEFAULT_DASHBOARD_INTRO
 	)
 
 	local quickRow = createGridRow(state, 96)
@@ -1374,35 +1487,7 @@ local function renderDashboard(state)
 		ICON_TEXTURES.reset
 	)
 
-	local status = createContentFrame(state, 76)
-	applyBackdrop(status, CARD_BG, CARD_BORDER)
-	local statusTitle = createText(status, FONT_HEADER, L["configCenterAddOnStatus"] or (_G.STATUS or "Status"), GOLD)
-	statusTitle:SetPoint("TOPLEFT", status, "TOPLEFT", 14, -11)
-	statusTitle:SetSize(220, 20)
-
-	local allSettingsLabel = (L["configCenterAllSettings"] or "All settings") .. ": " .. tostring(stats.controls)
-	local allSettings = addStatusChip(status, allSettingsLabel, GOLD, 170)
-	allSettings:SetPoint("BOTTOMLEFT", status, "BOTTOMLEFT", 14, 13)
-	local enabledLabel = (L["configCenterEnabledFeatures"] or "Enabled features") .. ": " .. tostring(stats.enabled)
-	local enabled = addStatusChip(status, enabledLabel, GREEN, 190)
-	enabled:SetPoint("LEFT", allSettings, "RIGHT", 10, 0)
-	local version = app.opts and app.opts.version
-	version = type(version) == "function" and version() or version
-	local previousChip = enabled
-	if version then
-		local versionLabel = (L["configCenterVersion"] or "Version") .. ": " .. tostring(version)
-		local versionChip = addStatusChip(status, versionLabel, WARNING, 138)
-		versionChip:SetPoint("LEFT", previousChip, "RIGHT", 10, 0)
-		previousChip = versionChip
-	end
-	local newCount = app.opts and app.opts.newCount
-	newCount = type(newCount) == "function" and newCount() or newCount
-	if tonumber(newCount) and tonumber(newCount) > 0 then
-		local newLabel = (L["configCenterNewInVersion"] or "New in this Version") .. ": " .. tostring(newCount)
-		local newChip = addStatusChip(status, newLabel, GOLD, 160)
-		newChip:SetPoint("LEFT", previousChip, "RIGHT", 10, 0)
-	end
-	state.y = state.y - 12
+	addDashboardStatusPanel(state, stats)
 
 	local enabledPages = collectEnabledPages(app, 5)
 	local panelRow = createContentFrame(state, 250)

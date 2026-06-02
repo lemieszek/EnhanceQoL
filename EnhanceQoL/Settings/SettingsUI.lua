@@ -48,6 +48,15 @@ local function ensureConfigApp()
 			end
 			return count
 		end,
+		profileCount = function()
+			local count = 0
+			if EnhanceQoLDB and type(EnhanceQoLDB.profiles) == "table" then
+				for profileName in pairs(EnhanceQoLDB.profiles) do
+					if type(profileName) == "string" and profileName ~= "" then count = count + 1 end
+				end
+			end
+			return count
+		end,
 		openLegacySettings = function()
 			if Settings and Settings.OpenToCategory and addon.SettingsLayout and addon.SettingsLayout.rootCategory then
 				Settings.OpenToCategory(addon.SettingsLayout.rootCategory:GetID())
