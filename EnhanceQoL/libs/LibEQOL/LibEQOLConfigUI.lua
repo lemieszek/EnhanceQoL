@@ -33,7 +33,7 @@ local DEFAULT_DASHBOARD_INTRO = "Welcome! EnhanceQoL improves your World of Warc
 
 local PANEL_BG = { 0.055, 0.049, 0.043, 0.94 }
 local PANEL_BORDER = { 0.43, 0.34, 0.19, 0.74 }
-local TOPBAR_BG = { 0.075, 0.064, 0.049, 0.96 }
+local TOPBAR_BG = { 0.105, 0.095, 0.078, 0.97 }
 local CONTENT_BG = { 0.035, 0.033, 0.031, 0.88 }
 local CARD_BG = { 0.080, 0.073, 0.061, 0.92 }
 local CARD_BG_HOVER = { 0.125, 0.101, 0.062, 0.98 }
@@ -47,6 +47,7 @@ local SIDEBAR_BG = { 0.030, 0.031, 0.030, 0.78 }
 local MUTED = { 0.67, 0.64, 0.58 }
 local WHITE = { 0.94, 0.91, 0.84 }
 local GOLD = { 1.0, 0.82, 0.36 }
+local TOPBAR_GOLD = { 1.0, 0.84, 0.36 }
 local GREEN = { 0.36, 0.82, 0.36 }
 
 local FALLBACK_ICON = "Interface\\Icons\\INV_Misc_Gear_01"
@@ -283,7 +284,7 @@ local function applyHoverState(frame, normalBg, hoverBg, normalBorder, hoverBord
 end
 
 local function getAddonIcon(app)
-	return app and app.opts and app.opts.icon or FALLBACK_ICON
+	return app and app.opts and app.opts.icon or SETTINGS_COG_ICON
 end
 
 local function getKeywordIconKey(text)
@@ -897,7 +898,7 @@ local function styleDashboardTile(tile)
 end
 
 local function addDashboardCard(row, index, title, description, iconSource, onClick)
-	local card = createGridCard({ contentWidth = row.contentWidth or CONTENT_WIDTH }, row, index, 2, 96)
+	local card = createGridCard({ contentWidth = row.contentWidth or CONTENT_WIDTH }, row, index, 2, 108)
 	styleDashboardTile(card)
 	if onClick then
 		card:SetScript("OnMouseUp", onClick)
@@ -912,7 +913,9 @@ local function addDashboardCard(row, index, title, description, iconSource, onCl
 
 	local desc = createText(card, FONT_TEXT, description or "", MUTED)
 	desc:SetPoint("TOPLEFT", titleText, "BOTTOMLEFT", 0, -7)
-	desc:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -18, 15)
+	desc:SetPoint("RIGHT", card, "RIGHT", -18, 0)
+	desc:SetHeight(42)
+	desc.Text:SetWordWrap(true)
 	return card
 end
 
@@ -943,7 +946,22 @@ local function getOptionalNumber(app, key)
 	return value
 end
 
-local function addDashboardStatusTile(parent, index, iconSource, iconAtlas, title, value)
+local function splitVersionBadge(version)
+	version = tostring(version or "")
+	local base, suffix = version:match("^(.-)%-beta([%w%.%-]*)$")
+	if base and base ~= "" then
+		local number = tostring(suffix or ""):match("^(%d+)")
+		return base, number and ("Beta " .. number) or "Beta"
+	end
+	base, suffix = version:match("^(.-)%-alpha([%w%.%-]*)$")
+	if base and base ~= "" then
+		local number = tostring(suffix or ""):match("^(%d+)")
+		return base, number and ("Alpha " .. number) or "Alpha"
+	end
+	return version, nil
+end
+
+local function addDashboardStatusTile(parent, index, iconSource, iconAtlas, title, value, badge)
 	local width = math.floor((parent.tileWidth or 160))
 	local tile = CreateFrame("Frame", nil, parent, "BackdropTemplate")
 	tile:SetSize(width, 72)
@@ -965,9 +983,14 @@ local function addDashboardStatusTile(parent, index, iconSource, iconAtlas, titl
 
 	local titleText = createText(tile, FONT_MUTED, title or "", GOLD)
 	titleText:SetPoint("TOPLEFT", icon, "TOPRIGHT", 12, 4)
-	titleText:SetPoint("RIGHT", tile, "RIGHT", -10, 0)
+	titleText:SetPoint("RIGHT", tile, "RIGHT", badge and -60 or -10, 0)
 	titleText:SetHeight(28)
 	titleText.Text:SetWordWrap(true)
+
+	if badge and badge ~= "" then
+		local badgeFrame = addStatusChip(tile, badge, GOLD, 54)
+		badgeFrame:SetPoint("TOPRIGHT", tile, "TOPRIGHT", -8, -11)
+	end
 
 	local valueText = createText(tile, FONT_TITLE, tostring(value or ""), WHITE)
 	valueText:SetPoint("TOPLEFT", icon, "TOPRIGHT", 12, -27)
@@ -999,10 +1022,12 @@ local function addDashboardStatusPanel(state, stats)
 	local version = app.opts and app.opts.version
 	version = type(version) == "function" and version() or version
 	if version then
+		local versionValue, versionBadge = splitVersionBadge(version)
 		tiles[#tiles + 1] = {
 			atlas = STATUS_VERSION_ATLAS,
 			title = L["configCenterVersion"] or "Version",
-			value = tostring(version),
+			value = versionValue,
+			badge = versionBadge,
 		}
 	end
 
@@ -1025,7 +1050,7 @@ local function addDashboardStatusPanel(state, stats)
 	local contentWidth = state.contentWidth or CONTENT_WIDTH
 	panel.tileWidth = math.floor((contentWidth - 28 - ((#tiles - 1) * GRID_GAP)) / math.max(#tiles, 1))
 	for index, tile in ipairs(tiles) do
-		addDashboardStatusTile(panel, index, tile.icon, tile.atlas, tile.title, tile.value)
+		addDashboardStatusTile(panel, index, tile.icon, tile.atlas, tile.title, tile.value, tile.badge)
 	end
 	state.y = state.y - 12
 	return panel
@@ -1451,7 +1476,7 @@ local function renderDashboard(state)
 		L["configCenterIntro"] or DEFAULT_DASHBOARD_INTRO
 	)
 
-	local quickRow = createGridRow(state, 96)
+	local quickRow = createGridRow(state, 108)
 	local legacyLabel = L["configCenterLegacyBlizzard"] or "Legacy Blizzard Settings"
 	addDashboardCard(
 		quickRow,
@@ -1471,7 +1496,7 @@ local function renderDashboard(state)
 		end
 	)
 
-	local quickRow2 = createGridRow(state, 96)
+	local quickRow2 = createGridRow(state, 108)
 	addDashboardCard(
 		quickRow2,
 		1,
@@ -2045,34 +2070,71 @@ local function createFrame(app)
 	frame.TopBarAccent:SetPoint("BOTTOMRIGHT", frame.TopBar, "BOTTOMRIGHT", -10, 0)
 	frame.TopBarAccent:SetHeight(1)
 
-	frame.HeaderIcon = createIconPlate(frame.TopBar, getAddonIcon(app), 34, false)
+	frame.HeaderIcon = createIcon(frame.TopBar, getAddonIcon(app), 32, false)
 	frame.HeaderIcon:SetPoint("LEFT", frame.TopBar, "LEFT", 12, 0)
 
-	frame.Title = frame:CreateFontString(nil, "OVERLAY", FONT_TITLE)
+	frame.Title = frame.TopBar:CreateFontString(nil, "OVERLAY", FONT_TITLE)
 	frame.Title:SetPoint("LEFT", frame.HeaderIcon, "RIGHT", 10, 0)
 	frame.Title:SetPoint("RIGHT", frame.TopBar, "RIGHT", -470, 0)
 	frame.Title:SetJustifyH("LEFT")
 	frame.Title:SetText(L["configCenterTitle"] or (getAppTitle(app) .. " Settings"))
-	setTextColor(frame.Title, GOLD)
+	frame.Title:SetShadowColor(0, 0, 0, 0.95)
+	frame.Title:SetShadowOffset(1, -1)
+	setTextColor(frame.Title, TOPBAR_GOLD)
 
-	frame.ResetButton = makeFlatButton(frame, _G.DEFAULTS or _G.RESET or "Defaults", 104, 28)
+	frame.ResetButton = makeFlatButton(frame.TopBar, _G.DEFAULTS or _G.RESET or "Defaults", 104, 28)
 	frame.ResetButton:SetPoint("RIGHT", frame.TopBar, "RIGHT", -46, 0)
+	setFrameBackdrop(frame.ResetButton, { 0.120, 0.105, 0.075, 0.95 }, { 0.55, 0.42, 0.18, 0.82 })
+	setTextColor(frame.ResetButton.Text, TOPBAR_GOLD)
+	frame.ResetButton:SetScript("OnEnter", function(self)
+		setFrameBackdrop(self, { 0.165, 0.135, 0.080, 0.98 }, CARD_BORDER_HOVER)
+	end)
+	frame.ResetButton:SetScript("OnLeave", function(self)
+		setFrameBackdrop(self, { 0.120, 0.105, 0.075, 0.95 }, { 0.55, 0.42, 0.18, 0.82 })
+	end)
 
-	frame.SearchBox = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
+	frame.SearchShell = CreateFrame("Frame", nil, frame.TopBar, "BackdropTemplate")
+	frame.SearchShell:SetSize(286, 28)
+	frame.SearchShell:SetPoint("RIGHT", frame.ResetButton, "LEFT", -12, 0)
+	applyBackdrop(frame.SearchShell, { 0.035, 0.034, 0.032, 0.95 }, { 0.30, 0.28, 0.22, 0.90 })
+
+	frame.SearchIcon = frame.SearchShell:CreateTexture(nil, "OVERLAY")
+	frame.SearchIcon:SetSize(15, 15)
+	frame.SearchIcon:SetPoint("LEFT", frame.SearchShell, "LEFT", 10, 0)
+	if frame.SearchIcon.SetAtlas then
+		local ok = pcall(frame.SearchIcon.SetAtlas, frame.SearchIcon, "common-search-magnifyingglass", false)
+		if not ok then
+			frame.SearchIcon:SetTexture("Interface\\Common\\UI-Searchbox-Icon")
+		end
+	else
+		frame.SearchIcon:SetTexture("Interface\\Common\\UI-Searchbox-Icon")
+	end
+	frame.SearchIcon:SetAlpha(0.72)
+
+	frame.SearchBox = CreateFrame("EditBox", nil, frame.SearchShell, "InputBoxTemplate")
 	frame.SearchBox:SetSize(286, 28)
-	frame.SearchBox:SetPoint("RIGHT", frame.ResetButton, "LEFT", -12, 0)
+	frame.SearchBox:SetPoint("CENTER", frame.SearchShell, "CENTER", 0, 0)
 	frame.SearchBox:SetAutoFocus(false)
+	if frame.SearchBox.SetTextInsets then
+		frame.SearchBox:SetTextInsets(34, 28, 0, 0)
+	end
+	for _, regionKey in ipairs({ "Left", "Middle", "Right", "LeftTex", "MiddleTex", "RightTex" }) do
+		local region = frame.SearchBox[regionKey]
+		if region and region.SetAlpha then
+			region:SetAlpha(0)
+		end
+	end
 	frame.SearchBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
 	frame.SearchBox:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
 
-	frame.SearchPlaceholder = frame:CreateFontString(nil, "OVERLAY", FONT_MUTED)
-	frame.SearchPlaceholder:SetPoint("LEFT", frame.SearchBox, "LEFT", 10, 1)
+	frame.SearchPlaceholder = frame.SearchShell:CreateFontString(nil, "OVERLAY", FONT_MUTED)
+	frame.SearchPlaceholder:SetPoint("LEFT", frame.SearchBox, "LEFT", 34, 1)
 	frame.SearchPlaceholder:SetPoint("RIGHT", frame.SearchBox, "RIGHT", -30, 1)
 	frame.SearchPlaceholder:SetJustifyH("LEFT")
 	frame.SearchPlaceholder:SetText((L["configCenterSearchPlaceholder"] or "Search settings") .. "...")
-	setTextColor(frame.SearchPlaceholder, MUTED)
+	setTextColor(frame.SearchPlaceholder, { 0.62, 0.60, 0.56, 0.92 })
 
-	frame.SearchClearButton = makeFlatButton(frame, "x", 24, 22)
+	frame.SearchClearButton = makeFlatButton(frame.SearchShell, "x", 24, 22)
 	frame.SearchClearButton:SetPoint("RIGHT", frame.SearchBox, "RIGHT", -4, 0)
 	frame.SearchClearButton:SetScript("OnClick", function()
 		frame.SearchBox:SetText("")
