@@ -822,10 +822,3 @@ addon.SettingsLayout.rootCategory = cat
 addon.SettingsLayout.rootLayout = layout
 
 ensureConfigApp()
-addon.functions.SettingsCreateButton(cat, {
-	var = "configCenterOpenButton",
-	label = L["configCenterOpen"] or "Open EnhanceQoL Settings",
-	text = L["configCenterOpen"] or "Open EnhanceQoL Settings",
-	desc = L["configCenterOpenDesc"] or "Opens the modern EnhanceQoL settings center.",
-	func = function() addon.functions.OpenConfigCenter() end,
-})
