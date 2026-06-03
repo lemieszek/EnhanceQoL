@@ -34,7 +34,7 @@ local PAGE_LAYOUT = {
 	detailNavGap = 8,
 	scrollInset = 8,
 	scrollBottomPad = 20,
-	sidePanelTopOffset = 88,
+	sidePanelTopOffset = 56,
 }
 local GRID_GAP = 12
 local STATUS_TILE_HEIGHT = 72
@@ -949,8 +949,8 @@ local function updateContentMetrics(state)
 		if scrollBar and scrollBar.ClearAllPoints and scrollBar.SetPoint then
 			scrollBar:ClearAllPoints()
 			if state.view == "page" and useSidePanel then
-				scrollBar:SetPoint("TOPLEFT", state.frame.Scroll, "TOPRIGHT", PAGE_LAYOUT.scrollbarOffset, -16)
-				scrollBar:SetPoint("BOTTOMLEFT", state.frame.Scroll, "BOTTOMRIGHT", PAGE_LAYOUT.scrollbarOffset, 16)
+				scrollBar:SetPoint("TOPLEFT", state.frame.Scroll, "TOPRIGHT", PAGE_LAYOUT.scrollbarOffset, 0)
+				scrollBar:SetPoint("BOTTOMLEFT", state.frame.Scroll, "BOTTOMRIGHT", PAGE_LAYOUT.scrollbarOffset, 0)
 			else
 				scrollBar:SetPoint("TOPRIGHT", state.frame.Scroll, "TOPRIGHT", -2, -16)
 				scrollBar:SetPoint("BOTTOMRIGHT", state.frame.Scroll, "BOTTOMRIGHT", -2, 16)
@@ -2259,9 +2259,9 @@ local function addPageScrollbarRail(state)
 		return nil
 	end
 	local rail = trackFrame(state.fixedFrames, CreateFrame("Frame", nil, state.frame.ContentShell, "BackdropTemplate"))
-	rail:SetPoint("TOPLEFT", state.frame.Scroll, "TOPRIGHT", PAGE_LAYOUT.scrollbarOffset - 2, -16)
-	rail:SetPoint("BOTTOMLEFT", state.frame.Scroll, "BOTTOMRIGHT", PAGE_LAYOUT.scrollbarOffset - 2, 16)
-	rail:SetWidth(math.max(16, PAGE_LAYOUT.scrollbarGutter - 6))
+	rail:SetPoint("TOPLEFT", state.frame.Scroll, "TOPRIGHT", PAGE_LAYOUT.scrollbarOffset, 0)
+	rail:SetPoint("BOTTOMLEFT", state.frame.Scroll, "BOTTOMRIGHT", PAGE_LAYOUT.scrollbarOffset, 0)
+	rail:SetWidth(12)
 	applyBackdrop(rail, { 0.038, 0.034, 0.026, 0.58 }, { 0.48, 0.38, 0.22, 0.54 })
 	if state.frame.Scroll and rail.SetFrameLevel and state.frame.Scroll.GetFrameLevel then
 		rail:SetFrameLevel(math.max(0, (state.frame.Scroll:GetFrameLevel() or 1) - 1))
@@ -2300,7 +2300,7 @@ local function addPageFixedHeader(state, category, pagePath)
 	local breadcrumb = createText(header, FONT_MUTED, pagePath, MUTED)
 	breadcrumb:SetPoint("LEFT", backButton, "RIGHT", 12, 0)
 	breadcrumb:SetPoint("RIGHT", header, "RIGHT", -4, 0)
-	breadcrumb:SetPoint("TOP", backButton, "TOP", 0, -2)
+	breadcrumb:SetPoint("CENTER", backButton, "CENTER", 0, 0)
 	breadcrumb:SetHeight(20)
 	return header
 end
@@ -2389,9 +2389,13 @@ local function addGroupSection(state, group, pagePath)
 
 	if not collapsed then
 		local y = -46
-		for _, control in ipairs(group.controls) do
+		for index, control in ipairs(group.controls) do
 			local rowHeight = getSettingRowHeight(control)
-			addSettingRow(state, control, pagePath, section, y, (state.pageSectionWidth or state.pageLeftWidth or 420) - 24)
+			local rowWidth = (state.pageSectionWidth or state.pageLeftWidth or 420) - 24
+			local row = addSettingRow(state, control, pagePath, section, y, rowWidth)
+			if index == #group.controls and row.Separator then
+				row.Separator:Hide()
+			end
 			y = y - rowHeight - 2
 		end
 	end
