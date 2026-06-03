@@ -890,6 +890,8 @@ local function updateContentMetrics(state)
 	local fallbackWidth = CONTENT_WIDTH
 	local usableShellWidth = math.max(1, math.floor(shellWidth > 0 and shellWidth or fallbackWidth))
 	local useSidePanel = state.view == "page"
+	local useContentGutter = state.view == "category"
+	local useDetachedScrollbar = useSidePanel or useContentGutter
 	local pageRightWidth = 0
 	local leftOuterWidth = usableShellWidth - (PAGE_LAYOUT.contentPad * 2)
 	local leftScrollWidth = leftOuterWidth
@@ -936,6 +938,14 @@ local function updateContentMetrics(state)
 				-(PAGE_LAYOUT.contentPad + pageRightWidth + PAGE_GAP + PAGE_LAYOUT.scrollbarGutter),
 				scrollBottomOffset
 			)
+		elseif useContentGutter then
+			state.frame.Scroll:SetPoint(
+				"BOTTOMRIGHT",
+				state.frame.ContentShell,
+				"BOTTOMRIGHT",
+				-(PAGE_LAYOUT.contentPad + PAGE_LAYOUT.scrollbarGutter),
+				scrollBottomOffset
+			)
 		else
 			state.frame.Scroll:SetPoint(
 				"BOTTOMRIGHT",
@@ -948,7 +958,7 @@ local function updateContentMetrics(state)
 		local scrollBar = getScrollBar(state.frame.Scroll)
 		if scrollBar and scrollBar.ClearAllPoints and scrollBar.SetPoint then
 			scrollBar:ClearAllPoints()
-			if state.view == "page" and useSidePanel then
+			if useDetachedScrollbar then
 				scrollBar:SetPoint("TOPLEFT", state.frame.Scroll, "TOPRIGHT", PAGE_LAYOUT.scrollbarOffset, 0)
 				scrollBar:SetPoint("BOTTOMLEFT", state.frame.Scroll, "BOTTOMRIGHT", PAGE_LAYOUT.scrollbarOffset, 0)
 			else
@@ -961,6 +971,8 @@ local function updateContentMetrics(state)
 	local width
 	if state.view == "page" and useSidePanel then
 		width = pageViewportWidth
+	elseif useContentGutter then
+		width = usableShellWidth - (PAGE_LAYOUT.contentPad * 2) - PAGE_LAYOUT.scrollbarGutter
 	else
 		width = usableShellWidth - (PAGE_LAYOUT.contentPad * 2)
 	end
@@ -1013,7 +1025,11 @@ updateScrollFrameVisibility = function(scrollFrame)
 	local scrollBar = getScrollBar(scrollFrame)
 	if not scrollBar or not scrollBar.SetShown then return end
 	local range = scrollFrame.GetVerticalScrollRange and scrollFrame:GetVerticalScrollRange() or 0
-	scrollBar:SetShown(range and range > 1)
+	local shown = range and range > 1
+	scrollBar:SetShown(shown)
+	if scrollFrame._EQOLScrollRail and scrollFrame._EQOLScrollRail.SetShown then
+		scrollFrame._EQOLScrollRail:SetShown(shown)
+	end
 end
 
 local function clearContent(state)
@@ -1022,6 +1038,9 @@ local function clearContent(state)
 end
 
 local function clearFixedContent(state)
+	if state.frame and state.frame.Scroll then
+		state.frame.Scroll._EQOLScrollRail = nil
+	end
 	clearFrameList(state.fixedFrames)
 end
 
@@ -2160,6 +2179,8 @@ local function renderDashboard(state)
 	state.y = state.y - 14
 end
 
+local addContentScrollbarRail
+
 local function renderCategoryOverview(state, categoryID)
 	local app = state.app
 	local category = app.categoriesByID[categoryID]
@@ -2167,6 +2188,7 @@ local function renderCategoryOverview(state, categoryID)
 		renderDashboard(state)
 		return
 	end
+	addContentScrollbarRail(state)
 	addSectionTitle(state, category.title or category.id, category.description)
 	local pages = app:GetPages(categoryID)
 	if #pages == 0 then
@@ -2254,8 +2276,8 @@ local function addPageLeftColumnShell(state)
 	return shell
 end
 
-local function addPageScrollbarRail(state)
-	if state.sidePanelMode ~= "right" or not state.frame.ContentShell or not state.frame.Scroll then
+function addContentScrollbarRail(state)
+	if not state.frame.ContentShell or not state.frame.Scroll then
 		return nil
 	end
 	local rail = trackFrame(state.fixedFrames, CreateFrame("Frame", nil, state.frame.ContentShell, "BackdropTemplate"))
@@ -2266,6 +2288,7 @@ local function addPageScrollbarRail(state)
 	if state.frame.Scroll and rail.SetFrameLevel and state.frame.Scroll.GetFrameLevel then
 		rail:SetFrameLevel(math.max(0, (state.frame.Scroll:GetFrameLevel() or 1) - 1))
 	end
+	state.frame.Scroll._EQOLScrollRail = rail
 	return rail
 end
 
@@ -2416,7 +2439,7 @@ local function renderPage(state, pageID)
 	if state.sidePanelMode == "right" then
 		addPageLeftColumnShell(state)
 		addPageFixedHeader(state, category, pagePath)
-		addPageScrollbarRail(state)
+		addContentScrollbarRail(state)
 		addPageSidePanel(state, page, category)
 	end
 
