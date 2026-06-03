@@ -2,6 +2,10 @@
 
 ## [11.0.0-alpha1] - 2026-06-03
 
+### ℹ️ Important
+
+- Settings: EnhanceQoL is beginning the migration from the full Blizzard Settings tree to a dedicated EnhanceQoL Settings Center with dashboard, feature pages, grouped controls, direct search, and `/eqol2` access during the alpha phase.
+
 ### ✨ Added
 
 - Settings: Added the experimental modern EnhanceQoL Settings Center, available with `/eqol2` while the legacy settings remain available through `/eqol` and the minimap button.
