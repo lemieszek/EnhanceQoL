@@ -178,6 +178,13 @@ local function registerLegacyControl(category, cbData, controlType, setting)
 		label = cbData.text or cbData.label or cbData.name,
 		description = cbData.desc,
 		default = cbData.default,
+		dbDefault = key and function()
+			local defaults = addon.dbDefaults
+			if type(defaults) == "table" and defaults[key] ~= nil then
+				return defaults[key], true
+			end
+			return nil, false
+		end or nil,
 		keywords = cbData.searchtags,
 		level = cbData.level,
 		order = type(cbData.order) == "number" and cbData.order or addon.ConfigControlOrder,

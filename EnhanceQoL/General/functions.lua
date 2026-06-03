@@ -651,7 +651,21 @@ function addon.functions.CleanupPrivateProfileData()
 	end
 end
 
+local function copyDefaultValue(value, depth)
+	depth = (depth or 0) + 1
+	if depth > 8 or type(value) ~= "table" then
+		return value
+	end
+	local copy = {}
+	for childKey, childValue in pairs(value) do
+		copy[childKey] = copyDefaultValue(childValue, depth)
+	end
+	return copy
+end
+
 function addon.functions.InitDBValue(key, defaultValue)
+	addon.dbDefaults = addon.dbDefaults or {}
+	if addon.dbDefaults[key] == nil and defaultValue ~= nil then addon.dbDefaults[key] = copyDefaultValue(defaultValue) end
 	if addon.db[key] == nil then addon.db[key] = defaultValue end
 end
 

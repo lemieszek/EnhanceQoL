@@ -93,6 +93,14 @@ local function resolveControlDefault(control)
 		end
 		return control.default, true
 	end
+	if type(control.dbDefault) == "function" then
+		local ok, value, hasDefault = pcall(control.dbDefault, control)
+		if ok and (hasDefault == true or value ~= nil) then
+			return value, true
+		end
+	elseif control.dbDefault ~= nil then
+		return control.dbDefault, true
+	end
 	if control.setting then
 		local methods = { "GetDefaultValue", "GetDefault" }
 		for _, method in ipairs(methods) do
@@ -400,6 +408,7 @@ function AppMixin:RegisterLegacyControl(data)
 		description = data.description or data.desc,
 		key = data.key or data.var,
 		default = data.default,
+		dbDefault = data.dbDefault,
 		keywords = data.keywords or data.searchtags,
 		level = data.level or "basic",
 		order = data.order,

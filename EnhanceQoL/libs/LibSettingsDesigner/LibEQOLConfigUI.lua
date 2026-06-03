@@ -85,10 +85,17 @@ local GREEN = { 0.36, 0.82, 0.36 }
 local FALLBACK_ICON = "Interface\\Icons\\INV_Misc_Gear_01"
 local ADDON_ICON = "Interface\\AddOns\\EnhanceQoL\\Icons\\Icon.tga"
 local SETTINGS_COG_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Cogwheel.tga"
+local SETTINGS_ECONOMY_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Economy.tga"
 local SETTINGS_EXPORT_IMPORT_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\ExportImport.tga"
+local SETTINGS_GAMEPLAY_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Gameplay.tga"
+local SETTINGS_GENERAL_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\General.tga"
+local SETTINGS_INTERFACE_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Interface.tga"
+local SETTINGS_PROFILES_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Profiles.tga"
 local SETTINGS_QUESTION_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Question.tga"
 local SETTINGS_QUICK_REFERENCE_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\QuickReference.tga"
 local SETTINGS_REVERT_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Revert.tga"
+local SETTINGS_SOUND_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Sound.tga"
+local SETTINGS_SOCIAL_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Social.tga"
 local STATUS_ENABLED_ICON = "Interface\\RaidFrame\\ReadyCheck-Ready"
 local STATUS_PROFILE_ICON = "Interface\\Icons\\INV_Misc_GroupNeedMore"
 local STATUS_VERSION_ATLAS = "worldquest-tracker-questmarker"
@@ -107,21 +114,22 @@ local ICON_TEXTURES = {
 	diagnostics = "Interface\\Icons\\INV_Gizmo_02",
 	cooldown = "Interface\\Icons\\INV_Misc_PocketWatch_01",
 	dashboard = SETTINGS_COG_ICON,
-	economy = "Interface\\Icons\\INV_Misc_Coin_01",
-	gameplay = "Interface\\Icons\\Ability_DualWield",
-	general = "Interface\\Icons\\Trade_BlackSmithing",
+	economy = SETTINGS_ECONOMY_ICON,
+	gameplay = SETTINGS_GAMEPLAY_ICON,
+	general = SETTINGS_GENERAL_ICON,
 	help = SETTINGS_QUICK_REFERENCE_ICON,
-	interface = "Interface\\Icons\\INV_Misc_Monitor_01",
+	importexport = SETTINGS_EXPORT_IMPORT_ICON,
+	interface = SETTINGS_INTERFACE_ICON,
 	map = "Interface\\Icons\\INV_Misc_Map_01",
 	mover = "Interface\\Icons\\Ability_Hunter_MasterMarksman",
 	nameplate = "Interface\\Icons\\INV_Misc_Tournaments_banner_Human",
 	popups = "Interface\\Icons\\INV_Misc_Note_01",
-	profiles = SETTINGS_EXPORT_IMPORT_ICON,
+	profiles = SETTINGS_PROFILES_ICON,
 	reset = SETTINGS_REVERT_ICON,
 	resource = "Interface\\Icons\\INV_Misc_Food_100",
 	skinner = "Interface\\Icons\\INV_Misc_EngGizmos_17",
-	social = "Interface\\Icons\\INV_Misc_GroupLooking",
-	sound = "Interface\\Icons\\INV_Misc_Note_01",
+	social = SETTINGS_SOCIAL_ICON,
+	sound = SETTINGS_SOUND_ICON,
 	support = SETTINGS_QUESTION_ICON,
 	tooltip = "Interface\\Icons\\INV_Misc_Note_03",
 	unitframes = "Interface\\Icons\\INV_Misc_GroupLooking",
@@ -138,6 +146,17 @@ local CATEGORY_ICON_KEYS = {
 	profiles = "profiles",
 	social = "social",
 	sound = "sound",
+}
+
+local CATEGORY_ICON_TEXTURES = {
+	dashboard = SETTINGS_COG_ICON,
+	economy = SETTINGS_ECONOMY_ICON,
+	gameplay = SETTINGS_GAMEPLAY_ICON,
+	general = SETTINGS_GENERAL_ICON,
+	interface = SETTINGS_INTERFACE_ICON,
+	profiles = SETTINGS_PROFILES_ICON,
+	sound = SETTINGS_SOUND_ICON,
+	social = SETTINGS_SOCIAL_ICON,
 }
 
 local CATEGORY_ICON_ATLASES = {
@@ -423,6 +442,9 @@ local function getKeywordIconKey(text)
 end
 
 local function resolveCategoryIcon(category)
+	if category and CATEGORY_ICON_TEXTURES[category.id] then
+		return CATEGORY_ICON_TEXTURES[category.id]
+	end
 	if category and category.icon then
 		return category.icon
 	end
@@ -1995,7 +2017,7 @@ local function renderDashboard(state)
 		1,
 		L["configCenterImportExport"] or "Import / Export",
 		L["configCenterImportExportDesc"] or "Import or export your settings and profiles.",
-		ICON_TEXTURES.profiles
+		ICON_TEXTURES.importexport
 	)
 	addDashboardCard(
 		quickRow2,
