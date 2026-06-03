@@ -52,6 +52,7 @@ local SLIDER_ROW_HEIGHT = 88
 local SLIDER_ROW_HEIGHT_COMPACT = 72
 local COMPLEX_ROW_HEIGHT = 92
 local ROW_INSET = 14
+local SCROLL_CONTENT_INSET = 2
 local FIELD_CONTROL_LEFT = 18
 local FIELD_CONTROL_WIDTH_MIN = 260
 local FIELD_CONTROL_WIDTH_MAX = 340
@@ -355,12 +356,103 @@ end
 local function setFrameBackdrop(frame, bg, border)
 	setBackdropColor(frame, bg)
 	setBackdropBorderColor(frame, border)
+	if frame and frame.SetBorderColor then
+		frame:SetBorderColor(border)
+	end
 end
 
 local function setTextColor(fontString, color)
 	if fontString and color then
 		fontString:SetTextColor(color[1], color[2], color[3], color[4] or 1)
 	end
+end
+
+local function getEffectiveScale(frame)
+	if frame and frame.GetEffectiveScale then
+		local scale = frame:GetEffectiveScale()
+		if scale and scale > 0 then
+			return scale
+		end
+	end
+	if UIParent and UIParent.GetEffectiveScale then
+		local scale = UIParent:GetEffectiveScale()
+		if scale and scale > 0 then
+			return scale
+		end
+	end
+	return 1
+end
+
+local function snap(frame, value)
+	local numberValue = tonumber(value) or 0
+	local scale = getEffectiveScale(frame)
+	return math.floor((numberValue * scale) + 0.5) / scale
+end
+
+local function snapPoint(frame, point, relativeTo, relativePoint, x, y)
+	frame:SetPoint(point, relativeTo, relativePoint, snap(relativeTo or frame, x or 0), snap(relativeTo or frame, y or 0))
+end
+
+local function snapSize(frame, width, height)
+	frame:SetSize(snap(frame, width or 0), snap(frame, height or 0))
+end
+
+local function getPixelSize(frame)
+	return 1 / getEffectiveScale(frame)
+end
+
+local function preparePixelTexture(texture)
+	if texture.SetSnapToPixelGrid then
+		texture:SetSnapToPixelGrid(false)
+	end
+	if texture.SetTexelSnappingBias then
+		texture:SetTexelSnappingBias(0)
+	end
+end
+
+local function setPixelBorderColor(frame, color)
+	if not frame or not color then
+		return
+	end
+	local px = getPixelSize(frame)
+	for _, texture in ipairs({ frame.BorderTop, frame.BorderBottom, frame.BorderLeft, frame.BorderRight }) do
+		if texture then
+			texture:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
+		end
+	end
+	if frame.BorderTop then frame.BorderTop:SetHeight(px) end
+	if frame.BorderBottom then frame.BorderBottom:SetHeight(px) end
+	if frame.BorderLeft then frame.BorderLeft:SetWidth(px) end
+	if frame.BorderRight then frame.BorderRight:SetWidth(px) end
+end
+
+local function createPixelBorder(frame, borderColor)
+	if frame.BorderTop then
+		setPixelBorderColor(frame, borderColor)
+		return
+	end
+	frame.BorderTop = frame:CreateTexture(nil, "OVERLAY", nil, 1)
+	frame.BorderTop:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+	frame.BorderTop:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+	preparePixelTexture(frame.BorderTop)
+
+	frame.BorderBottom = frame:CreateTexture(nil, "OVERLAY", nil, 1)
+	frame.BorderBottom:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
+	frame.BorderBottom:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+	preparePixelTexture(frame.BorderBottom)
+
+	frame.BorderLeft = frame:CreateTexture(nil, "OVERLAY", nil, 1)
+	frame.BorderLeft:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+	frame.BorderLeft:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
+	preparePixelTexture(frame.BorderLeft)
+
+	frame.BorderRight = frame:CreateTexture(nil, "OVERLAY", nil, 1)
+	frame.BorderRight:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+	frame.BorderRight:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+	preparePixelTexture(frame.BorderRight)
+
+	frame.SetBorderColor = frame.SetBorderColor or setPixelBorderColor
+	setPixelBorderColor(frame, borderColor)
 end
 
 local function applyHoverState(frame, normalBg, hoverBg, normalBorder, hoverBorder)
@@ -376,6 +468,7 @@ local getControlType
 
 local function styleInlineSettingRow(row)
 	applyBackdrop(row, ROW_BG, ROW_BORDER)
+	createPixelBorder(row, ROW_BORDER)
 	row:EnableMouse(true)
 	row:SetScript("OnEnter", function(self)
 		setFrameBackdrop(self, ROW_HOVER_BG, ROW_HOVER_BORDER)
@@ -384,10 +477,11 @@ local function styleInlineSettingRow(row)
 		setFrameBackdrop(self, ROW_BG, ROW_BORDER)
 	end)
 	row.Separator = row:CreateTexture(nil, "BACKGROUND")
+	preparePixelTexture(row.Separator)
 	row.Separator:SetColorTexture(ROW_SEPARATOR[1], ROW_SEPARATOR[2], ROW_SEPARATOR[3], ROW_SEPARATOR[4])
 	row.Separator:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", ROW_INSET, 0)
 	row.Separator:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -ROW_INSET, 0)
-	row.Separator:SetHeight(1)
+	row.Separator:SetHeight(getPixelSize(row))
 end
 
 local function getControlLayoutType(control)
@@ -562,10 +656,11 @@ end
 
 local function createContentFrame(state, height)
 	local frame = trackFrame(state.contentFrames, CreateFrame("Frame", nil, state.content, "BackdropTemplate"))
-	frame:SetPoint("TOPLEFT", state.content, "TOPLEFT", 0, state.y)
-	frame:SetPoint("TOPRIGHT", state.content, "TOPRIGHT", 0, state.y)
-	frame:SetHeight(height)
-	state.y = state.y - height
+	local snappedY = snap(state.content, state.y)
+	snapPoint(frame, "TOPLEFT", state.content, "TOPLEFT", 0, snappedY)
+	snapPoint(frame, "TOPRIGHT", state.content, "TOPRIGHT", 0, snappedY)
+	frame:SetHeight(snap(frame, height))
+	state.y = snap(state.content, state.y - height)
 	return frame
 end
 
@@ -979,7 +1074,7 @@ local function updateContentMetrics(state)
 		width = usableShellWidth - (PAGE_LAYOUT.contentPad * 2)
 	end
 	local minimumWidth = state.view == "page" and PAGE_LEFT_WIDTH_MIN or 640
-	width = math.max(minimumWidth, math.floor(width))
+	width = snap(state.frame.ContentShell or state.frame, math.max(minimumWidth, math.floor(width)))
 	state.contentWidth = width
 	state.pageLeftWidth = width
 	state.content:SetWidth(width)
@@ -1085,18 +1180,21 @@ local function addInfoCard(state, title, lines, height)
 end
 
 local function createGridRow(state, height)
-	local row = createContentFrame(state, height)
-	row.contentWidth = state.contentWidth or CONTENT_WIDTH
-	row:SetWidth(row.contentWidth)
-	state.y = state.y - GRID_GAP
+	local row = trackFrame(state.contentFrames, CreateFrame("Frame", nil, state.content, "BackdropTemplate"))
+	row.contentWidth = math.max(1, (state.contentWidth or CONTENT_WIDTH) - (SCROLL_CONTENT_INSET * 2))
+	snapPoint(row, "TOPLEFT", state.content, "TOPLEFT", SCROLL_CONTENT_INSET, state.y)
+	snapPoint(row, "TOPRIGHT", state.content, "TOPRIGHT", -SCROLL_CONTENT_INSET, state.y)
+	row:SetHeight(snap(row, height))
+	state.y = snap(state.content, state.y - height - GRID_GAP)
 	return row
 end
 
 local function createGridCard(state, row, index, columns, height)
-	local width = math.floor(((state.contentWidth or CONTENT_WIDTH) - ((columns - 1) * GRID_GAP)) / columns)
+	local rowWidth = row.contentWidth or state.contentWidth or CONTENT_WIDTH
+	local width = math.floor((rowWidth - ((columns - 1) * GRID_GAP)) / columns)
 	local card = CreateFrame("Button", nil, row, "BackdropTemplate")
-	card:SetSize(width, height)
-	card:SetPoint("TOPLEFT", row, "TOPLEFT", (index - 1) * (width + GRID_GAP), 0)
+	snapSize(card, width, height)
+	snapPoint(card, "TOPLEFT", row, "TOPLEFT", (index - 1) * (width + GRID_GAP), 0)
 	applyBackdrop(card, CARD_BG, CARD_BORDER)
 	card:EnableMouse(true)
 	applyHoverState(card)
@@ -1105,9 +1203,9 @@ end
 
 local function createPageLeftFrame(state, height)
 	local frame = trackFrame(state.contentFrames, CreateFrame("Frame", nil, state.content, "BackdropTemplate"))
-	frame:SetPoint("TOPLEFT", state.content, "TOPLEFT", PAGE_LAYOUT.columnInset, state.y)
-	frame:SetSize(state.pageSectionWidth or state.pageLeftWidth or 420, height)
-	state.y = state.y - height
+	snapPoint(frame, "TOPLEFT", state.content, "TOPLEFT", PAGE_LAYOUT.columnInset, state.y)
+	snapSize(frame, state.pageSectionWidth or state.pageLeftWidth or 420, height)
+	state.y = snap(state.content, state.y - height)
 	return frame
 end
 
@@ -1154,35 +1252,8 @@ local function applyDashboardCardBackground(card, bgColor)
 	end
 end
 
-local function createDashboardCardBorder(card)
-	if card.BorderTop then return end
-	card.BorderTop = card:CreateTexture(nil, "OVERLAY", nil, 1)
-	card.BorderTop:SetPoint("TOPLEFT", card, "TOPLEFT", 0, 0)
-	card.BorderTop:SetPoint("TOPRIGHT", card, "TOPRIGHT", 0, 0)
-	card.BorderTop:SetHeight(1)
-
-	card.BorderBottom = card:CreateTexture(nil, "OVERLAY", nil, 1)
-	card.BorderBottom:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", 0, 0)
-	card.BorderBottom:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", 0, 0)
-	card.BorderBottom:SetHeight(1)
-
-	card.BorderLeft = card:CreateTexture(nil, "OVERLAY", nil, 1)
-	card.BorderLeft:SetPoint("TOPLEFT", card, "TOPLEFT", 0, 0)
-	card.BorderLeft:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", 0, 0)
-	card.BorderLeft:SetWidth(1)
-
-	card.BorderRight = card:CreateTexture(nil, "OVERLAY", nil, 1)
-	card.BorderRight:SetPoint("TOPRIGHT", card, "TOPRIGHT", 0, 0)
-	card.BorderRight:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", 0, 0)
-	card.BorderRight:SetWidth(1)
-end
-
 local function setDashboardCardBorder(card, borderColor)
-	createDashboardCardBorder(card)
-	card.BorderTop:SetColorTexture(borderColor[1], borderColor[2], borderColor[3], borderColor[4])
-	card.BorderBottom:SetColorTexture(borderColor[1], borderColor[2], borderColor[3], borderColor[4])
-	card.BorderLeft:SetColorTexture(borderColor[1], borderColor[2], borderColor[3], borderColor[4])
-	card.BorderRight:SetColorTexture(borderColor[1], borderColor[2], borderColor[3], borderColor[4])
+	createPixelBorder(card, borderColor)
 end
 
 local function styleRaisedTile(tile)
@@ -1705,8 +1776,8 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 	local row
 	if parent then
 		row = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-		row:SetPoint("TOPLEFT", parent, "TOPLEFT", 12, yOffset or -42)
-		row:SetSize(rowWidth, rowHeight)
+		snapPoint(row, "TOPLEFT", parent, "TOPLEFT", 12, yOffset or -42)
+		snapSize(row, rowWidth, rowHeight)
 	else
 		row = createContentFrame(state, rowHeight)
 		rowWidth = row:GetWidth() > 0 and row:GetWidth() or rowWidth
@@ -1851,7 +1922,7 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 
 	refreshControlRow(app, control, row)
 	if not parent then
-		state.y = state.y - 10
+		state.y = snap(state.content, state.y - 10)
 	end
 	return row
 end
@@ -2382,6 +2453,7 @@ local function addGroupSection(state, group, pagePath)
 	local height = 46 + controlsHeight + rowGap + 14
 	local section = createPageLeftFrame(state, height)
 	applyBackdrop(section, DETAIL_SECTION_BG, DETAIL_COLORS.sectionBorder)
+	createPixelBorder(section, DETAIL_COLORS.sectionBorder)
 
 	local header = CreateFrame("Button", nil, section, "BackdropTemplate")
 	header:SetPoint("TOPLEFT", section, "TOPLEFT", 0, 0)
@@ -2403,10 +2475,11 @@ local function addGroupSection(state, group, pagePath)
 		state:RenderContent()
 	end)
 	local headerLine = header:CreateTexture(nil, "OVERLAY")
+	preparePixelTexture(headerLine)
 	headerLine:SetColorTexture(ROW_SEPARATOR[1], ROW_SEPARATOR[2], ROW_SEPARATOR[3], 0.42)
 	headerLine:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", 0, 0)
 	headerLine:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", 0, 0)
-	headerLine:SetHeight(1)
+	headerLine:SetHeight(getPixelSize(header))
 
 	if not collapsed then
 		local y = -46
