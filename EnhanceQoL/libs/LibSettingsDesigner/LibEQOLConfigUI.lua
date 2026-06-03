@@ -2909,7 +2909,7 @@ local function createFrame(app)
 	frame.ContentShell = CreateFrame("Frame", nil, frame, "BackdropTemplate")
 	frame.ContentShell:SetPoint("TOPLEFT", frame.SidebarShell, "TOPRIGHT", 8, 0)
 	frame.ContentShell:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -20, 18)
-	applyBackdrop(frame.ContentShell, CONTENT_BG, { 0.24, 0.20, 0.14, 0.54 })
+	applyBackdrop(frame.ContentShell, CONTENT_BG, PANEL_BORDER)
 
 	frame.Scroll = CreateFrame("ScrollFrame", nil, frame.ContentShell, "UIPanelScrollFrameTemplate")
 	frame.Scroll:SetPoint("TOPLEFT", frame.ContentShell, "TOPLEFT", 12, -12)
