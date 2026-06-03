@@ -746,6 +746,7 @@ end
 local function createContentFrame(state, height)
 	local frame = trackFrame(state.contentFrames, CreateFrame("Frame", nil, state.content, "BackdropTemplate"))
 	local snappedY = snap(state.content, state.y)
+	frame._EQOLContentY = snappedY
 	snapPoint(frame, "TOPLEFT", state.content, "TOPLEFT", 0, snappedY)
 	snapPoint(frame, "TOPRIGHT", state.content, "TOPRIGHT", 0, snappedY)
 	frame:SetHeight(snap(frame, height))
@@ -1244,6 +1245,27 @@ local function refreshControlRow(app, control, row)
 			row.value.Text:SetText(formatControlValue(control, value))
 		end
 	end
+	for _, button in ipairs({
+		row.configureButton,
+		row.dropdownButton,
+		row.multiDropdownButton,
+		row.colorButton,
+		row.swatch,
+		row.actionButton,
+	}) do
+		if button then
+			if button.SetEnabled then
+				button:SetEnabled(enabled)
+			elseif enabled and button.Enable then
+				button:Enable()
+			elseif button.Disable then
+				button:Disable()
+			end
+			if button.EnableMouse then
+				button:EnableMouse(enabled)
+			end
+		end
+	end
 	if row.swatch and type(control.getColor) == "function" then
 		local key = control.key or control.id
 		local ok, r, g, b, a = pcall(control.getColor, key)
@@ -1294,8 +1316,10 @@ local function updateContentMetrics(state)
 	local shellWidth = state.frame.ContentShell and state.frame.ContentShell:GetWidth() or 0
 	local fallbackWidth = CONTENT_WIDTH
 	local usableShellWidth = math.max(1, math.floor(shellWidth > 0 and shellWidth or fallbackWidth))
-	local useSidePanel = state.view == "page"
-	local useContentGutter = state.view == "category" or state.view == "dashboard"
+	local query = state.frame.SearchBox and state.frame.SearchBox:GetText() or ""
+	local useSearchView = query ~= ""
+	local useSidePanel = state.view == "page" and not useSearchView
+	local useContentGutter = useSearchView or state.view == "category" or state.view == "dashboard"
 	local useDetachedScrollbar = useSidePanel or useContentGutter
 	local pageRightWidth = 0
 	local leftOuterWidth = usableShellWidth - (PAGE_LAYOUT.contentPad * 2)
@@ -1454,6 +1478,45 @@ updateScrollFrameVisibility = function(scrollFrame)
 	end
 end
 
+function lib.ScrollToControlRow(state, controlID)
+	if not controlID or not state.frame or not state.frame.Scroll then
+		return
+	end
+	for _, entry in ipairs(state.controlRows or {}) do
+		local control = entry.control
+		local row = entry.row
+		if control and row and (control.id == controlID or control.key == controlID) then
+			local y = row._EQOLContentY
+			if y then
+				local scrollFrame = state.frame.Scroll
+				local range = scrollFrame.GetVerticalScrollRange and scrollFrame:GetVerticalScrollRange() or 0
+				local target = math.max(0, math.min(range or 0, -y - 16))
+				scrollFrame:SetVerticalScroll(target)
+				local scrollBar = getScrollBar(scrollFrame)
+				if scrollBar and scrollBar.SetValue then
+					scrollBar:SetValue(target)
+				end
+			end
+			return
+		end
+	end
+end
+
+function lib.FocusPendingControl(state)
+	local controlID = state.pendingFocusControlID
+	if not controlID then
+		return
+	end
+	state.pendingFocusControlID = nil
+	if _G.C_Timer and _G.C_Timer.After then
+		_G.C_Timer.After(0, function()
+			lib.ScrollToControlRow(state, controlID)
+		end)
+	else
+		lib.ScrollToControlRow(state, controlID)
+	end
+end
+
 local function clearContent(state)
 	clearFrameList(state.contentFrames)
 	state.controlRows = {}
@@ -1508,6 +1571,7 @@ end
 local function createGridRow(state, height)
 	local row = trackFrame(state.contentFrames, CreateFrame("Frame", nil, state.content, "BackdropTemplate"))
 	row.contentWidth = math.max(1, (state.contentWidth or CONTENT_WIDTH) - (SCROLL_CONTENT_INSET * 2))
+	row._EQOLContentY = state.y
 	snapPoint(row, "TOPLEFT", state.content, "TOPLEFT", SCROLL_CONTENT_INSET, state.y)
 	snapPoint(row, "TOPRIGHT", state.content, "TOPRIGHT", -SCROLL_CONTENT_INSET, state.y)
 	row:SetHeight(snap(row, height))
@@ -1528,6 +1592,7 @@ end
 
 local function createPageLeftFrame(state, height)
 	local frame = trackFrame(state.contentFrames, CreateFrame("Frame", nil, state.content, "BackdropTemplate"))
+	frame._EQOLContentY = state.y
 	snapPoint(frame, "TOPLEFT", state.content, "TOPLEFT", PAGE_LAYOUT.columnInset, state.y)
 	snapSize(frame, state.pageSectionWidth or state.pageLeftWidth or 420, height)
 	state.y = snap(state.content, state.y - height)
@@ -1774,14 +1839,21 @@ local function addConfigureFallback(row, app, control, text, opts)
 	else
 		button:SetPoint("RIGHT", row, "RIGHT", -14, 0)
 	end
+	row.configureButton = button
 	setFrameBackdrop(button, { 0.100, 0.087, 0.064, 0.95 }, { 0.50, 0.39, 0.20, 0.78 })
 	button:SetScript("OnClick", function()
+		if not app:IsControlEnabled(control) then
+			return
+		end
 		openLegacySettingsForControl(app, control)
 	end)
 	return button
 end
 
 local function commitInputValue(app, control, editBox, row)
+	if not app:IsControlEnabled(control) then
+		return
+	end
 	local value = editBox:GetText() or ""
 	if control.numeric then
 		value = tonumber(value)
@@ -1930,6 +2002,7 @@ local function addDropdownWidget(row, app, control, opts)
 	else
 		button:SetPoint("RIGHT", row, "RIGHT", -14, 0)
 	end
+	row.dropdownButton = button
 	row.value = createText(button, FONT_TEXT, "", WHITE, "LEFT")
 	row.value:SetPoint("TOPLEFT", button, "TOPLEFT", 10, 0)
 	row.value:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -22, 0)
@@ -1938,6 +2011,9 @@ local function addDropdownWidget(row, app, control, opts)
 	local arrow = createDropdownArrow(button, app, 12)
 	arrow:SetPoint("RIGHT", button, "RIGHT", -8, 0)
 	button:SetScript("OnClick", function(owner)
+		if not app:IsControlEnabled(control) then
+			return
+		end
 		MenuUtil.CreateContextMenu(owner, function(_, rootDescription)
 			local function getCurrentValue()
 				if opts.getValue then
@@ -1976,6 +2052,7 @@ local function addMultiDropdownWidget(row, app, control, opts)
 	else
 		button:SetPoint("RIGHT", row, "RIGHT", -14, 0)
 	end
+	row.multiDropdownButton = button
 	row.value = createText(button, FONT_TEXT, "", WHITE, "LEFT")
 	row.value:SetPoint("TOPLEFT", button, "TOPLEFT", 10, 0)
 	row.value:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -22, 0)
@@ -1989,6 +2066,9 @@ local function addMultiDropdownWidget(row, app, control, opts)
 	end
 
 	button:SetScript("OnClick", function(owner)
+		if not app:IsControlEnabled(control) then
+			return
+		end
 		MenuUtil.CreateContextMenu(owner, function(_, rootDescription)
 			for _, option in ipairs(getControlOptions(control)) do
 				local function isSelected(value)
@@ -2124,7 +2204,11 @@ local function addColorWidget(row, app, control, opts)
 
 	local button = makeFlatButton(row, _G.CHANGE or "Change", 92, 26)
 	button:SetPoint("LEFT", row.hexText, "RIGHT", 10, 0)
+	row.colorButton = button
 	local function openPicker()
+		if not app:IsControlEnabled(control) then
+			return
+		end
 		local key = control.key or control.id
 		local ok, r, g, b, a = pcall(control.getColor, key)
 		if not ok then
@@ -2254,12 +2338,6 @@ local function addColorOverridesWidget(row, app, control, opts)
 				})
 			end
 
-			item:SetScript("OnEnter", function(self)
-				setFrameBackdrop(self, CARD_BG_HOVER, CARD_BORDER_HOVER)
-			end)
-			item:SetScript("OnLeave", function(self)
-				setFrameBackdrop(self, { 0.045, 0.040, 0.032, 0.70 }, { 0.20, 0.16, 0.10, 0.45 })
-			end)
 		item:SetScript("OnClick", openPicker)
 		item.Swatch:SetScript("OnClick", openPicker)
 		row.colorOverrideSwatches[#row.colorOverrideSwatches + 1] = item
@@ -2273,7 +2351,9 @@ local function addColorOverridesWidget(row, app, control, opts)
 			if not ok then
 				r, g, b, a = 1, 1, 1, 1
 			end
-			item:SetAlpha(1)
+			item:SetAlpha(enabled and 1 or 0.55)
+			if item.EnableMouse then item:EnableMouse(enabled) end
+			if item.Swatch and item.Swatch.EnableMouse then item.Swatch:EnableMouse(enabled) end
 			item.Swatch.Texture:SetColorTexture(r or 1, g or 1, b or 1, a or 1)
 			if control.colorizeLabel and enabled then
 				item.Text:SetTextColor(r or MUTED[1], g or MUTED[2], b or MUTED[3], 1)
@@ -2297,6 +2377,9 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 		row = CreateFrame("Frame", nil, parent, "BackdropTemplate")
 		snapPoint(row, "TOPLEFT", parent, "TOPLEFT", 12, yOffset or -42)
 		snapSize(row, rowWidth, rowHeight)
+		if parent._EQOLContentY then
+			row._EQOLContentY = parent._EQOLContentY + (yOffset or -42)
+		end
 	else
 		row = createContentFrame(state, rowHeight)
 		rowWidth = row:GetWidth() > 0 and row:GetWidth() or rowWidth
@@ -2476,7 +2559,11 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 		desc:SetHeight(36)
 		local button = makeFlatButton(row, control.buttonText or (_G.OKAY or "OK"), 112, 26)
 		button:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -14, 14)
+		row.actionButton = button
 		button:SetScript("OnClick", function()
+			if not app:IsControlEnabled(control) then
+				return
+			end
 			if type(control.onClick) == "function" then
 				control.onClick()
 			elseif type(control.setValue) == "function" then
@@ -2564,7 +2651,7 @@ local function addPageCard(state, page, row, index, columns)
 	local controlCount = #(page.controls or {})
 	local card = row and createGridCard(state, row, index, columns or 2, PAGE_CARD_HEIGHT)
 		or createContentFrame(state, PAGE_CARD_HEIGHT)
-	styleRaisedTile(card)
+	styleRaisedTile(card, true)
 	card:SetScript("OnMouseUp", function()
 		state:SetPage(page.id)
 	end)
@@ -3126,47 +3213,34 @@ local function renderSearch(state, query)
 	local app = state.app
 	local L = getLocale(app)
 	local results = app:GetSearchResults(query, 80)
+	addContentScrollbarRail(state)
 	addSectionTitle(state, (L["configCenterSearchPlaceholder"] or "Search settings") .. ": " .. query)
 	if #results == 0 then
 		addInfoCard(state, L["configCenterNoResults"] or "No settings found.", {}, 64)
 		return
 	end
 	for _, control in ipairs(results) do
-		local page = app:GetPage(control.pageID)
-		local card = createContentFrame(state, 78)
+		local rowHeight = getSettingRowHeight(control)
+		local card = createContentFrame(state, rowHeight + 34)
 		applyBackdrop(card, CARD_BG, CARD_BORDER)
-		card:EnableMouse(true)
-		applyHoverState(card)
-		card:SetScript("OnMouseUp", function()
-			state:SetPage(control.pageID)
-		end)
+		createPixelBorder(card, CARD_BORDER)
 
-		local iconSource, iconIsAtlas = resolvePageIcon(page)
-		local icon = createIconPlate(card, iconSource, 38, iconIsAtlas)
-		icon:SetPoint("LEFT", card, "LEFT", 14, 0)
-
-		local title = createText(card, FONT_HEADER, control.label or control.id, WHITE)
-		title:SetPoint("TOPLEFT", icon, "TOPRIGHT", 14, -5)
-		title:SetPoint("RIGHT", card, "RIGHT", -190, 0)
-		title:SetHeight(20)
-
-		local descText = control.description or getPageDescription(app, page)
-		local desc = createText(card, FONT_MUTED, descText, MUTED)
-		desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -5)
-		desc:SetPoint("RIGHT", card, "RIGHT", -190, 0)
-		desc:SetHeight(22)
+		local rowWidth = (state.contentWidth or CONTENT_WIDTH) - 24
+		local row = addSettingRow(state, control, nil, card, -8, rowWidth)
+		if row.Separator then
+			row.Separator:Hide()
+		end
 
 		local path = createText(card, FONT_MUTED, getControlPath(app, control), GOLD)
-		path:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", 0, -4)
-		path:SetPoint("RIGHT", card, "RIGHT", -190, 0)
+		path:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", 14, 9)
+		path:SetPoint("RIGHT", card, "RIGHT", -104, 0)
 		path:SetHeight(16)
+		path.Text:SetJustifyV("MIDDLE")
 
-		local badge = addStatusChip(card, getControlTypeLabel(app, control), GOLD, 86)
-		badge:SetPoint("RIGHT", card, "RIGHT", -92, 8)
 		local openButton = makeFlatButton(card, _G.OPEN or "Open", 74, 24)
-		openButton:SetPoint("RIGHT", card, "RIGHT", -14, -12)
+		openButton:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -14, 6)
 		openButton:SetScript("OnClick", function()
-			state:SetPage(control.pageID)
+			state:SetPage(control.pageID, control.id)
 		end)
 		state.y = state.y - 8
 	end
@@ -3180,15 +3254,29 @@ function StateMixin:RenderContent()
 	clearFixedContent(self)
 	local query = self.frame.SearchBox:GetText() or ""
 	if query ~= "" then
+		self.resetSearchScroll = self.lastSearchQuery ~= query
+		self.lastSearchQuery = query
 		renderSearch(self, query)
 	elseif self.view == "category" then
+		self.lastSearchQuery = nil
 		renderCategoryOverview(self, self.selectedCategoryID)
 	elseif self.view == "page" then
+		self.lastSearchQuery = nil
 		renderPage(self, self.selectedPageID)
 	else
+		self.lastSearchQuery = nil
 		renderDashboard(self)
 	end
 	setScrollHeight(self)
+	if self.resetSearchScroll and self.frame and self.frame.Scroll then
+		self.frame.Scroll:SetVerticalScroll(0)
+		local scrollBar = getScrollBar(self.frame.Scroll)
+		if scrollBar and scrollBar.SetValue then
+			scrollBar:SetValue(0)
+		end
+		self.resetSearchScroll = nil
+	end
+	lib.FocusPendingControl(self)
 	self:RefreshSidebarSelection()
 end
 
@@ -3301,14 +3389,25 @@ function StateMixin:SetCategory(categoryID)
 	self:RenderContent()
 end
 
-function StateMixin:SetPage(pageID)
+function StateMixin:SetPage(pageID, focusControlID)
 	local page = self.app:GetPage(pageID)
 	self.view = "page"
 	self.selectedPageID = pageID
 	if page then
 		self.selectedCategoryID = page.category
 	end
-	self.frame.SearchBox:SetText("")
+	if focusControlID then
+		local control = self.app.controlsByID and self.app.controlsByID[focusControlID]
+		if control and control.groupID and self.collapsedGroups then
+			self.collapsedGroups[control.groupID] = nil
+		end
+		self.pendingFocusControlID = focusControlID
+	end
+	if self.frame.SearchBox:GetText() ~= "" then
+		self.suppressSearchRender = true
+		self.frame.SearchBox:SetText("")
+		self.suppressSearchRender = nil
+	end
 	self:RenderContent()
 end
 
@@ -3528,6 +3627,9 @@ local function createFrame(app)
 		end
 		if frame.SearchClearButton then
 			frame.SearchClearButton:SetShown(frame.SearchBox:GetText() ~= "")
+		end
+		if state.suppressSearchRender then
+			return
 		end
 		state:RenderContent()
 	end)

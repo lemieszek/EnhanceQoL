@@ -1,9 +1,10 @@
 # Changelog
 
-## [10.25.0-beta1] - 2026-06-02
+## [11.0.0-alpha1] - 2026-06-03
 
 ### ✨ Added
 
+- Settings: Added the experimental modern EnhanceQoL Settings Center, available with `/eqol2` while the legacy settings remain available through `/eqol` and the minimap button.
 - Unit Frames / Castbar and Resource Bars: Added configurable text anchors for cast names, cast durations, and resource bar values so text can stay pinned to the desired position while bars resize.
 
 ### 🐛 Fixed
