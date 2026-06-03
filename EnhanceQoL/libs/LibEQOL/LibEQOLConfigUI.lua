@@ -26,6 +26,12 @@ local PAGE_LEFT_WIDTH_MIN = 560
 local PAGE_LEFT_WIDTH_IDEAL = 620
 local PAGE_GAP = 16
 local GRID_GAP = 12
+local PAGE_CARD_HEIGHT = 112
+local PAGE_CARD_PAD_X = 18
+local PAGE_CARD_ICON_SIZE = 42
+local PAGE_CARD_TEXT_GAP = 18
+local PAGE_CARD_CHEVRON_WIDTH = 28
+local PAGE_CARD_TEXT_LEFT = PAGE_CARD_PAD_X + PAGE_CARD_ICON_SIZE + PAGE_CARD_TEXT_GAP
 local BOOLEAN_ROW_HEIGHT = 68
 local STACKED_ROW_HEIGHT = 106
 local SLIDER_ROW_HEIGHT = 88
@@ -134,37 +140,32 @@ local CATEGORY_ICON_ATLASES = {
 	gameplay = "icons_64x64_damage",
 }
 
-local PAGE_ICON_KEYS = {
-	actiontracker = "actiontracker",
-	actionbars = "actionbar",
-	action = "actionbar",
-	bags = "bags",
-	buff = "buff",
-	castbar = "castbar",
-	castbars = "castbar",
-	chat = "chat",
-	combat = "combat",
-	cooldown = "cooldown",
-	cooldowns = "cooldown",
-	data = "data",
-	diagnostic = "diagnostics",
-	loot = "bags",
-	map = "map",
-	minimap = "map",
-	mover = "mover",
-	nameplates = "nameplate",
-	nameplate = "nameplate",
-	popup = "popups",
-	profile = "profiles",
-	resource = "resource",
-	skinner = "skinner",
-	tooltips = "tooltip",
-	tooltip = "tooltip",
-	unitframes = "unitframes",
-	unit = "unitframes",
-	ui = "interface",
-	vendor = "vendor",
-	sell = "vendor",
+local PAGE_ICON_RULES = {
+	{ "actiontracker", "actiontracker" },
+	{ "actionbars", "actionbar" },
+	{ "castbarscooldowns", "castbar" },
+	{ "castbars", "castbar" },
+	{ "classbuff", "buff" },
+	{ "cooldownpanels", "cooldown" },
+	{ "barsresources", "resource" },
+	{ "unitframes", "unitframes" },
+	{ "worldmap", "map" },
+	{ "minimap", "map" },
+	{ "nameplates", "nameplate" },
+	{ "popups", "popups" },
+	{ "skinner", "skinner" },
+	{ "tooltip", "tooltip" },
+	{ "mover", "mover" },
+	{ "combat", "combat" },
+	{ "data", "data" },
+	{ "resource", "resource" },
+	{ "vendor", "vendor" },
+	{ "sell", "vendor" },
+	{ "chat", "chat" },
+	{ "loot", "bags" },
+	{ "bags", "bags" },
+	{ "map", "map" },
+	{ "action", "actionbar" },
 }
 
 local PAGE_DESCRIPTION_FALLBACKS = {
@@ -195,6 +196,34 @@ local PAGE_DESCRIPTION_FALLBACKS = {
 	unitframes = "Customize player, target, focus, party and group frames, including layout, bars, auras and text.",
 	vendor = "Add convenient vendor and merchant shortcuts.",
 	autosell = "Automatically sell configured items and junk at vendors.",
+}
+
+local PAGE_CARD_DESCRIPTION_FALLBACKS = {
+	actionbars = "configCenterPageCardDescActionBars",
+	actiontracker = "configCenterPageCardDescActionTracker",
+	bars = "configCenterPageCardDescBarsResources",
+	castbars = "configCenterPageCardDescCastbarsCooldowns",
+	chat = "configCenterPageCardDescChat",
+	classbuff = "configCenterPageCardDescClassBuffReminder",
+	combat = "configCenterPageCardDescCombatAlerts",
+	cooldownpanels = "configCenterPageCardDescCooldownPanels",
+	data = "configCenterPageCardDescDataPanels",
+	death = "configCenterPageCardDescDeath",
+	dungeons = "configCenterPageCardDescDungeons",
+	groupfinder = "configCenterPageCardDescGroupFinder",
+	loot = "configCenterPageCardDescLoot",
+	map = "configCenterPageCardDescMapNavigation",
+	minimap = "configCenterPageCardDescMapNavigation",
+	mover = "configCenterPageCardDescMover",
+	nameplates = "configCenterPageCardDescNameplates",
+	popups = "configCenterPageCardDescPopupsUITweaks",
+	questing = "configCenterPageCardDescQuesting",
+	skinner = "configCenterPageCardDescSkinner",
+	tooltip = "configCenterPageCardDescTooltip",
+	tooltips = "configCenterPageCardDescTooltip",
+	unitframes = "configCenterPageCardDescUnitFrames",
+	vendor = "configCenterPageCardDescVendor",
+	autosell = "configCenterPageCardDescAutoSell",
 }
 
 local frames = lib.frames or {}
@@ -380,10 +409,10 @@ local function normalizeIconLookupText(text)
 end
 
 local function getKeywordIconKey(text)
-	text = tostring(text or ""):lower()
-	for keyword, iconKey in pairs(PAGE_ICON_KEYS) do
-		if text:find(keyword, 1, true) then
-			return iconKey
+	local lookup = normalizeIconLookupText(text)
+	for _, rule in ipairs(PAGE_ICON_RULES) do
+		if lookup:find(rule[1], 1, true) then
+			return rule[2]
 		end
 	end
 	return nil
@@ -556,6 +585,17 @@ local function getPageDescription(app, page)
 		return getSettingCountText(app, #(page.controls or {}))
 	end
 	return ""
+end
+
+local function getPageCardDescription(app, page)
+	local L = getLocale(app)
+	local lookup = normalizePageLookupText(page)
+	for keyword, localeKey in pairs(PAGE_CARD_DESCRIPTION_FALLBACKS) do
+		if lookup:find(keyword, 1, true) then
+			return L[localeKey] or getPageDescription(app, page)
+		end
+	end
+	return getPageDescription(app, page)
 end
 
 function getControlType(control)
@@ -1756,36 +1796,43 @@ end
 
 local function addPageCard(state, page, row, index, columns)
 	local controlCount = #(page.controls or {})
-	local card = row and createGridCard(state, row, index, columns or 2, 104) or createContentFrame(state, 104)
+	local card = row and createGridCard(state, row, index, columns or 2, PAGE_CARD_HEIGHT)
+		or createContentFrame(state, PAGE_CARD_HEIGHT)
 	styleRaisedTile(card)
 	card:SetScript("OnMouseUp", function()
 		state:SetPage(page.id)
 	end)
 
 	local iconSource, iconIsAtlas = resolvePageIcon(page)
-	local icon = createIconPlate(card, iconSource, 42, iconIsAtlas)
-	icon:SetPoint("LEFT", card, "LEFT", 14, 0)
+	local icon = createIconPlate(card, iconSource, PAGE_CARD_ICON_SIZE, iconIsAtlas)
+	icon:SetPoint("LEFT", card, "LEFT", PAGE_CARD_PAD_X, 0)
+
+	local textLeft = PAGE_CARD_TEXT_LEFT
+	local rightInset = PAGE_CARD_CHEVRON_WIDTH + 20
 
 	local title = createText(card, FONT_HEADER, page.title or page.id, WHITE)
-	title:SetPoint("TOPLEFT", icon, "TOPRIGHT", 14, -3)
-	title:SetPoint("RIGHT", card, "RIGHT", -42, 0)
+	title:SetPoint("TOPLEFT", card, "TOPLEFT", textLeft, -24)
+	title:SetPoint("RIGHT", card, "RIGHT", -rightInset, 0)
 	title:SetHeight(22)
 
-	local desc = getPageDescription(state.app, page)
+	local desc = getPageCardDescription(state.app, page)
 	local descText = createText(card, FONT_MUTED, desc, MUTED)
-	descText:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -5)
-	descText:SetPoint("RIGHT", card, "RIGHT", -42, 0)
-	descText:SetHeight(26)
+	descText:SetPoint("TOPLEFT", card, "TOPLEFT", textLeft, -50)
+	descText:SetPoint("RIGHT", card, "RIGHT", -rightInset, 0)
+	descText:SetHeight(32)
 	descText.Text:SetWordWrap(true)
+	if descText.Text.SetMaxLines then
+		descText.Text:SetMaxLines(2)
+	end
 
 	local metaText = getSettingCountText(state.app, controlCount)
 	local meta = createText(card, FONT_MUTED, metaText, GOLD)
-	meta:SetPoint("TOPLEFT", icon, "TOPRIGHT", 14, -62)
-	meta:SetPoint("RIGHT", card, "RIGHT", -42, 0)
+	meta:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", textLeft, 14)
+	meta:SetPoint("RIGHT", card, "RIGHT", -rightInset, 0)
 	meta:SetHeight(16)
 
 	local open = createText(card, FONT_TITLE, ">", GOLD, "RIGHT")
-	open:SetPoint("RIGHT", card, "RIGHT", -16, 0)
+	open:SetPoint("RIGHT", card, "RIGHT", -18, 0)
 	open:SetSize(18, 22)
 	if not row then
 		state.y = state.y - 10
@@ -1998,7 +2045,7 @@ local function renderCategoryOverview(state, categoryID)
 		return
 	end
 	for index = 1, #pages, 2 do
-		local row = createGridRow(state, 104)
+		local row = createGridRow(state, PAGE_CARD_HEIGHT)
 		addPageCard(state, pages[index], row, 1, 2)
 		if pages[index + 1] then
 			addPageCard(state, pages[index + 1], row, 2, 2)
