@@ -34,7 +34,7 @@ local PAGE_LAYOUT = {
 	detailNavGap = 8,
 	scrollInset = 8,
 	scrollBottomPad = 20,
-	sidePanelTopOffset = 56,
+	sidePanelTopOffset = 48,
 }
 local GRID_GAP = 12
 local STATUS_TILE_HEIGHT = 72
