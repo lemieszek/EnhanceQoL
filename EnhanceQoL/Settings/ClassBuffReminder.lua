@@ -230,6 +230,8 @@ end
 
 local expandable = addon.functions.SettingsCreateExpandableSection(cat, {
 	name = L["Class Buff Reminder"] or "Class Buff Reminder",
+	description = L["configCenterPageDescClassBuffReminder"]
+		or "Track missing class buffs for your group and connect those reminders with flask and buff food helpers.",
 	newTagID = "ClassBuffReminder",
 	expanded = false,
 	colorizeTitle = false,

@@ -140,6 +140,8 @@ local framesExpandable = addon.SettingsLayout.uiFramesExpandable
 if not framesExpandable then
 	framesExpandable = addon.functions.SettingsCreateExpandableSection(cUIInput, {
 		name = L["VisibilityAndFadingFrames"] or "Visibility & Fading (Frames)",
+		description = L["configCenterPageDescVisibilityFrames"]
+			or "Control when supported Blizzard frames are shown, hidden or faded during combat, targeting and mouseover states.",
 		expanded = false,
 		colorizeTitle = false,
 	})
@@ -150,6 +152,8 @@ local barsResourcesExpandable = addon.SettingsLayout.uiBarsResourcesExpandable
 if not barsResourcesExpandable then
 	barsResourcesExpandable = addon.functions.SettingsCreateExpandableSection(cUIInput, {
 		name = L["BarsAndResources"] or "Bars & Resources",
+		description = L["configCenterPageDescBarsResources"]
+			or "Adjust class resources, resource and status bars, XP, absorb and player resource displays.",
 		expanded = false,
 		colorizeTitle = false,
 		newTagID = "ResourceBars",
@@ -514,6 +518,8 @@ if addon.Aura and addon.Aura.functions and addon.Aura.functions.AddResourceBarsS
 
 local interfaceExpandable = addon.functions.SettingsCreateExpandableSection(cUIInput, {
 	name = L["PopupsAndUITweaks"] or "Popups & UI Tweaks",
+	description = L["configCenterPageDescPopupsUITweaks"]
+		or "Tune login UI scaling, collection alerts, micro menu notifications and small Blizzard UI conveniences.",
 	expanded = false,
 	colorizeTitle = false,
 	newTagID = "PopupsAndUITweaks",

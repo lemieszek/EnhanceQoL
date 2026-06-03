@@ -14,6 +14,8 @@ if not (cat and addon.functions and addon.functions.SettingsCreateExpandableSect
 
 local expandable = addon.functions.SettingsCreateExpandableSection(cat, {
 	name = L["Cooldown Panels"] or "Cooldown Panels",
+	description = L["configCenterPageDescCooldownPanels"]
+		or "Create and manage custom cooldown panels, then edit tracked abilities, layout and visibility in the panel editor.",
 	newTagID = "CooldownPanels",
 	expanded = false,
 	colorizeTitle = false,

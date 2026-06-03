@@ -28,13 +28,15 @@ local PAGE_GAP = 16
 local GRID_GAP = 12
 local BOOLEAN_ROW_HEIGHT = 68
 local STACKED_ROW_HEIGHT = 106
-local SLIDER_ROW_HEIGHT = 86
-local SLIDER_ROW_HEIGHT_COMPACT = 64
+local SLIDER_ROW_HEIGHT = 88
+local SLIDER_ROW_HEIGHT_COMPACT = 72
 local COMPLEX_ROW_HEIGHT = 92
 local ROW_INSET = 14
 local FIELD_CONTROL_LEFT = 18
 local FIELD_CONTROL_WIDTH_MIN = 260
 local FIELD_CONTROL_WIDTH_MAX = 340
+local SLIDER_SCALE_LABEL_WIDTH = 32
+local SLIDER_SCALE_GAP = 12
 
 local FONT_TITLE = "GameFontNormalLarge"
 local FONT_HERO = "GameFontNormalHuge2"
@@ -166,31 +168,31 @@ local PAGE_ICON_KEYS = {
 }
 
 local PAGE_DESCRIPTION_FALLBACKS = {
-	actionbars = "Adjust action bar visibility, size, text and button behavior.",
-	actiontracker = "Track important actions, cooldowns and combat state.",
-	bars = "Customize resource bars, class bars and status displays.",
-	castbars = "Configure cast bars, cooldown displays and timing helpers.",
+	actionbars = "Configure action bar visibility, button growth, borders, keybind text, macro labels and cooldown text.",
+	actiontracker = "Show your recently used spells as a movable icon history.",
+	bars = "Adjust class resources, resource and status bars, XP, absorb and player resource displays.",
+	castbars = "Configure cast bars, GCD and cooldown displays, combat text, focus interrupt alerts and timing helpers.",
 	chat = "Improve chat history, whispers and message handling.",
-	classbuff = "Track missing buffs and class-specific reminders.",
-	combat = "Show important combat warnings and reminders.",
-	cooldownpanels = "Manage cooldown panels, layout and visibility.",
-	data = "Customize compact data and information panels.",
+	classbuff = "Track missing class buffs and connect reminders with flask and buff food helpers.",
+	combat = "Configure death alerts, no-target indicators and other combat reminders.",
+	cooldownpanels = "Create and manage custom cooldown panels, tracked abilities, layout and visibility.",
+	data = "Configure compact data panels, tooltip hints and modifier-based context menus.",
 	death = "Customize death, resurrection and release helpers.",
 	dungeons = "Configure dungeon, Mythic+ and teleport helpers.",
 	groupfinder = "Improve group finder and group workflow helpers.",
 	includelists = "Manage items that should always or never be handled.",
 	loot = "Configure loot, item handling and inventory helpers.",
-	map = "Configure map, minimap and navigation helpers.",
-	minimap = "Configure map, minimap and navigation helpers.",
+	map = "Customize world map coordinates, square minimap layout, minimap stats and button storage.",
+	minimap = "Customize world map coordinates, square minimap layout, minimap stats and button storage.",
 	mover = "Move and position supported UI elements.",
-	nameplates = "Adjust nameplates, names and related display options.",
-	popups = "Tweak dialogs, popups and small UI behaviors.",
+	nameplates = "Adjust player names, nameplate text, markers, mob colors and dungeon-specific nameplate behavior.",
+	popups = "Tune login UI scaling, collection alerts, micro menu notifications and small Blizzard UI conveniences.",
 	questing = "Automate quest handling and cinematic convenience options.",
 	skinner = "Customize the appearance of supported Blizzard UI frames.",
 	standaloneprivateaura = "Configure standalone private aura display.",
 	tooltips = "Customize tooltip content, IDs, icons and extra information.",
 	tooltip = "Customize tooltip content, IDs, icons and extra information.",
-	unitframes = "Adjust player, target and party frame options.",
+	unitframes = "Customize player, target, focus, party and group frames, including layout, bars, auras and text.",
 	vendor = "Add convenient vendor and merchant shortcuts.",
 	autosell = "Automatically sell configured items and junk at vendors.",
 }
@@ -358,9 +360,13 @@ local function getFieldControlWidth(rowWidth)
 end
 
 local function getSliderControlWidth(rowWidth, labelWidth, sliderGap)
+	local available = (tonumber(rowWidth) or 0)
+		- (FIELD_CONTROL_LEFT * 2)
+		- ((labelWidth or 0) * 2)
+		- ((sliderGap or 0) * 2)
 	return math.max(
-		FIELD_CONTROL_WIDTH_MIN,
-		(tonumber(rowWidth) or 0) - (FIELD_CONTROL_LEFT * 2) - ((labelWidth or 0) * 2) - ((sliderGap or 0) * 2)
+		120,
+		available
 	)
 end
 
@@ -745,6 +751,9 @@ local function refreshControlRow(app, control, row)
 		end
 		row.slider.updating = true
 		row.slider:SetValue(value)
+		if row.slider.SyncVisual then
+			row.slider:SyncVisual(value)
+		end
 		row.slider.updating = false
 	end
 	if row.editBox then
@@ -1245,59 +1254,113 @@ local function addSliderWidget(row, app, control, opts)
 		valueText:SetSize(62, 18)
 	end
 	row.value = valueText
-	local sliderWidth = opts.width or 220
-	local trackInset = 4
-	local fillInset = 1
-	local trackWidth = math.max(32, sliderWidth - (trackInset * 2))
-	local slider = CreateFrame("Slider", nil, row, "OptionsSliderTemplate")
-	if opts.point then
-		slider:SetPoint(opts.point[1], opts.point[2], opts.point[3], opts.point[4], opts.point[5])
-	else
-		slider:SetPoint("RIGHT", valueText, "LEFT", -12, -7)
-	end
-	slider:SetSize(sliderWidth, 18)
+	local sliderWidth = math.max(120, tonumber(opts.width) or 220)
+	local trackHeight = 4
+	local sliderHitHeight = 22
+	local thumbWidth = 12
+	local thumbHeight = 16
 	local minValue = tonumber(control.min) or 0
 	local maxValue = tonumber(control.max) or 1
-	slider:SetMinMaxValues(minValue, maxValue)
-	slider:SetValueStep(tonumber(control.step) or 1)
-	if slider.SetObeyStepOnDrag then slider:SetObeyStepOnDrag(true) end
-	if slider.Low then slider.Low:Hide() end
-	if slider.High then slider.High:Hide() end
-	if slider.Text then slider.Text:Hide() end
-	if slider.Left then slider.Left:Hide() end
-	if slider.Middle then slider.Middle:Hide() end
-	if slider.Right then slider.Right:Hide() end
-	slider.Track = CreateFrame("Frame", nil, row, "BackdropTemplate")
-	slider.Track:SetSize(trackWidth, 8)
-	slider.Track:SetPoint("LEFT", slider, "LEFT", trackInset, 0)
-	applyBackdrop(slider.Track, { 0.025, 0.024, 0.022, 0.95 }, { 0.28, 0.24, 0.17, 0.75 })
-	slider.Fill = slider.Track:CreateTexture(nil, "OVERLAY")
-	slider.Fill:SetPoint("LEFT", slider.Track, "LEFT", fillInset, 0)
-	slider.Fill:SetHeight(3)
-	slider.Fill:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.68)
-	if slider.Thumb then
-		slider.Thumb:SetVertexColor(1.0, 0.84, 0.46, 1)
+	if maxValue < minValue then
+		minValue, maxValue = maxValue, minValue
 	end
-	local function updateFill(value)
-		local span = maxValue - minValue
-		local percent = span ~= 0 and ((tonumber(value) or minValue) - minValue) / span or 0
-		percent = math.max(0, math.min(1, percent))
-		slider.Fill:SetWidth(math.max(1, (trackWidth - (fillInset * 2)) * percent))
+	local step = tonumber(control.step) or 1
+
+	local function clamp(value)
+		value = tonumber(value) or minValue
+		if value < minValue then value = minValue end
+		if value > maxValue then value = maxValue end
+		return value
 	end
-	slider:SetScript("OnValueChanged", function(self, value)
-		updateFill(value)
-		if self.updating then
-			valueText.Text:SetText(formatControlValue(control, value))
-			return
+
+	local function normalize(value)
+		value = clamp(value)
+		if step and step > 0 then
+			value = minValue + (math.floor(((value - minValue) / step) + 0.5) * step)
+			value = clamp(value)
 		end
-		local step = tonumber(control.step) or 1
-		if step > 0 then
-			value = math.floor((value / step) + 0.5) * step
+		return value
+	end
+
+	local track = CreateFrame("Frame", nil, row)
+	track:SetSize(sliderWidth, sliderHitHeight)
+	if opts.point then
+		track:SetPoint(opts.point[1], opts.point[2], opts.point[3], opts.point[4], opts.point[5])
+	else
+		track:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", FIELD_CONTROL_LEFT, 10)
+	end
+
+	local bar = track:CreateTexture(nil, "BACKGROUND")
+	bar:SetPoint("LEFT", track, "LEFT", 0, 0)
+	bar:SetPoint("RIGHT", track, "RIGHT", 0, 0)
+	bar:SetHeight(trackHeight)
+	bar:SetColorTexture(0.075, 0.070, 0.060, 0.95)
+	local fill = track:CreateTexture(nil, "ARTWORK")
+	fill:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, 0)
+	fill:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", 0, 0)
+	fill:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.78)
+
+	local slider = CreateFrame("Slider", nil, row)
+	slider:SetOrientation("HORIZONTAL")
+	slider:SetPoint("LEFT", track, "LEFT", 0, 0)
+	slider:SetPoint("RIGHT", track, "RIGHT", 0, 0)
+	slider:SetHeight(sliderHitHeight)
+	slider:SetMinMaxValues(minValue, maxValue)
+	slider:SetValueStep(step)
+	if slider.SetObeyStepOnDrag then slider:SetObeyStepOnDrag(true) end
+	if slider.SetThumbTexture then
+		slider:SetThumbTexture("Interface\\Buttons\\WHITE8X8")
+	end
+	local thumb = slider.GetThumbTexture and slider:GetThumbTexture()
+	if thumb then
+		thumb:SetSize(thumbWidth, thumbHeight)
+		if thumb.SetColorTexture then
+			thumb:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 1)
+		else
+			thumb:SetVertexColor(GOLD[1], GOLD[2], GOLD[3], 1)
+		end
+	end
+
+	function slider.SyncVisual(_, value)
+		value = normalize(value)
+		local span = maxValue - minValue
+		local percent = span ~= 0 and ((value - minValue) / span) or 0
+		percent = math.max(0, math.min(1, percent))
+		local barWidth = bar:GetWidth()
+		if not barWidth or barWidth <= 0 then
+			barWidth = sliderWidth
+		end
+		local fillWidth = barWidth * percent
+		if fillWidth <= 0.5 then
+			fill:Hide()
+		else
+			fill:Show()
+			fill:SetWidth(fillWidth)
 		end
 		valueText.Text:SetText(formatControlValue(control, value))
+	end
+
+	slider:SetScript("OnValueChanged", function(self, rawValue)
+		local value = normalize(rawValue)
+		self:SyncVisual(value)
+		if self.updating or self.normalizing then
+			return
+		end
+		if math.abs((tonumber(rawValue) or value) - value) > 0.0001 then
+			self.normalizing = true
+			self:SetValue(value)
+			self.normalizing = false
+		end
 		app:SetControlValue(control, value)
 	end)
+
+	slider.Track = track
+	slider.Bar = bar
+	slider.Fill = fill
 	row.slider = slider
+	row.sliderTrack = track
+	row.sliderBar = bar
+	row.sliderFill = fill
 	return slider
 end
 
@@ -1544,23 +1607,27 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 			valueText:SetPoint("TOPRIGHT", row, "TOPRIGHT", -18, -12)
 			valueText:SetSize(valueWidth, 20)
 			local hasRangeLabels = control.min ~= nil or control.max ~= nil
-			local labelWidth = hasRangeLabels and 44 or 0
-			local sliderGap = hasRangeLabels and 8 or 0
+			local labelWidth = hasRangeLabels and SLIDER_SCALE_LABEL_WIDTH or 0
+			local sliderGap = hasRangeLabels and SLIDER_SCALE_GAP or 0
 			local sliderY = 10
-			if hasRangeLabels then
-				local minLabel = createText(row, FONT_MUTED, formatControlValue(control, control.min), MUTED)
-				minLabel:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", FIELD_CONTROL_LEFT, sliderY - 1)
-				minLabel:SetSize(labelWidth, 18)
-				local maxLabel = createText(row, FONT_MUTED, formatControlValue(control, control.max), MUTED, "RIGHT")
-				maxLabel:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -FIELD_CONTROL_LEFT, sliderY - 1)
-				maxLabel:SetSize(labelWidth, 18)
-			end
 			local sliderWidth = getSliderControlWidth(rowWidth, labelWidth, sliderGap)
-			addSliderWidget(row, app, control, {
+			local slider = addSliderWidget(row, app, control, {
 				point = { "BOTTOMLEFT", row, "BOTTOMLEFT", FIELD_CONTROL_LEFT + labelWidth + sliderGap, sliderY },
 				width = sliderWidth,
 				valueText = valueText,
 			})
+			if hasRangeLabels then
+				local minLabel = createText(row, FONT_MUTED, formatControlValue(control, control.min), MUTED, "RIGHT")
+				minLabel:SetPoint("RIGHT", slider, "LEFT", -sliderGap, 0)
+				minLabel:SetSize(labelWidth, 18)
+				minLabel.Text:SetJustifyH("RIGHT")
+				minLabel.Text:SetJustifyV("MIDDLE")
+				local maxLabel = createText(row, FONT_MUTED, formatControlValue(control, control.max), MUTED, "LEFT")
+				maxLabel:SetPoint("LEFT", slider, "RIGHT", sliderGap, 0)
+				maxLabel:SetSize(labelWidth, 18)
+				maxLabel.Text:SetJustifyH("LEFT")
+				maxLabel.Text:SetJustifyV("MIDDLE")
+			end
 		elseif controlType == "dropdown" or controlType == "sounddropdown" then
 			desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
 			desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)

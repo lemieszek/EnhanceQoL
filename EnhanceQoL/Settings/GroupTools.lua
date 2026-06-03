@@ -85,6 +85,8 @@ local combatCategory = addon.SettingsLayout.rootUI
 if combatCategory then
 	local combatSection = addon.functions.SettingsCreateExpandableSection(combatCategory, {
 		name = L["groupToolsCombatAlertsSection"] or "Combat Alerts",
+		description = L["configCenterPageDescCombatAlerts"]
+			or "Configure death alerts and no-target indicators, including text, sound, TTS, role rules and Edit Mode placement.",
 		expanded = false,
 		colorizeTitle = false,
 		newTagID = "GroupToolsCombatAlerts",

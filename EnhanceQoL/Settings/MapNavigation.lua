@@ -12,6 +12,8 @@ local refreshWorldMapCoordinates
 
 local mapExpandable = addon.functions.SettingsCreateExpandableSection(cMapNav, {
 	name = L["MapNavigation"],
+	description = L["configCenterPageDescMapNavigation"]
+		or "Customize world map coordinates, square minimap layout, minimap stats, loot spec shortcuts and minimap button storage.",
 	newTagID = "MapNavigation",
 	expanded = false,
 	colorizeTitle = false,

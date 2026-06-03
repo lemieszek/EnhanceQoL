@@ -1125,6 +1125,8 @@ local function createActionBarCategory()
 
 	local expandable = addon.functions.SettingsCreateExpandableSection(category, {
 		name = L["ActionBarsAndButtons"] or "Action Bars & Buttons",
+		description = L["configCenterPageDescActionBars"]
+			or "Configure action bar visibility, button growth, borders, keybind text, macro labels and cooldown text.",
 		expanded = false,
 		colorizeTitle = false,
 	})
@@ -1414,6 +1416,8 @@ local function createFrameCategory()
 
 	local expandable = addon.functions.SettingsCreateExpandableSection(category, {
 		name = L["VisibilityAndFadingFrames"] or "Visibility & Fading (Frames)",
+		description = L["configCenterPageDescVisibilityFrames"]
+			or "Control when supported Blizzard frames are shown, hidden or faded during combat, targeting and mouseover states.",
 		newTagID = "VisibilityFrames",
 		expanded = false,
 		colorizeTitle = false,
@@ -1619,6 +1623,8 @@ local function createNameplatesCategory()
 
 	local expandable = addon.functions.SettingsCreateExpandableSection(category, {
 		name = label,
+		description = L["configCenterPageDescNameplates"]
+			or "Adjust player names, nameplate text, markers, mob colors and dungeon-specific nameplate behavior.",
 		expanded = false,
 		colorizeTitle = false,
 		newTagID = "Nameplates",
@@ -2215,6 +2221,8 @@ local function createCastbarCategory()
 
 	local expandable = addon.functions.SettingsCreateExpandableSection(category, {
 		name = label,
+		description = L["configCenterPageDescCastbarsCooldowns"]
+			or "Configure cast bars, GCD and cooldown displays, combat text, focus interrupt alerts and timing helpers.",
 		expanded = false,
 		colorizeTitle = false,
 		newTagID = "CastbarsAndCooldowns",
@@ -2518,6 +2526,8 @@ local function ensureBarsResourcesCategory()
 	if not expandable then
 		expandable = addon.functions.SettingsCreateExpandableSection(category, {
 			name = L["BarsAndResources"] or "Bars & Resources",
+			description = L["configCenterPageDescBarsResources"]
+				or "Adjust class resources, resource and status bars, XP, absorb and player resource displays.",
 			expanded = false,
 			colorizeTitle = false,
 			newTagID = "ResourceBars",

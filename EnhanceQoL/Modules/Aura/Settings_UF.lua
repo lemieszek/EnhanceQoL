@@ -8800,6 +8800,8 @@ local function registerSettingsUI()
 	if not expandable then
 		expandable = addon.functions.SettingsCreateExpandableSection(cUF, {
 			name = L["CustomUnitFrames"] or "EQoL Unit Frames",
+			description = L["configCenterPageDescUnitFrames"]
+				or "Customize player, target, focus, party and group frames, including layout, bars, auras, text and profiles.",
 			newTagID = "CustomUnitFrames",
 			expanded = false,
 			colorizeTitle = false,
