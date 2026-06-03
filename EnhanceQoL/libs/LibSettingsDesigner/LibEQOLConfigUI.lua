@@ -323,23 +323,108 @@ local function applyBackdrop(frame, bg, border)
 	frame:SetBackdropBorderColor(border[1], border[2], border[3], border[4])
 end
 
-local function applyWindowBorder(frame)
+local function getAssetRoot(app)
+	local opts = app and app.opts
+	local root = opts and opts.assetRoot
+	if type(root) ~= "string" or root == "" then
+		local addonFolder = opts and (opts.addonFolder or opts.folder) or nil
+		root = "Interface\\AddOns\\"
+			.. tostring(addonFolder or (app and app.id) or "EnhanceQoL")
+			.. "\\libs\\LibSettingsDesigner\\Assets\\"
+	end
+	local last = root:sub(-1)
+	if last ~= "\\" and last ~= "/" then
+		root = root .. "\\"
+	end
+	return root
+end
+
+local function getLibAssetPath(app, fileName)
+	return getAssetRoot(app) .. fileName
+end
+
+local function createAssetArrow(parent, app, size, family, direction)
+	local arrow = parent:CreateTexture(nil, "OVERLAY")
+	arrow:SetSize(size or 14, size or 14)
+	local prefix = family == "collapse" and "LibSettingsDesigner_Collapse" or "LibSettingsDesigner_Dropdown"
+	local suffix = direction == "right" and "Right"
+		or direction == "left" and "Left"
+		or direction == "up" and "Up"
+		or "Down"
+	local fileName = prefix .. suffix .. ".tga"
+	arrow:SetTexture(getLibAssetPath(app, fileName))
+	arrow:SetVertexColor(GOLD[1], GOLD[2], GOLD[3], GOLD[4] or 1)
+	return arrow
+end
+
+local function createDropdownArrow(parent, app, size)
+	return createAssetArrow(parent, app, size, "dropdown", "down")
+end
+
+local function createCollapseArrow(parent, app, size, collapsed)
+	return createAssetArrow(parent, app, size, "collapse", collapsed and "right" or "down")
+end
+
+local function applyWindowBorder(frame, app)
 	if not frame or frame.WindowBorder then
 		return
 	end
-	local atlas = "AdventureMap-InsetMapBorder"
-	if C_Texture and C_Texture.GetAtlasInfo and not C_Texture.GetAtlasInfo(atlas) then
-		return
+	local borderPath = getAssetRoot(app) .. "PanelBorder_"
+	local cornerSize = 70
+	local edgeThickness = 70
+	local cornerOffset = 13
+	local rightOffset = cornerOffset + 8
+	local parts = {}
+
+	local function makePart(key, subLevel)
+		local texture = frame:CreateTexture(nil, "BORDER", nil, subLevel or 0)
+		texture:SetTexture(borderPath .. key .. ".tga")
+		texture:SetAlpha(0.95)
+		parts[key] = texture
+		return texture
 	end
-	local border = frame:CreateTexture(nil, "BORDER", nil, 1)
-	border:SetPoint("TOPLEFT", frame, "TOPLEFT", -22, 22)
-	border:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 22, -22)
-	local ok = border.SetAtlas and pcall(border.SetAtlas, border, atlas, false)
-	if not ok then
-		border:Hide()
-		return
-	end
-	frame.WindowBorder = border
+
+	local tl = makePart("tl", 1)
+	tl:SetSize(cornerSize, cornerSize)
+	tl:SetPoint("TOPLEFT", frame, "TOPLEFT", -cornerOffset, cornerOffset)
+
+	local tr = makePart("tr", 1)
+	tr:SetSize(cornerSize, cornerSize)
+	tr:SetPoint("TOPRIGHT", frame, "TOPRIGHT", rightOffset, cornerOffset)
+
+	local bl = makePart("bl", 1)
+	bl:SetSize(cornerSize, cornerSize)
+	bl:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", -cornerOffset, -cornerOffset)
+
+	local br = makePart("br", 1)
+	br:SetSize(cornerSize, cornerSize)
+	br:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", rightOffset, -cornerOffset)
+
+	local top = makePart("t", 0)
+	top:SetPoint("TOPLEFT", tl, "TOPRIGHT", 0, 0)
+	top:SetPoint("TOPRIGHT", tr, "TOPLEFT", 0, 0)
+	top:SetHeight(edgeThickness)
+	top:SetHorizTile(true)
+
+	local bottom = makePart("b", 0)
+	bottom:SetPoint("BOTTOMLEFT", bl, "BOTTOMRIGHT", 0, 0)
+	bottom:SetPoint("BOTTOMRIGHT", br, "BOTTOMLEFT", 0, 0)
+	bottom:SetHeight(edgeThickness)
+	bottom:SetHorizTile(true)
+
+	local left = makePart("l", 0)
+	left:SetPoint("TOPLEFT", tl, "BOTTOMLEFT", 0, 0)
+	left:SetPoint("BOTTOMLEFT", bl, "TOPLEFT", 0, 0)
+	left:SetWidth(edgeThickness)
+	left:SetVertTile(true)
+
+	local right = makePart("r", 0)
+	right:SetPoint("TOPRIGHT", tr, "BOTTOMRIGHT", 0, 0)
+	right:SetPoint("BOTTOMRIGHT", br, "TOPRIGHT", 0, 0)
+	right:SetWidth(edgeThickness)
+	right:SetVertTile(true)
+
+	frame.WindowBorder = parts
 	setBasicFrameBorderAlpha(frame, 0)
 end
 
@@ -1831,9 +1916,8 @@ local function addDropdownWidget(row, app, control, opts)
 	row.value:SetPoint("LEFT", button, "LEFT", 10, 0)
 	row.value:SetPoint("RIGHT", button, "RIGHT", -22, 0)
 	row.value:SetHeight(18)
-	local arrow = createText(button, FONT_TEXT, "v", GOLD, "RIGHT")
-	arrow:SetPoint("RIGHT", button, "RIGHT", -8, 1)
-	arrow:SetSize(14, 18)
+	local arrow = createDropdownArrow(button, app, 12)
+	arrow:SetPoint("RIGHT", button, "RIGHT", -8, 0)
 	button:SetScript("OnClick", function(owner)
 		MenuUtil.CreateContextMenu(owner, function(_, rootDescription)
 			local function getCurrentValue()
@@ -1877,9 +1961,8 @@ local function addMultiDropdownWidget(row, app, control, opts)
 	row.value:SetPoint("LEFT", button, "LEFT", 10, 0)
 	row.value:SetPoint("RIGHT", button, "RIGHT", -22, 0)
 	row.value:SetHeight(18)
-	local arrow = createText(button, FONT_TEXT, "v", GOLD, "RIGHT")
-	arrow:SetPoint("RIGHT", button, "RIGHT", -8, 1)
-	arrow:SetSize(14, 18)
+	local arrow = createDropdownArrow(button, app, 12)
+	arrow:SetPoint("RIGHT", button, "RIGHT", -8, 0)
 
 	local function refreshSummary()
 		row.value.Text:SetText(lib.GetMultiSummary(app, control))
@@ -2865,8 +2948,8 @@ local function addPageFixedHeader(state, category, pagePath)
 	local breadcrumb = createText(header, FONT_MUTED, pagePath, MUTED)
 	breadcrumb:SetPoint("LEFT", backButton, "RIGHT", 12, 0)
 	breadcrumb:SetPoint("RIGHT", header, "RIGHT", -4, 0)
-	breadcrumb:SetPoint("CENTER", backButton, "CENTER", 0, 0)
 	breadcrumb:SetHeight(20)
+	breadcrumb.Text:SetJustifyV("MIDDLE")
 	return header
 end
 
@@ -2939,10 +3022,8 @@ local function addGroupSection(state, group, pagePath)
 	header.Text:SetJustifyH("LEFT")
 	header.Text:SetText(group.title or group.id)
 	setTextColor(header.Text, WHITE)
-	header.Chevron = header:CreateFontString(nil, "OVERLAY", FONT_TEXT)
+	header.Chevron = createCollapseArrow(header, state.app, 12, collapsed)
 	header.Chevron:SetPoint("RIGHT", header, "RIGHT", -14, 0)
-	header.Chevron:SetText(collapsed and ">" or "v")
-	setTextColor(header.Chevron, GOLD)
 	header:SetScript("OnClick", function()
 		state.collapsedGroups[group.id] = not collapsed
 		state:RenderContent()
@@ -3244,7 +3325,7 @@ local function createFrame(app)
 	frame:SetScript("OnDragStart", frame.StartMoving)
 	frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
 	applyBackdrop(frame, PANEL_BG, PANEL_BORDER)
-	applyWindowBorder(frame)
+	applyWindowBorder(frame, app)
 	if frame.CloseButton then
 		frame.CloseButton:Hide()
 		if frame.CloseButton.HookScript then

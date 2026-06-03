@@ -35,6 +35,8 @@ local function ensureConfigApp()
 	local app = ConfigLib:RegisterAddOn(addonName, {
 		title = "Enhance QoL",
 		icon = "Interface\\AddOns\\EnhanceQoL\\Icons\\Icon.tga",
+		addonFolder = addonName,
+		assetRoot = "Interface\\AddOns\\EnhanceQoL\\libs\\LibSettingsDesigner\\Assets\\",
 		db = function() return addon.db end,
 		profile = function() return addon.db end,
 		locale = L,
