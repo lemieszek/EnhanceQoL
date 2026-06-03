@@ -68,7 +68,6 @@ local FONT_MUTED = "GameFontDisableSmall"
 local DEFAULT_DASHBOARD_INTRO = "Welcome! EnhanceQoL improves your World of Warcraft experience "
 	.. "with quality of life features and customization options."
 
-local PANEL_BG = { 0.055, 0.049, 0.043, 0.94 }
 local PANEL_BORDER = { 0.43, 0.34, 0.19, 0.74 }
 local TOPBAR_BG = { 0.105, 0.095, 0.078, 0.97 }
 local CONTENT_BG = { 0.028, 0.026, 0.022, 0.92 }
@@ -3317,7 +3316,7 @@ end
 local function createFrame(app)
 	local L = getLocale(app)
 	local name = (app.id or "EQOL") .. "ConfigCenterFrame"
-	local frame = CreateFrame("Frame", name, UIParent, "BasicFrameTemplateWithInset")
+	local frame = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
 	frame:SetSize(WINDOW_WIDTH, WINDOW_HEIGHT)
 	frame:SetPoint("CENTER")
 	frame:SetFrameStrata("DIALOG")
@@ -3326,7 +3325,11 @@ local function createFrame(app)
 	frame:RegisterForDrag("LeftButton")
 	frame:SetScript("OnDragStart", frame.StartMoving)
 	frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-	applyBackdrop(frame, PANEL_BG, PANEL_BORDER)
+	frame.bg = frame:CreateTexture(nil, "BACKGROUND")
+	frame.bg:SetPoint("TOPLEFT", frame, "TOPLEFT", 8, -8)
+	frame.bg:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 10)
+	frame.bg:SetTexture(getLibAssetPath(app, "LibSettingsDesigner_BackgroundDark.tga"))
+	frame.bg:SetAlpha(0.9)
 	applyWindowBorder(frame, app)
 	if frame.CloseButton then
 		frame.CloseButton:Hide()
@@ -3337,9 +3340,9 @@ local function createFrame(app)
 	frame:Hide()
 
 	frame.TopBar = CreateFrame("Frame", nil, frame, "BackdropTemplate")
-	frame.TopBar:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -8)
-	frame.TopBar:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -10, -8)
-	frame.TopBar:SetHeight(54)
+	frame.TopBar:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, -12)
+	frame.TopBar:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -20, -12)
+	frame.TopBar:SetHeight(48)
 	applyBackdrop(frame.TopBar, TOPBAR_BG, { 0.52, 0.39, 0.19, 0.52 })
 
 	frame.TopBarAccent = frame.TopBar:CreateTexture(nil, "OVERLAY")
