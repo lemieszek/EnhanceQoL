@@ -68,30 +68,30 @@ local FONT_MUTED = "GameFontDisableSmall"
 local DEFAULT_DASHBOARD_INTRO = "Welcome! EnhanceQoL improves your World of Warcraft experience "
 	.. "with quality of life features and customization options."
 
-local PANEL_BORDER = { 0.43, 0.34, 0.19, 0.74 }
-local TOPBAR_BG = { 0.105, 0.095, 0.078, 0.97 }
-local CONTENT_BG = { 0.028, 0.026, 0.022, 0.92 }
-local CARD_BG = { 0.080, 0.073, 0.061, 0.92 }
-local CARD_BG_HOVER = { 0.125, 0.101, 0.062, 0.98 }
-local CARD_BORDER = { 0.46, 0.36, 0.20, 0.62 }
-local CARD_BORDER_HOVER = { 0.94, 0.67, 0.25, 0.90 }
-local DASHBOARD_CARD_BG = { 0.145, 0.145, 0.132, 0.96 }
-local DASHBOARD_CARD_BG_HOVER = { 0.178, 0.170, 0.142, 0.99 }
-local DASHBOARD_CARD_BORDER = { 0.43, 0.40, 0.32, 0.88 }
-local DETAIL_SECTION_BG = { 0.092, 0.080, 0.060, 0.96 }
+local PANEL_BORDER = { 0.58, 0.50, 0.34, 0.55 }
+local TOPBAR_BG = { 0.052, 0.058, 0.063, 0.96 }
+local CONTENT_BG = { 0.040, 0.047, 0.055, 0.90 }
+local CARD_BG = { 0.065, 0.068, 0.070, 0.92 }
+local CARD_BG_HOVER = { 0.125, 0.100, 0.055, 0.96 }
+local CARD_BORDER = { 0.48, 0.40, 0.26, 0.38 }
+local CARD_BORDER_HOVER = { 0.95, 0.72, 0.30, 0.80 }
+local DASHBOARD_CARD_BG = { 0.075, 0.082, 0.086, 0.92 }
+local DASHBOARD_CARD_BG_HOVER = { 0.125, 0.100, 0.055, 0.96 }
+local DASHBOARD_CARD_BORDER = { 0.48, 0.40, 0.26, 0.38 }
+local DETAIL_SECTION_BG = { 0.055, 0.060, 0.065, 0.88 }
 local DETAIL_COLORS = {
-	columnBg = { 0.052, 0.047, 0.038, 0.82 },
-	columnBorder = { 0.48, 0.38, 0.22, 0.72 },
-	sectionBorder = { 0.70, 0.56, 0.32, 0.82 },
-	sectionHeaderBg = { 0.135, 0.105, 0.062, 0.98 },
+	columnBg = { 0.040, 0.047, 0.055, 0.84 },
+	columnBorder = { 0.58, 0.50, 0.34, 0.50 },
+	sectionBorder = { 0.58, 0.50, 0.34, 0.55 },
+	sectionHeaderBg = { 0.095, 0.085, 0.060, 0.94 },
 }
-local ROW_BG = { 0.070, 0.061, 0.047, 0.50 }
-local ROW_BORDER = { 0.26, 0.20, 0.12, 0.18 }
-local ROW_HOVER_BG = { 0.150, 0.112, 0.060, 0.64 }
-local ROW_HOVER_BORDER = { 0.92, 0.67, 0.27, 0.62 }
+local ROW_BG = { 0.060, 0.068, 0.074, 0.46 }
+local ROW_BORDER = { 0.48, 0.40, 0.26, 0.18 }
+local ROW_HOVER_BG = { 0.125, 0.100, 0.055, 0.60 }
+local ROW_HOVER_BORDER = { 0.95, 0.73, 0.32, 0.58 }
 local ROW_SEPARATOR = { 0.68, 0.54, 0.30, 0.32 }
-local SELECTED_BG = { 0.24, 0.17, 0.065, 0.96 }
-local SIDEBAR_BG = { 0.030, 0.031, 0.030, 0.78 }
+local SELECTED_BG = { 0.150, 0.115, 0.055, 0.98 }
+local SIDEBAR_BG = { 0.052, 0.060, 0.066, 0.58 }
 local MUTED = { 0.67, 0.64, 0.58 }
 local WHITE = { 0.94, 0.91, 0.84 }
 local GOLD = { 1.0, 0.82, 0.36 }
@@ -369,16 +369,16 @@ local function applyWindowBorder(frame, app)
 		return
 	end
 	local borderPath = getAssetRoot(app) .. "PanelBorder_"
-	local cornerSize = 70
-	local edgeThickness = 70
-	local cornerOffset = 13
-	local rightOffset = cornerOffset + 8
+	local cornerSize = 58
+	local edgeThickness = 58
+	local cornerOffset = 10
+	local rightOffset = cornerOffset + 6
 	local parts = {}
 
 	local function makePart(key, subLevel)
 		local texture = frame:CreateTexture(nil, "BORDER", nil, subLevel or 0)
 		texture:SetTexture(borderPath .. key .. ".tga")
-		texture:SetAlpha(0.95)
+		texture:SetAlpha(1)
 		parts[key] = texture
 		return texture
 	end
@@ -1295,7 +1295,7 @@ local function updateContentMetrics(state)
 	local fallbackWidth = CONTENT_WIDTH
 	local usableShellWidth = math.max(1, math.floor(shellWidth > 0 and shellWidth or fallbackWidth))
 	local useSidePanel = state.view == "page"
-	local useContentGutter = state.view == "category"
+	local useContentGutter = state.view == "category" or state.view == "dashboard"
 	local useDetachedScrollbar = useSidePanel or useContentGutter
 	local pageRightWidth = 0
 	local leftOuterWidth = usableShellWidth - (PAGE_LAYOUT.contentPad * 2)
@@ -1423,6 +1423,23 @@ local function skinScrollFrame(scrollFrame)
 			end
 		end
 	end
+	if scrollFrame.EnableMouseWheel then
+		scrollFrame:EnableMouseWheel(true)
+	end
+	scrollFrame:SetScript("OnMouseWheel", function(self, delta)
+		local range = self.GetVerticalScrollRange and self:GetVerticalScrollRange() or 0
+		if not range or range <= 0 then
+			return
+		end
+		local step = self._EQOLScrollStep or 64
+		local current = self.GetVerticalScroll and self:GetVerticalScroll() or 0
+		local target = math.max(0, math.min(range, current - ((delta or 0) * step)))
+		self:SetVerticalScroll(target)
+		local bar = getScrollBar(self)
+		if bar and bar.SetValue then
+			bar:SetValue(target)
+		end
+	end)
 end
 
 updateScrollFrameVisibility = function(scrollFrame)
@@ -1725,7 +1742,7 @@ local function addDashboardStatusPanel(state, stats)
 	end
 
 	local panel = createContentFrame(state, 130)
-	applyBackdrop(panel, { 0.070, 0.068, 0.060, 0.90 }, DASHBOARD_CARD_BORDER)
+	applyBackdrop(panel, DETAIL_SECTION_BG, DASHBOARD_CARD_BORDER)
 	local title = createText(panel, FONT_TITLE, L["configCenterAddOnStatus"] or (_G.STATUS or "Status"), GOLD)
 	title:SetPoint("TOPLEFT", panel, "TOPLEFT", 14, -13)
 	title:SetPoint("RIGHT", panel, "RIGHT", -14, 0)
@@ -2697,10 +2714,13 @@ local function addDashboardNewPanel(state, parent, entries, width)
 	return panel
 end
 
+local addContentScrollbarRail
+
 local function renderDashboard(state)
 	local app = state.app
 	local L = getLocale(app)
 	local stats = app:GetStats()
+	addContentScrollbarRail(state)
 	addDashboardHero(
 		state,
 		L["configCenterTitle"] or (getAppTitle(app) .. " Settings"),
@@ -2787,8 +2807,8 @@ local function renderDashboard(state)
 			mini:SetPoint("TOPLEFT", enabledPanel, "TOPLEFT", 14, -38 - ((index - 1) * 39))
 			mini:SetPoint("RIGHT", enabledPanel, "RIGHT", -14, 0)
 			mini:SetHeight(34)
-			applyBackdrop(mini, { 0.058, 0.052, 0.044, 0.90 }, CARD_BORDER)
-			applyHoverState(mini, { 0.058, 0.052, 0.044, 0.90 }, CARD_BG_HOVER, CARD_BORDER, CARD_BORDER_HOVER)
+			applyBackdrop(mini, CARD_BG, CARD_BORDER)
+			applyHoverState(mini, CARD_BG, CARD_BG_HOVER, CARD_BORDER, CARD_BORDER_HOVER)
 			mini:SetScript("OnClick", function() state:SetPage(page.id) end)
 			local iconSource, iconIsAtlas = resolvePageIcon(page)
 			local icon = createIcon(mini, iconSource, 20, iconIsAtlas)
@@ -2804,8 +2824,6 @@ local function renderDashboard(state)
 	end
 	state.y = state.y - 14
 end
-
-local addContentScrollbarRail
 
 local function renderCategoryOverview(state, categoryID)
 	local app = state.app
@@ -3181,7 +3199,7 @@ function StateMixin:RefreshSidebarSelection()
 			selected = self.selectedCategoryID == row.categoryID and self.view ~= "dashboard"
 		end
 		row.selected = selected
-		setFrameBackdrop(row, selected and SELECTED_BG or SIDEBAR_BG, selected and CARD_BORDER_HOVER or { 0, 0, 0, 0 })
+		setFrameBackdrop(row, selected and SELECTED_BG or SIDEBAR_BG, selected and CARD_BORDER_HOVER or CARD_BORDER)
 		setTextColor(row.Text, selected and GOLD or WHITE)
 		if row.Accent then row.Accent:SetShown(selected) end
 	end
@@ -3194,7 +3212,7 @@ function StateMixin:RenderSidebar()
 	local L = getLocale(self.app)
 
 	local dashboard = createSidebarFrame(self, 44)
-	applyBackdrop(dashboard, SIDEBAR_BG, { 0, 0, 0, 0 })
+	applyBackdrop(dashboard, SIDEBAR_BG, CARD_BORDER)
 	dashboard.Accent = dashboard:CreateTexture(nil, "OVERLAY")
 	dashboard.Accent:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.85)
 	dashboard.Accent:SetPoint("TOPLEFT", dashboard, "TOPLEFT", 0, -6)
@@ -3217,7 +3235,7 @@ function StateMixin:RenderSidebar()
 		setFrameBackdrop(
 			row,
 			row.selected and SELECTED_BG or SIDEBAR_BG,
-			row.selected and CARD_BORDER_HOVER or { 0, 0, 0, 0 }
+			row.selected and CARD_BORDER_HOVER or CARD_BORDER
 		)
 	end)
 	dashboard:SetScript("OnClick", function()
@@ -3227,39 +3245,41 @@ function StateMixin:RenderSidebar()
 	self.sidebarRows.dashboard = dashboard
 
 	for _, category in ipairs(self.app:GetCategories()) do
-		local row = createSidebarFrame(self, 44)
-		applyBackdrop(row, SIDEBAR_BG, { 0, 0, 0, 0 })
-		row.Accent = row:CreateTexture(nil, "OVERLAY")
-		row.Accent:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.85)
-		row.Accent:SetPoint("TOPLEFT", row, "TOPLEFT", 0, -6)
-		row.Accent:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, 6)
-		row.Accent:SetWidth(2)
-		local iconSource, iconIsAtlas = resolveCategoryIcon(category)
-		row.Icon = createIcon(row, iconSource, 22, iconIsAtlas)
-		row.Icon:SetPoint("LEFT", row, "LEFT", 12, 0)
-		row.Text = row:CreateFontString(nil, "OVERLAY", FONT_TEXT)
-		row.Text:SetPoint("LEFT", row.Icon, "RIGHT", 10, 0)
-		row.Text:SetPoint("RIGHT", row, "RIGHT", -12, 0)
-		row.Text:SetJustifyH("LEFT")
-		row.Text:SetText(category.title or category.id)
-		row.categoryID = category.id
-		row:SetScript("OnEnter", function(sidebarRow)
-			if not sidebarRow.selected then
-				setFrameBackdrop(sidebarRow, { 0.165, 0.135, 0.080, 0.98 }, CARD_BORDER_HOVER)
-			end
-		end)
-		row:SetScript("OnLeave", function(sidebarRow)
-			setFrameBackdrop(
-				sidebarRow,
-				sidebarRow.selected and SELECTED_BG or SIDEBAR_BG,
-				sidebarRow.selected and CARD_BORDER_HOVER or { 0, 0, 0, 0 }
-			)
-		end)
-		row:SetScript("OnClick", function()
-			frame.SearchBox:SetText("")
-			self:SetCategory(category.id)
-		end)
-		self.sidebarRows[category.id] = row
+		if category.hidden ~= true and category.visible ~= false then
+			local row = createSidebarFrame(self, 44)
+			applyBackdrop(row, SIDEBAR_BG, CARD_BORDER)
+			row.Accent = row:CreateTexture(nil, "OVERLAY")
+			row.Accent:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.85)
+			row.Accent:SetPoint("TOPLEFT", row, "TOPLEFT", 0, -6)
+			row.Accent:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, 6)
+			row.Accent:SetWidth(2)
+			local iconSource, iconIsAtlas = resolveCategoryIcon(category)
+			row.Icon = createIcon(row, iconSource, 22, iconIsAtlas)
+			row.Icon:SetPoint("LEFT", row, "LEFT", 12, 0)
+			row.Text = row:CreateFontString(nil, "OVERLAY", FONT_TEXT)
+			row.Text:SetPoint("LEFT", row.Icon, "RIGHT", 10, 0)
+			row.Text:SetPoint("RIGHT", row, "RIGHT", -12, 0)
+			row.Text:SetJustifyH("LEFT")
+			row.Text:SetText(category.title or category.id)
+			row.categoryID = category.id
+			row:SetScript("OnEnter", function(sidebarRow)
+				if not sidebarRow.selected then
+					setFrameBackdrop(sidebarRow, { 0.165, 0.135, 0.080, 0.98 }, CARD_BORDER_HOVER)
+				end
+			end)
+			row:SetScript("OnLeave", function(sidebarRow)
+				setFrameBackdrop(
+					sidebarRow,
+					sidebarRow.selected and SELECTED_BG or SIDEBAR_BG,
+					sidebarRow.selected and CARD_BORDER_HOVER or CARD_BORDER
+				)
+			end)
+			row:SetScript("OnClick", function()
+				frame.SearchBox:SetText("")
+				self:SetCategory(category.id)
+			end)
+			self.sidebarRows[category.id] = row
+		end
 	end
 	frame.Sidebar:SetHeight(math.max(1, math.abs(self.sidebarY) + 8))
 	updateScrollFrameVisibility(frame.SidebarScroll)
@@ -3332,11 +3352,17 @@ local function createFrame(app)
 	frame:RegisterForDrag("LeftButton")
 	frame:SetScript("OnDragStart", frame.StartMoving)
 	frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-	frame.bg = frame:CreateTexture(nil, "BACKGROUND")
+	frame.bg = frame:CreateTexture(nil, "BACKGROUND", nil, -2)
 	frame.bg:SetPoint("TOPLEFT", frame, "TOPLEFT", 8, -8)
 	frame.bg:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 10)
-	frame.bg:SetTexture(getLibAssetPath(app, "LibSettingsDesigner_BackgroundDark.tga"))
-	frame.bg:SetAlpha(0.9)
+	frame.bg:SetColorTexture(0.035, 0.038, 0.043, 0.96)
+	frame.MaterialOverlay = frame:CreateTexture(nil, "BACKGROUND", nil, -1)
+	frame.MaterialOverlay:SetPoint("TOPLEFT", frame.bg, "TOPLEFT", 0, 0)
+	frame.MaterialOverlay:SetPoint("BOTTOMRIGHT", frame.bg, "BOTTOMRIGHT", 0, 0)
+	frame.MaterialOverlay:SetTexture(getLibAssetPath(app, "LibSettingsDesigner_BackgroundDark.tga"))
+	frame.MaterialOverlay:SetVertexColor(0.72, 0.78, 0.84, 1)
+	frame.MaterialOverlay:SetBlendMode("BLEND")
+	frame.MaterialOverlay:SetAlpha(0.08)
 	applyWindowBorder(frame, app)
 	if frame.CloseButton then
 		frame.CloseButton:Hide()
@@ -3459,6 +3485,7 @@ local function createFrame(app)
 	frame.SidebarScroll = CreateFrame("ScrollFrame", nil, frame.SidebarShell, "UIPanelScrollFrameTemplate")
 	frame.SidebarScroll:SetPoint("TOPLEFT", frame.SidebarShell, "TOPLEFT", 8, -8)
 	frame.SidebarScroll:SetPoint("BOTTOMRIGHT", frame.SidebarShell, "BOTTOMRIGHT", -28, 54)
+	frame.SidebarScroll._EQOLScrollStep = 44
 	skinScrollFrame(frame.SidebarScroll)
 
 	frame.Sidebar = CreateFrame("Frame", nil, frame.SidebarScroll)
@@ -3480,6 +3507,7 @@ local function createFrame(app)
 	frame.Scroll = CreateFrame("ScrollFrame", nil, frame.ContentShell, "UIPanelScrollFrameTemplate")
 	frame.Scroll:SetPoint("TOPLEFT", frame.ContentShell, "TOPLEFT", 12, -12)
 	frame.Scroll:SetPoint("BOTTOMRIGHT", frame.ContentShell, "BOTTOMRIGHT", -14, 12)
+	frame.Scroll._EQOLScrollStep = 64
 	skinScrollFrame(frame.Scroll)
 
 	frame.Content = CreateFrame("Frame", nil, frame.Scroll)

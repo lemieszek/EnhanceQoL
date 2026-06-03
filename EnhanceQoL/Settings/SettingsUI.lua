@@ -79,7 +79,6 @@ local function ensureConfigApp()
 	app:RegisterCategory({ id = "economy", title = L["Economy"] or "Economy", order = 500, iconAtlas = "auctionhouse-icon-favorite" })
 	app:RegisterCategory({ id = "sound", title = _G["SOUND"] or "Sound", order = 600, iconAtlas = "poi-door-arrow-down" })
 	app:RegisterCategory({ id = "profiles", title = L["Profiles"] or "Profiles", order = 700, iconAtlas = "services-icon-warning" })
-	app:RegisterCategory({ id = "advanced", title = L["configCenterAdvanced"] or "Advanced", order = 800, iconAtlas = "common-icon-rotateright" })
 	app:SetDefaultPage("dashboard")
 
 	addon.ConfigApp = app
