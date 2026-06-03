@@ -2165,6 +2165,14 @@ local function renderPage(state, pageID)
 	status:SetPoint("TOPRIGHT", header, "TOPRIGHT", 0, -7)
 	if category then
 		status:EnableMouse(true)
+		status:SetScript("OnEnter", function(self)
+			setFrameBackdrop(self, { 0.165, 0.135, 0.080, 0.98 }, CARD_BORDER_HOVER)
+			setTextColor(self.Text, TOPBAR_GOLD)
+		end)
+		status:SetScript("OnLeave", function(self)
+			setFrameBackdrop(self, { 0.02, 0.05, 0.025, 0.86 }, { GOLD[1], GOLD[2], GOLD[3], 0.45 })
+			setTextColor(self.Text, GOLD)
+		end)
 		status:SetScript("OnMouseUp", function()
 			state:SetCategory(category.id)
 		end)
@@ -2300,7 +2308,9 @@ function StateMixin:RenderSidebar()
 	dashboard.Text:SetText(L["configCenterDashboard"] or "Dashboard")
 	dashboard.view = "dashboard"
 	dashboard:SetScript("OnEnter", function(row)
-		if not row.selected then setFrameBackdrop(row, CARD_BG_HOVER, CARD_BORDER) end
+		if not row.selected then
+			setFrameBackdrop(row, { 0.165, 0.135, 0.080, 0.98 }, CARD_BORDER_HOVER)
+		end
 	end)
 	dashboard:SetScript("OnLeave", function(row)
 		setFrameBackdrop(
@@ -2333,7 +2343,9 @@ function StateMixin:RenderSidebar()
 		row.Text:SetText(category.title or category.id)
 		row.categoryID = category.id
 		row:SetScript("OnEnter", function(sidebarRow)
-			if not sidebarRow.selected then setFrameBackdrop(sidebarRow, CARD_BG_HOVER, CARD_BORDER) end
+			if not sidebarRow.selected then
+				setFrameBackdrop(sidebarRow, { 0.165, 0.135, 0.080, 0.98 }, CARD_BORDER_HOVER)
+			end
 		end)
 		row:SetScript("OnLeave", function(sidebarRow)
 			setFrameBackdrop(
@@ -2414,6 +2426,12 @@ local function createFrame(app)
 	frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
 	applyBackdrop(frame, PANEL_BG, PANEL_BORDER)
 	applyWindowBorder(frame)
+	if frame.CloseButton then
+		frame.CloseButton:Hide()
+		if frame.CloseButton.HookScript then
+			frame.CloseButton:HookScript("OnShow", function(self) self:Hide() end)
+		end
+	end
 	frame:Hide()
 
 	frame.TopBar = CreateFrame("Frame", nil, frame, "BackdropTemplate")
@@ -2440,8 +2458,28 @@ local function createFrame(app)
 	frame.Title:SetShadowOffset(1, -1)
 	setTextColor(frame.Title, TOPBAR_GOLD)
 
+	frame.CustomCloseButton = CreateFrame("Button", nil, frame.TopBar, "BackdropTemplate")
+	frame.CustomCloseButton:SetSize(30, 28)
+	frame.CustomCloseButton:SetPoint("RIGHT", frame.TopBar, "RIGHT", -12, 0)
+	applyBackdrop(frame.CustomCloseButton, { 0.060, 0.052, 0.040, 0.20 }, { 0, 0, 0, 0 })
+	frame.CustomCloseButton.Text = frame.CustomCloseButton:CreateFontString(nil, "OVERLAY", FONT_TITLE)
+	frame.CustomCloseButton.Text:SetAllPoints(frame.CustomCloseButton)
+	frame.CustomCloseButton.Text:SetJustifyH("CENTER")
+	frame.CustomCloseButton.Text:SetJustifyV("MIDDLE")
+	frame.CustomCloseButton.Text:SetText("X")
+	setTextColor(frame.CustomCloseButton.Text, TOPBAR_GOLD)
+	frame.CustomCloseButton:SetScript("OnEnter", function(self)
+		setFrameBackdrop(self, { 0.165, 0.135, 0.080, 0.98 }, CARD_BORDER_HOVER)
+	end)
+	frame.CustomCloseButton:SetScript("OnLeave", function(self)
+		setFrameBackdrop(self, { 0.060, 0.052, 0.040, 0.20 }, { 0, 0, 0, 0 })
+	end)
+	frame.CustomCloseButton:SetScript("OnClick", function()
+		frame:Hide()
+	end)
+
 	frame.ResetButton = makeFlatButton(frame.TopBar, _G.DEFAULTS or _G.RESET or "Defaults", 104, 28)
-	frame.ResetButton:SetPoint("RIGHT", frame.TopBar, "RIGHT", -46, 0)
+	frame.ResetButton:SetPoint("RIGHT", frame.CustomCloseButton, "LEFT", -10, 0)
 	setFrameBackdrop(frame.ResetButton, { 0.120, 0.105, 0.075, 0.95 }, { 0.55, 0.42, 0.18, 0.82 })
 	setTextColor(frame.ResetButton.Text, TOPBAR_GOLD)
 	frame.ResetButton:SetScript("OnEnter", function(self)
