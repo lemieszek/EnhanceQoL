@@ -3316,6 +3316,13 @@ end
 local function createFrame(app)
 	local L = getLocale(app)
 	local name = (app.id or "EQOL") .. "ConfigCenterFrame"
+	local outerInsetLeft = 17.5
+	local outerInsetRight = 10
+	local outerInsetY = 21
+	local topInset = 19
+	local topBarHeight = 48
+	local contentGap = 12
+	local contentTop = topInset + topBarHeight + contentGap
 	local frame = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
 	frame:SetSize(WINDOW_WIDTH, WINDOW_HEIGHT)
 	frame:SetPoint("CENTER")
@@ -3340,9 +3347,9 @@ local function createFrame(app)
 	frame:Hide()
 
 	frame.TopBar = CreateFrame("Frame", nil, frame, "BackdropTemplate")
-	frame.TopBar:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, -12)
-	frame.TopBar:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -20, -12)
-	frame.TopBar:SetHeight(48)
+	frame.TopBar:SetPoint("TOPLEFT", frame, "TOPLEFT", outerInsetLeft, -topInset)
+	frame.TopBar:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -outerInsetRight, -topInset)
+	frame.TopBar:SetHeight(topBarHeight)
 	applyBackdrop(frame.TopBar, TOPBAR_BG, { 0.52, 0.39, 0.19, 0.52 })
 
 	frame.TopBarAccent = frame.TopBar:CreateTexture(nil, "OVERLAY")
@@ -3444,8 +3451,8 @@ local function createFrame(app)
 	frame.SearchClearButton:Hide()
 
 	frame.SidebarShell = CreateFrame("Frame", nil, frame, "BackdropTemplate")
-	frame.SidebarShell:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, -72)
-	frame.SidebarShell:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 18, 18)
+	frame.SidebarShell:SetPoint("TOPLEFT", frame, "TOPLEFT", outerInsetLeft, -contentTop)
+	frame.SidebarShell:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", outerInsetLeft, outerInsetY)
 	frame.SidebarShell:SetWidth(SIDEBAR_WIDTH)
 	applyBackdrop(frame.SidebarShell, SIDEBAR_BG, PANEL_BORDER)
 
@@ -3467,7 +3474,7 @@ local function createFrame(app)
 
 	frame.ContentShell = CreateFrame("Frame", nil, frame, "BackdropTemplate")
 	frame.ContentShell:SetPoint("TOPLEFT", frame.SidebarShell, "TOPRIGHT", 8, 0)
-	frame.ContentShell:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -20, 18)
+	frame.ContentShell:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -outerInsetRight, outerInsetY)
 	applyBackdrop(frame.ContentShell, CONTENT_BG, PANEL_BORDER)
 
 	frame.Scroll = CreateFrame("ScrollFrame", nil, frame.ContentShell, "UIPanelScrollFrameTemplate")
