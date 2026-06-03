@@ -624,6 +624,7 @@ L["confirmTimerRemovalTradeDesc"] = "Bestätigt das Entfernen des Zeitlimits aut
 L["configCenterAbout"] = "About"
 L["configCenterAddOnStatus"] = "AddOn Status"
 L["configCenterAdvanced"] = "Erweitert"
+L["configCenterAdvancedSettingDesc"] = "Konfiguriere diese erweiterte Einstellung."
 L["configCenterAllSettings"] = "Alle Einstellungen"
 L["configCenterBagsLoot"] = "Taschen, Beute & Gegenstände"
 L["configCenterChatSocial"] = "Chat & Soziales"

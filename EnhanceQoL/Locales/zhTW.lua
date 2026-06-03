@@ -624,6 +624,7 @@ L["confirmTimerRemovalTradeDesc"] = "在交易綁定戰利品時自動確認移�
 L["configCenterAbout"] = "About"
 L["configCenterAddOnStatus"] = "AddOn Status"
 L["configCenterAdvanced"] = "進階"
+L["configCenterAdvancedSettingDesc"] = "設定此進階選項。"
 L["configCenterAllSettings"] = "所有設定"
 L["configCenterBagsLoot"] = "背包、拾取與物品"
 L["configCenterChatSocial"] = "聊天與社交"

@@ -624,6 +624,7 @@ L["confirmTimerRemovalTradeDesc"] = "귀속 전리품을 거래할 때 타이머
 L["configCenterAbout"] = "About"
 L["configCenterAddOnStatus"] = "AddOn Status"
 L["configCenterAdvanced"] = "고급"
+L["configCenterAdvancedSettingDesc"] = "이 고급 설정을 구성합니다."
 L["configCenterAllSettings"] = "모든 설정"
 L["configCenterBagsLoot"] = "가방, 전리품 및 아이템"
 L["configCenterChatSocial"] = "대화 및 소셜"

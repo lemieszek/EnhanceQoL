@@ -25,6 +25,17 @@ local PAGE_RIGHT_WIDTH_MIN = 190
 local PAGE_LEFT_WIDTH_MIN = 560
 local PAGE_LEFT_WIDTH_IDEAL = 620
 local PAGE_GAP = 16
+local PAGE_LAYOUT = {
+	contentPad = 10,
+	scrollbarGutter = 26, -- reserved, visible gutter between settings column and side panel
+	columnInset = 5, -- keep section borders away from the scroll clipping edge
+	scrollbarOffset = 8,
+	detailNavHeight = 30,
+	detailNavGap = 8,
+	scrollInset = 8,
+	scrollBottomPad = 20,
+	sidePanelTopOffset = 88,
+}
 local GRID_GAP = 12
 local STATUS_TILE_HEIGHT = 72
 local STATUS_ICON_SIZE = 30
@@ -60,7 +71,7 @@ local DEFAULT_DASHBOARD_INTRO = "Welcome! EnhanceQoL improves your World of Warc
 local PANEL_BG = { 0.055, 0.049, 0.043, 0.94 }
 local PANEL_BORDER = { 0.43, 0.34, 0.19, 0.74 }
 local TOPBAR_BG = { 0.105, 0.095, 0.078, 0.97 }
-local CONTENT_BG = { 0.035, 0.033, 0.031, 0.88 }
+local CONTENT_BG = { 0.028, 0.026, 0.022, 0.92 }
 local CARD_BG = { 0.080, 0.073, 0.061, 0.92 }
 local CARD_BG_HOVER = { 0.125, 0.101, 0.062, 0.98 }
 local CARD_BORDER = { 0.46, 0.36, 0.20, 0.62 }
@@ -68,12 +79,18 @@ local CARD_BORDER_HOVER = { 0.94, 0.67, 0.25, 0.90 }
 local DASHBOARD_CARD_BG = { 0.145, 0.145, 0.132, 0.96 }
 local DASHBOARD_CARD_BG_HOVER = { 0.178, 0.170, 0.142, 0.99 }
 local DASHBOARD_CARD_BORDER = { 0.43, 0.40, 0.32, 0.88 }
-local DETAIL_SECTION_BG = { 0.065, 0.058, 0.047, 0.94 }
-local ROW_BG = { 0.000, 0.000, 0.000, 0.00 }
-local ROW_BORDER = { 0.000, 0.000, 0.000, 0.00 }
-local ROW_HOVER_BG = { 0.120, 0.097, 0.055, 0.38 }
-local ROW_HOVER_BORDER = { 0.76, 0.55, 0.22, 0.54 }
-local ROW_SEPARATOR = { 0.50, 0.40, 0.24, 0.30 }
+local DETAIL_SECTION_BG = { 0.092, 0.080, 0.060, 0.96 }
+local DETAIL_COLORS = {
+	columnBg = { 0.052, 0.047, 0.038, 0.82 },
+	columnBorder = { 0.48, 0.38, 0.22, 0.72 },
+	sectionBorder = { 0.70, 0.56, 0.32, 0.82 },
+	sectionHeaderBg = { 0.135, 0.105, 0.062, 0.98 },
+}
+local ROW_BG = { 0.070, 0.061, 0.047, 0.50 }
+local ROW_BORDER = { 0.26, 0.20, 0.12, 0.18 }
+local ROW_HOVER_BG = { 0.150, 0.112, 0.060, 0.64 }
+local ROW_HOVER_BORDER = { 0.92, 0.67, 0.27, 0.62 }
+local ROW_SEPARATOR = { 0.68, 0.54, 0.30, 0.32 }
 local SELECTED_BG = { 0.24, 0.17, 0.065, 0.96 }
 local SIDEBAR_BG = { 0.030, 0.031, 0.030, 0.78 }
 local MUTED = { 0.67, 0.64, 0.58 }
@@ -82,24 +99,26 @@ local GOLD = { 1.0, 0.82, 0.36 }
 local TOPBAR_GOLD = { 1.0, 0.84, 0.36 }
 local GREEN = { 0.36, 0.82, 0.36 }
 
-local FALLBACK_ICON = "Interface\\Icons\\INV_Misc_Gear_01"
-local ADDON_ICON = "Interface\\AddOns\\EnhanceQoL\\Icons\\Icon.tga"
-local SETTINGS_COG_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Cogwheel.tga"
-local SETTINGS_ECONOMY_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Economy.tga"
-local SETTINGS_EXPORT_IMPORT_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\ExportImport.tga"
-local SETTINGS_GAMEPLAY_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Gameplay.tga"
-local SETTINGS_GENERAL_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\General.tga"
-local SETTINGS_INTERFACE_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Interface.tga"
-local SETTINGS_PROFILES_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Profiles.tga"
-local SETTINGS_QUESTION_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Question.tga"
-local SETTINGS_QUICK_REFERENCE_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\QuickReference.tga"
-local SETTINGS_REVERT_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Revert.tga"
-local SETTINGS_SOUND_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Sound.tga"
-local SETTINGS_SOCIAL_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Social.tga"
-local STATUS_ENABLED_ICON = "Interface\\RaidFrame\\ReadyCheck-Ready"
-local STATUS_PROFILE_ICON = "Interface\\Icons\\INV_Misc_GroupNeedMore"
-local STATUS_VERSION_ATLAS = "worldquest-tracker-questmarker"
-local STATUS_NEW_ATLAS = "collections-icon-favorites"
+local ASSET = {
+	fallback = "Interface\\Icons\\INV_Misc_Gear_01",
+	addon = "Interface\\AddOns\\EnhanceQoL\\Icons\\Icon.tga",
+	cog = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Cogwheel.tga",
+	economy = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Economy.tga",
+	exportImport = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\ExportImport.tga",
+	gameplay = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Gameplay.tga",
+	general = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\General.tga",
+	interface = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Interface.tga",
+	profiles = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Profiles.tga",
+	question = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Question.tga",
+	quickReference = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\QuickReference.tga",
+	revert = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Revert.tga",
+	social = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Social.tga",
+	sound = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Sound.tga",
+	statusEnabled = "Interface\\RaidFrame\\ReadyCheck-Ready",
+	statusProfile = "Interface\\Icons\\INV_Misc_GroupNeedMore",
+	statusVersionAtlas = "worldquest-tracker-questmarker",
+	statusNewAtlas = "collections-icon-favorites",
+}
 local ICON_TEXTURES = {
 	actionbar = "Interface\\Icons\\INV_Sword_04",
 	actiontracker = "Interface\\Icons\\Ability_Hunter_MarkedForDeath",
@@ -113,24 +132,24 @@ local ICON_TEXTURES = {
 	data = "Interface\\Icons\\INV_Misc_Note_05",
 	diagnostics = "Interface\\Icons\\INV_Gizmo_02",
 	cooldown = "Interface\\Icons\\INV_Misc_PocketWatch_01",
-	dashboard = SETTINGS_COG_ICON,
-	economy = SETTINGS_ECONOMY_ICON,
-	gameplay = SETTINGS_GAMEPLAY_ICON,
-	general = SETTINGS_GENERAL_ICON,
-	help = SETTINGS_QUICK_REFERENCE_ICON,
-	importexport = SETTINGS_EXPORT_IMPORT_ICON,
-	interface = SETTINGS_INTERFACE_ICON,
+	dashboard = ASSET.cog,
+	economy = ASSET.economy,
+	gameplay = ASSET.gameplay,
+	general = ASSET.general,
+	help = ASSET.quickReference,
+	importexport = ASSET.exportImport,
+	interface = ASSET.interface,
 	map = "Interface\\Icons\\INV_Misc_Map_01",
 	mover = "Interface\\Icons\\Ability_Hunter_MasterMarksman",
 	nameplate = "Interface\\Icons\\INV_Misc_Tournaments_banner_Human",
 	popups = "Interface\\Icons\\INV_Misc_Note_01",
-	profiles = SETTINGS_PROFILES_ICON,
-	reset = SETTINGS_REVERT_ICON,
+	profiles = ASSET.profiles,
+	reset = ASSET.revert,
 	resource = "Interface\\Icons\\INV_Misc_Food_100",
 	skinner = "Interface\\Icons\\INV_Misc_EngGizmos_17",
-	social = SETTINGS_SOCIAL_ICON,
-	sound = SETTINGS_SOUND_ICON,
-	support = SETTINGS_QUESTION_ICON,
+	social = ASSET.social,
+	sound = ASSET.sound,
+	support = ASSET.question,
 	tooltip = "Interface\\Icons\\INV_Misc_Note_03",
 	unitframes = "Interface\\Icons\\INV_Misc_GroupLooking",
 	vendor = "Interface\\Icons\\INV_Misc_Coin_02",
@@ -149,18 +168,14 @@ local CATEGORY_ICON_KEYS = {
 }
 
 local CATEGORY_ICON_TEXTURES = {
-	dashboard = SETTINGS_COG_ICON,
-	economy = SETTINGS_ECONOMY_ICON,
-	gameplay = SETTINGS_GAMEPLAY_ICON,
-	general = SETTINGS_GENERAL_ICON,
-	interface = SETTINGS_INTERFACE_ICON,
-	profiles = SETTINGS_PROFILES_ICON,
-	sound = SETTINGS_SOUND_ICON,
-	social = SETTINGS_SOCIAL_ICON,
-}
-
-local CATEGORY_ICON_ATLASES = {
-	gameplay = "icons_64x64_damage",
+	dashboard = ASSET.cog,
+	economy = ASSET.economy,
+	gameplay = ASSET.gameplay,
+	general = ASSET.general,
+	interface = ASSET.interface,
+	profiles = ASSET.profiles,
+	sound = ASSET.sound,
+	social = ASSET.social,
 }
 
 local PAGE_ICON_RULES = {
@@ -423,7 +438,7 @@ local function getSliderControlWidth(rowWidth, labelWidth, sliderGap)
 end
 
 local function getAddonIcon(app)
-	return app and app.opts and app.opts.icon or SETTINGS_COG_ICON
+	return app and app.opts and app.opts.icon or ASSET.cog
 end
 
 local function normalizeIconLookupText(text)
@@ -451,11 +466,8 @@ local function resolveCategoryIcon(category)
 	if category and category.iconAtlas then
 		return category.iconAtlas, true
 	end
-	if category and CATEGORY_ICON_ATLASES[category.id] then
-		return CATEGORY_ICON_ATLASES[category.id], true
-	end
 	local iconKey = category and CATEGORY_ICON_KEYS[category.id]
-	return ICON_TEXTURES[iconKey or "advanced"] or FALLBACK_ICON
+	return ICON_TEXTURES[iconKey or "advanced"] or ASSET.fallback
 end
 
 local function resolveProfilePageIcon(page)
@@ -476,7 +488,7 @@ local function resolveProfilePageIcon(page)
 		return "GM-icon-settings-pressed", true
 	end
 	if lookup:find("addon", 1, true) then
-		return ADDON_ICON
+		return ASSET.addon
 	end
 
 	return nil
@@ -494,7 +506,7 @@ local function resolvePageIcon(page)
 		return profileIcon, isProfileAtlas
 	end
 	local iconKey = getKeywordIconKey((page and page.id or "") .. " " .. (page and page.title or ""))
-	return ICON_TEXTURES[iconKey or "advanced"] or FALLBACK_ICON
+	return ICON_TEXTURES[iconKey or "advanced"] or ASSET.fallback
 end
 
 local function createIcon(parent, source, size, isAtlas)
@@ -507,9 +519,9 @@ local function createIcon(parent, source, size, isAtlas)
 		if ok then
 			return icon
 		end
-		source = FALLBACK_ICON
+		source = ASSET.fallback
 	end
-	icon:SetTexture(source or FALLBACK_ICON)
+	icon:SetTexture(source or ASSET.fallback)
 	return icon
 end
 
@@ -868,43 +880,89 @@ local function setScrollHeight(state)
 	updateScrollFrameVisibility(state.frame.Scroll)
 end
 
+local function getScrollBar(scrollFrame)
+	if not scrollFrame then return nil end
+	return scrollFrame.ScrollBar or _G[scrollFrame:GetName() and (scrollFrame:GetName() .. "ScrollBar") or ""]
+end
+
 local function updateContentMetrics(state)
 	local shellWidth = state.frame.ContentShell and state.frame.ContentShell:GetWidth() or 0
 	local fallbackWidth = CONTENT_WIDTH
-	local usableShellWidth = math.max(1, math.floor((shellWidth > 0 and shellWidth or fallbackWidth) - 26))
+	local usableShellWidth = math.max(1, math.floor(shellWidth > 0 and shellWidth or fallbackWidth))
 	local useSidePanel = state.view == "page"
 	local pageRightWidth = 0
+	local leftOuterWidth = usableShellWidth - (PAGE_LAYOUT.contentPad * 2)
+	local leftScrollWidth = leftOuterWidth
 	if useSidePanel then
-		local idealRightWidth = usableShellWidth - PAGE_LEFT_WIDTH_IDEAL - PAGE_GAP - 14
+		local availableWidth = usableShellWidth - (PAGE_LAYOUT.contentPad * 2)
+		local idealRightWidth = availableWidth - PAGE_LEFT_WIDTH_IDEAL - PAGE_GAP - PAGE_LAYOUT.scrollbarGutter
 		pageRightWidth = math.min(PAGE_RIGHT_WIDTH, math.max(PAGE_RIGHT_WIDTH_MIN, idealRightWidth))
-		if usableShellWidth - pageRightWidth - PAGE_GAP - 14 < PAGE_LEFT_WIDTH_MIN then
-			pageRightWidth = usableShellWidth - PAGE_LEFT_WIDTH_MIN - PAGE_GAP - 14
+		if availableWidth - pageRightWidth - PAGE_GAP - PAGE_LAYOUT.scrollbarGutter < PAGE_LEFT_WIDTH_MIN then
+			pageRightWidth = availableWidth - PAGE_LEFT_WIDTH_MIN - PAGE_GAP - PAGE_LAYOUT.scrollbarGutter
 		end
 		pageRightWidth = math.max(PAGE_RIGHT_WIDTH_MIN, math.floor(pageRightWidth))
+		leftOuterWidth = math.max(PAGE_LEFT_WIDTH_MIN, availableWidth - pageRightWidth - PAGE_GAP)
+		leftScrollWidth = math.max(PAGE_LEFT_WIDTH_MIN, leftOuterWidth - PAGE_LAYOUT.scrollbarGutter)
 	end
 	state.sidePanelMode = useSidePanel and "right" or nil
 	state.pageRightWidth = pageRightWidth
 	state.pageGap = useSidePanel and PAGE_GAP or 0
+	state.pageLeftOuterWidth = leftOuterWidth
+	local pageViewportWidth = leftScrollWidth
+	state.pageSectionWidth = math.max(1, pageViewportWidth - (PAGE_LAYOUT.columnInset * 2) - 18)
 	if state.frame.Scroll and state.frame.ContentShell then
 		state.frame.Scroll:ClearAllPoints()
-		state.frame.Scroll:SetPoint("TOPLEFT", state.frame.ContentShell, "TOPLEFT", 12, -12)
+		local scrollTopOffset = PAGE_LAYOUT.contentPad
+		local scrollBottomOffset = PAGE_LAYOUT.contentPad
+		if state.view == "page" and useSidePanel then
+			scrollTopOffset = PAGE_LAYOUT.contentPad
+				+ PAGE_LAYOUT.detailNavHeight
+				+ PAGE_LAYOUT.detailNavGap
+				+ PAGE_LAYOUT.scrollInset
+			scrollBottomOffset = PAGE_LAYOUT.scrollBottomPad
+		end
+		state.frame.Scroll:SetPoint(
+			"TOPLEFT",
+			state.frame.ContentShell,
+			"TOPLEFT",
+			PAGE_LAYOUT.contentPad,
+			-scrollTopOffset
+		)
 		if state.view == "page" and useSidePanel then
 			state.frame.Scroll:SetPoint(
 				"BOTTOMRIGHT",
 				state.frame.ContentShell,
 				"BOTTOMRIGHT",
-				-(pageRightWidth + PAGE_GAP + 14),
-				12
+				-(PAGE_LAYOUT.contentPad + pageRightWidth + PAGE_GAP + PAGE_LAYOUT.scrollbarGutter),
+				scrollBottomOffset
 			)
 		else
-			state.frame.Scroll:SetPoint("BOTTOMRIGHT", state.frame.ContentShell, "BOTTOMRIGHT", -14, 12)
+			state.frame.Scroll:SetPoint(
+				"BOTTOMRIGHT",
+				state.frame.ContentShell,
+				"BOTTOMRIGHT",
+				-PAGE_LAYOUT.contentPad,
+				scrollBottomOffset
+			)
+		end
+		local scrollBar = getScrollBar(state.frame.Scroll)
+		if scrollBar and scrollBar.ClearAllPoints and scrollBar.SetPoint then
+			scrollBar:ClearAllPoints()
+			if state.view == "page" and useSidePanel then
+				scrollBar:SetPoint("TOPLEFT", state.frame.Scroll, "TOPRIGHT", PAGE_LAYOUT.scrollbarOffset, -16)
+				scrollBar:SetPoint("BOTTOMLEFT", state.frame.Scroll, "BOTTOMRIGHT", PAGE_LAYOUT.scrollbarOffset, 16)
+			else
+				scrollBar:SetPoint("TOPRIGHT", state.frame.Scroll, "TOPRIGHT", -2, -16)
+				scrollBar:SetPoint("BOTTOMRIGHT", state.frame.Scroll, "BOTTOMRIGHT", -2, 16)
+			end
+			if scrollBar.SetWidth then scrollBar:SetWidth(12) end
 		end
 	end
 	local width
 	if state.view == "page" and useSidePanel then
-		width = usableShellWidth - pageRightWidth - PAGE_GAP - 14
+		width = pageViewportWidth
 	else
-		width = usableShellWidth
+		width = usableShellWidth - (PAGE_LAYOUT.contentPad * 2)
 	end
 	local minimumWidth = state.view == "page" and PAGE_LEFT_WIDTH_MIN or 640
 	width = math.max(minimumWidth, math.floor(width))
@@ -915,14 +973,20 @@ end
 
 local function skinScrollFrame(scrollFrame)
 	if not scrollFrame then return end
-	local scrollBar = scrollFrame.ScrollBar or _G[scrollFrame:GetName() and (scrollFrame:GetName() .. "ScrollBar") or ""]
+	local scrollBar = getScrollBar(scrollFrame)
 	local up = scrollFrame.ScrollBar and scrollFrame.ScrollBar.ScrollUpButton or scrollFrame.ScrollUpButton
 	local down = scrollFrame.ScrollBar and scrollFrame.ScrollBar.ScrollDownButton or scrollFrame.ScrollDownButton
 	local buttons = {}
 	if scrollBar then
 		up = up or scrollBar.ScrollUpButton or scrollBar.Back
 		down = down or scrollBar.ScrollDownButton or scrollBar.Forward
-		if scrollBar.SetAlpha then scrollBar:SetAlpha(0.55) end
+		if scrollBar.SetAlpha then scrollBar:SetAlpha(0.72) end
+		local thumb = scrollBar.GetThumbTexture and scrollBar:GetThumbTexture()
+		if thumb and thumb.SetAlpha then thumb:SetAlpha(0.90) end
+		for _, key in ipairs({ "Track", "Background", "BG", "Middle", "Top", "Bottom" }) do
+			local region = scrollBar[key]
+			if region and region.SetAlpha then region:SetAlpha(0.24) end
+		end
 	end
 	buttons[1] = up
 	buttons[2] = down
@@ -946,7 +1010,7 @@ end
 
 updateScrollFrameVisibility = function(scrollFrame)
 	if not scrollFrame then return end
-	local scrollBar = scrollFrame.ScrollBar or _G[scrollFrame:GetName() and (scrollFrame:GetName() .. "ScrollBar") or ""]
+	local scrollBar = getScrollBar(scrollFrame)
 	if not scrollBar or not scrollBar.SetShown then return end
 	local range = scrollFrame.GetVerticalScrollRange and scrollFrame:GetVerticalScrollRange() or 0
 	scrollBar:SetShown(range and range > 1)
@@ -1020,8 +1084,8 @@ end
 
 local function createPageLeftFrame(state, height)
 	local frame = trackFrame(state.contentFrames, CreateFrame("Frame", nil, state.content, "BackdropTemplate"))
-	frame:SetPoint("TOPLEFT", state.content, "TOPLEFT", 0, state.y)
-	frame:SetSize(state.pageLeftWidth or 420, height)
+	frame:SetPoint("TOPLEFT", state.content, "TOPLEFT", PAGE_LAYOUT.columnInset, state.y)
+	frame:SetSize(state.pageSectionWidth or state.pageLeftWidth or 420, height)
 	state.y = state.y - height
 	return frame
 end
@@ -1039,11 +1103,11 @@ local function addStatusChip(parent, text, color, width)
 end
 
 local function getDashboardIconSize(iconSource)
-	if iconSource == SETTINGS_QUICK_REFERENCE_ICON then
+	if iconSource == ASSET.quickReference then
 		return 48, 50
-	elseif iconSource == SETTINGS_EXPORT_IMPORT_ICON then
+	elseif iconSource == ASSET.exportImport then
 		return 48, 54
-	elseif iconSource == SETTINGS_REVERT_ICON then
+	elseif iconSource == ASSET.revert then
 		return 48, 56
 	end
 	return 48, 48
@@ -1053,7 +1117,7 @@ local function createDashboardIcon(parent, iconSource)
 	local icon = parent:CreateTexture(nil, "OVERLAY")
 	local width, height = getDashboardIconSize(iconSource)
 	icon:SetSize(width, height)
-	icon:SetTexture(iconSource or FALLBACK_ICON)
+	icon:SetTexture(iconSource or ASSET.fallback)
 	return icon
 end
 
@@ -1149,7 +1213,7 @@ local function addDashboardHero(state, title, subtitle)
 	subText:SetPoint("RIGHT", hero, "RIGHT", -166, 0)
 	subText:SetHeight(48)
 
-	local icon = createDashboardIcon(hero, SETTINGS_COG_ICON)
+	local icon = createDashboardIcon(hero, ASSET.cog)
 	icon:SetSize(92, 92)
 	icon:SetPoint("RIGHT", hero, "RIGHT", -36, -4)
 	state.y = state.y - 8
@@ -1192,10 +1256,10 @@ local function addDashboardStatusTile(parent, index, iconSource, iconAtlas, titl
 		local hasAtlas = not C_Texture or not C_Texture.GetAtlasInfo or C_Texture.GetAtlasInfo(iconAtlas)
 		local ok = hasAtlas and pcall(icon.SetAtlas, icon, iconAtlas, false)
 		if not ok then
-			icon:SetTexture(iconSource or FALLBACK_ICON)
+			icon:SetTexture(iconSource or ASSET.fallback)
 		end
 	else
-		icon:SetTexture(iconSource or FALLBACK_ICON)
+		icon:SetTexture(iconSource or ASSET.fallback)
 	end
 
 	local titleText = createText(tile, FONT_MUTED, title or "", GOLD)
@@ -1223,7 +1287,7 @@ local function addDashboardStatusPanel(state, stats)
 	local L = getLocale(app)
 	local tiles = {
 		{
-			icon = STATUS_ENABLED_ICON,
+			icon = ASSET.statusEnabled,
 			title = L["configCenterCustomizedSettings"] or "Customized settings",
 			value = tostring(stats.customized or 0) .. " / " .. tostring(stats.customizable or stats.controls or 0),
 		},
@@ -1232,7 +1296,7 @@ local function addDashboardStatusPanel(state, stats)
 	local profileCount = getOptionalNumber(app, "profileCount")
 	if profileCount then
 		tiles[#tiles + 1] = {
-			icon = STATUS_PROFILE_ICON,
+			icon = ASSET.statusProfile,
 			title = L["Profiles"] or "Profiles",
 			value = tostring(profileCount),
 		}
@@ -1243,7 +1307,7 @@ local function addDashboardStatusPanel(state, stats)
 	if version then
 		local versionValue, versionBadge = splitVersionBadge(version)
 		tiles[#tiles + 1] = {
-			atlas = STATUS_VERSION_ATLAS,
+			atlas = ASSET.statusVersionAtlas,
 			title = L["configCenterVersion"] or "Version",
 			value = versionValue,
 			badge = versionBadge,
@@ -1253,7 +1317,7 @@ local function addDashboardStatusPanel(state, stats)
 	local newCount = getOptionalNumber(app, "newCount")
 	if newCount and newCount > 0 then
 		tiles[#tiles + 1] = {
-			atlas = STATUS_NEW_ATLAS,
+			atlas = ASSET.statusNewAtlas,
 			title = L["configCenterNewInVersion"] or "New in this Version",
 			value = tostring(newCount),
 		}
@@ -1612,6 +1676,7 @@ end
 
 local function addSettingRow(state, control, pathText, parent, yOffset, width)
 	local app = state.app
+	local _ = pathText
 	local controlType = getControlType(control)
 	local layoutType = getControlLayoutType(control)
 	local rowHeight = getSettingRowHeight(control)
@@ -1641,8 +1706,13 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 	local descText
 	if controlType == "slider" then
 		descText = control.description
+	elseif control.description and control.description ~= "" then
+		descText = control.description
+	elseif layoutType == "complex" then
+		local L = getLocale(app)
+		descText = L["configCenterAdvancedSettingDesc"] or "Configure this advanced setting."
 	else
-		descText = control.description or pathText or getControlPath(app, control)
+		descText = ""
 	end
 	local desc = createText(row, FONT_MUTED, descText or "", MUTED)
 	desc.Text:SetWordWrap(true)
@@ -1968,7 +2038,7 @@ local function addDashboardNewPanel(state, parent, entries, width)
 		icon:SetSize(15, 15)
 		icon:SetPoint("LEFT", row, "LEFT", 0, 0)
 		if icon.SetAtlas then
-			local ok = pcall(icon.SetAtlas, icon, STATUS_NEW_ATLAS, false)
+			local ok = pcall(icon.SetAtlas, icon, ASSET.statusNewAtlas, false)
 			if not ok then icon:SetTexture("Interface\\Common\\ReputationStar") end
 		else
 			icon:SetTexture("Interface\\Common\\ReputationStar")
@@ -2158,12 +2228,95 @@ local function collectPageGroups(app, page, mainToggle)
 	return groups
 end
 
+local function addPageLeftColumnShell(state)
+	if state.sidePanelMode ~= "right" or not state.frame.ContentShell then
+		return nil
+	end
+	local shell = trackFrame(state.fixedFrames, CreateFrame("Frame", nil, state.frame.ContentShell, "BackdropTemplate"))
+	shell:SetPoint(
+		"TOPLEFT",
+		state.frame.ContentShell,
+		"TOPLEFT",
+		PAGE_LAYOUT.contentPad,
+		-(PAGE_LAYOUT.contentPad + PAGE_LAYOUT.detailNavHeight + PAGE_LAYOUT.detailNavGap)
+	)
+	shell:SetPoint(
+		"BOTTOMRIGHT",
+		state.frame.ContentShell,
+		"BOTTOMRIGHT",
+		-(PAGE_LAYOUT.contentPad + (state.pageRightWidth or PAGE_RIGHT_WIDTH) + PAGE_GAP + PAGE_LAYOUT.scrollbarGutter),
+		PAGE_LAYOUT.contentPad
+	)
+	applyBackdrop(shell, DETAIL_COLORS.columnBg, DETAIL_COLORS.columnBorder)
+	if state.frame.Scroll and shell.SetFrameLevel and state.frame.Scroll.GetFrameLevel then
+		shell:SetFrameLevel(math.max(0, (state.frame.Scroll:GetFrameLevel() or 1) - 1))
+	end
+	return shell
+end
+
+local function addPageScrollbarRail(state)
+	if state.sidePanelMode ~= "right" or not state.frame.ContentShell or not state.frame.Scroll then
+		return nil
+	end
+	local rail = trackFrame(state.fixedFrames, CreateFrame("Frame", nil, state.frame.ContentShell, "BackdropTemplate"))
+	rail:SetPoint("TOPLEFT", state.frame.Scroll, "TOPRIGHT", PAGE_LAYOUT.scrollbarOffset - 2, -16)
+	rail:SetPoint("BOTTOMLEFT", state.frame.Scroll, "BOTTOMRIGHT", PAGE_LAYOUT.scrollbarOffset - 2, 16)
+	rail:SetWidth(math.max(16, PAGE_LAYOUT.scrollbarGutter - 6))
+	applyBackdrop(rail, { 0.038, 0.034, 0.026, 0.58 }, { 0.48, 0.38, 0.22, 0.54 })
+	if state.frame.Scroll and rail.SetFrameLevel and state.frame.Scroll.GetFrameLevel then
+		rail:SetFrameLevel(math.max(0, (state.frame.Scroll:GetFrameLevel() or 1) - 1))
+	end
+	return rail
+end
+
+local function addPageFixedHeader(state, category, pagePath)
+	if state.sidePanelMode ~= "right" or not state.frame.ContentShell then
+		return nil
+	end
+	local header = trackFrame(state.fixedFrames, CreateFrame("Frame", nil, state.frame.ContentShell, "BackdropTemplate"))
+	header:SetPoint(
+		"TOPLEFT",
+		state.frame.ContentShell,
+		"TOPLEFT",
+		PAGE_LAYOUT.contentPad + PAGE_LAYOUT.columnInset,
+		-(PAGE_LAYOUT.contentPad + 2)
+	)
+	header:SetSize(state.pageSectionWidth or state.pageLeftWidth or 420, PAGE_LAYOUT.detailNavHeight)
+	if state.frame.Scroll and header.SetFrameLevel and state.frame.Scroll.GetFrameLevel then
+		header:SetFrameLevel((state.frame.Scroll:GetFrameLevel() or 1) + 2)
+	end
+
+	local backLabel = "< " .. tostring(category and (category.title or category.id) or (_G.BACK or ""))
+	local backButton = makeFlatButton(header, backLabel, 136, 24)
+	backButton:SetPoint("LEFT", header, "LEFT", 0, 0)
+	backButton:SetScript("OnClick", function()
+		if category and category.id then
+			state:SetCategory(category.id)
+		else
+			state:SetDashboard()
+		end
+	end)
+
+	local breadcrumb = createText(header, FONT_MUTED, pagePath, MUTED)
+	breadcrumb:SetPoint("LEFT", backButton, "RIGHT", 12, 0)
+	breadcrumb:SetPoint("RIGHT", header, "RIGHT", -4, 0)
+	breadcrumb:SetPoint("TOP", backButton, "TOP", 0, -2)
+	breadcrumb:SetHeight(20)
+	return header
+end
+
 local function addPageSidePanel(state, page, category)
 	local L = getLocale(state.app)
 	local panel = trackFrame(state.fixedFrames, CreateFrame("Frame", nil, state.frame.ContentShell, "BackdropTemplate"))
-	panel:SetPoint("TOPRIGHT", state.frame.ContentShell, "TOPRIGHT", -14, -12)
-	panel:SetSize(state.pageRightWidth or PAGE_RIGHT_WIDTH, 248)
-	applyBackdrop(panel, CARD_BG, CARD_BORDER)
+	panel:SetPoint(
+		"TOPRIGHT",
+		state.frame.ContentShell,
+		"TOPRIGHT",
+		-PAGE_LAYOUT.contentPad,
+		-PAGE_LAYOUT.sidePanelTopOffset
+	)
+	panel:SetSize(state.pageRightWidth or PAGE_RIGHT_WIDTH, 292)
+	applyBackdrop(panel, DETAIL_SECTION_BG, DETAIL_COLORS.sectionBorder)
 
 	local aboutTitle = createText(panel, FONT_HEADER, L["configCenterAbout"] or "About", GOLD)
 	aboutTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", 14, -14)
@@ -2207,13 +2360,13 @@ local function addGroupSection(state, group, pagePath)
 	local rowGap = collapsed and 0 or math.max(#group.controls - 1, 0) * 2
 	local height = 46 + controlsHeight + rowGap + 14
 	local section = createPageLeftFrame(state, height)
-	applyBackdrop(section, DETAIL_SECTION_BG, CARD_BORDER)
+	applyBackdrop(section, DETAIL_SECTION_BG, DETAIL_COLORS.sectionBorder)
 
 	local header = CreateFrame("Button", nil, section, "BackdropTemplate")
 	header:SetPoint("TOPLEFT", section, "TOPLEFT", 0, 0)
 	header:SetPoint("TOPRIGHT", section, "TOPRIGHT", 0, 0)
 	header:SetHeight(40)
-	applyBackdrop(header, { 0.078, 0.068, 0.050, 0.96 }, { 0, 0, 0, 0 })
+	applyBackdrop(header, DETAIL_COLORS.sectionHeaderBg, { 0, 0, 0, 0 })
 	header.Text = header:CreateFontString(nil, "OVERLAY", FONT_HEADER)
 	header.Text:SetPoint("LEFT", header, "LEFT", 14, 0)
 	header.Text:SetPoint("RIGHT", header, "RIGHT", -34, 0)
@@ -2228,12 +2381,17 @@ local function addGroupSection(state, group, pagePath)
 		state.collapsedGroups[group.id] = not collapsed
 		state:RenderContent()
 	end)
+	local headerLine = header:CreateTexture(nil, "OVERLAY")
+	headerLine:SetColorTexture(ROW_SEPARATOR[1], ROW_SEPARATOR[2], ROW_SEPARATOR[3], 0.42)
+	headerLine:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", 0, 0)
+	headerLine:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", 0, 0)
+	headerLine:SetHeight(1)
 
 	if not collapsed then
 		local y = -46
 		for _, control in ipairs(group.controls) do
 			local rowHeight = getSettingRowHeight(control)
-			addSettingRow(state, control, pagePath, section, y, (state.pageLeftWidth or 420) - 24)
+			addSettingRow(state, control, pagePath, section, y, (state.pageSectionWidth or state.pageLeftWidth or 420) - 24)
 			y = y - rowHeight - 2
 		end
 	end
@@ -2250,49 +2408,33 @@ local function renderPage(state, pageID)
 	end
 	local category = app.categoriesByID[page.category or ""]
 	local pagePath = getPagePath(app, page)
-	local breadcrumb = createText(createContentFrame(state, 22), FONT_MUTED, getPagePath(app, page), MUTED)
-	breadcrumb:SetAllPoints(breadcrumb:GetParent())
-	state.y = state.y - 4
 
-	local header = createContentFrame(state, 78)
+	if state.sidePanelMode == "right" then
+		addPageLeftColumnShell(state)
+		addPageFixedHeader(state, category, pagePath)
+		addPageScrollbarRail(state)
+		addPageSidePanel(state, page, category)
+	end
+
+	local header = createPageLeftFrame(state, 100)
 	local iconSource, iconIsAtlas = resolvePageIcon(page)
 	local icon = createIconPlate(header, iconSource, 54, iconIsAtlas)
-	icon:SetPoint("TOPLEFT", header, "TOPLEFT", 0, -4)
+	icon:SetPoint("TOPLEFT", header, "TOPLEFT", 0, -14)
 	local title = createText(header, FONT_TITLE, page.title or page.id, WHITE)
 	title:SetPoint("TOPLEFT", icon, "TOPRIGHT", 16, -1)
-	title:SetPoint("RIGHT", header, "RIGHT", -190, 0)
+	title:SetPoint("RIGHT", header, "RIGHT", -6, 0)
 	title:SetHeight(25)
 	local desc = createText(header, FONT_MUTED, getPageDescription(app, page), MUTED)
 	desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
-	desc:SetPoint("RIGHT", header, "RIGHT", -190, 0)
-	desc:SetHeight(36)
-	local statusLabel = category and (category.title or category.id) or (_G.SETTINGS or "Settings")
-	local status = addStatusChip(header, statusLabel, GOLD, 150)
-	status:SetPoint("TOPRIGHT", header, "TOPRIGHT", 0, -7)
-	if category then
-		status:EnableMouse(true)
-		status:SetScript("OnEnter", function(self)
-			setFrameBackdrop(self, { 0.165, 0.135, 0.080, 0.98 }, CARD_BORDER_HOVER)
-			setTextColor(self.Text, TOPBAR_GOLD)
-		end)
-		status:SetScript("OnLeave", function(self)
-			setFrameBackdrop(self, { 0.02, 0.05, 0.025, 0.86 }, { GOLD[1], GOLD[2], GOLD[3], 0.45 })
-			setTextColor(self.Text, GOLD)
-		end)
-		status:SetScript("OnMouseUp", function()
-			state:SetCategory(category.id)
-		end)
-	end
+	desc:SetPoint("RIGHT", header, "RIGHT", -6, 0)
+	desc:SetHeight(42)
 	state.y = state.y - 8
 
 	local groupsStartY = state.y
-	if state.sidePanelMode == "right" then
-		addPageSidePanel(state, page, category)
-	end
 	local groups = collectPageGroups(app, page, nil)
 	if #groups == 0 then
 		local empty = createPageLeftFrame(state, 72)
-		applyBackdrop(empty, CARD_BG, CARD_BORDER)
+		applyBackdrop(empty, DETAIL_SECTION_BG, DETAIL_COLORS.sectionBorder)
 		local emptyLabel = getLocale(app)["configCenterNoResults"] or "No settings found."
 		local emptyText = createText(empty, FONT_MUTED, emptyLabel, MUTED)
 		emptyText:SetPoint("TOPLEFT", empty, "TOPLEFT", 14, -14)
@@ -2667,7 +2809,7 @@ local function createFrame(app)
 	frame.LegacyButton:SetScript("OnClick", function() openLegacySettings(app) end)
 
 	frame.ContentShell = CreateFrame("Frame", nil, frame, "BackdropTemplate")
-	frame.ContentShell:SetPoint("TOPLEFT", frame.SidebarShell, "TOPRIGHT", 18, 0)
+	frame.ContentShell:SetPoint("TOPLEFT", frame.SidebarShell, "TOPRIGHT", 8, 0)
 	frame.ContentShell:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -20, 18)
 	applyBackdrop(frame.ContentShell, CONTENT_BG, { 0.24, 0.20, 0.14, 0.54 })
 

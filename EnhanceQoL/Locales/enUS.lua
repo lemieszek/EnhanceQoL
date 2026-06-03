@@ -624,6 +624,7 @@ L["confirmTimerRemovalTradeDesc"] = "Confirms timer removal automatically when t
 L["configCenterAbout"] = "About"
 L["configCenterAddOnStatus"] = "AddOn Status"
 L["configCenterAdvanced"] = "Advanced"
+L["configCenterAdvancedSettingDesc"] = "Configure this advanced setting."
 L["configCenterAllSettings"] = "All settings"
 L["configCenterBagsLoot"] = "Bags, Loot & Items"
 L["configCenterChatSocial"] = "Chat & Social"

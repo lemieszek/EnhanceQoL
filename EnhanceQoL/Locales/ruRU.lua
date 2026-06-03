@@ -624,6 +624,7 @@ L["confirmTimerRemovalTradeDesc"] = "Автоматически подтверж
 L["configCenterAbout"] = "About"
 L["configCenterAddOnStatus"] = "AddOn Status"
 L["configCenterAdvanced"] = "Дополнительно"
+L["configCenterAdvancedSettingDesc"] = "Настройте этот дополнительный параметр."
 L["configCenterAllSettings"] = "Все настройки"
 L["configCenterBagsLoot"] = "Сумки, добыча и предметы"
 L["configCenterChatSocial"] = "Чат и соц. функции"

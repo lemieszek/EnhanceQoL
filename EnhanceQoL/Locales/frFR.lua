@@ -624,6 +624,7 @@ L["confirmTimerRemovalTradeDesc"] = "Confirme automatiquement la suppression du 
 L["configCenterAbout"] = "About"
 L["configCenterAddOnStatus"] = "AddOn Status"
 L["configCenterAdvanced"] = "Avancé"
+L["configCenterAdvancedSettingDesc"] = "Configurez ce paramètre avancé."
 L["configCenterAllSettings"] = "Tous les paramètres"
 L["configCenterBagsLoot"] = "Sacs, butin et objets"
 L["configCenterChatSocial"] = "Discussion et social"
