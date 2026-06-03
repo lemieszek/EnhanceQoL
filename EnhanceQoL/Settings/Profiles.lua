@@ -56,10 +56,6 @@ local bagsCategoriesExpandable
 local damageMeterExpandable
 local hbpExpandable
 
-local function isBagsCategoriesSectionVisible()
-	return addon.db and addon.db.enableBagsModule == true and bagsCategoriesExpandable and bagsCategoriesExpandable:IsExpanded() ~= false
-end
-
 local profileOrderActive, profileOrderGlobal, profileOrderCopy, profileOrderDelete = {}, {}, {}, {}
 local globalFontOrder = {}
 local importProtectionOrder = {}
@@ -1560,7 +1556,7 @@ addon.functions.SettingsCreateButton(cProfiles, {
 		end
 		showExportCodeDialog("EQOL_BAGS_CATEGORIES_EXPORT", L["Export Bags categories"] or "Export Bags categories", code)
 	end,
-	parentSection = isBagsCategoriesSectionVisible,
+	parentSection = bagsCategoriesExpandable,
 })
 
 addon.functions.SettingsCreateButton(cProfiles, {
@@ -1576,7 +1572,7 @@ addon.functions.SettingsCreateButton(cProfiles, {
 			false
 		)
 	end,
-	parentSection = isBagsCategoriesSectionVisible,
+	parentSection = bagsCategoriesExpandable,
 })
 
 damageMeterExpandable = addon.functions.SettingsCreateExpandableSection(cProfiles, {

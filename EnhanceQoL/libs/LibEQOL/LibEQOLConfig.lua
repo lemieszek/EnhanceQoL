@@ -123,6 +123,7 @@ local LEGACY_CONTROL_METADATA_FIELDS = {
 	"modernGroup",
 	"multiline",
 	"multilineHeight",
+	"newTagID",
 	"numeric",
 	"onClick",
 	"optionfunc",
@@ -294,6 +295,7 @@ function AppMixin:RegisterLegacySection(section, data)
 		iconAtlas = data.iconAtlas,
 		icon = data.icon,
 		mainToggleID = data.mainToggleID,
+		newTagID = data.newTagID,
 		order = data.order or 500,
 		legacy = true,
 	})

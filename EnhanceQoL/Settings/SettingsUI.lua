@@ -48,6 +48,12 @@ local function ensureConfigApp()
 			end
 			return count
 		end,
+		isNewTag = function(tagID)
+			local newTags = addon.variables and addon.variables.NewVersionTableEQOL
+			if not tagID or type(newTags) ~= "table" then return false end
+			local key = tostring(tagID)
+			return newTags[key] == true or newTags[prefix .. "_" .. key] == true
+		end,
 		profileCount = function()
 			local count = 0
 			if EnhanceQoLDB and type(EnhanceQoLDB.profiles) == "table" then
@@ -175,6 +181,7 @@ local function registerLegacyControl(category, cbData, controlType, setting)
 		keywords = cbData.searchtags,
 		level = cbData.level,
 		order = type(cbData.order) == "number" and cbData.order or addon.ConfigControlOrder,
+		newTagID = cbData.newTagID,
 		groupID = groupID,
 		groupTitle = groupTitle,
 		setting = setting,
@@ -798,6 +805,7 @@ function addon.functions.SettingsCreateExpandableSection(cat, cbData)
 			icon = cbData.icon,
 			iconAtlas = cbData.iconAtlas,
 			mainToggleID = cbData.mainToggleID,
+			newTagID = cbData.newTagID,
 		})
 		if pageID then
 			addon.ConfigCurrentGroupByPageID[pageID] = nil

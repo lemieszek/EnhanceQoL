@@ -13,14 +13,26 @@ local UIParent = _G.UIParent
 local C_Texture = _G.C_Texture
 local MenuUtil = _G.MenuUtil
 local ColorPickerFrame = _G.ColorPickerFrame
+local StaticPopupDialogs = _G.StaticPopupDialogs
+local StaticPopup_Show = _G.StaticPopup_Show
 
 local WINDOW_WIDTH = 1080
 local WINDOW_HEIGHT = 700
 local SIDEBAR_WIDTH = 236
 local CONTENT_WIDTH = 790
 local PAGE_RIGHT_WIDTH = 248
+local PAGE_RIGHT_WIDTH_MIN = 190
+local PAGE_LEFT_WIDTH_MIN = 560
+local PAGE_LEFT_WIDTH_IDEAL = 620
 local PAGE_GAP = 16
 local GRID_GAP = 12
+local BOOLEAN_ROW_HEIGHT = 68
+local STACKED_ROW_HEIGHT = 106
+local COMPLEX_ROW_HEIGHT = 92
+local ROW_INSET = 14
+local FIELD_CONTROL_LEFT = 18
+local FIELD_CONTROL_WIDTH_MIN = 260
+local FIELD_CONTROL_WIDTH_MAX = 340
 
 local FONT_TITLE = "GameFontNormalLarge"
 local FONT_HERO = "GameFontNormalHuge2"
@@ -42,6 +54,12 @@ local CARD_BORDER_HOVER = { 0.94, 0.67, 0.25, 0.90 }
 local DASHBOARD_CARD_BG = { 0.145, 0.145, 0.132, 0.96 }
 local DASHBOARD_CARD_BG_HOVER = { 0.178, 0.170, 0.142, 0.99 }
 local DASHBOARD_CARD_BORDER = { 0.43, 0.40, 0.32, 0.88 }
+local DETAIL_SECTION_BG = { 0.065, 0.058, 0.047, 0.94 }
+local ROW_BG = { 0.000, 0.000, 0.000, 0.00 }
+local ROW_BORDER = { 0.000, 0.000, 0.000, 0.00 }
+local ROW_HOVER_BG = { 0.120, 0.097, 0.055, 0.38 }
+local ROW_HOVER_BORDER = { 0.76, 0.55, 0.22, 0.54 }
+local ROW_SEPARATOR = { 0.50, 0.40, 0.24, 0.30 }
 local SELECTED_BG = { 0.24, 0.17, 0.065, 0.96 }
 local SIDEBAR_BG = { 0.030, 0.031, 0.030, 0.78 }
 local MUTED = { 0.67, 0.64, 0.58 }
@@ -51,6 +69,7 @@ local TOPBAR_GOLD = { 1.0, 0.84, 0.36 }
 local GREEN = { 0.36, 0.82, 0.36 }
 
 local FALLBACK_ICON = "Interface\\Icons\\INV_Misc_Gear_01"
+local ADDON_ICON = "Interface\\AddOns\\EnhanceQoL\\Icons\\Icon.tga"
 local SETTINGS_COG_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Cogwheel.tga"
 local SETTINGS_EXPORT_IMPORT_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\ExportImport.tga"
 local SETTINGS_QUESTION_ICON = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Question.tga"
@@ -283,8 +302,58 @@ local function applyHoverState(frame, normalBg, hoverBg, normalBorder, hoverBord
 	end)
 end
 
+local getControlType
+
+local function styleInlineSettingRow(row)
+	applyBackdrop(row, ROW_BG, ROW_BORDER)
+	row:EnableMouse(true)
+	row:SetScript("OnEnter", function(self)
+		setFrameBackdrop(self, ROW_HOVER_BG, ROW_HOVER_BORDER)
+	end)
+	row:SetScript("OnLeave", function(self)
+		setFrameBackdrop(self, ROW_BG, ROW_BORDER)
+	end)
+	row.Separator = row:CreateTexture(nil, "BACKGROUND")
+	row.Separator:SetColorTexture(ROW_SEPARATOR[1], ROW_SEPARATOR[2], ROW_SEPARATOR[3], ROW_SEPARATOR[4])
+	row.Separator:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", ROW_INSET, 0)
+	row.Separator:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -ROW_INSET, 0)
+	row.Separator:SetHeight(1)
+end
+
+local function getControlLayoutType(control)
+	local controlType = getControlType(control)
+	if controlType == "toggle" or controlType == "checkbox" then
+		return "boolean"
+	end
+	if controlType == "slider" or controlType == "dropdown" or controlType == "sounddropdown"
+		or controlType == "input" or controlType == "colorpicker" then
+		return "stacked"
+	end
+	return "complex"
+end
+
+local function getSettingRowHeight(control)
+	local layoutType = getControlLayoutType(control)
+	if layoutType == "boolean" then
+		return BOOLEAN_ROW_HEIGHT
+	end
+	if layoutType == "stacked" then
+		return STACKED_ROW_HEIGHT
+	end
+	return COMPLEX_ROW_HEIGHT
+end
+
+local function getFieldControlWidth(rowWidth)
+	return math.max(FIELD_CONTROL_WIDTH_MIN, math.min(FIELD_CONTROL_WIDTH_MAX, (tonumber(rowWidth) or 0) - 36))
+end
+
 local function getAddonIcon(app)
 	return app and app.opts and app.opts.icon or SETTINGS_COG_ICON
+end
+
+local function normalizeIconLookupText(text)
+	text = tostring(text or ""):lower()
+	return text:gsub("[^%w]+", "")
 end
 
 local function getKeywordIconKey(text)
@@ -311,12 +380,40 @@ local function resolveCategoryIcon(category)
 	return ICON_TEXTURES[iconKey or "advanced"] or FALLBACK_ICON
 end
 
+local function resolveProfilePageIcon(page)
+	if not page or page.category ~= "profiles" then
+		return nil
+	end
+
+	local lookup = normalizeIconLookupText((page.id or "") .. " " .. (page.title or "") .. " " .. (page.newTagID or ""))
+	if lookup:find("damagemeter", 1, true) then
+		return "icons_64x64_damage", true
+	end
+	if lookup:find("healerbuffplacement", 1, true)
+		or lookup:find("profileshbp", 1, true)
+		or lookup:find("hbp", 1, true) then
+		return "UI-LFG-RoleIcon-Healer", true
+	end
+	if lookup:find("settings", 1, true) then
+		return "GM-icon-settings-pressed", true
+	end
+	if lookup:find("addon", 1, true) then
+		return ADDON_ICON
+	end
+
+	return nil
+end
+
 local function resolvePageIcon(page)
 	if page and page.icon then
 		return page.icon
 	end
 	if page and page.iconAtlas then
 		return page.iconAtlas, true
+	end
+	local profileIcon, isProfileAtlas = resolveProfilePageIcon(page)
+	if profileIcon then
+		return profileIcon, isProfileAtlas
 	end
 	local iconKey = getKeywordIconKey((page and page.id or "") .. " " .. (page and page.title or ""))
 	return ICON_TEXTURES[iconKey or "advanced"] or FALLBACK_ICON
@@ -402,12 +499,6 @@ local function getSettingCountText(app, count)
 	return tostring(count) .. " " .. label
 end
 
-local function getFeatureCountText(app, count)
-	local L = getLocale(app)
-	local label = count == 1 and (L["configCenterFeature"] or "feature") or (L["configCenterFeatures"] or "features")
-	return tostring(count) .. " " .. label
-end
-
 local function getAppTitle(app)
 	return (app and app.opts and app.opts.title) or (app and app.id) or "Settings"
 end
@@ -444,7 +535,7 @@ local function getPageDescription(app, page)
 	return ""
 end
 
-local function getControlType(control)
+function getControlType(control)
 	local controlType = tostring(control and (control.type or control.sType) or "text"):lower()
 	if controlType == "checkbox" then
 		return "toggle"
@@ -584,21 +675,6 @@ local function openLegacySettingsForControl(app, control)
 	end
 end
 
-local function getCategoryStats(app, categoryID)
-	local pages = app:GetPages(categoryID)
-	local controls = 0
-	local enabled = 0
-	for _, page in ipairs(pages) do
-		for _, control in ipairs(page.controls or {}) do
-			controls = controls + 1
-			if (control.type == "toggle" or control.type == "checkbox") and app:GetControlValue(control) == true then
-				enabled = enabled + 1
-			end
-		end
-	end
-	return #pages, controls, enabled
-end
-
 local function makeFlatButton(parent, text, width, height, iconSource, iconIsAtlas)
 	local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
 	button:SetSize(width or 120, height or 26)
@@ -678,6 +754,16 @@ local function refreshControlRow(app, control, row)
 		local ok, r, g, b, a = pcall(control.getColor, key)
 		if ok then
 			row.swatch.Texture:SetColorTexture(r or 1, g or 1, b or 1, a or 1)
+			if row.hexText then
+				row.hexText.Text:SetText(
+					string.format(
+						"#%02X%02X%02X",
+						math.floor(((r or 1) * 255) + 0.5),
+						math.floor(((g or 1) * 255) + 0.5),
+						math.floor(((b or 1) * 255) + 0.5)
+					)
+				)
+			end
 		end
 	end
 end
@@ -691,12 +777,47 @@ local function setScrollHeight(state)
 end
 
 local function updateContentMetrics(state)
-	local scrollWidth = state.frame.Scroll and state.frame.Scroll:GetWidth() or 0
-	local width = math.max(640, math.floor((scrollWidth > 0 and scrollWidth or CONTENT_WIDTH) - 26))
+	local shellWidth = state.frame.ContentShell and state.frame.ContentShell:GetWidth() or 0
+	local fallbackWidth = CONTENT_WIDTH
+	local usableShellWidth = math.max(1, math.floor((shellWidth > 0 and shellWidth or fallbackWidth) - 26))
+	local useSidePanel = state.view == "page"
+	local pageRightWidth = 0
+	if useSidePanel then
+		local idealRightWidth = usableShellWidth - PAGE_LEFT_WIDTH_IDEAL - PAGE_GAP - 14
+		pageRightWidth = math.min(PAGE_RIGHT_WIDTH, math.max(PAGE_RIGHT_WIDTH_MIN, idealRightWidth))
+		if usableShellWidth - pageRightWidth - PAGE_GAP - 14 < PAGE_LEFT_WIDTH_MIN then
+			pageRightWidth = usableShellWidth - PAGE_LEFT_WIDTH_MIN - PAGE_GAP - 14
+		end
+		pageRightWidth = math.max(PAGE_RIGHT_WIDTH_MIN, math.floor(pageRightWidth))
+	end
+	state.sidePanelMode = useSidePanel and "right" or nil
+	state.pageRightWidth = pageRightWidth
+	state.pageGap = useSidePanel and PAGE_GAP or 0
+	if state.frame.Scroll and state.frame.ContentShell then
+		state.frame.Scroll:ClearAllPoints()
+		state.frame.Scroll:SetPoint("TOPLEFT", state.frame.ContentShell, "TOPLEFT", 12, -12)
+		if state.view == "page" and useSidePanel then
+			state.frame.Scroll:SetPoint(
+				"BOTTOMRIGHT",
+				state.frame.ContentShell,
+				"BOTTOMRIGHT",
+				-(pageRightWidth + PAGE_GAP + 14),
+				12
+			)
+		else
+			state.frame.Scroll:SetPoint("BOTTOMRIGHT", state.frame.ContentShell, "BOTTOMRIGHT", -14, 12)
+		end
+	end
+	local width
+	if state.view == "page" and useSidePanel then
+		width = usableShellWidth - pageRightWidth - PAGE_GAP - 14
+	else
+		width = usableShellWidth
+	end
+	local minimumWidth = state.view == "page" and PAGE_LEFT_WIDTH_MIN or 640
+	width = math.max(minimumWidth, math.floor(width))
 	state.contentWidth = width
-	state.pageRightWidth = math.min(PAGE_RIGHT_WIDTH, math.floor(width * 0.32))
-	state.pageGap = PAGE_GAP
-	state.pageLeftWidth = math.max(420, width - state.pageRightWidth - state.pageGap)
+	state.pageLeftWidth = width
 	state.content:SetWidth(width)
 end
 
@@ -742,6 +863,10 @@ end
 local function clearContent(state)
 	clearFrameList(state.contentFrames)
 	state.y = -2
+end
+
+local function clearFixedContent(state)
+	clearFrameList(state.fixedFrames)
 end
 
 local function clearSidebar(state)
@@ -883,7 +1008,7 @@ local function setDashboardCardBorder(card, borderColor)
 	card.BorderRight:SetColorTexture(borderColor[1], borderColor[2], borderColor[3], borderColor[4])
 end
 
-local function styleDashboardTile(tile)
+local function styleRaisedTile(tile)
 	applyDashboardCardBackground(tile, DASHBOARD_CARD_BG)
 	setDashboardCardBorder(tile, DASHBOARD_CARD_BORDER)
 	tile:EnableMouse(true)
@@ -899,7 +1024,7 @@ end
 
 local function addDashboardCard(row, index, title, description, iconSource, onClick)
 	local card = createGridCard({ contentWidth = row.contentWidth or CONTENT_WIDTH }, row, index, 2, 108)
-	styleDashboardTile(card)
+	styleRaisedTile(card)
 	if onClick then
 		card:SetScript("OnMouseUp", onClick)
 	end
@@ -966,7 +1091,7 @@ local function addDashboardStatusTile(parent, index, iconSource, iconAtlas, titl
 	local tile = CreateFrame("Frame", nil, parent, "BackdropTemplate")
 	tile:SetSize(width, 72)
 	tile:SetPoint("TOPLEFT", parent, "TOPLEFT", 14 + ((index - 1) * (width + GRID_GAP)), -44)
-	styleDashboardTile(tile)
+	styleRaisedTile(tile)
 
 	local icon = tile:CreateTexture(nil, "OVERLAY")
 	icon:SetSize(32, 32)
@@ -1056,10 +1181,22 @@ local function addDashboardStatusPanel(state, stats)
 	return panel
 end
 
-local function addConfigureFallback(row, app, control, text)
+local function addConfigureFallback(row, app, control, text, opts)
+	opts = opts or {}
 	local L = getLocale(app)
-	local button = makeFlatButton(row, text or L["configCenterConfigure"] or "Configure", 138, 26, ICON_TEXTURES.advanced)
-	button:SetPoint("RIGHT", row, "RIGHT", -14, 0)
+	local button = makeFlatButton(
+		row,
+		text or L["configCenterConfigure"] or "Configure",
+		opts.width or 138,
+		26,
+		ICON_TEXTURES.advanced
+	)
+	if opts.point then
+		button:SetPoint(opts.point[1], opts.point[2], opts.point[3], opts.point[4], opts.point[5])
+	else
+		button:SetPoint("RIGHT", row, "RIGHT", -14, 0)
+	end
+	setFrameBackdrop(button, { 0.100, 0.087, 0.064, 0.95 }, { 0.50, 0.39, 0.20, 0.78 })
 	button:SetScript("OnClick", function()
 		openLegacySettingsForControl(app, control)
 	end)
@@ -1082,15 +1219,23 @@ local function commitInputValue(app, control, editBox, row)
 	refreshControlRow(app, control, row)
 end
 
-local function addSliderWidget(row, app, control)
-	local valueText = createText(row, FONT_TEXT, "", GOLD, "RIGHT")
-	valueText:SetPoint("RIGHT", row, "RIGHT", -14, 10)
-	valueText:SetSize(62, 18)
+local function addSliderWidget(row, app, control, opts)
+	opts = opts or {}
+	local valueText = opts.valueText
+	if not valueText then
+		valueText = createText(row, FONT_TEXT, "", GOLD, "RIGHT")
+		valueText:SetPoint("RIGHT", row, "RIGHT", -14, 10)
+		valueText:SetSize(62, 18)
+	end
 	row.value = valueText
-
+	local sliderWidth = opts.width or 220
 	local slider = CreateFrame("Slider", nil, row, "OptionsSliderTemplate")
-	slider:SetPoint("RIGHT", valueText, "LEFT", -12, -7)
-	slider:SetSize(168, 18)
+	if opts.point then
+		slider:SetPoint(opts.point[1], opts.point[2], opts.point[3], opts.point[4], opts.point[5])
+	else
+		slider:SetPoint("RIGHT", valueText, "LEFT", -12, -7)
+	end
+	slider:SetSize(sliderWidth, 18)
 	local minValue = tonumber(control.min) or 0
 	local maxValue = tonumber(control.max) or 1
 	slider:SetMinMaxValues(minValue, maxValue)
@@ -1103,7 +1248,7 @@ local function addSliderWidget(row, app, control)
 	if slider.Middle then slider.Middle:Hide() end
 	if slider.Right then slider.Right:Hide() end
 	slider.Track = CreateFrame("Frame", nil, row, "BackdropTemplate")
-	slider.Track:SetSize(168, 6)
+	slider.Track:SetSize(sliderWidth, 6)
 	slider.Track:SetPoint("CENTER", slider, "CENTER", 0, 0)
 	applyBackdrop(slider.Track, { 0.025, 0.024, 0.022, 0.95 }, { 0.28, 0.24, 0.17, 0.75 })
 	slider.Fill = slider.Track:CreateTexture(nil, "OVERLAY")
@@ -1117,7 +1262,7 @@ local function addSliderWidget(row, app, control)
 		local span = maxValue - minValue
 		local percent = span ~= 0 and ((tonumber(value) or minValue) - minValue) / span or 0
 		percent = math.max(0, math.min(1, percent))
-		slider.Fill:SetWidth(math.max(1, 166 * percent))
+		slider.Fill:SetWidth(math.max(1, (sliderWidth - 2) * percent))
 	end
 	slider:SetScript("OnValueChanged", function(self, value)
 		updateFill(value)
@@ -1136,14 +1281,19 @@ local function addSliderWidget(row, app, control)
 	return slider
 end
 
-local function addDropdownWidget(row, app, control)
+local function addDropdownWidget(row, app, control, opts)
+	opts = opts or {}
 	local options = getControlOptions(control)
 	if #options == 0 or not MenuUtil or not MenuUtil.CreateContextMenu then
-		addConfigureFallback(row, app, control)
+		addConfigureFallback(row, app, control, nil, opts.configure)
 		return
 	end
-	local button = makeFlatButton(row, "", 188, 26)
-	button:SetPoint("RIGHT", row, "RIGHT", -14, 0)
+	local button = makeFlatButton(row, "", opts.width or 220, 26)
+	if opts.point then
+		button:SetPoint(opts.point[1], opts.point[2], opts.point[3], opts.point[4], opts.point[5])
+	else
+		button:SetPoint("RIGHT", row, "RIGHT", -14, 0)
+	end
 	row.value = createText(button, FONT_TEXT, "", WHITE, "LEFT")
 	row.value:SetPoint("LEFT", button, "LEFT", 10, 0)
 	row.value:SetPoint("RIGHT", button, "RIGHT", -22, 0)
@@ -1164,10 +1314,15 @@ local function addDropdownWidget(row, app, control)
 	return button
 end
 
-local function addInputWidget(row, app, control)
+local function addInputWidget(row, app, control, opts)
+	opts = opts or {}
 	local editBox = CreateFrame("EditBox", nil, row, "InputBoxTemplate")
-	editBox:SetSize(math.min(tonumber(control.inputWidth) or 178, 220), control.multiline and 48 or 26)
-	editBox:SetPoint("RIGHT", row, "RIGHT", -14, 0)
+	editBox:SetSize(opts.width or math.min(tonumber(control.inputWidth) or 178, 220), control.multiline and 48 or 26)
+	if opts.point then
+		editBox:SetPoint(opts.point[1], opts.point[2], opts.point[3], opts.point[4], opts.point[5])
+	else
+		editBox:SetPoint("RIGHT", row, "RIGHT", -14, 0)
+	end
 	editBox:SetAutoFocus(false)
 	editBox:SetNumeric(control.numeric == true)
 	if control.maxChars then editBox:SetMaxLetters(control.maxChars) end
@@ -1230,23 +1385,35 @@ local function addToggleWidget(row, app, control)
 	return switch
 end
 
-local function addColorWidget(row, app, control)
+local function addColorWidget(row, app, control, opts)
+	opts = opts or {}
+	if type(control.getColor) ~= "function" or type(control.setColor) ~= "function" or not ColorPickerFrame then
+		addConfigureFallback(row, app, control, nil, opts.configure)
+		return
+	end
+	local currentLabel = createText(row, FONT_MUTED, opts.currentText or (_G.CURRENT or "Current") .. ":", MUTED)
+	if opts.point then
+		currentLabel:SetPoint(opts.point[1], opts.point[2], opts.point[3], opts.point[4], opts.point[5])
+	else
+		currentLabel:SetPoint("LEFT", row, "LEFT", FIELD_CONTROL_LEFT, -29)
+	end
+	currentLabel:SetSize(58, 20)
+
 	local swatch = CreateFrame("Button", nil, row, "BackdropTemplate")
 	swatch:SetSize(34, 24)
-	swatch:SetPoint("RIGHT", row, "RIGHT", -112, 0)
+	swatch:SetPoint("LEFT", currentLabel, "RIGHT", 8, 0)
 	applyBackdrop(swatch, { 0.02, 0.02, 0.02, 0.92 }, CARD_BORDER)
 	swatch.Texture = swatch:CreateTexture(nil, "OVERLAY")
 	swatch.Texture:SetPoint("TOPLEFT", swatch, "TOPLEFT", 4, -4)
 	swatch.Texture:SetPoint("BOTTOMRIGHT", swatch, "BOTTOMRIGHT", -4, 4)
 	row.swatch = swatch
+	row.hexText = createText(row, FONT_TEXT, "", GOLD)
+	row.hexText:SetPoint("LEFT", swatch, "RIGHT", 10, 1)
+	row.hexText:SetSize(80, 20)
 
-	local button = makeFlatButton(row, _G.COLOR or "Color", 92, 26)
-	button:SetPoint("RIGHT", row, "RIGHT", -14, 0)
+	local button = makeFlatButton(row, _G.CHANGE or "Change", 92, 26)
+	button:SetPoint("LEFT", row.hexText, "RIGHT", 10, 0)
 	local function openPicker()
-		if type(control.getColor) ~= "function" or type(control.setColor) ~= "function" or not ColorPickerFrame then
-			openLegacySettingsForControl(app, control)
-			return
-		end
 		local key = control.key or control.id
 		local ok, r, g, b, a = pcall(control.getColor, key)
 		if not ok then
@@ -1294,45 +1461,94 @@ end
 
 local function addSettingRow(state, control, pathText, parent, yOffset, width)
 	local app = state.app
+	local controlType = getControlType(control)
+	local layoutType = getControlLayoutType(control)
+	local rowHeight = getSettingRowHeight(control)
+	local rowWidth = width or parent and (parent:GetWidth() - 24) or state.pageLeftWidth or state.contentWidth or 620
 	local row
 	if parent then
 		row = CreateFrame("Frame", nil, parent, "BackdropTemplate")
 		row:SetPoint("TOPLEFT", parent, "TOPLEFT", 12, yOffset or -42)
-		row:SetSize(width or parent:GetWidth() - 24, 66)
+		row:SetSize(rowWidth, rowHeight)
 	else
-		row = createContentFrame(state, 66)
+		row = createContentFrame(state, rowHeight)
+		rowWidth = row:GetWidth() > 0 and row:GetWidth() or rowWidth
 	end
-	applyBackdrop(row, CARD_BG, CARD_BORDER)
-	row:EnableMouse(true)
-	applyHoverState(row, CARD_BG, CARD_BG_HOVER, CARD_BORDER, CARD_BORDER_HOVER)
+	styleInlineSettingRow(row)
 
-	local iconKey = getKeywordIconKey((control.id or "") .. " " .. (control.label or "")) or "advanced"
-	local rowIcon = createIcon(row, ICON_TEXTURES[iconKey], 18, false)
-	rowIcon:SetPoint("TOPLEFT", row, "TOPLEFT", 14, -14)
+	local textLeft = 16
+	if control.icon or control.iconAtlas then
+		local rowIcon = createIcon(row, control.icon or control.iconAtlas, 18, control.iconAtlas ~= nil)
+		rowIcon:SetPoint("TOPLEFT", row, "TOPLEFT", 14, -14)
+		textLeft = 42
+	end
 
 	local title = createText(row, FONT_TEXT, control.label or control.id, WHITE)
-	title:SetPoint("TOPLEFT", rowIcon, "TOPRIGHT", 9, 3)
-	title:SetPoint("RIGHT", row, "RIGHT", -150, 0)
+	title:SetPoint("TOPLEFT", row, "TOPLEFT", textLeft, -12)
 	title:SetHeight(20)
 
 	local descText = control.description or pathText or getControlPath(app, control)
 	local desc = createText(row, FONT_MUTED, descText or "", MUTED)
-	desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -5)
-	desc:SetPoint("RIGHT", row, "RIGHT", -150, 0)
-	desc:SetHeight(28)
+	desc.Text:SetWordWrap(true)
 
-	local controlType = getControlType(control)
-	if controlType == "toggle" then
+	if layoutType == "boolean" then
+		title:SetPoint("RIGHT", row, "RIGHT", -88, 0)
+		desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -5)
+		desc:SetPoint("RIGHT", row, "RIGHT", -88, 0)
+		desc:SetHeight(30)
 		addToggleWidget(row, app, control)
-	elseif controlType == "slider" then
-		addSliderWidget(row, app, control)
-	elseif controlType == "dropdown" or controlType == "sounddropdown" then
-		addDropdownWidget(row, app, control)
-	elseif controlType == "input" then
-		addInputWidget(row, app, control)
+	elseif layoutType == "stacked" then
+		local valueWidth = controlType == "slider" and 96 or 0
+		if valueWidth > 0 then
+			title:SetPoint("RIGHT", row, "RIGHT", -(valueWidth + 18), 0)
+		else
+			title:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+		end
+		desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
+		desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+		desc:SetHeight(32)
+
+		local controlWidth = getFieldControlWidth(rowWidth)
+		local controlPoint = { "BOTTOMLEFT", row, "BOTTOMLEFT", FIELD_CONTROL_LEFT, 15 }
+		if controlType == "slider" then
+			local valueText = createText(row, FONT_TEXT, "", GOLD, "RIGHT")
+			valueText:SetPoint("TOPRIGHT", row, "TOPRIGHT", -18, -12)
+			valueText:SetSize(valueWidth, 20)
+			addSliderWidget(row, app, control, {
+				point = controlPoint,
+				width = controlWidth,
+				valueText = valueText,
+			})
+		elseif controlType == "dropdown" or controlType == "sounddropdown" then
+			addDropdownWidget(row, app, control, {
+				point = controlPoint,
+				width = controlWidth,
+				configure = {
+					point = controlPoint,
+					width = 150,
+				},
+			})
+		elseif controlType == "input" then
+			addInputWidget(row, app, control, {
+				point = controlPoint,
+				width = controlWidth,
+			})
+		elseif controlType == "colorpicker" then
+			addColorWidget(row, app, control, {
+				point = controlPoint,
+				configure = {
+					point = controlPoint,
+					width = 150,
+				},
+			})
+		end
 	elseif controlType == "button" then
+		title:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+		desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
+		desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+		desc:SetHeight(36)
 		local button = makeFlatButton(row, control.buttonText or (_G.OKAY or "OK"), 112, 26)
-		button:SetPoint("RIGHT", row, "RIGHT", -14, 0)
+		button:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -14, 14)
 		button:SetScript("OnClick", function()
 			if type(control.onClick) == "function" then
 				control.onClick()
@@ -1340,17 +1556,22 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 				control.setValue()
 			end
 		end)
-	elseif controlType == "colorpicker" then
-		addColorWidget(row, app, control)
-	elseif controlType == "multidropdown" or controlType == "sortablelist" or controlType == "coloroverrides" then
-		addConfigureFallback(row, app, control)
 	else
-		addConfigureFallback(row, app, control)
+		title:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+		desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
+		desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+		desc:SetHeight(36)
+		addConfigureFallback(row, app, control, nil, {
+			point = { "BOTTOMRIGHT", row, "BOTTOMRIGHT", -14, 14 },
+			width = 150,
+		})
+		local badge = addStatusChip(row, control.level == "advanced" and "Advanced" or "Legacy", MUTED, 74)
+		badge:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", textLeft, 15)
 	end
 
 	refreshControlRow(app, control, row)
 	if not parent then
-		state.y = state.y - 8
+		state.y = state.y - 10
 	end
 	return row
 end
@@ -1377,46 +1598,45 @@ local function resetCurrentPage(state)
 	state:RenderContent()
 end
 
-local function addCategoryCard(state, category, row, index, columns)
-	local app = state.app
-	local pageCount, controlCount, enabledCount = getCategoryStats(app, category.id)
-	local card = row and createGridCard(state, row, index, columns or 2, 86) or createContentFrame(state, 84)
-	applyBackdrop(card, CARD_BG, CARD_BORDER)
-	card:EnableMouse(true)
-	applyHoverState(card)
-	card:SetScript("OnMouseUp", function()
-		state:SetCategory(category.id)
-	end)
-
-	local iconSource, iconIsAtlas = resolveCategoryIcon(category)
-	local icon = createIconPlate(card, iconSource, 42, iconIsAtlas)
-	icon:SetPoint("LEFT", card, "LEFT", 14, 0)
-
-	local title = createText(card, FONT_HEADER, category.title or category.id, WHITE)
-	title:SetPoint("TOPLEFT", icon, "TOPRIGHT", 14, -3)
-	title:SetPoint("RIGHT", card, "RIGHT", -88, 0)
-	title:SetHeight(22)
-
-	local categoryDetails = getFeatureCountText(app, pageCount) .. " · " .. getSettingCountText(app, controlCount)
-	local details = createText(card, FONT_MUTED, categoryDetails, MUTED)
-	details:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
-	details:SetPoint("RIGHT", card, "RIGHT", -88, 0)
-	details:SetHeight(22)
-
-	local enabled = createText(card, FONT_MUTED, tostring(enabledCount), GOLD, "RIGHT")
-	enabled:SetPoint("RIGHT", card, "RIGHT", -16, 0)
-	enabled:SetSize(110, 24)
-	if not row then
-		state.y = state.y - 10
+local function confirmResetCurrentPage(state)
+	if state.view ~= "page" or not state.selectedPageID then
+		return
 	end
+	local page = state.app:GetPage(state.selectedPageID)
+	if not page then
+		return
+	end
+	local L = getLocale(state.app)
+	if not StaticPopupDialogs or not StaticPopup_Show then
+		resetCurrentPage(state)
+		return
+	end
+	StaticPopupDialogs.EQOL_CONFIG_CENTER_RESET_DEFAULTS = StaticPopupDialogs.EQOL_CONFIG_CENTER_RESET_DEFAULTS or {
+		button1 = _G.OKAY or "OK",
+		button2 = _G.CANCEL or "Cancel",
+		timeout = 0,
+		whileDead = true,
+		hideOnEscape = true,
+		preferredIndex = 3,
+		OnAccept = function(_, data)
+			if data and data.state then
+				resetCurrentPage(data.state)
+			end
+		end,
+	}
+	local dialog = StaticPopupDialogs.EQOL_CONFIG_CENTER_RESET_DEFAULTS
+	dialog.text = (L["configCenterConfirmDefaultsTitle"] or "Reset this page to default values?")
+		.. "\n\n"
+		.. (L["configCenterConfirmDefaultsDesc"] or "This will restore all settings on %s to their defaults."):format(
+			page.title or page.id
+		)
+	StaticPopup_Show("EQOL_CONFIG_CENTER_RESET_DEFAULTS", nil, nil, { state = state })
 end
 
 local function addPageCard(state, page, row, index, columns)
 	local controlCount = #(page.controls or {})
-	local card = row and createGridCard(state, row, index, columns or 2, 90) or createContentFrame(state, 88)
-	applyBackdrop(card, CARD_BG, CARD_BORDER)
-	card:EnableMouse(true)
-	applyHoverState(card)
+	local card = row and createGridCard(state, row, index, columns or 2, 104) or createContentFrame(state, 104)
+	styleRaisedTile(card)
 	card:SetScript("OnMouseUp", function()
 		state:SetPage(page.id)
 	end)
@@ -1432,13 +1652,14 @@ local function addPageCard(state, page, row, index, columns)
 
 	local desc = getPageDescription(state.app, page)
 	local descText = createText(card, FONT_MUTED, desc, MUTED)
-	descText:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
+	descText:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -5)
 	descText:SetPoint("RIGHT", card, "RIGHT", -42, 0)
-	descText:SetHeight(32)
+	descText:SetHeight(26)
+	descText.Text:SetWordWrap(true)
 
 	local metaText = getSettingCountText(state.app, controlCount)
 	local meta = createText(card, FONT_MUTED, metaText, GOLD)
-	meta:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", 70, 11)
+	meta:SetPoint("TOPLEFT", icon, "TOPRIGHT", 14, -62)
 	meta:SetPoint("RIGHT", card, "RIGHT", -42, 0)
 	meta:SetHeight(16)
 
@@ -1466,6 +1687,81 @@ local function collectEnabledPages(app, limit)
 	return result
 end
 
+local function isNewTagActive(app, tagID)
+	local resolver = app and app.opts and app.opts.isNewTag
+	if type(resolver) ~= "function" or not tagID then
+		return false
+	end
+	local ok, result = pcall(resolver, tagID)
+	return ok and result == true
+end
+
+local function collectNewEntries(app, limit)
+	local result = {}
+	local seen = {}
+	for _, page in ipairs(app.pages or {}) do
+		if page.newTagID and isNewTagActive(app, page.newTagID) and not seen[page.id] then
+			result[#result + 1] = {
+				title = page.title or page.id,
+				pageID = page.id,
+			}
+			seen[page.id] = true
+			if limit and #result >= limit then return result end
+		end
+	end
+	for _, control in ipairs(app.controls or {}) do
+		if control.newTagID and isNewTagActive(app, control.newTagID) and not seen[control.id] then
+			result[#result + 1] = {
+				title = control.label or control.id,
+				pageID = control.pageID,
+			}
+			seen[control.id] = true
+			if limit and #result >= limit then return result end
+		end
+	end
+	return result
+end
+
+local function addDashboardNewPanel(state, parent, entries, width)
+	local app = state.app
+	local L = getLocale(app)
+	local panel = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+	panel:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, 0)
+	panel:SetSize(width, 250)
+	applyBackdrop(panel, CARD_BG, CARD_BORDER)
+
+	local title = createText(panel, FONT_HEADER, L["configCenterNewInVersion"] or "New in this Version", GOLD)
+	title:SetPoint("TOPLEFT", panel, "TOPLEFT", 14, -12)
+	title:SetPoint("RIGHT", panel, "RIGHT", -14, 0)
+	title:SetHeight(20)
+
+	for index, entry in ipairs(entries) do
+		local row = CreateFrame("Button", nil, panel)
+		row:SetPoint("TOPLEFT", panel, "TOPLEFT", 14, -46 - ((index - 1) * 38))
+		row:SetPoint("RIGHT", panel, "RIGHT", -14, 0)
+		row:SetHeight(26)
+		row:SetScript("OnClick", function()
+			if entry.pageID then state:SetPage(entry.pageID) end
+		end)
+
+		local icon = row:CreateTexture(nil, "OVERLAY")
+		icon:SetSize(15, 15)
+		icon:SetPoint("LEFT", row, "LEFT", 0, 0)
+		if icon.SetAtlas then
+			local ok = pcall(icon.SetAtlas, icon, STATUS_NEW_ATLAS, false)
+			if not ok then icon:SetTexture("Interface\\Common\\ReputationStar") end
+		else
+			icon:SetTexture("Interface\\Common\\ReputationStar")
+		end
+
+		local label = createText(row, FONT_TEXT, entry.title or "", WHITE)
+		label:SetPoint("LEFT", icon, "RIGHT", 10, 0)
+		label:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+		label:SetHeight(22)
+	end
+	return panel
+end
+
 local function renderDashboard(state)
 	local app = state.app
 	local L = getLocale(app)
@@ -1477,7 +1773,6 @@ local function renderDashboard(state)
 	)
 
 	local quickRow = createGridRow(state, 108)
-	local legacyLabel = L["configCenterLegacyBlizzard"] or "Legacy Blizzard Settings"
 	addDashboardCard(
 		quickRow,
 		1,
@@ -1515,12 +1810,22 @@ local function renderDashboard(state)
 	addDashboardStatusPanel(state, stats)
 
 	local enabledPages = collectEnabledPages(app, 5)
+	local newEntries = collectNewEntries(app, 3)
 	local panelRow = createContentFrame(state, 250)
-	local leftWidth = math.floor(((state.contentWidth or CONTENT_WIDTH) - GRID_GAP) * 0.62)
-	local rightWidth = (state.contentWidth or CONTENT_WIDTH) - leftWidth - GRID_GAP
+	local panelWidth = state.contentWidth or CONTENT_WIDTH
+	local hasNewPanel = #newEntries > 0
+	local newPanelWidth = hasNewPanel and math.floor((panelWidth - GRID_GAP) * 0.48) or 0
+	local enabledWidth = hasNewPanel and (panelWidth - newPanelWidth - GRID_GAP) or panelWidth
+	if hasNewPanel then
+		addDashboardNewPanel(state, panelRow, newEntries, newPanelWidth)
+	end
 	local enabledPanel = CreateFrame("Frame", nil, panelRow, "BackdropTemplate")
-	enabledPanel:SetPoint("TOPLEFT", panelRow, "TOPLEFT", 0, 0)
-	enabledPanel:SetSize(leftWidth, 250)
+	if hasNewPanel then
+		enabledPanel:SetPoint("TOPRIGHT", panelRow, "TOPRIGHT", 0, 0)
+	else
+		enabledPanel:SetPoint("TOPLEFT", panelRow, "TOPLEFT", 0, 0)
+	end
+	enabledPanel:SetSize(enabledWidth, 250)
 	applyBackdrop(enabledPanel, CARD_BG, CARD_BORDER)
 	local enabledTitle = createText(
 		enabledPanel,
@@ -1555,29 +1860,7 @@ local function renderDashboard(state)
 			badge:SetPoint("RIGHT", mini, "RIGHT", -8, 0)
 		end
 	end
-
-	local actionsPanel = CreateFrame("Frame", nil, panelRow, "BackdropTemplate")
-	actionsPanel:SetPoint("TOPRIGHT", panelRow, "TOPRIGHT", 0, 0)
-	actionsPanel:SetSize(rightWidth, 250)
-	applyBackdrop(actionsPanel, CARD_BG, CARD_BORDER)
-	local actionsTitle = createText(actionsPanel, FONT_HEADER, L["configCenterQuickActions"] or "Quick actions", GOLD)
-	actionsTitle:SetPoint("TOPLEFT", actionsPanel, "TOPLEFT", 14, -12)
-	actionsTitle:SetPoint("RIGHT", actionsPanel, "RIGHT", -14, 0)
-	actionsTitle:SetHeight(20)
-	local legacy = makeFlatButton(actionsPanel, legacyLabel, math.max(180, rightWidth - 28), 28, ICON_TEXTURES.advanced)
-	legacy:SetPoint("TOPLEFT", actionsTitle, "BOTTOMLEFT", 0, -12)
-	legacy:SetScript("OnClick", function() openLegacySettings(app) end)
 	state.y = state.y - 14
-
-	addSectionTitle(state, _G.CATEGORY or "Category", nil)
-	local categories = app:GetCategories()
-	for index = 1, #categories, 2 do
-		local row = createGridRow(state, 86)
-		addCategoryCard(state, categories[index], row, 1, 2)
-		if categories[index + 1] then
-			addCategoryCard(state, categories[index + 1], row, 2, 2)
-		end
-	end
 end
 
 local function renderCategoryOverview(state, categoryID)
@@ -1594,65 +1877,12 @@ local function renderCategoryOverview(state, categoryID)
 		return
 	end
 	for index = 1, #pages, 2 do
-		local row = createGridRow(state, 90)
+		local row = createGridRow(state, 104)
 		addPageCard(state, pages[index], row, 1, 2)
 		if pages[index + 1] then
 			addPageCard(state, pages[index + 1], row, 2, 2)
 		end
 	end
-end
-
-local function isReliableMainToggle(page, control, candidateCount)
-	if not control or getControlType(control) ~= "toggle" then
-		return false
-	end
-	if page.mainToggleID and control.id == page.mainToggleID then
-		return true
-	end
-	if control.isMainToggle == true or control.uiRole == "mainToggle" then
-		return true
-	end
-	if candidateCount ~= 1 then
-		return false
-	end
-	local label = tostring(control.label or "")
-	local key = tostring(control.key or control.id or ""):lower()
-	local pageKey = tostring(page.id or page.title or ""):lower():gsub("[^%w]+", "")
-	if label:match("^Enable%s+") then
-		return true
-	end
-	if key:match("^enable") and (pageKey == "" or key:find(pageKey, 1, true)) then
-		return true
-	end
-	return false
-end
-
-local function findMainToggle(app, page)
-	local explicit
-	local candidates = {}
-	for _, control in ipairs(page.controls or {}) do
-		if getControlType(control) == "toggle" then
-			if page.mainToggleID and control.id == page.mainToggleID then
-				explicit = control
-				break
-			end
-			if control.isMainToggle == true or control.uiRole == "mainToggle" then
-				explicit = control
-				break
-			end
-			local label = tostring(control.label or "")
-			local key = tostring(control.key or control.id or ""):lower()
-			if label:match("^Enable%s+") or key:match("^enable") then
-				candidates[#candidates + 1] = control
-			end
-		end
-	end
-	if explicit then return explicit end
-	if #candidates == 1 and isReliableMainToggle(page, candidates[1], 1) then
-		return candidates[1]
-	end
-	local _ = app
-	return nil
 end
 
 local function collectPageGroups(app, page, mainToggle)
@@ -1703,8 +1933,8 @@ end
 
 local function addPageSidePanel(state, page, category)
 	local L = getLocale(state.app)
-	local panel = trackFrame(state.contentFrames, CreateFrame("Frame", nil, state.content, "BackdropTemplate"))
-	panel:SetPoint("TOPRIGHT", state.content, "TOPRIGHT", 0, state.y)
+	local panel = trackFrame(state.fixedFrames, CreateFrame("Frame", nil, state.frame.ContentShell, "BackdropTemplate"))
+	panel:SetPoint("TOPRIGHT", state.frame.ContentShell, "TOPRIGHT", -14, -12)
 	panel:SetSize(state.pageRightWidth or PAGE_RIGHT_WIDTH, 248)
 	applyBackdrop(panel, CARD_BG, CARD_BORDER)
 
@@ -1741,15 +1971,22 @@ end
 
 local function addGroupSection(state, group, pagePath)
 	local collapsed = state.collapsedGroups and state.collapsedGroups[group.id] == true
-	local rowCount = collapsed and 0 or #group.controls
-	local height = 42 + (rowCount * 74) + 12
+	local controlsHeight = 0
+	if not collapsed then
+		for _, control in ipairs(group.controls) do
+			controlsHeight = controlsHeight + getSettingRowHeight(control)
+		end
+	end
+	local rowGap = collapsed and 0 or math.max(#group.controls - 1, 0) * 2
+	local height = 46 + controlsHeight + rowGap + 14
 	local section = createPageLeftFrame(state, height)
-	applyBackdrop(section, { 0.036, 0.036, 0.044, 0.90 }, CARD_BORDER)
+	applyBackdrop(section, DETAIL_SECTION_BG, CARD_BORDER)
 
 	local header = CreateFrame("Button", nil, section, "BackdropTemplate")
 	header:SetPoint("TOPLEFT", section, "TOPLEFT", 0, 0)
 	header:SetPoint("TOPRIGHT", section, "TOPRIGHT", 0, 0)
-	header:SetHeight(38)
+	header:SetHeight(40)
+	applyBackdrop(header, { 0.078, 0.068, 0.050, 0.96 }, { 0, 0, 0, 0 })
 	header.Text = header:CreateFontString(nil, "OVERLAY", FONT_HEADER)
 	header.Text:SetPoint("LEFT", header, "LEFT", 14, 0)
 	header.Text:SetPoint("RIGHT", header, "RIGHT", -34, 0)
@@ -1766,10 +2003,11 @@ local function addGroupSection(state, group, pagePath)
 	end)
 
 	if not collapsed then
-		local y = -42
+		local y = -46
 		for _, control in ipairs(group.controls) do
+			local rowHeight = getSettingRowHeight(control)
 			addSettingRow(state, control, pagePath, section, y, (state.pageLeftWidth or 420) - 24)
-			y = y - 74
+			y = y - rowHeight - 2
 		end
 	end
 	state.y = state.y - 12
@@ -1804,16 +2042,19 @@ local function renderPage(state, pageID)
 	local statusLabel = category and (category.title or category.id) or (_G.SETTINGS or "Settings")
 	local status = addStatusChip(header, statusLabel, GOLD, 150)
 	status:SetPoint("TOPRIGHT", header, "TOPRIGHT", 0, -7)
+	if category then
+		status:EnableMouse(true)
+		status:SetScript("OnMouseUp", function()
+			state:SetCategory(category.id)
+		end)
+	end
 	state.y = state.y - 8
 
-	local mainToggle = findMainToggle(app, page)
-	if mainToggle then
-		addSettingRow(state, mainToggle, pagePath)
-	end
-
 	local groupsStartY = state.y
-	addPageSidePanel(state, page, category)
-	local groups = collectPageGroups(app, page, mainToggle)
+	if state.sidePanelMode == "right" then
+		addPageSidePanel(state, page, category)
+	end
+	local groups = collectPageGroups(app, page, nil)
 	if #groups == 0 then
 		local empty = createPageLeftFrame(state, 72)
 		applyBackdrop(empty, CARD_BG, CARD_BORDER)
@@ -1826,15 +2067,9 @@ local function renderPage(state, pageID)
 			addGroupSection(state, group, pagePath)
 		end
 	end
-	state.y = math.min(state.y, groupsStartY - 230)
-
-	local footer = createContentFrame(state, 42)
-	local reset = makeFlatButton(footer, _G.RESET or "Reset", 118, 28, ICON_TEXTURES.reset)
-	reset:SetPoint("RIGHT", footer, "RIGHT", -130, 0)
-	reset:SetScript("OnClick", function() resetCurrentPage(state) end)
-	local apply = makeFlatButton(footer, _G.APPLY or "Apply", 118, 28)
-	apply:SetPoint("RIGHT", footer, "RIGHT", 0, 0)
-	apply:SetScript("OnClick", function() state:RenderContent() end)
+	if state.sidePanelMode == "right" then
+		state.y = math.min(state.y, groupsStartY - 230)
+	end
 end
 
 local function renderSearch(state, query)
@@ -1892,6 +2127,7 @@ local StateMixin = {}
 function StateMixin:RenderContent()
 	updateContentMetrics(self)
 	clearContent(self)
+	clearFixedContent(self)
 	local query = self.frame.SearchBox:GetText() or ""
 	if query ~= "" then
 		renderSearch(self, query)
@@ -2026,6 +2262,7 @@ local function initializeState(frame, app)
 		frame = frame,
 		content = frame.Content,
 		contentFrames = {},
+		fixedFrames = {},
 		sidebarFrames = {},
 		sidebarRows = {},
 		collapsedGroups = {},
@@ -2194,7 +2431,7 @@ local function createFrame(app)
 		state:RenderContent()
 	end)
 	frame.ResetButton:SetScript("OnClick", function()
-		resetCurrentPage(state)
+		confirmResetCurrentPage(state)
 	end)
 	frame:SetScript("OnSizeChanged", function()
 		if frame:IsShown() then
