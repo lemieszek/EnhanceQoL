@@ -45,7 +45,6 @@ local PAGE_CARD_HEIGHT = 112
 local PAGE_CARD_PAD_X = 18
 local PAGE_CARD_ICON_SIZE = 42
 local PAGE_CARD_TEXT_GAP = 18
-local PAGE_CARD_CHEVRON_WIDTH = 28
 local PAGE_CARD_TEXT_LEFT = PAGE_CARD_PAD_X + PAGE_CARD_ICON_SIZE + PAGE_CARD_TEXT_GAP
 local BOOLEAN_ROW_HEIGHT = 68
 local STACKED_ROW_HEIGHT = 106
@@ -627,13 +626,16 @@ end
 
 local function getPageCardDescription(app, page)
 	local L = getLocale(app)
+	if page and page.description and page.description ~= "" then
+		return page.description
+	end
 	local lookup = normalizePageLookupText(page)
 	for keyword, localeKey in pairs(PAGE_CARD_DESCRIPTION_FALLBACKS) do
 		if lookup:find(keyword, 1, true) then
-			return L[localeKey] or getPageDescription(app, page)
+			return L[localeKey] or ""
 		end
 	end
-	return getPageDescription(app, page)
+	return ""
 end
 
 function getControlType(control)
@@ -1925,7 +1927,7 @@ local function addPageCard(state, page, row, index, columns)
 	icon:SetPoint("LEFT", card, "LEFT", PAGE_CARD_PAD_X, 0)
 
 	local textLeft = PAGE_CARD_TEXT_LEFT
-	local rightInset = PAGE_CARD_CHEVRON_WIDTH + 20
+	local rightInset = PAGE_CARD_PAD_X
 
 	local title = createText(card, FONT_HEADER, page.title or page.id, WHITE)
 	title:SetPoint("TOPLEFT", card, "TOPLEFT", textLeft, -24)
@@ -1947,10 +1949,6 @@ local function addPageCard(state, page, row, index, columns)
 	meta:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", textLeft, 14)
 	meta:SetPoint("RIGHT", card, "RIGHT", -rightInset, 0)
 	meta:SetHeight(16)
-
-	local open = createText(card, FONT_TITLE, ">", GOLD, "RIGHT")
-	open:SetPoint("RIGHT", card, "RIGHT", -18, 0)
-	open:SetSize(18, 22)
 	if not row then
 		state.y = state.y - 10
 	end
