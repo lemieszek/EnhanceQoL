@@ -77,7 +77,7 @@ local CARD_BORDER = { 0.48, 0.40, 0.26, 0.38 }
 local CARD_BORDER_HOVER = { 0.95, 0.72, 0.30, 0.80 }
 local DASHBOARD_CARD_BG = { 0.075, 0.082, 0.086, 0.92 }
 local DASHBOARD_CARD_BG_HOVER = { 0.125, 0.100, 0.055, 0.96 }
-local DASHBOARD_CARD_BORDER = { 0.48, 0.40, 0.26, 0.38 }
+local DASHBOARD_CARD_BORDER = { 0.42, 0.36, 0.24, 0.30 }
 local DETAIL_SECTION_BG = { 0.055, 0.060, 0.065, 0.88 }
 local DETAIL_COLORS = {
 	columnBg = { 0.040, 0.047, 0.055, 0.84 },
@@ -91,7 +91,7 @@ local ROW_HOVER_BG = { 0.125, 0.100, 0.055, 0.60 }
 local ROW_HOVER_BORDER = { 0.95, 0.73, 0.32, 0.58 }
 local ROW_SEPARATOR = { 0.68, 0.54, 0.30, 0.32 }
 local SELECTED_BG = { 0.150, 0.115, 0.055, 0.98 }
-local SIDEBAR_BG = { 0.052, 0.060, 0.066, 0.58 }
+local SIDEBAR_BG = { 0.030, 0.034, 0.038, 0.45 }
 local MUTED = { 0.67, 0.64, 0.58 }
 local WHITE = { 0.94, 0.91, 0.84 }
 local GOLD = { 1.0, 0.82, 0.36 }
@@ -1523,7 +1523,6 @@ local function createGridCard(state, row, index, columns, height)
 	snapPoint(card, "TOPLEFT", row, "TOPLEFT", (index - 1) * (width + GRID_GAP), 0)
 	applyBackdrop(card, CARD_BG, CARD_BORDER)
 	card:EnableMouse(true)
-	applyHoverState(card)
 	return card, width
 end
 
@@ -1582,23 +1581,25 @@ local function setDashboardCardBorder(card, borderColor)
 	createPixelBorder(card, borderColor)
 end
 
-local function styleRaisedTile(tile)
+local function styleRaisedTile(tile, interactive)
 	applyDashboardCardBackground(tile, DASHBOARD_CARD_BG)
 	setDashboardCardBorder(tile, DASHBOARD_CARD_BORDER)
-	tile:EnableMouse(true)
-	tile:SetScript("OnEnter", function(self)
-		applyDashboardCardBackground(self, DASHBOARD_CARD_BG_HOVER)
-		setDashboardCardBorder(self, CARD_BORDER_HOVER)
-	end)
-	tile:SetScript("OnLeave", function(self)
-		applyDashboardCardBackground(self, DASHBOARD_CARD_BG)
-		setDashboardCardBorder(self, DASHBOARD_CARD_BORDER)
-	end)
+	if interactive then
+		tile:EnableMouse(true)
+		tile:SetScript("OnEnter", function(self)
+			applyDashboardCardBackground(self, DASHBOARD_CARD_BG_HOVER)
+			setDashboardCardBorder(self, CARD_BORDER_HOVER)
+		end)
+		tile:SetScript("OnLeave", function(self)
+			applyDashboardCardBackground(self, DASHBOARD_CARD_BG)
+			setDashboardCardBorder(self, DASHBOARD_CARD_BORDER)
+		end)
+	end
 end
 
 local function addDashboardCard(row, index, title, description, iconSource, onClick)
 	local card = createGridCard({ contentWidth = row.contentWidth or CONTENT_WIDTH }, row, index, 2, 108)
-	styleRaisedTile(card)
+	styleRaisedTile(card, onClick ~= nil)
 	if onClick then
 		card:SetScript("OnMouseUp", onClick)
 	end
@@ -1634,6 +1635,7 @@ local function addDashboardHero(state, title, subtitle)
 	local icon = createDashboardIcon(hero, ASSET.cog)
 	icon:SetSize(92, 92)
 	icon:SetPoint("RIGHT", hero, "RIGHT", -36, -4)
+	icon:SetAlpha(0.90)
 	state.y = state.y - 8
 	return hero
 end
@@ -1665,7 +1667,7 @@ local function addDashboardStatusTile(parent, index, iconSource, iconAtlas, titl
 	local tile = CreateFrame("Frame", nil, parent, "BackdropTemplate")
 	tile:SetSize(width, STATUS_TILE_HEIGHT)
 	tile:SetPoint("TOPLEFT", parent, "TOPLEFT", 14 + ((index - 1) * (width + GRID_GAP)), -44)
-	styleRaisedTile(tile)
+	styleRaisedTile(tile, false)
 
 	local icon = tile:CreateTexture(nil, "OVERLAY")
 	icon:SetSize(STATUS_ICON_SIZE, STATUS_ICON_SIZE)
@@ -1706,7 +1708,7 @@ local function addDashboardStatusPanel(state, stats)
 	local tiles = {
 		{
 			icon = ASSET.statusEnabled,
-			title = L["configCenterCustomizedSettings"] or "Customized settings",
+			title = L["configCenterCustomized"] or "Customized",
 			value = tostring(stats.customized or 0) .. " / " .. tostring(stats.customizable or stats.controls or 0),
 		},
 	}
@@ -3199,7 +3201,7 @@ function StateMixin:RefreshSidebarSelection()
 			selected = self.selectedCategoryID == row.categoryID and self.view ~= "dashboard"
 		end
 		row.selected = selected
-		setFrameBackdrop(row, selected and SELECTED_BG or SIDEBAR_BG, selected and CARD_BORDER_HOVER or CARD_BORDER)
+		setFrameBackdrop(row, selected and SELECTED_BG or SIDEBAR_BG, selected and CARD_BORDER_HOVER or { 0.42, 0.34, 0.20, 0.16 })
 		setTextColor(row.Text, selected and GOLD or WHITE)
 		if row.Accent then row.Accent:SetShown(selected) end
 	end
@@ -3212,7 +3214,7 @@ function StateMixin:RenderSidebar()
 	local L = getLocale(self.app)
 
 	local dashboard = createSidebarFrame(self, 44)
-	applyBackdrop(dashboard, SIDEBAR_BG, CARD_BORDER)
+	applyBackdrop(dashboard, SIDEBAR_BG, { 0.42, 0.34, 0.20, 0.16 })
 	dashboard.Accent = dashboard:CreateTexture(nil, "OVERLAY")
 	dashboard.Accent:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.85)
 	dashboard.Accent:SetPoint("TOPLEFT", dashboard, "TOPLEFT", 0, -6)
@@ -3228,14 +3230,14 @@ function StateMixin:RenderSidebar()
 	dashboard.view = "dashboard"
 	dashboard:SetScript("OnEnter", function(row)
 		if not row.selected then
-			setFrameBackdrop(row, { 0.165, 0.135, 0.080, 0.98 }, CARD_BORDER_HOVER)
+			setFrameBackdrop(row, { 0.105, 0.082, 0.045, 0.72 }, { 0.85, 0.62, 0.25, 0.52 })
 		end
 	end)
 	dashboard:SetScript("OnLeave", function(row)
 		setFrameBackdrop(
 			row,
 			row.selected and SELECTED_BG or SIDEBAR_BG,
-			row.selected and CARD_BORDER_HOVER or CARD_BORDER
+			row.selected and CARD_BORDER_HOVER or { 0.42, 0.34, 0.20, 0.16 }
 		)
 	end)
 	dashboard:SetScript("OnClick", function()
@@ -3247,7 +3249,7 @@ function StateMixin:RenderSidebar()
 	for _, category in ipairs(self.app:GetCategories()) do
 		if category.hidden ~= true and category.visible ~= false then
 			local row = createSidebarFrame(self, 44)
-			applyBackdrop(row, SIDEBAR_BG, CARD_BORDER)
+			applyBackdrop(row, SIDEBAR_BG, { 0.42, 0.34, 0.20, 0.16 })
 			row.Accent = row:CreateTexture(nil, "OVERLAY")
 			row.Accent:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.85)
 			row.Accent:SetPoint("TOPLEFT", row, "TOPLEFT", 0, -6)
@@ -3264,14 +3266,14 @@ function StateMixin:RenderSidebar()
 			row.categoryID = category.id
 			row:SetScript("OnEnter", function(sidebarRow)
 				if not sidebarRow.selected then
-					setFrameBackdrop(sidebarRow, { 0.165, 0.135, 0.080, 0.98 }, CARD_BORDER_HOVER)
+					setFrameBackdrop(sidebarRow, { 0.105, 0.082, 0.045, 0.72 }, { 0.85, 0.62, 0.25, 0.52 })
 				end
 			end)
 			row:SetScript("OnLeave", function(sidebarRow)
 				setFrameBackdrop(
 					sidebarRow,
 					sidebarRow.selected and SELECTED_BG or SIDEBAR_BG,
-					sidebarRow.selected and CARD_BORDER_HOVER or CARD_BORDER
+					sidebarRow.selected and CARD_BORDER_HOVER or { 0.42, 0.34, 0.20, 0.16 }
 				)
 			end)
 			row:SetScript("OnClick", function()

@@ -112,9 +112,6 @@ local function resolveControlDefault(control)
 			end
 		end
 	end
-	if control.type == "toggle" or control.type == "checkbox" then
-		return false, true
-	end
 	return nil, false
 end
 
@@ -509,6 +506,14 @@ function AppMixin:GetControlValue(control)
 	return control.default
 end
 
+local function getEffectiveControlValue(app, control, default, hasDefault)
+	local value = app:GetControlValue(control)
+	if value == nil and hasDefault then
+		return default
+	end
+	return value
+end
+
 function AppMixin:SetControlValue(control, value)
 	if control.setting and control.setting.SetValue then
 		local ok = pcall(control.setting.SetValue, control.setting, value)
@@ -593,7 +598,7 @@ function AppMixin:IsControlCustomized(control)
 	if not hasDefault then
 		return false
 	end
-	local value = self:GetControlValue(control)
+	local value = getEffectiveControlValue(self, control, default, hasDefault)
 	return not valuesEqual(value, default)
 end
 
@@ -602,7 +607,7 @@ function AppMixin:GetStats()
 	local booleanTrue = 0
 	local controlsWithDefaults = 0
 	for _, control in ipairs(self.controls) do
-		local _, hasDefault = resolveControlDefault(control)
+		local default, hasDefault = resolveControlDefault(control)
 		if hasDefault then
 			controlsWithDefaults = controlsWithDefaults + 1
 			if self:IsControlCustomized(control) then
@@ -610,7 +615,7 @@ function AppMixin:GetStats()
 			end
 		end
 		if control.type == "toggle" or control.type == "checkbox" then
-			if self:GetControlValue(control) == true then
+			if getEffectiveControlValue(self, control, default, hasDefault) == true then
 				booleanTrue = booleanTrue + 1
 			end
 		end
