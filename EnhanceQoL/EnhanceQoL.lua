@@ -6176,11 +6176,7 @@ end
 
 local function initCharacter() addon.functions.initItemInventory() end
 
-local function OpenSettingsRoot()
-	if addon.functions and addon.functions.OpenConfigCenter then
-		addon.functions.OpenConfigCenter()
-		return
-	end
+local function OpenLegacySettingsRoot()
 	if not (Settings and Settings.OpenToCategory) then return end
 	if not (addon.SettingsLayout and addon.SettingsLayout.rootCategory) then return end
 
@@ -6195,7 +6191,21 @@ local function OpenSettingsRoot()
 	Settings.OpenToCategory(addon.SettingsLayout.rootCategory:GetID())
 end
 
+local function OpenSettingsRoot()
+	OpenLegacySettingsRoot()
+end
+
+local function OpenModernSettingsRoot()
+	if addon.functions and addon.functions.OpenConfigCenter then
+		addon.functions.OpenConfigCenter()
+		return
+	end
+	OpenLegacySettingsRoot()
+end
+
+addon.functions.OpenLegacySettingsRoot = OpenLegacySettingsRoot
 addon.functions.OpenSettingsRoot = OpenSettingsRoot
+addon.functions.OpenModernSettingsRoot = OpenModernSettingsRoot
 
 function addon.functions.checkReloadFrame()
 	if addon.variables.requireReload == false then return end
@@ -6912,9 +6922,12 @@ function loadMain()
 	-- Slash-Command hinzufügen
 	if addon.functions and addon.functions.SetSlashCommandAlias then
 		addon.functions.SetSlashCommandAlias("ENHANCEQOL", 1, "/eqol")
+		addon.functions.SetSlashCommandAlias("ENHANCEQOLMODERN", 1, "/eqol2")
 	else
 		SLASH_ENHANCEQOL1 = "/eqol"
+		SLASH_ENHANCEQOLMODERN1 = "/eqol2"
 	end
+	SlashCmdList["ENHANCEQOLMODERN"] = function() OpenModernSettingsRoot() end
 	SlashCmdList["ENHANCEQOL"] = function(msg)
 		msg = tostring(msg or "")
 		if msg:match("^aag%s*(%d+)$") then

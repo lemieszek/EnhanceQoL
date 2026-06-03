@@ -6,8 +6,6 @@
 	<Script file="LibEQOLSettingsColorOverrides.lua" />
 	<Script file="LibEQOLSettingsSoundDropdown.lua" />
 	<Script file="LibEQOLSettingsSortableList.lua" />
-	<Script file="LibEQOLConfig.lua" />
-	<Script file="LibEQOLConfigUI.lua" />
 	<Include file="LibEQOLSettingsTemplates.xml" />
 	<Script file="LibEQOLEditMode.lua" />
 	<Script file="LibEQOL.lua" />
