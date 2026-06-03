@@ -161,6 +161,23 @@ local LEGACY_CONTROL_METADATA_FIELDS = {
 	"colorizeLabel",
 	"customDefaultText",
 	"customText",
+	"dropdownDefault",
+	"dropdownDesc",
+	"dropdownFormatter",
+	"dropdownGet",
+	"dropdownKey",
+	"dropdownList",
+	"dropdownListFunc",
+	"dropdownName",
+	"dropdownOptionfunc",
+	"dropdownOptions",
+	"dropdownOrder",
+	"dropdownSet",
+	"dropdownSetting",
+	"dropdownSuffix",
+	"dropdownText",
+	"dropdownValueFormatter",
+	"dropdownValues",
 	"entries",
 	"formatter",
 	"frameHeight",
@@ -206,6 +223,7 @@ local LEGACY_CONTROL_METADATA_FIELDS = {
 	"setSelected",
 	"setSelectedFunc",
 	"setSelection",
+	"selectionSource",
 	"soundResolver",
 	"step",
 	"subvar",
@@ -468,6 +486,16 @@ function AppMixin:GetControlValue(control)
 			return value
 		end
 	end
+	if type(control.getSelection) == "function" then
+		local ok, value = pcall(control.getSelection, control)
+		if ok then
+			return value
+		end
+		ok, value = pcall(control.getSelection)
+		if ok then
+			return value
+		end
+	end
 	if type(control.getValue) == "function" then
 		local ok, value = pcall(control.getValue)
 		if ok then
@@ -484,6 +512,16 @@ end
 function AppMixin:SetControlValue(control, value)
 	if control.setting and control.setting.SetValue then
 		local ok = pcall(control.setting.SetValue, control.setting, value)
+		if ok then
+			return true
+		end
+	end
+	if type(control.setSelection) == "function" then
+		local ok = pcall(control.setSelection, value, control)
+		if ok then
+			return true
+		end
+		ok = pcall(control.setSelection, value)
 		if ok then
 			return true
 		end

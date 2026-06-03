@@ -490,6 +490,8 @@ local function getControlLayoutType(control)
 		return "boolean"
 	end
 	if controlType == "slider" or controlType == "dropdown" or controlType == "sounddropdown"
+		or controlType == "multidropdown"
+		or controlType == "checkboxdropdown"
 		or controlType == "input" or controlType == "colorpicker" then
 		return "stacked"
 	end
@@ -508,6 +510,9 @@ local function getSettingRowHeight(control)
 	end
 	if controlType == "slider" then
 		return hasUsefulDescription(control) and SLIDER_ROW_HEIGHT or SLIDER_ROW_HEIGHT_COMPACT
+	end
+	if controlType == "coloroverrides" then
+		return lib.GetColorOverridesRowHeight(control)
 	end
 	if layoutType == "stacked" then
 		return STACKED_ROW_HEIGHT
@@ -750,13 +755,14 @@ local function getControlTypeLabel(app, control)
 		return _G.ENABLE or "Toggle"
 	elseif controlType == "slider" then
 		return L["configCenterControlSlider"] or "Slider"
-	elseif controlType == "dropdown" or controlType == "sounddropdown" then
+	elseif controlType == "dropdown" or controlType == "sounddropdown" or controlType == "multidropdown"
+		or controlType == "checkboxdropdown" then
 		return L["configCenterControlDropdown"] or "Dropdown"
 	elseif controlType == "input" then
 		return _G.EDIT or "Input"
 	elseif controlType == "button" then
 		return _G.ACTION or "Action"
-	elseif controlType == "colorpicker" then
+	elseif controlType == "colorpicker" or controlType == "coloroverrides" then
 		return _G.COLOR or "Color"
 	end
 	return _G.SETTINGS or "Settings"
@@ -867,6 +873,203 @@ local function getDropdownValueText(control, value)
 	return formatControlValue(control, value)
 end
 
+function lib.GetCheckboxDropdownOptions(control)
+	return getControlOptions({
+		values = control.dropdownValues
+			or control.dropdownOptions
+			or control.dropdownList
+			or control.values
+			or control.options
+			or control.list,
+		optionfunc = control.dropdownOptionfunc
+			or control.dropdownListFunc
+			or control.optionfunc
+			or control.listFunc,
+		orderList = control.dropdownOrder or control.orderList,
+		order = control.dropdownOrder or control.order,
+	})
+end
+
+function lib.GetCheckboxDropdownValue(app, control)
+	if control.dropdownSetting and control.dropdownSetting.GetValue then
+		local ok, value = pcall(control.dropdownSetting.GetValue, control.dropdownSetting)
+		if ok then
+			return value
+		end
+	end
+	if type(control.dropdownGet) == "function" then
+		local ok, value = pcall(control.dropdownGet)
+		if ok then
+			return value
+		end
+		ok, value = pcall(control.dropdownGet, control)
+		if ok then
+			return value
+		end
+	end
+	local db = app.opts and app.opts.db and app.opts.db()
+	if type(db) == "table" and control.dropdownKey ~= nil then
+		return db[control.dropdownKey]
+	end
+	return control.dropdownDefault
+end
+
+function lib.SetCheckboxDropdownValue(app, control, value)
+	if control.dropdownSetting and control.dropdownSetting.SetValue then
+		local ok = pcall(control.dropdownSetting.SetValue, control.dropdownSetting, value)
+		if ok then
+			return true
+		end
+	end
+	if type(control.dropdownSet) == "function" then
+		local ok = pcall(control.dropdownSet, value)
+		if ok then
+			return true
+		end
+		ok = pcall(control.dropdownSet, nil, value)
+		if ok then
+			return true
+		end
+	end
+	local db = app.opts and app.opts.db and app.opts.db()
+	if type(db) == "table" and control.dropdownKey ~= nil then
+		db[control.dropdownKey] = value
+		return true
+	end
+	return false
+end
+
+function lib.GetCheckboxDropdownText(app, control)
+	local dropdownControl = {
+		values = control.dropdownValues
+			or control.dropdownOptions
+			or control.dropdownList
+			or control.values
+			or control.options
+			or control.list,
+		optionfunc = control.dropdownOptionfunc
+			or control.dropdownListFunc
+			or control.optionfunc
+			or control.listFunc,
+		orderList = control.dropdownOrder or control.orderList,
+		order = control.dropdownOrder or control.order,
+		formatter = control.dropdownFormatter or control.formatter,
+		valueFormatter = control.dropdownValueFormatter or control.valueFormatter,
+		suffix = control.dropdownSuffix,
+	}
+	return getDropdownValueText(dropdownControl, lib.GetCheckboxDropdownValue(app, control))
+end
+
+function lib.CopySelectionMap(selection)
+	local copy = {}
+	if type(selection) ~= "table" then
+		return copy
+	end
+	if #selection > 0 then
+		for index = 1, #selection do
+			local value = selection[index]
+			if value ~= nil and type(value) ~= "boolean" then
+				copy[value] = true
+			end
+		end
+	end
+	for key, value in pairs(selection) do
+		if value and (type(key) == "string" or type(key) == "number") then
+			copy[key] = true
+		end
+	end
+	return copy
+end
+
+function lib.IsMultiOptionSelected(selection, value)
+	if type(selection) ~= "table" then
+		return false
+	end
+	return selection[value] == true or selection[tostring(value)] == true
+end
+
+function lib.SetMultiOptionSelected(selection, value, selected)
+	if selected then
+		selection[value] = true
+	else
+		selection[value] = nil
+		selection[tostring(value)] = nil
+	end
+end
+
+function lib.GetPerOptionSelection(control)
+	local selection = {}
+	if type(control.isSelectedFunc) ~= "function" then
+		return selection
+	end
+	for _, option in ipairs(getControlOptions(control)) do
+		local ok, selected = pcall(control.isSelectedFunc, option.value)
+		if ok and selected == true then
+			selection[option.value] = true
+		end
+	end
+	return selection
+end
+
+function lib.GetMultiSelection(app, control)
+	if control.selectionSource == "perOption" then
+		return lib.GetPerOptionSelection(control)
+	end
+	local value = app:GetControlValue(control)
+	if type(value) == "table" then
+		return lib.CopySelectionMap(value)
+	end
+	if type(control.isSelectedFunc) == "function" then
+		return lib.GetPerOptionSelection(control)
+	end
+	return {}
+end
+
+function lib.GetMultiSummary(app, control)
+	local selection = lib.GetMultiSelection(app, control)
+	if type(control.summary) == "function" then
+		local ok, text = pcall(control.summary, selection, control)
+		if ok and text ~= nil and text ~= "" then
+			return tostring(text)
+		end
+		ok, text = pcall(control.summary, selection)
+		if ok and text ~= nil and text ~= "" then
+			return tostring(text)
+		end
+	end
+
+	local labels = {}
+	for _, option in ipairs(getControlOptions(control)) do
+		if lib.IsMultiOptionSelected(selection, option.value) then
+			labels[#labels + 1] = option.label
+			if #labels >= 2 then
+				break
+			end
+		end
+	end
+	local selectedCount = 0
+	for _, option in ipairs(getControlOptions(control)) do
+		if lib.IsMultiOptionSelected(selection, option.value) then
+			selectedCount = selectedCount + 1
+		end
+	end
+	if selectedCount == 0 then
+		return control.customDefaultText or _G.NONE or "None"
+	end
+	if selectedCount > #labels then
+		return table.concat(labels, ", ") .. " +" .. tostring(selectedCount - #labels)
+	end
+	return table.concat(labels, ", ")
+end
+
+function lib.GetColorOverridesRowHeight(control)
+	local count = type(control.entries) == "table" and #control.entries or 0
+	if count <= 0 then
+		return COMPLEX_ROW_HEIGHT
+	end
+	return math.max(COMPLEX_ROW_HEIGHT, 78 + (math.ceil(count / 2) * 36))
+end
+
 local function openLegacySettingsForControl(app, control)
 	if app.opts and type(app.opts.openLegacySettings) == "function" then
 		app.opts.openLegacySettings(control)
@@ -943,10 +1146,17 @@ local function refreshControlRow(app, control, row)
 		row.editBox:SetText(formatControlValue(control, app:GetControlValue(control)))
 	end
 	if row.value then
-		local value = app:GetControlValue(control)
-		if getControlType(control) == "dropdown" or getControlType(control) == "sounddropdown" then
+		if row.refreshValue then
+			row.refreshValue()
+		elseif getControlType(control) == "multidropdown" then
+			row.value.Text:SetText(lib.GetMultiSummary(app, control))
+		elseif getControlType(control) == "checkboxdropdown" then
+			row.value.Text:SetText(lib.GetCheckboxDropdownText(app, control))
+		elseif getControlType(control) == "dropdown" or getControlType(control) == "sounddropdown" then
+			local value = app:GetControlValue(control)
 			row.value.Text:SetText(getDropdownValueText(control, value))
 		else
+			local value = app:GetControlValue(control)
 			row.value.Text:SetText(formatControlValue(control, value))
 		end
 	end
@@ -965,6 +1175,20 @@ local function refreshControlRow(app, control, row)
 					)
 				)
 			end
+		end
+	end
+	if row.refreshControls then
+		row.refreshControls()
+	end
+end
+
+function lib.RefreshVisibleRows(state)
+	if not state or type(state.controlRows) ~= "table" then
+		return
+	end
+	for _, entry in ipairs(state.controlRows) do
+		if entry.row and entry.control then
+			refreshControlRow(state.app, entry.control, entry.row)
 		end
 	end
 end
@@ -1131,6 +1355,7 @@ end
 
 local function clearContent(state)
 	clearFrameList(state.contentFrames)
+	state.controlRows = {}
 	state.y = -2
 end
 
@@ -1466,7 +1691,7 @@ local function commitInputValue(app, control, editBox, row)
 		end
 	end
 	app:SetControlValue(control, value)
-	refreshControlRow(app, control, row)
+	lib.RefreshVisibleRows(row._state)
 end
 
 local function addSliderWidget(row, app, control, opts)
@@ -1576,6 +1801,7 @@ local function addSliderWidget(row, app, control, opts)
 			self.normalizing = false
 		end
 		app:SetControlValue(control, value)
+		lib.RefreshVisibleRows(row._state)
 	end)
 
 	slider.Track = track
@@ -1590,7 +1816,7 @@ end
 
 local function addDropdownWidget(row, app, control, opts)
 	opts = opts or {}
-	local options = getControlOptions(control)
+	local options = opts.options or getControlOptions(control)
 	if #options == 0 or not MenuUtil or not MenuUtil.CreateContextMenu then
 		addConfigureFallback(row, app, control, nil, opts.configure)
 		return
@@ -1610,14 +1836,84 @@ local function addDropdownWidget(row, app, control, opts)
 	arrow:SetSize(14, 18)
 	button:SetScript("OnClick", function(owner)
 		MenuUtil.CreateContextMenu(owner, function(_, rootDescription)
-			for _, option in ipairs(getControlOptions(control)) do
-				rootDescription:CreateButton(option.label, function()
-					app:SetControlValue(control, option.value)
-					refreshControlRow(app, control, row)
-				end)
+			local function getCurrentValue()
+				if opts.getValue then
+					return opts.getValue()
+				end
+				return app:GetControlValue(control)
+			end
+			for _, option in ipairs(opts.options or getControlOptions(control)) do
+				rootDescription:CreateRadio(option.label, function(value)
+					return tostring(getCurrentValue()) == tostring(value)
+				end, function(value)
+					if opts.setValue then
+						opts.setValue(value)
+					else
+						app:SetControlValue(control, value)
+					end
+					lib.RefreshVisibleRows(row._state)
+				end, option.value)
 			end
 		end)
 	end)
+	return button
+end
+
+local function addMultiDropdownWidget(row, app, control, opts)
+	opts = opts or {}
+	local options = getControlOptions(control)
+	if #options == 0 or not MenuUtil or not MenuUtil.CreateContextMenu then
+		addConfigureFallback(row, app, control, nil, opts.configure)
+		return
+	end
+
+	local button = makeFlatButton(row, "", opts.width or 260, 26)
+	if opts.point then
+		button:SetPoint(opts.point[1], opts.point[2], opts.point[3], opts.point[4], opts.point[5])
+	else
+		button:SetPoint("RIGHT", row, "RIGHT", -14, 0)
+	end
+	row.value = createText(button, FONT_TEXT, "", WHITE, "LEFT")
+	row.value:SetPoint("LEFT", button, "LEFT", 10, 0)
+	row.value:SetPoint("RIGHT", button, "RIGHT", -22, 0)
+	row.value:SetHeight(18)
+	local arrow = createText(button, FONT_TEXT, "v", GOLD, "RIGHT")
+	arrow:SetPoint("RIGHT", button, "RIGHT", -8, 1)
+	arrow:SetSize(14, 18)
+
+	local function refreshSummary()
+		row.value.Text:SetText(lib.GetMultiSummary(app, control))
+	end
+
+	button:SetScript("OnClick", function(owner)
+		MenuUtil.CreateContextMenu(owner, function(_, rootDescription)
+			for _, option in ipairs(getControlOptions(control)) do
+				local function isSelected(value)
+					return lib.IsMultiOptionSelected(lib.GetMultiSelection(app, control), value)
+				end
+				local function setSelected(value)
+					local selection = lib.CopySelectionMap(lib.GetMultiSelection(app, control))
+					local selected = not lib.IsMultiOptionSelected(selection, value)
+					lib.SetMultiOptionSelected(selection, value, selected)
+					if type(control.setSelectedFunc) == "function" then
+						local ok = pcall(control.setSelectedFunc, value, selected, option)
+						if not ok then
+							app:SetControlValue(control, selection)
+						end
+					else
+						app:SetControlValue(control, selection)
+					end
+					if type(control.callback) == "function" then
+						pcall(control.callback, option)
+					end
+					lib.RefreshVisibleRows(row._state)
+					refreshSummary()
+				end
+				rootDescription:CreateCheckbox(option.label, isSelected, setSelected, option.value)
+			end
+		end)
+	end)
+	refreshSummary()
 	return button
 end
 
@@ -1645,10 +1941,15 @@ local function addInputWidget(row, app, control, opts)
 	return editBox
 end
 
-local function addToggleWidget(row, app, control)
+local function addToggleWidget(row, app, control, opts)
+	opts = opts or {}
 	local switch = CreateFrame("Button", nil, row, "BackdropTemplate")
 	switch:SetSize(48, 24)
-	switch:SetPoint("RIGHT", row, "RIGHT", -16, 0)
+	if opts.point then
+		switch:SetPoint(opts.point[1], opts.point[2], opts.point[3], opts.point[4], opts.point[5])
+	else
+		switch:SetPoint("RIGHT", row, "RIGHT", -16, 0)
+	end
 	applyBackdrop(switch, { 0.050, 0.046, 0.038, 0.95 }, CARD_BORDER)
 
 	switch.Knob = CreateFrame("Frame", nil, switch, "BackdropTemplate")
@@ -1685,7 +1986,7 @@ local function addToggleWidget(row, app, control)
 			return
 		end
 		app:SetControlValue(control, not self:GetChecked())
-		refreshControlRow(app, control, row)
+		lib.RefreshVisibleRows(row._state)
 	end)
 
 	row.check = switch
@@ -1731,7 +2032,7 @@ local function addColorWidget(row, app, control, opts)
 			local nr, ng, nb = ColorPickerFrame:GetColorRGB()
 			local na = ColorPickerFrame.GetColorAlpha and ColorPickerFrame:GetColorAlpha() or a
 			control.setColor(key, nr, ng, nb, na)
-			refreshControlRow(app, control, row)
+			lib.RefreshVisibleRows(row._state)
 		end
 		if ColorPickerFrame.SetupColorPickerAndShow then
 			ColorPickerFrame:SetupColorPickerAndShow({
@@ -1744,7 +2045,7 @@ local function addColorWidget(row, app, control, opts)
 				opacityFunc = applyColor,
 				cancelFunc = function(previous)
 					if previous then control.setColor(key, previous.r, previous.g, previous.b, previous.opacity) end
-					refreshControlRow(app, control, row)
+					lib.RefreshVisibleRows(row._state)
 				end,
 			})
 		else
@@ -1755,7 +2056,7 @@ local function addColorWidget(row, app, control, opts)
 			ColorPickerFrame.previousValues = { r = r, g = g, b = b, opacity = a }
 			ColorPickerFrame.cancelFunc = function(previous)
 				if previous then control.setColor(key, previous.r, previous.g, previous.b, previous.opacity) end
-				refreshControlRow(app, control, row)
+				lib.RefreshVisibleRows(row._state)
 			end
 			ColorPickerFrame:SetColorRGB(r, g, b)
 			ColorPickerFrame:Show()
@@ -1764,6 +2065,121 @@ local function addColorWidget(row, app, control, opts)
 	button:SetScript("OnClick", openPicker)
 	swatch:SetScript("OnClick", openPicker)
 	return button
+end
+
+local function addColorOverridesWidget(row, app, control, opts)
+	opts = opts or {}
+	local entries = type(control.entries) == "table" and control.entries or {}
+	local hasColorCallbacks = type(control.getColor) == "function" and type(control.setColor) == "function"
+	if #entries == 0 or not hasColorCallbacks or not ColorPickerFrame then
+		addConfigureFallback(row, app, control, nil, opts.configure)
+		return
+	end
+
+	row.colorOverrideSwatches = {}
+	local columnGap = 14
+	local rowHeight = 30
+	local startX = FIELD_CONTROL_LEFT
+	local startY = opts.startY or -58
+	local availableWidth = math.max(300, (opts.width or row:GetWidth() or 560) - (startX * 2))
+	local columnWidth = math.floor((availableWidth - columnGap) / 2)
+
+	for index, entry in ipairs(entries) do
+		local column = (index - 1) % 2
+		local line = math.floor((index - 1) / 2)
+		local item = CreateFrame("Button", nil, row, "BackdropTemplate")
+		item:SetSize(columnWidth, rowHeight)
+		item:SetPoint(
+			"TOPLEFT",
+			row,
+			"TOPLEFT",
+			startX + (column * (columnWidth + columnGap)),
+			startY - (line * 36)
+		)
+		setFrameBackdrop(item, { 0.045, 0.040, 0.032, 0.70 }, { 0.20, 0.16, 0.10, 0.45 })
+
+		item.Text = item:CreateFontString(nil, "OVERLAY", FONT_MUTED)
+		item.Text:SetPoint("LEFT", item, "LEFT", 8, 0)
+		item.Text:SetPoint("RIGHT", item, "RIGHT", -42, 0)
+		item.Text:SetJustifyH("LEFT")
+		item.Text:SetText(entry.label or entry.key or "?")
+		setTextColor(item.Text, MUTED)
+
+		item.Swatch = CreateFrame("Button", nil, item, "BackdropTemplate")
+		item.Swatch:SetSize(24, 20)
+		item.Swatch:SetPoint("RIGHT", item, "RIGHT", -8, 0)
+		applyBackdrop(item.Swatch, { 0.02, 0.02, 0.02, 0.92 }, CARD_BORDER)
+		item.Swatch.Texture = item.Swatch:CreateTexture(nil, "OVERLAY")
+		item.Swatch.Texture:SetPoint("TOPLEFT", item.Swatch, "TOPLEFT", 4, -4)
+		item.Swatch.Texture:SetPoint("BOTTOMRIGHT", item.Swatch, "BOTTOMRIGHT", -4, 4)
+
+		local function openPicker()
+			if not app:IsControlEnabled(control) then
+				return
+			end
+			local ok, r, g, b, a = pcall(control.getColor, entry.key)
+			if not ok then
+				r, g, b, a = 1, 1, 1, 1
+			end
+			r, g, b, a = r or 1, g or 1, b or 1, a or 1
+			local function applyColor()
+				local nr, ng, nb = ColorPickerFrame:GetColorRGB()
+				local na = ColorPickerFrame.GetColorAlpha and ColorPickerFrame:GetColorAlpha() or a
+				control.setColor(entry.key, nr, ng, nb, control.hasOpacity and na or nil)
+				lib.RefreshVisibleRows(row._state)
+			end
+			ColorPickerFrame:SetupColorPickerAndShow({
+				r = r,
+				g = g,
+				b = b,
+				opacity = a,
+				hasOpacity = control.hasOpacity,
+				swatchFunc = applyColor,
+				opacityFunc = applyColor,
+					cancelFunc = function(previous)
+						if previous then
+							control.setColor(
+								entry.key,
+								previous.r,
+								previous.g,
+								previous.b,
+								control.hasOpacity and previous.opacity or nil
+							)
+						end
+						lib.RefreshVisibleRows(row._state)
+					end,
+				})
+			end
+
+			item:SetScript("OnEnter", function(self)
+				setFrameBackdrop(self, CARD_BG_HOVER, CARD_BORDER_HOVER)
+			end)
+			item:SetScript("OnLeave", function(self)
+				setFrameBackdrop(self, { 0.045, 0.040, 0.032, 0.70 }, { 0.20, 0.16, 0.10, 0.45 })
+			end)
+		item:SetScript("OnClick", openPicker)
+		item.Swatch:SetScript("OnClick", openPicker)
+		row.colorOverrideSwatches[#row.colorOverrideSwatches + 1] = item
+	end
+
+	row.refreshControls = function()
+		local enabled = app:IsControlEnabled(control)
+		for index, item in ipairs(row.colorOverrideSwatches or {}) do
+			local entry = entries[index]
+			local ok, r, g, b, a = pcall(control.getColor, entry.key)
+			if not ok then
+				r, g, b, a = 1, 1, 1, 1
+			end
+			item:SetAlpha(1)
+			item.Swatch.Texture:SetColorTexture(r or 1, g or 1, b or 1, a or 1)
+			if control.colorizeLabel and enabled then
+				item.Text:SetTextColor(r or MUTED[1], g or MUTED[2], b or MUTED[3], 1)
+			else
+				setTextColor(item.Text, MUTED)
+			end
+		end
+	end
+	row.refreshControls()
 end
 
 local function addSettingRow(state, control, pathText, parent, yOffset, width)
@@ -1782,6 +2198,9 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 		row = createContentFrame(state, rowHeight)
 		rowWidth = row:GetWidth() > 0 and row:GetWidth() or rowWidth
 	end
+	row._state = state
+	state.controlRows = state.controlRows or {}
+	state.controlRows[#state.controlRows + 1] = { row = row, control = control }
 	styleInlineSettingRow(row)
 
 	local textLeft = 16
@@ -1871,6 +2290,46 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 					width = 150,
 				},
 			})
+		elseif controlType == "multidropdown" then
+			desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
+			desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+			desc:SetHeight(32)
+			local controlPoint = { "BOTTOMLEFT", row, "BOTTOMLEFT", FIELD_CONTROL_LEFT, 15 }
+			addMultiDropdownWidget(row, app, control, {
+				point = controlPoint,
+				width = controlWidth,
+				configure = {
+					point = controlPoint,
+					width = 150,
+				},
+			})
+		elseif controlType == "checkboxdropdown" then
+			title:SetPoint("RIGHT", row, "RIGHT", -88, 0)
+			desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
+			desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+			desc:SetHeight(32)
+			addToggleWidget(row, app, control, {
+				point = { "TOPRIGHT", row, "TOPRIGHT", -16, -12 },
+			})
+			local controlPoint = { "BOTTOMLEFT", row, "BOTTOMLEFT", FIELD_CONTROL_LEFT, 15 }
+			addDropdownWidget(row, app, control, {
+				point = controlPoint,
+				width = controlWidth,
+				options = lib.GetCheckboxDropdownOptions(control),
+				getValue = function()
+					return lib.GetCheckboxDropdownValue(app, control)
+				end,
+				setValue = function(value)
+					lib.SetCheckboxDropdownValue(app, control, value)
+				end,
+				configure = {
+					point = controlPoint,
+					width = 150,
+				},
+			})
+			row.refreshValue = function()
+				row.value.Text:SetText(lib.GetCheckboxDropdownText(app, control))
+			end
 		elseif controlType == "input" then
 			desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
 			desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
@@ -1893,6 +2352,20 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 				},
 			})
 		end
+	elseif controlType == "coloroverrides" then
+		title:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+		desc.Text:SetText(control.description or "")
+		desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
+		desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+		desc:SetHeight(control.description and control.description ~= "" and 24 or 1)
+		addColorOverridesWidget(row, app, control, {
+			width = rowWidth,
+			startY = control.description and control.description ~= "" and -68 or -48,
+			configure = {
+				point = { "BOTTOMRIGHT", row, "BOTTOMRIGHT", -14, 14 },
+				width = 150,
+			},
+		})
 	elseif controlType == "button" then
 		title:SetPoint("RIGHT", row, "RIGHT", -18, 0)
 		desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)

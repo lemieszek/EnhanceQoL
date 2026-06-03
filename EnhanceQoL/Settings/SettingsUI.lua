@@ -370,9 +370,36 @@ function addon.functions.SettingsCreateCheckboxDropdown(cat, cbData)
 		prefix = prefix,
 	})
 	addon.SettingsLayout.elements = addon.SettingsLayout.elements or {}
-	addon.SettingsLayout.elements[cbData.var] = { initializer = initializer, setting = checkboxSetting, dropdownSetting = dropdownSetting }
-	if dropdownKey then addon.SettingsLayout.elements[dropdownKey] = { initializer = initializer, setting = dropdownSetting, checkboxSetting = checkboxSetting } end
-	registerLegacyControl(cat, cbData, "toggle", checkboxSetting)
+	addon.SettingsLayout.elements[cbData.var] = {
+		initializer = initializer,
+		setting = checkboxSetting,
+		dropdownSetting = dropdownSetting,
+	}
+	if dropdownKey then
+		addon.SettingsLayout.elements[dropdownKey] = {
+			initializer = initializer,
+			setting = dropdownSetting,
+			checkboxSetting = checkboxSetting,
+		}
+	end
+	local modernData = {}
+	for key, value in pairs(cbData) do
+		modernData[key] = value
+	end
+	modernData.dropdownKey = dropdownKey
+	modernData.dropdownSetting = dropdownSetting
+	modernData.dropdownValues = cbData.dropdownList or cbData.dropdownValues or cbData.list or cbData.values
+	modernData.dropdownOptions = modernData.dropdownValues
+	modernData.dropdownOrder = cbData.dropdownOrder or cbData.order
+	modernData.dropdownOptionfunc = cbData.dropdownOptionfunc
+		or cbData.dropdownListFunc
+		or cbData.listFunc
+		or cbData.optionfunc
+	modernData.dropdownName = cbData.dropdownText or cbData.dropdownName
+	modernData.dropdownDesc = cbData.dropdownDesc
+	modernData.dropdownGet = cbData.dropdownGet or function() return addon.db[dropdownKey] end
+	modernData.dropdownSet = cbData.dropdownSet or function(v) addon.db[dropdownKey] = v end
+	registerLegacyControl(cat, modernData, "checkboxdropdown", checkboxSetting)
 	return addon.SettingsLayout.elements[cbData.var]
 end
 
@@ -622,7 +649,31 @@ function addon.functions.SettingsCreateMultiDropdown(cat, cbData)
 
 	addon.SettingsLayout.elements = addon.SettingsLayout.elements or {}
 	addon.SettingsLayout.elements[cbData.var] = { initializer = initializer }
-	registerLegacyControl(cat, cbData, "multidropdown", nil)
+	local modernData = {}
+	for key, value in pairs(cbData) do
+		modernData[key] = value
+	end
+	local hasExplicitSelectionGetter = type(cbData.getSelection) == "function" or type(cbData.get) == "function"
+	local hasPerOptionSelection = type(cbData.isSelectedFunc) == "function"
+	if hasExplicitSelectionGetter then
+		modernData.getSelection = cbData.getSelection or cbData.get
+	elseif hasPerOptionSelection then
+		modernData.getSelection = getSelectionFromSelected
+		modernData.selectionSource = "perOption"
+	else
+		modernData.getSelection = storageDisabled and getSelectionFromSelected or getSelection
+	end
+	if cbData.setSelection or cbData.set then
+		modernData.setSelection = cbData.setSelection or cbData.set
+	elseif type(cbData.setSelectedFunc) == "function" then
+		modernData.setSelection = setSelectionFromSelected
+	else
+		modernData.setSelection = storageDisabled and setSelectionFromSelected or setSelection
+	end
+	modernData.values = cbData.options or cbData.list
+	modernData.optionfunc = cbData.optionfunc or cbData.listFunc
+	modernData.menuHeight = cbData.menuHeight or 200
+	registerLegacyControl(cat, modernData, "multidropdown", nil)
 	return initializer
 end
 
@@ -689,7 +740,7 @@ function addon.functions.SettingsCreateColorOverrides(cat, cbData)
 	})
 	addon.SettingsLayout.elements = addon.SettingsLayout.elements or {}
 	addon.SettingsLayout.elements[cbData.var or cbData.key or "ColorOverrides"] = { initializer = initializer }
-	registerLegacyControl(cat, cbData, "colorpicker", nil)
+	registerLegacyControl(cat, cbData, "coloroverrides", nil)
 	return initializer
 end
 
