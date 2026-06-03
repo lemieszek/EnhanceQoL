@@ -52,6 +52,64 @@ local function normalizeSearchText(text)
 	return text
 end
 
+local function valuesEqual(a, b, depth)
+	depth = (depth or 0) + 1
+	if depth > 5 then
+		return a == b
+	end
+	if a == b then
+		return true
+	end
+	if type(a) ~= type(b) then
+		return false
+	end
+	if type(a) ~= "table" then
+		return false
+	end
+	for key, value in pairs(a) do
+		if not valuesEqual(value, b[key], depth) then
+			return false
+		end
+	end
+	for key in pairs(b) do
+		if a[key] == nil then
+			return false
+		end
+	end
+	return true
+end
+
+local function resolveControlDefault(control)
+	if not control then
+		return nil, false
+	end
+	if control.default ~= nil then
+		if type(control.default) == "function" then
+			local ok, value = pcall(control.default)
+			if ok then
+				return value, true
+			end
+			return nil, false
+		end
+		return control.default, true
+	end
+	if control.setting then
+		local methods = { "GetDefaultValue", "GetDefault" }
+		for _, method in ipairs(methods) do
+			if type(control.setting[method]) == "function" then
+				local ok, value = pcall(control.setting[method], control.setting)
+				if ok then
+					return value, true
+				end
+			end
+		end
+	end
+	if control.type == "toggle" or control.type == "checkbox" then
+		return false, true
+	end
+	return nil, false
+end
+
 local function getCategoryKey(category)
 	if not category then
 		return nil
@@ -483,12 +541,30 @@ function AppMixin:GetSearchResults(query, limit)
 	return results
 end
 
+function AppMixin:IsControlCustomized(control)
+	local default, hasDefault = resolveControlDefault(control)
+	if not hasDefault then
+		return false
+	end
+	local value = self:GetControlValue(control)
+	return not valuesEqual(value, default)
+end
+
 function AppMixin:GetStats()
-	local enabled = 0
+	local customized = 0
+	local booleanTrue = 0
+	local controlsWithDefaults = 0
 	for _, control in ipairs(self.controls) do
+		local _, hasDefault = resolveControlDefault(control)
+		if hasDefault then
+			controlsWithDefaults = controlsWithDefaults + 1
+			if self:IsControlCustomized(control) then
+				customized = customized + 1
+			end
+		end
 		if control.type == "toggle" or control.type == "checkbox" then
 			if self:GetControlValue(control) == true then
-				enabled = enabled + 1
+				booleanTrue = booleanTrue + 1
 			end
 		end
 	end
@@ -496,7 +572,10 @@ function AppMixin:GetStats()
 		categories = #self.categories,
 		pages = #self.pages,
 		controls = #self.controls,
-		enabled = enabled,
+		customized = customized,
+		customizable = controlsWithDefaults,
+		booleanTrue = booleanTrue,
+		enabled = customized,
 	}
 end
 

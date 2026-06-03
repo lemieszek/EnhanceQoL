@@ -26,6 +26,10 @@ local PAGE_LEFT_WIDTH_MIN = 560
 local PAGE_LEFT_WIDTH_IDEAL = 620
 local PAGE_GAP = 16
 local GRID_GAP = 12
+local STATUS_TILE_HEIGHT = 72
+local STATUS_ICON_SIZE = 30
+local STATUS_TILE_PAD_X = 16
+local STATUS_TEXT_LEFT = 58
 local PAGE_CARD_HEIGHT = 112
 local PAGE_CARD_PAD_X = 18
 local PAGE_CARD_ICON_SIZE = 42
@@ -1155,13 +1159,13 @@ end
 local function addDashboardStatusTile(parent, index, iconSource, iconAtlas, title, value, badge)
 	local width = math.floor((parent.tileWidth or 160))
 	local tile = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-	tile:SetSize(width, 72)
+	tile:SetSize(width, STATUS_TILE_HEIGHT)
 	tile:SetPoint("TOPLEFT", parent, "TOPLEFT", 14 + ((index - 1) * (width + GRID_GAP)), -44)
 	styleRaisedTile(tile)
 
 	local icon = tile:CreateTexture(nil, "OVERLAY")
-	icon:SetSize(32, 32)
-	icon:SetPoint("LEFT", tile, "LEFT", 14, -1)
+	icon:SetSize(STATUS_ICON_SIZE, STATUS_ICON_SIZE)
+	icon:SetPoint("LEFT", tile, "LEFT", STATUS_TILE_PAD_X, 0)
 	if iconAtlas and icon.SetAtlas then
 		local hasAtlas = not C_Texture or not C_Texture.GetAtlasInfo or C_Texture.GetAtlasInfo(iconAtlas)
 		local ok = hasAtlas and pcall(icon.SetAtlas, icon, iconAtlas, false)
@@ -1173,20 +1177,22 @@ local function addDashboardStatusTile(parent, index, iconSource, iconAtlas, titl
 	end
 
 	local titleText = createText(tile, FONT_MUTED, title or "", GOLD)
-	titleText:SetPoint("TOPLEFT", icon, "TOPRIGHT", 12, 4)
-	titleText:SetPoint("RIGHT", tile, "RIGHT", badge and -60 or -10, 0)
-	titleText:SetHeight(28)
-	titleText.Text:SetWordWrap(true)
+	titleText:SetPoint("TOPLEFT", tile, "TOPLEFT", STATUS_TEXT_LEFT, -13)
+	titleText:SetPoint("RIGHT", tile, "RIGHT", badge and -68 or -12, 0)
+	titleText:SetHeight(18)
+	titleText.Text:SetWordWrap(false)
+	titleText.Text:SetJustifyV("MIDDLE")
 
 	if badge and badge ~= "" then
 		local badgeFrame = addStatusChip(tile, badge, GOLD, 54)
-		badgeFrame:SetPoint("TOPRIGHT", tile, "TOPRIGHT", -8, -11)
+		badgeFrame:SetPoint("TOPRIGHT", tile, "TOPRIGHT", -10, -10)
 	end
 
 	local valueText = createText(tile, FONT_TITLE, tostring(value or ""), WHITE)
-	valueText:SetPoint("TOPLEFT", icon, "TOPRIGHT", 12, -27)
-	valueText:SetPoint("RIGHT", tile, "RIGHT", -10, 0)
-	valueText:SetHeight(26)
+	valueText:SetPoint("BOTTOMLEFT", tile, "BOTTOMLEFT", STATUS_TEXT_LEFT, 12)
+	valueText:SetPoint("RIGHT", tile, "RIGHT", -12, 0)
+	valueText:SetHeight(24)
+	valueText.Text:SetJustifyV("MIDDLE")
 	return tile
 end
 
@@ -1196,8 +1202,8 @@ local function addDashboardStatusPanel(state, stats)
 	local tiles = {
 		{
 			icon = STATUS_ENABLED_ICON,
-			title = L["configCenterEnabledFeatures"] or "Enabled features",
-			value = tostring(stats.enabled) .. " / " .. tostring(stats.controls),
+			title = L["configCenterCustomizedSettings"] or "Customized settings",
+			value = tostring(stats.customized or 0) .. " / " .. tostring(stats.customizable or stats.controls or 0),
 		},
 	}
 
@@ -1238,8 +1244,8 @@ local function addDashboardStatusPanel(state, stats)
 	title:SetPoint("RIGHT", panel, "RIGHT", -14, 0)
 	title:SetHeight(24)
 
-	local contentWidth = state.contentWidth or CONTENT_WIDTH
-	panel.tileWidth = math.floor((contentWidth - 28 - ((#tiles - 1) * GRID_GAP)) / math.max(#tiles, 1))
+	local innerWidth = (state.contentWidth or CONTENT_WIDTH) - 28
+	panel.tileWidth = math.floor((innerWidth - ((#tiles - 1) * GRID_GAP)) / math.max(#tiles, 1))
 	for index, tile in ipairs(tiles) do
 		addDashboardStatusTile(panel, index, tile.icon, tile.atlas, tile.title, tile.value, tile.badge)
 	end
@@ -1839,11 +1845,35 @@ local function addPageCard(state, page, row, index, columns)
 	end
 end
 
-local function collectEnabledPages(app, limit)
+local function isPageMasterToggle(page, control)
+	if not page or not control then
+		return false
+	end
+	if control.isMainToggle == true or control.uiRole == "mainToggle" then
+		return true
+	end
+	return page.mainToggleID ~= nil and page.mainToggleID == control.id
+end
+
+local function collectEnabledFeaturePages(app, limit)
 	local result = {}
 	local seen = {}
 	for _, control in ipairs(app.controls or {}) do
-		if getControlType(control) == "toggle" and app:GetControlValue(control) == true and not seen[control.pageID] then
+		local page = app:GetPage(control.pageID)
+		if page and isPageMasterToggle(page, control) and app:GetControlValue(control) == true and not seen[page.id] then
+			result[#result + 1] = page
+			seen[page.id] = true
+			if limit and #result >= limit then break end
+		end
+	end
+	return result
+end
+
+local function collectCustomizedPages(app, limit)
+	local result = {}
+	local seen = {}
+	for _, control in ipairs(app.controls or {}) do
+		if app:IsControlCustomized(control) and not seen[control.pageID] then
 			local page = app:GetPage(control.pageID)
 			if page then
 				result[#result + 1] = page
@@ -1977,7 +2007,13 @@ local function renderDashboard(state)
 
 	addDashboardStatusPanel(state, stats)
 
-	local enabledPages = collectEnabledPages(app, 5)
+	local enabledPages = collectEnabledFeaturePages(app, 5)
+	local customizedPages = #enabledPages == 0 and collectCustomizedPages(app, 5) or {}
+	local featurePages = #enabledPages > 0 and enabledPages or customizedPages
+	local featureBadgeText = #enabledPages > 0 and (_G.ENABLED or "Enabled")
+		or (L["configCenterCustomized"] or "Customized")
+	local featureTitleText = #enabledPages > 0 and (L["configCenterEnabledFeatures"] or "Enabled features")
+		or (L["configCenterCustomizedFeatures"] or "Customized Features")
 	local newEntries = collectNewEntries(app, 3)
 	local panelRow = createContentFrame(state, 250)
 	local panelWidth = state.contentWidth or CONTENT_WIDTH
@@ -1998,18 +2034,18 @@ local function renderDashboard(state)
 	local enabledTitle = createText(
 		enabledPanel,
 		FONT_HEADER,
-		L["configCenterRecentlyEnabled"] or "Recently Enabled Features",
+		featureTitleText,
 		GOLD
 	)
 	enabledTitle:SetPoint("TOPLEFT", enabledPanel, "TOPLEFT", 14, -12)
 	enabledTitle:SetPoint("RIGHT", enabledPanel, "RIGHT", -14, 0)
 	enabledTitle:SetHeight(20)
-	if #enabledPages == 0 then
+	if #featurePages == 0 then
 		local emptyText = createText(enabledPanel, FONT_MUTED, L["configCenterNoResults"] or "No settings found.", MUTED)
 		emptyText:SetPoint("TOPLEFT", enabledTitle, "BOTTOMLEFT", 0, -12)
 		emptyText:SetPoint("BOTTOMRIGHT", enabledPanel, "BOTTOMRIGHT", -14, 14)
 	else
-		for index, page in ipairs(enabledPages) do
+		for index, page in ipairs(featurePages) do
 			local mini = CreateFrame("Button", nil, enabledPanel, "BackdropTemplate")
 			mini:SetPoint("TOPLEFT", enabledPanel, "TOPLEFT", 14, -38 - ((index - 1) * 39))
 			mini:SetPoint("RIGHT", enabledPanel, "RIGHT", -14, 0)
@@ -2024,7 +2060,8 @@ local function renderDashboard(state)
 			label:SetPoint("LEFT", icon, "RIGHT", 9, 0)
 			label:SetPoint("RIGHT", mini, "RIGHT", -96, 0)
 			label:SetHeight(18)
-			local badge = addStatusChip(mini, _G.ENABLED or "Enabled", GREEN, 76)
+			local badgeColor = #enabledPages > 0 and GREEN or GOLD
+			local badge = addStatusChip(mini, featureBadgeText, badgeColor, 92)
 			badge:SetPoint("RIGHT", mini, "RIGHT", -8, 0)
 		end
 	end
