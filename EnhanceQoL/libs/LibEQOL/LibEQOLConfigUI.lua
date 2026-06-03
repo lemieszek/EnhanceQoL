@@ -28,6 +28,8 @@ local PAGE_GAP = 16
 local GRID_GAP = 12
 local BOOLEAN_ROW_HEIGHT = 68
 local STACKED_ROW_HEIGHT = 106
+local SLIDER_ROW_HEIGHT = 86
+local SLIDER_ROW_HEIGHT_COMPACT = 64
 local COMPLEX_ROW_HEIGHT = 92
 local ROW_INSET = 14
 local FIELD_CONTROL_LEFT = 18
@@ -332,10 +334,18 @@ local function getControlLayoutType(control)
 	return "complex"
 end
 
+local function hasUsefulDescription(control)
+	return type(control and control.description) == "string" and control.description:gsub("%s+", "") ~= ""
+end
+
 local function getSettingRowHeight(control)
 	local layoutType = getControlLayoutType(control)
+	local controlType = getControlType(control)
 	if layoutType == "boolean" then
 		return BOOLEAN_ROW_HEIGHT
+	end
+	if controlType == "slider" then
+		return hasUsefulDescription(control) and SLIDER_ROW_HEIGHT or SLIDER_ROW_HEIGHT_COMPACT
 	end
 	if layoutType == "stacked" then
 		return STACKED_ROW_HEIGHT
@@ -345,6 +355,13 @@ end
 
 local function getFieldControlWidth(rowWidth)
 	return math.max(FIELD_CONTROL_WIDTH_MIN, math.min(FIELD_CONTROL_WIDTH_MAX, (tonumber(rowWidth) or 0) - 36))
+end
+
+local function getSliderControlWidth(rowWidth, labelWidth, sliderGap)
+	return math.max(
+		FIELD_CONTROL_WIDTH_MIN,
+		(tonumber(rowWidth) or 0) - (FIELD_CONTROL_LEFT * 2) - ((labelWidth or 0) * 2) - ((sliderGap or 0) * 2)
+	)
 end
 
 local function getAddonIcon(app)
@@ -1229,6 +1246,9 @@ local function addSliderWidget(row, app, control, opts)
 	end
 	row.value = valueText
 	local sliderWidth = opts.width or 220
+	local trackInset = 4
+	local fillInset = 1
+	local trackWidth = math.max(32, sliderWidth - (trackInset * 2))
 	local slider = CreateFrame("Slider", nil, row, "OptionsSliderTemplate")
 	if opts.point then
 		slider:SetPoint(opts.point[1], opts.point[2], opts.point[3], opts.point[4], opts.point[5])
@@ -1248,12 +1268,12 @@ local function addSliderWidget(row, app, control, opts)
 	if slider.Middle then slider.Middle:Hide() end
 	if slider.Right then slider.Right:Hide() end
 	slider.Track = CreateFrame("Frame", nil, row, "BackdropTemplate")
-	slider.Track:SetSize(sliderWidth, 6)
-	slider.Track:SetPoint("CENTER", slider, "CENTER", 0, 0)
+	slider.Track:SetSize(trackWidth, 8)
+	slider.Track:SetPoint("LEFT", slider, "LEFT", trackInset, 0)
 	applyBackdrop(slider.Track, { 0.025, 0.024, 0.022, 0.95 }, { 0.28, 0.24, 0.17, 0.75 })
 	slider.Fill = slider.Track:CreateTexture(nil, "OVERLAY")
-	slider.Fill:SetPoint("LEFT", slider.Track, "LEFT", 1, 0)
-	slider.Fill:SetHeight(4)
+	slider.Fill:SetPoint("LEFT", slider.Track, "LEFT", fillInset, 0)
+	slider.Fill:SetHeight(3)
 	slider.Fill:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.68)
 	if slider.Thumb then
 		slider.Thumb:SetVertexColor(1.0, 0.84, 0.46, 1)
@@ -1262,7 +1282,7 @@ local function addSliderWidget(row, app, control, opts)
 		local span = maxValue - minValue
 		local percent = span ~= 0 and ((tonumber(value) or minValue) - minValue) / span or 0
 		percent = math.max(0, math.min(1, percent))
-		slider.Fill:SetWidth(math.max(1, (sliderWidth - 2) * percent))
+		slider.Fill:SetWidth(math.max(1, (trackWidth - (fillInset * 2)) * percent))
 	end
 	slider:SetScript("OnValueChanged", function(self, value)
 		updateFill(value)
@@ -1487,7 +1507,12 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 	title:SetPoint("TOPLEFT", row, "TOPLEFT", textLeft, -12)
 	title:SetHeight(20)
 
-	local descText = control.description or pathText or getControlPath(app, control)
+	local descText
+	if controlType == "slider" then
+		descText = control.description
+	else
+		descText = control.description or pathText or getControlPath(app, control)
+	end
 	local desc = createText(row, FONT_MUTED, descText or "", MUTED)
 	desc.Text:SetWordWrap(true)
 
@@ -1504,22 +1529,43 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 		else
 			title:SetPoint("RIGHT", row, "RIGHT", -18, 0)
 		end
-		desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
-		desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
-		desc:SetHeight(32)
 
 		local controlWidth = getFieldControlWidth(rowWidth)
-		local controlPoint = { "BOTTOMLEFT", row, "BOTTOMLEFT", FIELD_CONTROL_LEFT, 15 }
 		if controlType == "slider" then
+			local hasDescription = hasUsefulDescription(control)
+			if hasDescription then
+				desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -2)
+				desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+				desc:SetHeight(22)
+			else
+				desc:Hide()
+			end
 			local valueText = createText(row, FONT_TEXT, "", GOLD, "RIGHT")
 			valueText:SetPoint("TOPRIGHT", row, "TOPRIGHT", -18, -12)
 			valueText:SetSize(valueWidth, 20)
+			local hasRangeLabels = control.min ~= nil or control.max ~= nil
+			local labelWidth = hasRangeLabels and 44 or 0
+			local sliderGap = hasRangeLabels and 8 or 0
+			local sliderY = 10
+			if hasRangeLabels then
+				local minLabel = createText(row, FONT_MUTED, formatControlValue(control, control.min), MUTED)
+				minLabel:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", FIELD_CONTROL_LEFT, sliderY - 1)
+				minLabel:SetSize(labelWidth, 18)
+				local maxLabel = createText(row, FONT_MUTED, formatControlValue(control, control.max), MUTED, "RIGHT")
+				maxLabel:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -FIELD_CONTROL_LEFT, sliderY - 1)
+				maxLabel:SetSize(labelWidth, 18)
+			end
+			local sliderWidth = getSliderControlWidth(rowWidth, labelWidth, sliderGap)
 			addSliderWidget(row, app, control, {
-				point = controlPoint,
-				width = controlWidth,
+				point = { "BOTTOMLEFT", row, "BOTTOMLEFT", FIELD_CONTROL_LEFT + labelWidth + sliderGap, sliderY },
+				width = sliderWidth,
 				valueText = valueText,
 			})
 		elseif controlType == "dropdown" or controlType == "sounddropdown" then
+			desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
+			desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+			desc:SetHeight(32)
+			local controlPoint = { "BOTTOMLEFT", row, "BOTTOMLEFT", FIELD_CONTROL_LEFT, 15 }
 			addDropdownWidget(row, app, control, {
 				point = controlPoint,
 				width = controlWidth,
@@ -1529,11 +1575,19 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 				},
 			})
 		elseif controlType == "input" then
+			desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
+			desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+			desc:SetHeight(32)
+			local controlPoint = { "BOTTOMLEFT", row, "BOTTOMLEFT", FIELD_CONTROL_LEFT, 15 }
 			addInputWidget(row, app, control, {
 				point = controlPoint,
 				width = controlWidth,
 			})
 		elseif controlType == "colorpicker" then
+			desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
+			desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+			desc:SetHeight(32)
+			local controlPoint = { "BOTTOMLEFT", row, "BOTTOMLEFT", FIELD_CONTROL_LEFT, 15 }
 			addColorWidget(row, app, control, {
 				point = controlPoint,
 				configure = {
