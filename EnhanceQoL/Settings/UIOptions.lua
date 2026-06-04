@@ -319,6 +319,7 @@ local function createActionBarVisibility(category, expandable)
 				var = info.var .. "_visibility",
 				storage = false,
 				text = info.text or info.name or info.var,
+				desc = L["ActionbarVisibilityRuleSelectionDesc"],
 				options = ABRule,
 				isSelectedFunc = function(key)
 					local cfg = NormalizeActionBarVisibilityConfig(info.var)
@@ -1078,6 +1079,17 @@ local function createLabelControls(category, expandable)
 		var = "actionBarFullRangeColoring",
 		text = L["fullButtonRangeColoring"],
 		desc = L["fullButtonRangeColoringDesc"],
+		richNote = {
+			title = L["fullButtonRangeColoring"],
+			blocks = {
+				{ text = L["fullButtonRangeColoringDesc"] },
+				{
+					image = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Examples\\FullRangeColoring.tga",
+					width = 172,
+					height = 180,
+				},
+			},
+		},
 		func = function(value)
 			addon.db["actionBarFullRangeColoring"] = value
 			if ActionBarLabels and ActionBarLabels.UpdateRangeOverlayEvents then ActionBarLabels.UpdateRangeOverlayEvents() end
@@ -1127,6 +1139,7 @@ local function createActionBarCategory()
 		name = L["ActionBarsAndButtons"] or "Action Bars & Buttons",
 		configPageKey = "ActionBarsAndButtons",
 		iconKey = "actionbar",
+		modernOnly = true,
 		description = L["configCenterPageDescActionBars"]
 			or "Configure action bar visibility, button growth, borders, keybind text, macro labels and cooldown text.",
 		expanded = false,
@@ -1444,6 +1457,7 @@ local function createFrameCategory()
 					var = info.var .. "_visibility",
 					storage = false,
 					text = info.text or info.name or info.var,
+					desc = L["visibilityFrameRuleSelectionDesc"],
 					options = options,
 					isSelectedFunc = function(key)
 						local cfg = NormalizeUnitFrameVisibilityConfig(info.var)

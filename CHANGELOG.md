@@ -4,8 +4,13 @@
 
 ### ✨ Added
 
+- Settings Center / Action Bars: Added a clearer explanation for action bar visibility rules so the multi-select describes show, hide, mouseover, and fade behavior instead of showing a generic fallback.
 - Settings Center / Skinner: Added a Character Frame section header and renamed the main toggle to make it clear that it enables Character Frame skinning.
 - Settings Center / Skinner: Added a Character Frame preview note using the new example image asset.
+
+### 🔄 Changed
+
+- Settings Center: Migrated Action Bars & Buttons and Skinner away from the legacy Blizzard Settings renderer. They now register only for the modern Settings Center while keeping their SavedVariables and runtime behavior unchanged.
 
 ### 🐛 Fixed
 

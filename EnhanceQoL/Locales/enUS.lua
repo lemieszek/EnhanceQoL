@@ -63,6 +63,7 @@ L["actionBarShortHotkeys"] = "Shorten keybind text"
 L["actionBarShortHotkeysDesc"] = "Displays abbreviations such as SM3 for Shift + Mouse Button 3."
 L["ActionbarVisibilityExplain2"] = '|cff99e599Set the action bar to "%s" in %s to use the options below.|r\
 |cff99e599You can combine mouseover, in-combat, and out-of-combat visibility.|r'
+L["ActionbarVisibilityRuleSelectionDesc"] = "Choose when this action bar should be shown, faded, or hidden. Show rules make the bar visible in matching situations; hide rules take priority, and mouseover/fade rules can reveal it temporarily."
 L["ActionTracker"] = "Action Tracker"
 L["actionTrackerDesc"] = "Shows your most recently cast spells as icons."
 L["actionTrackerEditModeHint"] = "Use Edit Mode to move the tracker and adjust size, spacing, direction, and fade."
@@ -3825,6 +3826,7 @@ L["VisibilityFrameAssigned"] = "Frame already assigned to:"
 L["VisibilityFrameExists"] = "Frame already in this config."
 L["visibilityFrameExplain2"] = "|cff99e599Combine the same triggers for Blizzard unit frames.|r\
 |cff99e599Mouseover can be layered with combat or other checks.|r"
+L["visibilityFrameRuleSelectionDesc"] = "Choose when this frame is shown, faded, or hidden. Show rules can make it visible during combat, targeting, mouseover, or similar states; hide rules take priority when their condition is active."
 L["visibilityFrameExtrasNote2"] = "|cff99e599Looking for raid frames, name truncation, or health text tweaks?|r\
 |cff99e599Those options remain under UI >> Unit Frames.|r"
 L["VisibilityFrameInvalid"] = "Invalid frame."

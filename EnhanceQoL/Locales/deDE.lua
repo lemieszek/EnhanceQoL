@@ -64,6 +64,7 @@ L["actionBarShortHotkeys"] = "Tastenbelegungstext verkürzen"
 L["actionBarShortHotkeysDesc"] = "Zeigt Abkürzungen wie SM3 für Umschalt + Maustaste 3 an."
 L["ActionbarVisibilityExplain2"] = "|cff99e599Stelle die Aktionsleiste auf \"%s\" in %s, um die Optionen unten zu verwenden.|r\
 |cff99e599Mausover-, Kampf- und Nichtkampf-Sichtbarkeit lassen sich kombinieren.|r"
+L["ActionbarVisibilityRuleSelectionDesc"] = "Wähle, wann diese Aktionsleiste angezeigt, verblasst oder ausgeblendet werden soll. Anzeigen-Regeln machen die Leiste in passenden Situationen sichtbar; Ausblenden-Regeln haben Vorrang, und Mouseover-/Fade-Regeln können sie kurzzeitig einblenden."
 L["ActionTracker"] = "Aktions-Tracker"
 L["actionTrackerDesc"] = "Zeigt deine zuletzt gewirkten Zauber als Icons."
 L["actionTrackerEditModeHint"] = "Im Bearbeitungsmodus verschieben und Größe, Abstand, Richtung und Ausblenden anpassen."
@@ -3817,6 +3818,7 @@ L["VisibilityFrameAssigned"] = "Frame bereits zugewiesen an:"
 L["VisibilityFrameExists"] = "Frame bereits in dieser Konfiguration."
 L["visibilityFrameExplain2"] = "|cff99e599Kombiniere gleiche Auslöser für Blizzard-Einheitenrahmen.|r\
 |cff99e599Mouseover lässt sich mit Kampf- oder Spieler-Gesundheitsprüfungen schichten.|r"
+L["visibilityFrameRuleSelectionDesc"] = "Wähle, wann dieser Frame angezeigt, ausgeblendet oder verblasst wird. Anzeige-Regeln können ihn im Kampf, bei Ziel, Mouseover oder ähnlichen Zuständen sichtbar machen; Ausblend-Regeln haben Vorrang, wenn ihre Bedingung aktiv ist."
 L["visibilityFrameExtrasNote2"] = "|cff99e599Du suchst nach Raidframes, Namenskürzung oder Lebensbalken-Texten?|r\
 |cff99e599Diese Optionen findest du weiterhin unter UI >> Einheitenfenster.|r"
 L["VisibilityFrameInvalid"] = "Ungültiger Frame."

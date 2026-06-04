@@ -64,6 +64,7 @@ L["actionBarShortHotkeys"] = "단축키 텍스트 줄이기"
 L["actionBarShortHotkeysDesc"] = "Shift + 마우스 버튼 3처럼 SM3 약어를 표시합니다."
 L["ActionbarVisibilityExplain2"] = "|cff99e599아래 옵션을 사용하려면 행동 단축바를 \"%s\"로 설정하고 %s에서 적용하세요.|r\
 |cff99e599마우스오버, 전투 중, 전투 종료 시 표시를 조합할 수 있습니다.|r"
+L["ActionbarVisibilityRuleSelectionDesc"] = "이 행동 단축바를 언제 표시하거나 흐리게 하거나 숨길지 선택합니다. 표시 규칙은 조건이 맞을 때 단축바를 보이게 하고, 숨김 규칙은 우선 적용되며, 마우스오버/페이드 규칙은 일시적으로 다시 보이게 할 수 있습니다."
 L["ActionTracker"] = "행동 추적기"
 L["actionTrackerDesc"] = "최근 시전한 주문을 아이콘으로 표시합니다."
 L["actionTrackerEditModeHint"] = "편집 모드에서 이동하고 크기, 간격, 방향, 페이드 시간을 조정하세요."
@@ -3817,6 +3818,7 @@ L["VisibilityFrameAssigned"] = "프레임이 이미 다음에 할당됨:"
 L["VisibilityFrameExists"] = "이 구성에 이미 있는 프레임입니다."
 L["visibilityFrameExplain2"] = "|cff99e599블리자드 유닛 프레임에 동일한 트리거를 조합하세요.|r\
 |cff99e599마우스오버는 전투 또는 플레이어 체력 조건과 함께 사용할 수 있습니다.|r"
+L["visibilityFrameRuleSelectionDesc"] = "이 프레임이 표시되거나 흐려지거나 숨겨지는 시점을 선택합니다. 표시 규칙은 전투, 대상 보유, 마우스오버 또는 비슷한 상태에서 프레임을 보이게 하며, 숨김 규칙은 조건이 활성화되면 우선 적용됩니다."
 L["visibilityFrameExtrasNote2"] = "|cff99e599공격대 프레임, 이름 줄이기 또는 체력 문자 조정이 필요하신가요?|r\
 |cff99e599해당 옵션은 UI >> 유닛 프레임에 있습니다.|r"
 L["VisibilityFrameInvalid"] = "잘못된 프레임입니다."

@@ -23,6 +23,7 @@ addon.ConfigSectionByParentCheck = addon.ConfigSectionByParentCheck or {}
 addon.ConfigControlOrder = addon.ConfigControlOrder or 0
 addon.ConfigLastControlByPageID = addon.ConfigLastControlByPageID or {}
 addon.ConfigLastControlBySection = addon.ConfigLastControlBySection or {}
+addon.ConfigModernOnlySections = addon.ConfigModernOnlySections or {}
 
 local rootCategoryMap = {
 	UI = "interface",
@@ -455,6 +456,69 @@ local function resolveConfigSection(sectionOrParentCheck)
 	return sectionOrParentCheck
 end
 
+local function isModernOnlySection(sectionOrParentCheck)
+	local section = resolveConfigSection(sectionOrParentCheck)
+	return section and addon.ConfigModernOnlySections and addon.ConfigModernOnlySections[section] == true
+end
+
+local function createModernOnlySection(data)
+	local section = {
+		data = {
+			expanded = data and data.expanded ~= false,
+			name = data and (data.name or data.text) or "Section",
+		},
+		modernOnly = true,
+	}
+	function section:IsExpanded()
+		return self.data and self.data.expanded ~= false
+	end
+	function section:GetExtent()
+		return data and data.extent or 25
+	end
+	return section
+end
+
+local function createModernOnlySetting(key, cbData)
+	local setting = {}
+	local function setValue(value)
+		if cbData and type(cbData.func) == "function" then
+			cbData.func(value)
+		elseif cbData and type(cbData.set) == "function" then
+			cbData.set(nil, value)
+		elseif cbData and cbData.var then
+			addon.db = addon.db or {}
+			if cbData.subvar then
+				addon.db[cbData.var] = type(addon.db[cbData.var]) == "table" and addon.db[cbData.var] or {}
+				addon.db[cbData.var][cbData.subvar] = value
+			else
+				addon.db[cbData.var] = value
+			end
+		end
+	end
+	function setting:GetValue()
+		if cbData and type(cbData.get) == "function" then return cbData.get() end
+		if cbData and cbData.var and addon.db then
+			local value = addon.db[cbData.var]
+			if cbData.subvar and type(value) == "table" then value = value[cbData.subvar] end
+			if value ~= nil then return value end
+		end
+		return cbData and cbData.default
+	end
+	function setting:SetValue(value) setValue(value) end
+	function setting:GetVariable()
+		return prefix .. tostring(key or (cbData and cbData.var) or "setting")
+	end
+	return setting
+end
+
+local function rememberModernOnlyElement(key, setting)
+	addon.SettingsLayout.elements = addon.SettingsLayout.elements or {}
+	if key then
+		addon.SettingsLayout.elements[key] = { setting = setting, element = nil, modernOnly = true }
+	end
+	return addon.SettingsLayout.elements[key]
+end
+
 local function getDefaultGroupID(app, pageID)
 	if not app or not pageID then return nil end
 	local groupID = "settings"
@@ -703,6 +767,38 @@ end
 -- Checkbox
 ---------------------------------------------------------
 function addon.functions.SettingsCreateCheckbox(cat, cbData)
+	if isModernOnlySection(cbData and cbData.parentSection) then
+		local setting = createModernOnlySetting(cbData.var, cbData)
+		local element = rememberModernOnlyElement(cbData.var, setting)
+		registerLegacyControl(cat, cbData, "toggle", setting)
+		if cbData.children then
+			for _, v in pairs(cbData.children) do
+				v.element = v.element or element
+				v.parentCheck = v.parentCheck or cbData.parentCheck
+				local sType = v.sType or v.type
+				if sType == "dropdown" then
+					addon.functions.SettingsCreateDropdown(cat, v)
+				elseif sType == "scrolldropdown" then
+					addon.functions.SettingsCreateScrollDropdown(cat, v)
+				elseif sType == "checkbox" then
+					addon.functions.SettingsCreateCheckbox(cat, v)
+				elseif sType == "multidropdown" then
+					addon.functions.SettingsCreateMultiDropdown(cat, v)
+				elseif sType == "slider" then
+					addon.functions.SettingsCreateSlider(cat, v)
+				elseif sType == "hint" then
+					addon.functions.SettingsCreateText(cat, v.text, { parentSection = v.parentSection })
+				elseif sType == "colorpicker" then
+					addon.functions.SettingsCreateColorPicker(cat, v)
+				elseif sType == "button" then
+					addon.functions.SettingsCreateButton(cat, v)
+				elseif sType == "sounddropdown" then
+					addon.functions.SettingsCreateSoundDropdown(cat, v)
+				end
+			end
+		end
+		return element
+	end
 	local element, setting = SettingsLib:CreateCheckbox(cat, {
 		key = cbData.var,
 		name = cbData.text,
@@ -765,6 +861,27 @@ end
 -- Checkbox + Dropdown
 ---------------------------------------------------------
 function addon.functions.SettingsCreateCheckboxDropdown(cat, cbData)
+	if isModernOnlySection(cbData and cbData.parentSection) then
+		local setting = createModernOnlySetting(cbData.var, cbData)
+		local dropdownKey = cbData.dropdownVar or cbData.dropdownKey
+		local element = rememberModernOnlyElement(cbData.var, setting)
+		if dropdownKey then rememberModernOnlyElement(dropdownKey, createModernOnlySetting(dropdownKey, cbData)) end
+		local modernData = {}
+		for key, value in pairs(cbData) do
+			modernData[key] = value
+		end
+		modernData.dropdownKey = dropdownKey
+		modernData.dropdownValues = cbData.dropdownList or cbData.dropdownValues or cbData.list or cbData.values
+		modernData.dropdownOptions = modernData.dropdownValues
+		modernData.dropdownOrder = cbData.dropdownOrder or cbData.order
+		modernData.dropdownOptionfunc = cbData.dropdownOptionfunc or cbData.dropdownListFunc or cbData.listFunc or cbData.optionfunc
+		modernData.dropdownName = cbData.dropdownText or cbData.dropdownName
+		modernData.dropdownDesc = cbData.dropdownDesc
+		modernData.dropdownGet = cbData.dropdownGet or function() return addon.db and addon.db[dropdownKey] end
+		modernData.dropdownSet = cbData.dropdownSet or function(v) addon.db = addon.db or {}; addon.db[dropdownKey] = v end
+		registerLegacyControl(cat, modernData, "checkboxdropdown", setting)
+		return element
+	end
 	local dropdownKey = cbData.dropdownVar or cbData.dropdownKey
 	local initializer, checkboxSetting, dropdownSetting = SettingsLib:CreateCheckboxDropdown(cat, {
 		key = cbData.var,
@@ -825,6 +942,12 @@ end
 -- Slider
 ---------------------------------------------------------
 function addon.functions.SettingsCreateSlider(cat, cbData)
+	if isModernOnlySection(cbData and cbData.parentSection) then
+		local setting = createModernOnlySetting(cbData.var, cbData)
+		local element = rememberModernOnlyElement(cbData.var, setting)
+		registerLegacyControl(cat, cbData, "slider", setting)
+		return element
+	end
 	local element, setting = SettingsLib:CreateSlider(cat, {
 		key = cbData.var,
 		name = cbData.text,
@@ -857,6 +980,12 @@ end
 -- Input
 ---------------------------------------------------------
 function addon.functions.SettingsCreateInput(cat, cbData)
+	if isModernOnlySection(cbData and cbData.parentSection) then
+		local setting = createModernOnlySetting(cbData.var, cbData)
+		local element = rememberModernOnlyElement(cbData.var, setting)
+		registerLegacyControl(cat, cbData, "input", setting)
+		return element
+	end
 	local element, setting = SettingsLib:CreateInput(cat, {
 		key = cbData.var,
 		name = cbData.text,
@@ -895,6 +1024,12 @@ end
 -- Dropdown
 ---------------------------------------------------------
 function addon.functions.SettingsCreateDropdown(cat, cbData)
+	if isModernOnlySection(cbData and cbData.parentSection) then
+		local setting = createModernOnlySetting(cbData.var, cbData)
+		local element = rememberModernOnlyElement(cbData.var, setting)
+		registerLegacyControl(cat, cbData, "dropdown", setting)
+		return element
+	end
 	local element, setting = SettingsLib:CreateDropdown(cat, {
 		key = cbData.var,
 		name = cbData.text,
@@ -922,6 +1057,13 @@ end
 -- Scroll Dropdown
 ---------------------------------------------------------
 function addon.functions.SettingsCreateScrollDropdown(cat, cbData)
+	if isModernOnlySection(cbData and cbData.parentSection) then
+		local key = cbData.var or cbData.key
+		local setting = createModernOnlySetting(key, cbData)
+		local element = rememberModernOnlyElement(key, setting)
+		registerLegacyControl(cat, cbData, "dropdown", setting)
+		return element
+	end
 	if not SettingsLib.CreateScrollDropdown then return addon.functions.SettingsCreateDropdown(cat, cbData) end
 
 	local key = cbData.var or cbData.key
@@ -1038,35 +1180,37 @@ function addon.functions.SettingsCreateMultiDropdown(cat, cbData)
 		if cbData.callback then cbData.callback(map) end
 	end
 
-	local initializer = SettingsLib:CreateMultiDropdown(cat, {
-		key = cbData.var,
-		db = explicitStorageDB or (not storageDisabled and addon.db) or nil,
-		name = cbData.text,
-		values = cbData.options or cbData.list,
-		optionfunc = cbData.optionfunc or cbData.listFunc,
-		desc = cbData.desc,
-		tooltip = cbData.tooltip,
-		height = cbData.menuHeight or 200,
-		order = cbData.order,
-		customText = cbData.customText,
-		customDefaultText = cbData.customDefaultText,
-		isSelected = cbData.isSelectedFunc,
-		setSelected = cbData.setSelectedFunc,
-		getSelection = cbData.getSelection or cbData.get or (storageDisabled and getSelectionFromSelected or getSelection),
-		setSelection = cbData.setSelection or cbData.set or (storageDisabled and setSelectionFromSelected or setSelection),
-		summary = cbData.summary,
-		searchtags = cbData.searchtags,
-		parent = cbData.element or cbData.parent,
-		parentCheck = cbData.parentCheck,
-		notify = cbData.notify,
-		parentSection = cbData.parentSection,
-		isEnabled = cbData.isEnabled,
-		prefix = prefix,
-		hideSummary = cbData.hideSummary == nil and true or cbData.hideSummary,
-	})
-
+	local initializer
+	if not isModernOnlySection(cbData and cbData.parentSection) then
+		initializer = SettingsLib:CreateMultiDropdown(cat, {
+			key = cbData.var,
+			db = explicitStorageDB or (not storageDisabled and addon.db) or nil,
+			name = cbData.text,
+			values = cbData.options or cbData.list,
+			optionfunc = cbData.optionfunc or cbData.listFunc,
+			desc = cbData.desc,
+			tooltip = cbData.tooltip,
+			height = cbData.menuHeight or 200,
+			order = cbData.order,
+			customText = cbData.customText,
+			customDefaultText = cbData.customDefaultText,
+			isSelected = cbData.isSelectedFunc,
+			setSelected = cbData.setSelectedFunc,
+			getSelection = cbData.getSelection or cbData.get or (storageDisabled and getSelectionFromSelected or getSelection),
+			setSelection = cbData.setSelection or cbData.set or (storageDisabled and setSelectionFromSelected or setSelection),
+			summary = cbData.summary,
+			searchtags = cbData.searchtags,
+			parent = cbData.element or cbData.parent,
+			parentCheck = cbData.parentCheck,
+			notify = cbData.notify,
+			parentSection = cbData.parentSection,
+			isEnabled = cbData.isEnabled,
+			prefix = prefix,
+			hideSummary = cbData.hideSummary == nil and true or cbData.hideSummary,
+		})
+	end
 	addon.SettingsLayout.elements = addon.SettingsLayout.elements or {}
-	addon.SettingsLayout.elements[cbData.var] = { initializer = initializer }
+	addon.SettingsLayout.elements[cbData.var] = { initializer = initializer, modernOnly = initializer == nil }
 	local modernData = {}
 	for key, value in pairs(cbData) do
 		modernData[key] = value
@@ -1099,6 +1243,12 @@ end
 -- Sound Dropdown
 ---------------------------------------------------------
 function addon.functions.SettingsCreateSoundDropdown(cat, cbData)
+	if isModernOnlySection(cbData and cbData.parentSection) then
+		local setting = createModernOnlySetting(cbData.var, cbData)
+		local element = rememberModernOnlyElement(cbData.var, setting)
+		registerLegacyControl(cat, cbData, "sounddropdown", setting)
+		return element
+	end
 	local initializer, setting = SettingsLib:CreateSoundDropdown(cat, {
 		key = cbData.var,
 		name = cbData.text,
@@ -1136,6 +1286,11 @@ end
 -- Color Overrides Panel
 ---------------------------------------------------------
 function addon.functions.SettingsCreateColorOverrides(cat, cbData)
+	if isModernOnlySection(cbData and cbData.parentSection) then
+		rememberModernOnlyElement(cbData.var or cbData.key or "ColorOverrides")
+		registerLegacyControl(cat, cbData, "coloroverrides", nil)
+		return nil
+	end
 	local initializer = SettingsLib:CreateColorOverrides(cat, {
 		key = cbData.var or cbData.key,
 		headerText = cbData.text or cbData.name,
@@ -1167,7 +1322,10 @@ end
 function addon.functions.SettingsCreateHeadline(cat, text, extra)
 	local data = type(text) == "table" and text or extra
 	local headerText = type(text) == "table" and (text.name or text.text or text.label or text.title) or text
-	local header = SettingsLib:CreateHeader(cat, text, extra)
+	local header
+	if not isModernOnlySection(data and data.parentSection) then
+		header = SettingsLib:CreateHeader(cat, text, extra)
+	end
 	local app = ensureConfigApp()
 	if app and data and data.parentSection then
 		local resolvedSection = resolveConfigSection(data.parentSection)
@@ -1191,7 +1349,10 @@ function addon.functions.SettingsCreateHeadline(cat, text, extra)
 end
 
 function addon.functions.SettingsCreateText(cat, text, extra)
-	local element = SettingsLib:CreateText(cat, text, extra)
+	local element
+	if not isModernOnlySection(extra and extra.parentSection) then
+		element = SettingsLib:CreateText(cat, text, extra)
+	end
 	local app = ensureConfigApp()
 	if app and app.RegisterControlNote and extra and extra.parentSection and type(text) == "string" then
 		local resolvedSection = resolveConfigSection(extra.parentSection)
@@ -1208,6 +1369,11 @@ function addon.functions.SettingsCreateText(cat, text, extra)
 end
 
 function addon.functions.SettingsCreateButton(cat, cbData)
+	if isModernOnlySection(cbData and cbData.parentSection) then
+		local btn = rememberModernOnlyElement(cbData.var or cbData.text)
+		registerLegacyControl(cat, cbData, "button", nil)
+		return btn
+	end
 	local btn = SettingsLib:CreateButton(cat, {
 		label = cbData.label,
 		text = cbData.text,
@@ -1247,26 +1413,29 @@ function addon.functions.SettingsCreateColorPicker(cat, cbData)
 		local default = type(cbData.default) == "function" and cbData.default() or cbData.default
 		return default and default.r or 1, default and default.g or 1, default and default.b or 1, default and default.a or 1
 	end
-	local initializer = SettingsLib:CreateColorOverrides(cat, {
-		key = cbData.var, -- eindeutiger Key
-		headerText = cbData.text, -- Überschrift (optional)
-		entries = entries,
-		getColor = getColor,
-		setColor = setColor,
-		getDefaultColor = getDefaultColor,
-		parent = cbData.element,
-		parentCheck = cbData.parentCheck,
-		searchtags = cbData.searchtags,
-		notify = cbData.notify,
-		parentSection = cbData.parentSection,
-		prefix = prefix,
-		colorizeLabel = cbData.colorizeLabel,
-		hasOpacity = cbData.hasOpacity,
-	})
+	local initializer
+	if not isModernOnlySection(cbData and cbData.parentSection) then
+		initializer = SettingsLib:CreateColorOverrides(cat, {
+			key = cbData.var, -- eindeutiger Key
+			headerText = cbData.text, -- Überschrift (optional)
+			entries = entries,
+			getColor = getColor,
+			setColor = setColor,
+			getDefaultColor = getDefaultColor,
+			parent = cbData.element,
+			parentCheck = cbData.parentCheck,
+			searchtags = cbData.searchtags,
+			notify = cbData.notify,
+			parentSection = cbData.parentSection,
+			prefix = prefix,
+			colorizeLabel = cbData.colorizeLabel,
+			hasOpacity = cbData.hasOpacity,
+		})
+	end
 
 	addon.SettingsLayout = addon.SettingsLayout or {}
 	addon.SettingsLayout.elements = addon.SettingsLayout.elements or {}
-	addon.SettingsLayout.elements[cbData.var] = { initializer = initializer }
+	addon.SettingsLayout.elements[cbData.var] = { initializer = initializer, modernOnly = initializer == nil }
 	cbData.entries = entries
 	cbData.getColor = getColor
 	cbData.setColor = setColor
@@ -1276,16 +1445,22 @@ function addon.functions.SettingsCreateColorPicker(cat, cbData)
 end
 
 function addon.functions.SettingsCreateExpandableSection(cat, cbData)
-	local section = SettingsLib:CreateExpandableSection(cat, {
-		name = cbData.name,
-		expanded = cbData.expanded,
-		searchtags = cbData.searchtags,
-		colorizeTitle = cbData.colorizeTitle,
-		titleColor = cbData.titleColor,
-		extent = cbData.extent,
-		newTagID = cbData.newTagID,
-		prefix = prefix,
-	})
+	local section
+	if cbData.modernOnly then
+		section = createModernOnlySection(cbData)
+		addon.ConfigModernOnlySections[section] = true
+	else
+		section = SettingsLib:CreateExpandableSection(cat, {
+			name = cbData.name,
+			expanded = cbData.expanded,
+			searchtags = cbData.searchtags,
+			colorizeTitle = cbData.colorizeTitle,
+			titleColor = cbData.titleColor,
+			extent = cbData.extent,
+			newTagID = cbData.newTagID,
+			prefix = prefix,
+		})
+	end
 	if cbData.var then
 		addon.SettingsLayout = addon.SettingsLayout or {}
 		addon.SettingsLayout.elements = addon.SettingsLayout.elements or {}

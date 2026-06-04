@@ -64,6 +64,7 @@ L["actionBarShortHotkeys"] = "Acortar texto de teclas rápidas"
 L["actionBarShortHotkeysDesc"] = "Muestra abreviaturas como SM3 para Mayús + Botón del mouse 3."
 L["ActionbarVisibilityExplain2"] = "|cff99e599Configura la barra de acción en \"%s\" en %s para usar las opciones de abajo.|r\
 |cff99e599Puedes combinar visibilidad por ratón encima, en combate y fuera de combate.|r"
+L["ActionbarVisibilityRuleSelectionDesc"] = "Elige cuándo se debe mostrar, desvanecer u ocultar esta barra de acción. Las reglas de mostrar la hacen visible en situaciones coincidentes; las reglas de ocultar tienen prioridad, y las reglas de mouseover/desvanecer pueden revelarla temporalmente."
 L["ActionTracker"] = "Rastreador de acciones"
 L["actionTrackerDesc"] = "Muestra tus últimos hechizos lanzados como iconos."
 L["actionTrackerEditModeHint"] = "Usa el modo de edición para moverlo y ajustar tamaño, espaciado, dirección y desvanecimiento."
@@ -3817,6 +3818,7 @@ L["VisibilityFrameAssigned"] = "Marco ya asignado a:"
 L["VisibilityFrameExists"] = "Marco ya en esta configuración."
 L["visibilityFrameExplain2"] = "|cff99e599Combina los mismos activadores para los marcos de unidades de Blizzard.|r\
 |cff99e599El paso del ratón se puede combinar con comprobaciones de combate o salud del jugador.|r"
+L["visibilityFrameRuleSelectionDesc"] = "Elige cuándo se muestra, se desvanece o se oculta este marco. Las reglas de mostrar pueden hacerlo visible en combate, con objetivo, al pasar el ratón o en estados similares; las reglas de ocultar tienen prioridad cuando su condición está activa."
 L["visibilityFrameExtrasNote2"] = "|cff99e599¿Buscas marcos de banda, truncado de nombres o ajustes de texto de salud?|r\
 |cff99e599Esas opciones siguen en IU >> Marcos de unidad.|r"
 L["VisibilityFrameInvalid"] = "Marco no válido."

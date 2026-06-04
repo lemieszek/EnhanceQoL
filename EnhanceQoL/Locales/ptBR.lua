@@ -64,6 +64,7 @@ L["actionBarShortHotkeys"] = "Abreviar texto das teclas"
 L["actionBarShortHotkeysDesc"] = "Mostra abreviações como SM3 para Shift + Botão do mouse 3."
 L["ActionbarVisibilityExplain2"] = "|cff99e599Defina a barra de ação como \"%s\" em %s para usar as opções abaixo.|r\
 |cff99e599Você pode combinar visibilidade ao passar o mouse, em combate e fora de combate.|r"
+L["ActionbarVisibilityRuleSelectionDesc"] = "Escolha quando esta barra de ação deve ser mostrada, esmaecida ou ocultada. Regras de exibição tornam a barra visível em situações correspondentes; regras de ocultação têm prioridade, e regras de mouseover/esmaecimento podem revelá-la temporariamente."
 L["ActionTracker"] = "Rastreador de ações"
 L["actionTrackerDesc"] = "Mostra seus feitiços lançados recentemente como ícones."
 L["actionTrackerEditModeHint"] = "Use o Modo de Edição para mover e ajustar tamanho, espaçamento, direção e desvanecimento."
@@ -3817,6 +3818,7 @@ L["VisibilityFrameAssigned"] = "Quadro já atribuído a:"
 L["VisibilityFrameExists"] = "Quadro já nesta configuração."
 L["visibilityFrameExplain2"] = "|cff99e599Combine os mesmos gatilhos para os quadros de unidade da Blizzard.|r\
 |cff99e599O passar do mouse pode ser combinado com verificações de combate ou saúde do jogador.|r"
+L["visibilityFrameRuleSelectionDesc"] = "Escolha quando este quadro é mostrado, esmaecido ou ocultado. Regras de exibição podem torná-lo visível em combate, com alvo, ao passar o mouse ou em estados semelhantes; regras de ocultação têm prioridade quando sua condição está ativa."
 L["visibilityFrameExtrasNote2"] = "|cff99e599Procurando quadros de raide, truncamento de nome ou ajustes de texto de vida?|r\
 |cff99e599Essas opções continuam em IU >> Quadros de unidade.|r"
 L["VisibilityFrameInvalid"] = "Quadro inválido."

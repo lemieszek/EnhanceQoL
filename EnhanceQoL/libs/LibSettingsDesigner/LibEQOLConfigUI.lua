@@ -1212,6 +1212,28 @@ function lib.RenderNoteBlock(panel, block, y, width)
 	return y
 end
 
+local function getNoteImageWidth(note)
+	local width = 0
+	for _, block in ipairs(note and note.blocks or {}) do
+		if type(block) == "table" and (block.image or block.texture) then
+			width = math.max(width, tonumber(block.width) or 0)
+		end
+	end
+	return width
+end
+
+local function getControlNotePanelWidth(control, notes)
+	local baseWidth = tonumber(control and control.noteWidth) or 286
+	local imageWidth = 0
+	for _, note in ipairs(notes or {}) do
+		imageWidth = math.max(imageWidth, getNoteImageWidth(note))
+	end
+	if imageWidth > 0 then
+		return math.min(532, math.max(baseWidth, imageWidth + 20))
+	end
+	return baseWidth
+end
+
 function lib.HideControlNotePanel(state)
 	if state and state.notePanel then
 		state.notePanel:Hide()
@@ -1245,8 +1267,8 @@ function lib.ShowControlNotePanel(state, row, control)
 	applyBackdrop(panel, CARD_BG, { 0, 0, 0, 0 })
 	createPixelBorder(panel, CARD_BORDER_HOVER)
 
-	local width = 286
 	panel.NoteInset = 10
+	local width = getControlNotePanelWidth(control, notes)
 	local textWidth = width - (panel.NoteInset * 2)
 	local y = -panel.NoteInset
 	local label = _G.NOTES_LABEL or _G.NOTES

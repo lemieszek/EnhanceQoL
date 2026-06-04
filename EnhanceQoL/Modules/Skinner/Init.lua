@@ -788,6 +788,7 @@ function addon.Skinner.functions.InitSettings()
 		name = L["skinnerTitle"],
 		configPageKey = "Skinner",
 		iconKey = "skinner",
+		modernOnly = true,
 		expanded = false,
 		colorizeTitle = false,
 	})
@@ -800,6 +801,16 @@ function addon.Skinner.functions.InitSettings()
 		var = "skinnerCharacterFrameEnabled",
 		text = L["skinnerCharacterFrameEnabled"],
 		default = false,
+		richNote = {
+			title = L["skinnerCharacterFrameSection"],
+			blocks = {
+				{
+					image = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Examples\\CharacterFrameExample.tga",
+					width = 512,
+					height = 430,
+				},
+			},
+		},
 		func = function(value)
 			addon.db["skinnerCharacterFrameEnabled"] = value
 			if value then

@@ -64,6 +64,7 @@ L["actionBarShortHotkeys"] = "Accorcia testo dei tasti"
 L["actionBarShortHotkeysDesc"] = "Mostra abbreviazioni come SM3 per Maiusc + Pulsante del mouse 3."
 L["ActionbarVisibilityExplain2"] = "|cff99e599Imposta la barra d'azione su \"%s\" in %s per usare le opzioni sotto.|r\
 |cff99e599Puoi combinare visibilità al passaggio del mouse, in combattimento e fuori combattimento.|r"
+L["ActionbarVisibilityRuleSelectionDesc"] = "Scegli quando questa barra d'azione deve essere mostrata, sfumata o nascosta. Le regole di visualizzazione la rendono visibile nelle situazioni corrispondenti; le regole di occultamento hanno priorità, e le regole di mouseover/sfumatura possono rivelarla temporaneamente."
 L["ActionTracker"] = "Tracciatore azioni"
 L["actionTrackerDesc"] = "Mostra gli ultimi incantesimi lanciati come icone."
 L["actionTrackerEditModeHint"] = "Usa la modalità modifica per spostare e regolare dimensione, spaziatura, direzione e dissolvenza."
@@ -3817,6 +3818,7 @@ L["VisibilityFrameAssigned"] = "Frame già assegnato a:"
 L["VisibilityFrameExists"] = "Frame già in questa configurazione."
 L["visibilityFrameExplain2"] = "|cff99e599Combina gli stessi trigger per i riquadri unità Blizzard.|r\
 |cff99e599Il passaggio del mouse può essere combinato con controlli di combattimento o salute del giocatore.|r"
+L["visibilityFrameRuleSelectionDesc"] = "Scegli quando questo frame viene mostrato, sfumato o nascosto. Le regole di visualizzazione possono renderlo visibile in combattimento, con un bersaglio, al passaggio del mouse o in stati simili; le regole di occultamento hanno priorità quando la loro condizione è attiva."
 L["visibilityFrameExtrasNote2"] = "|cff99e599Cerchi riquadri incursione, troncamento nomi o modifiche al testo salute?|r\
 |cff99e599Queste opzioni restano in UI >> Riquadri unità.|r"
 L["VisibilityFrameInvalid"] = "Frame non valido."

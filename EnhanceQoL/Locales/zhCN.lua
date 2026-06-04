@@ -64,6 +64,7 @@ L["actionBarShortHotkeys"] = "缩短快捷键文本"
 L["actionBarShortHotkeysDesc"] = "显示诸如 SM3（Shift + 鼠标按键3）这样的缩写。"
 L["ActionbarVisibilityExplain2"] = "|cff99e599将动作条设为“%s”（在%s中）后，可使用以下选项。|r\
 |cff99e599鼠标悬停、战斗中和战斗外的可见性可以组合。|r"
+L["ActionbarVisibilityRuleSelectionDesc"] = "选择此动作条何时显示、淡化或隐藏。显示规则会在匹配的情况下让动作条可见；隐藏规则优先，而鼠标悬停/淡化规则可临时显示它。"
 L["ActionTracker"] = "动作追踪器"
 L["actionTrackerDesc"] = "以图标显示你最近施放的法术。"
 L["actionTrackerEditModeHint"] = "在编辑模式中移动并调整大小、间距、方向和淡出时间。"
@@ -3816,6 +3817,7 @@ L["VisibilityFrameAssigned"] = "框体已分配给："
 L["VisibilityFrameExists"] = "框体已在此配置中。"
 L["visibilityFrameExplain2"] = "|cff99e599为暴雪单位框体组合相同触发器。|r\
 |cff99e599鼠标悬停可与战斗或玩家生命值检测叠加。|r"
+L["visibilityFrameRuleSelectionDesc"] = "选择此框体何时显示、淡化或隐藏。显示规则可在战斗、有目标、鼠标悬停或类似状态下显示框体；隐藏规则在条件生效时优先。"
 L["visibilityFrameExtrasNote2"] = "|cff99e599想找团队框体、名字缩写或生命值文字调整？|r\
 |cff99e599这些选项仍在 UI >> 单位框体。|r"
 L["VisibilityFrameInvalid"] = "无效框体。"

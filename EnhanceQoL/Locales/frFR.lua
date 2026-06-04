@@ -64,6 +64,7 @@ L["actionBarShortHotkeys"] = "Raccourcir le texte des raccourcis"
 L["actionBarShortHotkeysDesc"] = "Affiche des abréviations comme SM3 pour Maj + Bouton de souris 3."
 L["ActionbarVisibilityExplain2"] = "|cff99e599Réglez la barre d'action sur \"%s\" dans %s pour utiliser les options ci-dessous.|r\
 |cff99e599Vous pouvez combiner l'affichage au survol, en combat ou hors combat.|r"
+L["ActionbarVisibilityRuleSelectionDesc"] = "Choisissez quand cette barre d'action doit être affichée, estompée ou masquée. Les règles d'affichage la rendent visible dans les situations correspondantes ; les règles de masquage sont prioritaires, et les règles de survol/estompage peuvent la révéler temporairement."
 L["ActionTracker"] = "Suivi d'actions"
 L["actionTrackerDesc"] = "Affiche vos derniers sorts lancés sous forme d'icônes."
 L["actionTrackerEditModeHint"] = "Utilisez le mode d'édition pour déplacer et régler la taille, l'espacement, la direction et le fondu."
@@ -3817,6 +3818,7 @@ L["VisibilityFrameAssigned"] = "Cadre déjà assigné à :"
 L["VisibilityFrameExists"] = "Cadre déjà dans cette configuration."
 L["visibilityFrameExplain2"] = "|cff99e599Combinez les mêmes déclencheurs pour les cadres d'unités Blizzard.|r\
 |cff99e599Le survol peut être combiné avec les vérifications de combat ou de santé du joueur.|r"
+L["visibilityFrameRuleSelectionDesc"] = "Choisissez quand ce cadre est affiché, estompé ou masqué. Les règles d'affichage peuvent le rendre visible en combat, avec une cible, au survol ou dans des états similaires ; les règles de masquage sont prioritaires quand leur condition est active."
 L["visibilityFrameExtrasNote2"] = "|cff99e599Vous cherchez les cadres de raid, la troncature des noms ou des ajustements du texte de santé ?|r\
 |cff99e599Ces options restent sous IU >> Cadres d'unité.|r"
 L["VisibilityFrameInvalid"] = "Cadre invalide."

@@ -64,6 +64,7 @@ L["actionBarShortHotkeys"] = "縮短快捷鍵文字"
 L["actionBarShortHotkeysDesc"] = "顯示類似 SM3（Shift + 滑鼠按鍵3）的縮寫。"
 L["ActionbarVisibilityExplain2"] = "|cff99e599將動作列設為「%s」（在%s中）後，可使用以下選項。|r\
 |cff99e599可組合滑鼠指向、戰鬥中與戰鬥外的顯示。|r"
+L["ActionbarVisibilityRuleSelectionDesc"] = "選擇此動作列何時顯示、淡化或隱藏。顯示規則會在符合條件時讓動作列可見；隱藏規則優先，而滑鼠指向/淡化規則可暫時顯示它。"
 L["ActionTracker"] = "動作追蹤器"
 L["actionTrackerDesc"] = "以圖示顯示你最近施放的法術。"
 L["actionTrackerEditModeHint"] = "在編輯模式中移動並調整大小、間距、方向與淡出時間。"
@@ -3816,6 +3817,7 @@ L["VisibilityFrameAssigned"] = "框架已指派給："
 L["VisibilityFrameExists"] = "框架已在此設定中。"
 L["visibilityFrameExplain2"] = "|cff99e599為暴雪單位框架組合相同的觸發條件。|r\
 |cff99e599滑鼠指向可與戰鬥或玩家血量檢查搭配。|r"
+L["visibilityFrameRuleSelectionDesc"] = "選擇此框架何時顯示、淡化或隱藏。顯示規則可在戰鬥、有目標、滑鼠指向或類似狀態下顯示框架；隱藏規則在條件啟用時優先。"
 L["visibilityFrameExtrasNote2"] = "|cff99e599想找團隊框架、名稱截斷或血量文字調整？|r\
 |cff99e599這些選項仍在 UI >> 單位框架。|r"
 L["VisibilityFrameInvalid"] = "無效的框架。"
