@@ -154,6 +154,7 @@ local ICON_TEXTURES = {
 	map = "Interface\\Icons\\INV_Misc_Map_01",
 	markers = "Interface\\Icons\\Ability_Hunter_MarkedForDeath",
 	macros = "Interface\\Icons\\INV_Misc_Note_05",
+	mouseaccessibility = "Interface\\Icons\\INV_Misc_Mouse_01",
 	movementinput = "Interface\\Icons\\INV_Boots_Plate_01",
 	mover = "Interface\\Icons\\Ability_Hunter_MasterMarksman",
 	nameplate = "Interface\\Icons\\INV_Misc_Tournaments_banner_Human",
@@ -164,6 +165,7 @@ local ICON_TEXTURES = {
 	questing = "Interface\\Icons\\INV_Misc_Note_04",
 	reset = "Interface\\Icons\\Ability_Hunter_MasterMarksman",
 	resource = "Interface\\Icons\\INV_Misc_Food_100",
+	repair = "Interface\\Icons\\Trade_BlackSmithing",
 	settingspage = "Interface\\Icons\\INV_Misc_Gear_01",
 	skinner = "Interface\\Icons\\INV_Misc_EngGizmos_17",
 	social = "Interface\\Icons\\INV_Letter_15",
@@ -171,6 +173,8 @@ local ICON_TEXTURES = {
 	support = "Interface\\Icons\\INV_Misc_QuestionMark",
 	system = "Interface\\Icons\\INV_Gizmo_01",
 	systemdebug = "Interface\\Icons\\INV_Gizmo_02",
+	talentreminder = "Interface\\Icons\\Ability_Marksmanship",
+	teleports = "Interface\\Icons\\Spell_Arcane_TeleportDalaran",
 	tooltip = "Interface\\Icons\\INV_Misc_Note_03",
 	unitframes = "Interface\\Icons\\INV_Misc_GroupLooking",
 	uiutilities = "Interface\\Icons\\INV_Misc_Wrench_01",
@@ -225,6 +229,13 @@ local PAGE_ICON_RULES = {
 	{ "movementinput", "movementinput" },
 	{ "friendscommunities", "community" },
 	{ "privacyblockingignore", "privacy" },
+	{ "mouseaccessibility", "mouseaccessibility" },
+	{ "talentreminder", "talentreminder" },
+	{ "repairoptions", "repair" },
+	{ "repair", "repair" },
+	{ "teleports", "teleports" },
+	{ "teleport", "teleports" },
+	{ "sound", "sound" },
 	{ "dungeons", "dungeons" },
 	{ "questing", "questing" },
 	{ "groupfinder", "groupfinder" },
@@ -1476,6 +1487,49 @@ end
 local function getScrollBar(scrollFrame)
 	if not scrollFrame then return nil end
 	return scrollFrame.ScrollBar or _G[scrollFrame:GetName() and (scrollFrame:GetName() .. "ScrollBar") or ""]
+end
+
+function lib.SetContentScrollTop(state)
+	local scrollFrame = state and state.frame and state.frame.Scroll
+	if not scrollFrame then
+		return
+	end
+	scrollFrame:SetVerticalScroll(0)
+	local scrollBar = getScrollBar(scrollFrame)
+	if scrollBar and scrollBar.SetValue then
+		scrollBar:SetValue(0)
+	end
+end
+
+function lib.SetContentScroll(state, value)
+	local scrollFrame = state and state.frame and state.frame.Scroll
+	if not scrollFrame then
+		return
+	end
+	local range = scrollFrame.GetVerticalScrollRange and scrollFrame:GetVerticalScrollRange() or 0
+	local target = math.max(0, math.min(tonumber(value) or 0, range or 0))
+	scrollFrame:SetVerticalScroll(target)
+	local scrollBar = getScrollBar(scrollFrame)
+	if scrollBar and scrollBar.SetValue then
+		scrollBar:SetValue(target)
+	end
+end
+
+function lib.GetContentScroll(state)
+	local scrollFrame = state and state.frame and state.frame.Scroll
+	if not scrollFrame or not scrollFrame.GetVerticalScroll then
+		return 0
+	end
+	return scrollFrame:GetVerticalScroll() or 0
+end
+
+function lib.QueueContentScroll(state, value)
+	lib.SetContentScroll(state, value)
+	if C_Timer and C_Timer.After then
+		C_Timer.After(0, function()
+			lib.SetContentScroll(state, value)
+		end)
+	end
 end
 
 local function updateContentMetrics(state)
@@ -3208,9 +3262,9 @@ local function addPageFixedHeader(state, category, pagePath)
 	backButton:SetPoint("LEFT", header, "LEFT", 0, 0)
 	backButton:SetScript("OnClick", function()
 		if category and category.id then
-			state:SetCategory(category.id)
+			state:SetCategory(category.id, true)
 		else
-			state:SetDashboard()
+			state:SetDashboard(true)
 		end
 	end)
 
@@ -3429,12 +3483,19 @@ function StateMixin:RenderContent()
 		renderDashboard(self)
 	end
 	setScrollHeight(self)
-	if self.resetSearchScroll and self.frame and self.frame.Scroll then
-		self.frame.Scroll:SetVerticalScroll(0)
-		local scrollBar = getScrollBar(self.frame.Scroll)
-		if scrollBar and scrollBar.SetValue then
-			scrollBar:SetValue(0)
+	if self.resetContentScroll then
+		if self.pendingFocusControlID then
+			-- Search result navigation scrolls to the focused control after render.
+		elseif self.restoreContentScrollKey and self.scrollPositions then
+			lib.QueueContentScroll(self, self.scrollPositions[self.restoreContentScrollKey] or 0)
+		else
+			lib.SetContentScrollTop(self)
 		end
+		self.resetContentScroll = nil
+		self.restoreContentScrollKey = nil
+	end
+	if self.resetSearchScroll and self.frame and self.frame.Scroll then
+		lib.SetContentScrollTop(self)
 		self.resetSearchScroll = nil
 	end
 	lib.FocusPendingControl(self)
@@ -3537,13 +3598,42 @@ function StateMixin:RenderSidebar()
 	self:RefreshSidebarSelection()
 end
 
-function StateMixin:SetDashboard()
+function StateMixin:GetContentScrollKey()
+	if self.view == "dashboard" then
+		return "dashboard"
+	end
+	if self.view == "category" and self.selectedCategoryID then
+		return "category:" .. tostring(self.selectedCategoryID)
+	end
+	if self.view == "page" and self.selectedPageID then
+		return "page:" .. tostring(self.selectedPageID)
+	end
+	return nil
+end
+
+function StateMixin:SaveCurrentContentScroll()
+	if self.frame and self.frame.SearchBox and self.frame.SearchBox:GetText() ~= "" then
+		return
+	end
+	local key = self:GetContentScrollKey()
+	if not key then
+		return
+	end
+	self.scrollPositions = self.scrollPositions or {}
+	self.scrollPositions[key] = lib.GetContentScroll(self)
+end
+
+function StateMixin:SetDashboard(restoreScroll)
+	self.resetContentScroll = true
+	self.restoreContentScrollKey = restoreScroll and "dashboard" or nil
 	self.view = "dashboard"
 	self.selectedPageID = nil
 	self:RenderContent()
 end
 
-function StateMixin:SetCategory(categoryID)
+function StateMixin:SetCategory(categoryID, restoreScroll)
+	self.resetContentScroll = true
+	self.restoreContentScrollKey = restoreScroll and ("category:" .. tostring(categoryID)) or nil
 	self.view = "category"
 	self.selectedCategoryID = categoryID
 	self.selectedPageID = nil
@@ -3552,6 +3642,8 @@ end
 
 function StateMixin:SetPage(pageID, focusControlID)
 	local page = self.app:GetPage(pageID)
+	self:SaveCurrentContentScroll()
+	self.resetContentScroll = true
 	self.view = "page"
 	self.selectedPageID = pageID
 	if page then
@@ -3582,6 +3674,7 @@ local function initializeState(frame, app)
 		sidebarFrames = {},
 		sidebarRows = {},
 		collapsedGroups = {},
+		scrollPositions = {},
 		contentWidth = CONTENT_WIDTH,
 		view = "dashboard",
 		selectedCategoryID = nil,
