@@ -299,16 +299,6 @@ local function ensureConfigApp()
 							end
 						end,
 					},
-					{
-						title = L["configCenterImportExport"],
-						description = L["configCenterImportExportDesc"],
-						iconKey = "importexport",
-					},
-					{
-						title = L["configCenterResetDefaults"],
-						description = L["configCenterResetDefaultsDesc"],
-						iconKey = "reset",
-					},
 				},
 				status = {
 					title = L["configCenterAddOnStatus"] or (_G.STATUS or "Status"),
