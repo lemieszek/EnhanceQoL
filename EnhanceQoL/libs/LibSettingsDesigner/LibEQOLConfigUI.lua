@@ -1890,14 +1890,15 @@ local function refreshControlRow(app, control, row)
 		end
 		setTextColor(row.value.Text, enabled and TEXT.main or TEXT.disabled)
 	end
-	for _, button in ipairs({
-		row.configureButton,
-		row.dropdownButton,
-		row.multiDropdownButton,
-		row.colorButton,
-		row.swatch,
-		row.actionButton,
+	for _, buttonKey in ipairs({
+		"configureButton",
+		"dropdownButton",
+		"multiDropdownButton",
+		"colorButton",
+		"swatch",
+		"actionButton",
 	}) do
+		local button = row[buttonKey]
 		if button then
 			button._eqolDisabled = not enabled
 			if button.SetEnabled then
@@ -1908,7 +1909,7 @@ local function refreshControlRow(app, control, row)
 				button:Disable()
 			end
 			if button.EnableMouse then
-				button:EnableMouse(true)
+				button:EnableMouse(enabled)
 			end
 			if button._eqolApplyVisual then
 				button._eqolApplyVisual(button)
