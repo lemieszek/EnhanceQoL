@@ -93,13 +93,13 @@ local data = {
 	text = L["automaticallyOpenContainer"],
 	func = function(value) addon.db["automaticallyOpenContainer"] = value and true or false end,
 	desc = L["containerActionsFeatureDesc2"],
-	modernDescription = L["configCenterPageCardDescContainerActions"] or L["containerActionsFeatureDesc2"],
+	modernDescription = (L["containerActionsFeatureDesc2"] or ""):match("^(.-[%.%!%?])%s+") or L["containerActionsFeatureDesc2"],
 	parentSection = expandable,
 }
 
 addon.functions.SettingsCreateText(cContainer, L["containerActionsFeatureDesc2"], { parentSection = expandable })
 addon.functions.SettingsCreateCheckbox(cContainer, data)
-addon.functions.SettingsCreateText(cContainer, L["containerActionsEditModeHint"] .. "\n" .. "|cff99e599" .. L["containerActionsBlacklistHint"] .. "|r", { parentSection = expandable })
+addon.functions.SettingsCreateText(cContainer, (L["containerActionsConfigCenterNote"] or L["containerActionsEditModeHint"]) .. "\n\n" .. "|cff99e599" .. L["containerActionsBlacklistHint"] .. "|r", { parentSection = expandable })
 
 data = {
 	listFunc = function()

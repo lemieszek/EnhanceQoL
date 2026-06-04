@@ -761,6 +761,7 @@ L["containerActionsBlacklistRemoved"] = "Desbloqueado %s (%d)."
 L["containerActionsButtonTooltip"] = "Clique para usar este item."
 L["containerActionsChunkNote"] = "Consome %d por vez."
 L["containerActionsChunkSuffix"] = " (por %d)"
+L["containerActionsConfigCenterNote"] = "Posicione o botão de contêiner pelo Modo de Edição. Posicione a âncora onde quiser e clique no botão para usar o próximo item da fila."
 L["containerActionsCropIcon"] = "Recortar ícone para o estilo da Blizzard"
 L["containerActionsEditModeHint"] = "Posicione o botão de contêiner pelo Modo de Edição."
 L["containerActionsFeatureDesc2"] = "Quando ativado, itens que exigem um clique seguro são enfileirados no botão de ação de contêiner. \

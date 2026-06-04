@@ -761,6 +761,7 @@ L["containerActionsBlacklistRemoved"] = "Sbloccato %s (%d)."
 L["containerActionsButtonTooltip"] = "Clicca per usare questo oggetto."
 L["containerActionsChunkNote"] = "Consuma %d alla volta."
 L["containerActionsChunkSuffix"] = " (per %d)"
+L["containerActionsConfigCenterNote"] = "Posiziona il pulsante del contenitore tramite la Modalità Modifica. Posiziona l'ancora dove vuoi, quindi fai clic sul pulsante per usare il prossimo oggetto in coda."
 L["containerActionsCropIcon"] = "Ritaglia icona in stile Blizzard"
 L["containerActionsEditModeHint"] = "Posiziona il pulsante del contenitore tramite la Modalità Modifica."
 L["containerActionsFeatureDesc2"] = "Quando è attivo, gli oggetti che richiedono un clic sicuro vengono messi in coda sul pulsante azione del contenitore. \

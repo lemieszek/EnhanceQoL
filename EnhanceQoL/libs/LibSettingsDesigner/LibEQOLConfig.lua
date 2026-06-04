@@ -204,6 +204,8 @@ local LEGACY_CONTROL_METADATA_FIELDS = {
 	"multiline",
 	"multilineHeight",
 	"newTagID",
+	"note",
+	"notes",
 	"numeric",
 	"onClick",
 	"optionfunc",
@@ -216,6 +218,8 @@ local LEGACY_CONTROL_METADATA_FIELDS = {
 	"readOnly",
 	"orderList",
 	"rowHeight",
+	"richNote",
+	"richNotes",
 	"setColor",
 	"setSelected",
 	"setSelectedFunc",
@@ -253,7 +257,31 @@ local function rebuildSearchBlob(app, control)
 	addSearchBlob(parts, page and page.title)
 	addSearchBlob(parts, group and group.title)
 	addSearchBlob(parts, category and category.title)
+	for _, note in ipairs(control.notes or {}) do
+		addSearchBlob(parts, note.title)
+		addSearchBlob(parts, note.text)
+		for _, block in ipairs(note.blocks or {}) do
+			addSearchBlob(parts, type(block) == "table" and (block.title or block.text) or block)
+		end
+	end
 	control.searchBlob = table.concat(parts, " ")
+end
+
+local function noteHasContent(note)
+	if type(note.text) == "string" and note.text:gsub("%s+", "") ~= "" then
+		return true
+	end
+	if type(note.blocks) == "table" then
+		for _, block in ipairs(note.blocks) do
+			if type(block) == "string" and block:gsub("%s+", "") ~= "" then
+				return true
+			end
+			if type(block) == "table" and ((type(block.text) == "string" and block.text:gsub("%s+", "") ~= "") or block.image or block.texture) then
+				return true
+			end
+		end
+	end
+	return false
 end
 
 function AppMixin:RegisterCategory(data)
@@ -323,7 +351,7 @@ function AppMixin:RegisterPageNote(pageID, data)
 	else
 		note = { text = data }
 	end
-	if type(note.text) ~= "string" or note.text:gsub("%s+", "") == "" then
+	if not noteHasContent(note) then
 		return nil
 	end
 	page.aboutNotes = page.aboutNotes or {}
@@ -334,6 +362,32 @@ function AppMixin:RegisterPageNote(pageID, data)
 	end
 	page.aboutNotes[#page.aboutNotes + 1] = note
 	table.sort(page.aboutNotes, sortByOrderAndTitle)
+	return note
+end
+
+function AppMixin:RegisterControlNote(controlID, data)
+	local control = self.controlsByID[controlID]
+	if not control then
+		return nil
+	end
+	local note
+	if type(data) == "table" then
+		note = copyTable(data, {})
+	else
+		note = { text = data }
+	end
+	if not noteHasContent(note) then
+		return nil
+	end
+	control.notes = control.notes or {}
+	for _, existing in ipairs(control.notes) do
+		if existing.text == note.text then
+			return existing
+		end
+	end
+	control.notes[#control.notes + 1] = note
+	table.sort(control.notes, sortByOrderAndTitle)
+	rebuildSearchBlob(self, control)
 	return note
 end
 
@@ -392,7 +446,8 @@ function AppMixin:RegisterLegacySection(section, data)
 	if not categoryID then
 		categoryID = self.legacyCategories[getCategoryKey(data.category)] or "advanced"
 	end
-	local pageID = data.pageID or (categoryID .. "." .. normalizeID(data.title or data.name or "settings"))
+	local stablePageName = data.pageKey or data.newTagID or data.var or data.key or data.title or data.name or "settings"
+	local pageID = data.pageID or (categoryID .. "." .. normalizeID(stablePageName))
 	local page = self:RegisterPage({
 		id = pageID,
 		category = categoryID,

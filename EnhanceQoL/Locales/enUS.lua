@@ -761,6 +761,7 @@ L["containerActionsBlacklistRemoved"] = "Unblocked %s (%d)."
 L["containerActionsButtonTooltip"] = "Click to use this item."
 L["containerActionsChunkNote"] = "Consumes %d at a time."
 L["containerActionsChunkSuffix"] = " (per %d)"
+L["containerActionsConfigCenterNote"] = "Position the container action button through Edit Mode. Place the anchor where you want it, then click the button to use the next queued item."
 L["containerActionsCropIcon"] = "Crop icon to Blizzard style"
 L["containerActionsEditModeHint"] = "Position the container action button through Edit Mode."
 L["containerActionsFeatureDesc2"] = "When enabled, items that require a secure click are queued on the container action button. \

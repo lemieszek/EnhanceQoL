@@ -20,6 +20,8 @@ addon.ConfigGroupOrderByPageID = addon.ConfigGroupOrderByPageID or {}
 addon.ConfigCurrentGroupBySection = addon.ConfigCurrentGroupBySection or {}
 addon.ConfigGroupTitleBySection = addon.ConfigGroupTitleBySection or {}
 addon.ConfigControlOrder = addon.ConfigControlOrder or 0
+addon.ConfigLastControlByPageID = addon.ConfigLastControlByPageID or {}
+addon.ConfigLastControlBySection = addon.ConfigLastControlBySection or {}
 
 local rootCategoryMap = {
 	UI = "interface",
@@ -34,6 +36,16 @@ local rootCategoryMap = {
 local newSettingsAssetRoot = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\"
 local function newSettingsAsset(fileName)
 	return newSettingsAssetRoot .. fileName
+end
+
+local function getLocaleKeyForText(text)
+	if type(text) ~= "string" or text == "" then return nil end
+	for key, value in pairs(L) do
+		if type(key) == "string" and value == text then
+			return key
+		end
+	end
+	return nil
 end
 
 local function ensureConfigApp()
@@ -264,7 +276,7 @@ local function registerLegacyControl(category, cbData, controlType, setting)
 	if not id then return end
 	addon.ConfigControlOrder = (addon.ConfigControlOrder or 0) + 1
 	local groupID, groupTitle, pageID = getLegacyControlGroup(app, category, cbData)
-	app:RegisterLegacyControl({
+	local control = app:RegisterLegacyControl({
 		legacyCategory = category,
 		parentSection = cbData.parentSection,
 		pageID = pageID,
@@ -355,7 +367,18 @@ local function registerLegacyControl(category, cbData, controlType, setting)
 		previewSoundFunc = cbData.previewSoundFunc,
 		playbackChannel = cbData.playbackChannel,
 		getPlaybackChannel = cbData.getPlaybackChannel,
+		note = cbData.note,
+		notes = cbData.notes,
+		richNote = cbData.richNote,
+		richNotes = cbData.richNotes,
 	})
+	if control and pageID then
+		addon.ConfigLastControlByPageID[pageID] = control.id
+		if cbData.parentSection then
+			addon.ConfigLastControlBySection[cbData.parentSection] = control.id
+		end
+	end
+	return control
 end
 
 local function getCVarOptionData(cvarKey) return addon.variables and addon.variables.cvarOptions and addon.variables.cvarOptions[cvarKey] end
@@ -888,10 +911,11 @@ end
 function addon.functions.SettingsCreateText(cat, text, extra)
 	local element = SettingsLib:CreateText(cat, text, extra)
 	local app = ensureConfigApp()
-	if app and app.RegisterPageNote and extra and extra.parentSection and type(text) == "string" then
+	if app and app.RegisterControlNote and extra and extra.parentSection and type(text) == "string" then
 		local pageID = app.legacySections and app.legacySections[extra.parentSection]
-		if pageID and app:GetPage(pageID) then
-			app:RegisterPageNote(pageID, {
+		local controlID = extra.controlID or extra.attachToControlID or addon.ConfigLastControlBySection[extra.parentSection] or (pageID and addon.ConfigLastControlByPageID[pageID])
+		if pageID and app:GetPage(pageID) and controlID then
+			app:RegisterControlNote(controlID, {
 				text = text,
 				order = extra.order or addon.ConfigControlOrder or 0,
 			})
@@ -990,6 +1014,7 @@ function addon.functions.SettingsCreateExpandableSection(cat, cbData)
 			category = cat,
 			title = cbData.name,
 			pageID = cbData.configPageID,
+			pageKey = cbData.configPageKey or cbData.newTagID or getLocaleKeyForText(cbData.name),
 			order = cbData.order,
 			description = cbData.description or cbData.desc,
 			icon = cbData.icon,

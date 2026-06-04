@@ -761,6 +761,7 @@ L["containerActionsBlacklistRemoved"] = "Разблокировано: %s (%d)."
 L["containerActionsButtonTooltip"] = "Щёлкните, чтобы использовать этот предмет."
 L["containerActionsChunkNote"] = "Потребляет по %d за раз."
 L["containerActionsChunkSuffix"] = " (по %d)"
+L["containerActionsConfigCenterNote"] = "Позиционируйте кнопку контейнера через режим редактирования. Разместите якорь где нужно, затем нажмите кнопку, чтобы использовать следующий предмет в очереди."
 L["containerActionsCropIcon"] = "Обрезать иконку в стиле Blizzard"
 L["containerActionsEditModeHint"] = "Позиционируйте кнопку контейнера через режим редактирования."
 L["containerActionsFeatureDesc2"] = "При включении предметы, требующие защищённого клика, ставятся в очередь на кнопке действий контейнера. \

@@ -761,6 +761,7 @@ L["containerActionsBlacklistRemoved"] = "已解除封鎖 %s（%d）。"
 L["containerActionsButtonTooltip"] = "點擊以使用此物品。"
 L["containerActionsChunkNote"] = "一次消耗 %d。"
 L["containerActionsChunkSuffix"] = "（每次 %d）"
+L["containerActionsConfigCenterNote"] = "透過編輯模式定位容器動作按鈕。將錨點放到想要的位置，然後點擊按鈕使用下一個排隊物品。"
 L["containerActionsCropIcon"] = "將圖示裁切為暴雪風格"
 L["containerActionsEditModeHint"] = "透過編輯模式定位容器動作按鈕。"
 L["containerActionsFeatureDesc2"] = "啟用後，需要安全點擊的物品會排隊到容器動作按鈕。\

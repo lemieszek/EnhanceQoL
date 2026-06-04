@@ -761,6 +761,7 @@ L["containerActionsBlacklistRemoved"] = "已取消屏蔽 %s（%d）。"
 L["containerActionsButtonTooltip"] = "点击以使用此物品。"
 L["containerActionsChunkNote"] = "一次消耗 %d。"
 L["containerActionsChunkSuffix"] = "（每次 %d）"
+L["containerActionsConfigCenterNote"] = "通过编辑模式定位容器动作按钮。将锚点放到你想要的位置，然后点击按钮使用下一个排队物品。"
 L["containerActionsCropIcon"] = "将图标裁剪为暴雪风格"
 L["containerActionsEditModeHint"] = "通过编辑模式定位容器动作按钮。"
 L["containerActionsFeatureDesc2"] = "启用后，需要安全点击的物品会排队到容器动作按钮。\

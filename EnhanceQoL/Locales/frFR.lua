@@ -761,6 +761,7 @@ L["containerActionsBlacklistRemoved"] = "Débloqué : %s (%d)."
 L["containerActionsButtonTooltip"] = "Cliquez pour utiliser cet objet."
 L["containerActionsChunkNote"] = "Consomme %d à la fois."
 L["containerActionsChunkSuffix"] = " (par %d)"
+L["containerActionsConfigCenterNote"] = "Positionnez le bouton d’action de conteneur via le mode Édition. Placez l’ancre où vous le souhaitez, puis cliquez sur le bouton pour utiliser l’objet suivant en file."
 L["containerActionsCropIcon"] = "Rogner l'icône au style Blizzard"
 L["containerActionsEditModeHint"] = "Positionnez le bouton d’action de conteneur via le mode Édition."
 L["containerActionsFeatureDesc2"] = "Quand c'est activé, les objets nécessitant un clic sécurisé sont mis en file d'attente sur le bouton d'action de conteneur. \

@@ -798,7 +798,7 @@ local function resolveProfilePageIcon(app, page)
 		return nil
 	end
 
-	local lookup = normalizeIconLookupText((page.id or "") .. " " .. (page.title or "") .. " " .. (page.newTagID or ""))
+	local lookup = normalizeIconLookupText((page.id or "") .. " " .. (page.newTagID or ""))
 	if lookup:find("damagemeter", 1, true) then
 		return "icons_64x64_damage", true
 	end
@@ -828,12 +828,12 @@ local function resolvePageIcon(app, page)
 	if profileIcon then
 		return profileIcon, isProfileAtlas
 	end
-	local pageTitleLookup = normalizeIconLookupText(page and page.title or "")
 	local pageID = tostring(page and page.id or "")
-	if pageTitleLookup == "settings" or pageID:match("%.settings$") then
+	if pageID:match("%.settings$") then
 		return getAppIconTexture(app, "settingspage")
 	end
-	local iconKey = getKeywordIconKey((page and page.id or "") .. " " .. (page and page.title or ""))
+	local iconKey = getKeywordIconKey((page and page.id or "") .. " " .. (page and page.newTagID or ""))
+		or getKeywordIconKey(page and page.title or "")
 	return getAppIconTexture(app, iconKey or "advanced")
 end
 
@@ -877,7 +877,9 @@ local function trackFrame(list, frame)
 	return frame
 end
 
-local function createText(parent, template, text, color, justify)
+local createText
+
+function createText(parent, template, text, color, justify)
 	local textFrame = CreateFrame("Frame", nil, parent)
 	textFrame.Text = textFrame:CreateFontString(nil, "OVERLAY", template or FONT_TEXT)
 	textFrame.Text:SetAllPoints(textFrame)
@@ -970,15 +972,15 @@ local function getPageDescription(app, page)
 	return ""
 end
 
-local function stripColorCodes(text)
+function lib.StripColorCodes(text)
 	text = tostring(text or "")
 	text = text:gsub("|c%x%x%x%x%x%x%x%x", "")
 	text = text:gsub("|r", "")
 	return text
 end
 
-local function compactDescription(text)
-	text = stripColorCodes(text)
+function lib.CompactDescription(text)
+	text = lib.StripColorCodes(text)
 	text = text:gsub("\\\n", "\n")
 	text = text:gsub("[%s\r\n]+", " ")
 	text = text:gsub("^%s+", ""):gsub("%s+$", "")
@@ -992,18 +994,173 @@ local function compactDescription(text)
 	return text:sub(1, 115):gsub("%s+%S*$", "") .. "..."
 end
 
-local function getPageAboutText(app, page)
-	local parts = {}
-	local description = getPageDescription(app, page)
-	if description and description ~= "" then
-		parts[#parts + 1] = description
-	end
-	for _, note in ipairs(page and page.aboutNotes or {}) do
-		if type(note.text) == "string" and note.text:gsub("%s+", "") ~= "" then
-			parts[#parts + 1] = note.text
+function lib.GetPageAboutText(app, page)
+	return getPageDescription(app, page)
+end
+
+function lib.EstimateTextHeight(text, width, lineHeight, minHeight)
+	text = lib.StripColorCodes(text)
+	text = text:gsub("\\\n", "\n")
+	local charsPerLine = math.max(18, math.floor((tonumber(width) or 170) / 6.2))
+	local lines = 0
+	for paragraph in tostring(text or ""):gmatch("([^\n]*)\n?") do
+		if paragraph == "" then
+			lines = lines + 1
+		else
+			lines = lines + math.max(1, math.ceil(#paragraph / charsPerLine))
 		end
 	end
-	return table.concat(parts, "\n\n")
+	return math.max(minHeight or 1, lines * (lineHeight or 13))
+end
+
+function lib.NormalizeNoteList(control)
+	local notes = {}
+	local function add(note)
+		if not note then return end
+		if type(note) == "string" then
+			note = { text = note }
+		elseif type(note) ~= "table" then
+			return
+		end
+		if type(note.text) == "string" and note.text:gsub("%s+", "") ~= "" then
+			notes[#notes + 1] = note
+		elseif type(note.blocks) == "table" then
+			for _, block in ipairs(note.blocks) do
+				if type(block) == "table" and ((type(block.text) == "string" and block.text:gsub("%s+", "") ~= "") or block.image or block.texture) then
+					notes[#notes + 1] = note
+					return
+				end
+			end
+		end
+	end
+	add(control and control.note)
+	add(control and control.richNote)
+	for _, note in ipairs(control and control.notes or {}) do
+		add(note)
+	end
+	for _, note in ipairs(control and control.richNotes or {}) do
+		add(note)
+	end
+	table.sort(notes, function(a, b)
+		return (tonumber(a.order) or 0) < (tonumber(b.order) or 0)
+	end)
+	return notes
+end
+
+function lib.AddNoteText(panel, text, color, y, width, template)
+	local cleanText = tostring(text or ""):gsub("\\\n", "\n")
+	local height = lib.EstimateTextHeight(cleanText, width, 15, 18)
+	local inset = panel.NoteInset or 10
+	local frame = createText(panel, template or FONT_TEXT, cleanText, type(color) == "table" and color or TEXT.muted)
+	frame:SetPoint("TOPLEFT", panel, "TOPLEFT", inset, y)
+	frame:SetPoint("RIGHT", panel, "RIGHT", -inset, 0)
+	frame:SetHeight(height)
+	return y - height - 6
+end
+
+function lib.RenderNoteBlock(panel, block, y, width)
+	if type(block) == "string" then
+		return lib.AddNoteText(panel, block, TEXT.main, y, width)
+	end
+	if type(block) ~= "table" then
+		return y
+	end
+	if block.type == "spacer" then
+		return y - (tonumber(block.height) or 8)
+	end
+	local texturePath = block.image or block.texture
+	if texturePath then
+		local inset = panel.NoteInset or 10
+		local imageWidth = math.min(width, tonumber(block.width) or width)
+		local imageHeight = tonumber(block.height) or math.floor(imageWidth * 0.56)
+		local tex = panel:CreateTexture(nil, "ARTWORK")
+		tex:SetTexture(texturePath)
+		tex:SetPoint("TOPLEFT", panel, "TOPLEFT", inset, y)
+		tex:SetSize(imageWidth, imageHeight)
+		panel.Textures = panel.Textures or {}
+		panel.Textures[#panel.Textures + 1] = tex
+		return y - imageHeight - 6
+	end
+	if block.title then
+		y = lib.AddNoteText(panel, block.title, TEXT.gold, y, width, FONT_TEXT)
+	end
+	if block.text then
+		y = lib.AddNoteText(panel, block.text, block.color or TEXT.muted, y, width, block.font)
+	end
+	return y
+end
+
+function lib.HideControlNotePanel(state)
+	if state and state.notePanel then
+		state.notePanel:Hide()
+	end
+end
+
+function lib.ShowControlNotePanel(state, row, control)
+	local notes = lib.NormalizeNoteList(control)
+	if #notes == 0 or not state or not state.frame or not row then
+		return
+	end
+	local panel = state.notePanel
+	if not panel then
+		panel = CreateFrame("Frame", nil, state.frame, "BackdropTemplate")
+		panel:SetFrameStrata("TOOLTIP")
+		panel:SetFrameLevel((state.frame:GetFrameLevel() or 1) + 50)
+		state.notePanel = panel
+	end
+	panel:ClearAllPoints()
+	panel:Hide()
+	for _, child in ipairs({ panel:GetChildren() }) do
+		child:Hide()
+		child:SetParent(nil)
+	end
+	if panel.Textures then
+		for _, texture in ipairs(panel.Textures) do
+			texture:Hide()
+		end
+	end
+	panel.Textures = {}
+	applyBackdrop(panel, CARD_BG, { 0, 0, 0, 0 })
+	createPixelBorder(panel, CARD_BORDER_HOVER)
+
+	local width = 286
+	panel.NoteInset = 10
+	local textWidth = width - (panel.NoteInset * 2)
+	local y = -panel.NoteInset
+	local label = _G.NOTES_LABEL or _G.NOTES
+	if label then
+		y = lib.AddNoteText(panel, label, TEXT.gold, y, textWidth, FONT_HEADER)
+	end
+	for _, note in ipairs(notes) do
+		if note.title then
+			y = lib.AddNoteText(panel, note.title, TEXT.gold, y, textWidth, FONT_TEXT)
+		end
+		if note.text then
+			y = lib.AddNoteText(panel, note.text, note.color or TEXT.main, y, textWidth, note.font)
+		end
+		for _, block in ipairs(note.blocks or {}) do
+			y = lib.RenderNoteBlock(panel, block, y, textWidth)
+		end
+	end
+	local height = math.max(40, math.abs(y))
+	snapSize(panel, width, height)
+	snapPoint(panel, "TOPLEFT", row, "TOPRIGHT", 12, 0)
+	panel:Show()
+end
+
+function lib.AttachControlNoteHover(row, state, control)
+	local notes = lib.NormalizeNoteList(control)
+	if #notes == 0 then
+		return
+	end
+	row:SetScript("OnEnter", function(self)
+		setFrameBackdrop(self, ROW_HOVER_BG, ROW_HOVER_BORDER)
+		lib.ShowControlNotePanel(state, self, control)
+	end)
+	row:SetScript("OnLeave", function(self)
+		setFrameBackdrop(self, ROW_BG, ROW_BORDER)
+		lib.HideControlNotePanel(state)
+	end)
 end
 
 local function getPageCardDescription(app, page)
@@ -2655,9 +2812,9 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 
 	local descText
 	if controlType == "slider" then
-		descText = compactDescription(control.description)
+		descText = lib.CompactDescription(control.description)
 	elseif control.description and control.description ~= "" then
-		descText = compactDescription(control.description)
+		descText = lib.CompactDescription(control.description)
 	elseif layoutType == "complex" then
 		local L = getLocale(app)
 		descText = L["configCenterAdvancedSettingDesc"] or "Configure this advanced setting."
@@ -2839,6 +2996,7 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 	end
 
 	refreshControlRow(app, control, row)
+	lib.AttachControlNoteHover(row, state, control)
 	if not parent then
 		state.y = snap(state.content, state.y - 10)
 	end
@@ -3324,10 +3482,10 @@ end
 
 local function addPageSidePanel(state, page, category)
 	local L = getLocale(state.app)
-	local hasNotes = page and page.aboutNotes and #page.aboutNotes > 0
-	local aboutHeight = hasNotes and 154 or 58
-	local dividerTop = 46 + aboutHeight
-	local panelHeight = hasNotes and 370 or 292
+	local _ = category
+	local aboutTextValue = lib.GetPageAboutText(state.app, page)
+	local aboutHeight = lib.EstimateTextHeight(aboutTextValue, (state.pageRightWidth or PAGE_RIGHT_WIDTH) - 28, 13, 58)
+	local panelHeight = math.max(148, math.min(320, aboutHeight + 52))
 	local panel = trackFrame(state.fixedFrames, CreateFrame("Frame", nil, state.frame.ContentShell, "BackdropTemplate"))
 	panel:SetPoint(
 		"TOPRIGHT",
@@ -3344,29 +3502,10 @@ local function addPageSidePanel(state, page, category)
 	aboutTitle:SetPoint("RIGHT", panel, "RIGHT", -14, 0)
 	aboutTitle:SetHeight(20)
 
-	local aboutText = createText(panel, FONT_MUTED, getPageAboutText(state.app, page), TEXT.muted)
+	local aboutText = createText(panel, FONT_MUTED, aboutTextValue, TEXT.muted)
 	aboutText:SetPoint("TOPLEFT", aboutTitle, "BOTTOMLEFT", 0, -8)
 	aboutText:SetPoint("RIGHT", panel, "RIGHT", -14, 0)
 	aboutText:SetHeight(aboutHeight)
-
-	local divider = panel:CreateTexture(nil, "OVERLAY")
-	divider:SetColorTexture(CARD_BORDER[1], CARD_BORDER[2], CARD_BORDER[3], 0.55)
-	divider:SetPoint("TOPLEFT", aboutText, "BOTTOMLEFT", 0, -10)
-	divider:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -14, -dividerTop)
-	divider:SetHeight(1)
-
-	local relatedTitle = createText(panel, FONT_HEADER, L["configCenterRelated"] or "Related", TEXT.gold)
-	relatedTitle:SetPoint("TOPLEFT", divider, "BOTTOMLEFT", 0, -12)
-	relatedTitle:SetPoint("RIGHT", panel, "RIGHT", -14, 0)
-	relatedTitle:SetHeight(20)
-	local relatedLines = {
-		category and (category.title or category.id) or "",
-		getSettingCountText(state.app, #(page.controls or {})),
-	}
-	local relatedText = createText(panel, FONT_MUTED, table.concat(relatedLines, "\n"), TEXT.subtle)
-	relatedText:SetPoint("TOPLEFT", relatedTitle, "BOTTOMLEFT", 0, -8)
-	relatedText:SetPoint("RIGHT", panel, "RIGHT", -14, 0)
-	relatedText:SetHeight(48)
 	return panel
 end
 
@@ -3442,18 +3581,14 @@ local function renderPage(state, pageID)
 		addPageSidePanel(state, page, category)
 	end
 
-	local header = createPageLeftFrame(state, 100)
+	local header = createPageLeftFrame(state, 74)
 	local iconSource, iconIsAtlas = resolvePageIcon(app, page)
 	local icon = createIconPlate(header, iconSource, 54, iconIsAtlas)
-	icon:SetPoint("TOPLEFT", header, "TOPLEFT", 0, -14)
+	icon:SetPoint("TOPLEFT", header, "TOPLEFT", 0, -10)
 	local title = createText(header, FONT_TITLE, page.title or page.id, TEXT.main)
-	title:SetPoint("TOPLEFT", icon, "TOPRIGHT", 16, -1)
+	title:SetPoint("LEFT", icon, "RIGHT", 16, 0)
 	title:SetPoint("RIGHT", header, "RIGHT", -6, 0)
-	title:SetHeight(25)
-	local desc = createText(header, FONT_MUTED, getPageDescription(app, page), TEXT.muted)
-	desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
-	desc:SetPoint("RIGHT", header, "RIGHT", -6, 0)
-	desc:SetHeight(42)
+	title:SetHeight(30)
 	state.y = state.y - 8
 
 	local groupsStartY = state.y

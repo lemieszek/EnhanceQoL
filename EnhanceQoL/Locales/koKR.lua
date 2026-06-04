@@ -761,6 +761,7 @@ L["containerActionsBlacklistRemoved"] = "차단 해제: %s (%d)."
 L["containerActionsButtonTooltip"] = "이 아이템을 사용하려면 클릭하세요."
 L["containerActionsChunkNote"] = "한 번에 %d개를 소모합니다."
 L["containerActionsChunkSuffix"] = " (회당 %d)"
+L["containerActionsConfigCenterNote"] = "편집 모드로 컨테이너 동작 버튼의 위치를 지정하세요. 앵커를 원하는 위치에 놓은 다음 버튼을 눌러 다음 아이템을 사용하세요."
 L["containerActionsCropIcon"] = "아이콘을 블리자드 스타일로 자르기"
 L["containerActionsEditModeHint"] = "편집 모드로 컨테이너 동작 버튼의 위치를 지정하세요."
 L["containerActionsFeatureDesc2"] = "활성화하면 안전 클릭이 필요한 아이템이 컨테이너 행동 버튼 대기열에 쌓입니다. \

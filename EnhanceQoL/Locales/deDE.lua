@@ -761,6 +761,7 @@ L["containerActionsBlacklistRemoved"] = "Entsperrt %s (%d)."
 L["containerActionsButtonTooltip"] = "Klicken, um diesen Gegenstand zu verwenden."
 L["containerActionsChunkNote"] = "Verbraucht jeweils %d."
 L["containerActionsChunkSuffix"] = " (je %d)"
+L["containerActionsConfigCenterNote"] = "Positioniere die Container-Aktionstaste über den Edit Mode. Platziere den Anker dort, wo du ihn haben möchtest, und klicke anschließend auf den Button, um den nächsten Gegenstand zu nutzen."
 L["containerActionsCropIcon"] = "Icon auf Blizzard-Stil zuschneiden"
 L["containerActionsEditModeHint"] = "Positioniere die Container-Aktionstaste über den Edit Mode."
 L["containerActionsFeatureDesc2"] = "Wenn aktiviert, werden Gegenstände, die einen sicheren Klick benötigen, auf dem Behälteraktionsbutton in eine Warteschlange gelegt. \
