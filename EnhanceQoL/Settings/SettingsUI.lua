@@ -48,11 +48,27 @@ local function getLocaleKeyForText(text)
 	return nil
 end
 
+local function splitVersionBadge(version)
+	version = tostring(version or "")
+	local base, suffix = version:match("^(.-)%-beta([%w%.%-]*)$")
+	if base and base ~= "" then
+		local number = tostring(suffix or ""):match("^(%d+)")
+		return base, number and ("Beta " .. number) or "Beta"
+	end
+	base, suffix = version:match("^(.-)%-alpha([%w%.%-]*)$")
+	if base and base ~= "" then
+		local number = tostring(suffix or ""):match("^(%d+)")
+		return base, number and ("Alpha " .. number) or "Alpha"
+	end
+	return version, nil
+end
+
 local function ensureConfigApp()
 	if addon.ConfigApp or not ConfigLib then return addon.ConfigApp end
 
 	local app = ConfigLib:RegisterAddOn(addonName, {
 		title = "Enhance QoL",
+		settingsTitle = L["configCenterTitle"] or "EnhanceQoL Settings",
 		icon = "Interface\\AddOns\\EnhanceQoL\\Icons\\Icon.tga",
 		addonFolder = addonName,
 		assetRoot = "Interface\\AddOns\\EnhanceQoL\\libs\\LibSettingsDesigner\\Assets\\",
@@ -143,6 +159,101 @@ local function ensureConfigApp()
 		db = function() return addon.db end,
 		profile = function() return addon.db end,
 		locale = L,
+		dashboard = function()
+			return {
+				hero = {
+					title = L["configCenterTitle"] or "EnhanceQoL Settings",
+					subtitle = L["configCenterIntro"],
+					iconKey = "dashboard",
+				},
+				cards = {
+					{
+						title = L["configCenterQuickReference"],
+						description = L["configCenterQuickReferenceDesc"],
+						iconKey = "help",
+					},
+					{
+						title = L["configCenterSupportFeedback"],
+						description = L["configCenterSupportFeedbackDesc"],
+						iconKey = "support",
+						onClick = function()
+							if Settings and Settings.OpenToCategory and addon.SettingsLayout and addon.SettingsLayout.rootCategory then
+								Settings.OpenToCategory(addon.SettingsLayout.rootCategory:GetID())
+							end
+						end,
+					},
+					{
+						title = L["configCenterImportExport"],
+						description = L["configCenterImportExportDesc"],
+						iconKey = "importexport",
+					},
+					{
+						title = L["configCenterResetDefaults"],
+						description = L["configCenterResetDefaultsDesc"],
+						iconKey = "reset",
+					},
+				},
+				status = true,
+				status = {
+					title = L["configCenterAddOnStatus"] or (_G.STATUS or "Status"),
+					tiles = function(_, stats)
+						local tiles = {
+							{
+								icon = "Interface\\RaidFrame\\ReadyCheck-Ready",
+								title = L["configCenterCustomized"] or "Customized",
+								value = tostring(stats.customized or 0) .. " / " .. tostring(stats.customizable or stats.controls or 0),
+							},
+						}
+						local profileCount = 0
+						if EnhanceQoLDB and type(EnhanceQoLDB.profiles) == "table" then
+							for profileName in pairs(EnhanceQoLDB.profiles) do
+								if type(profileName) == "string" and profileName ~= "" then profileCount = profileCount + 1 end
+							end
+						end
+						if profileCount > 0 then
+							tiles[#tiles + 1] = {
+								icon = "Interface\\Icons\\INV_Misc_GroupNeedMore",
+								title = L["Profiles"] or "Profiles",
+								value = tostring(profileCount),
+							}
+						end
+						local version = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(addonName, "Version")
+						if version then
+							local versionValue, versionBadge = splitVersionBadge(version)
+							tiles[#tiles + 1] = {
+								atlas = "worldquest-tracker-questmarker",
+								title = _G.GAME_VERSION_LABEL or L["configCenterVersion"] or "Version",
+								value = versionValue,
+								badge = versionBadge,
+							}
+						end
+						local newCount = 0
+						for _, value in pairs(addon.variables and addon.variables.NewVersionTableEQOL or {}) do
+							if value then newCount = newCount + 1 end
+						end
+						if newCount > 0 then
+							tiles[#tiles + 1] = {
+								atlas = "collections-icon-favorites",
+								title = L["configCenterNewInVersion"] or "New in this Version",
+								value = tostring(newCount),
+							}
+						end
+						return tiles
+					end,
+				},
+				features = {
+					enabledTitle = L["configCenterEnabledFeatures"],
+					customizedTitle = L["configCenterCustomizedFeatures"],
+					enabledBadge = _G.ENABLED,
+					customizedBadge = L["configCenterCustomized"],
+					limit = 5,
+				},
+				newEntries = {
+					title = L["configCenterNewInVersion"],
+					limit = 3,
+				},
+			}
+		end,
 		version = function()
 			return C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(addonName, "Version")
 		end,
