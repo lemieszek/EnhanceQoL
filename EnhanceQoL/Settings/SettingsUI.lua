@@ -360,7 +360,7 @@ local function ensureConfigApp()
 				},
 				newEntries = {
 					title = L["configCenterNewInVersion"],
-					limit = 3,
+					limit = 5,
 				},
 			}
 		end,
