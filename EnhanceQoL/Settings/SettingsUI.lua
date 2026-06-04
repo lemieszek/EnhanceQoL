@@ -17,6 +17,8 @@ addon.functions = addon.functions or {}
 addon.ConfigCurrentGroupByPageID = addon.ConfigCurrentGroupByPageID or {}
 addon.ConfigGroupTitleByPageID = addon.ConfigGroupTitleByPageID or {}
 addon.ConfigGroupOrderByPageID = addon.ConfigGroupOrderByPageID or {}
+addon.ConfigCurrentGroupBySection = addon.ConfigCurrentGroupBySection or {}
+addon.ConfigGroupTitleBySection = addon.ConfigGroupTitleBySection or {}
 addon.ConfigControlOrder = addon.ConfigControlOrder or 0
 
 local rootCategoryMap = {
@@ -29,6 +31,11 @@ local rootCategoryMap = {
 	PROFILES = "profiles",
 }
 
+local newSettingsAssetRoot = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\"
+local function newSettingsAsset(fileName)
+	return newSettingsAssetRoot .. fileName
+end
+
 local function ensureConfigApp()
 	if addon.ConfigApp or not ConfigLib then return addon.ConfigApp end
 
@@ -37,6 +44,85 @@ local function ensureConfigApp()
 		icon = "Interface\\AddOns\\EnhanceQoL\\Icons\\Icon.tga",
 		addonFolder = addonName,
 		assetRoot = "Interface\\AddOns\\EnhanceQoL\\libs\\LibSettingsDesigner\\Assets\\",
+		categoryIconTextures = {
+			dashboard = newSettingsAsset("Cogwheel.tga"),
+			economy = newSettingsAsset("Economy.tga"),
+			gameplay = newSettingsAsset("Gameplay.tga"),
+			general = newSettingsAsset("General.tga"),
+			interface = newSettingsAsset("Interface.tga"),
+			profiles = newSettingsAsset("Profiles.tga"),
+			social = newSettingsAsset("Social.tga"),
+			sound = newSettingsAsset("Sound.tga"),
+		},
+		iconTextures = {
+			actionbar = newSettingsAsset("ActionBarsButtons.tga"),
+			actiontracker = newSettingsAsset("ActionTracker.tga"),
+			addonprofile = newSettingsAsset("AddonProfile.tga"),
+			auction = newSettingsAsset("Auction.tga"),
+			autosell = newSettingsAsset("AutoSell.tga"),
+			bags = newSettingsAsset("BagsCategories.tga"),
+			bagscategories = newSettingsAsset("BagsCategories.tga"),
+			bars = newSettingsAsset("BarsResources.tga"),
+			bank = newSettingsAsset("Bank.tga"),
+			buff = newSettingsAsset("ClassBuffReminder.tga"),
+			castbar = newSettingsAsset("CastbarsCooldowns.tga"),
+			chat = newSettingsAsset("ChatWindow.tga"),
+			chatbubbles = newSettingsAsset("ChatBubbles.tga"),
+			chathistory = newSettingsAsset("ChatHistory.tga"),
+			chatwindow = newSettingsAsset("ChatWindow.tga"),
+			combat = newSettingsAsset("CombatAlerts.tga"),
+			combatlogging = newSettingsAsset("CombatLogging.tga"),
+			community = newSettingsAsset("FriendsCommunities.tga"),
+			containeractions = newSettingsAsset("ContainerActions.tga"),
+			cooldown = newSettingsAsset("CastbarsCooldowns.tga"),
+			cooldownpanels = newSettingsAsset("CastbarsCooldowns.tga"),
+			crafting = newSettingsAsset("CraftingOrders.tga"),
+			dashboard = newSettingsAsset("Cogwheel.tga"),
+			data = newSettingsAsset("DataPanels.tga"),
+			death = newSettingsAsset("DeathResurrection.tga"),
+			diagnostics = newSettingsAsset("SystemDebug.tga"),
+			dialogsconfirmations = newSettingsAsset("DialogsConfirmations.tga"),
+			dungeons = newSettingsAsset("DungeonsMythic.tga"),
+			economy = newSettingsAsset("Economy.tga"),
+			focus = newSettingsAsset("FocusMarker.tga"),
+			gameplay = newSettingsAsset("Gameplay.tga"),
+			gearupgrades = newSettingsAsset("GearUpgrades.tga"),
+			general = newSettingsAsset("General.tga"),
+			goldtracking = newSettingsAsset("GoldTracking.tga"),
+			groupfinder = newSettingsAsset("GroupFinder.tga"),
+			help = newSettingsAsset("QuickReference.tga"),
+			importexport = newSettingsAsset("ExportImport.tga"),
+			includelists = newSettingsAsset("IncludeExcludeLists.tga"),
+			instantmessenger = newSettingsAsset("InstantMessenger.tga"),
+			interface = newSettingsAsset("Interface.tga"),
+			loot = newSettingsAsset("LootRewards.tga"),
+			macros = newSettingsAsset("MacrosConsumables.tga"),
+			mailbox = newSettingsAsset("Mailbox.tga"),
+			map = newSettingsAsset("MapMinimap.tga"),
+			markers = newSettingsAsset("Markers.tga"),
+			movementinput = newSettingsAsset("MovementInput.tga"),
+			mover = newSettingsAsset("Mover.tga"),
+			nameplate = newSettingsAsset("NameplatesNames.tga"),
+			popups = newSettingsAsset("PopupsUITweaks.tga"),
+			privateaura = newSettingsAsset("StandalonePrivateAuras.tga"),
+			privacy = newSettingsAsset("PrivacyBlockingIgnore.tga"),
+			profiles = newSettingsAsset("Profiles.tga"),
+			questing = newSettingsAsset("QuestingCinematics.tga"),
+			reset = newSettingsAsset("Revert.tga"),
+			resource = newSettingsAsset("BarsResources.tga"),
+			settingspage = newSettingsAsset("SettingsPage.tga"),
+			skinner = newSettingsAsset("Skinner.tga"),
+			social = newSettingsAsset("Social.tga"),
+			sound = newSettingsAsset("Sound.tga"),
+			support = newSettingsAsset("Question.tga"),
+			systemdebug = newSettingsAsset("SystemDebug.tga"),
+			tooltip = newSettingsAsset("Tooltip.tga"),
+			unitframes = newSettingsAsset("UnitFrames.tga"),
+			uiutilities = newSettingsAsset("UIUtilities.tga"),
+			vendor = newSettingsAsset("VendorsServices.tga"),
+			vendorsservices = newSettingsAsset("VendorsServices.tga"),
+			visibility = newSettingsAsset("VisibilityFading.tga"),
+		},
 		db = function() return addon.db end,
 		profile = function() return addon.db end,
 		locale = L,
@@ -131,6 +217,10 @@ local function getLegacyControlGroup(app, category, cbData)
 			order = cbData.groupOrder,
 		})
 		return groupID, groupTitle, pageID
+	end
+	if cbData.parentSection and addon.ConfigCurrentGroupBySection[cbData.parentSection] then
+		local groupID = addon.ConfigCurrentGroupBySection[cbData.parentSection]
+		return groupID, addon.ConfigGroupTitleBySection[cbData.parentSection], pageID
 	end
 	local groupID = addon.ConfigCurrentGroupByPageID[pageID]
 	if groupID then return groupID, addon.ConfigGroupTitleByPageID[pageID], pageID end
@@ -766,20 +856,25 @@ end
 -- Text / Header / Button / Notify
 ---------------------------------------------------------
 function addon.functions.SettingsCreateHeadline(cat, text, extra)
+	local data = type(text) == "table" and text or extra
+	local headerText = type(text) == "table" and (text.name or text.text or text.label or text.title) or text
 	local header = SettingsLib:CreateHeader(cat, text, extra)
 	local app = ensureConfigApp()
-	if app and extra and extra.parentSection then
-		local pageID = app.legacySections and app.legacySections[extra.parentSection]
+	if app and data and data.parentSection then
+		local pageID = app.legacySections and app.legacySections[data.parentSection]
 		if pageID and app:GetPage(pageID) then
 			addon.ConfigGroupOrderByPageID[pageID] = (addon.ConfigGroupOrderByPageID[pageID] or 0) + 10
-			local groupID = extra.groupID or extra.modernGroup or ConfigLib:NormalizeID(text or "settings")
+			local groupID = data.groupID or data.modernGroup or ConfigLib:NormalizeID(headerText or "settings")
+			local groupTitle = headerText or groupID
 			app:RegisterGroup(pageID, {
 				id = groupID,
-				title = text,
-				order = extra.order or addon.ConfigGroupOrderByPageID[pageID],
+				title = groupTitle,
+				order = data.order or addon.ConfigGroupOrderByPageID[pageID],
 			})
 			addon.ConfigCurrentGroupByPageID[pageID] = groupID
-			addon.ConfigGroupTitleByPageID[pageID] = text
+			addon.ConfigGroupTitleByPageID[pageID] = groupTitle
+			addon.ConfigCurrentGroupBySection[data.parentSection] = groupID
+			addon.ConfigGroupTitleBySection[data.parentSection] = groupTitle
 		end
 	end
 	return header
@@ -888,6 +983,8 @@ function addon.functions.SettingsCreateExpandableSection(cat, cbData)
 			addon.ConfigCurrentGroupByPageID[pageID] = nil
 			addon.ConfigGroupTitleByPageID[pageID] = nil
 			addon.ConfigGroupOrderByPageID[pageID] = 0
+			addon.ConfigCurrentGroupBySection[section] = nil
+			addon.ConfigGroupTitleBySection[section] = nil
 		end
 	end
 	return section

@@ -100,19 +100,6 @@ local GREEN = { 0.36, 0.82, 0.36 }
 
 local ASSET = {
 	fallback = "Interface\\Icons\\INV_Misc_Gear_01",
-	addon = "Interface\\AddOns\\EnhanceQoL\\Icons\\Icon.tga",
-	cog = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Cogwheel.tga",
-	economy = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Economy.tga",
-	exportImport = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\ExportImport.tga",
-	gameplay = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Gameplay.tga",
-	general = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\General.tga",
-	interface = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Interface.tga",
-	profiles = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Profiles.tga",
-	question = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Question.tga",
-	quickReference = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\QuickReference.tga",
-	revert = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Revert.tga",
-	social = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Social.tga",
-	sound = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Sound.tga",
 	statusEnabled = "Interface\\RaidFrame\\ReadyCheck-Ready",
 	statusProfile = "Interface\\Icons\\INV_Misc_GroupNeedMore",
 	statusVersionAtlas = "worldquest-tracker-questmarker",
@@ -121,37 +108,75 @@ local ASSET = {
 local ICON_TEXTURES = {
 	actionbar = "Interface\\Icons\\INV_Sword_04",
 	actiontracker = "Interface\\Icons\\Ability_Hunter_MarkedForDeath",
+	addonprofile = "Interface\\Icons\\INV_Misc_GroupNeedMore",
 	advanced = "Interface\\Icons\\INV_Misc_Gear_01",
+	auction = "Interface\\Icons\\INV_Misc_Coin_01",
+	autosell = "Interface\\Icons\\INV_Misc_Coin_02",
 	bags = "Interface\\Icons\\INV_Misc_Bag_08",
+	bagscategories = "Interface\\Icons\\INV_Misc_Bag_10",
 	bars = "Interface\\Icons\\INV_Misc_Desecrated_PlateBelt",
+	bank = "Interface\\Icons\\INV_Misc_Bag_10",
 	buff = "Interface\\Icons\\Spell_Holy_BlessingOfKings",
 	castbar = "Interface\\Icons\\Spell_Nature_TimeStop",
 	chat = "Interface\\Icons\\INV_Letter_15",
+	chatbubbles = "Interface\\Icons\\INV_Letter_15",
+	chathistory = "Interface\\Icons\\INV_Misc_Note_03",
+	chatwindow = "Interface\\Icons\\INV_Letter_15",
 	combat = "Interface\\Icons\\Ability_Warrior_BattleShout",
+	combatlogging = "Interface\\Icons\\INV_Misc_Note_05",
+	community = "Interface\\Icons\\Achievement_GuildPerk_EverybodysFriend",
+	container = "Interface\\Icons\\INV_Box_01",
+	containeractions = "Interface\\Icons\\INV_Box_01",
+	crafting = "Interface\\Icons\\Trade_BlackSmithing",
 	data = "Interface\\Icons\\INV_Misc_Note_05",
+	death = "Interface\\Icons\\Ability_Creature_Cursed_02",
 	diagnostics = "Interface\\Icons\\INV_Gizmo_02",
+	dialogs = "Interface\\Icons\\INV_Misc_Note_06",
+	dialogsconfirmations = "Interface\\Icons\\INV_Misc_Note_06",
 	cooldown = "Interface\\Icons\\INV_Misc_PocketWatch_01",
-	dashboard = ASSET.cog,
-	economy = ASSET.economy,
-	gameplay = ASSET.gameplay,
-	general = ASSET.general,
-	help = ASSET.quickReference,
-	importexport = ASSET.exportImport,
-	interface = ASSET.interface,
+	cooldownpanels = "Interface\\Icons\\INV_Misc_PocketWatch_01",
+	dashboard = "Interface\\Icons\\INV_Misc_Gear_01",
+	dungeons = "Interface\\Icons\\INV_Misc_Map_01",
+	economy = "Interface\\Icons\\INV_Misc_Coin_01",
+	focus = "Interface\\Icons\\Ability_Hunter_SniperShot",
+	gameplay = "Interface\\Icons\\Ability_DualWield",
+	general = "Interface\\Icons\\INV_Misc_Wrench_01",
+	gearupgrades = "Interface\\Icons\\INV_Chest_Plate18",
+	goldtracking = "Interface\\Icons\\INV_Misc_Coin_01",
+	groupfinder = "Interface\\Icons\\Achievement_GuildPerk_HaveGroupWillTravel",
+	help = "Interface\\Icons\\INV_Misc_Book_09",
+	importexport = "Interface\\Icons\\INV_Misc_ArrowUp",
+	includelists = "Interface\\Icons\\INV_Misc_Note_05",
+	instantmessenger = "Interface\\Icons\\INV_Letter_15",
+	interface = "Interface\\Icons\\INV_Misc_Monitor_01",
+	loot = "Interface\\Icons\\INV_Misc_Bag_08",
+	mailbox = "Interface\\Icons\\INV_Letter_16",
 	map = "Interface\\Icons\\INV_Misc_Map_01",
+	markers = "Interface\\Icons\\Ability_Hunter_MarkedForDeath",
+	macros = "Interface\\Icons\\INV_Misc_Note_05",
+	movementinput = "Interface\\Icons\\INV_Boots_Plate_01",
 	mover = "Interface\\Icons\\Ability_Hunter_MasterMarksman",
 	nameplate = "Interface\\Icons\\INV_Misc_Tournaments_banner_Human",
 	popups = "Interface\\Icons\\INV_Misc_Note_01",
-	profiles = ASSET.profiles,
-	reset = ASSET.revert,
+	privateaura = "Interface\\Icons\\Spell_Arcane_PrismaticCloak",
+	privacy = "Interface\\Icons\\Achievement_GuildPerk_EverybodysFriend",
+	profiles = "Interface\\Icons\\INV_Misc_GroupNeedMore",
+	questing = "Interface\\Icons\\INV_Misc_Note_04",
+	reset = "Interface\\Icons\\Ability_Hunter_MasterMarksman",
 	resource = "Interface\\Icons\\INV_Misc_Food_100",
+	settingspage = "Interface\\Icons\\INV_Misc_Gear_01",
 	skinner = "Interface\\Icons\\INV_Misc_EngGizmos_17",
-	social = ASSET.social,
-	sound = ASSET.sound,
-	support = ASSET.question,
+	social = "Interface\\Icons\\INV_Letter_15",
+	sound = "Interface\\Icons\\INV_Misc_Note_01",
+	support = "Interface\\Icons\\INV_Misc_QuestionMark",
+	system = "Interface\\Icons\\INV_Gizmo_01",
+	systemdebug = "Interface\\Icons\\INV_Gizmo_02",
 	tooltip = "Interface\\Icons\\INV_Misc_Note_03",
 	unitframes = "Interface\\Icons\\INV_Misc_GroupLooking",
+	uiutilities = "Interface\\Icons\\INV_Misc_Wrench_01",
 	vendor = "Interface\\Icons\\INV_Misc_Coin_02",
+	vendorsservices = "Interface\\Icons\\INV_Misc_Coin_02",
+	visibility = "Interface\\Icons\\Ability_Stealth",
 }
 
 local CATEGORY_ICON_KEYS = {
@@ -166,26 +191,46 @@ local CATEGORY_ICON_KEYS = {
 	sound = "sound",
 }
 
-local CATEGORY_ICON_TEXTURES = {
-	dashboard = ASSET.cog,
-	economy = ASSET.economy,
-	gameplay = ASSET.gameplay,
-	general = ASSET.general,
-	interface = ASSET.interface,
-	profiles = ASSET.profiles,
-	sound = ASSET.sound,
-	social = ASSET.social,
-}
-
 local PAGE_ICON_RULES = {
+	{ "standaloneprivateauras", "privateaura" },
+	{ "privateauras", "privateaura" },
+	{ "visibilityfading", "visibility" },
+	{ "visibilityframes", "visibility" },
+	{ "addon", "addonprofile" },
 	{ "actiontracker", "actiontracker" },
 	{ "actionbars", "actionbar" },
+	{ "actionbarsbuttons", "actionbar" },
 	{ "castbarscooldowns", "castbar" },
 	{ "castbars", "castbar" },
+	{ "chathistory", "chathistory" },
+	{ "chatbubbles", "chatbubbles" },
+	{ "chatwindow", "chatwindow" },
 	{ "classbuff", "buff" },
-	{ "cooldownpanels", "cooldown" },
+	{ "combatlogging", "combatlogging" },
+	{ "cooldownpanels", "cooldownpanels" },
 	{ "barsresources", "resource" },
 	{ "unitframes", "unitframes" },
+	{ "instantmessenger", "instantmessenger" },
+	{ "dialogsconfirmations", "dialogsconfirmations" },
+	{ "systemdebug", "systemdebug" },
+	{ "uiutilities", "uiutilities" },
+	{ "containeractions", "containeractions" },
+	{ "gearupgrades", "gearupgrades" },
+	{ "bagscategories", "bagscategories" },
+	{ "vendorsservices", "vendorsservices" },
+	{ "trackingmoney", "goldtracking" },
+	{ "goldtracking", "goldtracking" },
+	{ "includelists", "includelists" },
+	{ "macrosconsumables", "macros" },
+	{ "movementinput", "movementinput" },
+	{ "friendscommunities", "community" },
+	{ "privacyblockingignore", "privacy" },
+	{ "dungeons", "dungeons" },
+	{ "questing", "questing" },
+	{ "groupfinder", "groupfinder" },
+	{ "death", "death" },
+	{ "autosell", "autosell" },
+	{ "lootrewards", "loot" },
 	{ "worldmap", "map" },
 	{ "minimap", "map" },
 	{ "nameplates", "nameplate" },
@@ -193,11 +238,20 @@ local PAGE_ICON_RULES = {
 	{ "skinner", "skinner" },
 	{ "tooltip", "tooltip" },
 	{ "mover", "mover" },
+	{ "focusmarker", "focus" },
+	{ "markers", "markers" },
 	{ "combat", "combat" },
 	{ "data", "data" },
 	{ "resource", "resource" },
+	{ "auction", "auction" },
+	{ "crafting", "crafting" },
+	{ "mailbox", "mailbox" },
+	{ "merchant", "vendor" },
+	{ "bank", "bank" },
 	{ "vendor", "vendor" },
 	{ "sell", "vendor" },
+	{ "privacy", "social" },
+	{ "friends", "community" },
 	{ "chat", "chat" },
 	{ "loot", "bags" },
 	{ "bags", "bags" },
@@ -208,57 +262,112 @@ local PAGE_ICON_RULES = {
 local PAGE_DESCRIPTION_FALLBACKS = {
 	actionbars = "Configure action bar visibility, button growth, borders, keybind text, macro labels and cooldown text.",
 	actiontracker = "Show your recently used spells as a movable icon history.",
+	addon = "Manage the active AddOn profile and profile import protection.",
 	bars = "Adjust class resources, resource and status bars, XP, absorb and player resource displays.",
+	bank = "Configure bank and warband-bank convenience actions.",
+	bagscategories = "Manage saved bag category profiles and import or export bag layouts.",
+	bagsinventory = "Configure bags, item overlays, durability warnings and inventory helpers.",
 	castbars = "Configure cast bars, GCD and cooldown displays, combat text, focus interrupt alerts and timing helpers.",
+	chatbubbles = "Customize chat bubble text, font size and display behavior.",
+	chathistory = "Keep recent chat messages available across sessions.",
+	chatwindow = "Customize chat window behavior, links and small chat shortcuts.",
 	chat = "Improve chat history, whispers and message handling.",
 	classbuff = "Track missing class buffs and connect reminders with flask and buff food helpers.",
+	combatlogging = "Automatically control combat logging for raids and selected encounters.",
 	combat = "Configure death alerts, no-target indicators and other combat reminders.",
+	containeractions = "Automatically open safe containers and manage blocked items.",
 	cooldownpanels = "Create and manage custom cooldown panels, tracked abilities, layout and visibility.",
+	craftingorders = "Add convenience options for crafting order and profession workflows.",
 	data = "Configure compact data panels, tooltip hints and modifier-based context menus.",
 	death = "Customize death, resurrection and release helpers.",
+	dialogsconfirmations = "Control confirmation dialogs and optional auto-confirm behavior.",
 	dungeons = "Configure dungeon, Mythic+ and teleport helpers.",
+	focusmarker = "Place and maintain focus markers for group or combat workflows.",
+	friendscommunities = "Add convenience tools for friends, communities and social windows.",
+	gearupgrades = "Configure gear upgrade, catalyst, enchant and item-level helpers.",
 	groupfinder = "Improve group finder and group workflow helpers.",
 	includelists = "Manage items that should always or never be handled.",
 	loot = "Configure loot, item handling and inventory helpers.",
+	macrosconsumables = "Create quick macros and convenience actions for mounts and consumables.",
+	mailbox = "Add address book and mailbox convenience helpers.",
 	map = "Customize world map coordinates, square minimap layout, minimap stats and button storage.",
+	markers = "Configure raid marker helpers and group marker shortcuts.",
+	merchant = "Configure merchant, repair and vendor quality-of-life actions.",
 	minimap = "Customize world map coordinates, square minimap layout, minimap stats and button storage.",
+	movementinput = "Tune movement and input-related convenience options.",
 	mover = "Move and position supported UI elements.",
 	nameplates = "Adjust player names, nameplate text, markers, mob colors and dungeon-specific nameplate behavior.",
 	popups = "Tune login UI scaling, collection alerts, micro menu notifications and small Blizzard UI conveniences.",
+	privacyblockingignore = "Manage ignore, privacy and blocking convenience tools.",
+	profilesdamagemeter = "Import or export Damage Meter profile data.",
+	profileshealerbuffplacement = "Manage Healer Buff Placement profile data.",
 	questing = "Automate quest handling and cinematic convenience options.",
+	settings = "Review category-level options and compatibility settings.",
 	skinner = "Customize the appearance of supported Blizzard UI frames.",
-	standaloneprivateaura = "Configure standalone private aura display.",
+	standaloneprivateaura = "Configure the standalone private aura anchor and open its Edit Mode controls.",
+	systemdebug = "Configure diagnostics, debug helpers and system-level options.",
+	trackingmoney = "Track gold and character money movement.",
 	tooltips = "Customize tooltip content, IDs, icons and extra information.",
 	tooltip = "Customize tooltip content, IDs, icons and extra information.",
+	uiutilities = "Enable small interface utilities and slash-command helpers.",
 	unitframes = "Customize player, target, focus, party and group frames, including layout, bars, auras and text.",
 	vendor = "Add convenient vendor and merchant shortcuts.",
+	visibilityframes = "Control when supported Blizzard frames are shown, hidden or faded.",
 	autosell = "Automatically sell configured items and junk at vendors.",
 }
 
 local PAGE_CARD_DESCRIPTION_FALLBACKS = {
 	actionbars = "configCenterPageCardDescActionBars",
 	actiontracker = "configCenterPageCardDescActionTracker",
+	addon = "configCenterPageCardDescAddOn",
 	bars = "configCenterPageCardDescBarsResources",
+	bank = "configCenterPageCardDescBank",
+	bagscategories = "configCenterPageCardDescBagsCategories",
+	bagsinventory = "configCenterPageCardDescBagsInventory",
 	castbars = "configCenterPageCardDescCastbarsCooldowns",
+	chatbubbles = "configCenterPageCardDescChatBubbles",
+	chathistory = "configCenterPageCardDescChatHistory",
+	chatwindow = "configCenterPageCardDescChatWindow",
 	chat = "configCenterPageCardDescChat",
 	classbuff = "configCenterPageCardDescClassBuffReminder",
+	combatlogging = "configCenterPageCardDescCombatLogging",
 	combat = "configCenterPageCardDescCombatAlerts",
+	containeractions = "configCenterPageCardDescContainerActions",
 	cooldownpanels = "configCenterPageCardDescCooldownPanels",
+	craftingorders = "configCenterPageCardDescCraftingOrders",
 	data = "configCenterPageCardDescDataPanels",
+	dialogsconfirmations = "configCenterPageCardDescDialogsConfirmations",
 	death = "configCenterPageCardDescDeath",
 	dungeons = "configCenterPageCardDescDungeons",
+	focusmarker = "configCenterPageCardDescFocusMarker",
+	friendscommunities = "configCenterPageCardDescFriendsCommunities",
+	gearupgrades = "configCenterPageCardDescGearUpgrades",
 	groupfinder = "configCenterPageCardDescGroupFinder",
 	loot = "configCenterPageCardDescLoot",
+	macrosconsumables = "configCenterPageCardDescMacrosConsumables",
+	mailbox = "configCenterPageCardDescMailbox",
 	map = "configCenterPageCardDescMapNavigation",
+	markers = "configCenterPageCardDescMarkers",
+	merchant = "configCenterPageCardDescMerchant",
 	minimap = "configCenterPageCardDescMapNavigation",
+	movementinput = "configCenterPageCardDescMovementInput",
 	mover = "configCenterPageCardDescMover",
 	nameplates = "configCenterPageCardDescNameplates",
 	popups = "configCenterPageCardDescPopupsUITweaks",
+	privacyblockingignore = "configCenterPageCardDescPrivacyBlockingIgnore",
+	profilesdamagemeter = "configCenterPageCardDescProfilesDamageMeter",
+	profileshealerbuffplacement = "configCenterPageCardDescProfilesHealerBuffPlacement",
 	questing = "configCenterPageCardDescQuesting",
+	settings = "configCenterPageCardDescSettings",
 	skinner = "configCenterPageCardDescSkinner",
+	standaloneprivateaura = "configCenterPageCardDescStandalonePrivateAuras",
+	systemdebug = "configCenterPageCardDescSystemDebug",
 	tooltip = "configCenterPageCardDescTooltip",
 	tooltips = "configCenterPageCardDescTooltip",
+	trackingmoney = "configCenterPageCardDescTrackingMoney",
+	uiutilities = "configCenterPageCardDescUIUtilities",
 	unitframes = "configCenterPageCardDescUnitFrames",
+	visibilityframes = "configCenterPageCardDescVisibilityFrames",
 	vendor = "configCenterPageCardDescVendor",
 	autosell = "configCenterPageCardDescAutoSell",
 }
@@ -620,7 +729,23 @@ local function getSliderControlWidth(rowWidth, labelWidth, sliderGap)
 end
 
 local function getAddonIcon(app)
-	return app and app.opts and app.opts.icon or ASSET.cog
+	return app and app.opts and app.opts.icon or ICON_TEXTURES.dashboard or ASSET.fallback
+end
+
+local function getAppIconTexture(app, key)
+	local textures = app and app.opts and app.opts.iconTextures
+	if type(textures) == "table" and textures[key] then
+		return textures[key]
+	end
+	return ICON_TEXTURES[key] or ASSET.fallback
+end
+
+local function getAppCategoryIconTexture(app, categoryID)
+	local textures = app and app.opts and app.opts.categoryIconTextures
+	if type(textures) == "table" and textures[categoryID] then
+		return textures[categoryID]
+	end
+	return nil
 end
 
 local function normalizeIconLookupText(text)
@@ -638,9 +763,10 @@ local function getKeywordIconKey(text)
 	return nil
 end
 
-local function resolveCategoryIcon(category)
-	if category and CATEGORY_ICON_TEXTURES[category.id] then
-		return CATEGORY_ICON_TEXTURES[category.id]
+local function resolveCategoryIcon(app, category)
+	local appIcon = category and getAppCategoryIconTexture(app, category.id)
+	if appIcon then
+		return appIcon
 	end
 	if category and category.icon then
 		return category.icon
@@ -649,10 +775,10 @@ local function resolveCategoryIcon(category)
 		return category.iconAtlas, true
 	end
 	local iconKey = category and CATEGORY_ICON_KEYS[category.id]
-	return ICON_TEXTURES[iconKey or "advanced"] or ASSET.fallback
+	return getAppIconTexture(app, iconKey or "advanced")
 end
 
-local function resolveProfilePageIcon(page)
+local function resolveProfilePageIcon(app, page)
 	if not page or page.category ~= "profiles" then
 		return nil
 	end
@@ -670,25 +796,30 @@ local function resolveProfilePageIcon(page)
 		return "GM-icon-settings-pressed", true
 	end
 	if lookup:find("addon", 1, true) then
-		return ASSET.addon
+		return getAddonIcon(app)
 	end
 
 	return nil
 end
 
-local function resolvePageIcon(page)
+local function resolvePageIcon(app, page)
 	if page and page.icon then
 		return page.icon
 	end
 	if page and page.iconAtlas then
 		return page.iconAtlas, true
 	end
-	local profileIcon, isProfileAtlas = resolveProfilePageIcon(page)
+	local profileIcon, isProfileAtlas = resolveProfilePageIcon(app, page)
 	if profileIcon then
 		return profileIcon, isProfileAtlas
 	end
+	local pageTitleLookup = normalizeIconLookupText(page and page.title or "")
+	local pageID = tostring(page and page.id or "")
+	if pageTitleLookup == "settings" or pageID:match("%.settings$") then
+		return getAppIconTexture(app, "settingspage")
+	end
 	local iconKey = getKeywordIconKey((page and page.id or "") .. " " .. (page and page.title or ""))
-	return ICON_TEXTURES[iconKey or "advanced"] or ASSET.fallback
+	return getAppIconTexture(app, iconKey or "advanced")
 end
 
 local function createIcon(parent, source, size, isAtlas)
@@ -711,7 +842,7 @@ local function createIconPlate(parent, source, size, isAtlas)
 	local plate = CreateFrame("Frame", nil, parent, "BackdropTemplate")
 	plate:SetSize(size or 42, size or 42)
 	applyBackdrop(plate, { 0.015, 0.015, 0.018, 0.80 }, { 0.55, 0.42, 0.18, 0.75 })
-	plate.Icon = createIcon(plate, source, (size or 42) - 12, isAtlas)
+	plate.Icon = createIcon(plate, source, (size or 42) - 6, isAtlas)
 	plate.Icon:SetPoint("CENTER")
 	return plate
 end
@@ -793,15 +924,30 @@ local function normalizePageLookupText(page)
 	return tostring((page and page.id or "") .. " " .. (page and page.title or "")):lower():gsub("[^%w]+", "")
 end
 
+function lib.GetBestPageFallback(lookup, fallbackTable)
+	local bestKey, bestValue
+	for keyword, value in pairs(fallbackTable or {}) do
+		if lookup:find(keyword, 1, true) and (not bestKey or #keyword > #bestKey) then
+			bestKey = keyword
+			bestValue = value
+		end
+	end
+	return bestValue
+end
+
 local function getPageDescription(app, page)
 	if page and page.description and page.description ~= "" then
 		return page.description
 	end
 	local lookup = normalizePageLookupText(page)
-	for keyword, description in pairs(PAGE_DESCRIPTION_FALLBACKS) do
-		if lookup:find(keyword, 1, true) then
-			return description
-		end
+	local description = lib.GetBestPageFallback(lookup, PAGE_DESCRIPTION_FALLBACKS)
+	if description then
+		return description
+	end
+	local L = getLocale(app)
+	local localeKey = lib.GetBestPageFallback(lookup, PAGE_CARD_DESCRIPTION_FALLBACKS)
+	if localeKey and L[localeKey] and L[localeKey] ~= "" then
+		return L[localeKey]
 	end
 	if page then
 		return getSettingCountText(app, #(page.controls or {}))
@@ -815,10 +961,9 @@ local function getPageCardDescription(app, page)
 		return page.description
 	end
 	local lookup = normalizePageLookupText(page)
-	for keyword, localeKey in pairs(PAGE_CARD_DESCRIPTION_FALLBACKS) do
-		if lookup:find(keyword, 1, true) then
-			return L[localeKey] or ""
-		end
+	local localeKey = lib.GetBestPageFallback(lookup, PAGE_CARD_DESCRIPTION_FALLBACKS)
+	if localeKey then
+		return L[localeKey] or ""
 	end
 	return ""
 end
@@ -851,6 +996,27 @@ local function getControlTypeLabel(app, control)
 		return _G.COLOR or "Color"
 	end
 	return _G.SETTINGS or "Settings"
+end
+
+function lib.GetFallbackControlDescription(app, control)
+	local L = getLocale(app)
+	local controlType = getControlType(control)
+	if controlType == "slider" then
+		return L["configCenterSliderFallbackDesc"] or "Adjust this value."
+	elseif controlType == "dropdown" or controlType == "sounddropdown" then
+		return L["configCenterDropdownFallbackDesc"] or "Choose one of the available options."
+	elseif controlType == "multidropdown" then
+		return L["configCenterMultiDropdownFallbackDesc"] or "Choose one or more options."
+	elseif controlType == "checkboxdropdown" then
+		return L["configCenterCheckboxDropdownFallbackDesc"] or "Enable this setting and choose its related option."
+	elseif controlType == "input" then
+		return L["configCenterInputFallbackDesc"] or "Enter the value used by this setting."
+	elseif controlType == "colorpicker" or controlType == "coloroverrides" then
+		return L["configCenterColorFallbackDesc"] or "Choose a color for this setting."
+	elseif controlType == "button" then
+		return L["configCenterButtonFallbackDesc"] or "Run this action."
+	end
+	return ""
 end
 
 local function callFormatter(formatter, value, control)
@@ -1612,13 +1778,6 @@ local function addStatusChip(parent, text, color, width)
 end
 
 local function getDashboardIconSize(iconSource)
-	if iconSource == ASSET.quickReference then
-		return 48, 50
-	elseif iconSource == ASSET.exportImport then
-		return 48, 54
-	elseif iconSource == ASSET.revert then
-		return 48, 56
-	end
 	return 48, 48
 end
 
@@ -1697,7 +1856,7 @@ local function addDashboardHero(state, title, subtitle)
 	subText:SetPoint("RIGHT", hero, "RIGHT", -166, 0)
 	subText:SetHeight(48)
 
-	local icon = createDashboardIcon(hero, ASSET.cog)
+	local icon = createDashboardIcon(hero, getAppIconTexture(state.app, "dashboard"))
 	icon:SetSize(92, 92)
 	icon:SetPoint("RIGHT", hero, "RIGHT", -36, -4)
 	icon:SetAlpha(0.90)
@@ -1832,7 +1991,7 @@ local function addConfigureFallback(row, app, control, text, opts)
 		text or L["configCenterConfigure"] or "Configure",
 		opts.width or 138,
 		26,
-		ICON_TEXTURES.advanced
+		getAppIconTexture(app, "advanced")
 	)
 	if opts.point then
 		button:SetPoint(opts.point[1], opts.point[2], opts.point[3], opts.point[4], opts.point[5])
@@ -2408,6 +2567,8 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 	elseif layoutType == "complex" then
 		local L = getLocale(app)
 		descText = L["configCenterAdvancedSettingDesc"] or "Configure this advanced setting."
+	elseif layoutType == "stacked" or controlType == "button" or controlType == "coloroverrides" then
+		descText = lib.GetFallbackControlDescription(app, control)
 	else
 		descText = ""
 	end
@@ -2656,7 +2817,7 @@ local function addPageCard(state, page, row, index, columns)
 		state:SetPage(page.id)
 	end)
 
-	local iconSource, iconIsAtlas = resolvePageIcon(page)
+	local iconSource, iconIsAtlas = resolvePageIcon(state.app, page)
 	local icon = createIconPlate(card, iconSource, PAGE_CARD_ICON_SIZE, iconIsAtlas)
 	icon:SetPoint("LEFT", card, "LEFT", PAGE_CARD_PAD_X, 0)
 
@@ -2822,14 +2983,14 @@ local function renderDashboard(state)
 		1,
 		L["configCenterQuickReference"] or (_G.HELP_LABEL or _G.HELP or "Help"),
 		L["configCenterQuickReferenceDesc"] or "Useful links, slash commands and information.",
-		ICON_TEXTURES.help
+		getAppIconTexture(app, "help")
 	)
 	addDashboardCard(
 		quickRow,
 		2,
 		L["configCenterSupportFeedback"] or "Support & Feedback",
 		L["configCenterSupportFeedbackDesc"] or "Report bugs, request features or get help.",
-		ICON_TEXTURES.support,
+		getAppIconTexture(app, "support"),
 		function()
 			openLegacySettings(app)
 		end
@@ -2841,14 +3002,14 @@ local function renderDashboard(state)
 		1,
 		L["configCenterImportExport"] or "Import / Export",
 		L["configCenterImportExportDesc"] or "Import or export your settings and profiles.",
-		ICON_TEXTURES.importexport
+		getAppIconTexture(app, "importexport")
 	)
 	addDashboardCard(
 		quickRow2,
 		2,
 		L["configCenterResetDefaults"] or "Reset & Defaults",
 		L["configCenterResetDefaultsDesc"] or "Reset settings or restore default values.",
-		ICON_TEXTURES.reset
+		getAppIconTexture(app, "reset")
 	)
 
 	addDashboardStatusPanel(state, stats)
@@ -2899,7 +3060,7 @@ local function renderDashboard(state)
 			applyBackdrop(mini, CARD_BG, CARD_BORDER)
 			applyHoverState(mini, CARD_BG, CARD_BG_HOVER, CARD_BORDER, CARD_BORDER_HOVER)
 			mini:SetScript("OnClick", function() state:SetPage(page.id) end)
-			local iconSource, iconIsAtlas = resolvePageIcon(page)
+			local iconSource, iconIsAtlas = resolvePageIcon(app, page)
 			local icon = createIcon(mini, iconSource, 20, iconIsAtlas)
 			icon:SetPoint("LEFT", mini, "LEFT", 9, 0)
 			local label = createText(mini, FONT_TEXT, page.title or page.id, WHITE)
@@ -3177,7 +3338,7 @@ local function renderPage(state, pageID)
 	end
 
 	local header = createPageLeftFrame(state, 100)
-	local iconSource, iconIsAtlas = resolvePageIcon(page)
+	local iconSource, iconIsAtlas = resolvePageIcon(app, page)
 	local icon = createIconPlate(header, iconSource, 54, iconIsAtlas)
 	icon:SetPoint("TOPLEFT", header, "TOPLEFT", 0, -14)
 	local title = createText(header, FONT_TITLE, page.title or page.id, WHITE)
@@ -3308,7 +3469,7 @@ function StateMixin:RenderSidebar()
 	dashboard.Accent:SetPoint("TOPLEFT", dashboard, "TOPLEFT", 0, -6)
 	dashboard.Accent:SetPoint("BOTTOMLEFT", dashboard, "BOTTOMLEFT", 0, 6)
 	dashboard.Accent:SetWidth(2)
-	dashboard.Icon = createIcon(dashboard, ICON_TEXTURES.dashboard, 22, false)
+	dashboard.Icon = createIcon(dashboard, getAppIconTexture(self.app, "dashboard"), 22, false)
 	dashboard.Icon:SetPoint("LEFT", dashboard, "LEFT", 12, 0)
 	dashboard.Text = dashboard:CreateFontString(nil, "OVERLAY", FONT_TEXT)
 	dashboard.Text:SetPoint("LEFT", dashboard.Icon, "RIGHT", 10, 0)
@@ -3343,7 +3504,7 @@ function StateMixin:RenderSidebar()
 			row.Accent:SetPoint("TOPLEFT", row, "TOPLEFT", 0, -6)
 			row.Accent:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, 6)
 			row.Accent:SetWidth(2)
-			local iconSource, iconIsAtlas = resolveCategoryIcon(category)
+			local iconSource, iconIsAtlas = resolveCategoryIcon(self.app, category)
 			row.Icon = createIcon(row, iconSource, 22, iconIsAtlas)
 			row.Icon:SetPoint("LEFT", row, "LEFT", 12, 0)
 			row.Text = row:CreateFontString(nil, "OVERLAY", FONT_TEXT)
@@ -3596,7 +3757,7 @@ local function createFrame(app)
 	frame.SidebarScroll:SetScrollChild(frame.Sidebar)
 
 	local legacyLabel = L["configCenterLegacyBlizzard"] or "Legacy Blizzard Settings"
-	frame.LegacyButton = makeFlatButton(frame.SidebarShell, legacyLabel, 184, 30, ICON_TEXTURES.advanced)
+	frame.LegacyButton = makeFlatButton(frame.SidebarShell, legacyLabel, 184, 30, getAppIconTexture(app, "advanced"))
 	frame.LegacyButton:SetPoint("BOTTOMLEFT", frame.SidebarShell, "BOTTOMLEFT", 8, 11)
 	frame.LegacyButton:SetScript("OnClick", function() openLegacySettings(app) end)
 
