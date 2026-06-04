@@ -8805,6 +8805,7 @@ local function registerSettingsUI()
 			newTagID = "CustomUnitFrames",
 			iconKey = "unitframes",
 			modernCategory = "suites",
+			modernOnly = true,
 			expanded = false,
 			colorizeTitle = false,
 		})
@@ -8821,9 +8822,25 @@ local function registerSettingsUI()
 		addon.db.ufGroupFrames[kind] = addon.db.ufGroupFrames[kind] or {}
 		return addon.db.ufGroupFrames[kind]
 	end
+	local frameToggleDesc = L["UFFrameToggleEditModeDesc"] or "Enable this frame here, then adjust layout and position in Edit Mode."
+	local function hasClassColorConsumer()
+		if ensureConfig("player").enabled == true then return true end
+		if ensureConfig("target").enabled == true then return true end
+		if ensureConfig("targettarget").enabled == true then return true end
+		local partyCfg = getGroupFramesConfig("party")
+		if partyCfg and partyCfg.enabled == true then return true end
+		local raidCfg = getGroupFramesConfig("raid")
+		if raidCfg and raidCfg.enabled == true then return true end
+		local mtCfg = getGroupFramesConfig("mt")
+		if mtCfg and mtCfg.enabled == true then return true end
+		local maCfg = getGroupFramesConfig("ma")
+		return maCfg and maCfg.enabled == true
+	end
+	addon.functions.SettingsCreateHeadline(cUF, L["UFGroupFrames"] or "Group Frames", { parentSection = expandable, order = 20 })
 	addon.functions.SettingsCreateCheckbox(cUF, {
 		var = "ufEnablePartyGroupFrames",
 		text = L["UFGroupFramesPartyEnable"] or "Enable party frames",
+		desc = frameToggleDesc,
 		default = false,
 		get = function()
 			local cfg = getGroupFramesConfig("party")
@@ -8850,6 +8867,7 @@ local function registerSettingsUI()
 	addon.functions.SettingsCreateCheckbox(cUF, {
 		var = "ufEnableRaidGroupFrames",
 		text = L["UFGroupFramesRaidEnable"] or "Enable raid frames",
+		desc = frameToggleDesc,
 		default = false,
 		get = function()
 			local cfg = getGroupFramesConfig("raid")
@@ -8876,6 +8894,7 @@ local function registerSettingsUI()
 	addon.functions.SettingsCreateCheckbox(cUF, {
 		var = "ufEnableMainTankGroupFrames",
 		text = L["UFGroupFramesMTEnable"] or "Enable Main Tank frames",
+		desc = frameToggleDesc,
 		default = false,
 		get = function()
 			local cfg = getGroupFramesConfig("mt")
@@ -8902,6 +8921,7 @@ local function registerSettingsUI()
 	addon.functions.SettingsCreateCheckbox(cUF, {
 		var = "ufEnableMainAssistGroupFrames",
 		text = L["UFGroupFramesMAEnable"] or "Enable Main Assist frames",
+		desc = frameToggleDesc,
 		default = false,
 		get = function()
 			local cfg = getGroupFramesConfig("ma")
@@ -8930,6 +8950,7 @@ local function registerSettingsUI()
 		addon.functions.SettingsCreateCheckbox(cUF, {
 			var = varName,
 			text = label,
+			desc = frameToggleDesc,
 			default = def.enabled or false,
 			get = function() return ensureConfig(unit).enabled == true end,
 			func = function(val)
@@ -8957,13 +8978,8 @@ local function registerSettingsUI()
 		return def.enabled or false
 	end
 
+	addon.functions.SettingsCreateHeadline(cUF, L["UFSoloFrames"] or "Solo Frames", { parentSection = expandable, order = 10 })
 	addToggle("player", L["UFPlayerEnable"] or "Enable custom player frame", "ufEnablePlayer")
-	local castbarSetting = _G.HUD_EDIT_MODE_SETTING_UNIT_FRAME_CAST_BAR_UNDERNEATH or "Castbar underneath"
-	addon.functions.SettingsCreateText(
-		cUF,
-		(L["UFPlayerCastbarHint"] or 'Uses Blizzard\'s Player Castbar.\nBefore enabling, open Edit Mode\nand make sure the Player Frame setting\n"%s" is unchecked.'):format(castbarSetting),
-		{ parentSection = expandable }
-	)
 	addToggle("target", L["UFTargetEnable"] or "Enable custom target frame", "ufEnableTarget")
 	addToggle("targettarget", L["UFToTEnable"] or "Enable target-of-target frame", "ufEnableToT")
 	addToggle("pet", L["UFPetEnable"] or "Enable pet frame", "ufEnablePet")
@@ -8971,6 +8987,7 @@ local function registerSettingsUI()
 	addon.functions.SettingsCreateCheckbox(cUF, {
 		var = "ufEnableBoss",
 		text = L["UFBossEnable"] or "Enable boss frames",
+		desc = frameToggleDesc,
 		default = false,
 		get = function() return ensureConfig("boss").enabled == true end,
 		func = function(val)
@@ -9049,6 +9066,7 @@ local function registerSettingsUI()
 		var = "ufUseCustomClassColors",
 		text = L["ufUseCustomClassColors"] or "Use custom class colors for unit frames",
 		desc = L["ufUseCustomClassColorsDesc"] or "Overrides class colors used by Enhance QoL unit frames.",
+		isEnabled = hasClassColorConsumer,
 		func = function(value)
 			if UFProfiles and UFProfiles.SetUseCustomClassColors then
 				UFProfiles.SetUseCustomClassColors(value and true or false)
@@ -9083,7 +9101,7 @@ local function registerSettingsUI()
 		parent = classColorParent,
 		parentCheck = function()
 			local entry = addon.SettingsLayout.elements["ufUseCustomClassColors"]
-			return entry and entry.setting and entry.setting:GetValue() == true
+			return hasClassColorConsumer() and entry and entry.setting and entry.setting:GetValue() == true
 		end,
 		parentSection = expandable,
 	})
