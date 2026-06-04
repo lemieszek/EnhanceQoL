@@ -65,8 +65,307 @@ local FONT_HEADER = "GameFontNormal"
 local FONT_TEXT = "GameFontHighlight"
 local FONT_MUTED = "GameFontDisableSmall"
 
-local DEFAULT_DASHBOARD_INTRO = "Welcome! EnhanceQoL improves your World of Warcraft experience "
-	.. "with quality of life features and customization options."
+lib.DEFAULT_DASHBOARD_INTRO = "Review settings, quick actions, and configuration pages."
+
+lib.LOCALES = {
+	enUS = {
+		configCenterAbout = "About",
+		configCenterAdvancedSettingDesc = "Configure this advanced setting.",
+		configCenterButtonFallbackDesc = "Run this action.",
+		configCenterChange = "Change",
+		configCenterCheckboxDropdownFallbackDesc = "Enable this setting and choose its related option.",
+		configCenterColorFallbackDesc = "Choose a color for this setting.",
+		configCenterConfigure = "Configure",
+		configCenterConfirmDefaultsDesc = "This will restore all settings on %s to their defaults.",
+		configCenterConfirmDefaultsTitle = "Reset this page to default values?",
+		configCenterControlDropdown = "Dropdown",
+		configCenterControlSlider = "Slider",
+		configCenterCurrent = "Current",
+		configCenterDashboard = "Dashboard",
+		configCenterDropdownFallbackDesc = "Choose one of the available options.",
+		configCenterInputFallbackDesc = "Enter the value used by this setting.",
+		configCenterLegacyBlizzard = "Legacy Blizzard Settings",
+		configCenterMultiDropdownFallbackDesc = "Choose one or more options.",
+		configCenterNoResults = "No settings found.",
+		configCenterOpen = "Open Settings",
+		configCenterOpenDesc = "Opens the modern settings center.",
+		configCenterSearchPlaceholder = "Search settings",
+		configCenterSetting = "setting",
+		configCenterSettings = "settings",
+		configCenterSliderFallbackDesc = "Adjust this value.",
+		configCenterTitle = "Settings",
+	},
+	deDE = {
+		configCenterAbout = "Überblick",
+		configCenterAdvancedSettingDesc = "Konfiguriere diese erweiterte Einstellung.",
+		configCenterButtonFallbackDesc = "Führe diese Aktion aus.",
+		configCenterChange = "Ändern",
+		configCenterCheckboxDropdownFallbackDesc = "Aktiviere diese Einstellung und wähle die zugehörige Option.",
+		configCenterColorFallbackDesc = "Wähle eine Farbe für diese Einstellung.",
+		configCenterConfigure = "Konfigurieren",
+		configCenterConfirmDefaultsDesc = "Dadurch werden alle Einstellungen auf %s auf ihre Standardwerte zurückgesetzt.",
+		configCenterConfirmDefaultsTitle = "Diese Seite auf Standardwerte zurücksetzen?",
+		configCenterControlDropdown = "Dropdown",
+		configCenterControlSlider = "Schieberegler",
+		configCenterCurrent = "Aktuell",
+		configCenterDashboard = "Dashboard",
+		configCenterDropdownFallbackDesc = "Wähle eine der verfügbaren Optionen.",
+		configCenterInputFallbackDesc = "Gib den Wert für diese Einstellung ein.",
+		configCenterLegacyBlizzard = "Alte Blizzard-Einstellungen",
+		configCenterMultiDropdownFallbackDesc = "Wähle eine oder mehrere Optionen.",
+		configCenterNoResults = "Keine Einstellungen gefunden.",
+		configCenterOpen = "Einstellungen öffnen",
+		configCenterOpenDesc = "Öffnet das moderne Einstellungscenter.",
+		configCenterSearchPlaceholder = "Einstellungen suchen",
+		configCenterSetting = "Einstellung",
+		configCenterSettings = "Einstellungen",
+		configCenterSliderFallbackDesc = "Passe diesen Wert an.",
+		configCenterTitle = "Einstellungen",
+	},
+	esES = {
+		configCenterAbout = "Acerca de",
+		configCenterAdvancedSettingDesc = "Configura este ajuste avanzado.",
+		configCenterButtonFallbackDesc = "Ejecuta esta acción.",
+		configCenterChange = "Cambiar",
+		configCenterCheckboxDropdownFallbackDesc = "Activa este ajuste y elige su opción relacionada.",
+		configCenterColorFallbackDesc = "Elige un color para este ajuste.",
+		configCenterConfigure = "Configurar",
+		configCenterConfirmDefaultsDesc = "Esto restaurará todos los ajustes de %s a sus valores predeterminados.",
+		configCenterConfirmDefaultsTitle = "¿Restablecer esta página a los valores predeterminados?",
+		configCenterControlDropdown = "Desplegable",
+		configCenterControlSlider = "Deslizador",
+		configCenterCurrent = "Actual",
+		configCenterDashboard = "Panel",
+		configCenterDropdownFallbackDesc = "Elige una de las opciones disponibles.",
+		configCenterInputFallbackDesc = "Introduce el valor usado por este ajuste.",
+		configCenterLegacyBlizzard = "Ajustes clásicos de Blizzard",
+		configCenterMultiDropdownFallbackDesc = "Elige una o más opciones.",
+		configCenterNoResults = "No se encontraron ajustes.",
+		configCenterOpen = "Abrir ajustes",
+		configCenterOpenDesc = "Abre el centro de ajustes moderno.",
+		configCenterSearchPlaceholder = "Buscar ajustes",
+		configCenterSetting = "ajuste",
+		configCenterSettings = "ajustes",
+		configCenterSliderFallbackDesc = "Ajusta este valor.",
+		configCenterTitle = "Ajustes",
+	},
+	esMX = {
+		configCenterAbout = "Acerca de",
+		configCenterAdvancedSettingDesc = "Configura este ajuste avanzado.",
+		configCenterButtonFallbackDesc = "Ejecuta esta acción.",
+		configCenterChange = "Cambiar",
+		configCenterCheckboxDropdownFallbackDesc = "Activa este ajuste y elige su opción relacionada.",
+		configCenterColorFallbackDesc = "Elige un color para este ajuste.",
+		configCenterConfigure = "Configurar",
+		configCenterConfirmDefaultsDesc = "Esto restaurará todos los ajustes de %s a sus valores predeterminados.",
+		configCenterConfirmDefaultsTitle = "¿Restablecer esta página a los valores predeterminados?",
+		configCenterControlDropdown = "Desplegable",
+		configCenterControlSlider = "Deslizador",
+		configCenterCurrent = "Actual",
+		configCenterDashboard = "Panel",
+		configCenterDropdownFallbackDesc = "Elige una de las opciones disponibles.",
+		configCenterInputFallbackDesc = "Introduce el valor usado por este ajuste.",
+		configCenterLegacyBlizzard = "Ajustes clásicos de Blizzard",
+		configCenterMultiDropdownFallbackDesc = "Elige una o más opciones.",
+		configCenterNoResults = "No se encontraron ajustes.",
+		configCenterOpen = "Abrir ajustes",
+		configCenterOpenDesc = "Abre el centro de ajustes moderno.",
+		configCenterSearchPlaceholder = "Buscar ajustes",
+		configCenterSetting = "ajuste",
+		configCenterSettings = "ajustes",
+		configCenterSliderFallbackDesc = "Ajusta este valor.",
+		configCenterTitle = "Ajustes",
+	},
+	frFR = {
+		configCenterAbout = "À propos",
+		configCenterAdvancedSettingDesc = "Configurez ce réglage avancé.",
+		configCenterButtonFallbackDesc = "Exécute cette action.",
+		configCenterChange = "Modifier",
+		configCenterCheckboxDropdownFallbackDesc = "Activez ce réglage et choisissez l’option associée.",
+		configCenterColorFallbackDesc = "Choisissez une couleur pour ce réglage.",
+		configCenterConfigure = "Configurer",
+		configCenterConfirmDefaultsDesc = "Tous les réglages de %s seront restaurés à leurs valeurs par défaut.",
+		configCenterConfirmDefaultsTitle = "Réinitialiser cette page aux valeurs par défaut ?",
+		configCenterControlDropdown = "Menu déroulant",
+		configCenterControlSlider = "Curseur",
+		configCenterCurrent = "Actuel",
+		configCenterDashboard = "Tableau de bord",
+		configCenterDropdownFallbackDesc = "Choisissez une des options disponibles.",
+		configCenterInputFallbackDesc = "Saisissez la valeur utilisée par ce réglage.",
+		configCenterLegacyBlizzard = "Réglages Blizzard classiques",
+		configCenterMultiDropdownFallbackDesc = "Choisissez une ou plusieurs options.",
+		configCenterNoResults = "Aucun réglage trouvé.",
+		configCenterOpen = "Ouvrir les réglages",
+		configCenterOpenDesc = "Ouvre le centre de réglages moderne.",
+		configCenterSearchPlaceholder = "Rechercher des réglages",
+		configCenterSetting = "réglage",
+		configCenterSettings = "réglages",
+		configCenterSliderFallbackDesc = "Ajustez cette valeur.",
+		configCenterTitle = "Réglages",
+	},
+	itIT = {
+		configCenterAbout = "Informazioni",
+		configCenterAdvancedSettingDesc = "Configura questa impostazione avanzata.",
+		configCenterButtonFallbackDesc = "Esegui questa azione.",
+		configCenterChange = "Cambia",
+		configCenterCheckboxDropdownFallbackDesc = "Attiva questa impostazione e scegli l’opzione correlata.",
+		configCenterColorFallbackDesc = "Scegli un colore per questa impostazione.",
+		configCenterConfigure = "Configura",
+		configCenterConfirmDefaultsDesc = "Questo ripristinerà tutte le impostazioni di %s ai valori predefiniti.",
+		configCenterConfirmDefaultsTitle = "Ripristinare questa pagina ai valori predefiniti?",
+		configCenterControlDropdown = "Menu a discesa",
+		configCenterControlSlider = "Cursore",
+		configCenterCurrent = "Attuale",
+		configCenterDashboard = "Panoramica",
+		configCenterDropdownFallbackDesc = "Scegli una delle opzioni disponibili.",
+		configCenterInputFallbackDesc = "Inserisci il valore usato da questa impostazione.",
+		configCenterLegacyBlizzard = "Impostazioni Blizzard classiche",
+		configCenterMultiDropdownFallbackDesc = "Scegli una o più opzioni.",
+		configCenterNoResults = "Nessuna impostazione trovata.",
+		configCenterOpen = "Apri impostazioni",
+		configCenterOpenDesc = "Apre il centro impostazioni moderno.",
+		configCenterSearchPlaceholder = "Cerca impostazioni",
+		configCenterSetting = "impostazione",
+		configCenterSettings = "impostazioni",
+		configCenterSliderFallbackDesc = "Regola questo valore.",
+		configCenterTitle = "Impostazioni",
+	},
+	koKR = {
+		configCenterAbout = "정보",
+		configCenterAdvancedSettingDesc = "이 고급 설정을 구성합니다.",
+		configCenterButtonFallbackDesc = "이 동작을 실행합니다.",
+		configCenterChange = "변경",
+		configCenterCheckboxDropdownFallbackDesc = "이 설정을 활성화하고 관련 옵션을 선택합니다.",
+		configCenterColorFallbackDesc = "이 설정에 사용할 색상을 선택합니다.",
+		configCenterConfigure = "구성",
+		configCenterConfirmDefaultsDesc = "%s의 모든 설정을 기본값으로 복원합니다.",
+		configCenterConfirmDefaultsTitle = "이 페이지를 기본값으로 초기화할까요?",
+		configCenterControlDropdown = "드롭다운",
+		configCenterControlSlider = "슬라이더",
+		configCenterCurrent = "현재",
+		configCenterDashboard = "대시보드",
+		configCenterDropdownFallbackDesc = "사용 가능한 옵션 중 하나를 선택합니다.",
+		configCenterInputFallbackDesc = "이 설정에서 사용할 값을 입력합니다.",
+		configCenterLegacyBlizzard = "기존 Blizzard 설정",
+		configCenterMultiDropdownFallbackDesc = "하나 이상의 옵션을 선택합니다.",
+		configCenterNoResults = "설정을 찾을 수 없습니다.",
+		configCenterOpen = "설정 열기",
+		configCenterOpenDesc = "최신 설정 센터를 엽니다.",
+		configCenterSearchPlaceholder = "설정 검색",
+		configCenterSetting = "설정",
+		configCenterSettings = "설정",
+		configCenterSliderFallbackDesc = "이 값을 조정합니다.",
+		configCenterTitle = "설정",
+	},
+	ptBR = {
+		configCenterAbout = "Sobre",
+		configCenterAdvancedSettingDesc = "Configure esta configuração avançada.",
+		configCenterButtonFallbackDesc = "Executa esta ação.",
+		configCenterChange = "Alterar",
+		configCenterCheckboxDropdownFallbackDesc = "Ative esta configuração e escolha a opção relacionada.",
+		configCenterColorFallbackDesc = "Escolha uma cor para esta configuração.",
+		configCenterConfigure = "Configurar",
+		configCenterConfirmDefaultsDesc = "Isso restaurará todas as configurações de %s para os valores padrão.",
+		configCenterConfirmDefaultsTitle = "Restaurar esta página para os valores padrão?",
+		configCenterControlDropdown = "Menu suspenso",
+		configCenterControlSlider = "Controle deslizante",
+		configCenterCurrent = "Atual",
+		configCenterDashboard = "Painel",
+		configCenterDropdownFallbackDesc = "Escolha uma das opções disponíveis.",
+		configCenterInputFallbackDesc = "Digite o valor usado por esta configuração.",
+		configCenterLegacyBlizzard = "Configurações clássicas da Blizzard",
+		configCenterMultiDropdownFallbackDesc = "Escolha uma ou mais opções.",
+		configCenterNoResults = "Nenhuma configuração encontrada.",
+		configCenterOpen = "Abrir configurações",
+		configCenterOpenDesc = "Abre a central moderna de configurações.",
+		configCenterSearchPlaceholder = "Buscar configurações",
+		configCenterSetting = "configuração",
+		configCenterSettings = "configurações",
+		configCenterSliderFallbackDesc = "Ajuste este valor.",
+		configCenterTitle = "Configurações",
+	},
+	ruRU = {
+		configCenterAbout = "Описание",
+		configCenterAdvancedSettingDesc = "Настройте этот расширенный параметр.",
+		configCenterButtonFallbackDesc = "Выполнить это действие.",
+		configCenterChange = "Изменить",
+		configCenterCheckboxDropdownFallbackDesc = "Включите этот параметр и выберите связанную опцию.",
+		configCenterColorFallbackDesc = "Выберите цвет для этого параметра.",
+		configCenterConfigure = "Настроить",
+		configCenterConfirmDefaultsDesc = "Все настройки на странице %s будут восстановлены по умолчанию.",
+		configCenterConfirmDefaultsTitle = "Сбросить эту страницу к значениям по умолчанию?",
+		configCenterControlDropdown = "Выпадающий список",
+		configCenterControlSlider = "Ползунок",
+		configCenterCurrent = "Текущее",
+		configCenterDashboard = "Панель",
+		configCenterDropdownFallbackDesc = "Выберите один из доступных вариантов.",
+		configCenterInputFallbackDesc = "Введите значение для этого параметра.",
+		configCenterLegacyBlizzard = "Старые настройки Blizzard",
+		configCenterMultiDropdownFallbackDesc = "Выберите один или несколько вариантов.",
+		configCenterNoResults = "Настройки не найдены.",
+		configCenterOpen = "Открыть настройки",
+		configCenterOpenDesc = "Открывает современный центр настроек.",
+		configCenterSearchPlaceholder = "Поиск настроек",
+		configCenterSetting = "настройка",
+		configCenterSettings = "настройки",
+		configCenterSliderFallbackDesc = "Измените это значение.",
+		configCenterTitle = "Настройки",
+	},
+	zhCN = {
+		configCenterAbout = "关于",
+		configCenterAdvancedSettingDesc = "配置此高级设置。",
+		configCenterButtonFallbackDesc = "执行此操作。",
+		configCenterChange = "更改",
+		configCenterCheckboxDropdownFallbackDesc = "启用此设置并选择相关选项。",
+		configCenterColorFallbackDesc = "为此设置选择颜色。",
+		configCenterConfigure = "配置",
+		configCenterConfirmDefaultsDesc = "这会将 %s 上的所有设置恢复为默认值。",
+		configCenterConfirmDefaultsTitle = "将此页面重置为默认值？",
+		configCenterControlDropdown = "下拉菜单",
+		configCenterControlSlider = "滑块",
+		configCenterCurrent = "当前",
+		configCenterDashboard = "仪表盘",
+		configCenterDropdownFallbackDesc = "选择一个可用选项。",
+		configCenterInputFallbackDesc = "输入此设置使用的值。",
+		configCenterLegacyBlizzard = "旧版 Blizzard 设置",
+		configCenterMultiDropdownFallbackDesc = "选择一个或多个选项。",
+		configCenterNoResults = "未找到设置。",
+		configCenterOpen = "打开设置",
+		configCenterOpenDesc = "打开现代设置中心。",
+		configCenterSearchPlaceholder = "搜索设置",
+		configCenterSetting = "设置",
+		configCenterSettings = "设置",
+		configCenterSliderFallbackDesc = "调整此值。",
+		configCenterTitle = "设置",
+	},
+	zhTW = {
+		configCenterAbout = "關於",
+		configCenterAdvancedSettingDesc = "設定此進階選項。",
+		configCenterButtonFallbackDesc = "執行此動作。",
+		configCenterChange = "變更",
+		configCenterCheckboxDropdownFallbackDesc = "啟用此設定並選擇相關選項。",
+		configCenterColorFallbackDesc = "為此設定選擇顏色。",
+		configCenterConfigure = "設定",
+		configCenterConfirmDefaultsDesc = "這會將 %s 上的所有設定還原為預設值。",
+		configCenterConfirmDefaultsTitle = "將此頁面重設為預設值？",
+		configCenterControlDropdown = "下拉選單",
+		configCenterControlSlider = "滑桿",
+		configCenterCurrent = "目前",
+		configCenterDashboard = "儀表板",
+		configCenterDropdownFallbackDesc = "選擇一個可用選項。",
+		configCenterInputFallbackDesc = "輸入此設定使用的值。",
+		configCenterLegacyBlizzard = "舊版 Blizzard 設定",
+		configCenterMultiDropdownFallbackDesc = "選擇一個或多個選項。",
+		configCenterNoResults = "找不到設定。",
+		configCenterOpen = "開啟設定",
+		configCenterOpenDesc = "開啟現代設定中心。",
+		configCenterSearchPlaceholder = "搜尋設定",
+		configCenterSetting = "設定",
+		configCenterSettings = "設定",
+		configCenterSliderFallbackDesc = "調整此值。",
+		configCenterTitle = "設定",
+	},
+}
 
 local PANEL_BORDER = { 0.58, 0.50, 0.34, 0.55 }
 local TOPBAR_BG = { 0.052, 0.058, 0.063, 0.96 }
@@ -452,7 +751,7 @@ local function getAssetRoot(app)
 	if type(root) ~= "string" or root == "" then
 		local addonFolder = opts and (opts.addonFolder or opts.folder) or nil
 		root = "Interface\\AddOns\\"
-			.. tostring(addonFolder or (app and app.id) or "EnhanceQoL")
+			.. tostring(addonFolder or (app and app.id) or "LibSettingsDesigner")
 			.. "\\libs\\LibSettingsDesigner\\Assets\\"
 	end
 	local last = root:sub(-1)
@@ -911,8 +1210,28 @@ local function createSidebarFrame(state, height)
 	return frame
 end
 
+local function getLibLocale()
+	local locale = _G.GetLocale and _G.GetLocale() or "enUS"
+	return lib.LOCALES[locale] or lib.LOCALES.enUS
+end
+
 local function getLocale(app)
-	return app and app.opts and app.opts.locale or {}
+	local appLocale = app and app.opts and app.opts.locale or nil
+	local libLocale = getLibLocale()
+	if type(appLocale) ~= "table" then
+		return libLocale
+	end
+	return setmetatable({}, {
+		__index = function(_, key)
+			if libLocale[key] ~= nil then
+				return libLocale[key]
+			end
+			if appLocale[key] ~= nil then
+				return appLocale[key]
+			end
+			return lib.LOCALES.enUS[key]
+		end,
+	})
 end
 
 local function getSettingCountText(app, count)
@@ -2094,7 +2413,25 @@ local function addDashboardCard(row, index, title, description, iconSource, onCl
 	return card
 end
 
-local function addDashboardHero(state, title, subtitle)
+function lib.GetDashboardOptions(app)
+	local dashboard = app and app.opts and app.opts.dashboard
+	local defined = dashboard ~= nil
+	if type(dashboard) == "function" then
+		local ok, result = pcall(dashboard, app)
+		if ok then
+			dashboard = result
+		else
+			dashboard = nil
+		end
+	end
+	if type(dashboard) ~= "table" then
+		dashboard = {}
+	end
+	dashboard._defined = defined
+	return dashboard
+end
+
+local function addDashboardHero(state, title, subtitle, iconSource)
 	local hero = createContentFrame(state, 138)
 
 	local titleText = createText(hero, FONT_HERO, title or "", TEXT.main)
@@ -2107,7 +2444,7 @@ local function addDashboardHero(state, title, subtitle)
 	subText:SetPoint("RIGHT", hero, "RIGHT", -166, 0)
 	subText:SetHeight(48)
 
-	local icon = createDashboardIcon(hero, getAppIconTexture(state.app, "dashboard"))
+	local icon = createDashboardIcon(hero, iconSource or getAppIconTexture(state.app, "dashboard"))
 	icon:SetSize(92, 92)
 	icon:SetPoint("RIGHT", hero, "RIGHT", -36, -4)
 	icon:SetAlpha(0.90)
@@ -2177,50 +2514,21 @@ local function addDashboardStatusTile(parent, index, iconSource, iconAtlas, titl
 	return tile
 end
 
-local function addDashboardStatusPanel(state, stats)
+local function addDashboardStatusPanel(state, stats, statusConfig)
 	local app = state.app
-	local L = getLocale(app)
-	local tiles = {
-		{
-			icon = ASSET.statusEnabled,
-			title = L["configCenterCustomized"] or "Customized",
-			value = tostring(stats.customized or 0) .. " / " .. tostring(stats.customizable or stats.controls or 0),
-		},
-	}
-
-	local profileCount = getOptionalNumber(app, "profileCount")
-	if profileCount then
-		tiles[#tiles + 1] = {
-			icon = ASSET.statusProfile,
-			title = L["Profiles"] or "Profiles",
-			value = tostring(profileCount),
-		}
+	statusConfig = type(statusConfig) == "table" and statusConfig or {}
+	local tiles = statusConfig.tiles
+	if type(tiles) == "function" then
+		local ok, result = pcall(tiles, app, stats)
+		tiles = ok and result or nil
 	end
-
-	local version = app.opts and app.opts.version
-	version = type(version) == "function" and version() or version
-	if version then
-		local versionValue, versionBadge = splitVersionBadge(version)
-		tiles[#tiles + 1] = {
-			atlas = ASSET.statusVersionAtlas,
-			title = L["configCenterVersion"] or "Version",
-			value = versionValue,
-			badge = versionBadge,
-		}
-	end
-
-	local newCount = getOptionalNumber(app, "newCount")
-	if newCount and newCount > 0 then
-		tiles[#tiles + 1] = {
-			atlas = ASSET.statusNewAtlas,
-			title = L["configCenterNewInVersion"] or "New in this Version",
-			value = tostring(newCount),
-		}
+	if type(tiles) ~= "table" or #tiles == 0 then
+		return nil
 	end
 
 	local panel = createContentFrame(state, 130)
 	applyBackdrop(panel, DETAIL_SECTION_BG, DASHBOARD_CARD_BORDER)
-	local title = createText(panel, FONT_TITLE, L["configCenterAddOnStatus"] or (_G.STATUS or "Status"), TEXT.gold)
+	local title = createText(panel, FONT_TITLE, statusConfig.title or (_G.STATUS or "Status"), TEXT.gold)
 	title:SetPoint("TOPLEFT", panel, "TOPLEFT", 14, -13)
 	title:SetPoint("RIGHT", panel, "RIGHT", -14, 0)
 	title:SetHeight(24)
@@ -2588,11 +2896,12 @@ end
 
 local function addColorWidget(row, app, control, opts)
 	opts = opts or {}
+	local L = getLocale(app)
 	if type(control.getColor) ~= "function" or type(control.setColor) ~= "function" or not ColorPickerFrame then
 		addConfigureFallback(row, app, control, nil, opts.configure)
 		return
 	end
-	local currentLabel = createText(row, FONT_MUTED, opts.currentText or (_G.CURRENT or "Current") .. ":", TEXT.subtle)
+	local currentLabel = createText(row, FONT_MUTED, opts.currentText or (L["configCenterCurrent"] or "Current") .. ":", TEXT.subtle)
 	if opts.point then
 		currentLabel:SetPoint(opts.point[1], opts.point[2], opts.point[3], opts.point[4], opts.point[5])
 	else
@@ -2612,7 +2921,7 @@ local function addColorWidget(row, app, control, opts)
 	row.hexText:SetPoint("LEFT", swatch, "RIGHT", 10, 1)
 	row.hexText:SetSize(80, 20)
 
-	local button = makeFlatButton(row, _G.CHANGE or "Change", 92, 26)
+	local button = makeFlatButton(row, L["configCenterChange"] or "Change", 92, 26)
 	button:SetPoint("LEFT", row.hexText, "RIGHT", 10, 0)
 	row.colorButton = button
 	local function openPicker()
@@ -3176,7 +3485,7 @@ local function collectNewEntries(app, limit)
 	return result
 end
 
-local function addDashboardNewPanel(state, parent, entries, width)
+local function addDashboardNewPanel(state, parent, entries, width, titleText)
 	local app = state.app
 	local L = getLocale(app)
 	local panel = CreateFrame("Frame", nil, parent, "BackdropTemplate")
@@ -3184,7 +3493,7 @@ local function addDashboardNewPanel(state, parent, entries, width)
 	panel:SetSize(width, 250)
 	applyBackdrop(panel, CARD_BG, CARD_BORDER)
 
-	local title = createText(panel, FONT_HEADER, L["configCenterNewInVersion"] or "New in this Version", TEXT.gold)
+	local title = createText(panel, FONT_HEADER, titleText or L["configCenterSettings"] or "Settings", TEXT.gold)
 	title:SetPoint("TOPLEFT", panel, "TOPLEFT", 14, -12)
 	title:SetPoint("RIGHT", panel, "RIGHT", -14, 0)
 	title:SetHeight(20)
@@ -3216,71 +3525,84 @@ local function addDashboardNewPanel(state, parent, entries, width)
 	return panel
 end
 
+function lib.AddDashboardCards(state, cards)
+	if type(cards) ~= "table" or #cards == 0 then
+		return
+	end
+	for index = 1, #cards, 2 do
+		local row = createGridRow(state, 108)
+		for column = 1, 2 do
+			local card = cards[index + column - 1]
+			if card then
+				addDashboardCard(
+					row,
+					column,
+					card.title,
+					card.description or card.desc,
+					card.icon or getAppIconTexture(state.app, card.iconKey or "advanced"),
+					card.onClick
+				)
+			end
+		end
+	end
+end
+
 local addContentScrollbarRail
 
 local function renderDashboard(state)
 	local app = state.app
 	local L = getLocale(app)
 	local stats = app:GetStats()
+	local dashboard = lib.GetDashboardOptions(app)
+	local hero = type(dashboard.hero) == "table" and dashboard.hero or {}
 	addContentScrollbarRail(state)
 	addDashboardHero(
 		state,
-		L["configCenterTitle"] or (getAppTitle(app) .. " Settings"),
-		L["configCenterIntro"] or DEFAULT_DASHBOARD_INTRO
+		hero.title or L["configCenterTitle"] or (getAppTitle(app) .. " Settings"),
+		hero.subtitle or hero.description or lib.DEFAULT_DASHBOARD_INTRO,
+		hero.icon or (hero.iconKey and getAppIconTexture(app, hero.iconKey))
 	)
 
-	local quickRow = createGridRow(state, 108)
-	addDashboardCard(
-		quickRow,
-		1,
-		L["configCenterQuickReference"] or (_G.HELP_LABEL or _G.HELP or "Help"),
-		L["configCenterQuickReferenceDesc"] or "Useful links, slash commands and information.",
-		getAppIconTexture(app, "help")
-	)
-	addDashboardCard(
-		quickRow,
-		2,
-		L["configCenterSupportFeedback"] or "Support & Feedback",
-		L["configCenterSupportFeedbackDesc"] or "Report bugs, request features or get help.",
-		getAppIconTexture(app, "support"),
-		function()
-			openLegacySettings(app)
-		end
-	)
+	lib.AddDashboardCards(state, dashboard.cards)
 
-	local quickRow2 = createGridRow(state, 108)
-	addDashboardCard(
-		quickRow2,
-		1,
-		L["configCenterImportExport"] or "Import / Export",
-		L["configCenterImportExportDesc"] or "Import or export your settings and profiles.",
-		getAppIconTexture(app, "importexport")
-	)
-	addDashboardCard(
-		quickRow2,
-		2,
-		L["configCenterResetDefaults"] or "Reset & Defaults",
-		L["configCenterResetDefaultsDesc"] or "Reset settings or restore default values.",
-		getAppIconTexture(app, "reset")
-	)
+	if dashboard.status == true or type(dashboard.status) == "table" then
+		addDashboardStatusPanel(state, stats, dashboard.status == true and {} or dashboard.status)
+	end
 
-	addDashboardStatusPanel(state, stats)
+	if not dashboard._defined or (dashboard.features == nil and dashboard.newEntries == nil) then
+		return
+	end
 
-	local enabledPages = collectEnabledFeaturePages(app, 5)
-	local customizedPages = #enabledPages == 0 and collectCustomizedPages(app, 5) or {}
+	local featureConfig = type(dashboard.features) == "table" and dashboard.features or {}
+	local enabledPages = {}
+	local customizedPages = {}
+	if dashboard.features ~= nil and dashboard.features ~= false then
+		enabledPages = collectEnabledFeaturePages(app, featureConfig.limit or 5)
+		customizedPages = #enabledPages == 0 and collectCustomizedPages(app, 5) or {}
+	end
 	local featurePages = #enabledPages > 0 and enabledPages or customizedPages
-	local featureBadgeText = #enabledPages > 0 and (_G.ENABLED or "Enabled")
-		or (L["configCenterCustomized"] or "Customized")
-	local featureTitleText = #enabledPages > 0 and (L["configCenterEnabledFeatures"] or "Enabled features")
-		or (L["configCenterCustomizedFeatures"] or "Customized Features")
-	local newEntries = collectNewEntries(app, 3)
+	local featureBadgeText = #enabledPages > 0 and (featureConfig.enabledBadge or _G.ENABLED or "")
+		or (featureConfig.customizedBadge or "")
+	local featureTitleText = #enabledPages > 0 and (featureConfig.enabledTitle or L["configCenterSettings"] or "Settings")
+		or (featureConfig.customizedTitle or L["configCenterSettings"] or "Settings")
+	local newConfig = type(dashboard.newEntries) == "table" and dashboard.newEntries or {}
+	local newEntries = (dashboard.newEntries == nil or dashboard.newEntries == false) and {}
+		or collectNewEntries(app, newConfig.limit or 3)
+	local hasFeaturePanel = dashboard.features ~= nil and dashboard.features ~= false
+	local hasNewPanel = #newEntries > 0
+	if not hasFeaturePanel and not hasNewPanel then
+		return
+	end
 	local panelRow = createContentFrame(state, 250)
 	local panelWidth = state.contentWidth or CONTENT_WIDTH
-	local hasNewPanel = #newEntries > 0
-	local newPanelWidth = hasNewPanel and math.floor((panelWidth - GRID_GAP) * 0.48) or 0
+	local newPanelWidth = hasNewPanel and hasFeaturePanel and math.floor((panelWidth - GRID_GAP) * 0.48)
+		or panelWidth
 	local enabledWidth = hasNewPanel and (panelWidth - newPanelWidth - GRID_GAP) or panelWidth
 	if hasNewPanel then
-		addDashboardNewPanel(state, panelRow, newEntries, newPanelWidth)
+		addDashboardNewPanel(state, panelRow, newEntries, newPanelWidth, newConfig.title)
+	end
+	if not hasFeaturePanel then
+		return
 	end
 	local enabledPanel = CreateFrame("Frame", nil, panelRow, "BackdropTemplate")
 	if hasNewPanel then
@@ -3722,7 +4044,7 @@ function StateMixin:RenderSidebar()
 	dashboard.Text:SetPoint("LEFT", dashboard.Icon, "RIGHT", 10, 0)
 	dashboard.Text:SetPoint("RIGHT", dashboard, "RIGHT", -12, 0)
 	dashboard.Text:SetJustifyH("LEFT")
-	dashboard.Text:SetText(L["configCenterDashboard"] or "Dashboard")
+	dashboard.Text:SetText((self.app.opts and self.app.opts.dashboardTitle) or L["configCenterDashboard"] or "Dashboard")
 	dashboard.view = "dashboard"
 	dashboard:SetScript("OnEnter", function(row)
 		if not row.selected then
@@ -3932,7 +4254,7 @@ local function createFrame(app)
 	frame.Title:SetPoint("LEFT", frame.HeaderIcon, "RIGHT", 10, 0)
 	frame.Title:SetPoint("RIGHT", frame.TopBar, "RIGHT", -470, 0)
 	frame.Title:SetJustifyH("LEFT")
-	frame.Title:SetText(L["configCenterTitle"] or (getAppTitle(app) .. " Settings"))
+	frame.Title:SetText(app.opts and app.opts.settingsTitle or L["configCenterTitle"] or (getAppTitle(app) .. " Settings"))
 	frame.Title:SetShadowColor(0, 0, 0, 0.95)
 	frame.Title:SetShadowOffset(1, -1)
 	setTextColor(frame.Title, TEXT.topbarGold)

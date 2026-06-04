@@ -69,6 +69,7 @@ local function ensureConfigApp()
 	local app = ConfigLib:RegisterAddOn(addonName, {
 		title = "Enhance QoL",
 		settingsTitle = L["configCenterTitle"] or "EnhanceQoL Settings",
+		dashboardTitle = L["configCenterDashboard"] or "Dashboard",
 		icon = "Interface\\AddOns\\EnhanceQoL\\Icons\\Icon.tga",
 		addonFolder = addonName,
 		assetRoot = "Interface\\AddOns\\EnhanceQoL\\libs\\LibSettingsDesigner\\Assets\\",
@@ -193,7 +194,6 @@ local function ensureConfigApp()
 						iconKey = "reset",
 					},
 				},
-				status = true,
 				status = {
 					title = L["configCenterAddOnStatus"] or (_G.STATUS or "Status"),
 					tiles = function(_, stats)
