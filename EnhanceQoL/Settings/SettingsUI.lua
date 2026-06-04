@@ -104,6 +104,59 @@ local pageIconKeysByStableID = {
 	VisibilityFrames = "visibility",
 }
 
+local pageDescriptionKeysByStableID = {
+	ActionBarsAndButtons = "configCenterPageCardDescActionBars",
+	ActionTracker = "configCenterPageCardDescActionTracker",
+	AutoSellRules = "configCenterPageCardDescAutoSell",
+	BagsInventory = "configCenterPageCardDescBagsInventory",
+	Bank = "configCenterPageCardDescBank",
+	BarsAndResources = "configCenterPageCardDescBarsResources",
+	CastbarsAndCooldowns = "configCenterPageCardDescCastbarsCooldowns",
+	ChatBubbles = "configCenterPageCardDescChatBubbles",
+	ChatHistory = "configCenterPageCardDescChatHistory",
+	ChatWindow = "configCenterPageCardDescChatWindow",
+	ClassBuffReminder = "configCenterPageCardDescClassBuffReminder",
+	CombatLogging = "configCenterPageCardDescCombatLogging",
+	ContainerActions = "configCenterPageCardDescContainerActions",
+	CooldownPanels = "configCenterPageCardDescCooldownPanels",
+	CustomUnitFrames = "configCenterPageCardDescUnitFrames",
+	DataPanel = "configCenterPageCardDescDataPanels",
+	DeathResurrect = "configCenterPageCardDescDeath",
+	DialogsConfirmations = "configCenterPageCardDescDialogsConfirmations",
+	DungeonsMythicPlus = "configCenterPageCardDescDungeons",
+	EconomyCraftingOrders = "configCenterPageCardDescCraftingOrders",
+	FriendsCommunities = "configCenterPageCardDescFriendsCommunities",
+	GearUpgrades = "configCenterPageCardDescGearUpgrades",
+	GoldTracking = "configCenterPageCardDescTrackingMoney",
+	GroupFinder = "configCenterPageCardDescGroupFinder",
+	GroupToolsCombatAlerts = "configCenterPageCardDescCombatAlerts",
+	GroupToolsFocusMarker = "configCenterPageCardDescFocusMarker",
+	Loot = "configCenterPageCardDescLoot",
+	MacrosConsumables = "configCenterPageCardDescMacrosConsumables",
+	Mailbox = "configCenterPageCardDescMailbox",
+	MapNavigation = "configCenterPageCardDescMapNavigation",
+	MouseAccessibility = "configCenterPageCardDescMovementInput",
+	MovementInput = "configCenterPageCardDescMovementInput",
+	Mover = "configCenterPageCardDescMover",
+	Nameplates = "configCenterPageCardDescNameplates",
+	PopupsAndUITweaks = "configCenterPageCardDescPopupsUITweaks",
+	PrivacyBlockingIgnore = "configCenterPageCardDescPrivacyBlockingIgnore",
+	ProfilesAddOn = "configCenterPageCardDescAddOn",
+	ProfilesBagsCategories = "configCenterPageCardDescBagsCategories",
+	ProfilesDamageMeter = "configCenterPageCardDescProfilesDamageMeter",
+	ProfilesHBP = "configCenterPageCardDescProfilesHealerBuffPlacement",
+	Questing = "configCenterPageCardDescQuesting",
+	Skinner = "configCenterPageCardDescSkinner",
+	SystemAndDebug = "configCenterPageCardDescSystemDebug",
+	Teleports = "configCenterPageCardDescDungeons",
+	Tooltip = "configCenterPageCardDescTooltip",
+	UFProfiles = "configCenterPageCardDescSettings",
+	ufStandalonePrivateAurasExpandable = "configCenterPageCardDescStandalonePrivateAuras",
+	UnitFrames = "configCenterPageCardDescUnitFrames",
+	VendorQuickActions = "configCenterPageCardDescVendor",
+	VisibilityFrames = "configCenterPageCardDescVisibilityFrames",
+}
+
 local function splitVersionBadge(version)
 	version = tostring(version or "")
 	local base, suffix = version:match("^(.-)%-beta([%w%.%-]*)$")
@@ -127,6 +180,7 @@ local function ensureConfigApp()
 		settingsTitle = L["configCenterTitle"] or "EnhanceQoL Settings",
 		dashboardTitle = L["configCenterDashboard"] or "Dashboard",
 		icon = "Interface\\AddOns\\EnhanceQoL\\Icons\\Icon.tga",
+		pageDescriptionKeys = pageDescriptionKeysByStableID,
 		addonFolder = addonName,
 		assetRoot = "Interface\\AddOns\\EnhanceQoL\\libs\\LibSettingsDesigner\\Assets\\",
 		categoryIconTextures = {
@@ -285,10 +339,7 @@ local function ensureConfigApp()
 								badge = versionBadge,
 							}
 						end
-						local newCount = 0
-						for _, value in pairs(addon.variables and addon.variables.NewVersionTableEQOL or {}) do
-							if value then newCount = newCount + 1 end
-						end
+						local newCount = tonumber(stats and stats.newControls) or 0
 						if newCount > 0 then
 							tiles[#tiles + 1] = {
 								atlas = "collections-icon-favorites",
@@ -317,11 +368,9 @@ local function ensureConfigApp()
 			return C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(addonName, "Version")
 		end,
 		newCount = function()
-			local count = 0
-			for _, value in pairs(addon.variables and addon.variables.NewVersionTableEQOL or {}) do
-				if value then count = count + 1 end
-			end
-			return count
+			local appInstance = addon.ConfigApp
+			local stats = appInstance and appInstance.GetStats and appInstance:GetStats()
+			return stats and stats.newControls or 0
 		end,
 		isNewTag = function(tagID)
 			local newTags = addon.variables and addon.variables.NewVersionTableEQOL

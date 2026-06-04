@@ -725,6 +725,7 @@ function AppMixin:GetStats()
 	local customized = 0
 	local booleanTrue = 0
 	local controlsWithDefaults = 0
+	local newControls = 0
 	for _, control in ipairs(self.controls) do
 		local default, hasDefault = resolveControlDefault(control)
 		if hasDefault then
@@ -738,11 +739,15 @@ function AppMixin:GetStats()
 				booleanTrue = booleanTrue + 1
 			end
 		end
+		if self:IsControlNew(control) then
+			newControls = newControls + 1
+		end
 	end
 	return {
 		categories = #self.categories,
 		pages = #self.pages,
 		controls = #self.controls,
+		newControls = newControls,
 		customized = customized,
 		customizable = controlsWithDefaults,
 		booleanTrue = booleanTrue,

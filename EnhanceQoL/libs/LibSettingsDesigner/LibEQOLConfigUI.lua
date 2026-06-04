@@ -87,6 +87,7 @@ lib.LOCALES = {
 		configCenterLegacyBlizzard = "Legacy Blizzard Settings",
 		configCenterMultiDropdownFallbackDesc = "Choose one or more options.",
 		configCenterNoResults = "No settings found.",
+		configCenterOpenButton = "Open",
 		configCenterOpen = "Open Settings",
 		configCenterOpenDesc = "Opens the modern settings center.",
 		configCenterSearchPlaceholder = "Search settings",
@@ -114,6 +115,7 @@ lib.LOCALES = {
 		configCenterLegacyBlizzard = "Alte Blizzard-Einstellungen",
 		configCenterMultiDropdownFallbackDesc = "Wähle eine oder mehrere Optionen.",
 		configCenterNoResults = "Keine Einstellungen gefunden.",
+		configCenterOpenButton = "Öffnen",
 		configCenterOpen = "Einstellungen öffnen",
 		configCenterOpenDesc = "Öffnet das moderne Einstellungscenter.",
 		configCenterSearchPlaceholder = "Einstellungen suchen",
@@ -141,6 +143,7 @@ lib.LOCALES = {
 		configCenterLegacyBlizzard = "Ajustes clásicos de Blizzard",
 		configCenterMultiDropdownFallbackDesc = "Elige una o más opciones.",
 		configCenterNoResults = "No se encontraron ajustes.",
+		configCenterOpenButton = "Abrir",
 		configCenterOpen = "Abrir ajustes",
 		configCenterOpenDesc = "Abre el centro de ajustes moderno.",
 		configCenterSearchPlaceholder = "Buscar ajustes",
@@ -168,6 +171,7 @@ lib.LOCALES = {
 		configCenterLegacyBlizzard = "Ajustes clásicos de Blizzard",
 		configCenterMultiDropdownFallbackDesc = "Elige una o más opciones.",
 		configCenterNoResults = "No se encontraron ajustes.",
+		configCenterOpenButton = "Abrir",
 		configCenterOpen = "Abrir ajustes",
 		configCenterOpenDesc = "Abre el centro de ajustes moderno.",
 		configCenterSearchPlaceholder = "Buscar ajustes",
@@ -195,6 +199,7 @@ lib.LOCALES = {
 		configCenterLegacyBlizzard = "Réglages Blizzard classiques",
 		configCenterMultiDropdownFallbackDesc = "Choisissez une ou plusieurs options.",
 		configCenterNoResults = "Aucun réglage trouvé.",
+		configCenterOpenButton = "Ouvrir",
 		configCenterOpen = "Ouvrir les réglages",
 		configCenterOpenDesc = "Ouvre le centre de réglages moderne.",
 		configCenterSearchPlaceholder = "Rechercher des réglages",
@@ -222,6 +227,7 @@ lib.LOCALES = {
 		configCenterLegacyBlizzard = "Impostazioni Blizzard classiche",
 		configCenterMultiDropdownFallbackDesc = "Scegli una o più opzioni.",
 		configCenterNoResults = "Nessuna impostazione trovata.",
+		configCenterOpenButton = "Apri",
 		configCenterOpen = "Apri impostazioni",
 		configCenterOpenDesc = "Apre il centro impostazioni moderno.",
 		configCenterSearchPlaceholder = "Cerca impostazioni",
@@ -249,6 +255,7 @@ lib.LOCALES = {
 		configCenterLegacyBlizzard = "기존 Blizzard 설정",
 		configCenterMultiDropdownFallbackDesc = "하나 이상의 옵션을 선택합니다.",
 		configCenterNoResults = "설정을 찾을 수 없습니다.",
+		configCenterOpenButton = "열기",
 		configCenterOpen = "설정 열기",
 		configCenterOpenDesc = "최신 설정 센터를 엽니다.",
 		configCenterSearchPlaceholder = "설정 검색",
@@ -276,6 +283,7 @@ lib.LOCALES = {
 		configCenterLegacyBlizzard = "Configurações clássicas da Blizzard",
 		configCenterMultiDropdownFallbackDesc = "Escolha uma ou mais opções.",
 		configCenterNoResults = "Nenhuma configuração encontrada.",
+		configCenterOpenButton = "Abrir",
 		configCenterOpen = "Abrir configurações",
 		configCenterOpenDesc = "Abre a central moderna de configurações.",
 		configCenterSearchPlaceholder = "Buscar configurações",
@@ -303,6 +311,7 @@ lib.LOCALES = {
 		configCenterLegacyBlizzard = "Старые настройки Blizzard",
 		configCenterMultiDropdownFallbackDesc = "Выберите один или несколько вариантов.",
 		configCenterNoResults = "Настройки не найдены.",
+		configCenterOpenButton = "Открыть",
 		configCenterOpen = "Открыть настройки",
 		configCenterOpenDesc = "Открывает современный центр настроек.",
 		configCenterSearchPlaceholder = "Поиск настроек",
@@ -330,6 +339,7 @@ lib.LOCALES = {
 		configCenterLegacyBlizzard = "旧版 Blizzard 设置",
 		configCenterMultiDropdownFallbackDesc = "选择一个或多个选项。",
 		configCenterNoResults = "未找到设置。",
+		configCenterOpenButton = "打开",
 		configCenterOpen = "打开设置",
 		configCenterOpenDesc = "打开现代设置中心。",
 		configCenterSearchPlaceholder = "搜索设置",
@@ -357,6 +367,7 @@ lib.LOCALES = {
 		configCenterLegacyBlizzard = "舊版 Blizzard 設定",
 		configCenterMultiDropdownFallbackDesc = "選擇一個或多個選項。",
 		configCenterNoResults = "找不到設定。",
+		configCenterOpenButton = "開啟",
 		configCenterOpen = "開啟設定",
 		configCenterOpenDesc = "開啟現代設定中心。",
 		configCenterSearchPlaceholder = "搜尋設定",
@@ -496,119 +507,6 @@ local CATEGORY_ICON_KEYS = {
 	profiles = "profiles",
 	social = "social",
 	sound = "sound",
-}
-
-local PAGE_DESCRIPTION_FALLBACKS = {
-	actionbars = "Configure action bar visibility, button growth, borders, keybind text, macro labels and cooldown text.",
-	actiontracker = "Show your recently used spells as a movable icon history.",
-	addon = "Manage the active AddOn profile and profile import protection.",
-	bars = "Adjust class resources, resource and status bars, XP, absorb and player resource displays.",
-	bank = "Configure bank and warband-bank convenience actions.",
-	bagscategories = "Manage saved bag category profiles and import or export bag layouts.",
-	bagsinventory = "Configure bags, item overlays, durability warnings and inventory helpers.",
-	castbars = "Configure cast bars, GCD and cooldown displays, combat text, focus interrupt alerts and timing helpers.",
-	chatbubbles = "Customize chat bubble text, font size and display behavior.",
-	chathistory = "Keep recent chat messages available across sessions.",
-	chatwindow = "Customize chat window behavior, links and small chat shortcuts.",
-	chat = "Improve chat history, whispers and message handling.",
-	classbuff = "Track missing class buffs and connect reminders with flask and buff food helpers.",
-	combatlogging = "Automatically control combat logging for raids and selected encounters.",
-	combat = "Configure death alerts, no-target indicators and other combat reminders.",
-	containeractions = "Automatically open safe containers and manage blocked items.",
-	cooldownpanels = "Create and manage custom cooldown panels, tracked abilities, layout and visibility.",
-	craftingorders = "Add convenience options for crafting order and profession workflows.",
-	data = "Configure compact data panels, tooltip hints and modifier-based context menus.",
-	death = "Customize death, resurrection and release helpers.",
-	dialogsconfirmations = "Control confirmation dialogs and optional auto-confirm behavior.",
-	dungeons = "Configure dungeon, Mythic+ and teleport helpers.",
-	focusmarker = "Place and maintain focus markers for group or combat workflows.",
-	friendscommunities = "Add convenience tools for friends, communities and social windows.",
-	gearupgrades = "Configure gear upgrade, catalyst, enchant and item-level helpers.",
-	groupfinder = "Improve group finder and group workflow helpers.",
-	includelists = "Manage items that should always or never be handled.",
-	loot = "Configure loot, item handling and inventory helpers.",
-	macrosconsumables = "Create quick macros and convenience actions for mounts and consumables.",
-	mailbox = "Add address book and mailbox convenience helpers.",
-	map = "Customize world map coordinates, square minimap layout, minimap stats and button storage.",
-	markers = "Configure raid marker helpers and group marker shortcuts.",
-	merchant = "Configure merchant, repair and vendor quality-of-life actions.",
-	minimap = "Customize world map coordinates, square minimap layout, minimap stats and button storage.",
-	movementinput = "Tune movement and input-related convenience options.",
-	mover = "Move and position supported UI elements.",
-	nameplates = "Adjust player names, nameplate text, markers, mob colors and dungeon-specific nameplate behavior.",
-	popups = "Tune login UI scaling, collection alerts, micro menu notifications and small Blizzard UI conveniences.",
-	privacyblockingignore = "Manage ignore, privacy and blocking convenience tools.",
-	profilesdamagemeter = "Import or export Damage Meter profile data.",
-	profileshealerbuffplacement = "Manage Healer Buff Placement profile data.",
-	questing = "Automate quest handling and cinematic convenience options.",
-	settings = "Review category-level options and compatibility settings.",
-	skinner = "Customize the appearance of supported Blizzard UI frames.",
-	standaloneprivateaura = "Configure the standalone private aura anchor and open its Edit Mode controls.",
-	systemdebug = "Configure diagnostics, debug helpers and system-level options.",
-	trackingmoney = "Track gold and character money movement.",
-	tooltips = "Customize tooltip content, IDs, icons and extra information.",
-	tooltip = "Customize tooltip content, IDs, icons and extra information.",
-	uiutilities = "Enable small interface utilities and slash-command helpers.",
-	unitframes = "Customize player, target, focus, party and group frames, including layout, bars, auras and text.",
-	vendor = "Add convenient vendor and merchant shortcuts.",
-	visibilityframes = "Control when supported Blizzard frames are shown, hidden or faded.",
-	autosell = "Automatically sell configured items and junk at vendors.",
-}
-
-local PAGE_CARD_DESCRIPTION_FALLBACKS = {
-	actionbars = "configCenterPageCardDescActionBars",
-	actiontracker = "configCenterPageCardDescActionTracker",
-	addon = "configCenterPageCardDescAddOn",
-	bars = "configCenterPageCardDescBarsResources",
-	bank = "configCenterPageCardDescBank",
-	bagscategories = "configCenterPageCardDescBagsCategories",
-	bagsinventory = "configCenterPageCardDescBagsInventory",
-	castbars = "configCenterPageCardDescCastbarsCooldowns",
-	chatbubbles = "configCenterPageCardDescChatBubbles",
-	chathistory = "configCenterPageCardDescChatHistory",
-	chatwindow = "configCenterPageCardDescChatWindow",
-	chat = "configCenterPageCardDescChat",
-	classbuff = "configCenterPageCardDescClassBuffReminder",
-	combatlogging = "configCenterPageCardDescCombatLogging",
-	combat = "configCenterPageCardDescCombatAlerts",
-	containeractions = "configCenterPageCardDescContainerActions",
-	cooldownpanels = "configCenterPageCardDescCooldownPanels",
-	craftingorders = "configCenterPageCardDescCraftingOrders",
-	data = "configCenterPageCardDescDataPanels",
-	dialogsconfirmations = "configCenterPageCardDescDialogsConfirmations",
-	death = "configCenterPageCardDescDeath",
-	dungeons = "configCenterPageCardDescDungeons",
-	focusmarker = "configCenterPageCardDescFocusMarker",
-	friendscommunities = "configCenterPageCardDescFriendsCommunities",
-	gearupgrades = "configCenterPageCardDescGearUpgrades",
-	groupfinder = "configCenterPageCardDescGroupFinder",
-	loot = "configCenterPageCardDescLoot",
-	macrosconsumables = "configCenterPageCardDescMacrosConsumables",
-	mailbox = "configCenterPageCardDescMailbox",
-	map = "configCenterPageCardDescMapNavigation",
-	markers = "configCenterPageCardDescMarkers",
-	merchant = "configCenterPageCardDescMerchant",
-	minimap = "configCenterPageCardDescMapNavigation",
-	movementinput = "configCenterPageCardDescMovementInput",
-	mover = "configCenterPageCardDescMover",
-	nameplates = "configCenterPageCardDescNameplates",
-	popups = "configCenterPageCardDescPopupsUITweaks",
-	privacyblockingignore = "configCenterPageCardDescPrivacyBlockingIgnore",
-	profilesdamagemeter = "configCenterPageCardDescProfilesDamageMeter",
-	profileshealerbuffplacement = "configCenterPageCardDescProfilesHealerBuffPlacement",
-	questing = "configCenterPageCardDescQuesting",
-	settings = "configCenterPageCardDescSettings",
-	skinner = "configCenterPageCardDescSkinner",
-	standaloneprivateaura = "configCenterPageCardDescStandalonePrivateAuras",
-	systemdebug = "configCenterPageCardDescSystemDebug",
-	tooltip = "configCenterPageCardDescTooltip",
-	tooltips = "configCenterPageCardDescTooltip",
-	trackingmoney = "configCenterPageCardDescTrackingMoney",
-	uiutilities = "configCenterPageCardDescUIUtilities",
-	unitframes = "configCenterPageCardDescUnitFrames",
-	visibilityframes = "configCenterPageCardDescVisibilityFrames",
-	vendor = "configCenterPageCardDescVendor",
-	autosell = "configCenterPageCardDescAutoSell",
 }
 
 local frames = lib.frames or {}
@@ -1139,28 +1037,54 @@ local function normalizePageLookupText(page)
 	return tostring((page and page.id or "") .. " " .. (page and page.title or "")):lower():gsub("[^%w]+", "")
 end
 
+local function normalizeLookupKey(value)
+	return tostring(value or ""):lower():gsub("[^%w]+", "")
+end
+
 function lib.GetBestPageFallback(lookup, fallbackTable)
 	local bestKey, bestValue
 	for keyword, value in pairs(fallbackTable or {}) do
-		if lookup:find(keyword, 1, true) and (not bestKey or #keyword > #bestKey) then
-			bestKey = keyword
+		local normalizedKey = normalizeLookupKey(keyword)
+		if normalizedKey ~= "" and lookup:find(normalizedKey, 1, true) and (not bestKey or #normalizedKey > #bestKey) then
+			bestKey = normalizedKey
 			bestValue = value
 		end
 	end
 	return bestValue
 end
 
+local function getPageDescriptionLocaleKey(app, page)
+	if page and page.descriptionKey and page.descriptionKey ~= "" then
+		return page.descriptionKey
+	end
+	local keys = app and app.opts and (app.opts.pageDescriptionKeys or app.opts.pageDescriptionLocaleKeys)
+	if type(keys) ~= "table" then
+		return nil
+	end
+	local candidates = {
+		page and page.pageKey,
+		page and page.newTagID,
+		page and page.key,
+		page and page.id,
+	}
+	for _, candidate in ipairs(candidates) do
+		if candidate and keys[candidate] then
+			return keys[candidate]
+		end
+		local normalized = normalizeLookupKey(candidate)
+		if normalized ~= "" and keys[normalized] then
+			return keys[normalized]
+		end
+	end
+	return lib.GetBestPageFallback(normalizePageLookupText(page), keys)
+end
+
 local function getPageDescription(app, page)
 	if page and page.description and page.description ~= "" then
 		return page.description
 	end
-	local lookup = normalizePageLookupText(page)
-	local description = lib.GetBestPageFallback(lookup, PAGE_DESCRIPTION_FALLBACKS)
-	if description then
-		return description
-	end
 	local L = getLocale(app)
-	local localeKey = lib.GetBestPageFallback(lookup, PAGE_CARD_DESCRIPTION_FALLBACKS)
+	local localeKey = getPageDescriptionLocaleKey(app, page)
 	if localeKey and L[localeKey] and L[localeKey] ~= "" then
 		return L[localeKey]
 	end
@@ -1366,8 +1290,7 @@ local function getPageCardDescription(app, page)
 	if page and page.description and page.description ~= "" then
 		return page.description
 	end
-	local lookup = normalizePageLookupText(page)
-	local localeKey = lib.GetBestPageFallback(lookup, PAGE_CARD_DESCRIPTION_FALLBACKS)
+	local localeKey = getPageDescriptionLocaleKey(app, page)
 	if localeKey then
 		return L[localeKey] or ""
 	end
@@ -3430,16 +3353,6 @@ end
 local function collectNewEntries(app, limit)
 	local result = {}
 	local seen = {}
-	for _, page in ipairs(app.pages or {}) do
-		if lib.IsPageNew(app, page) and not seen[page.id] then
-			result[#result + 1] = {
-				title = page.title or page.id,
-				pageID = page.id,
-			}
-			seen[page.id] = true
-			if limit and #result >= limit then return result end
-		end
-	end
 	for _, control in ipairs(app.controls or {}) do
 		if lib.IsControlNew(app, control) and not seen[control.id] then
 			result[#result + 1] = {
@@ -3465,7 +3378,7 @@ local function addDashboardNewPanel(state, parent, entries, width, titleText)
 	title:SetPoint("TOPLEFT", panel, "TOPLEFT", 14, -12)
 	title:SetPoint("RIGHT", panel, "RIGHT", -92, 0)
 	title:SetHeight(20)
-	local openNewButton = makeFlatButton(panel, _G.OPEN or "Open", 74, 24)
+	local openNewButton = makeFlatButton(panel, (getLocale(state.app)["configCenterOpenButton"] or "Open"), 74, 24)
 	openNewButton:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -12, -10)
 	openNewButton:SetScript("OnClick", function()
 		lib.SetSearchQuery(state, "tag:new")
@@ -3950,7 +3863,7 @@ local function renderSearch(state, query)
 			path:SetHeight(16)
 			path.Text:SetJustifyV("MIDDLE")
 
-			local openButton = makeFlatButton(card, _G.OPEN or "Open", 74, 24)
+			local openButton = makeFlatButton(card, (L["configCenterOpenButton"] or "Open"), 74, 24)
 			openButton:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -14, 8)
 			openButton:SetScript("OnClick", function()
 				state:SetPage(control.pageID)
@@ -3974,7 +3887,7 @@ local function renderSearch(state, query)
 			path:SetHeight(16)
 			path.Text:SetJustifyV("MIDDLE")
 
-			local openButton = makeFlatButton(card, _G.OPEN or "Open", 74, 24)
+			local openButton = makeFlatButton(card, (L["configCenterOpenButton"] or "Open"), 74, 24)
 			openButton:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -14, 6)
 			openButton:SetScript("OnClick", function()
 				state:SetPage(control.pageID, control.id)
