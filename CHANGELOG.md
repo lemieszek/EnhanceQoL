@@ -24,6 +24,8 @@
 ### 🐛 Fixed
 
 - Settings Center / Skinner: Fixed the Character Frame setting order so the main Character Frame toggle appears first and disables the dependent alpha and border options when turned off.
+- Settings Center: Fixed disabled dropdowns, buttons, and color controls keeping an active-looking border until hovered by refreshing optional row widgets reliably even when earlier widget slots are empty.
+- Cooldown Panels: Fixed Paste Entry Style copying tracked aura identity fields, which could leave a copied aura's label and icon on the target entry instead of only applying the visual style.
 
 ---
 
