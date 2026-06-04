@@ -8440,12 +8440,13 @@ end
 
 local function getAuraKindFlags(unit, aura, helpfulFilter, harmfulFilter, externalFilter, dispelFilter, wantBuff, wantDebuff, wantExternals, wantsDispel, wantsHealerBuffPlacement, contextKind)
 	if not (unit and aura and aura.auraInstanceID) then return nil end
-	if UF.GlobalAuraIgnore and UF.GlobalAuraIgnore.ShouldIgnoreAura and UF.GlobalAuraIgnore.ShouldIgnoreAura(contextKind, aura) then return nil end
+	local globallyIgnored = UF.GlobalAuraIgnore and UF.GlobalAuraIgnore.ShouldIgnoreAura and UF.GlobalAuraIgnore.ShouldIgnoreAura(contextKind, aura)
+	if globallyIgnored and not wantsHealerBuffPlacement then return nil end
 	local flags
 	local harmfulMatch, helpfulMatch
 
 	if wantBuff or wantsHealerBuffPlacement then
-		helpfulMatch = UFHelper.IsAuraFilteredIn(unit, aura, helpfulFilter)
+		helpfulMatch = not globallyIgnored and UFHelper.IsAuraFilteredIn(unit, aura, helpfulFilter)
 		if helpfulMatch then flags = setAuraFlag(flags, AURA_KIND_HELPFUL) end
 		if wantsHealerBuffPlacement and UFHelper.IsHelpfulAura(aura, true) and aura.spellId and UF.GroupFramesHealerBuffs and UF.GroupFramesHealerBuffs.GetFamilyFromSpell then
 			local healerTracked = UF.GroupFramesHealerBuffs.GetFamilyFromSpell(aura.spellId) ~= nil
@@ -8453,13 +8454,13 @@ local function getAuraKindFlags(unit, aura, helpfulFilter, harmfulFilter, extern
 		end
 	end
 
-	if (wantDebuff or wantsDispel) and not helpfulMatch then
+	if (wantDebuff or wantsDispel) and not globallyIgnored and not helpfulMatch then
 		harmfulMatch = UFHelper.IsAuraFilteredIn(unit, aura, harmfulFilter)
 		if wantDebuff and harmfulMatch then flags = setAuraFlag(flags, AURA_KIND_HARMFUL) end
 	end
 
-	if wantExternals and not harmfulMatch and UFHelper.IsAuraFilteredIn(unit, aura, externalFilter) then flags = setAuraFlag(flags, AURA_KIND_EXTERNAL) end
-	if wantsDispel and UFHelper.IsAuraFilteredIn(unit, aura, dispelFilter) then flags = setAuraFlag(flags, AURA_KIND_DISPEL) end
+	if wantExternals and not globallyIgnored and not harmfulMatch and UFHelper.IsAuraFilteredIn(unit, aura, externalFilter) then flags = setAuraFlag(flags, AURA_KIND_EXTERNAL) end
+	if wantsDispel and not globallyIgnored and UFHelper.IsAuraFilteredIn(unit, aura, dispelFilter) then flags = setAuraFlag(flags, AURA_KIND_DISPEL) end
 
 	return flags
 end
