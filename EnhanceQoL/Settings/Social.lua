@@ -15,6 +15,8 @@ addon.SettingsLayout.socialCategory = cSocial
 local privacyExpandable = addon.functions.SettingsCreateExpandableSection(cSocial, {
 	name = L["PrivacyBlockingIgnore"] or "Privacy, Blocking & Ignore",
 	newTagID = "SocialGeneral",
+	configPageKey = "PrivacyBlockingIgnore",
+	iconKey = "privacy",
 	expanded = false,
 	colorizeTitle = false,
 })
@@ -193,6 +195,8 @@ addon.functions.SettingsCreateCheckboxes(cSocial, privacyData)
 
 local friendsExpandable = addon.functions.SettingsCreateExpandableSection(cSocial, {
 	name = L["FriendsAndCommunities"] or "Friends & Communities",
+	configPageKey = "FriendsCommunities",
+	iconKey = "community",
 	expanded = false,
 	colorizeTitle = false,
 })

@@ -12637,7 +12637,7 @@ function GF:ToggleCustomSortEditor(kind)
 	if not editor then return end
 	if editor.Title and editor.Title.SetText then
 		local label = (kind == "party" and (PARTY or "Party")) or (RAID or "Raid")
-		editor.Title:SetText("Custom Sort Order (" .. label .. ")")
+			editor.Title:SetText((L["customSortEditorTitle"]):format(label))
 	end
 	local sameKind = editor._eqolKind == kind
 	editor._eqolKind = kind

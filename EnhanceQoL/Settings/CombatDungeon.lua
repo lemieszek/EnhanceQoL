@@ -2400,6 +2400,8 @@ function addon.functions.initDungeonFrame()
 		expandable = addon.functions.SettingsCreateExpandableSection(addon.SettingsLayout.characterInspectCategory, {
 			name = L["MacrosAndConsumables"] or "Macros & Consumables",
 			newTagID = "MacrosAndConsumables",
+			configPageKey = "MacrosConsumables",
+			iconKey = "macros",
 			expanded = false,
 			colorizeTitle = false,
 		})
@@ -2737,6 +2739,8 @@ local sectionGroupFinder = addon.SettingsLayout.gameplayGroupFinderSection
 if not sectionGroupFinder then
 	sectionGroupFinder = addon.functions.SettingsCreateExpandableSection(cChar, {
 		name = L["Group Finder"],
+		configPageKey = "GroupFinder",
+		iconKey = "groupfinder",
 		expanded = false,
 		colorizeTitle = false,
 	})
@@ -2887,6 +2891,7 @@ if not sectionDeathRes then
 	sectionDeathRes = addon.functions.SettingsCreateExpandableSection(cChar, {
 		name = L["DeathResurrect"],
 		newTagID = "DeathResurrect",
+		iconKey = "death",
 		expanded = false,
 		colorizeTitle = false,
 	})

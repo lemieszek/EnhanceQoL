@@ -455,6 +455,7 @@ function AppMixin:RegisterLegacySection(section, data)
 		description = data.description,
 		iconAtlas = data.iconAtlas,
 		icon = data.icon,
+		iconKey = data.iconKey,
 		mainToggleID = data.mainToggleID,
 		newTagID = data.newTagID,
 		order = data.order or 500,

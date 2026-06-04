@@ -52,6 +52,8 @@ local function buildDrinkMacroSettings()
 		convenienceSection = addon.functions.SettingsCreateExpandableSection(cDrink, {
 			name = L["MacrosAndConsumables"] or "Macros & Consumables",
 			newTagID = "MacrosAndConsumables",
+			configPageKey = "MacrosConsumables",
+			iconKey = "macros",
 			expanded = false,
 			colorizeTitle = false,
 		})

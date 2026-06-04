@@ -90,6 +90,7 @@ if combatCategory then
 		expanded = false,
 		colorizeTitle = false,
 		newTagID = "GroupToolsCombatAlerts",
+		iconKey = "combat",
 	})
 	addon.SettingsLayout.groupToolsCombatAlertsSection = combatSection
 
@@ -122,6 +123,7 @@ if gameplayCategory then
 		expanded = false,
 		colorizeTitle = false,
 		newTagID = "GroupToolsFocusMarker",
+		iconKey = "focus",
 	})
 	addon.SettingsLayout.groupToolsFocusMarkerSection = focusSection
 

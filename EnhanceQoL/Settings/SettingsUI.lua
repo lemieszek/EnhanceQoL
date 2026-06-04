@@ -19,6 +19,7 @@ addon.ConfigGroupTitleByPageID = addon.ConfigGroupTitleByPageID or {}
 addon.ConfigGroupOrderByPageID = addon.ConfigGroupOrderByPageID or {}
 addon.ConfigCurrentGroupBySection = addon.ConfigCurrentGroupBySection or {}
 addon.ConfigGroupTitleBySection = addon.ConfigGroupTitleBySection or {}
+addon.ConfigSectionByParentCheck = addon.ConfigSectionByParentCheck or {}
 addon.ConfigControlOrder = addon.ConfigControlOrder or 0
 addon.ConfigLastControlByPageID = addon.ConfigLastControlByPageID or {}
 addon.ConfigLastControlBySection = addon.ConfigLastControlBySection or {}
@@ -47,6 +48,54 @@ local function getLocaleKeyForText(text)
 	end
 	return nil
 end
+
+local pageIconKeysByStableID = {
+	ActionBarsAndButtons = "actionbar",
+	AutoSellRules = "autosell",
+	BagsInventory = "bags",
+	Bank = "bank",
+	BarsAndResources = "resource",
+	CastbarsAndCooldowns = "castbar",
+	ClassBuffReminder = "buff",
+	ContainerActions = "containeractions",
+	CooldownPanels = "cooldownpanels",
+	CustomUnitFrames = "unitframes",
+	DataPanel = "data",
+	DialogsConfirmations = "dialogsconfirmations",
+	DungeonsMythicPlus = "dungeons",
+	EconomyCraftingOrders = "crafting",
+	GearUpgrades = "gearupgrades",
+	GroupToolsCombatAlerts = "combat",
+	GroupToolsFocusMarker = "focus",
+	InstantMessenger = "instantmessenger",
+	Loot = "loot",
+	MacrosConsumables = "macros",
+	Mailbox = "mailbox",
+	MapNavigation = "map",
+	MouseAccessibility = "mouseaccessibility",
+	MovementInput = "movementinput",
+	Mover = "mover",
+	Nameplates = "nameplate",
+	PopupsAndUITweaks = "popups",
+	PrivacyBlockingIgnore = "privacy",
+	ProfilesAddOn = "addonprofile",
+	ProfilesBagsCategories = "bagscategories",
+	ProfilesDamageMeter = "damagemeterprofile",
+	ProfilesHBP = "healerbuffplacementprofile",
+	Questing = "questing",
+	SocialGeneral = "privacy",
+	SystemAndDebug = "systemdebug",
+	TalentReminder = "talentreminder",
+	Teleports = "teleports",
+	Tooltip = "tooltip",
+	UFProfiles = "settingspage",
+	ufStandalonePrivateAurasExpandable = "privateaura",
+	UnitFrames = "unitframes",
+	VendorDestroyQueue = "includelists",
+	VendorIncludeExclude = "includelists",
+	VendorQuickActions = "vendor",
+	VisibilityFrames = "visibility",
+}
 
 local function splitVersionBadge(version)
 	version = tostring(version or "")
@@ -106,6 +155,7 @@ local function ensureConfigApp()
 			cooldown = newSettingsAsset("CastbarsCooldowns.tga"),
 			cooldownpanels = newSettingsAsset("CastbarsCooldowns.tga"),
 			crafting = newSettingsAsset("CraftingOrders.tga"),
+			damagemeterprofile = newSettingsAsset("DamageMeterProfile.tga"),
 			dashboard = newSettingsAsset("Cogwheel.tga"),
 			data = newSettingsAsset("DataPanels.tga"),
 			death = newSettingsAsset("DeathResurrection.tga"),
@@ -119,6 +169,7 @@ local function ensureConfigApp()
 			general = newSettingsAsset("General.tga"),
 			goldtracking = newSettingsAsset("GoldTracking.tga"),
 			groupfinder = newSettingsAsset("GroupFinder.tga"),
+			healerbuffplacementprofile = newSettingsAsset("HealerBuffPlacementProfile.tga"),
 			help = newSettingsAsset("QuickReference.tga"),
 			importexport = newSettingsAsset("ExportImport.tga"),
 			includelists = newSettingsAsset("IncludeExcludeLists.tga"),
@@ -303,6 +354,10 @@ local function resolveLegacyPageID(app, cbData, category)
 	if not app then return nil end
 	if cbData and cbData.pageID then return cbData.pageID end
 	if cbData and cbData.parentSection and app.legacySections then return app.legacySections[cbData.parentSection] end
+	if cbData and cbData.parentSection and addon.ConfigSectionByParentCheck and app.legacySections then
+		local section = addon.ConfigSectionByParentCheck[cbData.parentSection]
+		if section then return app.legacySections[section] end
+	end
 	if category and app.legacyCategories then
 		local key
 		if type(category) == "table" and category.GetID then
@@ -318,6 +373,20 @@ local function resolveLegacyPageID(app, cbData, category)
 		if categoryID then return categoryID .. ".settings" end
 	end
 	return nil
+end
+
+function addon.functions.RegisterConfigParentSection(parentCheck, section)
+	if type(parentCheck) ~= "function" or not section then return parentCheck end
+	addon.ConfigSectionByParentCheck = addon.ConfigSectionByParentCheck or {}
+	addon.ConfigSectionByParentCheck[parentCheck] = section
+	return parentCheck
+end
+
+local function resolveConfigSection(sectionOrParentCheck)
+	if addon.ConfigSectionByParentCheck and addon.ConfigSectionByParentCheck[sectionOrParentCheck] then
+		return addon.ConfigSectionByParentCheck[sectionOrParentCheck]
+	end
+	return sectionOrParentCheck
 end
 
 local function getDefaultGroupID(app, pageID)
@@ -349,6 +418,13 @@ local function getLegacyControlGroup(app, category, cbData)
 	if cbData.parentSection and addon.ConfigCurrentGroupBySection[cbData.parentSection] then
 		local groupID = addon.ConfigCurrentGroupBySection[cbData.parentSection]
 		return groupID, addon.ConfigGroupTitleBySection[cbData.parentSection], pageID
+	end
+	if cbData.parentSection and addon.ConfigSectionByParentCheck then
+		local section = addon.ConfigSectionByParentCheck[cbData.parentSection]
+		if section and addon.ConfigCurrentGroupBySection[section] then
+			local groupID = addon.ConfigCurrentGroupBySection[section]
+			return groupID, addon.ConfigGroupTitleBySection[section], pageID
+		end
 	end
 	local groupID = addon.ConfigCurrentGroupByPageID[pageID]
 	if groupID then return groupID, addon.ConfigGroupTitleByPageID[pageID], pageID end
@@ -1000,7 +1076,8 @@ function addon.functions.SettingsCreateHeadline(cat, text, extra)
 	local header = SettingsLib:CreateHeader(cat, text, extra)
 	local app = ensureConfigApp()
 	if app and data and data.parentSection then
-		local pageID = app.legacySections and app.legacySections[data.parentSection]
+		local resolvedSection = resolveConfigSection(data.parentSection)
+		local pageID = app.legacySections and app.legacySections[resolvedSection]
 		if pageID and app:GetPage(pageID) then
 			addon.ConfigGroupOrderByPageID[pageID] = (addon.ConfigGroupOrderByPageID[pageID] or 0) + 10
 			local groupID = data.groupID or data.modernGroup or ConfigLib:NormalizeID(headerText or "settings")
@@ -1012,8 +1089,8 @@ function addon.functions.SettingsCreateHeadline(cat, text, extra)
 			})
 			addon.ConfigCurrentGroupByPageID[pageID] = groupID
 			addon.ConfigGroupTitleByPageID[pageID] = groupTitle
-			addon.ConfigCurrentGroupBySection[data.parentSection] = groupID
-			addon.ConfigGroupTitleBySection[data.parentSection] = groupTitle
+			addon.ConfigCurrentGroupBySection[resolvedSection] = groupID
+			addon.ConfigGroupTitleBySection[resolvedSection] = groupTitle
 		end
 	end
 	return header
@@ -1023,8 +1100,9 @@ function addon.functions.SettingsCreateText(cat, text, extra)
 	local element = SettingsLib:CreateText(cat, text, extra)
 	local app = ensureConfigApp()
 	if app and app.RegisterControlNote and extra and extra.parentSection and type(text) == "string" then
-		local pageID = app.legacySections and app.legacySections[extra.parentSection]
-		local controlID = extra.controlID or extra.attachToControlID or addon.ConfigLastControlBySection[extra.parentSection] or (pageID and addon.ConfigLastControlByPageID[pageID])
+		local resolvedSection = resolveConfigSection(extra.parentSection)
+		local pageID = app.legacySections and app.legacySections[resolvedSection]
+		local controlID = extra.controlID or extra.attachToControlID or addon.ConfigLastControlBySection[resolvedSection] or (pageID and addon.ConfigLastControlByPageID[pageID])
 		if pageID and app:GetPage(pageID) and controlID then
 			app:RegisterControlNote(controlID, {
 				text = text,
@@ -1121,15 +1199,17 @@ function addon.functions.SettingsCreateExpandableSection(cat, cbData)
 	end
 	local app = ensureConfigApp()
 	if app then
+		local pageKey = cbData.configPageKey or cbData.newTagID or getLocaleKeyForText(cbData.name)
 		local pageID = app:RegisterLegacySection(section, {
 			category = cat,
 			title = cbData.name,
 			pageID = cbData.configPageID,
-			pageKey = cbData.configPageKey or cbData.newTagID or getLocaleKeyForText(cbData.name),
+			pageKey = pageKey,
 			order = cbData.order,
 			description = cbData.description or cbData.desc,
 			icon = cbData.icon,
 			iconAtlas = cbData.iconAtlas,
+			iconKey = cbData.iconKey or pageIconKeysByStableID[pageKey] or pageIconKeysByStableID[cbData.newTagID],
 			mainToggleID = cbData.mainToggleID,
 			newTagID = cbData.newTagID,
 		})

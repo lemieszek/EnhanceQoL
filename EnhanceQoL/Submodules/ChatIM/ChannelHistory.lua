@@ -273,7 +273,7 @@ local function ensureClearPopups()
 	if not StaticPopupDialogs then return end
 	if not StaticPopupDialogs["EQOL_CLEAR_HISTORY_CHAR"] then
 		StaticPopupDialogs["EQOL_CLEAR_HISTORY_CHAR"] = {
-			text = "Clear chat history for %s?",
+				text = L["CH_CLEAR_HISTORY_CHAR_CONFIRM"],
 			button1 = YES,
 			button2 = CANCEL,
 			timeout = 0,
@@ -287,7 +287,7 @@ local function ensureClearPopups()
 	end
 	if not StaticPopupDialogs["EQOL_CLEAR_HISTORY_CHANNEL"] then
 		StaticPopupDialogs["EQOL_CLEAR_HISTORY_CHANNEL"] = {
-			text = "Clear chat history for %s in current scope?",
+				text = L["CH_CLEAR_HISTORY_SCOPE_CONFIRM"],
 			button1 = YES,
 			button2 = CANCEL,
 			timeout = 0,
@@ -2564,7 +2564,7 @@ function ChannelHistory:ShowCharacterContextMenu(entry)
 	ensureClearPopups()
 	MU.CreateContextMenu(UIParent, function(_, root)
 		root:CreateTitle(name)
-		root:CreateButton("Clear history", function() StaticPopup_Show("EQOL_CLEAR_HISTORY_CHAR", name, nil, { faction = factionKey, realm = realmKey, char = charKey }) end)
+		root:CreateButton(L["CH_CLEAR_HISTORY"], function() StaticPopup_Show("EQOL_CLEAR_HISTORY_CHAR", name, nil, { faction = factionKey, realm = realmKey, char = charKey }) end)
 	end)
 end
 

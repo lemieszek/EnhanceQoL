@@ -14,6 +14,8 @@ local cMouse = addon.SettingsLayout.rootGENERAL
 local expandable = addon.functions.SettingsCreateExpandableSection(cMouse, {
 	name = L["MouseAndAccessibility"] or "Mouse & Accessibility",
 	newTagID = "MouseAndAccessibility",
+	configPageKey = "MouseAccessibility",
+	iconKey = "mouseaccessibility",
 	expanded = false,
 	colorizeTitle = false,
 })

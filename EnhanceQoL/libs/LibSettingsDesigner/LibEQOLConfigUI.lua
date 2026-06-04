@@ -498,81 +498,6 @@ local CATEGORY_ICON_KEYS = {
 	sound = "sound",
 }
 
-local PAGE_ICON_RULES = {
-	{ "standaloneprivateauras", "privateaura" },
-	{ "privateauras", "privateaura" },
-	{ "visibilityfading", "visibility" },
-	{ "visibilityframes", "visibility" },
-	{ "addon", "addonprofile" },
-	{ "actiontracker", "actiontracker" },
-	{ "actionbars", "actionbar" },
-	{ "actionbarsbuttons", "actionbar" },
-	{ "castbarscooldowns", "castbar" },
-	{ "castbars", "castbar" },
-	{ "chathistory", "chathistory" },
-	{ "chatbubbles", "chatbubbles" },
-	{ "chatwindow", "chatwindow" },
-	{ "classbuff", "buff" },
-	{ "combatlogging", "combatlogging" },
-	{ "cooldownpanels", "cooldownpanels" },
-	{ "barsresources", "resource" },
-	{ "unitframes", "unitframes" },
-	{ "instantmessenger", "instantmessenger" },
-	{ "dialogsconfirmations", "dialogsconfirmations" },
-	{ "systemdebug", "systemdebug" },
-	{ "uiutilities", "uiutilities" },
-	{ "containeractions", "containeractions" },
-	{ "gearupgrades", "gearupgrades" },
-	{ "bagscategories", "bagscategories" },
-	{ "vendorsservices", "vendorsservices" },
-	{ "trackingmoney", "goldtracking" },
-	{ "goldtracking", "goldtracking" },
-	{ "includelists", "includelists" },
-	{ "macrosconsumables", "macros" },
-	{ "movementinput", "movementinput" },
-	{ "friendscommunities", "community" },
-	{ "privacyblockingignore", "privacy" },
-	{ "mouseaccessibility", "mouseaccessibility" },
-	{ "talentreminder", "talentreminder" },
-	{ "repairoptions", "repair" },
-	{ "repair", "repair" },
-	{ "teleports", "teleports" },
-	{ "teleport", "teleports" },
-	{ "sound", "sound" },
-	{ "dungeons", "dungeons" },
-	{ "questing", "questing" },
-	{ "groupfinder", "groupfinder" },
-	{ "death", "death" },
-	{ "autosell", "autosell" },
-	{ "lootrewards", "loot" },
-	{ "worldmap", "map" },
-	{ "minimap", "map" },
-	{ "nameplates", "nameplate" },
-	{ "popups", "popups" },
-	{ "skinner", "skinner" },
-	{ "tooltip", "tooltip" },
-	{ "mover", "mover" },
-	{ "focusmarker", "focus" },
-	{ "markers", "markers" },
-	{ "combat", "combat" },
-	{ "data", "data" },
-	{ "resource", "resource" },
-	{ "auction", "auction" },
-	{ "crafting", "crafting" },
-	{ "mailbox", "mailbox" },
-	{ "merchant", "vendor" },
-	{ "bank", "bank" },
-	{ "vendor", "vendor" },
-	{ "sell", "vendor" },
-	{ "privacy", "social" },
-	{ "friends", "community" },
-	{ "chat", "chat" },
-	{ "loot", "bags" },
-	{ "bags", "bags" },
-	{ "map", "map" },
-	{ "action", "actionbar" },
-}
-
 local PAGE_DESCRIPTION_FALLBACKS = {
 	actionbars = "Configure action bar visibility, button growth, borders, keybind text, macro labels and cooldown text.",
 	actiontracker = "Show your recently used spells as a movable icon history.",
@@ -1062,21 +987,6 @@ local function getAppCategoryIconTexture(app, categoryID)
 	return nil
 end
 
-local function normalizeIconLookupText(text)
-	text = tostring(text or ""):lower()
-	return text:gsub("[^%w]+", "")
-end
-
-local function getKeywordIconKey(text)
-	local lookup = normalizeIconLookupText(text)
-	for _, rule in ipairs(PAGE_ICON_RULES) do
-		if lookup:find(rule[1], 1, true) then
-			return rule[2]
-		end
-	end
-	return nil
-end
-
 local function resolveCategoryIcon(app, category)
 	local appIcon = category and getAppCategoryIconTexture(app, category.id)
 	if appIcon then
@@ -1092,30 +1002,6 @@ local function resolveCategoryIcon(app, category)
 	return getAppIconTexture(app, iconKey or "advanced")
 end
 
-local function resolveProfilePageIcon(app, page)
-	if not page or page.category ~= "profiles" then
-		return nil
-	end
-
-	local lookup = normalizeIconLookupText((page.id or "") .. " " .. (page.newTagID or ""))
-	if lookup:find("damagemeter", 1, true) then
-		return "icons_64x64_damage", true
-	end
-	if lookup:find("healerbuffplacement", 1, true)
-		or lookup:find("profileshbp", 1, true)
-		or lookup:find("hbp", 1, true) then
-		return "UI-LFG-RoleIcon-Healer", true
-	end
-	if lookup:find("settings", 1, true) then
-		return "GM-icon-settings-pressed", true
-	end
-	if lookup:find("addon", 1, true) then
-		return getAddonIcon(app)
-	end
-
-	return nil
-end
-
 local function resolvePageIcon(app, page)
 	if page and page.icon then
 		return page.icon
@@ -1123,17 +1009,10 @@ local function resolvePageIcon(app, page)
 	if page and page.iconAtlas then
 		return page.iconAtlas, true
 	end
-	local profileIcon, isProfileAtlas = resolveProfilePageIcon(app, page)
-	if profileIcon then
-		return profileIcon, isProfileAtlas
+	if page and page.iconKey then
+		return getAppIconTexture(app, page.iconKey)
 	end
-	local pageID = tostring(page and page.id or "")
-	if pageID:match("%.settings$") then
-		return getAppIconTexture(app, "settingspage")
-	end
-	local iconKey = getKeywordIconKey((page and page.id or "") .. " " .. (page and page.newTagID or ""))
-		or getKeywordIconKey(page and page.title or "")
-	return getAppIconTexture(app, iconKey or "advanced")
+	return getAppIconTexture(app, "advanced")
 end
 
 local function createIcon(parent, source, size, isAtlas)

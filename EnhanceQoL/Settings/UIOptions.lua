@@ -1125,6 +1125,8 @@ local function createActionBarCategory()
 
 	local expandable = addon.functions.SettingsCreateExpandableSection(category, {
 		name = L["ActionBarsAndButtons"] or "Action Bars & Buttons",
+		configPageKey = "ActionBarsAndButtons",
+		iconKey = "actionbar",
 		description = L["configCenterPageDescActionBars"]
 			or "Configure action bar visibility, button growth, borders, keybind text, macro labels and cooldown text.",
 		expanded = false,
@@ -1419,6 +1421,7 @@ local function createFrameCategory()
 		description = L["configCenterPageDescVisibilityFrames"]
 			or "Control when supported Blizzard frames are shown, hidden or faded during combat, targeting and mouseover states.",
 		newTagID = "VisibilityFrames",
+		iconKey = "visibility",
 		expanded = false,
 		colorizeTitle = false,
 	})
@@ -1434,10 +1437,11 @@ local function createFrameCategory()
 	table.sort(frames, function(a, b) return (a.text or a.name or "") < (b.text or b.name or "") end)
 
 	local function expandWith(predicate)
-		return function()
+		local parentCheck = function()
 			if expandable and expandable.IsExpanded and expandable:IsExpanded() == false then return false end
 			return predicate()
 		end
+		return addon.functions.RegisterConfigParentSection(parentCheck, expandable)
 	end
 
 	for _, info in ipairs(frames) do
@@ -1628,6 +1632,7 @@ local function createNameplatesCategory()
 		expanded = false,
 		colorizeTitle = false,
 		newTagID = "Nameplates",
+		iconKey = "nameplate",
 	})
 	addon.SettingsLayout.uiNameplatesExpandable = expandable
 
@@ -2226,6 +2231,7 @@ local function createCastbarCategory()
 		expanded = false,
 		colorizeTitle = false,
 		newTagID = "CastbarsAndCooldowns",
+		iconKey = "castbar",
 	})
 	addon.SettingsLayout.uiCastbarsExpandable = expandable
 
@@ -2476,10 +2482,11 @@ local function createCastbarCategory()
 	end
 	local function shouldShowCastbarDropdown() return #getCastbarOptions() > 0 end
 	local function expandWith(predicate)
-		return function()
+		local parentCheck = function()
 			if expandable and expandable.IsExpanded and expandable:IsExpanded() == false then return false end
 			return predicate()
 		end
+		return addon.functions.RegisterConfigParentSection(parentCheck, expandable)
 	end
 	addon.functions.SettingsCreateHeadline(category, L["CastBars2"], {
 		parentSection = expandable,
@@ -2531,6 +2538,7 @@ local function ensureBarsResourcesCategory()
 			expanded = false,
 			colorizeTitle = false,
 			newTagID = "ResourceBars",
+			iconKey = "resource",
 		})
 		addon.SettingsLayout.uiBarsResourcesExpandable = expandable
 	end

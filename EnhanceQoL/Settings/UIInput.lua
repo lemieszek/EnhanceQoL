@@ -140,6 +140,8 @@ local framesExpandable = addon.SettingsLayout.uiFramesExpandable
 if not framesExpandable then
 	framesExpandable = addon.functions.SettingsCreateExpandableSection(cUIInput, {
 		name = L["VisibilityAndFadingFrames"] or "Visibility & Fading (Frames)",
+		configPageKey = "VisibilityFrames",
+		iconKey = "visibility",
 		description = L["configCenterPageDescVisibilityFrames"]
 			or "Control when supported Blizzard frames are shown, hidden or faded during combat, targeting and mouseover states.",
 		expanded = false,
@@ -157,6 +159,7 @@ if not barsResourcesExpandable then
 		expanded = false,
 		colorizeTitle = false,
 		newTagID = "ResourceBars",
+		iconKey = "resource",
 	})
 	addon.SettingsLayout.uiBarsResourcesExpandable = barsResourcesExpandable
 end
@@ -523,6 +526,7 @@ local interfaceExpandable = addon.functions.SettingsCreateExpandableSection(cUII
 	expanded = false,
 	colorizeTitle = false,
 	newTagID = "PopupsAndUITweaks",
+	iconKey = "popups",
 })
 
 local uiScaleOptions = {

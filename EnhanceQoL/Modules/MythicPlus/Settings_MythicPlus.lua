@@ -25,6 +25,7 @@ local function buildSettings()
 			expanded = false,
 			colorizeTitle = false,
 			newTagID = "Teleports",
+			iconKey = "teleports",
 		})
 		addon.SettingsLayout.gameplayTeleportsSection = sectionTeleports
 	end
@@ -126,6 +127,8 @@ local function buildSettings()
 	if not sectionTalent then
 		sectionTalent = addon.functions.SettingsCreateExpandableSection(cGameplay, {
 			name = L["TalentReminder"],
+			configPageKey = "TalentReminder",
+			iconKey = "talentreminder",
 			expanded = false,
 			colorizeTitle = false,
 		})

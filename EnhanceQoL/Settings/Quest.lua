@@ -628,7 +628,7 @@ function addon.functions.initQuest()
 	local function EQOL_ShowCopyURL(url)
 		if not StaticPopupDialogs["ENHANCEQOL_COPY_URL"] then
 			StaticPopupDialogs["ENHANCEQOL_COPY_URL"] = {
-				text = "Copy URL:",
+					text = L["copyUrlPopupText"],
 				button1 = OKAY,
 				hasEditBox = true,
 				timeout = 0,
@@ -667,10 +667,10 @@ function addon.functions.initQuest()
 		end
 		if not qid then return end
 		root:CreateDivider()
-		local btn = root:CreateButton("Copy Wowhead URL", function() EQOL_ShowCopyURL(("https://www.wowhead.com/quest=%d"):format(qid)) end)
+		local btn = root:CreateButton(L["CopyWowheadURL"], function() EQOL_ShowCopyURL(("https://www.wowhead.com/quest=%d"):format(qid)) end)
 		btn:AddInitializer(function()
 			btn:SetTooltip(function(tt)
-				GameTooltip_SetTitle(tt, "Wowhead")
+				GameTooltip_SetTitle(tt, L["wowhead"])
 				GameTooltip_AddNormalLine(tt, ("quest=%d"):format(qid))
 			end)
 		end)

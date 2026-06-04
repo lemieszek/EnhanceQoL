@@ -1406,7 +1406,7 @@ registerEditModeBars = function()
 							local order = root.order or {}
 							local function addPanelEntry(panelId, panel)
 								if not panel or panel.enabled == false then return end
-								local label = string.format("Panel %s: %s", tostring(panelId), panel.name or "Cooldown Panel")
+									local label = (L["cooldownPanelReferenceLabel"]):format(tostring(panelId), panel.name or L["cooldownPanelDefaultName"])
 								add("EQOL_CooldownPanel" .. tostring(panelId), label)
 							end
 							if #order > 0 then

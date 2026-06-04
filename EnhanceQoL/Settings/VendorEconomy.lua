@@ -121,6 +121,8 @@ addon.SettingsLayout.vendorEconomyCategory = cVendorEconomy
 
 local vendorsExpandable = addon.functions.SettingsCreateExpandableSection(cVendorEconomy, {
 	name = L["VendorsServices"],
+	configPageKey = "VendorsServices",
+	iconKey = "vendorsservices",
 	expanded = false,
 	colorizeTitle = false,
 })
@@ -159,6 +161,7 @@ addon.functions.SettingsCreateCheckboxes(cVendorEconomy, data)
 local bankExpandable = addon.functions.SettingsCreateExpandableSection(cVendorEconomy, {
 	name = BANK,
 	newTagID = "Bank",
+	iconKey = "bank",
 	expanded = false,
 	colorizeTitle = false,
 })
@@ -368,6 +371,8 @@ addon.functions.SettingsCreateCheckboxes(cVendorEconomy, data)
 
 local merchantExpandable = addon.functions.SettingsCreateExpandableSection(cVendorEconomy, {
 	name = L["MerchantUI"],
+	configPageKey = "Merchant",
+	iconKey = "vendor",
 	expanded = false,
 	colorizeTitle = false,
 })
@@ -428,6 +433,8 @@ addon.functions.SettingsCreateCheckboxes(cVendorEconomy, data)
 
 local auctionHouseExpandable = addon.functions.SettingsCreateExpandableSection(cVendorEconomy, {
 	name = BUTTON_LAG_AUCTIONHOUSE,
+	configPageKey = "AuctionHouse",
+	iconKey = "auction",
 	expanded = false,
 	colorizeTitle = false,
 })
@@ -522,6 +529,7 @@ addon.functions.SettingsCreateDropdown(cVendorEconomy, {
 local craftingOrdersExpandable = addon.functions.SettingsCreateExpandableSection(cVendorEconomy, {
 	name = _G["PLACE_CRAFTING_ORDERS"] or "Crafting Orders",
 	newTagID = "EconomyCraftingOrders",
+	iconKey = "crafting",
 	expanded = false,
 	colorizeTitle = false,
 })
@@ -544,6 +552,7 @@ addon.functions.SettingsCreateCheckboxes(cVendorEconomy, data)
 local mailboxExpandable = addon.functions.SettingsCreateExpandableSection(addon.SettingsLayout.rootSOCIAL, {
 	name = MINIMAP_TRACKING_MAILBOX,
 	newTagID = "Mailbox",
+	iconKey = "mailbox",
 	expanded = false,
 	colorizeTitle = false,
 })
@@ -647,6 +656,8 @@ addon.functions.SettingsCreateCheckboxes(addon.SettingsLayout.rootSOCIAL, data)
 function addon.functions.settingsAddGold()
 	local goldExpandable = addon.functions.SettingsCreateExpandableSection(addon.SettingsLayout.rootGENERAL, {
 		name = L["GoldTracking"],
+		configPageKey = "GoldTracking",
+		iconKey = "goldtracking",
 		expanded = false,
 		colorizeTitle = false,
 	})

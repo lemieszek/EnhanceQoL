@@ -702,8 +702,8 @@ data = {
 			},
 			{
 				var = "chatHistoryButtonOffsetX",
-				text = "History button offset X",
-				desc = "Adjust horizontal offset of the Chat History toggle button relative to Quick Join.",
+				text = L["chatHistoryButtonOffsetX"],
+				desc = L["chatHistoryButtonOffsetXDesc"],
 				parentCheck = function()
 					return addon.SettingsLayout.elements["enableChatHistory"]
 						and addon.SettingsLayout.elements["enableChatHistory"].setting
@@ -723,8 +723,8 @@ data = {
 			},
 			{
 				var = "chatHistoryButtonOffsetY",
-				text = "History button offset Y",
-				desc = "Adjust vertical offset of the Chat History toggle button relative to Quick Join.",
+				text = L["chatHistoryButtonOffsetY"],
+				desc = L["chatHistoryButtonOffsetYDesc"],
 				parentCheck = function()
 					return addon.SettingsLayout.elements["enableChatHistory"]
 						and addon.SettingsLayout.elements["enableChatHistory"].setting
@@ -744,8 +744,8 @@ data = {
 			},
 			{
 				var = "chatHistoryShowButton",
-				text = "Show History toggle icon",
-				desc = "Show a small icon below the Quick Join toast to open/close Chat History.",
+				text = L["chatHistoryShowButton"],
+				desc = L["chatHistoryShowButtonDesc"],
 				parentCheck = function()
 					return addon.SettingsLayout.elements["enableChatHistory"]
 						and addon.SettingsLayout.elements["enableChatHistory"].setting

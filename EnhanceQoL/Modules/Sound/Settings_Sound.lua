@@ -104,6 +104,8 @@ addon.SettingsLayout.soundCategory = cSound
 
 local audioDeviceExpandable = addon.functions.SettingsCreateExpandableSection(cSound, {
 	name = L["audioDeviceSection"] or "Audio device",
+	configPageKey = "SoundAudioDevice",
+	iconKey = "soundsettings",
 	expanded = false,
 	colorizeTitle = false,
 })
@@ -126,6 +128,8 @@ CreateAudioCheckbox({
 
 local soundExpandable = addon.functions.SettingsCreateExpandableSection(cSound, {
 	name = L["soundMuteSection"] or "Sounds to mute",
+	configPageKey = "SoundMute",
+	iconKey = "sound",
 	expanded = false,
 	colorizeTitle = false,
 })
@@ -265,6 +269,8 @@ end
 
 local extraSoundExpandable = addon.functions.SettingsCreateExpandableSection(cSound, {
 	name = L["soundExtraSection"] or "Additional sounds",
+	configPageKey = "SoundExtra",
+	iconKey = "sound",
 	expanded = false,
 	colorizeTitle = false,
 })

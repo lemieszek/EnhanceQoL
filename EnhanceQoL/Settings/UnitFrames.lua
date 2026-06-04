@@ -30,10 +30,11 @@ local function isEQoLUnitEnabled(unit)
 end
 
 local function expandWith(predicate)
-	return function()
+	local parentCheck = function()
 		if expandable and expandable.IsExpanded and expandable:IsExpanded() == false then return false end
 		return predicate()
 	end
+	return addon.functions.RegisterConfigParentSection(parentCheck, expandable)
 end
 
 addon.functions.SettingsCreateHeadline(cUnitFrame, COMBAT_TEXT_LABEL, { parentSection = expandable })

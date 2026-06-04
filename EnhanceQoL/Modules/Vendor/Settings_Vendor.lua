@@ -175,6 +175,8 @@ local function buildSettings()
 
 	local quickActionsExpandable = addon.functions.SettingsCreateExpandableSection(cVendor, {
 		name = L["vendorQuickActions"] or "Vendor - Quick Actions",
+		configPageKey = "VendorQuickActions",
+		iconKey = "vendor",
 		expanded = false,
 		colorizeTitle = false,
 	})
@@ -240,6 +242,7 @@ local function buildSettings()
 	local autoSellExpandable = addon.functions.SettingsCreateExpandableSection(cVendor, {
 		name = L["vendorAutoSellRules"] or "Vendor - Auto-Sell Rules",
 		newTagID = "AutoSellRules",
+		iconKey = "autosell",
 		expanded = false,
 		colorizeTitle = false,
 	})
@@ -421,6 +424,8 @@ local function buildSettings()
 
 	local includeExcludeExpandable = addon.functions.SettingsCreateExpandableSection(cVendor, {
 		name = L["vendorIncludeExclude"] or "Vendor - Include / Exclude",
+		configPageKey = "VendorIncludeExclude",
+		iconKey = "includelists",
 		expanded = false,
 		colorizeTitle = false,
 	})
@@ -483,6 +488,8 @@ local function buildSettings()
 
 	local destroyQueueExpandable = addon.functions.SettingsCreateExpandableSection(cVendor, {
 		name = L["vendorDestroyQueue"] or "Vendor - Destroy Queue",
+		configPageKey = "VendorDestroyQueue",
+		iconKey = "includelists",
 		expanded = false,
 		colorizeTitle = false,
 	})

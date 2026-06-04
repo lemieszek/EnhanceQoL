@@ -12,6 +12,8 @@ addon.Skinner = addon.Skinner or {}
 addon.Skinner.functions = addon.Skinner.functions or {}
 addon.Skinner.variables = addon.Skinner.variables or {}
 
+local L = LibStub("AceLocale-3.0"):GetLocale(parentAddonName)
+
 local function isCharacterFrameSkinEnabled() return addon.db and addon.db.skinnerCharacterFrameEnabled == true end
 
 local function isCharacterFrameAddonLoaded()
@@ -783,7 +785,9 @@ function addon.Skinner.functions.InitSettings()
 
 	local category = addon.SettingsLayout.rootUI
 	local expandable = addon.functions.SettingsCreateExpandableSection(category, {
-		name = "Skinner",
+		name = L["skinnerTitle"],
+		configPageKey = "Skinner",
+		iconKey = "skinner",
 		expanded = false,
 		colorizeTitle = false,
 	})
@@ -792,7 +796,7 @@ function addon.Skinner.functions.InitSettings()
 
 	addon.functions.SettingsCreateSlider(category, {
 		var = "skinnerCharacterFrameAlpha",
-		text = "Character Frame Alpha",
+		text = L["skinnerCharacterFrameAlpha"],
 		default = FLAT_PANEL_BG.a,
 		min = 0,
 		max = 1,
@@ -808,7 +812,7 @@ function addon.Skinner.functions.InitSettings()
 
 	addon.functions.SettingsCreateCheckbox(category, {
 		var = "skinnerCharacterFrameEnabled",
-		text = "Character Frame",
+		text = L["skinnerCharacterFrameEnabled"],
 		default = false,
 		func = function(value)
 			addon.db["skinnerCharacterFrameEnabled"] = value
@@ -825,7 +829,7 @@ function addon.Skinner.functions.InitSettings()
 
 	local borderToggle = addon.functions.SettingsCreateCheckbox(category, {
 		var = "skinnerCharacterFrameBorderEnabled",
-		text = "Outer Frame Border",
+		text = L["skinnerOuterFrameBorder"],
 		default = true,
 		func = function(value)
 			addon.db["skinnerCharacterFrameBorderEnabled"] = value and true or false
@@ -838,7 +842,7 @@ function addon.Skinner.functions.InitSettings()
 
 	addon.functions.SettingsCreateSlider(category, {
 		var = "skinnerCharacterFrameBorderSize",
-		text = "Outer Border Size",
+		text = L["skinnerOuterBorderSize"],
 		default = 1,
 		min = 1,
 		max = 6,
@@ -856,7 +860,7 @@ function addon.Skinner.functions.InitSettings()
 
 	addon.functions.SettingsCreateColorPicker(category, {
 		var = "skinnerCharacterFrameBorderColor",
-		text = "Outer Border Color",
+		text = L["skinnerOuterBorderColor"],
 		hasOpacity = true,
 		callback = function()
 			if addon.Skinner and addon.Skinner.functions and addon.Skinner.functions.ApplyCharacterFrameSkin and isCharacterFrameSkinEnabled() then

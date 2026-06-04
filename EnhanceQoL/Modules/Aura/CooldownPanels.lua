@@ -2005,7 +2005,7 @@ CooldownPanels.GetRelativeFrameCache = function(runtimePanel, panel, panelKey)
 		for id, other in pairs(root.panels) do
 			local otherId = normalizeId(id)
 			if otherId ~= panelKey then
-				local label = string.format("Panel %s: %s", tostring(otherId), other and other.name or "Cooldown Panel")
+					local label = (L["cooldownPanelReferenceLabel"]):format(tostring(otherId), other and other.name or L["cooldownPanelDefaultName"])
 				add(panelFrameName(otherId), label)
 			end
 		end
@@ -9199,7 +9199,7 @@ local function createPanelFrame(panelId, panel)
 
 	local label = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	label:SetPoint("CENTER")
-	label:SetText(panel and panel.name or "Cooldown Panel")
+	label:SetText(panel and panel.name or L["cooldownPanelDefaultName"])
 	label:Hide()
 	frame.label = label
 
@@ -13810,7 +13810,7 @@ function CooldownPanels:RefreshLayoutPanelStandaloneMenu()
 	end
 	local dialog = state.dialog
 	if dialog then
-		local title = panel.name or "Cooldown Panel"
+			local title = panel.name or L["cooldownPanelDefaultName"]
 		if dialog.context then dialog.context.title = title end
 		if dialog.Title and title then dialog.Title:SetText(title) end
 	end
@@ -13833,7 +13833,7 @@ function CooldownPanels:OpenLayoutPanelStandaloneMenu(panelId, anchorFrame)
 
 	local spawnPosition = self:GetStandaloneDialogSpawnPosition(anchorFrame, registeredHostFrame, 12, 0)
 	local dialog = lib:ShowStandaloneSettingsDialog(registeredHostFrame, {
-		title = registeredPanel.name or "Cooldown Panel",
+			title = registeredPanel.name or L["cooldownPanelDefaultName"],
 		settings = registeredSettings,
 		showReset = false,
 		showSettingsReset = false,
@@ -17358,7 +17358,7 @@ function CooldownPanels:ApplyLayout(panelId, countOverride)
 
 	frame:SetFrameStrata(Helper.NormalizeStrata(layout.strata, Helper.PANEL_LAYOUT_DEFAULTS.strata))
 	syncLayoutSelectionStrata(frame)
-	if frame.label then frame.label:SetText(panel.name or "Cooldown Panel") end
+	if frame.label then frame.label:SetText(panel.name or L["cooldownPanelDefaultName"]) end
 	CooldownPanels.ClearAppliedAnchorCache(runtime)
 	self:ApplyPanelPosition(panelId)
 end
@@ -20366,7 +20366,7 @@ local function getCopySettingsEntries(panelKey)
 			if otherId ~= panelKey then
 				local other = root.panels[otherId]
 				if other then
-					local label = string.format("Panel %s: %s", tostring(otherId), other.name or "Cooldown Panel")
+						local label = (L["cooldownPanelReferenceLabel"]):format(tostring(otherId), other.name or L["cooldownPanelDefaultName"])
 					entries[#entries + 1] = { id = otherId, label = label }
 					seen[otherId] = true
 				end
@@ -20376,7 +20376,7 @@ local function getCopySettingsEntries(panelKey)
 	for id, other in pairs(root.panels) do
 		local otherId = normalizeId(id)
 		if other and otherId ~= panelKey and not seen[otherId] then
-			local label = string.format("Panel %s: %s", tostring(otherId), other.name or "Cooldown Panel")
+				local label = (L["cooldownPanelReferenceLabel"]):format(tostring(otherId), other.name or L["cooldownPanelDefaultName"])
 			entries[#entries + 1] = { id = otherId, label = label }
 		end
 	end

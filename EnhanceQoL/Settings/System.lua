@@ -16,6 +16,8 @@ addon.SettingsLayout.systemCategory = cGeneral
 
 local movementExpandable = addon.functions.SettingsCreateExpandableSection(cGeneral, {
 	name = L["cvarCategoryMovementInput"] or "Movement & Input",
+	configPageKey = "MovementInput",
+	iconKey = "movementinput",
 	expanded = false,
 	colorizeTitle = false,
 })
@@ -36,6 +38,8 @@ addon.functions.SettingsCreateCheckboxes(cGeneral, movementData)
 
 local dialogExpandable = addon.functions.SettingsCreateExpandableSection(cGeneral, {
 	name = L["DialogsAndConfirmations"] or "Dialogs & Confirmations",
+	configPageKey = "DialogsConfirmations",
+	iconKey = "dialogsconfirmations",
 	expanded = false,
 	colorizeTitle = false,
 })
@@ -119,6 +123,8 @@ addon.functions.SettingsCreateMultiDropdown(cGeneral, {
 
 local utilitiesExpandable = addon.functions.SettingsCreateExpandableSection(cGeneral, {
 	name = L["UIUtilities"] or "UI Utilities",
+	configPageKey = "UIUtilities",
+	iconKey = "uiutilities",
 	expanded = false,
 	colorizeTitle = false,
 })
@@ -249,6 +255,8 @@ addon.functions.SettingsCreateCheckbox(cGeneral, {
 
 local systemExpandable = addon.functions.SettingsCreateExpandableSection(cGeneral, {
 	name = L["SystemAndDebug"] or "System & Debug",
+	configPageKey = "SystemAndDebug",
+	iconKey = "systemdebug",
 	expanded = false,
 	colorizeTitle = false,
 })
