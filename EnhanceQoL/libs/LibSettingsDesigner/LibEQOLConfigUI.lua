@@ -2780,13 +2780,14 @@ local function addColorWidget(row, app, control, opts)
 		addConfigureFallback(row, app, control, nil, opts.configure)
 		return
 	end
-	local currentLabel = createText(row, FONT_MUTED, opts.currentText or (L["configCenterCurrent"] or "Current") .. ":", TEXT.subtle)
+	local currentLabel = createText(row, FONT_TEXT, opts.currentText or (L["configCenterCurrent"] or "Current") .. ":", TEXT.main)
 	if opts.point then
 		currentLabel:SetPoint(opts.point[1], opts.point[2], opts.point[3], opts.point[4], opts.point[5])
 	else
 		currentLabel:SetPoint("LEFT", row, "LEFT", FIELD_CONTROL_LEFT, -29)
 	end
-	currentLabel:SetSize(58, 20)
+	currentLabel:SetSize(58, 26)
+	currentLabel.Text:SetJustifyV("MIDDLE")
 
 	local swatch = CreateFrame("Button", nil, row, "BackdropTemplate")
 	swatch:SetSize(34, 24)
@@ -2797,8 +2798,9 @@ local function addColorWidget(row, app, control, opts)
 	swatch.Texture:SetPoint("BOTTOMRIGHT", swatch, "BOTTOMRIGHT", -4, 4)
 	row.swatch = swatch
 	row.hexText = createText(row, FONT_TEXT, "", TEXT.gold)
-	row.hexText:SetPoint("LEFT", swatch, "RIGHT", 10, 1)
-	row.hexText:SetSize(80, 20)
+	row.hexText:SetPoint("LEFT", swatch, "RIGHT", 10, 0)
+	row.hexText:SetSize(80, 26)
+	row.hexText.Text:SetJustifyV("MIDDLE")
 
 	local button = makeFlatButton(row, L["configCenterChange"] or "Change", 92, 26)
 	button:SetPoint("LEFT", row.hexText, "RIGHT", 10, 0)
