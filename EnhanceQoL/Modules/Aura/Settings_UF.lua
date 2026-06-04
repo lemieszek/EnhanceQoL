@@ -8803,6 +8803,7 @@ local function registerSettingsUI()
 			description = L["configCenterPageDescUnitFrames"]
 				or "Customize player, target, focus, party and group frames, including layout, bars, auras, text and profiles.",
 			newTagID = "CustomUnitFrames",
+			iconKey = "unitframes",
 			expanded = false,
 			colorizeTitle = false,
 		})
@@ -9094,6 +9095,7 @@ local function registerSettingsUI()
 			colorizeTitle = false,
 			parentSection = expandable,
 			newTagID = "ufStandalonePrivateAurasExpandable",
+			iconKey = "privateaura",
 		})
 		addon.SettingsLayout.expUFStandalonePrivateAuras = standalonePrivateAuraExpandable
 	end
@@ -9221,6 +9223,7 @@ local function registerSettingsUI()
 
 		local expandableProfile = addon.functions.SettingsCreateExpandableSection(cProfiles, {
 			name = L["CustomUnitFrames"],
+			iconKey = "settingspage",
 			expanded = false,
 			colorizeTitle = false,
 			newTagID = "UFProfiles",

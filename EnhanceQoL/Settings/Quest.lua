@@ -20,6 +20,7 @@ addon.SettingsLayout.questCategory = cQuest
 local questingExpandable = addon.functions.SettingsCreateExpandableSection(cQuest, {
 	name = L["QuestingAndCinematics"] or "Questing & Cinematics",
 	newTagID = "Questing",
+	iconKey = "questing",
 	expanded = false,
 	colorizeTitle = false,
 })

@@ -56,6 +56,8 @@ addon.SettingsLayout.chatframeCategory = cChatFrame
 
 local chatWindowExpandable = addon.functions.SettingsCreateExpandableSection(cChatFrame, {
 	name = L["ChatWindow"] or "Chat Window",
+	configPageKey = "ChatWindow",
+	iconKey = "chatwindow",
 	expanded = false,
 	colorizeTitle = false,
 })
@@ -253,6 +255,7 @@ addon.functions.SettingsCreateCheckboxes(cChatFrame, data)
 
 local chatIMExpandable = addon.functions.SettingsCreateExpandableSection(cChatFrame, {
 	name = L["InstantMessenger"] or "Instant Messenger",
+	iconKey = "instantmessenger",
 	expanded = false,
 	colorizeTitle = false,
 	newTagID = "InstantMessenger",
@@ -508,6 +511,8 @@ addon.functions.SettingsCreateButton(cChatFrame, data)
 
 local chatHistoryExpandable = addon.functions.SettingsCreateExpandableSection(cChatFrame, {
 	name = L["CH_TITLE_HISTORY"] or "Chat History",
+	configPageKey = "ChatHistory",
+	iconKey = "chathistory",
 	expanded = false,
 	colorizeTitle = false,
 })
@@ -850,6 +855,8 @@ addon.functions.SettingsCreateCheckboxes(cChatFrame, data)
 
 local chatBubblesExpandable = addon.functions.SettingsCreateExpandableSection(cChatFrame, {
 	name = L["ChatBubbles"] or "Chat Bubbles",
+	configPageKey = "ChatBubbles",
+	iconKey = "chatbubbles",
 	expanded = false,
 	colorizeTitle = false,
 })

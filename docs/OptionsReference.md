@@ -128,7 +128,6 @@ The **CVar** section exposes common console variables as checkboxes. Changing th
 - Enable autodismount when using abilities while flying
 - Enable mouse scroll in chat
 - Disable death effects
-- Show LUA-Error on UI
 - Show class colors on nameplates
 - Disable tutorials
 - Show the Guild on Players

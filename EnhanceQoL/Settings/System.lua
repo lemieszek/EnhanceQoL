@@ -253,19 +253,6 @@ addon.functions.SettingsCreateCheckbox(cGeneral, {
 	parentSection = utilitiesExpandable,
 })
 
-local systemExpandable = addon.functions.SettingsCreateExpandableSection(cGeneral, {
-	name = L["SystemAndDebug"] or "System & Debug",
-	configPageKey = "SystemAndDebug",
-	iconKey = "systemdebug",
-	expanded = false,
-	colorizeTitle = false,
-})
-
-local systemData = {}
-
-applyParentSection(systemData, systemExpandable)
-addon.functions.SettingsCreateCheckboxes(cGeneral, systemData)
-
 ----- REGION END
 
 function addon.functions.initSystem() end

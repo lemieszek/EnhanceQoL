@@ -2201,6 +2201,8 @@ function addon.functions.initDungeonFrame()
 
 	local combatLogSection = addon.functions.SettingsCreateExpandableSection(cChar, {
 		name = L["combatLogSection"] or "Combat logging",
+		configPageKey = "CombatLogging",
+		iconKey = "combatlogging",
 		expanded = false,
 		colorizeTitle = false,
 	})
@@ -2293,6 +2295,8 @@ function addon.functions.initDungeonFrame()
 	if not sectionMarkers then
 		sectionMarkers = addon.functions.SettingsCreateExpandableSection(cChar, {
 			name = L["Markers"],
+			configPageKey = "Markers",
+			iconKey = "markers",
 			expanded = false,
 			colorizeTitle = false,
 		})
@@ -2303,6 +2307,8 @@ function addon.functions.initDungeonFrame()
 		if not sectionMarkers then
 			sectionMarkers = addon.functions.SettingsCreateExpandableSection(addon.SettingsLayout.characterInspectCategory, {
 				name = L["Markers"],
+				configPageKey = "Markers",
+				iconKey = "markers",
 				expanded = false,
 				colorizeTitle = false,
 			})
@@ -2474,6 +2480,7 @@ local sectionDungeon = addon.SettingsLayout.gameplayDungeonsMythicSection
 if not sectionDungeon then
 	sectionDungeon = addon.functions.SettingsCreateExpandableSection(cChar, {
 		name = L["DungeonsMythicPlus"],
+		iconKey = "dungeons",
 		expanded = false,
 		colorizeTitle = false,
 		newTagID = "DungeonsMythicPlus",

@@ -56,7 +56,11 @@ local pageIconKeysByStableID = {
 	Bank = "bank",
 	BarsAndResources = "resource",
 	CastbarsAndCooldowns = "castbar",
+	ChatBubbles = "chatbubbles",
+	ChatHistory = "chathistory",
+	ChatWindow = "chatwindow",
 	ClassBuffReminder = "buff",
+	CombatLogging = "combatlogging",
 	ContainerActions = "containeractions",
 	CooldownPanels = "cooldownpanels",
 	CustomUnitFrames = "unitframes",
@@ -82,7 +86,10 @@ local pageIconKeysByStableID = {
 	ProfilesBagsCategories = "bagscategories",
 	ProfilesDamageMeter = "damagemeterprofile",
 	ProfilesHBP = "healerbuffplacementprofile",
+	ProfilesResourceBars = "resource",
 	Questing = "questing",
+	SharedMedia = "soundsettings",
+	SharedMediaDeepVoiceSounds = "soundsettings",
 	SocialGeneral = "privacy",
 	SystemAndDebug = "systemdebug",
 	TalentReminder = "talentreminder",
@@ -330,8 +337,17 @@ local function ensureConfigApp()
 			end
 			return count
 		end,
-		openLegacySettings = function()
-			if Settings and Settings.OpenToCategory and addon.SettingsLayout and addon.SettingsLayout.rootCategory then
+		openLegacySettings = function(control)
+			if control and control.type == "keybind" and Settings and Settings.OpenToCategory and Settings.KEYBINDINGS_CATEGORY_ID then
+				local scrollToElementName
+				if control.bindingIndex and GetBinding then
+					local _, bindingCategory = GetBinding(control.bindingIndex)
+					if bindingCategory then
+						scrollToElementName = _G[bindingCategory] or bindingCategory
+					end
+				end
+				Settings.OpenToCategory(Settings.KEYBINDINGS_CATEGORY_ID, scrollToElementName)
+			elseif Settings and Settings.OpenToCategory and addon.SettingsLayout and addon.SettingsLayout.rootCategory then
 				Settings.OpenToCategory(addon.SettingsLayout.rootCategory:GetID())
 			end
 		end,
@@ -558,6 +574,7 @@ local function registerLegacyControl(category, cbData, controlType, setting)
 		notes = cbData.notes,
 		richNote = cbData.richNote,
 		richNotes = cbData.richNotes,
+		bindingIndex = cbData.bindingIndex,
 	})
 	if control and pageID then
 		addon.ConfigLastControlByPageID[pageID] = control.id
@@ -583,11 +600,6 @@ function addon.functions.SetCVarOptionState(cvarKey, enabled)
 	if not optionData then return end
 	local newValue = enabled and optionData.trueValue or optionData.falseValue
 	if newValue == nil then return end
-	if optionData.persistent then
-		addon.db = addon.db or {}
-		addon.db.cvarOverrides = addon.db.cvarOverrides or {}
-		addon.db.cvarOverrides[cvarKey] = tostring(newValue)
-	end
 	if addon.functions.setCVarValue then addon.functions.setCVarValue(cvarKey, newValue) end
 end
 
@@ -603,7 +615,19 @@ function addon.functions.SettingsCreateCategory(parent, treeName, sort, newTagID
 	return cat, layout
 end
 
-function addon.functions.SettingsCreateKeybind(cat, bindingIndex, parentSection) SettingsLib:CreateKeybind(cat, { bindingIndex = bindingIndex, parentSection = parentSection }) end
+function addon.functions.SettingsCreateKeybind(cat, bindingIndex, parentSection)
+	local initializer = SettingsLib:CreateKeybind(cat, { bindingIndex = bindingIndex, parentSection = parentSection })
+	registerLegacyControl(cat, {
+		id = "Binding_" .. tostring(bindingIndex),
+		text = _G.KEY_BINDINGS or "Key Bindings",
+		desc = _G.KEY_BINDINGS_TOOLTIP or _G.KEY_BINDINGS or "Configure key bindings.",
+		bindingIndex = bindingIndex,
+		parentSection = parentSection,
+		buttonText = _G.KEY_BINDINGS or "Key Bindings",
+		level = "advanced",
+	}, "keybind", nil)
+	return initializer
+end
 
 ---------------------------------------------------------
 -- Checkbox

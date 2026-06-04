@@ -153,6 +153,7 @@ local AppMixin = {}
 
 local LEGACY_CONTROL_METADATA_FIELDS = {
 	"buttonText",
+	"bindingIndex",
 	"callback",
 	"clampToRange",
 	"colorizeLabel",

@@ -2905,6 +2905,7 @@ local cInventory = addon.SettingsLayout.rootGENERAL
 local expandable = addon.functions.SettingsCreateExpandableSection(cInventory, {
 	name = L["ItemsInventory"],
 	newTagID = "BagsInventory",
+	iconKey = "bags",
 	expanded = false,
 	colorizeTitle = false,
 })

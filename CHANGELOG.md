@@ -6,6 +6,7 @@
 
 - System / CVar: Removed the deprecated "Persist CVar values" option and its storage logic.
 - System / UI: Removed Blizzard CVar toggles that are base-game only and no longer needed in this addon: "Show LUA-Error on UI", "Auto-push new spells to your action bars", and "Enable Advanced Tooltips".
+- Settings / UI: Removed the empty `System & Debug` section from the General settings page.
 
 ---
 

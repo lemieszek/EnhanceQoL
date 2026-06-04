@@ -17,6 +17,7 @@ local expandable = addon.functions.SettingsCreateExpandableSection(cTooltip, {
 	configPageID = "interface.tooltips",
 	searchtags = { "tooltip", "item id", "spell id", "npc id", "realm", "guild" },
 	newTagID = "Tooltip",
+	iconKey = "tooltip",
 	expanded = false,
 	colorizeTitle = false,
 })

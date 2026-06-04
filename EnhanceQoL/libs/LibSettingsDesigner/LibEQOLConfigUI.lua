@@ -3175,11 +3175,13 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 		desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
 		desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
 		desc:SetHeight(36)
-		addConfigureFallback(row, app, control, nil, {
+		local fallbackText = controlType == "keybind" and control.buttonText or nil
+		addConfigureFallback(row, app, control, fallbackText, {
 			point = { "BOTTOMRIGHT", row, "BOTTOMRIGHT", -14, 14 },
 			width = 150,
 		})
-		local badge = addStatusChip(row, control.level == "advanced" and "Advanced" or "Legacy", TEXT.muted, 74)
+		local badgeText = controlType == "keybind" and (_G.KEY_BINDINGS or "Key Bindings") or (control.level == "advanced" and "Advanced" or "Legacy")
+		local badge = addStatusChip(row, badgeText, TEXT.muted, 92)
 		badge:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", textLeft, 15)
 	end
 

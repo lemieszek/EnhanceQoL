@@ -5490,6 +5490,8 @@ addon.Aura.functions.AddResourceBarsProfileSettings = function()
 
 	local expandableProfile = addon.functions.SettingsCreateExpandableSection(cProfiles, {
 		name = L["Resource Bars"],
+		configPageKey = "ProfilesResourceBars",
+		iconKey = "resource",
 		expanded = false,
 		colorizeTitle = false,
 	})

@@ -47,6 +47,8 @@ local cProfiles = addon.SettingsLayout.rootPROFILES
 
 local expandable = addon.functions.SettingsCreateExpandableSection(cProfiles, {
 	name = L["AddOn"],
+	configPageKey = "ProfilesAddOn",
+	iconKey = "addonprofile",
 	expanded = false,
 	colorizeTitle = false,
 	newTagID = "ProfilesAddOn",
@@ -1534,6 +1536,8 @@ createGlobalFontSettings(expandable)
 
 bagsCategoriesExpandable = addon.functions.SettingsCreateExpandableSection(cProfiles, {
 	name = L["Bags categories"] or "Bags categories",
+	configPageKey = "ProfilesBagsCategories",
+	iconKey = "bagscategories",
 	expanded = false,
 	colorizeTitle = false,
 	newTagID = "ProfilesBagsCategories",
@@ -1577,6 +1581,8 @@ addon.functions.SettingsCreateButton(cProfiles, {
 
 damageMeterExpandable = addon.functions.SettingsCreateExpandableSection(cProfiles, {
 	name = L["damageMeterTitle"] or "Damage Meter",
+	configPageKey = "ProfilesDamageMeter",
+	iconAtlas = "icons_64x64_damage",
 	expanded = false,
 	colorizeTitle = false,
 	newTagID = "ProfilesDamageMeter",
@@ -1614,6 +1620,8 @@ addon.functions.SettingsCreateButton(cProfiles, {
 
 hbpExpandable = addon.functions.SettingsCreateExpandableSection(cProfiles, {
 	name = L["Healer Buff Placement"] or "Healer Buff Placement",
+	configPageKey = "ProfilesHBP",
+	iconAtlas = "UI-LFG-RoleIcon-Healer",
 	expanded = false,
 	colorizeTitle = false,
 	newTagID = "ProfilesHBP",

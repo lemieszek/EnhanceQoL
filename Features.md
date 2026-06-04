@@ -115,7 +115,6 @@ Expose console variables as checkboxes:
 - Enable autodismount when using abilities (and while flying).
 - Enable mouse scroll in chat.
 - Disable death effects.
-- Show LUA-Error on UI.
 - Show class colors on nameplates.
 - Disable tutorials.
 - Show the Guild on Players.

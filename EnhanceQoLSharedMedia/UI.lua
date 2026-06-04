@@ -23,9 +23,12 @@ local function SanitizeVar(key) return (tostring(key):gsub("[^%w_]", "_")) end
 
 local function CreateSoundSection(title, varPrefix, sounds)
 	if not sounds or #sounds == 0 then return end
+	local pageKey = varPrefix == "SharedMediaDeepVoice" and "SharedMediaDeepVoiceSounds" or "SharedMedia"
 
 	local section = addon.functions.SettingsCreateExpandableSection(cSharedMedia, {
 		name = title,
+		configPageKey = pageKey,
+		iconKey = "soundsettings",
 		expanded = false,
 		colorizeTitle = false,
 	})

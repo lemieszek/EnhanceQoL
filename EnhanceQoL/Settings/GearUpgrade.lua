@@ -11,6 +11,7 @@ local cGearUpgrade = addon.SettingsLayout.rootGENERAL
 local expandable = addon.functions.SettingsCreateExpandableSection(cGearUpgrade, {
 	name = L["GearUpgrades"],
 	newTagID = "GearUpgrades",
+	iconKey = "gearupgrades",
 	expanded = false,
 	colorizeTitle = false,
 })

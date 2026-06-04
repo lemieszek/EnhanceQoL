@@ -9,6 +9,7 @@ local cUnitFrame = addon.SettingsLayout.rootUI
 
 local expandable = addon.functions.SettingsCreateExpandableSection(cUnitFrame, {
 	name = UNITFRAME_LABEL,
+	iconKey = "unitframes",
 	expanded = false,
 	colorizeTitle = false,
 	newTagID = "UnitFrames",
