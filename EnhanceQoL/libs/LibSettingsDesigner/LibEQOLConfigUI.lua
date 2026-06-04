@@ -701,6 +701,56 @@ local function setTextColor(fontString, color)
 	end
 end
 
+function lib.IsButtonActuallyEnabled(button)
+	if not button or type(button.IsEnabled) ~= "function" then
+		return true
+	end
+	local ok, enabled = pcall(button.IsEnabled, button)
+	if not ok then
+		return true
+	end
+	return enabled == true or enabled == 1
+end
+
+function lib.IsWidgetDisabled(widget)
+	if not widget then
+		return false
+	end
+	if widget._eqolDisabled == true then
+		return true
+	end
+	local owner = widget._eqolOwner or widget._eqolOwnerRow
+	if owner and owner._eqolDisabled == true then
+		return true
+	end
+	return not lib.IsButtonActuallyEnabled(widget)
+end
+
+function lib.ApplyFlatButtonVisual(button)
+	if not button then return end
+	if lib.IsWidgetDisabled(button) then
+		setFrameBackdrop(button, DISABLED_CONTROL_BG, DISABLED_CONTROL_BORDER)
+		if button.Text then setTextColor(button.Text, TEXT.disabled) end
+		if button.Icon and button.Icon.SetAlpha then button.Icon:SetAlpha(0.45) end
+		if button.Arrow and button.Arrow.SetVertexColor then
+			button.Arrow:SetVertexColor(TEXT.disabled[1], TEXT.disabled[2], TEXT.disabled[3], TEXT.disabled[4] or 1)
+			button.Arrow:SetAlpha(0.55)
+		end
+		return
+	end
+	if button.selected then
+		setFrameBackdrop(button, SELECTED_BG, CARD_BORDER_HOVER)
+	else
+		setFrameBackdrop(button, button._eqolNormalBg or { 0.07, 0.065, 0.055, 0.92 }, button._eqolNormalBorder or CARD_BORDER)
+	end
+	if button.Text then setTextColor(button.Text, TEXT.main) end
+	if button.Icon and button.Icon.SetAlpha then button.Icon:SetAlpha(1) end
+	if button.Arrow and button.Arrow.SetVertexColor then
+		button.Arrow:SetVertexColor(TEXT.gold[1], TEXT.gold[2], TEXT.gold[3], TEXT.gold[4] or 1)
+		button.Arrow:SetAlpha(1)
+	end
+end
+
 local function getEffectiveScale(frame)
 	if frame and frame.GetEffectiveScale then
 		local scale = frame:GetEffectiveScale()
@@ -1337,11 +1387,23 @@ function lib.AttachControlNoteHover(row, state, control)
 		return
 	end
 	row:SetScript("OnEnter", function(self)
+		if self._eqolDisabled then
+			setFrameBackdrop(self, DISABLED_ROW_BG, DISABLED_ROW_BORDER)
+			if self.SetBorderColor then self:SetBorderColor(DISABLED_ROW_BORDER) end
+			return
+		end
 		setFrameBackdrop(self, ROW_HOVER_BG, ROW_HOVER_BORDER)
+		if self.SetBorderColor then self:SetBorderColor(ROW_HOVER_BORDER) end
 		lib.ShowControlNotePanel(state, self, control)
 	end)
 	row:SetScript("OnLeave", function(self)
-		setFrameBackdrop(self, ROW_BG, ROW_BORDER)
+		if self._eqolDisabled then
+			setFrameBackdrop(self, DISABLED_ROW_BG, DISABLED_ROW_BORDER)
+			if self.SetBorderColor then self:SetBorderColor(DISABLED_ROW_BORDER) end
+		else
+			setFrameBackdrop(self, ROW_BG, ROW_BORDER)
+			if self.SetBorderColor then self:SetBorderColor(ROW_BORDER) end
+		end
 		lib.HideControlNotePanel(state)
 	end)
 end
@@ -1720,7 +1782,10 @@ end
 local function makeFlatButton(parent, text, width, height, iconSource, iconIsAtlas)
 	local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
 	button:SetSize(width or 120, height or 26)
-	applyBackdrop(button, { 0.07, 0.065, 0.055, 0.92 }, CARD_BORDER)
+	button._eqolOwner = parent
+	button._eqolNormalBg = { 0.07, 0.065, 0.055, 0.92 }
+	button._eqolNormalBorder = CARD_BORDER
+	applyBackdrop(button, button._eqolNormalBg, button._eqolNormalBorder)
 	local leftInset = 10
 	if iconSource then
 		button.Icon = createIcon(button, iconSource, math.min((height or 26) - 8, 18), iconIsAtlas)
@@ -1734,22 +1799,16 @@ local function makeFlatButton(parent, text, width, height, iconSource, iconIsAtl
 	button.Text:SetJustifyV("MIDDLE")
 	button.Text:SetText(text or "")
 	setTextColor(button.Text, TEXT.main)
+	button._eqolApplyVisual = lib.ApplyFlatButtonVisual
 	button._eqolOnEnter = function(self)
-		if self._eqolDisabled then
+		if lib.IsWidgetDisabled(self) then
+			lib.ApplyFlatButtonVisual(self)
 			return
 		end
 		setFrameBackdrop(self, CARD_BG_HOVER, CARD_BORDER_HOVER)
 	end
 	button._eqolOnLeave = function(self)
-		if self._eqolDisabled then
-			setFrameBackdrop(self, DISABLED_CONTROL_BG, DISABLED_CONTROL_BORDER)
-			return
-		end
-		if self.selected then
-			setFrameBackdrop(self, SELECTED_BG, CARD_BORDER_HOVER)
-		else
-			setFrameBackdrop(self, { 0.07, 0.065, 0.055, 0.92 }, CARD_BORDER)
-		end
+		lib.ApplyFlatButtonVisual(self)
 	end
 	button:SetScript("OnEnter", button._eqolOnEnter)
 	button:SetScript("OnLeave", button._eqolOnLeave)
@@ -1779,7 +1838,12 @@ local function refreshControlRow(app, control, row)
 		if row.check.SetChecked then
 			row.check:SetChecked(app:GetControlValue(control) == true)
 		end
-		if not enabled then
+		if row.check.EnableMouse then
+			row.check:EnableMouse(true)
+		end
+		if row.check._eqolOnLeave then
+			row.check._eqolOnLeave(row.check)
+		elseif not enabled then
 			setFrameBackdrop(row.check, DISABLED_CONTROL_BG, DISABLED_CONTROL_BORDER)
 		end
 	end
@@ -1844,9 +1908,11 @@ local function refreshControlRow(app, control, row)
 				button:Disable()
 			end
 			if button.EnableMouse then
-				button:EnableMouse(enabled)
+				button:EnableMouse(true)
 			end
-			if enabled then
+			if button._eqolApplyVisual then
+				button._eqolApplyVisual(button)
+			elseif enabled then
 				setFrameBackdrop(button, button.selected and SELECTED_BG or { 0.07, 0.065, 0.055, 0.92 }, button.selected and CARD_BORDER_HOVER or CARD_BORDER)
 				if button.Text then setTextColor(button.Text, TEXT.main) end
 			else
@@ -2485,7 +2551,9 @@ local function addConfigureFallback(row, app, control, text, opts)
 		button:SetPoint("RIGHT", row, "RIGHT", -14, 0)
 	end
 	row.configureButton = button
-	setFrameBackdrop(button, { 0.100, 0.087, 0.064, 0.95 }, { 0.50, 0.39, 0.20, 0.78 })
+	button._eqolNormalBg = { 0.100, 0.087, 0.064, 0.95 }
+	button._eqolNormalBorder = { 0.50, 0.39, 0.20, 0.78 }
+	setFrameBackdrop(button, button._eqolNormalBg, button._eqolNormalBorder)
 	button:SetScript("OnClick", function()
 		if not app:IsControlEnabled(control) then
 			return
@@ -2655,6 +2723,7 @@ local function addDropdownWidget(row, app, control, opts)
 	row.value.Text:SetJustifyH("LEFT")
 	row.value.Text:SetJustifyV("MIDDLE")
 	local arrow = createDropdownArrow(button, app, 12)
+	button.Arrow = arrow
 	arrow:SetPoint("RIGHT", button, "RIGHT", -8, 0)
 	button:SetScript("OnClick", function(owner)
 		if not app:IsControlEnabled(control) then
@@ -2706,6 +2775,7 @@ local function addMultiDropdownWidget(row, app, control, opts)
 	row.value.Text:SetJustifyH("LEFT")
 	row.value.Text:SetJustifyV("MIDDLE")
 	local arrow = createDropdownArrow(button, app, 12)
+	button.Arrow = arrow
 	arrow:SetPoint("RIGHT", button, "RIGHT", -8, 0)
 
 	local function refreshSummary()
@@ -2774,6 +2844,7 @@ end
 local function addToggleWidget(row, app, control, opts)
 	opts = opts or {}
 	local switch = CreateFrame("Button", nil, row, "BackdropTemplate")
+	switch._eqolOwner = row
 	switch:SetSize(48, 24)
 	if opts.point then
 		switch:SetPoint(opts.point[1], opts.point[2], opts.point[3], opts.point[4], opts.point[5])
@@ -2806,6 +2877,7 @@ local function addToggleWidget(row, app, control, opts)
 
 	switch._eqolOnEnter = function(self)
 		if self._eqolDisabled then
+			setFrameBackdrop(self, DISABLED_CONTROL_BG, DISABLED_CONTROL_BORDER)
 			return
 		end
 		setBackdropBorderColor(self, CARD_BORDER_HOVER)
@@ -2849,6 +2921,7 @@ local function addColorWidget(row, app, control, opts)
 	currentLabel.Text:SetJustifyV("MIDDLE")
 
 	local swatch = CreateFrame("Button", nil, row, "BackdropTemplate")
+	swatch._eqolOwner = row
 	swatch:SetSize(34, 24)
 	swatch:SetPoint("LEFT", currentLabel, "RIGHT", 8, 0)
 	applyBackdrop(swatch, { 0.02, 0.02, 0.02, 0.92 }, CARD_BORDER)
@@ -3981,24 +4054,24 @@ local function renderSearch(state, query)
 			state.y = state.y - 8
 		else
 			local rowHeight = getSettingRowHeight(control)
-			local card = createContentFrame(state, rowHeight + 34)
+			local card = createContentFrame(state, rowHeight + 52)
 			applyBackdrop(card, CARD_BG, CARD_BORDER)
 			createPixelBorder(card, CARD_BORDER)
 
 			local rowWidth = (state.contentWidth or CONTENT_WIDTH) - 24
-			local row = addSettingRow(state, control, nil, card, -8, rowWidth)
+			local row = addSettingRow(state, control, nil, card, -10, rowWidth)
 			if row.Separator then
 				row.Separator:Hide()
 			end
 
 			local path = createText(card, FONT_MUTED, getControlPath(app, control), TEXT.subtle)
-			path:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", 14, 9)
+			path:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", 14, 10)
 			path:SetPoint("RIGHT", card, "RIGHT", -104, 0)
 			path:SetHeight(16)
 			path.Text:SetJustifyV("MIDDLE")
 
 			local openButton = makeFlatButton(card, (L["configCenterOpenButton"] or "Open"), 74, 24)
-			openButton:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -14, 6)
+			openButton:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -14, 8)
 			openButton:SetScript("OnClick", function()
 				state:SetPage(control.pageID, control.id)
 			end)
@@ -4361,11 +4434,12 @@ local function createFrame(app)
 	frame.SearchIcon:SetAlpha(0.72)
 
 	frame.SearchBox = CreateFrame("EditBox", nil, frame.SearchShell, "InputBoxTemplate")
-	frame.SearchBox:SetSize(286, 28)
-	frame.SearchBox:SetPoint("CENTER", frame.SearchShell, "CENTER", 0, 0)
+	frame.SearchBox:SetPoint("LEFT", frame.SearchShell, "LEFT", 0, 0)
+	frame.SearchBox:SetPoint("RIGHT", frame.SearchShell, "RIGHT", -24, 0)
+	frame.SearchBox:SetHeight(28)
 	frame.SearchBox:SetAutoFocus(false)
 	if frame.SearchBox.SetTextInsets then
-		frame.SearchBox:SetTextInsets(34, 28, 0, 0)
+		frame.SearchBox:SetTextInsets(34, 4, 0, 0)
 	end
 	for _, regionKey in ipairs({ "Left", "Middle", "Right", "LeftTex", "MiddleTex", "RightTex" }) do
 		local region = frame.SearchBox[regionKey]
@@ -4383,12 +4457,27 @@ local function createFrame(app)
 	frame.SearchPlaceholder:SetText((L["configCenterSearchPlaceholder"] or "Search settings") .. "...")
 	setTextColor(frame.SearchPlaceholder, TEXT.subtle)
 
-	frame.SearchClearButton = makeFlatButton(frame.SearchShell, "X", 24, 22)
-	frame.SearchClearButton:SetPoint("RIGHT", frame.SearchBox, "RIGHT", -4, 0)
-	frame.SearchClearButton.Text:ClearAllPoints()
-	frame.SearchClearButton.Text:SetAllPoints(frame.SearchClearButton)
-	frame.SearchClearButton.Text:SetJustifyH("CENTER")
-	frame.SearchClearButton.Text:SetJustifyV("MIDDLE")
+	frame.SearchClearButton = CreateFrame("Button", nil, frame.SearchShell)
+	frame.SearchClearButton:SetSize(14, 14)
+	frame.SearchClearButton:SetPoint("RIGHT", frame.SearchShell, "RIGHT", -7, 0)
+	frame.SearchClearButton:SetFrameLevel(frame.SearchBox:GetFrameLevel() + 5)
+	frame.SearchClearButton:RegisterForClicks("LeftButtonUp")
+	frame.SearchClearButton.Icon = frame.SearchClearButton:CreateTexture(nil, "OVERLAY")
+	frame.SearchClearButton.Icon:SetAllPoints(frame.SearchClearButton)
+	if frame.SearchClearButton.Icon.SetAtlas then
+		if not pcall(frame.SearchClearButton.Icon.SetAtlas, frame.SearchClearButton.Icon, "common-search-clearbutton", false) then
+			frame.SearchClearButton.Icon:SetTexture("Interface\\Common\\VoiceChat-Muted")
+		end
+	else
+		frame.SearchClearButton.Icon:SetTexture("Interface\\Common\\VoiceChat-Muted")
+	end
+	frame.SearchClearButton.Icon:SetAlpha(0.70)
+	frame.SearchClearButton:SetScript("OnEnter", function(self)
+		self.Icon:SetAlpha(1)
+	end)
+	frame.SearchClearButton:SetScript("OnLeave", function(self)
+		self.Icon:SetAlpha(0.70)
+	end)
 	frame.SearchClearButton:SetScript("OnClick", function()
 		frame.SearchBox:SetText("")
 		frame.SearchBox:ClearFocus()
