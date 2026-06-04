@@ -8,6 +8,10 @@
 - System / UI: Removed Blizzard CVar toggles that are base-game only and no longer needed in this addon: "Show LUA-Error on UI", "Auto-push new spells to your action bars", and "Enable Advanced Tooltips".
 - Settings / UI: Removed the empty `System & Debug` section from the General settings page.
 
+### 🐛 Fixed
+
+- Damage Meter: Fixed a secret-value error when tooltip bar, icon, or row borders were refreshed while showing source breakdown tooltips in restricted combat-data environments.
+
 ---
 
 ## [11.0.0-alpha1] - 2026-06-03

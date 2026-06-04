@@ -2704,23 +2704,47 @@ function DamageMeter:ApplyTooltipFontString(fontString, config)
 end
 
 local function applyTooltipBorder(border, enabled, textureKey, size, r, g, b, a)
-	if not border or not border.SetBackdrop then return end
+	if not border then return end
 	if enabled then
-		local backdropChanged = false
+		if not border._damageMeterBorderTop then
+			border._damageMeterBorderTop = border:CreateTexture(nil, "BORDER")
+			border._damageMeterBorderBottom = border:CreateTexture(nil, "BORDER")
+			border._damageMeterBorderLeft = border:CreateTexture(nil, "BORDER")
+			border._damageMeterBorderRight = border:CreateTexture(nil, "BORDER")
+		end
+		local top = border._damageMeterBorderTop
+		local bottom = border._damageMeterBorderBottom
+		local left = border._damageMeterBorderLeft
+		local right = border._damageMeterBorderRight
 		if border._damageMeterBackdropEnabled ~= true
 			or border._damageMeterBackdropTexture ~= textureKey
 			or border._damageMeterBackdropSize ~= size then
 			border._damageMeterBackdropEnabled = true
 			border._damageMeterBackdropTexture = textureKey
 			border._damageMeterBackdropSize = size
-			backdropChanged = true
-			border:SetBackdrop({
-				edgeFile = resolveMedia("border", textureKey, DEFAULT_BORDER),
-				edgeSize = size,
-			})
+			local texture = resolveMedia("border", textureKey, DEFAULT_BORDER)
+			top:SetTexture(texture)
+			bottom:SetTexture(texture)
+			left:SetTexture(texture)
+			right:SetTexture(texture)
+			top:ClearAllPoints()
+			top:SetPoint("TOPLEFT", border, "TOPLEFT")
+			top:SetPoint("TOPRIGHT", border, "TOPRIGHT")
+			top:SetHeight(size)
+			bottom:ClearAllPoints()
+			bottom:SetPoint("BOTTOMLEFT", border, "BOTTOMLEFT")
+			bottom:SetPoint("BOTTOMRIGHT", border, "BOTTOMRIGHT")
+			bottom:SetHeight(size)
+			left:ClearAllPoints()
+			left:SetPoint("TOPLEFT", border, "TOPLEFT")
+			left:SetPoint("BOTTOMLEFT", border, "BOTTOMLEFT")
+			left:SetWidth(size)
+			right:ClearAllPoints()
+			right:SetPoint("TOPRIGHT", border, "TOPRIGHT")
+			right:SetPoint("BOTTOMRIGHT", border, "BOTTOMRIGHT")
+			right:SetWidth(size)
 		end
-		if backdropChanged
-			or border._damageMeterBorderColorR ~= r
+		if border._damageMeterBorderColorR ~= r
 			or border._damageMeterBorderColorG ~= g
 			or border._damageMeterBorderColorB ~= b
 			or border._damageMeterBorderColorA ~= a then
@@ -2728,8 +2752,15 @@ local function applyTooltipBorder(border, enabled, textureKey, size, r, g, b, a)
 			border._damageMeterBorderColorG = g
 			border._damageMeterBorderColorB = b
 			border._damageMeterBorderColorA = a
-			border:SetBackdropBorderColor(r, g, b, a)
+			top:SetVertexColor(r, g, b, a)
+			bottom:SetVertexColor(r, g, b, a)
+			left:SetVertexColor(r, g, b, a)
+			right:SetVertexColor(r, g, b, a)
 		end
+		top:Show()
+		bottom:Show()
+		left:Show()
+		right:Show()
 		setShownIfChanged(border, true)
 	else
 		if border._damageMeterBackdropEnabled ~= false then
@@ -2740,7 +2771,10 @@ local function applyTooltipBorder(border, enabled, textureKey, size, r, g, b, a)
 			border._damageMeterBorderColorG = nil
 			border._damageMeterBorderColorB = nil
 			border._damageMeterBorderColorA = nil
-			border:SetBackdrop(nil)
+			if border._damageMeterBorderTop then border._damageMeterBorderTop:Hide() end
+			if border._damageMeterBorderBottom then border._damageMeterBorderBottom:Hide() end
+			if border._damageMeterBorderLeft then border._damageMeterBorderLeft:Hide() end
+			if border._damageMeterBorderRight then border._damageMeterBorderRight:Hide() end
 		end
 		setShownIfChanged(border, false)
 	end
@@ -4328,9 +4362,9 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 			end
 			local classFilename = data.classFilename or (source and source.classFilename)
 			local barR, barG, barB, barA = getClassOrCustomColor(classFilename, config.tooltipBarColor, DEFAULT_WINDOW.tooltipBarColor, config.tooltipBarUseClassColor)
+			local availableBarWidth = math.max(1, width - rightPadding - barStartX)
+			local barHeight = math.max(1, currentLineHeight - 3)
 			if showBars and not data.header and not data.spacer and data.barValue ~= nil then
-				local availableBarWidth = math.max(1, width - rightPadding - barStartX)
-				local barHeight = math.max(1, currentLineHeight - 3)
 				line.barBG:SetTexture(barTexture)
 				line.barBG:SetVertexColor(0, 0, 0, math.min(0.45, (barA or 1) * 0.6))
 				line.barBG:SetPoint("LEFT", line.icon, "RIGHT", tooltipIconGap, 0)
@@ -4349,20 +4383,28 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 			end
 			local showLineBorders = not data.header and not data.spacer
 			local rowBorderOffset = clampNumber(config.tooltipRowBorderInset, 0, 24, DEFAULT_WINDOW.tooltipRowBorderInset)
+			local rowBorderWidth = math.max(1, width - rightPadding - 6 + (rowBorderOffset * 2))
+			local rowBorderHeight = math.max(1, currentLineHeight + (rowBorderOffset * 2))
+			line.rowBorder:ClearAllPoints()
 			line.rowBorder:SetPoint("TOPLEFT", line.icon, "TOPLEFT", -rowBorderOffset, rowBorderOffset)
-			line.rowBorder:SetPoint("BOTTOMRIGHT", line, "BOTTOMRIGHT", -(rightPadding - rowBorderOffset), -rowBorderOffset)
+			line.rowBorder:SetSize(rowBorderWidth, rowBorderHeight)
 			local rbr, rbg, rbb, rba = getClassOrCustomColor(classFilename, config.tooltipRowBorderColor, DEFAULT_WINDOW.tooltipRowBorderColor, config.tooltipRowBorderUseClassColor)
 			applyTooltipBorder(line.rowBorder, showLineBorders and config.tooltipRowBorderEnabled == true, config.tooltipRowBorderTexture, clampNumber(config.tooltipRowBorderSize, 1, 32, DEFAULT_WINDOW.tooltipRowBorderSize), rbr, rbg, rbb, rba)
 
 			local barBorderOffset = clampNumber(config.tooltipBarBorderInset, 0, 24, DEFAULT_WINDOW.tooltipBarBorderInset)
+			local barBorderWidth = math.max(1, availableBarWidth + (barBorderOffset * 2))
+			local barBorderHeight = math.max(1, barHeight + (barBorderOffset * 2))
+			line.barBorder:ClearAllPoints()
 			line.barBorder:SetPoint("TOPLEFT", line.bar, "TOPLEFT", -barBorderOffset, barBorderOffset)
-			line.barBorder:SetPoint("BOTTOMRIGHT", line.bar, "BOTTOMRIGHT", barBorderOffset, -barBorderOffset)
+			line.barBorder:SetSize(barBorderWidth, barBorderHeight)
 			local bbr, bbg, bbb, bba = getClassOrCustomColor(classFilename, config.tooltipBarBorderColor, DEFAULT_WINDOW.tooltipBarBorderColor, config.tooltipBarBorderUseClassColor)
 			applyTooltipBorder(line.barBorder, line.bar:IsShown() and config.tooltipBarBorderEnabled == true, config.tooltipBarBorderTexture, clampNumber(config.tooltipBarBorderSize, 1, 32, DEFAULT_WINDOW.tooltipBarBorderSize), bbr, bbg, bbb, bba)
 
 			local iconBorderOffset = clampNumber(config.tooltipIconBorderInset, 0, 24, DEFAULT_WINDOW.tooltipIconBorderInset)
+			local iconBorderSize = math.max(1, tooltipIconSize + (iconBorderOffset * 2))
+			line.iconBorder:ClearAllPoints()
 			line.iconBorder:SetPoint("TOPLEFT", line.icon, "TOPLEFT", -iconBorderOffset, iconBorderOffset)
-			line.iconBorder:SetPoint("BOTTOMRIGHT", line.icon, "BOTTOMRIGHT", iconBorderOffset, -iconBorderOffset)
+			line.iconBorder:SetSize(iconBorderSize, iconBorderSize)
 			local ibr, ibg, ibb, iba = getClassOrCustomColor(classFilename, config.tooltipIconBorderColor, DEFAULT_WINDOW.tooltipIconBorderColor, config.tooltipIconBorderUseClassColor)
 			applyTooltipBorder(line.iconBorder, line.icon:IsShown() and showLineBorders and config.tooltipIconBorderEnabled == true, config.tooltipIconBorderTexture, clampNumber(config.tooltipIconBorderSize, 1, 32, DEFAULT_WINDOW.tooltipIconBorderSize), ibr, ibg, ibb, iba)
 
