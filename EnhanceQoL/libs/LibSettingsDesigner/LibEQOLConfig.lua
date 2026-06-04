@@ -1,4 +1,4 @@
-local MODULE_MAJOR, MINOR = "LibEQOLConfig-1.0", 3
+local MODULE_MAJOR, MINOR = "LibEQOLConfig-1.0", 1
 local LibStub = _G.LibStub
 assert(LibStub, MODULE_MAJOR .. " requires LibStub")
 
@@ -747,6 +747,12 @@ function AppMixin:GetSearchResults(query, limit)
 end
 
 function AppMixin:IsControlCustomized(control)
+	if not control or control.trackCustomized == false then
+		return false
+	end
+	if control.type == "button" or control.type == "keybind" then
+		return false
+	end
 	local default, hasDefault = resolveControlDefault(control)
 	if not hasDefault then
 		return false

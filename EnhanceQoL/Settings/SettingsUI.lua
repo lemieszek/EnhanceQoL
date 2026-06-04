@@ -567,6 +567,7 @@ local function registerLegacyControl(category, cbData, controlType, setting)
 		end or nil,
 		keywords = cbData.searchtags,
 		level = cbData.level,
+		trackCustomized = cbData.trackCustomized,
 		order = type(cbData.order) == "number" and cbData.order or addon.ConfigControlOrder,
 		newTagID = cbData.newTagID,
 		groupID = groupID,

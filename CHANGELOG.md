@@ -2,14 +2,64 @@
 
 ## [11.0.0-alpha2] - 2026-06-04
 
+### ✨ Added
+
+- Settings Center: Added a richer dashboard for the experimental settings center, including quick-access cards, AddOn status tiles, customized feature overview, and a "New in this Version" overview.
+- Settings Center: Added modern category overview cards with feature icons, concise descriptions, setting counts, and clearer hover/selected states.
+- Settings Center: Added modern detail pages with fixed breadcrumb/back navigation, two-column detail layout, section cards, compact setting rows, and a persistent About panel.
+- Settings Center: Added native renderers for more setting control types, including compact toggles, stacked sliders, dropdowns, multi-dropdowns, inputs, color pickers, and polished configure/legacy fallbacks for complex controls.
+- Settings Center: Added setting notes/tooltips for richer contextual help on individual settings.
+- Settings Center: Added search-result cards that can show and edit matching controls directly, then open and scroll to the owning setting location.
+- Settings Center: Added `tag:new` search support and a dashboard shortcut for finding settings marked as new in the current version.
+- Settings Center: Added NEW badges to relevant sidebar categories and individual setting rows.
+- Settings Center: Added local LibSettingsDesigner assets for the modern frame shell, dropdown/collapse indicators, textures, and settings-center UI material.
+- Settings Center: Added EnhanceQoL-specific category/page icons for the modern settings overview.
+- Settings Center: Added internal library locale coverage for generic LibSettingsDesigner UI strings.
+
+### 🔄 Changed
+
+- Settings Center: Moved the experimental config stack out of `LibEQOL` into the standalone `LibSettingsDesigner` folder so it can evolve independently from the legacy settings wrapper.
+- Settings Center: Reworked the visual style toward a darker WoW-native charcoal material with clearer surface hierarchy, calmer normal borders, and stronger gold hover/selected borders.
+- Settings Center: Reworked the window frame, top bar, close button, search box, scrollbars, and spacing to better match the target mockup.
+- Settings Center: Reworked sliders into compact stacked field rows with aligned current value, muted min/max labels, and full-width tracks.
+- Settings Center: Reworked dropdown and multi-dropdown menus with clearer selected-state display, disabled-state handling, and radio/checkbox-style entries.
+- Settings Center: Reworked search so repeated searches reset to the top and clearing the query returns to the previous view.
+- Settings Center: Reworked the dashboard and category overview so non-clickable informational tiles no longer show misleading clickable hover borders.
+- Settings Center: Reworked "Customized settings" wording to the shorter "Customized".
+- Settings Center: Reworked `About` as the page overview panel and removed `Related` from the EnhanceQoL layout for now.
+- Settings Center: Reworked page descriptions, icons, and search metadata to be driven by EnhanceQoL page IDs instead of English display text, improving non-English locales.
+- Settings Center: Reworked new-setting counts so root/category/page placeholders are not counted as new settings.
+
 ### ❌ Removed
 
 - System / CVar: Removed the deprecated "Persist CVar values" option and its storage logic.
 - System / UI: Removed Blizzard CVar toggles that are base-game only and no longer needed in this addon: "Show LUA-Error on UI", "Auto-push new spells to your action bars", and "Enable Advanced Tooltips".
 - Settings / UI: Removed the empty `System & Debug` section from the General settings page.
+- Settings / Blizzard UI: Removed the temporary "Open EnhanceQoL Settings" button from the Blizzard Settings page to avoid confusing the release path while `/eqol2` remains experimental.
 
 ### 🐛 Fixed
 
+- Settings Center: Fixed random first checkboxes being promoted into fake page master toggles.
+- Settings Center: Fixed grouped detail pages by bridging existing settings headlines into modern section cards.
+- Settings Center: Fixed many controls rendering as static grey values instead of real widgets.
+- Settings Center: Fixed disabled dropdowns, color pickers, and related controls remaining clickable.
+- Settings Center: Fixed multi-dropdown selected values not visually reflecting the saved selection.
+- Settings Center: Fixed dependent controls not updating enabled/disabled state live after toggling their parent setting.
+- Settings Center: Fixed dropdown and multi-dropdown text vertical alignment.
+- Settings Center: Fixed repeated search/open navigation preserving an old scroll position.
+- Settings Center: Fixed scrollbar alignment, track height, and overlap issues across dashboard, category, search, and detail views.
+- Settings Center: Fixed detail-page bottom borders and last-row separators overlapping or showing unnecessary divider lines.
+- Settings Center: Fixed detail-page About panels starting lower than the main settings column.
+- Settings Center: Fixed top-bar title/search visibility issues caused by color/layering.
+- Settings Center: Fixed missing or incorrect localized text for dashboard, generic controls, About panels, and library-owned UI labels.
+- Settings Center: Fixed page/category icons resolving from translated text instead of stable IDs.
+- Settings Center: Fixed false "Customized" counts on fresh profiles by comparing only stored values against real `addon.dbDefaults`, supporting sub-settings, and normalizing color tables with alpha/default float tolerance.
+- Settings Center: Fixed `instanceDifficultyColors` defaults being written only to the active profile instead of also being available to the modern registry.
+- Settings Center: Fixed missing `subvar` metadata in the legacy-to-modern registry bridge.
+- Settings Center: Fixed color picker rows using disabled-looking swatches/buttons even when the setting was active.
+- Settings Center: Fixed NEW search results initially returning category/page placeholders instead of concrete new settings.
+- Settings Center: Fixed `tag:new` showing no results when old Blizzard Settings still marked settings as new.
+- Settings Center: Fixed the LibSettingsDesigner main file hitting WoW's "more than 200 local variables" warning by moving constant data out of the main function path.
 - Damage Meter: Fixed a secret-value error when tooltip bar, icon, or row borders were refreshed while showing source breakdown tooltips in restricted combat-data environments.
 
 ---

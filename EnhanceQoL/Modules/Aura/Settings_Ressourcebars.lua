@@ -5503,6 +5503,7 @@ addon.Aura.functions.AddResourceBarsProfileSettings = function()
 		get = getScope,
 		set = setScope,
 		default = "ALL",
+		trackCustomized = false,
 		parentSection = expandableProfile,
 	})
 
