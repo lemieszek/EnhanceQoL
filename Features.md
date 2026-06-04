@@ -118,7 +118,6 @@ Expose console variables as checkboxes:
 - Show LUA-Error on UI.
 - Show class colors on nameplates.
 - Disable tutorials.
-- Enable enhanced tooltips.
 - Show the Guild on Players.
 - Show the Title on Players.
 - Make the entire chat window clickable.

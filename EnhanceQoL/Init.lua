@@ -900,23 +900,4 @@ addon.variables.cvarOptions = {
 		description = addon.L["ffxDeath"],
 		category = "cvarCategoryDisplay",
 	},
-	["scriptErrors"] = {
-		trueValue = "1",
-		falseValue = "0",
-		description = addon.L["scriptErrors"],
-		category = "cvarCategorySystem",
-	},
-	["UberTooltips"] = {
-		trueValue = "1",
-		falseValue = "0",
-		description = addon.L["UberTooltips"],
-		category = "cvarCategorySystem",
-	},
-	["AutoPushSpellToActionBar"] = {
-		trueValue = "1",
-		falseValue = "0",
-		description = addon.L["AutoPushSpellToActionBar"],
-		persistent = true,
-		category = "cvarCategoryUtility",
-	},
 }

@@ -1133,15 +1133,6 @@ local function createActionBarCategory()
 		colorizeTitle = false,
 	})
 
-	addon.functions.SettingsCreateCheckbox(category, {
-		var = "AutoPushSpellToActionBar",
-		text = L["AutoPushSpellToActionBar"],
-		get = function() return getCVarOptionState("AutoPushSpellToActionBar") end,
-		func = function(value) setCVarOptionState("AutoPushSpellToActionBar", value) end,
-		default = false,
-		parentSection = expandable,
-	})
-
 	createActionBarVisibility(category, expandable)
 	createAnchorControls(category, expandable)
 	createButtonAppearanceControls(category, expandable)

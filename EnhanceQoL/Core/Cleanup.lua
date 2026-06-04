@@ -234,9 +234,23 @@ local function cleanupResourceBarProfile(profile)
 	end
 end
 
+local CVAR_PERSISTENCE_REMOVAL_KEYS = {
+	"cvarPersistenceEnabled",
+	"cvarOverrides",
+	"AutoPushSpellToActionBar",
+}
+
+local function cleanupRemovedCVarPersistenceKeys(profile)
+	if type(profile) ~= "table" then return end
+	for i = 1, #CVAR_PERSISTENCE_REMOVAL_KEYS do
+		profile[CVAR_PERSISTENCE_REMOVAL_KEYS[i]] = nil
+	end
+end
+
 local function cleanupLegacyProfileKeys(profile)
 	cleanupListedProfileKeys(profile, LEGACY_PROFILE_KEYS)
 	cleanupListedProfileKeys(profile, MULTIDROPDOWN_SCRATCH_PROFILE_KEYS)
+	cleanupRemovedCVarPersistenceKeys(profile)
 end
 
 local function cleanupCooldownPanelsStorageProfile(profile)

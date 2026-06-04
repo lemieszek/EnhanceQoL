@@ -1,5 +1,14 @@
 # Changelog
 
+## [11.0.0-alpha2] - 2026-06-04
+
+### ❌ Removed
+
+- System / CVar: Removed the deprecated "Persist CVar values" option and its storage logic.
+- System / UI: Removed Blizzard CVar toggles that are base-game only and no longer needed in this addon: "Show LUA-Error on UI", "Auto-push new spells to your action bars", and "Enable Advanced Tooltips".
+
+---
+
 ## [11.0.0-alpha1] - 2026-06-03
 
 ### ℹ️ Important

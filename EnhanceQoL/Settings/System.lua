@@ -261,32 +261,7 @@ local systemExpandable = addon.functions.SettingsCreateExpandableSection(cGenera
 	colorizeTitle = false,
 })
 
-local systemData = {
-	{
-		var = "cvarPersistenceEnabled",
-		text = L["cvarPersistence"],
-		desc = L["cvarPersistenceDesc"],
-		func = function(key)
-			addon.db["cvarPersistenceEnabled"] = key
-			if addon.functions.initializePersistentCVars then addon.functions.initializePersistentCVars() end
-		end,
-		default = false,
-	},
-	{
-		var = "scriptErrors",
-		text = L["scriptErrors"],
-		get = function() return getCVarOptionState("scriptErrors") end,
-		func = function(value) setCVarOptionState("scriptErrors", value) end,
-		default = false,
-	},
-	{
-		var = "UberTooltips",
-		text = L["UberTooltips"],
-		get = function() return getCVarOptionState("UberTooltips") end,
-		func = function(value) setCVarOptionState("UberTooltips", value) end,
-		default = false,
-	},
-}
+local systemData = {}
 
 applyParentSection(systemData, systemExpandable)
 addon.functions.SettingsCreateCheckboxes(cGeneral, systemData)
