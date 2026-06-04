@@ -1,5 +1,14 @@
 # Changelog
 
+## [11.0.0-alpha3] - 2026-06-04
+
+### 🐛 Fixed
+
+- Settings Center / Skinner: Fixed the Character Frame setting order so the main Character Frame toggle appears first and disables the dependent alpha and border options when turned off.
+- Settings Center / Skinner: Added a Character Frame section header and renamed the main toggle to make it clear that it enables Character Frame skinning.
+
+---
+
 ## [11.0.0-alpha2] - 2026-06-04
 
 ### ✨ Added

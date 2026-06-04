@@ -794,23 +794,9 @@ function addon.Skinner.functions.InitSettings()
 
 	addon.Skinner.variables.settingsExpandable = expandable
 
-	addon.functions.SettingsCreateSlider(category, {
-		var = "skinnerCharacterFrameAlpha",
-		text = L["skinnerCharacterFrameAlpha"],
-		default = FLAT_PANEL_BG.a,
-		min = 0,
-		max = 1,
-		step = 0.05,
-		set = function(value)
-			addon.db["skinnerCharacterFrameAlpha"] = value
-			if addon.Skinner and addon.Skinner.functions and addon.Skinner.functions.ApplyCharacterFrameSkin and isCharacterFrameSkinEnabled() then
-				addon.Skinner.functions.ApplyCharacterFrameSkin()
-			end
-		end,
-		parentSection = expandable,
-	})
+	addon.functions.SettingsCreateHeadline(category, L["skinnerCharacterFrameSection"], { parentSection = expandable })
 
-	addon.functions.SettingsCreateCheckbox(category, {
+	local characterFrameToggle = addon.functions.SettingsCreateCheckbox(category, {
 		var = "skinnerCharacterFrameEnabled",
 		text = L["skinnerCharacterFrameEnabled"],
 		default = false,
@@ -827,6 +813,26 @@ function addon.Skinner.functions.InitSettings()
 		parentSection = expandable,
 	})
 
+	local function isCharacterFrameSkinSettingEnabled() return isCharacterFrameSkinEnabled() end
+
+	addon.functions.SettingsCreateSlider(category, {
+		var = "skinnerCharacterFrameAlpha",
+		text = L["skinnerCharacterFrameAlpha"],
+		default = FLAT_PANEL_BG.a,
+		min = 0,
+		max = 1,
+		step = 0.05,
+		set = function(value)
+			addon.db["skinnerCharacterFrameAlpha"] = value
+			if addon.Skinner and addon.Skinner.functions and addon.Skinner.functions.ApplyCharacterFrameSkin and isCharacterFrameSkinEnabled() then
+				addon.Skinner.functions.ApplyCharacterFrameSkin()
+			end
+		end,
+		element = characterFrameToggle and characterFrameToggle.element,
+		parentCheck = isCharacterFrameSkinSettingEnabled,
+		parentSection = expandable,
+	})
+
 	local borderToggle = addon.functions.SettingsCreateCheckbox(category, {
 		var = "skinnerCharacterFrameBorderEnabled",
 		text = L["skinnerOuterFrameBorder"],
@@ -837,8 +843,14 @@ function addon.Skinner.functions.InitSettings()
 				addon.Skinner.functions.ApplyCharacterFrameSkin()
 			end
 		end,
+		element = characterFrameToggle and characterFrameToggle.element,
+		parentCheck = isCharacterFrameSkinSettingEnabled,
 		parentSection = expandable,
 	})
+
+	local function isCharacterFrameBorderSettingEnabled()
+		return isCharacterFrameSkinSettingEnabled() and addon.db and addon.db.skinnerCharacterFrameBorderEnabled == true
+	end
 
 	addon.functions.SettingsCreateSlider(category, {
 		var = "skinnerCharacterFrameBorderSize",
@@ -854,7 +866,7 @@ function addon.Skinner.functions.InitSettings()
 			end
 		end,
 		element = borderToggle and borderToggle.element,
-		parentCheck = function() return addon.db and addon.db.skinnerCharacterFrameBorderEnabled == true end,
+		parentCheck = isCharacterFrameBorderSettingEnabled,
 		parentSection = expandable,
 	})
 
@@ -868,7 +880,7 @@ function addon.Skinner.functions.InitSettings()
 			end
 		end,
 		element = borderToggle and borderToggle.element,
-		parentCheck = function() return addon.db and addon.db.skinnerCharacterFrameBorderEnabled == true end,
+		parentCheck = isCharacterFrameBorderSettingEnabled,
 		parentSection = expandable,
 	})
 end
