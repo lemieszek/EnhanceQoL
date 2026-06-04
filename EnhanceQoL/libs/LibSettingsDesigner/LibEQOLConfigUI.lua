@@ -2226,6 +2226,28 @@ local function addStatusChip(parent, text, color, width)
 	return chip
 end
 
+function lib.CreateNewBadge(parent)
+	local ok, badge = pcall(CreateFrame, "Frame", nil, parent, "NewFeatureLabelNoAnimateTemplate")
+	if not ok or not badge then
+		ok, badge = pcall(CreateFrame, "Frame", nil, parent, "NewFeatureLabelTemplate")
+	end
+	if ok and badge then
+		badge:SetScale(0.78)
+		badge:SetShown(true)
+		return badge
+	end
+	local chip = addStatusChip(parent, _G.NEW or "New", TEXT.gold, 54)
+	return chip
+end
+
+function lib.SetSearchQuery(state, query)
+	if not (state and state.frame and state.frame.SearchBox) then
+		return
+	end
+	state.frame.SearchBox:SetText(query or "")
+	state.frame.SearchBox:ClearFocus()
+end
+
 local function getDashboardIconSize(iconSource)
 	return 48, 48
 end
@@ -2353,12 +2375,15 @@ local function splitVersionBadge(version)
 	return version, nil
 end
 
-local function addDashboardStatusTile(parent, index, iconSource, iconAtlas, title, value, badge)
+local function addDashboardStatusTile(parent, index, iconSource, iconAtlas, title, value, badge, action)
 	local width = math.floor((parent.tileWidth or 160))
-	local tile = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+	local tile = CreateFrame(action and "Button" or "Frame", nil, parent, "BackdropTemplate")
 	tile:SetSize(width, STATUS_TILE_HEIGHT)
 	tile:SetPoint("TOPLEFT", parent, "TOPLEFT", 14 + ((index - 1) * (width + GRID_GAP)), -44)
-	styleRaisedTile(tile, false)
+	styleRaisedTile(tile, action ~= nil)
+	if action then
+		tile:SetScript("OnMouseUp", action)
+	end
 
 	local icon = tile:CreateTexture(nil, "OVERLAY")
 	icon:SetSize(STATUS_ICON_SIZE, STATUS_ICON_SIZE)
@@ -2415,7 +2440,13 @@ local function addDashboardStatusPanel(state, stats, statusConfig)
 	local innerWidth = (state.contentWidth or CONTENT_WIDTH) - 28
 	panel.tileWidth = math.floor((innerWidth - ((#tiles - 1) * GRID_GAP)) / math.max(#tiles, 1))
 	for index, tile in ipairs(tiles) do
-		addDashboardStatusTile(panel, index, tile.icon, tile.atlas, tile.title, tile.value, tile.badge)
+		local action
+		if tile.searchQuery then
+			action = function() lib.SetSearchQuery(state, tile.searchQuery) end
+		elseif type(tile.onClick) == "function" then
+			action = function() tile.onClick(state, app, stats) end
+		end
+		addDashboardStatusTile(panel, index, tile.icon, tile.atlas, tile.title, tile.value, tile.badge, action)
 	end
 	state.y = state.y - 12
 	return panel
@@ -3015,9 +3046,10 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 	end
 	local desc = createText(row, FONT_MUTED, descText or "", TEXT.muted)
 	desc.Text:SetWordWrap(true)
+	local hasNewBadge = lib.IsControlNew(app, control)
 
 	if layoutType == "boolean" then
-		title:SetPoint("RIGHT", row, "RIGHT", -88, 0)
+		title:SetPoint("RIGHT", row, "RIGHT", hasNewBadge and -154 or -88, 0)
 		desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -5)
 		desc:SetPoint("RIGHT", row, "RIGHT", -88, 0)
 		desc:SetHeight(30)
@@ -3025,9 +3057,9 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 	elseif layoutType == "stacked" then
 		local valueWidth = controlType == "slider" and 96 or 0
 		if valueWidth > 0 then
-			title:SetPoint("RIGHT", row, "RIGHT", -(valueWidth + 18), 0)
+			title:SetPoint("RIGHT", row, "RIGHT", hasNewBadge and -178 or -(valueWidth + 18), 0)
 		else
-			title:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+			title:SetPoint("RIGHT", row, "RIGHT", hasNewBadge and -154 or -18, 0)
 		end
 
 		local controlWidth = getFieldControlWidth(rowWidth)
@@ -3141,7 +3173,7 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 			})
 		end
 	elseif controlType == "coloroverrides" then
-		title:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+		title:SetPoint("RIGHT", row, "RIGHT", hasNewBadge and -154 or -18, 0)
 		desc.Text:SetText(control.description or "")
 		desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
 		desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
@@ -3155,7 +3187,7 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 			},
 		})
 	elseif controlType == "button" then
-		title:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+		title:SetPoint("RIGHT", row, "RIGHT", hasNewBadge and -154 or -18, 0)
 		desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
 		desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
 		desc:SetHeight(36)
@@ -3173,7 +3205,7 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 			end
 		end)
 	else
-		title:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+		title:SetPoint("RIGHT", row, "RIGHT", hasNewBadge and -154 or -18, 0)
 		desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
 		desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
 		desc:SetHeight(36)
@@ -3185,6 +3217,11 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 		local badgeText = controlType == "keybind" and (_G.KEY_BINDINGS or "Key Bindings") or (control.level == "advanced" and "Advanced" or "Legacy")
 		local badge = addStatusChip(row, badgeText, TEXT.muted, 92)
 		badge:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", textLeft, 15)
+	end
+
+	if hasNewBadge then
+		local newBadge = lib.CreateNewBadge(row)
+		newBadge:SetPoint("TOPRIGHT", row, "TOPRIGHT", -118, -8)
 	end
 
 	refreshControlRow(app, control, row)
@@ -3270,8 +3307,12 @@ local function addPageCard(state, page, row, index, columns)
 
 	local title = createText(card, FONT_HEADER, page.title or page.id, TEXT.main)
 	title:SetPoint("TOPLEFT", card, "TOPLEFT", textLeft, -24)
-	title:SetPoint("RIGHT", card, "RIGHT", -rightInset, 0)
+	title:SetPoint("RIGHT", card, "RIGHT", lib.IsPageOrChildNew(state.app, page) and -82 or -rightInset, 0)
 	title:SetHeight(22)
+	if lib.IsPageOrChildNew(state.app, page) then
+		local newBadge = lib.CreateNewBadge(card)
+		newBadge:SetPoint("TOPRIGHT", card, "TOPRIGHT", -16, -18)
+	end
 
 	local desc = getPageCardDescription(state.app, page)
 	local descText = createText(card, FONT_MUTED, desc, TEXT.muted)
@@ -3333,7 +3374,10 @@ local function collectCustomizedPages(app, limit)
 	return result
 end
 
-local function isNewTagActive(app, tagID)
+function lib.IsNewTagActive(app, tagID)
+	if app and type(app.IsNewTagActive) == "function" then
+		return app:IsNewTagActive(tagID)
+	end
 	local resolver = app and app.opts and app.opts.isNewTag
 	if type(resolver) ~= "function" or not tagID then
 		return false
@@ -3342,11 +3386,52 @@ local function isNewTagActive(app, tagID)
 	return ok and result == true
 end
 
+function lib.IsPageNew(app, page)
+	if app and type(app.IsPageNew) == "function" then
+		return app:IsPageNew(page)
+	end
+	return page and page.newTagID and lib.IsNewTagActive(app, page.newTagID) or false
+end
+
+function lib.IsControlNew(app, control)
+	if app and type(app.IsControlNew) == "function" then
+		return app:IsControlNew(control)
+	end
+	if control and control.newTagID and lib.IsNewTagActive(app, control.newTagID) then
+		return true
+	end
+	return false
+end
+
+function lib.IsPageOrChildNew(app, page)
+	if lib.IsPageNew(app, page) then
+		return true
+	end
+	for _, control in ipairs((page and page.controls) or {}) do
+		if lib.IsControlNew(app, control) then
+			return true
+		end
+	end
+	return false
+end
+
+function lib.IsCategoryNew(app, categoryID)
+	if not (app and categoryID) then
+		return false
+	end
+	for _, page in ipairs(app:GetPages(categoryID)) do
+		if lib.IsPageOrChildNew(app, page) then
+			return true
+		end
+	end
+	return false
+end
+
 local function collectNewEntries(app, limit)
 	local result = {}
 	local seen = {}
 	for _, page in ipairs(app.pages or {}) do
-		if page.newTagID and isNewTagActive(app, page.newTagID) and not seen[page.id] then
+		if lib.IsPageNew(app, page) and not seen[page.id] then
 			result[#result + 1] = {
 				title = page.title or page.id,
 				pageID = page.id,
@@ -3356,7 +3441,7 @@ local function collectNewEntries(app, limit)
 		end
 	end
 	for _, control in ipairs(app.controls or {}) do
-		if control.newTagID and isNewTagActive(app, control.newTagID) and not seen[control.id] then
+		if lib.IsControlNew(app, control) and not seen[control.id] then
 			result[#result + 1] = {
 				title = control.label or control.id,
 				pageID = control.pageID,
@@ -3378,8 +3463,13 @@ local function addDashboardNewPanel(state, parent, entries, width, titleText)
 
 	local title = createText(panel, FONT_HEADER, titleText or L["configCenterSettings"] or "Settings", TEXT.gold)
 	title:SetPoint("TOPLEFT", panel, "TOPLEFT", 14, -12)
-	title:SetPoint("RIGHT", panel, "RIGHT", -14, 0)
+	title:SetPoint("RIGHT", panel, "RIGHT", -92, 0)
 	title:SetHeight(20)
+	local openNewButton = makeFlatButton(panel, _G.OPEN or "Open", 74, 24)
+	openNewButton:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -12, -10)
+	openNewButton:SetScript("OnClick", function()
+		lib.SetSearchQuery(state, "tag:new")
+	end)
 
 	for index, entry in ipairs(entries) do
 		local row = CreateFrame("Button", nil, panel)
@@ -3826,29 +3916,71 @@ local function renderSearch(state, query)
 		return
 	end
 	for _, control in ipairs(results) do
-		local rowHeight = getSettingRowHeight(control)
-		local card = createContentFrame(state, rowHeight + 34)
-		applyBackdrop(card, CARD_BG, CARD_BORDER)
-		createPixelBorder(card, CARD_BORDER)
+		if control._pageResult then
+			local page = app:GetPage(control.pageID)
+			local card = createContentFrame(state, 102)
+			styleRaisedTile(card, true)
+			card:SetScript("OnMouseUp", function()
+				state:SetPage(control.pageID)
+			end)
 
-		local rowWidth = (state.contentWidth or CONTENT_WIDTH) - 24
-		local row = addSettingRow(state, control, nil, card, -8, rowWidth)
-		if row.Separator then
-			row.Separator:Hide()
+			local iconSource, iconIsAtlas = resolvePageIcon(app, page)
+			local icon = createIconPlate(card, iconSource, PAGE_CARD_ICON_SIZE, iconIsAtlas)
+			icon:SetPoint("LEFT", card, "LEFT", 18, 0)
+
+			local badge = lib.CreateNewBadge(card)
+			badge:SetPoint("TOPRIGHT", card, "TOPRIGHT", -100, -16)
+
+			local title = createText(card, FONT_HEADER, control.label or (page and page.title) or control.id, TEXT.main)
+			title:SetPoint("TOPLEFT", card, "TOPLEFT", 76, -18)
+			title:SetPoint("RIGHT", card, "RIGHT", -182, 0)
+			title:SetHeight(20)
+
+			local desc = createText(card, FONT_MUTED, control.description or "", TEXT.muted)
+			desc:SetPoint("TOPLEFT", card, "TOPLEFT", 76, -42)
+			desc:SetPoint("RIGHT", card, "RIGHT", -104, 0)
+			desc:SetHeight(28)
+			if desc.Text.SetMaxLines then
+				desc.Text:SetMaxLines(2)
+			end
+
+			local path = createText(card, FONT_MUTED, getPagePath(app, page), TEXT.subtle)
+			path:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", 76, 10)
+			path:SetPoint("RIGHT", card, "RIGHT", -104, 0)
+			path:SetHeight(16)
+			path.Text:SetJustifyV("MIDDLE")
+
+			local openButton = makeFlatButton(card, _G.OPEN or "Open", 74, 24)
+			openButton:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -14, 8)
+			openButton:SetScript("OnClick", function()
+				state:SetPage(control.pageID)
+			end)
+			state.y = state.y - 8
+		else
+			local rowHeight = getSettingRowHeight(control)
+			local card = createContentFrame(state, rowHeight + 34)
+			applyBackdrop(card, CARD_BG, CARD_BORDER)
+			createPixelBorder(card, CARD_BORDER)
+
+			local rowWidth = (state.contentWidth or CONTENT_WIDTH) - 24
+			local row = addSettingRow(state, control, nil, card, -8, rowWidth)
+			if row.Separator then
+				row.Separator:Hide()
+			end
+
+			local path = createText(card, FONT_MUTED, getControlPath(app, control), TEXT.subtle)
+			path:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", 14, 9)
+			path:SetPoint("RIGHT", card, "RIGHT", -104, 0)
+			path:SetHeight(16)
+			path.Text:SetJustifyV("MIDDLE")
+
+			local openButton = makeFlatButton(card, _G.OPEN or "Open", 74, 24)
+			openButton:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -14, 6)
+			openButton:SetScript("OnClick", function()
+				state:SetPage(control.pageID, control.id)
+			end)
+			state.y = state.y - 8
 		end
-
-		local path = createText(card, FONT_MUTED, getControlPath(app, control), TEXT.subtle)
-		path:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", 14, 9)
-		path:SetPoint("RIGHT", card, "RIGHT", -104, 0)
-		path:SetHeight(16)
-		path.Text:SetJustifyV("MIDDLE")
-
-		local openButton = makeFlatButton(card, _G.OPEN or "Open", 74, 24)
-		openButton:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -14, 6)
-		openButton:SetScript("OnClick", function()
-			state:SetPage(control.pageID, control.id)
-		end)
-		state.y = state.y - 8
 	end
 end
 
@@ -3961,9 +4093,13 @@ function StateMixin:RenderSidebar()
 			row.Icon:SetPoint("LEFT", row, "LEFT", 12, 0)
 			row.Text = row:CreateFontString(nil, "OVERLAY", FONT_TEXT)
 			row.Text:SetPoint("LEFT", row.Icon, "RIGHT", 10, 0)
-			row.Text:SetPoint("RIGHT", row, "RIGHT", -12, 0)
+			row.Text:SetPoint("RIGHT", row, "RIGHT", lib.IsCategoryNew(self.app, category.id) and -64 or -12, 0)
 			row.Text:SetJustifyH("LEFT")
 			row.Text:SetText(category.title or category.id)
+			if lib.IsCategoryNew(self.app, category.id) then
+				row.NewBadge = lib.CreateNewBadge(row)
+				row.NewBadge:SetPoint("RIGHT", row, "RIGHT", -10, 0)
+			end
 			row.categoryID = category.id
 			row:SetScript("OnEnter", function(sidebarRow)
 				if not sidebarRow.selected then

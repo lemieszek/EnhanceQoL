@@ -294,6 +294,7 @@ local function ensureConfigApp()
 								atlas = "collections-icon-favorites",
 								title = L["configCenterNewInVersion"] or "New in this Version",
 								value = tostring(newCount),
+								searchQuery = "tag:new",
 							}
 						end
 						return tiles
@@ -326,7 +327,7 @@ local function ensureConfigApp()
 			local newTags = addon.variables and addon.variables.NewVersionTableEQOL
 			if not tagID or type(newTags) ~= "table" then return false end
 			local key = tostring(tagID)
-			return newTags[key] == true or newTags[prefix .. "_" .. key] == true
+			return newTags[key] == true or newTags[prefix .. key] == true or newTags[prefix .. "_" .. key] == true
 		end,
 		profileCount = function()
 			local count = 0

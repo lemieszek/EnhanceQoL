@@ -454,6 +454,7 @@ function AppMixin:RegisterLegacySection(section, data)
 		category = categoryID,
 		title = data.title or data.name or pageID,
 		description = data.description,
+		pageKey = data.pageKey,
 		iconAtlas = data.iconAtlas,
 		icon = data.icon,
 		iconKey = data.iconKey,
@@ -646,29 +647,65 @@ function AppMixin:IsControlEnabled(control)
 	return true
 end
 
+function AppMixin:IsNewTagActive(tagID)
+	local resolver = self.opts and self.opts.isNewTag
+	if type(resolver) ~= "function" or not tagID then
+		return false
+	end
+	local ok, result = pcall(resolver, tagID)
+	return ok and result == true
+end
+
+function AppMixin:IsPageNew(page)
+	if not page then
+		return false
+	end
+	return self:IsNewTagActive(page.newTagID)
+		or self:IsNewTagActive(page.id)
+		or self:IsNewTagActive(page.pageKey)
+		or self:IsNewTagActive(page.key)
+end
+
+function AppMixin:IsControlNew(control)
+	if not control then
+		return false
+	end
+	return self:IsNewTagActive(control.newTagID)
+		or self:IsNewTagActive(control.id)
+		or self:IsNewTagActive(control.key)
+end
+
 function AppMixin:GetSearchResults(query, limit)
-	query = normalizeSearchText(query)
+	local rawQuery = tostring(query or "")
+	local newOnly = false
+	local terms = {}
+	for term in rawQuery:gmatch("%S+") do
+		local normalized = normalizeSearchText(term)
+		if term:lower() == "tag:new" or normalized == "tag new" or normalized == "tag.new" then
+			newOnly = true
+		elseif normalized ~= "" then
+			terms[#terms + 1] = normalized
+		end
+	end
 	local results = wipeTable(self._tmpSearch)
-	if query == "" then
+	if #terms == 0 and not newOnly then
 		return results
 	end
-	local terms = {}
-	for term in query:gmatch("%S+") do
-		terms[#terms + 1] = term
-	end
 	for _, control in ipairs(self.controls) do
-		local blob = control.searchBlob or ""
-		local matched = true
-		for _, term in ipairs(terms) do
-			if not blob:find(term, 1, true) then
-				matched = false
-				break
+		if not newOnly or self:IsControlNew(control) then
+			local blob = control.searchBlob or ""
+			local matched = true
+			for _, term in ipairs(terms) do
+				if not blob:find(term, 1, true) then
+					matched = false
+					break
+				end
 			end
-		end
-		if matched then
-			results[#results + 1] = control
-			if limit and #results >= limit then
-				break
+			if matched then
+				results[#results + 1] = control
+				if limit and #results >= limit then
+					break
+				end
 			end
 		end
 	end
