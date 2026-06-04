@@ -299,6 +299,7 @@ function addon.functions.SettingsCreateClassSpecificResourceBars(category, paren
 
 	local data = {}
 	local function isBlizzardClassResourceControlEnabled() return not isEQoLPlayerFrameEnabled() end
+	local function isBlizzardClassResourceControlHidden() return isEQoLPlayerFrameEnabled() end
 	local blizzardClassResourceControlDesc = L["visibilityRule_lockedByUF"] or "Visibility is controlled by Enhanced Unit Frames. Disable them to change this setting."
 
 	local function addTotemCheckbox(dbKey)
@@ -309,6 +310,7 @@ function addon.functions.SettingsCreateClassSpecificResourceBars(category, paren
 			func = function(value) addon.db[dbKey] = value end,
 			get = function() return addon.db[dbKey] end,
 			isEnabled = isBlizzardClassResourceControlEnabled,
+			hiddenWhen = isBlizzardClassResourceControlHidden,
 			parentSection = parentSection,
 		})
 	end
@@ -323,6 +325,7 @@ function addon.functions.SettingsCreateClassSpecificResourceBars(category, paren
 				if addon.functions and addon.functions.UpdateClassResourceVisibility then addon.functions.UpdateClassResourceVisibility() end
 			end,
 			isEnabled = isBlizzardClassResourceControlEnabled,
+			hiddenWhen = isBlizzardClassResourceControlHidden,
 			parentSection = parentSection,
 		})
 		addTotemCheckbox("deathknight_HideTotemBar")
@@ -337,6 +340,7 @@ function addon.functions.SettingsCreateClassSpecificResourceBars(category, paren
 				if addon.functions and addon.functions.UpdateClassResourceVisibility then addon.functions.UpdateClassResourceVisibility() end
 			end,
 			isEnabled = isBlizzardClassResourceControlEnabled,
+			hiddenWhen = isBlizzardClassResourceControlHidden,
 			parentSection = parentSection,
 		})
 	elseif classTag == "EVOKER" then
@@ -349,6 +353,7 @@ function addon.functions.SettingsCreateClassSpecificResourceBars(category, paren
 				if addon.functions and addon.functions.UpdateClassResourceVisibility then addon.functions.UpdateClassResourceVisibility() end
 			end,
 			isEnabled = isBlizzardClassResourceControlEnabled,
+			hiddenWhen = isBlizzardClassResourceControlHidden,
 			parentSection = parentSection,
 		})
 	elseif classTag == "MAGE" then
@@ -363,6 +368,7 @@ function addon.functions.SettingsCreateClassSpecificResourceBars(category, paren
 				if addon.functions and addon.functions.UpdateClassResourceVisibility then addon.functions.UpdateClassResourceVisibility() end
 			end,
 			isEnabled = isBlizzardClassResourceControlEnabled,
+			hiddenWhen = isBlizzardClassResourceControlHidden,
 			parentSection = parentSection,
 		})
 		addTotemCheckbox("monk_HideTotemBar")
@@ -380,6 +386,7 @@ function addon.functions.SettingsCreateClassSpecificResourceBars(category, paren
 				if addon.functions and addon.functions.UpdateClassResourceVisibility then addon.functions.UpdateClassResourceVisibility() end
 			end,
 			isEnabled = isBlizzardClassResourceControlEnabled,
+			hiddenWhen = isBlizzardClassResourceControlHidden,
 			parentSection = parentSection,
 		})
 	elseif classTag == "PALADIN" then
@@ -393,6 +400,7 @@ function addon.functions.SettingsCreateClassSpecificResourceBars(category, paren
 				if addon.functions and addon.functions.UpdateClassResourceVisibility then addon.functions.UpdateClassResourceVisibility() end
 			end,
 			isEnabled = isBlizzardClassResourceControlEnabled,
+			hiddenWhen = isBlizzardClassResourceControlHidden,
 			parentSection = parentSection,
 		})
 	elseif classTag == "WARLOCK" then
@@ -405,6 +413,7 @@ function addon.functions.SettingsCreateClassSpecificResourceBars(category, paren
 				if addon.functions and addon.functions.UpdateClassResourceVisibility then addon.functions.UpdateClassResourceVisibility() end
 			end,
 			isEnabled = isBlizzardClassResourceControlEnabled,
+			hiddenWhen = isBlizzardClassResourceControlHidden,
 			parentSection = parentSection,
 		})
 		addTotemCheckbox("warlock_HideTotemBar")

@@ -11,6 +11,10 @@
 ### 🔄 Changed
 
 - Settings Center: Added an `EQoL Suites` root category for major built-in replacement systems, including Bags, EQoL Unit Frames, Resource Bars, Cooldown Panels, and Damage Meter.
+- Settings Center: Added generic page and setting visibility predicates so migrated pages can hide obsolete Blizzard/native options when an EQoL replacement system is active.
+- Settings Center / Bags: Split the Bags suite entry from Bags & Inventory. Bags & Inventory now stays with native inventory helpers and is hidden when the Bags module is active.
+- Settings Center / Gear & Upgrades: Moved the low durability warning setting out of Bags & Inventory because it belongs to equipment status, not bag replacement settings.
+- Settings Center / Unit Frames: Hide legacy Blizzard unit-frame and class-resource controls from the modern menu when the matching EQoL Unit Frames replacement is active.
 - Settings Center: Migrated Action Bars & Buttons and Skinner away from the legacy Blizzard Settings renderer. They now register only for the modern Settings Center while keeping their SavedVariables and runtime behavior unchanged.
 - Settings Center: Migrated Visibility & Fading (Frames) to the modern Settings Center so frame visibility multi-select controls are registered directly on the modern page.
 - Settings Center / Visibility & Fading: Added contextual notes for frame visibility controls that are disabled because EQoL Unit Frames already manage that frame.

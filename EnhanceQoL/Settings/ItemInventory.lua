@@ -2902,18 +2902,19 @@ end
 
 local cInventory = addon.SettingsLayout.rootGENERAL
 
+local function shouldShowNativeBagSettings()
+	return not (addon.db and addon.db["enableBagsModule"] == true)
+end
+
 local expandable = addon.functions.SettingsCreateExpandableSection(cInventory, {
 	name = L["ItemsInventory"],
 	newTagID = "BagsInventory",
 	iconKey = "bags",
+	isVisible = shouldShowNativeBagSettings,
 	expanded = false,
 	colorizeTitle = false,
 })
 addon.SettingsLayout.bagsInventorySection = expandable
-
-local function shouldShowNativeBagSettings()
-	return not (addon.db and addon.db["enableBagsModule"] == true)
-end
 
 local function refreshSettingsLayout()
 	if SettingsInbound and SettingsInbound.RepairDisplay then
@@ -2933,6 +2934,7 @@ local function gateNativeBagSetting(entry)
 	end
 	return entry
 end
+gateNativeBagSetting(expandable)
 
 if addon.Bags then
 	addon.Bags.integrated = true
@@ -2983,6 +2985,7 @@ if addon.Bags then
 		})
 	end
 
+assert(addon.SettingsLayout.gearUpgradeSection, "GearUpgrade section must be registered before durability warning settings")
 addon.functions.SettingsCreateCheckbox(cInventory, {
 	var = DURABILITY_WARNING_DB_ENABLED,
 	text = L["DurabilityWarningEnable"] or "Low durability warning",
@@ -2996,7 +2999,7 @@ addon.functions.SettingsCreateCheckbox(cInventory, {
 			DurabilityWarning:Disable()
 		end
 	end,
-	parentSection = expandable,
+	parentSection = addon.SettingsLayout.gearUpgradeSection,
 })
 
 if shouldShowNativeBagSettings() then

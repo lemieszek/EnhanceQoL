@@ -1458,6 +1458,7 @@ local function createFrameCategory()
 					end,
 					setSelectedFunc = function(key, shouldSelect) setFrameRule(info, key, shouldSelect) end,
 					isEnabled = function() return shouldShow() end,
+					hiddenWhen = function() return not shouldShow() end,
 					richNote = {
 						title = L["CustomUnitFrames"] or L["Unit Frames"] or "EQoL Unit Frames",
 						text = L["visibilityRule_lockedByUF"]

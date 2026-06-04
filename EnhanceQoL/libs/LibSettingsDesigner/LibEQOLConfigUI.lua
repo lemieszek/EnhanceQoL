@@ -1017,6 +1017,19 @@ local function getSettingCountText(app, count)
 	return tostring(count) .. " " .. label
 end
 
+local function getVisiblePageControls(app, page)
+	if app and type(app.GetPageControls) == "function" then
+		return app:GetPageControls(page)
+	end
+	local controls = {}
+	for _, control in ipairs((page and page.controls) or {}) do
+		if not app or not app.IsControlVisible or app:IsControlVisible(control) then
+			controls[#controls + 1] = control
+		end
+	end
+	return controls
+end
+
 local function getAppTitle(app)
 	return (app and app.opts and app.opts.title) or (app and app.id) or "Settings"
 end
@@ -1089,7 +1102,7 @@ local function getPageDescription(app, page)
 		return L[localeKey]
 	end
 	if page then
-		return getSettingCountText(app, #(page.controls or {}))
+		return getSettingCountText(app, #getVisiblePageControls(app, page))
 	end
 	return ""
 end
@@ -3196,7 +3209,7 @@ local function resetCurrentPage(state)
 	if not page then
 		return
 	end
-	for _, control in ipairs(page.controls or {}) do
+	for _, control in ipairs(getVisiblePageControls(state.app, page)) do
 		if control.default ~= nil then
 			state.app:SetControlValue(control, control.default)
 		end
@@ -3240,7 +3253,7 @@ local function confirmResetCurrentPage(state)
 end
 
 local function addPageCard(state, page, row, index, columns)
-	local controlCount = #(page.controls or {})
+	local controlCount = #getVisiblePageControls(state.app, page)
 	local card = row and createGridCard(state, row, index, columns or 2, PAGE_CARD_HEIGHT)
 		or createContentFrame(state, PAGE_CARD_HEIGHT)
 	styleRaisedTile(card, true)
@@ -3299,7 +3312,12 @@ local function collectEnabledFeaturePages(app, limit)
 	local seen = {}
 	for _, control in ipairs(app.controls or {}) do
 		local page = app:GetPage(control.pageID)
-		if page and isPageMasterToggle(page, control) and app:GetControlValue(control) == true and not seen[page.id] then
+		if (not app.IsControlVisible or app:IsControlVisible(control))
+			and page
+			and isPageMasterToggle(page, control)
+			and app:GetControlValue(control) == true
+			and not seen[page.id]
+		then
 			result[#result + 1] = page
 			seen[page.id] = true
 			if limit and #result >= limit then break end
@@ -3312,7 +3330,7 @@ local function collectCustomizedPages(app, limit)
 	local result = {}
 	local seen = {}
 	for _, control in ipairs(app.controls or {}) do
-		if app:IsControlCustomized(control) and not seen[control.pageID] then
+		if (not app.IsControlVisible or app:IsControlVisible(control)) and app:IsControlCustomized(control) and not seen[control.pageID] then
 			local page = app:GetPage(control.pageID)
 			if page then
 				result[#result + 1] = page
@@ -3357,7 +3375,7 @@ function lib.IsPageOrChildNew(app, page)
 	if lib.IsPageNew(app, page) then
 		return true
 	end
-	for _, control in ipairs((page and page.controls) or {}) do
+	for _, control in ipairs(getVisiblePageControls(app, page)) do
 		if lib.IsControlNew(app, control) then
 			return true
 		end
@@ -3381,7 +3399,7 @@ local function collectNewEntries(app, limit)
 	local result = {}
 	local seen = {}
 	for _, control in ipairs(app.controls or {}) do
-		if lib.IsControlNew(app, control) and not seen[control.id] then
+		if (not app.IsControlVisible or app:IsControlVisible(control)) and lib.IsControlNew(app, control) and not seen[control.id] then
 			result[#result + 1] = {
 				title = control.label or control.id,
 				pageID = control.pageID,
@@ -3600,7 +3618,7 @@ local function collectPageGroups(app, page, mainToggle)
 		groupsByID[group.id] = entry
 	end
 	for _, control in ipairs(page.controls or {}) do
-		if control ~= mainToggle then
+		if control ~= mainToggle and (not app.IsControlVisible or app:IsControlVisible(control)) then
 			local groupID = control.groupID or "settings"
 			local entry = groupsByID[groupID]
 			if not entry then
@@ -4109,6 +4127,15 @@ end
 
 function StateMixin:SetPage(pageID, focusControlID)
 	local page = self.app:GetPage(pageID)
+	if not page or (self.app.IsPageVisible and not self.app:IsPageVisible(page)) then
+		local categoryID = page and page.category or self.selectedCategoryID
+		if categoryID then
+			self:SetCategory(categoryID)
+		else
+			self:SetDashboard()
+		end
+		return
+	end
 	self:SaveCurrentContentScroll()
 	self.resetContentScroll = true
 	self.view = "page"

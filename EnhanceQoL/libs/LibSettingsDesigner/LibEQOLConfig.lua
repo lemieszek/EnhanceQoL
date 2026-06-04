@@ -174,6 +174,60 @@ end
 
 local AppMixin = {}
 
+function AppMixin:IsPageVisible(page)
+	if type(page) == "string" then
+		page = self.pagesByID[page]
+	end
+	if not page or page.hidden == true or page.visible == false then
+		return false
+	end
+	if type(page.hiddenWhen) == "function" then
+		local ok, hidden = pcall(page.hiddenWhen, page, self)
+		if ok and hidden == true then
+			return false
+		end
+	end
+	local visibleFunc = type(page.isVisible) == "function" and page.isVisible
+		or type(page.visibleWhen) == "function" and page.visibleWhen
+		or type(page.visible) == "function" and page.visible
+	if visibleFunc then
+		local ok, visible = pcall(visibleFunc, page, self)
+		if not ok or visible == false then
+			return false
+		end
+	end
+	return true
+end
+
+function AppMixin:IsControlVisible(control)
+	if type(control) == "string" then
+		control = self.controlsByID[control]
+	end
+	if not control or control.hidden == true or control.visible == false then
+		return false
+	end
+	local page = control.pageID and self.pagesByID[control.pageID]
+	if not self:IsPageVisible(page) then
+		return false
+	end
+	if type(control.hiddenWhen) == "function" then
+		local ok, hidden = pcall(control.hiddenWhen, control, self)
+		if ok and hidden == true then
+			return false
+		end
+	end
+	local visibleFunc = type(control.isVisible) == "function" and control.isVisible
+		or type(control.visibleWhen) == "function" and control.visibleWhen
+		or type(control.visible) == "function" and control.visible
+	if visibleFunc then
+		local ok, visible = pcall(visibleFunc, control, self)
+		if not ok or visible == false then
+			return false
+		end
+	end
+	return true
+end
+
 local LEGACY_CONTROL_METADATA_FIELDS = {
 	"buttonText",
 	"bindingIndex",
@@ -212,11 +266,14 @@ local LEGACY_CONTROL_METADATA_FIELDS = {
 	"groupTitle",
 	"hasOpacity",
 	"height",
+	"hidden",
+	"hiddenWhen",
 	"hideSummary",
 	"inputWidth",
 	"isMainToggle",
 	"isSelected",
 	"isSelectedFunc",
+	"isVisible",
 	"justifyH",
 	"list",
 	"listFunc",
@@ -258,6 +315,8 @@ local LEGACY_CONTROL_METADATA_FIELDS = {
 	"uiRole",
 	"valueFormatter",
 	"values",
+	"visible",
+	"visibleWhen",
 }
 
 local function sortByOrderAndTitle(a, b)
@@ -483,6 +542,10 @@ function AppMixin:RegisterLegacySection(section, data)
 		iconKey = data.iconKey,
 		mainToggleID = data.mainToggleID,
 		newTagID = data.newTagID,
+		visible = data.visible,
+		isVisible = data.isVisible,
+		visibleWhen = data.visibleWhen,
+		hiddenWhen = data.hiddenWhen,
 		order = data.order or 500,
 		legacy = true,
 	})
@@ -562,12 +625,28 @@ end
 function AppMixin:GetPages(categoryID)
 	local pages = wipeTable(self._tmpPages)
 	for _, page in ipairs(self.pages) do
-		if not categoryID or page.category == categoryID then
+		if self:IsPageVisible(page) and (not categoryID or page.category == categoryID) then
 			pages[#pages + 1] = page
 		end
 	end
 	table.sort(pages, sortByOrderAndTitle)
 	return pages
+end
+
+function AppMixin:GetPageControls(pageOrID)
+	local page = type(pageOrID) == "string" and self.pagesByID[pageOrID] or pageOrID
+	local controls = wipeTable(self._tmpControls)
+	self._tmpControls = controls
+	if not page then
+		return controls
+	end
+	for _, control in ipairs(page.controls or {}) do
+		if self:IsControlVisible(control) then
+			controls[#controls + 1] = control
+		end
+	end
+	table.sort(controls, sortByOrderAndTitle)
+	return controls
 end
 
 function AppMixin:GetPage(pageID)
@@ -726,7 +805,7 @@ function AppMixin:GetSearchResults(query, limit)
 		return results
 	end
 	for _, control in ipairs(self.controls) do
-		if not newOnly or self:IsControlNew(control) then
+		if self:IsControlVisible(control) and (not newOnly or self:IsControlNew(control)) then
 			local blob = control.searchBlob or ""
 			local matched = true
 			for _, term in ipairs(terms) do
@@ -776,27 +855,37 @@ function AppMixin:GetStats()
 	local booleanTrue = 0
 	local controlsWithDefaults = 0
 	local newControls = 0
+	local controls = 0
+	local pages = 0
+	for _, page in ipairs(self.pages) do
+		if self:IsPageVisible(page) then
+			pages = pages + 1
+		end
+	end
 	for _, control in ipairs(self.controls) do
-		local default, hasDefault = resolveControlDefault(control)
-		if hasDefault then
-			controlsWithDefaults = controlsWithDefaults + 1
-			if self:IsControlCustomized(control) then
-				customized = customized + 1
+		if self:IsControlVisible(control) then
+			controls = controls + 1
+			local default, hasDefault = resolveControlDefault(control)
+			if hasDefault then
+				controlsWithDefaults = controlsWithDefaults + 1
+				if self:IsControlCustomized(control) then
+					customized = customized + 1
+				end
 			end
-		end
-		if control.type == "toggle" or control.type == "checkbox" then
-			if getEffectiveControlValue(self, control, default, hasDefault) == true then
-				booleanTrue = booleanTrue + 1
+			if control.type == "toggle" or control.type == "checkbox" then
+				if getEffectiveControlValue(self, control, default, hasDefault) == true then
+					booleanTrue = booleanTrue + 1
+				end
 			end
-		end
-		if self:IsControlNew(control) then
-			newControls = newControls + 1
+			if self:IsControlNew(control) then
+				newControls = newControls + 1
+			end
 		end
 	end
 	return {
 		categories = #self.categories,
-		pages = #self.pages,
-		controls = #self.controls,
+		pages = pages,
+		controls = controls,
 		newControls = newControls,
 		customized = customized,
 		customizable = controlsWithDefaults,
@@ -825,6 +914,7 @@ function lib:RegisterAddOn(id, opts)
 		legacyCategories = {},
 		legacySections = {},
 		_tmpPages = {},
+		_tmpControls = {},
 		_tmpSearch = {},
 	}
 	for key, value in pairs(AppMixin) do

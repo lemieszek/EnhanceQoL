@@ -16,6 +16,7 @@ local expandable = addon.functions.SettingsCreateExpandableSection(cGearUpgrade,
 	colorizeTitle = false,
 })
 addon.SettingsLayout.gearUpgradeCategory = cGearUpgrade
+addon.SettingsLayout.gearUpgradeSection = expandable
 
 addon.functions.SettingsCreateHeadline(cGearUpgrade, L["Show on Character Frame"], { parentSection = expandable })
 

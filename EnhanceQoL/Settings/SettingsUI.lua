@@ -645,6 +645,11 @@ local function registerLegacyControl(category, cbData, controlType, setting)
 		setValue = cbData.func or cbData.set,
 		parentCheck = cbData.parentCheck,
 		isEnabled = cbData.isEnabled,
+		hidden = cbData.hidden,
+		visible = cbData.visible,
+		isVisible = cbData.isVisible,
+		visibleWhen = cbData.visibleWhen,
+		hiddenWhen = cbData.hiddenWhen,
 		isMainToggle = cbData.isMainToggle,
 		uiRole = cbData.uiRole,
 		min = cbData.min,
@@ -779,6 +784,9 @@ function addon.functions.SettingsCreateCheckbox(cat, cbData)
 			for _, v in pairs(cbData.children) do
 				v.element = v.element or element
 				v.parentCheck = v.parentCheck or cbData.parentCheck
+				v.isVisible = v.isVisible or cbData.isVisible
+				v.visibleWhen = v.visibleWhen or cbData.visibleWhen
+				v.hiddenWhen = v.hiddenWhen or cbData.hiddenWhen
 				local sType = v.sType or v.type
 				if sType == "dropdown" then
 					addon.functions.SettingsCreateDropdown(cat, v)
@@ -827,6 +835,9 @@ function addon.functions.SettingsCreateCheckbox(cat, cbData)
 		for _, v in pairs(cbData.children) do
 			v.element = v.element or element
 			v.parentCheck = v.parentCheck or cbData.parentCheck
+			v.isVisible = v.isVisible or cbData.isVisible
+			v.visibleWhen = v.visibleWhen or cbData.visibleWhen
+			v.hiddenWhen = v.hiddenWhen or cbData.hiddenWhen
 			local sType = v.sType or v.type
 			if sType == "dropdown" then
 				addon.functions.SettingsCreateDropdown(cat, v)
@@ -1486,6 +1497,10 @@ function addon.functions.SettingsCreateExpandableSection(cat, cbData)
 			iconKey = cbData.iconKey or pageIconKeysByStableID[pageKey] or pageIconKeysByStableID[cbData.newTagID],
 			mainToggleID = cbData.mainToggleID,
 			newTagID = cbData.newTagID,
+			visible = cbData.visible,
+			isVisible = cbData.isVisible,
+			visibleWhen = cbData.visibleWhen,
+			hiddenWhen = cbData.hiddenWhen,
 		})
 		if pageID then
 			addon.ConfigCurrentGroupByPageID[pageID] = nil
