@@ -272,7 +272,7 @@ local function registerLegacyControl(category, cbData, controlType, setting)
 		key = key,
 		type = controlType,
 		label = cbData.text or cbData.label or cbData.name,
-		description = cbData.desc,
+		description = cbData.modernDescription or cbData.desc,
 		default = cbData.default,
 		dbDefault = key and function()
 			local defaults = addon.dbDefaults
@@ -885,7 +885,20 @@ function addon.functions.SettingsCreateHeadline(cat, text, extra)
 	return header
 end
 
-function addon.functions.SettingsCreateText(cat, text, extra) return SettingsLib:CreateText(cat, text, extra) end
+function addon.functions.SettingsCreateText(cat, text, extra)
+	local element = SettingsLib:CreateText(cat, text, extra)
+	local app = ensureConfigApp()
+	if app and app.RegisterPageNote and extra and extra.parentSection and type(text) == "string" then
+		local pageID = app.legacySections and app.legacySections[extra.parentSection]
+		if pageID and app:GetPage(pageID) then
+			app:RegisterPageNote(pageID, {
+				text = text,
+				order = extra.order or addon.ConfigControlOrder or 0,
+			})
+		end
+	end
+	return element
+end
 
 function addon.functions.SettingsCreateButton(cat, cbData)
 	local btn = SettingsLib:CreateButton(cat, {

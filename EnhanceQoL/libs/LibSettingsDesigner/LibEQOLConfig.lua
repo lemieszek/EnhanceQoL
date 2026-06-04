@@ -312,6 +312,31 @@ function AppMixin:RegisterGroup(pageID, data)
 	return group
 end
 
+function AppMixin:RegisterPageNote(pageID, data)
+	local page = self.pagesByID[pageID]
+	if not page then
+		return nil
+	end
+	local note
+	if type(data) == "table" then
+		note = copyTable(data, {})
+	else
+		note = { text = data }
+	end
+	if type(note.text) ~= "string" or note.text:gsub("%s+", "") == "" then
+		return nil
+	end
+	page.aboutNotes = page.aboutNotes or {}
+	for _, existing in ipairs(page.aboutNotes) do
+		if existing.text == note.text then
+			return existing
+		end
+	end
+	page.aboutNotes[#page.aboutNotes + 1] = note
+	table.sort(page.aboutNotes, sortByOrderAndTitle)
+	return note
+end
+
 function AppMixin:RegisterControl(pageID, data)
 	local page = self.pagesByID[pageID]
 	if not page or type(data) ~= "table" then

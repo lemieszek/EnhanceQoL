@@ -6191,11 +6191,13 @@ local function OpenLegacySettingsRoot()
 	Settings.OpenToCategory(addon.SettingsLayout.rootCategory:GetID())
 end
 
+local OpenModernSettingsRoot
+
 local function OpenSettingsRoot()
-	OpenLegacySettingsRoot()
+	OpenModernSettingsRoot()
 end
 
-local function OpenModernSettingsRoot()
+OpenModernSettingsRoot = function()
 	if addon.functions and addon.functions.OpenConfigCenter then
 		addon.functions.OpenConfigCenter()
 		return
@@ -6922,12 +6924,9 @@ function loadMain()
 	-- Slash-Command hinzufügen
 	if addon.functions and addon.functions.SetSlashCommandAlias then
 		addon.functions.SetSlashCommandAlias("ENHANCEQOL", 1, "/eqol")
-		addon.functions.SetSlashCommandAlias("ENHANCEQOLMODERN", 1, "/eqol2")
 	else
 		SLASH_ENHANCEQOL1 = "/eqol"
-		SLASH_ENHANCEQOLMODERN1 = "/eqol2"
 	end
-	SlashCmdList["ENHANCEQOLMODERN"] = function() OpenModernSettingsRoot() end
 	SlashCmdList["ENHANCEQOL"] = function(msg)
 		msg = tostring(msg or "")
 		if msg:match("^aag%s*(%d+)$") then

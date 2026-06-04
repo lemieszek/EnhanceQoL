@@ -93,6 +93,7 @@ local data = {
 	text = L["automaticallyOpenContainer"],
 	func = function(value) addon.db["automaticallyOpenContainer"] = value and true or false end,
 	desc = L["containerActionsFeatureDesc2"],
+	modernDescription = L["configCenterPageCardDescContainerActions"] or L["containerActionsFeatureDesc2"],
 	parentSection = expandable,
 }
 

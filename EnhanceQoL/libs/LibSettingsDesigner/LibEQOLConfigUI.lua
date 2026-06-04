@@ -92,10 +92,14 @@ local ROW_HOVER_BORDER = { 0.95, 0.73, 0.32, 0.58 }
 local ROW_SEPARATOR = { 0.68, 0.54, 0.30, 0.32 }
 local SELECTED_BG = { 0.150, 0.115, 0.055, 0.98 }
 local SIDEBAR_BG = { 0.030, 0.034, 0.038, 0.45 }
-local MUTED = { 0.67, 0.64, 0.58 }
-local WHITE = { 0.94, 0.91, 0.84 }
-local GOLD = { 1.0, 0.82, 0.36 }
-local TOPBAR_GOLD = { 1.0, 0.84, 0.36 }
+local TEXT = {
+	main = { 0.94, 0.91, 0.84, 1.00 },
+	muted = { 0.70, 0.67, 0.60, 1.00 },
+	subtle = { 0.55, 0.53, 0.48, 1.00 },
+	disabled = { 0.38, 0.36, 0.33, 1.00 },
+	gold = { 1.00, 0.82, 0.36, 1.00 },
+	topbarGold = { 1.00, 0.84, 0.36, 1.00 },
+}
 local GREEN = { 0.36, 0.82, 0.36 }
 
 local ASSET = {
@@ -472,7 +476,7 @@ local function createAssetArrow(parent, app, size, family, direction)
 		or "Down"
 	local fileName = prefix .. suffix .. ".tga"
 	arrow:SetTexture(getLibAssetPath(app, fileName))
-	arrow:SetVertexColor(GOLD[1], GOLD[2], GOLD[3], GOLD[4] or 1)
+	arrow:SetVertexColor(TEXT.gold[1], TEXT.gold[2], TEXT.gold[3], TEXT.gold[4] or 1)
 	return arrow
 end
 
@@ -966,6 +970,42 @@ local function getPageDescription(app, page)
 	return ""
 end
 
+local function stripColorCodes(text)
+	text = tostring(text or "")
+	text = text:gsub("|c%x%x%x%x%x%x%x%x", "")
+	text = text:gsub("|r", "")
+	return text
+end
+
+local function compactDescription(text)
+	text = stripColorCodes(text)
+	text = text:gsub("\\\n", "\n")
+	text = text:gsub("[%s\r\n]+", " ")
+	text = text:gsub("^%s+", ""):gsub("%s+$", "")
+	if #text <= 118 then
+		return text
+	end
+	local sentence = text:match("^(.-[%.%!%?])%s+")
+	if sentence and #sentence >= 24 and #sentence <= 118 then
+		return sentence
+	end
+	return text:sub(1, 115):gsub("%s+%S*$", "") .. "..."
+end
+
+local function getPageAboutText(app, page)
+	local parts = {}
+	local description = getPageDescription(app, page)
+	if description and description ~= "" then
+		parts[#parts + 1] = description
+	end
+	for _, note in ipairs(page and page.aboutNotes or {}) do
+		if type(note.text) == "string" and note.text:gsub("%s+", "") ~= "" then
+			parts[#parts + 1] = note.text
+		end
+	end
+	return table.concat(parts, "\n\n")
+end
+
 local function getPageCardDescription(app, page)
 	local L = getLocale(app)
 	if page and page.description and page.description ~= "" then
@@ -1353,7 +1393,7 @@ local function makeFlatButton(parent, text, width, height, iconSource, iconIsAtl
 	button.Text:SetPoint("RIGHT", button, "RIGHT", -10, 0)
 	button.Text:SetJustifyH("CENTER")
 	button.Text:SetText(text or "")
-	setTextColor(button.Text, WHITE)
+	setTextColor(button.Text, TEXT.main)
 	button:SetScript("OnEnter", function(self) setFrameBackdrop(self, CARD_BG_HOVER, CARD_BORDER_HOVER) end)
 	button:SetScript("OnLeave", function(self)
 		if self.selected then
@@ -1758,12 +1798,12 @@ end
 local function addSectionTitle(state, title, subtitle)
 	local height = subtitle and 58 or 34
 	local frame = createContentFrame(state, height)
-	local titleText = createText(frame, FONT_TITLE, title or "", GOLD)
+	local titleText = createText(frame, FONT_TITLE, title or "", TEXT.gold)
 	titleText:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
 	titleText:SetPoint("RIGHT", frame, "RIGHT", 0, 0)
 	titleText:SetHeight(24)
 	if subtitle and subtitle ~= "" then
-		local subText = createText(frame, FONT_MUTED, subtitle, MUTED)
+		local subText = createText(frame, FONT_MUTED, subtitle, TEXT.muted)
 		subText:SetPoint("TOPLEFT", titleText, "BOTTOMLEFT", 0, -6)
 		subText:SetPoint("RIGHT", frame, "RIGHT", 0, 0)
 		subText:SetHeight(24)
@@ -1776,12 +1816,12 @@ local function addInfoCard(state, title, lines, height)
 	local card = createContentFrame(state, height or 96)
 	applyBackdrop(card, CARD_BG, CARD_BORDER)
 
-	local titleText = createText(card, FONT_HEADER, title or "", GOLD)
+	local titleText = createText(card, FONT_HEADER, title or "", TEXT.gold)
 	titleText:SetPoint("TOPLEFT", card, "TOPLEFT", 14, -12)
 	titleText:SetPoint("RIGHT", card, "RIGHT", -14, 0)
 	titleText:SetHeight(20)
 
-	local body = createText(card, FONT_MUTED, table.concat(lines or {}, "\n"), MUTED)
+	local body = createText(card, FONT_MUTED, table.concat(lines or {}, "\n"), TEXT.muted)
 	body:SetPoint("TOPLEFT", titleText, "BOTTOMLEFT", 0, -8)
 	body:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -14, 12)
 	state.y = state.y - 12
@@ -1884,12 +1924,12 @@ local function addDashboardCard(row, index, title, description, iconSource, onCl
 	local icon = createDashboardIcon(card, iconSource)
 	icon:SetPoint("LEFT", card, "LEFT", 24, 0)
 
-	local titleText = createText(card, FONT_TITLE, title or "", WHITE)
+	local titleText = createText(card, FONT_TITLE, title or "", TEXT.main)
 	titleText:SetPoint("TOPLEFT", icon, "TOPRIGHT", 18, -6)
 	titleText:SetPoint("RIGHT", card, "RIGHT", -18, 0)
 	titleText:SetHeight(24)
 
-	local desc = createText(card, FONT_TEXT, description or "", MUTED)
+	local desc = createText(card, FONT_TEXT, description or "", TEXT.muted)
 	desc:SetPoint("TOPLEFT", titleText, "BOTTOMLEFT", 0, -7)
 	desc:SetPoint("RIGHT", card, "RIGHT", -18, 0)
 	desc:SetHeight(42)
@@ -1900,12 +1940,12 @@ end
 local function addDashboardHero(state, title, subtitle)
 	local hero = createContentFrame(state, 138)
 
-	local titleText = createText(hero, FONT_HERO, title or "", WHITE)
+	local titleText = createText(hero, FONT_HERO, title or "", TEXT.main)
 	titleText:SetPoint("TOPLEFT", hero, "TOPLEFT", 4, -10)
 	titleText:SetPoint("RIGHT", hero, "RIGHT", -146, 0)
 	titleText:SetHeight(42)
 
-	local subText = createText(hero, FONT_TEXT, subtitle or "", MUTED)
+	local subText = createText(hero, FONT_TEXT, subtitle or "", TEXT.muted)
 	subText:SetPoint("TOPLEFT", titleText, "BOTTOMLEFT", 0, -9)
 	subText:SetPoint("RIGHT", hero, "RIGHT", -166, 0)
 	subText:SetHeight(48)
@@ -1960,7 +2000,7 @@ local function addDashboardStatusTile(parent, index, iconSource, iconAtlas, titl
 		icon:SetTexture(iconSource or ASSET.fallback)
 	end
 
-	local titleText = createText(tile, FONT_MUTED, title or "", GOLD)
+	local titleText = createText(tile, FONT_MUTED, title or "", TEXT.gold)
 	titleText:SetPoint("TOPLEFT", tile, "TOPLEFT", STATUS_TEXT_LEFT, -13)
 	titleText:SetPoint("RIGHT", tile, "RIGHT", badge and -68 or -12, 0)
 	titleText:SetHeight(18)
@@ -1968,11 +2008,11 @@ local function addDashboardStatusTile(parent, index, iconSource, iconAtlas, titl
 	titleText.Text:SetJustifyV("MIDDLE")
 
 	if badge and badge ~= "" then
-		local badgeFrame = addStatusChip(tile, badge, GOLD, 54)
+		local badgeFrame = addStatusChip(tile, badge, TEXT.gold, 54)
 		badgeFrame:SetPoint("TOPRIGHT", tile, "TOPRIGHT", -10, -10)
 	end
 
-	local valueText = createText(tile, FONT_TITLE, tostring(value or ""), WHITE)
+	local valueText = createText(tile, FONT_TITLE, tostring(value or ""), TEXT.main)
 	valueText:SetPoint("BOTTOMLEFT", tile, "BOTTOMLEFT", STATUS_TEXT_LEFT, 12)
 	valueText:SetPoint("RIGHT", tile, "RIGHT", -12, 0)
 	valueText:SetHeight(24)
@@ -2023,7 +2063,7 @@ local function addDashboardStatusPanel(state, stats)
 
 	local panel = createContentFrame(state, 130)
 	applyBackdrop(panel, DETAIL_SECTION_BG, DASHBOARD_CARD_BORDER)
-	local title = createText(panel, FONT_TITLE, L["configCenterAddOnStatus"] or (_G.STATUS or "Status"), GOLD)
+	local title = createText(panel, FONT_TITLE, L["configCenterAddOnStatus"] or (_G.STATUS or "Status"), TEXT.gold)
 	title:SetPoint("TOPLEFT", panel, "TOPLEFT", 14, -13)
 	title:SetPoint("RIGHT", panel, "RIGHT", -14, 0)
 	title:SetHeight(24)
@@ -2086,7 +2126,7 @@ local function addSliderWidget(row, app, control, opts)
 	opts = opts or {}
 	local valueText = opts.valueText
 	if not valueText then
-		valueText = createText(row, FONT_TEXT, "", GOLD, "RIGHT")
+		valueText = createText(row, FONT_TEXT, "", TEXT.gold, "RIGHT")
 		valueText:SetPoint("RIGHT", row, "RIGHT", -14, 10)
 		valueText:SetSize(62, 18)
 	end
@@ -2135,7 +2175,7 @@ local function addSliderWidget(row, app, control, opts)
 	local fill = track:CreateTexture(nil, "ARTWORK")
 	fill:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, 0)
 	fill:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", 0, 0)
-	fill:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.78)
+	fill:SetColorTexture(TEXT.gold[1], TEXT.gold[2], TEXT.gold[3], 0.78)
 
 	local slider = CreateFrame("Slider", nil, row)
 	slider:SetOrientation("HORIZONTAL")
@@ -2152,9 +2192,9 @@ local function addSliderWidget(row, app, control, opts)
 	if thumb then
 		thumb:SetSize(thumbWidth, thumbHeight)
 		if thumb.SetColorTexture then
-			thumb:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 1)
+			thumb:SetColorTexture(TEXT.gold[1], TEXT.gold[2], TEXT.gold[3], 1)
 		else
-			thumb:SetVertexColor(GOLD[1], GOLD[2], GOLD[3], 1)
+			thumb:SetVertexColor(TEXT.gold[1], TEXT.gold[2], TEXT.gold[3], 1)
 		end
 	end
 
@@ -2216,7 +2256,7 @@ local function addDropdownWidget(row, app, control, opts)
 		button:SetPoint("RIGHT", row, "RIGHT", -14, 0)
 	end
 	row.dropdownButton = button
-	row.value = createText(button, FONT_TEXT, "", WHITE, "LEFT")
+	row.value = createText(button, FONT_TEXT, "", TEXT.main, "LEFT")
 	row.value:SetPoint("TOPLEFT", button, "TOPLEFT", 10, 0)
 	row.value:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -22, 0)
 	row.value.Text:SetJustifyH("LEFT")
@@ -2266,7 +2306,7 @@ local function addMultiDropdownWidget(row, app, control, opts)
 		button:SetPoint("RIGHT", row, "RIGHT", -14, 0)
 	end
 	row.multiDropdownButton = button
-	row.value = createText(button, FONT_TEXT, "", WHITE, "LEFT")
+	row.value = createText(button, FONT_TEXT, "", TEXT.main, "LEFT")
 	row.value:SetPoint("TOPLEFT", button, "TOPLEFT", 10, 0)
 	row.value:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -22, 0)
 	row.value.Text:SetJustifyH("LEFT")
@@ -2395,7 +2435,7 @@ local function addColorWidget(row, app, control, opts)
 		addConfigureFallback(row, app, control, nil, opts.configure)
 		return
 	end
-	local currentLabel = createText(row, FONT_MUTED, opts.currentText or (_G.CURRENT or "Current") .. ":", MUTED)
+	local currentLabel = createText(row, FONT_MUTED, opts.currentText or (_G.CURRENT or "Current") .. ":", TEXT.subtle)
 	if opts.point then
 		currentLabel:SetPoint(opts.point[1], opts.point[2], opts.point[3], opts.point[4], opts.point[5])
 	else
@@ -2411,7 +2451,7 @@ local function addColorWidget(row, app, control, opts)
 	swatch.Texture:SetPoint("TOPLEFT", swatch, "TOPLEFT", 4, -4)
 	swatch.Texture:SetPoint("BOTTOMRIGHT", swatch, "BOTTOMRIGHT", -4, 4)
 	row.swatch = swatch
-	row.hexText = createText(row, FONT_TEXT, "", GOLD)
+	row.hexText = createText(row, FONT_TEXT, "", TEXT.gold)
 	row.hexText:SetPoint("LEFT", swatch, "RIGHT", 10, 1)
 	row.hexText:SetSize(80, 20)
 
@@ -2503,7 +2543,7 @@ local function addColorOverridesWidget(row, app, control, opts)
 		item.Text:SetPoint("RIGHT", item, "RIGHT", -42, 0)
 		item.Text:SetJustifyH("LEFT")
 		item.Text:SetText(entry.label or entry.key or "?")
-		setTextColor(item.Text, MUTED)
+		setTextColor(item.Text, TEXT.subtle)
 
 		item.Swatch = CreateFrame("Button", nil, item, "BackdropTemplate")
 		item.Swatch:SetSize(24, 20)
@@ -2569,9 +2609,9 @@ local function addColorOverridesWidget(row, app, control, opts)
 			if item.Swatch and item.Swatch.EnableMouse then item.Swatch:EnableMouse(enabled) end
 			item.Swatch.Texture:SetColorTexture(r or 1, g or 1, b or 1, a or 1)
 			if control.colorizeLabel and enabled then
-				item.Text:SetTextColor(r or MUTED[1], g or MUTED[2], b or MUTED[3], 1)
+				item.Text:SetTextColor(r or TEXT.subtle[1], g or TEXT.subtle[2], b or TEXT.subtle[3], 1)
 			else
-				setTextColor(item.Text, MUTED)
+				setTextColor(item.Text, TEXT.subtle)
 			end
 		end
 	end
@@ -2609,15 +2649,15 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 		textLeft = 42
 	end
 
-	local title = createText(row, FONT_TEXT, control.label or control.id, WHITE)
+	local title = createText(row, FONT_TEXT, control.label or control.id, TEXT.main)
 	title:SetPoint("TOPLEFT", row, "TOPLEFT", textLeft, -12)
 	title:SetHeight(20)
 
 	local descText
 	if controlType == "slider" then
-		descText = control.description
+		descText = compactDescription(control.description)
 	elseif control.description and control.description ~= "" then
-		descText = control.description
+		descText = compactDescription(control.description)
 	elseif layoutType == "complex" then
 		local L = getLocale(app)
 		descText = L["configCenterAdvancedSettingDesc"] or "Configure this advanced setting."
@@ -2626,7 +2666,7 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 	else
 		descText = ""
 	end
-	local desc = createText(row, FONT_MUTED, descText or "", MUTED)
+	local desc = createText(row, FONT_MUTED, descText or "", TEXT.muted)
 	desc.Text:SetWordWrap(true)
 
 	if layoutType == "boolean" then
@@ -2653,7 +2693,7 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 			else
 				desc:Hide()
 			end
-			local valueText = createText(row, FONT_TEXT, "", GOLD, "RIGHT")
+			local valueText = createText(row, FONT_TEXT, "", TEXT.gold, "RIGHT")
 			valueText:SetPoint("TOPRIGHT", row, "TOPRIGHT", -18, -12)
 			valueText:SetSize(valueWidth, 20)
 			local hasRangeLabels = control.min ~= nil or control.max ~= nil
@@ -2667,12 +2707,12 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 				valueText = valueText,
 			})
 			if hasRangeLabels then
-				local minLabel = createText(row, FONT_MUTED, formatControlValue(control, control.min), MUTED, "RIGHT")
+				local minLabel = createText(row, FONT_MUTED, formatControlValue(control, control.min), TEXT.subtle, "RIGHT")
 				minLabel:SetPoint("RIGHT", slider, "LEFT", -sliderGap, 0)
 				minLabel:SetSize(labelWidth, 18)
 				minLabel.Text:SetJustifyH("RIGHT")
 				minLabel.Text:SetJustifyV("MIDDLE")
-				local maxLabel = createText(row, FONT_MUTED, formatControlValue(control, control.max), MUTED, "LEFT")
+				local maxLabel = createText(row, FONT_MUTED, formatControlValue(control, control.max), TEXT.subtle, "LEFT")
 				maxLabel:SetPoint("LEFT", slider, "RIGHT", sliderGap, 0)
 				maxLabel:SetSize(labelWidth, 18)
 				maxLabel.Text:SetJustifyH("LEFT")
@@ -2794,7 +2834,7 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 			point = { "BOTTOMRIGHT", row, "BOTTOMRIGHT", -14, 14 },
 			width = 150,
 		})
-		local badge = addStatusChip(row, control.level == "advanced" and "Advanced" or "Legacy", MUTED, 74)
+		local badge = addStatusChip(row, control.level == "advanced" and "Advanced" or "Legacy", TEXT.muted, 74)
 		badge:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", textLeft, 15)
 	end
 
@@ -2878,13 +2918,13 @@ local function addPageCard(state, page, row, index, columns)
 	local textLeft = PAGE_CARD_TEXT_LEFT
 	local rightInset = PAGE_CARD_PAD_X
 
-	local title = createText(card, FONT_HEADER, page.title or page.id, WHITE)
+	local title = createText(card, FONT_HEADER, page.title or page.id, TEXT.main)
 	title:SetPoint("TOPLEFT", card, "TOPLEFT", textLeft, -24)
 	title:SetPoint("RIGHT", card, "RIGHT", -rightInset, 0)
 	title:SetHeight(22)
 
 	local desc = getPageCardDescription(state.app, page)
-	local descText = createText(card, FONT_MUTED, desc, MUTED)
+	local descText = createText(card, FONT_MUTED, desc, TEXT.muted)
 	descText:SetPoint("TOPLEFT", card, "TOPLEFT", textLeft, -50)
 	descText:SetPoint("RIGHT", card, "RIGHT", -rightInset, 0)
 	descText:SetHeight(32)
@@ -2894,7 +2934,7 @@ local function addPageCard(state, page, row, index, columns)
 	end
 
 	local metaText = getSettingCountText(state.app, controlCount)
-	local meta = createText(card, FONT_MUTED, metaText, GOLD)
+	local meta = createText(card, FONT_MUTED, metaText, TEXT.gold)
 	meta:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", textLeft, 14)
 	meta:SetPoint("RIGHT", card, "RIGHT", -rightInset, 0)
 	meta:SetHeight(16)
@@ -2986,7 +3026,7 @@ local function addDashboardNewPanel(state, parent, entries, width)
 	panel:SetSize(width, 250)
 	applyBackdrop(panel, CARD_BG, CARD_BORDER)
 
-	local title = createText(panel, FONT_HEADER, L["configCenterNewInVersion"] or "New in this Version", GOLD)
+	local title = createText(panel, FONT_HEADER, L["configCenterNewInVersion"] or "New in this Version", TEXT.gold)
 	title:SetPoint("TOPLEFT", panel, "TOPLEFT", 14, -12)
 	title:SetPoint("RIGHT", panel, "RIGHT", -14, 0)
 	title:SetHeight(20)
@@ -3010,7 +3050,7 @@ local function addDashboardNewPanel(state, parent, entries, width)
 			icon:SetTexture("Interface\\Common\\ReputationStar")
 		end
 
-		local label = createText(row, FONT_TEXT, entry.title or "", WHITE)
+		local label = createText(row, FONT_TEXT, entry.title or "", TEXT.main)
 		label:SetPoint("LEFT", icon, "RIGHT", 10, 0)
 		label:SetPoint("RIGHT", row, "RIGHT", 0, 0)
 		label:SetHeight(22)
@@ -3096,13 +3136,13 @@ local function renderDashboard(state)
 		enabledPanel,
 		FONT_HEADER,
 		featureTitleText,
-		GOLD
+		TEXT.gold
 	)
 	enabledTitle:SetPoint("TOPLEFT", enabledPanel, "TOPLEFT", 14, -12)
 	enabledTitle:SetPoint("RIGHT", enabledPanel, "RIGHT", -14, 0)
 	enabledTitle:SetHeight(20)
 	if #featurePages == 0 then
-		local emptyText = createText(enabledPanel, FONT_MUTED, L["configCenterNoResults"] or "No settings found.", MUTED)
+		local emptyText = createText(enabledPanel, FONT_MUTED, L["configCenterNoResults"] or "No settings found.", TEXT.muted)
 		emptyText:SetPoint("TOPLEFT", enabledTitle, "BOTTOMLEFT", 0, -12)
 		emptyText:SetPoint("BOTTOMRIGHT", enabledPanel, "BOTTOMRIGHT", -14, 14)
 	else
@@ -3117,11 +3157,11 @@ local function renderDashboard(state)
 			local iconSource, iconIsAtlas = resolvePageIcon(app, page)
 			local icon = createIcon(mini, iconSource, 20, iconIsAtlas)
 			icon:SetPoint("LEFT", mini, "LEFT", 9, 0)
-			local label = createText(mini, FONT_TEXT, page.title or page.id, WHITE)
+			local label = createText(mini, FONT_TEXT, page.title or page.id, TEXT.main)
 			label:SetPoint("LEFT", icon, "RIGHT", 9, 0)
 			label:SetPoint("RIGHT", mini, "RIGHT", -96, 0)
 			label:SetHeight(18)
-			local badgeColor = #enabledPages > 0 and GREEN or GOLD
+			local badgeColor = #enabledPages > 0 and GREEN or TEXT.gold
 			local badge = addStatusChip(mini, featureBadgeText, badgeColor, 92)
 			badge:SetPoint("RIGHT", mini, "RIGHT", -8, 0)
 		end
@@ -3257,9 +3297,15 @@ local function addPageFixedHeader(state, category, pagePath)
 		header:SetFrameLevel((state.frame.Scroll:GetFrameLevel() or 1) + 2)
 	end
 
-	local backLabel = "< " .. tostring(category and (category.title or category.id) or (_G.BACK or ""))
-	local backButton = makeFlatButton(header, backLabel, 136, 24)
+	local backLabel = _G.BACK or "Back"
+	local backButton = makeFlatButton(header, backLabel, 104, 28)
 	backButton:SetPoint("LEFT", header, "LEFT", 0, 0)
+	setFrameBackdrop(backButton, { 0.120, 0.105, 0.075, 0.95 }, { 0.55, 0.42, 0.18, 0.82 })
+	setTextColor(backButton.Text, TEXT.topbarGold)
+	backButton:SetScript("OnEnter", function(self) setFrameBackdrop(self, CARD_BG_HOVER, CARD_BORDER_HOVER) end)
+	backButton:SetScript("OnLeave", function(self)
+		setFrameBackdrop(self, { 0.120, 0.105, 0.075, 0.95 }, { 0.55, 0.42, 0.18, 0.82 })
+	end)
 	backButton:SetScript("OnClick", function()
 		if category and category.id then
 			state:SetCategory(category.id, true)
@@ -3268,7 +3314,7 @@ local function addPageFixedHeader(state, category, pagePath)
 		end
 	end)
 
-	local breadcrumb = createText(header, FONT_MUTED, pagePath, MUTED)
+	local breadcrumb = createText(header, FONT_MUTED, pagePath, TEXT.subtle)
 	breadcrumb:SetPoint("LEFT", backButton, "RIGHT", 12, 0)
 	breadcrumb:SetPoint("RIGHT", header, "RIGHT", -4, 0)
 	breadcrumb:SetHeight(20)
@@ -3278,6 +3324,10 @@ end
 
 local function addPageSidePanel(state, page, category)
 	local L = getLocale(state.app)
+	local hasNotes = page and page.aboutNotes and #page.aboutNotes > 0
+	local aboutHeight = hasNotes and 154 or 58
+	local dividerTop = 46 + aboutHeight
+	local panelHeight = hasNotes and 370 or 292
 	local panel = trackFrame(state.fixedFrames, CreateFrame("Frame", nil, state.frame.ContentShell, "BackdropTemplate"))
 	panel:SetPoint(
 		"TOPRIGHT",
@@ -3286,26 +3336,26 @@ local function addPageSidePanel(state, page, category)
 		-PAGE_LAYOUT.contentPad,
 		-PAGE_LAYOUT.sidePanelTopOffset
 	)
-	panel:SetSize(state.pageRightWidth or PAGE_RIGHT_WIDTH, 292)
+	panel:SetSize(state.pageRightWidth or PAGE_RIGHT_WIDTH, panelHeight)
 	applyBackdrop(panel, DETAIL_SECTION_BG, DETAIL_COLORS.sectionBorder)
 
-	local aboutTitle = createText(panel, FONT_HEADER, L["configCenterAbout"] or "About", GOLD)
+	local aboutTitle = createText(panel, FONT_HEADER, L["configCenterAbout"] or "About", TEXT.gold)
 	aboutTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", 14, -14)
 	aboutTitle:SetPoint("RIGHT", panel, "RIGHT", -14, 0)
 	aboutTitle:SetHeight(20)
 
-	local aboutText = createText(panel, FONT_MUTED, getPageDescription(state.app, page), MUTED)
+	local aboutText = createText(panel, FONT_MUTED, getPageAboutText(state.app, page), TEXT.muted)
 	aboutText:SetPoint("TOPLEFT", aboutTitle, "BOTTOMLEFT", 0, -8)
 	aboutText:SetPoint("RIGHT", panel, "RIGHT", -14, 0)
-	aboutText:SetHeight(58)
+	aboutText:SetHeight(aboutHeight)
 
 	local divider = panel:CreateTexture(nil, "OVERLAY")
 	divider:SetColorTexture(CARD_BORDER[1], CARD_BORDER[2], CARD_BORDER[3], 0.55)
 	divider:SetPoint("TOPLEFT", aboutText, "BOTTOMLEFT", 0, -10)
-	divider:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -14, -104)
+	divider:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -14, -dividerTop)
 	divider:SetHeight(1)
 
-	local relatedTitle = createText(panel, FONT_HEADER, L["configCenterRelated"] or "Related", GOLD)
+	local relatedTitle = createText(panel, FONT_HEADER, L["configCenterRelated"] or "Related", TEXT.gold)
 	relatedTitle:SetPoint("TOPLEFT", divider, "BOTTOMLEFT", 0, -12)
 	relatedTitle:SetPoint("RIGHT", panel, "RIGHT", -14, 0)
 	relatedTitle:SetHeight(20)
@@ -3313,7 +3363,7 @@ local function addPageSidePanel(state, page, category)
 		category and (category.title or category.id) or "",
 		getSettingCountText(state.app, #(page.controls or {})),
 	}
-	local relatedText = createText(panel, FONT_MUTED, table.concat(relatedLines, "\n"), MUTED)
+	local relatedText = createText(panel, FONT_MUTED, table.concat(relatedLines, "\n"), TEXT.subtle)
 	relatedText:SetPoint("TOPLEFT", relatedTitle, "BOTTOMLEFT", 0, -8)
 	relatedText:SetPoint("RIGHT", panel, "RIGHT", -14, 0)
 	relatedText:SetHeight(48)
@@ -3329,7 +3379,7 @@ local function addGroupSection(state, group, pagePath)
 		end
 	end
 	local rowGap = collapsed and 0 or math.max(#group.controls - 1, 0) * 2
-	local height = 46 + controlsHeight + rowGap + 14
+	local height = collapsed and 40 or (46 + controlsHeight + rowGap + 14)
 	local section = createPageLeftFrame(state, height)
 	applyBackdrop(section, DETAIL_SECTION_BG, DETAIL_COLORS.sectionBorder)
 	createPixelBorder(section, DETAIL_COLORS.sectionBorder)
@@ -3344,7 +3394,7 @@ local function addGroupSection(state, group, pagePath)
 	header.Text:SetPoint("RIGHT", header, "RIGHT", -34, 0)
 	header.Text:SetJustifyH("LEFT")
 	header.Text:SetText(group.title or group.id)
-	setTextColor(header.Text, WHITE)
+	setTextColor(header.Text, TEXT.main)
 	header.Chevron = createCollapseArrow(header, state.app, 12, collapsed)
 	header.Chevron:SetPoint("RIGHT", header, "RIGHT", -14, 0)
 	header:SetScript("OnClick", function()
@@ -3357,6 +3407,7 @@ local function addGroupSection(state, group, pagePath)
 	headerLine:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", 0, 0)
 	headerLine:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", 0, 0)
 	headerLine:SetHeight(getPixelSize(header))
+	headerLine:SetShown(not collapsed)
 
 	if not collapsed then
 		local y = -46
@@ -3395,11 +3446,11 @@ local function renderPage(state, pageID)
 	local iconSource, iconIsAtlas = resolvePageIcon(app, page)
 	local icon = createIconPlate(header, iconSource, 54, iconIsAtlas)
 	icon:SetPoint("TOPLEFT", header, "TOPLEFT", 0, -14)
-	local title = createText(header, FONT_TITLE, page.title or page.id, WHITE)
+	local title = createText(header, FONT_TITLE, page.title or page.id, TEXT.main)
 	title:SetPoint("TOPLEFT", icon, "TOPRIGHT", 16, -1)
 	title:SetPoint("RIGHT", header, "RIGHT", -6, 0)
 	title:SetHeight(25)
-	local desc = createText(header, FONT_MUTED, getPageDescription(app, page), MUTED)
+	local desc = createText(header, FONT_MUTED, getPageDescription(app, page), TEXT.muted)
 	desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
 	desc:SetPoint("RIGHT", header, "RIGHT", -6, 0)
 	desc:SetHeight(42)
@@ -3411,7 +3462,7 @@ local function renderPage(state, pageID)
 		local empty = createPageLeftFrame(state, 72)
 		applyBackdrop(empty, DETAIL_SECTION_BG, DETAIL_COLORS.sectionBorder)
 		local emptyLabel = getLocale(app)["configCenterNoResults"] or "No settings found."
-		local emptyText = createText(empty, FONT_MUTED, emptyLabel, MUTED)
+		local emptyText = createText(empty, FONT_MUTED, emptyLabel, TEXT.muted)
 		emptyText:SetPoint("TOPLEFT", empty, "TOPLEFT", 14, -14)
 		emptyText:SetPoint("BOTTOMRIGHT", empty, "BOTTOMRIGHT", -14, 14)
 	else
@@ -3446,7 +3497,7 @@ local function renderSearch(state, query)
 			row.Separator:Hide()
 		end
 
-		local path = createText(card, FONT_MUTED, getControlPath(app, control), GOLD)
+		local path = createText(card, FONT_MUTED, getControlPath(app, control), TEXT.subtle)
 		path:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", 14, 9)
 		path:SetPoint("RIGHT", card, "RIGHT", -104, 0)
 		path:SetHeight(16)
@@ -3512,7 +3563,7 @@ function StateMixin:RefreshSidebarSelection()
 		end
 		row.selected = selected
 		setFrameBackdrop(row, selected and SELECTED_BG or SIDEBAR_BG, selected and CARD_BORDER_HOVER or { 0.42, 0.34, 0.20, 0.16 })
-		setTextColor(row.Text, selected and GOLD or WHITE)
+		setTextColor(row.Text, selected and TEXT.gold or TEXT.main)
 		if row.Accent then row.Accent:SetShown(selected) end
 	end
 end
@@ -3526,7 +3577,7 @@ function StateMixin:RenderSidebar()
 	local dashboard = createSidebarFrame(self, 44)
 	applyBackdrop(dashboard, SIDEBAR_BG, { 0.42, 0.34, 0.20, 0.16 })
 	dashboard.Accent = dashboard:CreateTexture(nil, "OVERLAY")
-	dashboard.Accent:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.85)
+	dashboard.Accent:SetColorTexture(TEXT.gold[1], TEXT.gold[2], TEXT.gold[3], 0.85)
 	dashboard.Accent:SetPoint("TOPLEFT", dashboard, "TOPLEFT", 0, -6)
 	dashboard.Accent:SetPoint("BOTTOMLEFT", dashboard, "BOTTOMLEFT", 0, 6)
 	dashboard.Accent:SetWidth(2)
@@ -3561,7 +3612,7 @@ function StateMixin:RenderSidebar()
 			local row = createSidebarFrame(self, 44)
 			applyBackdrop(row, SIDEBAR_BG, { 0.42, 0.34, 0.20, 0.16 })
 			row.Accent = row:CreateTexture(nil, "OVERLAY")
-			row.Accent:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.85)
+			row.Accent:SetColorTexture(TEXT.gold[1], TEXT.gold[2], TEXT.gold[3], 0.85)
 			row.Accent:SetPoint("TOPLEFT", row, "TOPLEFT", 0, -6)
 			row.Accent:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, 6)
 			row.Accent:SetWidth(2)
@@ -3734,7 +3785,7 @@ local function createFrame(app)
 	applyBackdrop(frame.TopBar, TOPBAR_BG, { 0.52, 0.39, 0.19, 0.52 })
 
 	frame.TopBarAccent = frame.TopBar:CreateTexture(nil, "OVERLAY")
-	frame.TopBarAccent:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.38)
+	frame.TopBarAccent:SetColorTexture(TEXT.gold[1], TEXT.gold[2], TEXT.gold[3], 0.38)
 	frame.TopBarAccent:SetPoint("BOTTOMLEFT", frame.TopBar, "BOTTOMLEFT", 10, 0)
 	frame.TopBarAccent:SetPoint("BOTTOMRIGHT", frame.TopBar, "BOTTOMRIGHT", -10, 0)
 	frame.TopBarAccent:SetHeight(1)
@@ -3749,7 +3800,7 @@ local function createFrame(app)
 	frame.Title:SetText(L["configCenterTitle"] or (getAppTitle(app) .. " Settings"))
 	frame.Title:SetShadowColor(0, 0, 0, 0.95)
 	frame.Title:SetShadowOffset(1, -1)
-	setTextColor(frame.Title, TOPBAR_GOLD)
+	setTextColor(frame.Title, TEXT.topbarGold)
 
 	frame.CustomCloseButton = CreateFrame("Button", nil, frame.TopBar, "BackdropTemplate")
 	frame.CustomCloseButton:SetSize(30, 28)
@@ -3760,7 +3811,7 @@ local function createFrame(app)
 	frame.CustomCloseButton.Text:SetJustifyH("CENTER")
 	frame.CustomCloseButton.Text:SetJustifyV("MIDDLE")
 	frame.CustomCloseButton.Text:SetText("X")
-	setTextColor(frame.CustomCloseButton.Text, TOPBAR_GOLD)
+	setTextColor(frame.CustomCloseButton.Text, TEXT.topbarGold)
 	frame.CustomCloseButton:SetScript("OnEnter", function(self)
 		setFrameBackdrop(self, { 0.165, 0.135, 0.080, 0.98 }, CARD_BORDER_HOVER)
 	end)
@@ -3774,7 +3825,7 @@ local function createFrame(app)
 	frame.ResetButton = makeFlatButton(frame.TopBar, _G.DEFAULTS or _G.RESET or "Defaults", 104, 28)
 	frame.ResetButton:SetPoint("RIGHT", frame.CustomCloseButton, "LEFT", -10, 0)
 	setFrameBackdrop(frame.ResetButton, { 0.120, 0.105, 0.075, 0.95 }, { 0.55, 0.42, 0.18, 0.82 })
-	setTextColor(frame.ResetButton.Text, TOPBAR_GOLD)
+	setTextColor(frame.ResetButton.Text, TEXT.topbarGold)
 	frame.ResetButton:SetScript("OnEnter", function(self)
 		setFrameBackdrop(self, { 0.165, 0.135, 0.080, 0.98 }, CARD_BORDER_HOVER)
 	end)
@@ -3821,7 +3872,7 @@ local function createFrame(app)
 	frame.SearchPlaceholder:SetPoint("RIGHT", frame.SearchBox, "RIGHT", -30, 1)
 	frame.SearchPlaceholder:SetJustifyH("LEFT")
 	frame.SearchPlaceholder:SetText((L["configCenterSearchPlaceholder"] or "Search settings") .. "...")
-	setTextColor(frame.SearchPlaceholder, { 0.62, 0.60, 0.56, 0.92 })
+	setTextColor(frame.SearchPlaceholder, TEXT.subtle)
 
 	frame.SearchClearButton = makeFlatButton(frame.SearchShell, "x", 24, 22)
 	frame.SearchClearButton:SetPoint("RIGHT", frame.SearchBox, "RIGHT", -4, 0)
