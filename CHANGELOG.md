@@ -10,7 +10,10 @@
 
 ### 🔄 Changed
 
+- Settings Center: Added an `EQoL Suites` root category for major built-in replacement systems, including Bags, EQoL Unit Frames, Resource Bars, Cooldown Panels, and Damage Meter.
 - Settings Center: Migrated Action Bars & Buttons and Skinner away from the legacy Blizzard Settings renderer. They now register only for the modern Settings Center while keeping their SavedVariables and runtime behavior unchanged.
+- Settings Center: Migrated Visibility & Fading (Frames) to the modern Settings Center so frame visibility multi-select controls are registered directly on the modern page.
+- Settings Center / Visibility & Fading: Added contextual notes for frame visibility controls that are disabled because EQoL Unit Frames already manage that frame.
 
 ### 🐛 Fixed
 

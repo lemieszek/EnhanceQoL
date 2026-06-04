@@ -18,6 +18,7 @@ local expandable = addon.functions.SettingsCreateExpandableSection(cat, {
 		or "Create and manage custom cooldown panels, then edit tracked abilities, layout and visibility in the panel editor.",
 	newTagID = "CooldownPanels",
 	iconKey = "cooldownpanels",
+	modernCategory = "suites",
 	expanded = false,
 	colorizeTitle = false,
 })

@@ -1144,6 +1144,11 @@ function lib.NormalizeNoteList(control)
 		elseif type(note) ~= "table" then
 			return
 		end
+		local visibleFunc = note.visible or note.condition
+		if type(visibleFunc) == "function" then
+			local ok, visible = pcall(visibleFunc, control)
+			if not ok or visible == false then return end
+		end
 		if type(note.text) == "string" and note.text:gsub("%s+", "") ~= "" then
 			notes[#notes + 1] = note
 		elseif type(note.blocks) == "table" then

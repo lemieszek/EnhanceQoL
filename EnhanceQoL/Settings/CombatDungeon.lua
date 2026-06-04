@@ -2587,6 +2587,22 @@ if cChar and sectionDungeon then
 		parentSection = sectionDungeon,
 	})
 
+	local damageMeterSection = addon.SettingsLayout.suitesDamageMeterSection
+	if not damageMeterSection then
+		damageMeterSection = addon.functions.SettingsCreateExpandableSection(cChar, {
+			name = L["damageMeterTitle"] or "Damage Meter",
+			configPageKey = "DamageMeter",
+			description = L["damageMeterEditModeHint"],
+			iconAtlas = "icons_64x64_damage",
+			modernCategory = "suites",
+			modernOnly = true,
+			expanded = false,
+			colorizeTitle = false,
+			newTagID = "damageMeterEnabled",
+		})
+		addon.SettingsLayout.suitesDamageMeterSection = damageMeterSection
+	end
+
 	local damageMeterEnable = addon.functions.SettingsCreateCheckbox(cChar, {
 		var = "damageMeterEnabled",
 		text = L["damageMeterEnabled"],
@@ -2595,7 +2611,7 @@ if cChar and sectionDungeon then
 			addon.db["damageMeterEnabled"] = value == true
 			if addon.DamageMeter and addon.DamageMeter.UpdateEventState then addon.DamageMeter:UpdateEventState() end
 		end,
-		parentSection = sectionDungeon,
+		parentSection = damageMeterSection,
 	})
 	local function isDamageMeterEnabled() return damageMeterEnable and damageMeterEnable.setting and damageMeterEnable.setting:GetValue() == true end
 	addon.functions.SettingsCreateSlider(cChar, {
@@ -2614,7 +2630,7 @@ if cChar and sectionDungeon then
 		parent = true,
 		element = damageMeterEnable.element,
 		parentCheck = isDamageMeterEnabled,
-		parentSection = sectionDungeon,
+		parentSection = damageMeterSection,
 	})
 	addon.functions.SettingsCreateCheckbox(cChar, {
 		var = "damageMeterEditModeSample",
@@ -2627,7 +2643,7 @@ if cChar and sectionDungeon then
 		parent = true,
 		element = damageMeterEnable.element,
 		parentCheck = isDamageMeterEnabled,
-		parentSection = sectionDungeon,
+		parentSection = damageMeterSection,
 	})
 
 	-- Objective Tracker

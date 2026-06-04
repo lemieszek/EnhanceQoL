@@ -2936,12 +2936,27 @@ end
 
 if addon.Bags then
 	addon.Bags.integrated = true
+	local bagsSuiteExpandable = addon.SettingsLayout.suitesBagsSection
+	if not bagsSuiteExpandable then
+		bagsSuiteExpandable = addon.functions.SettingsCreateExpandableSection(cInventory, {
+			name = L["configCenterBags"] or "Bags",
+			configPageKey = "Bags",
+			description = L["bagsModuleEnableDesc"],
+			iconKey = "bags",
+			modernCategory = "suites",
+			modernOnly = true,
+			expanded = false,
+			colorizeTitle = false,
+		})
+		addon.SettingsLayout.suitesBagsSection = bagsSuiteExpandable
+	end
+
 	addon.functions.SettingsCreateCheckbox(cInventory, {
 		var = "enableBagsModule",
 		text = L["bagsModuleEnable"] or "Enable Bags module",
 		desc = L["bagsModuleEnableDesc"] or "Opt-in replacement for the default bag window. Disabling after it was enabled takes full effect after a UI reload.",
 		default = false,
-		parentSection = expandable,
+		parentSection = bagsSuiteExpandable,
 		get = function()
 			return addon.db and addon.db.enableBagsModule == true
 		end,

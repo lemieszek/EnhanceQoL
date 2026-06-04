@@ -154,12 +154,14 @@ local barsResourcesExpandable = addon.SettingsLayout.uiBarsResourcesExpandable
 if not barsResourcesExpandable then
 	barsResourcesExpandable = addon.functions.SettingsCreateExpandableSection(cUIInput, {
 		name = L["BarsAndResources"] or "Bars & Resources",
+		configPageKey = "BarsAndResources",
 		description = L["configCenterPageDescBarsResources"]
 			or "Adjust class resources, resource and status bars, XP, absorb and player resource displays.",
 		expanded = false,
 		colorizeTitle = false,
 		newTagID = "ResourceBars",
 		iconKey = "resource",
+		modernCategory = "suites",
 	})
 	addon.SettingsLayout.uiBarsResourcesExpandable = barsResourcesExpandable
 end

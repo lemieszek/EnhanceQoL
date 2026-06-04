@@ -8804,6 +8804,7 @@ local function registerSettingsUI()
 				or "Customize player, target, focus, party and group frames, including layout, bars, auras, text and profiles.",
 			newTagID = "CustomUnitFrames",
 			iconKey = "unitframes",
+			modernCategory = "suites",
 			expanded = false,
 			colorizeTitle = false,
 		})

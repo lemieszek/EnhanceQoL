@@ -1426,6 +1426,7 @@ local function createFrameCategory()
 			or "Control when supported Blizzard frames are shown, hidden or faded during combat, targeting and mouseover states.",
 		newTagID = "VisibilityFrames",
 		iconKey = "visibility",
+		modernOnly = true,
 		expanded = false,
 		colorizeTitle = false,
 	})
@@ -1439,14 +1440,6 @@ local function createFrameCategory()
 		table.insert(frames, info)
 	end
 	table.sort(frames, function(a, b) return (a.text or a.name or "") < (b.text or b.name or "") end)
-
-	local function expandWith(predicate)
-		local parentCheck = function()
-			if expandable and expandable.IsExpanded and expandable:IsExpanded() == false then return false end
-			return predicate()
-		end
-		return addon.functions.RegisterConfigParentSection(parentCheck, expandable)
-	end
 
 	for _, info in ipairs(frames) do
 		if info.var and info.name then
@@ -1465,7 +1458,13 @@ local function createFrameCategory()
 					end,
 					setSelectedFunc = function(key, shouldSelect) setFrameRule(info, key, shouldSelect) end,
 					isEnabled = function() return shouldShow() end,
-					parentSection = expandWith(shouldShow),
+					richNote = {
+						title = L["CustomUnitFrames"] or L["Unit Frames"] or "EQoL Unit Frames",
+						text = L["visibilityRule_lockedByUF"]
+							or "Visibility is controlled by Enhanced Unit Frames. Disable them to change this setting.",
+						visible = function() return not shouldShow() end,
+					},
+					parentSection = expandable,
 				})
 			end
 		end

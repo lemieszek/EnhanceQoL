@@ -32,6 +32,7 @@ local rootCategoryMap = {
 	SOCIAL = "social",
 	ECONOMY = "economy",
 	SOUND = "sound",
+	SUITES = "suites",
 	PROFILES = "profiles",
 }
 
@@ -66,6 +67,7 @@ local pageIconKeysByStableID = {
 	CooldownPanels = "cooldownpanels",
 	CustomUnitFrames = "unitframes",
 	DataPanel = "data",
+	DamageMeter = "damagemeterprofile",
 	DialogsConfirmations = "dialogsconfirmations",
 	DungeonsMythicPlus = "dungeons",
 	EconomyCraftingOrders = "crafting",
@@ -193,6 +195,7 @@ local function ensureConfigApp()
 			profiles = newSettingsAsset("Profiles.tga"),
 			social = newSettingsAsset("Social.tga"),
 			sound = newSettingsAsset("SoundSettings.tga"),
+			suites = newSettingsAsset("AddonProfile.tga"),
 		},
 		iconTextures = {
 			actionbar = newSettingsAsset("ActionBarsButtons.tga"),
@@ -410,7 +413,8 @@ local function ensureConfigApp()
 	app:RegisterCategory({ id = "social", title = _G["SOCIAL_LABEL"] or L["configCenterChatSocial"] or "Chat & Social", order = 400, iconAtlas = "socialqueuing-icon-group" })
 	app:RegisterCategory({ id = "economy", title = L["Economy"] or "Economy", order = 500, iconAtlas = "auctionhouse-icon-favorite" })
 	app:RegisterCategory({ id = "sound", title = _G["SOUND"] or "Sound", order = 600, iconAtlas = "poi-door-arrow-down" })
-	app:RegisterCategory({ id = "profiles", title = L["Profiles"] or "Profiles", order = 700, iconAtlas = "services-icon-warning" })
+	app:RegisterCategory({ id = "suites", title = L["configCenterSuites"] or "EQoL Suites", order = 700, iconAtlas = "communities-icon-notification" })
+	app:RegisterCategory({ id = "profiles", title = L["Profiles"] or "Profiles", order = 800, iconAtlas = "services-icon-warning" })
 	app:SetDefaultPage("dashboard")
 
 	addon.ConfigApp = app
@@ -1471,6 +1475,7 @@ function addon.functions.SettingsCreateExpandableSection(cat, cbData)
 		local pageKey = cbData.configPageKey or cbData.newTagID or getLocaleKeyForText(cbData.name)
 		local pageID = app:RegisterLegacySection(section, {
 			category = cat,
+			categoryID = cbData.categoryID or cbData.modernCategory,
 			title = cbData.name,
 			pageID = cbData.configPageID,
 			pageKey = pageKey,
