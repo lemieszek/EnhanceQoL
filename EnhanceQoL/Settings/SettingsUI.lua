@@ -529,19 +529,38 @@ local function registerLegacyControl(category, cbData, controlType, setting)
 	if not id then return end
 	addon.ConfigControlOrder = (addon.ConfigControlOrder or 0) + 1
 	local groupID, groupTitle, pageID = getLegacyControlGroup(app, category, cbData)
+	local explicitDefault = cbData.modernDefault
+	if explicitDefault == nil then explicitDefault = cbData.default end
+	local registryDefault = key and function()
+		local defaults = addon.dbDefaults
+		if type(defaults) == "table" and defaults[key] ~= nil then
+			if cbData.subvar and type(defaults[key]) == "table" then
+				return defaults[key][cbData.subvar]
+			end
+			return defaults[key]
+		end
+		if type(explicitDefault) == "function" then
+			return explicitDefault()
+		end
+		return explicitDefault
+	end or explicitDefault
 	local control = app:RegisterLegacyControl({
 		legacyCategory = category,
 		parentSection = cbData.parentSection,
 		pageID = pageID,
 		id = id,
 		key = key,
+		subvar = cbData.subvar,
 		type = controlType,
 		label = cbData.text or cbData.label or cbData.name,
 		description = cbData.modernDescription or cbData.desc,
-		default = cbData.default,
+		default = registryDefault,
 		dbDefault = key and function()
 			local defaults = addon.dbDefaults
 			if type(defaults) == "table" and defaults[key] ~= nil then
+				if cbData.subvar and type(defaults[key]) == "table" then
+					return defaults[key][cbData.subvar], defaults[key][cbData.subvar] ~= nil
+				end
 				return defaults[key], true
 			end
 			return nil, false

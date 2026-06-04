@@ -4502,7 +4502,10 @@ local function initUI()
 		LFR = { r = 1.00, g = 1.00, b = 1.00 }, -- LFR: White (editable)
 		TW = { r = 1.00, g = 1.00, b = 1.00 }, -- Timewalking: White (editable)
 	}
+	addon.dbDefaults = addon.dbDefaults or {}
+	if type(addon.dbDefaults["instanceDifficultyColors"]) ~= "table" then addon.dbDefaults["instanceDifficultyColors"] = {} end
 	for k, v in pairs(defaultColors) do
+		if type(addon.dbDefaults["instanceDifficultyColors"][k]) ~= "table" then addon.dbDefaults["instanceDifficultyColors"][k] = { r = v.r, g = v.g, b = v.b, a = v.a or 1 } end
 		if type(addon.db["instanceDifficultyColors"][k]) ~= "table" then addon.db["instanceDifficultyColors"][k] = v end
 	end
 	-- addon.functions.InitDBValue("instanceDifficultyUseIcon", false)

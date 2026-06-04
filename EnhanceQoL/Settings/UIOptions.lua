@@ -2135,6 +2135,7 @@ local function createNameplatesCategory()
 		addon.functions.SettingsCreateColorPicker(category, {
 			var = var,
 			text = text,
+			modernDefault = function() return addon.dbDefaults and addon.dbDefaults[var] or nil end,
 			callback = function()
 				if addon.functions.RefreshDefaultNameplateMobColors then addon.functions.RefreshDefaultNameplateMobColors() end
 			end,
@@ -2171,6 +2172,7 @@ local function createNameplatesCategory()
 	addon.functions.SettingsCreateColorPicker(category, {
 		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.mobColorTankMode,
 		text = L["nameplateMobColorTankMode"] or "Tank mode color",
+		modernDefault = function() return addon.dbDefaults and addon.dbDefaults[DEFAULT_NAMEPLATE_FEATURE_KEYS.mobColorTankMode] or nil end,
 		callback = function()
 			if addon.functions.RefreshDefaultNameplateMobColors then addon.functions.RefreshDefaultNameplateMobColors() end
 		end,

@@ -1,4 +1,4 @@
-local MODULE_MAJOR, MINOR = "LibEQOLConfig-1.0", 1
+local MODULE_MAJOR, MINOR = "LibEQOLConfig-1.0", 3
 local LibStub = _G.LibStub
 assert(LibStub, MODULE_MAJOR .. " requires LibStub")
 
@@ -52,6 +52,8 @@ local function normalizeSearchText(text)
 	return text
 end
 
+local colorValuesEqual
+
 local function valuesEqual(a, b, depth)
 	depth = (depth or 0) + 1
 	if depth > 5 then
@@ -60,11 +62,17 @@ local function valuesEqual(a, b, depth)
 	if a == b then
 		return true
 	end
+	if type(a) == "number" and type(b) == "number" then
+		return math.abs(a - b) <= 0.000001
+	end
 	if type(a) ~= type(b) then
 		return false
 	end
 	if type(a) ~= "table" then
 		return false
+	end
+	if colorValuesEqual and colorValuesEqual(a, b) then
+		return true
 	end
 	for key, value in pairs(a) do
 		if not valuesEqual(value, b[key], depth) then
@@ -79,6 +87,21 @@ local function valuesEqual(a, b, depth)
 	return true
 end
 
+function colorValuesEqual(a, b)
+	if type(a) ~= "table" or type(b) ~= "table" then
+		return false
+	end
+	if type(a.r) ~= "number" or type(a.g) ~= "number" or type(a.b) ~= "number" then
+		return false
+	end
+	if type(b.r) ~= "number" or type(b.g) ~= "number" or type(b.b) ~= "number" then
+		return false
+	end
+	local alphaA = type(a.a) == "number" and a.a or 1
+	local alphaB = type(b.a) == "number" and b.a or 1
+	return valuesEqual(a.r, b.r) and valuesEqual(a.g, b.g) and valuesEqual(a.b, b.b) and valuesEqual(alphaA, alphaB)
+end
+
 local function resolveControlDefault(control)
 	if not control then
 		return nil, false
@@ -86,7 +109,7 @@ local function resolveControlDefault(control)
 	if control.default ~= nil then
 		if type(control.default) == "function" then
 			local ok, value = pcall(control.default)
-			if ok then
+			if ok and value ~= nil then
 				return value, true
 			end
 			return nil, false
@@ -597,6 +620,17 @@ local function getEffectiveControlValue(app, control, default, hasDefault)
 	return value
 end
 
+local function getStoredControlValue(app, control)
+	local db = app and app.opts and app.opts.db and app.opts.db()
+	if type(db) == "table" and control and control.key ~= nil and db[control.key] ~= nil then
+		if control.subvar and type(db[control.key]) == "table" then
+			return db[control.key][control.subvar], db[control.key][control.subvar] ~= nil
+		end
+		return db[control.key], true
+	end
+	return nil, false
+end
+
 function AppMixin:SetControlValue(control, value)
 	if control.setting and control.setting.SetValue then
 		local ok = pcall(control.setting.SetValue, control.setting, value)
@@ -716,6 +750,16 @@ function AppMixin:IsControlCustomized(control)
 	local default, hasDefault = resolveControlDefault(control)
 	if not hasDefault then
 		return false
+	end
+	local storedValue, hasStoredValue = getStoredControlValue(self, control)
+	if control and control.key ~= nil and not hasStoredValue then
+		return false
+	end
+	if hasStoredValue then
+		if control and control.type == "colorpicker" and colorValuesEqual(storedValue, default) then
+			return false
+		end
+		return not valuesEqual(storedValue, default)
 	end
 	local value = getEffectiveControlValue(self, control, default, hasDefault)
 	return not valuesEqual(value, default)

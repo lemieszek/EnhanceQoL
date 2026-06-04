@@ -213,7 +213,7 @@ local data = {
 						and addon.SettingsLayout.elements["chatFrameFadeEnabled"].setting
 						and addon.SettingsLayout.elements["chatFrameFadeEnabled"].setting:GetValue() == true
 				end,
-				get = function() return addon.db and addon.db.chatFrameFadeTimeVisible or 30 end,
+				get = function() return addon.db and addon.db.chatFrameFadeTimeVisible or 120 end,
 				set = function(value)
 					addon.db["chatFrameFadeTimeVisible"] = value
 					if addon.functions.ApplyChatFrameFade then addon.functions.ApplyChatFrameFade() end
@@ -222,7 +222,8 @@ local data = {
 				max = 300,
 				step = 1,
 				parent = true,
-				default = 30,
+				default = 120,
+				modernDefault = function() return addon.dbDefaults and addon.dbDefaults.chatFrameFadeTimeVisible or 120 end,
 				sType = "slider",
 			},
 			{
@@ -422,7 +423,7 @@ data = {
 						and addon.SettingsLayout.elements["enableChatIM"].setting
 						and addon.SettingsLayout.elements["enableChatIM"].setting:GetValue() == true
 				end,
-				get = function() return addon.db and addon.db.chatIMMaxHistory or 30 end,
+				get = function() return addon.db and addon.db.chatIMMaxHistory or 250 end,
 				set = function(value)
 					addon.db["chatIMMaxHistory"] = value
 					if addon.ChatIM and addon.ChatIM.SetMaxHistoryLines then addon.ChatIM:SetMaxHistoryLines(value) end
@@ -431,7 +432,8 @@ data = {
 				max = 1000,
 				step = 1,
 				parent = true,
-				default = 300,
+				default = 250,
+				modernDefault = function() return addon.dbDefaults and addon.dbDefaults.chatIMMaxHistory or 250 end,
 				sType = "slider",
 			},
 		},
@@ -571,6 +573,14 @@ local CHAT_FILTER_OPTIONS = {
 	{ key = "MAIL", label = makeFilterLabel("MAIL", "Interface\\MailFrame\\Mail-Icon", MAIL_LABEL or MAIL or INBOX or "Mail") },
 	{ key = "MONSTER", label = makeFilterLabel("MONSTER", nil, EXAMPLE_TARGET_MONSTER or "Monster") },
 }
+
+local function getDefaultChatChannelFilterSelection()
+	local defaults = {}
+	for _, opt in ipairs(CHAT_FILTER_OPTIONS) do
+		defaults[opt.key] = true
+	end
+	return defaults
+end
 
 data = {
 	{
@@ -837,6 +847,7 @@ data = {
 				parent = true,
 				sType = "multidropdown",
 				options = categoryOptions,
+				modernDefault = getDefaultChatChannelFilterSelection,
 				isSelectedFunc = function(key) return addon.db.chatChannelFiltersEnable[key] end,
 				setSelectedFunc = function(key, shouldSelect)
 					addon.db.chatChannelFiltersEnable[key] = shouldSelect and true or false
@@ -903,8 +914,11 @@ addon.functions.SettingsCreateCheckboxes(cChatFrame, data)
 
 function addon.functions.initChatFrame()
 	addon.db.chatChannelFiltersEnable = addon.db.chatChannelFiltersEnable or {}
+	addon.dbDefaults = addon.dbDefaults or {}
+	if type(addon.dbDefaults.chatChannelFiltersEnable) ~= "table" then addon.dbDefaults.chatChannelFiltersEnable = {} end
 	for _, opt in ipairs(CHAT_FILTER_OPTIONS) do
 		table.insert(categoryOptions, { value = opt.key, text = opt.label })
+		if addon.dbDefaults.chatChannelFiltersEnable[opt.key] == nil then addon.dbDefaults.chatChannelFiltersEnable[opt.key] = true end
 		if addon.db.chatChannelFiltersEnable[opt.key] == nil then addon.db.chatChannelFiltersEnable[opt.key] = true end
 	end
 	if addon.ChatIM and addon.ChatIM.ChannelHistory then addon.ChatIM.ChannelHistory.filterOptions = addon.ChatIM.ChannelHistory.filterOptions or CHAT_FILTER_OPTIONS end
