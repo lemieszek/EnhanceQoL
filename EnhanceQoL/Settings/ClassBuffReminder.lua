@@ -205,7 +205,7 @@ local function openFlaskSettings()
 		return
 	end
 
-	if addon.functions and addon.functions.OpenConfigCenter then addon.functions.OpenConfigCenter("gameplay.macrosconsumables") end
+	if addon.functions and addon.functions.OpenConfigCenter then addon.functions.OpenConfigCenter("gameplay.macrosconsumables", "flaskMacroEnabled") end
 end
 
 local function openFoodSettings()
@@ -219,7 +219,7 @@ local function openFoodSettings()
 		return
 	end
 
-	if addon.functions and addon.functions.OpenConfigCenter then addon.functions.OpenConfigCenter("gameplay.macrosconsumables") end
+	if addon.functions and addon.functions.OpenConfigCenter then addon.functions.OpenConfigCenter("gameplay.macrosconsumables", "buffFoodMacroEnabled") end
 end
 
 local expandable = addon.functions.SettingsCreateExpandableSection(cat, {

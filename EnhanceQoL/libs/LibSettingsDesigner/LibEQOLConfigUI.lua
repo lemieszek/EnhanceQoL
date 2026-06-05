@@ -4729,6 +4729,50 @@ function StateMixin:SetCategory(categoryID, restoreScroll)
 	self:RenderContent()
 end
 
+function lib.FindFirstControlInGroup(page, groupID)
+	if not page or not groupID then
+		return nil
+	end
+	for _, control in ipairs(page.controls or {}) do
+		if control.groupID == groupID then
+			return control
+		end
+	end
+	return nil
+end
+
+function StateMixin:ResolveFocusControlID(page, focusID)
+	if not page or not focusID then
+		return nil, nil
+	end
+	local focusKey = tostring(focusID)
+	local control = self.app.controlsByID and self.app.controlsByID[focusKey]
+	if control and control.pageID == page.id then
+		return control.id, control.groupID
+	end
+	for _, entry in ipairs(page.controls or {}) do
+		if entry.id == focusKey or entry.key == focusKey then
+			return entry.id, entry.groupID
+		end
+	end
+	local group = page.groupsByID and page.groupsByID[focusKey]
+	if not group then
+		local normalizedFocus = normalizeLookupKey(focusKey)
+		for _, entry in ipairs(page.groups or {}) do
+			local normalizedGroup = normalizeLookupKey(entry.id or entry.title)
+			if normalizedGroup == normalizedFocus or normalizedGroup:find(normalizedFocus, 1, true) == 1 then
+				group = entry
+				break
+			end
+		end
+	end
+	if group and group.id then
+		control = lib.FindFirstControlInGroup(page, group.id)
+		return control and control.id or nil, group.id
+	end
+	return nil, nil
+end
+
 function StateMixin:SetPage(pageID, focusControlID)
 	local page = self.app:GetPage(pageID)
 	if not page or (self.app.IsPageVisible and not self.app:IsPageVisible(page)) then
@@ -4748,11 +4792,11 @@ function StateMixin:SetPage(pageID, focusControlID)
 		self.selectedCategoryID = page.category
 	end
 	if focusControlID then
-		local control = self.app.controlsByID and self.app.controlsByID[focusControlID]
-		if control and control.groupID and self.collapsedGroups then
-			self.collapsedGroups[control.groupID] = nil
+		local resolvedControlID, groupID = self:ResolveFocusControlID(page, focusControlID)
+		if groupID and self.collapsedGroups then
+			self.collapsedGroups[groupID] = nil
 		end
-		self.pendingFocusControlID = focusControlID
+		self.pendingFocusControlID = resolvedControlID or focusControlID
 	end
 	if self.frame.SearchBox:GetText() ~= "" then
 		self.suppressSearchRender = true
@@ -5179,7 +5223,28 @@ local function createFrame(app)
 	return frame
 end
 
-function lib:Open(appOrID, pageID)
+function lib.ResolveOpenTarget(app, pageID, focusControlID)
+	if not pageID or pageID == "dashboard" or app:GetPage(pageID) then
+		return pageID, focusControlID
+	end
+	local text = tostring(pageID)
+	local bestPageID, bestFocus
+	for id in pairs(app.pagesByID or {}) do
+		if text == id or text:find(id .. ".", 1, true) == 1 then
+			local focus = text:sub(#id + 2)
+			if focus ~= "" and (not bestPageID or #id > #bestPageID) then
+				bestPageID = id
+				bestFocus = focus
+			end
+		end
+	end
+	if bestPageID then
+		return bestPageID, focusControlID or bestFocus
+	end
+	return pageID, focusControlID
+end
+
+function lib:Open(appOrID, pageID, focusControlID)
 	local _ = self
 	local app = type(appOrID) == "table" and appOrID or LibStub("LibEQOLConfig-1.0"):GetAddOn(appOrID)
 	if not app then
@@ -5193,8 +5258,9 @@ function lib:Open(appOrID, pageID)
 		frame._LibEQOLConfigState:RenderSidebar()
 	end
 	local state = frame._LibEQOLConfigState
+	pageID, focusControlID = lib.ResolveOpenTarget(app, pageID, focusControlID)
 	if pageID and pageID ~= "dashboard" then
-		state:SetPage(pageID)
+		state:SetPage(pageID, focusControlID)
 	elseif not pageID then
 		state:RenderContent()
 	else
@@ -5204,7 +5270,7 @@ function lib:Open(appOrID, pageID)
 	return frame
 end
 
-function lib:Toggle(appOrID, pageID)
+function lib:Toggle(appOrID, pageID, focusControlID)
 	local app = type(appOrID) == "table" and appOrID or LibStub("LibEQOLConfig-1.0"):GetAddOn(appOrID)
 	if not app then
 		return nil
@@ -5214,5 +5280,5 @@ function lib:Toggle(appOrID, pageID)
 		frame:Hide()
 		return frame
 	end
-	return self:Open(app, pageID)
+	return self:Open(app, pageID, focusControlID)
 end

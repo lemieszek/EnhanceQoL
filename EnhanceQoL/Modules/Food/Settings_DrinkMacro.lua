@@ -858,7 +858,7 @@ function addon.functions.OpenFlaskMacroSettings()
 	local convenienceSection = addon.SettingsLayout and addon.SettingsLayout.gameplayConvenienceSection
 	if convenienceSection and convenienceSection.data then convenienceSection.data.expanded = true end
 
-	if addon.functions and addon.functions.OpenConfigCenter then addon.functions.OpenConfigCenter("gameplay.macrosconsumables") end
+	if addon.functions and addon.functions.OpenConfigCenter then addon.functions.OpenConfigCenter("gameplay.macrosconsumables", "flaskMacroEnabled") end
 end
 
 function addon.functions.OpenBuffFoodMacroSettings()
@@ -871,5 +871,5 @@ function addon.functions.OpenBuffFoodMacroSettings()
 	local convenienceSection = addon.SettingsLayout and addon.SettingsLayout.gameplayConvenienceSection
 	if convenienceSection and convenienceSection.data then convenienceSection.data.expanded = true end
 
-	if addon.functions and addon.functions.OpenConfigCenter then addon.functions.OpenConfigCenter("gameplay.macrosconsumables") end
+	if addon.functions and addon.functions.OpenConfigCenter then addon.functions.OpenConfigCenter("gameplay.macrosconsumables", "buffFoodMacroEnabled") end
 end

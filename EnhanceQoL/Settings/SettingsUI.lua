@@ -754,10 +754,10 @@ local function getLegacyControlGroup(app, category, cbData)
 	return groupID, groupTitle, pageID
 end
 
-function addon.functions.OpenConfigCenter(pageID)
+function addon.functions.OpenConfigCenter(pageID, focusControlID)
 	local app = ensureConfigApp()
 	if ConfigUILib and app then
-		ConfigUILib:Open(app, pageID)
+		ConfigUILib:Open(app, pageID, focusControlID)
 		return
 	end
 	if Settings and Settings.OpenToCategory and addon.SettingsLayout and addon.SettingsLayout.rootCategory then
