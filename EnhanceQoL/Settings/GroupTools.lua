@@ -52,11 +52,12 @@ end
 
 local focusMarkerOrder = { 1, 2, 3, 4, 5, 6, 7, 8 }
 
-local function createFeatureToggle(category, section, feature, dbKey, titleKey, titleFallback, hintKey, hintFallback)
+local function createFeatureToggle(category, section, feature, dbKey, titleKey, titleFallback, hintKey, hintFallback, descKey, descFallback)
 	addon.functions.SettingsCreateHeadline(category, L[titleKey] or titleFallback, { parentSection = section })
 	local checkbox = addon.functions.SettingsCreateCheckbox(category, {
 		var = dbKey,
 		text = ENABLE_TEXT,
+		desc = descKey and (L[descKey] or descFallback) or nil,
 		get = function() return isEnabled(dbKey) end,
 		func = function(value) setEnabled(feature, value) end,
 		default = false,
@@ -81,16 +82,18 @@ if unitFrameCategory and unitFrameSection then
 	)
 end
 
-local combatCategory = addon.SettingsLayout.rootUI
+local combatCategory = addon.SettingsLayout.rootGAMEPLAY
 if combatCategory then
 	local combatSection = addon.functions.SettingsCreateExpandableSection(combatCategory, {
 		name = L["groupToolsCombatAlertsSection"] or "Combat Alerts",
 		description = L["configCenterPageDescCombatAlerts"]
-			or "Configure death alerts and no-target indicators, including text, sound, TTS, role rules and Edit Mode placement.",
+			or "Configure combat warnings such as death alerts and no-target reminders, including text, sound, TTS, role rules and Edit Mode placement.",
 		expanded = false,
 		colorizeTitle = false,
 		newTagID = "GroupToolsCombatAlerts",
 		iconKey = "combat",
+		modernCategory = "gameplay",
+		modernOnly = true,
 	})
 	addon.SettingsLayout.groupToolsCombatAlertsSection = combatSection
 
@@ -102,7 +105,9 @@ if combatCategory then
 		"groupToolsDeathAlert",
 		"Death Alert",
 		"groupToolsDeathAlertEditModeHint",
-		"Configure text, sound, TTS, role overrides, font, and position in Edit Mode."
+		"Configure text, sound, TTS, role overrides, font, and position in Edit Mode.",
+		"groupToolsDeathAlertDesc",
+		"Shows a configurable alert when a party or raid member dies, with optional text, sound and text-to-speech output."
 	)
 	createFeatureToggle(
 		combatCategory,
@@ -112,7 +117,9 @@ if combatCategory then
 		"groupToolsNoTargetIndicator",
 		"No Target Indicator",
 		"groupToolsNoTargetEditModeHint",
-		"Configure text, sound, font, target handling, and position in Edit Mode."
+		"Configure text, sound, font, target handling, and position in Edit Mode.",
+		"groupToolsNoTargetDesc",
+		"Shows a warning when you are in combat without a valid target, so target loss is easier to notice."
 	)
 end
 

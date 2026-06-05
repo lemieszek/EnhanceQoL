@@ -9106,62 +9106,53 @@ local function registerSettingsUI()
 		parentSection = expandable,
 	})
 
+	local standalonePrivateAuraCategory = addon.SettingsLayout.rootGAMEPLAY
 	local standalonePrivateAuraExpandable = addon.SettingsLayout.expUFStandalonePrivateAuras
-	if not standalonePrivateAuraExpandable then
-		standalonePrivateAuraExpandable = addon.functions.SettingsCreateExpandableSection(cUF, {
+	if standalonePrivateAuraCategory and not standalonePrivateAuraExpandable then
+		standalonePrivateAuraExpandable = addon.functions.SettingsCreateExpandableSection(standalonePrivateAuraCategory, {
 			name = L["UFStandalonePrivateAuras"] or "Standalone Private Auras",
+			description = L["configCenterPageCardDescStandalonePrivateAuras"],
 			expanded = false,
 			colorizeTitle = false,
-			parentSection = expandable,
 			newTagID = "ufStandalonePrivateAurasExpandable",
 			iconKey = "privateaura",
+			modernCategory = "gameplay",
+			modernOnly = true,
 		})
 		addon.SettingsLayout.expUFStandalonePrivateAuras = standalonePrivateAuraExpandable
 	end
 
-	addon.functions.SettingsCreateCheckbox(cUF, {
-		var = "ufStandalonePrivateAurasEnabled",
-		text = L["UFStandalonePrivateAurasEnable"] or "Enable standalone private aura anchor",
-		default = false,
-		get = function()
-			local cfg = ensureStandalonePrivateAuraConfig()
-			return cfg.enabled == true
-		end,
-		func = function(value)
-			local cfg = ensureStandalonePrivateAuraConfig()
-			cfg.enabled = value and true or false
-			local feature = addon.Aura and addon.Aura.StandalonePrivateAuras
-			if feature and feature.OnSettingChanged then
-				feature:OnSettingChanged(cfg.enabled == true)
-			elseif feature and feature.Refresh then
-				feature:Refresh()
-			end
-			if value == false then
-				addon.variables.requireReload = true
-				if addon.functions and addon.functions.checkReloadFrame then addon.functions.checkReloadFrame() end
-			end
-		end,
-		parentSection = standalonePrivateAuraExpandable,
-	})
-	addon.functions.SettingsCreateText(
-		cUF,
-		L["UFStandalonePrivateAurasHint"] or "Configure placement, size, wrapping, and display options in Edit Mode.",
-		{ parentSection = standalonePrivateAuraExpandable }
-	)
-	addon.functions.SettingsCreateButton(cUF, {
-		var = "ufStandalonePrivateAurasEditMode",
-		text = _G.HUD_EDIT_MODE_MENU or "Edit Mode",
-		func = function()
-			if EditModeManagerFrame and ShowUIPanel then
-				ShowUIPanel(EditModeManagerFrame)
-			elseif EditModeManagerFrame and EditModeManagerFrame.Show then
-				EditModeManagerFrame:Show()
-			end
-			local feature = addon.Aura and addon.Aura.StandalonePrivateAuras
-			if feature and feature.OpenEditMode then feature:OpenEditMode() end
-		end,
-		parentSection = standalonePrivateAuraExpandable,
-	})
+	if standalonePrivateAuraCategory and standalonePrivateAuraExpandable then
+		addon.functions.SettingsCreateCheckbox(standalonePrivateAuraCategory, {
+			var = "ufStandalonePrivateAurasEnabled",
+			text = L["UFStandalonePrivateAurasEnable"] or "Enable standalone private aura anchor",
+			default = false,
+			get = function()
+				local cfg = ensureStandalonePrivateAuraConfig()
+				return cfg.enabled == true
+			end,
+			func = function(value)
+				local cfg = ensureStandalonePrivateAuraConfig()
+				cfg.enabled = value and true or false
+				local feature = addon.Aura and addon.Aura.StandalonePrivateAuras
+				if feature and feature.OnSettingChanged then
+					feature:OnSettingChanged(cfg.enabled == true)
+				elseif feature and feature.Refresh then
+					feature:Refresh()
+				end
+				if value == false then
+					addon.variables.requireReload = true
+					if addon.functions and addon.functions.checkReloadFrame then addon.functions.checkReloadFrame() end
+				end
+			end,
+			parentSection = standalonePrivateAuraExpandable,
+		})
+		addon.functions.SettingsCreateText(
+			standalonePrivateAuraCategory,
+			L["UFStandalonePrivateAurasHint"] or "Use Edit Mode to position the standalone private aura anchor and adjust size, wrapping and display behavior.",
+			{ parentSection = standalonePrivateAuraExpandable }
+		)
+	end
 
 	do -- Profile management + export/import
 		if UFProfiles and UFProfiles.Initialize then UFProfiles.Initialize() end

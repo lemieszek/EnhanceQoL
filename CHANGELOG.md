@@ -1,5 +1,17 @@
 # Changelog
 
+## [11.0.0-alpha5] - 2026-06-05
+
+### ✨ Added
+
+### 🔄 Changed
+
+- Settings Center / Combat Alerts: Moved Combat Alerts to a modern-only Gameplay page and added clearer descriptions for death alerts, no-target reminders, sounds, TTS and role rules.
+- Settings Center / Combat Alerts: Added row-level descriptions for Death Alert and No Target Indicator so the purpose of each feature is visible directly in the modern page.
+- Settings Center / Private Auras: Moved Standalone Private Auras to a modern-only Gameplay page with clearer descriptions for the movable private aura anchor and Edit Mode placement.
+
+### 🐛 Fixed
+
 ## [11.0.0-alpha4] - 2026-06-04
 
 ### ✨ Added
