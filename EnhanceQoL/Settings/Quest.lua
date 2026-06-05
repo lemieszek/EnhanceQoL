@@ -23,6 +23,7 @@ local questingExpandable = addon.functions.SettingsCreateExpandableSection(cQues
 	iconKey = "questing",
 	expanded = false,
 	colorizeTitle = false,
+	modernOnly = true,
 })
 
 local REMOVE_IGNORED_QUEST_NPC_DIALOG = addonName .. "QuestIgnoredNPCRemove"

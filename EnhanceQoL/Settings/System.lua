@@ -106,6 +106,7 @@ addon.functions.SettingsCreateMultiDropdown(cGeneral, {
 local utilitiesExpandable = addon.functions.SettingsCreateExpandableSection(cGeneral, {
 	name = L["UIUtilities"] or "UI Utilities",
 	configPageKey = "UIUtilities",
+	description = L["configCenterPageCardDescUIUtilities"],
 	iconKey = "uiutilities",
 	modernOnly = true,
 	expanded = false,

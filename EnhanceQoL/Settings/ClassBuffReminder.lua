@@ -200,16 +200,12 @@ local function openFlaskSettings()
 		return
 	end
 
-	if not (Settings and Settings.OpenToCategory) then return end
-	local gameplayCategory = addon.SettingsLayout and addon.SettingsLayout.rootGAMEPLAY
-	if not gameplayCategory then return end
-
 	if InCombatLockdown and InCombatLockdown() then
 		if UIErrorsFrame and ERR_NOT_IN_COMBAT then UIErrorsFrame:AddMessage(ERR_NOT_IN_COMBAT, 1, 0, 0) end
 		return
 	end
 
-	Settings.OpenToCategory(gameplayCategory:GetID(), L["Flask Macro"] or "Flask Macro")
+	if addon.functions and addon.functions.OpenConfigCenter then addon.functions.OpenConfigCenter("gameplay.macrosconsumables") end
 end
 
 local function openFoodSettings()
@@ -218,16 +214,12 @@ local function openFoodSettings()
 		return
 	end
 
-	if not (Settings and Settings.OpenToCategory) then return end
-	local gameplayCategory = addon.SettingsLayout and addon.SettingsLayout.rootGAMEPLAY
-	if not gameplayCategory then return end
-
 	if InCombatLockdown and InCombatLockdown() then
 		if UIErrorsFrame and ERR_NOT_IN_COMBAT then UIErrorsFrame:AddMessage(ERR_NOT_IN_COMBAT, 1, 0, 0) end
 		return
 	end
 
-	Settings.OpenToCategory(gameplayCategory:GetID(), L["Buff Food Macro"] or "Buff Food Macro")
+	if addon.functions and addon.functions.OpenConfigCenter then addon.functions.OpenConfigCenter("gameplay.macrosconsumables") end
 end
 
 local expandable = addon.functions.SettingsCreateExpandableSection(cat, {
@@ -238,6 +230,7 @@ local expandable = addon.functions.SettingsCreateExpandableSection(cat, {
 	iconKey = "buff",
 	expanded = false,
 	colorizeTitle = false,
+	modernOnly = true,
 })
 
 addon.functions.SettingsCreateText(cat, L["ClassBuffReminderDesc"] or "Shows how many group members are missing the class buff your class can provide.", {

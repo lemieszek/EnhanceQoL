@@ -5,7 +5,6 @@ local ConfigLib = LibStub("LibEQOLConfig-1.0", true)
 
 local rootCategories = {
 	{ id = "UI", label = _G["INTERFACE_LABEL"] },
-	{ id = "GAMEPLAY", label = _G["SETTING_GROUP_GAMEPLAY"] },
 }
 
 local function buildSlashCommandHint(commands, desc, usage, note)
@@ -167,6 +166,9 @@ end
 addon.SettingsLayout.rootGENERAL = {
 	GetID = function() return "GENERAL" end,
 }
+addon.SettingsLayout.rootGAMEPLAY = {
+	GetID = function() return "GAMEPLAY" end,
+}
 
 if ConfigLib then
 	local app = ConfigLib:GetAddOn(addonName)
@@ -174,6 +176,10 @@ if ConfigLib then
 		app:RegisterLegacyCategory(addon.SettingsLayout.rootGENERAL, {
 			categoryID = "general",
 			title = _G["GENERAL"],
+		})
+		app:RegisterLegacyCategory(addon.SettingsLayout.rootGAMEPLAY, {
+			categoryID = "gameplay",
+			title = _G["SETTING_GROUP_GAMEPLAY"],
 		})
 	end
 end

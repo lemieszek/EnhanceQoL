@@ -2205,6 +2205,7 @@ function addon.functions.initDungeonFrame()
 		iconKey = "combatlogging",
 		expanded = false,
 		colorizeTitle = false,
+		modernOnly = true,
 	})
 
 	local combatLogEnabled = addon.functions.SettingsCreateCheckbox(cChar, {
@@ -2411,6 +2412,7 @@ function addon.functions.initDungeonFrame()
 			iconKey = "macros",
 			expanded = false,
 			colorizeTitle = false,
+			modernOnly = true,
 		})
 		addon.SettingsLayout.gameplayConvenienceSection = expandable
 	end
@@ -2487,6 +2489,7 @@ if not sectionDungeon then
 		expanded = false,
 		colorizeTitle = false,
 		newTagID = "DungeonsMythicPlus",
+		modernOnly = true,
 	})
 	addon.SettingsLayout.gameplayDungeonsMythicSection = sectionDungeon
 end
@@ -2774,6 +2777,7 @@ if not sectionGroupFinder then
 		iconKey = "groupfinder",
 		expanded = false,
 		colorizeTitle = false,
+		modernOnly = true,
 	})
 	addon.SettingsLayout.gameplayGroupFinderSection = sectionGroupFinder
 end
@@ -2925,6 +2929,7 @@ if not sectionDeathRes then
 		iconKey = "death",
 		expanded = false,
 		colorizeTitle = false,
+		modernOnly = true,
 	})
 	addon.SettingsLayout.gameplayDeathResSection = sectionDeathRes
 end

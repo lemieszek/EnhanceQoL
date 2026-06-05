@@ -56,6 +56,7 @@ local function buildDrinkMacroSettings()
 			iconKey = "macros",
 			expanded = false,
 			colorizeTitle = false,
+			modernOnly = true,
 		})
 		addon.SettingsLayout.gameplayConvenienceSection = convenienceSection
 	end
@@ -848,37 +849,27 @@ function addon.functions.initDrinkMacro()
 end
 
 function addon.functions.OpenFlaskMacroSettings()
-	if not (Settings and Settings.OpenToCategory) then return end
 	if InCombatLockdown and InCombatLockdown() then
 		if UIErrorsFrame and ERR_NOT_IN_COMBAT then UIErrorsFrame:AddMessage(ERR_NOT_IN_COMBAT, 1, 0, 0) end
 		return
 	end
 
 	if addon.functions and addon.functions.initDrinkMacro then addon.functions.initDrinkMacro() end
-
-	local gameplayCategory = addon.SettingsLayout and addon.SettingsLayout.rootGAMEPLAY
-	if not gameplayCategory then return end
-
 	local convenienceSection = addon.SettingsLayout and addon.SettingsLayout.gameplayConvenienceSection
 	if convenienceSection and convenienceSection.data then convenienceSection.data.expanded = true end
 
-	Settings.OpenToCategory(gameplayCategory:GetID(), L["Flask Macro"] or "Flask Macro")
+	if addon.functions and addon.functions.OpenConfigCenter then addon.functions.OpenConfigCenter("gameplay.macrosconsumables") end
 end
 
 function addon.functions.OpenBuffFoodMacroSettings()
-	if not (Settings and Settings.OpenToCategory) then return end
 	if InCombatLockdown and InCombatLockdown() then
 		if UIErrorsFrame and ERR_NOT_IN_COMBAT then UIErrorsFrame:AddMessage(ERR_NOT_IN_COMBAT, 1, 0, 0) end
 		return
 	end
 
 	if addon.functions and addon.functions.initDrinkMacro then addon.functions.initDrinkMacro() end
-
-	local gameplayCategory = addon.SettingsLayout and addon.SettingsLayout.rootGAMEPLAY
-	if not gameplayCategory then return end
-
 	local convenienceSection = addon.SettingsLayout and addon.SettingsLayout.gameplayConvenienceSection
 	if convenienceSection and convenienceSection.data then convenienceSection.data.expanded = true end
 
-	Settings.OpenToCategory(gameplayCategory:GetID(), L["Buff Food Macro"] or "Buff Food Macro")
+	if addon.functions and addon.functions.OpenConfigCenter then addon.functions.OpenConfigCenter("gameplay.macrosconsumables") end
 end

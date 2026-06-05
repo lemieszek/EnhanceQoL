@@ -947,7 +947,10 @@ function addon.functions.SettingsCreateCategory(parent, treeName, sort, newTagID
 end
 
 function addon.functions.SettingsCreateKeybind(cat, bindingIndex, parentSection)
-	local initializer = SettingsLib:CreateKeybind(cat, { bindingIndex = bindingIndex, parentSection = parentSection })
+	local initializer
+	if not isModernOnlySection(parentSection) then
+		initializer = SettingsLib:CreateKeybind(cat, { bindingIndex = bindingIndex, parentSection = parentSection })
+	end
 	registerLegacyControl(cat, {
 		id = "Binding_" .. tostring(bindingIndex),
 		text = _G.KEY_BINDINGS or "Key Bindings",

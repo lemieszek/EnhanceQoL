@@ -131,6 +131,7 @@ if gameplayCategory then
 		colorizeTitle = false,
 		newTagID = "GroupToolsFocusMarker",
 		iconKey = "focus",
+		modernOnly = true,
 	})
 	addon.SettingsLayout.groupToolsFocusMarkerSection = focusSection
 
