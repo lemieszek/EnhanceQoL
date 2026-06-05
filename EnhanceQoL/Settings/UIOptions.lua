@@ -2544,7 +2544,6 @@ local function ensureBarsResourcesCategory()
 				or "Adjust class resources, resource and status bars, XP, absorb and player resource displays.",
 			expanded = false,
 			colorizeTitle = false,
-			newTagID = "ResourceBars",
 			iconKey = "resource",
 		})
 		addon.SettingsLayout.uiBarsResourcesExpandable = expandable

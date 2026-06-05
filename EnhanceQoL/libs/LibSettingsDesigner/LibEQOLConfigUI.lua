@@ -1305,7 +1305,13 @@ function lib.NormalizeNoteList(control)
 	end
 	add(control and control.note)
 	add(control and control.richNote)
-	for _, note in ipairs(control and control.notes or {}) do
+	local controlNotes = control and control.notes
+	if type(controlNotes) == "string" then
+		controlNotes = { { text = controlNotes } }
+	elseif type(controlNotes) ~= "table" then
+		controlNotes = {}
+	end
+	for _, note in ipairs(controlNotes) do
 		add(note)
 	end
 	for _, note in ipairs(control and control.richNotes or {}) do
@@ -2822,7 +2828,15 @@ local function addDropdownWidget(row, app, control, opts)
 					else
 						app:SetControlValue(control, value)
 					end
-					lib.RefreshVisibleRows(row._state)
+					if control.refreshOnChange and row._state then
+						C_Timer.After(0, function()
+							if row._state and row._state.frame and row._state.frame:IsShown() then
+								row._state:RenderContent()
+							end
+						end)
+					else
+						lib.RefreshVisibleRows(row._state)
+					end
 				end, option.value)
 			end
 		end)

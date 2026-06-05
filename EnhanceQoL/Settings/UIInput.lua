@@ -159,9 +159,7 @@ if not barsResourcesExpandable then
 			or "Adjust class resources, resource and status bars, XP, absorb and player resource displays.",
 		expanded = false,
 		colorizeTitle = false,
-		newTagID = "ResourceBars",
 		iconKey = "resource",
-		modernCategory = "suites",
 	})
 	addon.SettingsLayout.uiBarsResourcesExpandable = barsResourcesExpandable
 end

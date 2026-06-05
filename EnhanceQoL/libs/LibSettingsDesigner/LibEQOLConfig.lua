@@ -297,6 +297,7 @@ local LEGACY_CONTROL_METADATA_FIELDS = {
 	"previewSoundFunc",
 	"previewTooltip",
 	"readOnly",
+	"refreshOnChange",
 	"orderList",
 	"rowHeight",
 	"richNote",
@@ -340,7 +341,13 @@ local function rebuildSearchBlob(app, control)
 	addSearchBlob(parts, page and page.title)
 	addSearchBlob(parts, group and group.title)
 	addSearchBlob(parts, category and category.title)
-	for _, note in ipairs(control.notes or {}) do
+	local notes = control.notes
+	if type(notes) == "string" then
+		notes = { { text = notes } }
+	elseif type(notes) ~= "table" then
+		notes = {}
+	end
+	for _, note in ipairs(notes) do
 		addSearchBlob(parts, note.title)
 		addSearchBlob(parts, note.text)
 		for _, block in ipairs(note.blocks or {}) do
