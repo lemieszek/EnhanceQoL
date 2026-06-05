@@ -26,6 +26,7 @@ local movementData = {
 	{
 		var = "autoDismount",
 		text = L["autoDismount"],
+		desc = L["autoDismountDesc"],
 		get = function() return getCVarOptionState("autoDismount") end,
 		func = function(value) setCVarOptionState("autoDismount", value) end,
 		default = false,
@@ -88,6 +89,7 @@ end
 addon.functions.SettingsCreateMultiDropdown(cGeneral, {
 	var = "dialogAutoConfirm",
 	text = L["dialogAutoConfirm"] or "Auto-confirm dialogs",
+	desc = L["dialogAutoConfirmDesc"],
 	options = {
 		{
 			value = "patron",

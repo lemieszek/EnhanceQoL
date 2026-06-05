@@ -430,6 +430,7 @@ local data = {
 	{
 		var = "modifyXPRepBar",
 		text = L["modifyXPRepBar"],
+		desc = L["modifyXPRepBarDesc"],
 		func = function(v)
 			addon.db["modifyXPRepBar"] = v
 			local height, width, scale = 17, 571, 1
@@ -446,6 +447,7 @@ local data = {
 			{
 				var = "modifyXPRepBarWidth",
 				text = HUD_EDIT_MODE_SETTING_CHAT_FRAME_WIDTH,
+				desc = L["modifyXPRepBarWidthDesc"],
 				get = function()
 					local w = MainStatusTrackingBarContainer:GetSize()
 					return addon.db and addon.db.modifyXPRepBarWidth or w
@@ -473,6 +475,7 @@ local data = {
 			{
 				var = "modifyXPRepBarHeight",
 				text = HUD_EDIT_MODE_SETTING_CHAT_FRAME_HEIGHT,
+				desc = L["modifyXPRepBarHeightDesc"],
 				get = function()
 					local _, h = MainStatusTrackingBarContainer:GetSize()
 					return addon.db and addon.db.modifyXPRepBarHeight or h
@@ -500,6 +503,7 @@ local data = {
 			{
 				var = "modifyXPRepBarScale",
 				text = RENDER_SCALE,
+				desc = L["modifyXPRepBarScaleDesc"],
 				get = function() return addon.db and addon.db.modifyXPRepBarScale or 1 end,
 				set = function(v)
 					addon.db["modifyXPRepBarScale"] = v
@@ -595,12 +599,14 @@ data = {
 	{
 		var = "ignoreTalkingHead",
 		text = string.format(L["ignoreTalkingHeadN"], HUD_EDIT_MODE_TALKING_HEAD_FRAME_LABEL),
+		desc = L["ignoreTalkingHeadDesc"],
 		func = function(v) addon.db["ignoreTalkingHead"] = v end,
 		parentSection = interfaceExpandable,
 	},
 	{
 		var = "ffxDeath",
 		text = L["ffxDeath"],
+		desc = L["ffxDeathDesc"],
 		get = function() return getCVarOptionState("ffxDeath") end,
 		func = function(value) setCVarOptionState("ffxDeath", value) end,
 		default = false,
@@ -609,6 +615,7 @@ data = {
 	{
 		var = "hideZoneText",
 		text = L["hideZoneText"],
+		desc = L["hideZoneTextDesc"],
 		func = function(v)
 			addon.db["hideZoneText"] = v
 			addon.functions.toggleZoneText(addon.db["hideZoneText"])
@@ -637,7 +644,8 @@ data = {
 	},
 	{
 		var = "hideRaidTools",
-		text = L["Hide Raid Tools in Party"],
+		text = L["hideRaidTools"],
+		desc = L["hideRaidToolsDesc"],
 		func = function(v)
 			local wasEnabled = addon.db["hideRaidTools"] == true
 			addon.db["hideRaidTools"] = v and true or false

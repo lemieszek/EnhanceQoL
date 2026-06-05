@@ -44,6 +44,7 @@ local data = {
 	{
 		var = "mouseRingEnabled",
 		text = L["mouseRingEnabled"],
+		desc = L["mouseRingEnabledDesc"],
 		func = function(v)
 			addon.db["mouseRingEnabled"] = v
 			if v then
@@ -63,6 +64,7 @@ local data = {
 			{
 				var = "mouseRingSize",
 				text = L["mouseRingSize"],
+				desc = L["mouseRingSizeDesc"],
 				get = function() return addon.db and addon.db.mouseRingSize or 70 end,
 				set = function(v)
 					addon.db["mouseRingSize"] = v
@@ -85,6 +87,7 @@ local data = {
 
 				var = "mouseRingHideDot",
 				text = L["mouseRingHideDot"],
+				desc = L["mouseRingHideDotDesc"],
 				func = function(v)
 					addon.db["mouseRingHideDot"] = v
 					if addon.mousePointer and addon.mousePointer.dot then
@@ -116,6 +119,7 @@ local data = {
 
 				var = "mouseRingOnlyInCombat",
 				text = L["mouseRingOnlyInCombat"],
+				desc = L["mouseRingOnlyInCombatDesc"],
 				func = function(v)
 					addon.db["mouseRingOnlyInCombat"] = v
 					if addon.Mouse.functions.refreshRingVisibility then addon.Mouse.functions.refreshRingVisibility() end
@@ -134,6 +138,7 @@ local data = {
 			{
 				var = "mouseRingOnlyOnRightClick",
 				text = L["mouseRingOnlyOnRightClick"],
+				desc = L["mouseRingOnlyOnRightClickDesc"],
 				func = function(v)
 					addon.db["mouseRingOnlyOnRightClick"] = v
 					if addon.Mouse.functions.refreshRingVisibility then addon.Mouse.functions.refreshRingVisibility() end
@@ -152,6 +157,7 @@ local data = {
 			{
 				var = "mouseRingCombatOverride",
 				text = L["mouseRingCombatOverride"],
+				desc = L["mouseRingCombatOverrideDesc"],
 				func = function(v)
 					addon.db["mouseRingCombatOverride"] = v
 					if addon.Mouse.functions.refreshRingStyle then addon.Mouse.functions.refreshRingStyle() end
@@ -170,6 +176,7 @@ local data = {
 					{
 						var = "mouseRingCombatOverrideSize",
 						text = L["mouseRingCombatOverrideSize"],
+						desc = L["mouseRingCombatOverrideSizeDesc"],
 						get = function() return addon.db and addon.db.mouseRingCombatOverrideSize or 70 end,
 						set = function(v)
 							addon.db["mouseRingCombatOverrideSize"] = v
@@ -194,6 +201,7 @@ local data = {
 					{
 						var = "mouseRingCombatOverrideColor",
 						text = L["mouseRingCombatOverrideColor"],
+						desc = L["mouseRingCombatOverrideColorDesc"],
 						parentCheck = function()
 							return addon.SettingsLayout.elements["mouseRingEnabled"]
 								and addon.SettingsLayout.elements["mouseRingEnabled"].setting
@@ -215,6 +223,7 @@ local data = {
 			{
 				var = "mouseRingCombatOverlay",
 				text = L["mouseRingCombatOverlay"],
+				desc = L["mouseRingCombatOverlayDesc"],
 				func = function(v)
 					addon.db["mouseRingCombatOverlay"] = v
 					if addon.Mouse.functions.refreshRingStyle then addon.Mouse.functions.refreshRingStyle() end
@@ -233,6 +242,7 @@ local data = {
 					{
 						var = "mouseRingCombatOverlaySize",
 						text = L["mouseRingCombatOverlaySize"],
+						desc = L["mouseRingCombatOverlaySizeDesc"],
 						get = function() return addon.db and addon.db.mouseRingCombatOverlaySize or 90 end,
 						set = function(v)
 							addon.db["mouseRingCombatOverlaySize"] = v
@@ -257,6 +267,7 @@ local data = {
 					{
 						var = "mouseRingCombatOverlayColor",
 						text = L["mouseRingCombatOverlayColor"],
+						desc = L["mouseRingCombatOverlayColorDesc"],
 						parentCheck = function()
 							return addon.SettingsLayout.elements["mouseRingEnabled"]
 								and addon.SettingsLayout.elements["mouseRingEnabled"].setting
@@ -279,6 +290,7 @@ local data = {
 
 				var = "mouseRingUseClassColor",
 				text = L["mouseRingUseClassColor"],
+				desc = L["mouseRingUseClassColorDesc"],
 				func = function(v)
 					addon.db["mouseRingUseClassColor"] = v
 					if addon.Mouse.functions.refreshRingStyle then addon.Mouse.functions.refreshRingStyle() end
@@ -297,7 +309,8 @@ local data = {
 			},
 			{
 				var = "mouseRingColor",
-				text = L["Ring Color"],
+				text = L["mouseRingColorLabel"] or L["Ring Color"],
+				desc = L["mouseRingColorDesc"],
 				parentCheck = function()
 					return addon.SettingsLayout.elements["mouseRingEnabled"]
 						and addon.SettingsLayout.elements["mouseRingEnabled"].setting
@@ -318,6 +331,7 @@ local data = {
 			{
 				var = "mouseRingClassColorAlpha",
 				text = _G.OPACITY or "Opacity",
+				desc = L["mouseRingClassColorAlphaDesc"],
 				get = function()
 					local color = addon.db and addon.db["mouseRingColor"]
 					if color and color.a ~= nil then return color.a end
@@ -357,6 +371,7 @@ local data = {
 				},
 				order = { "DOT", "RING" },
 				text = L["mouseRingProgressStyle"],
+				desc = L["mouseRingProgressStyleDesc"],
 				get = function() return addon.db["mouseRingProgressStyle"] or "DOT" end,
 				set = function(key)
 					addon.db["mouseRingProgressStyle"] = key
@@ -373,6 +388,7 @@ local data = {
 			{
 				var = "mouseRingProgressShowEdge",
 				text = L["mouseRingProgressShowEdge"],
+				desc = L["mouseRingProgressShowEdgeDesc"],
 				func = function(v)
 					addon.db["mouseRingProgressShowEdge"] = v
 					if addon.Mouse.functions.refreshRingStyle then addon.Mouse.functions.refreshRingStyle() end
@@ -389,6 +405,7 @@ local data = {
 			{
 				var = "mouseRingProgressHideDuringSwipe",
 				text = L["mouseRingProgressHideDuringSwipe"],
+				desc = L["mouseRingProgressHideDuringSwipeDesc"],
 				get = function() return addon.db and addon.db.mouseRingProgressHideDuringSwipe or 35 end,
 				set = function(v)
 					addon.db["mouseRingProgressHideDuringSwipe"] = v
@@ -414,6 +431,7 @@ local data = {
 			{
 				var = "mouseRingCastProgress",
 				text = L["mouseRingCastProgress"],
+				desc = L["mouseRingCastProgressDesc"],
 				func = function(v)
 					addon.db["mouseRingCastProgress"] = v
 					if addon.Mouse.functions.syncRingProgressState then addon.Mouse.functions.syncRingProgressState() end
@@ -430,6 +448,7 @@ local data = {
 			{
 				var = "mouseRingCastProgressShowOutsideCombat",
 				text = L["mouseRingCastProgressShowOutsideCombat"],
+				desc = L["mouseRingCastProgressShowOutsideCombatDesc"],
 				func = function(v)
 					addon.db["mouseRingCastProgressShowOutsideCombat"] = v and true or false
 					if addon.Mouse.functions.refreshRingVisibility then addon.Mouse.functions.refreshRingVisibility() end
@@ -444,6 +463,7 @@ local data = {
 			{
 				var = "mouseRingCastProgressColor",
 				text = L["mouseRingCastProgressColor"],
+				desc = L["mouseRingCastProgressColorDesc"],
 				parentCheck = function() return isCastProgressEnabledSetting() end,
 				callback = function(r, g, b, a)
 					if addon.Mouse.functions.refreshRingStyle then addon.Mouse.functions.refreshRingStyle() end
@@ -462,6 +482,7 @@ local data = {
 			{
 				var = "mouseRingGCDProgress",
 				text = L["mouseRingGCDProgress"],
+				desc = L["mouseRingGCDProgressDesc"],
 				func = function(v)
 					addon.db["mouseRingGCDProgress"] = v
 					if addon.Mouse.functions.syncRingProgressState then addon.Mouse.functions.syncRingProgressState() end
@@ -477,6 +498,7 @@ local data = {
 					{
 						var = "mouseRingGCDProgressColor",
 						text = L["mouseRingGCDProgressColor"],
+						desc = L["mouseRingGCDProgressColorDesc"],
 						parentCheck = function()
 							return isRingEnabledSetting()
 								and addon.SettingsLayout.elements["mouseRingGCDProgress"]
@@ -498,6 +520,7 @@ local data = {
 						},
 						order = { "REMAINING", "ELAPSED" },
 						text = L["mouseRingGCDProgressMode"],
+						desc = L["mouseRingGCDProgressModeDesc"],
 						get = function() return addon.db["mouseRingGCDProgressMode"] or "REMAINING" end,
 						set = function(key)
 							addon.db["mouseRingGCDProgressMode"] = key
@@ -528,6 +551,7 @@ data = {
 	{
 		var = "mouseCrosshairEnabled",
 		text = L["mouseCrosshairEnabled"],
+		desc = L["mouseCrosshairEnabledDesc"],
 		default = false,
 		func = function(v)
 			addon.db["mouseCrosshairEnabled"] = v and true or false
@@ -558,6 +582,7 @@ data = {
 	{
 		var = "mouseTrailEnabled",
 		text = L["mouseTrailEnabled"],
+		desc = L["mouseTrailEnabledDesc"],
 		func = function(v)
 			addon.db["mouseTrailEnabled"] = v
 			if addon.Mouse.functions.updateRunnerState then addon.Mouse.functions.updateRunnerState() end
@@ -568,6 +593,7 @@ data = {
 
 				var = "mouseTrailOnlyInCombat",
 				text = L["mouseTrailOnlyInCombat"],
+				desc = L["mouseTrailOnlyInCombatDesc"],
 				func = function(v) addon.db["mouseTrailOnlyInCombat"] = v end,
 				parentCheck = function()
 					return addon.SettingsLayout.elements["mouseTrailEnabled"]
@@ -584,6 +610,7 @@ data = {
 
 				var = "mouseTrailUseClassColor",
 				text = L["mouseTrailUseClassColor"],
+				desc = L["mouseTrailUseClassColorDesc"],
 				func = function(v)
 					addon.db["mouseTrailUseClassColor"] = v
 					if addon.Mouse.functions.refreshTrailStyle then addon.Mouse.functions.refreshTrailStyle() end
@@ -602,7 +629,8 @@ data = {
 			},
 			{
 				var = "mouseTrailColor",
-				text = L["Trail Color"],
+				text = L["mouseTrailColorLabel"] or L["Trail Color"],
+				desc = L["mouseTrailColorDesc"],
 				parentCheck = function()
 					return addon.SettingsLayout.elements["mouseTrailEnabled"]
 						and addon.SettingsLayout.elements["mouseTrailEnabled"].setting
@@ -623,6 +651,7 @@ data = {
 				list = { [1] = VIDEO_OPTIONS_LOW, [2] = VIDEO_OPTIONS_MEDIUM, [3] = VIDEO_OPTIONS_HIGH, [4] = VIDEO_OPTIONS_ULTRA, [5] = VIDEO_OPTIONS_ULTRA_HIGH },
 				order = { 1, 2, 3, 4, 5 },
 				text = L["mouseTrailDensity"],
+				desc = L["mouseTrailDensityDesc"],
 				get = function() return addon.db["mouseTrailDensity"] or 1 end,
 				set = function(key)
 					addon.db["mouseTrailDensity"] = key

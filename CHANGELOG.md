@@ -1,5 +1,12 @@
 # Changelog
 
+## [11.0.0-alpha6] - 2026-06-05
+
+### ✨ Added
+
+- Class Buff Reminder: Added configurable expiring-buff warnings with a global warning time and per-type global/custom times for class buffs, flasks, food, augment runes and weapon buffs.
+- Settings Center / Interface, General and Gameplay: Added missing descriptions for many controls and page areas so modern setting rows explain what the option affects before deeper migration work continues.
+
 ## [11.0.0-alpha5] - 2026-06-05
 
 ### ✨ Added

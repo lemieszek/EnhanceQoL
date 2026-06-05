@@ -70,6 +70,7 @@ local function buildDrinkMacroSettings()
 		{
 			var = "drinkMacroEnabled",
 			text = L["Enable Drink Macro"],
+			desc = L["drinkMacroEnabledDesc"],
 			func = function(value)
 				addon.db.drinkMacroEnabled = value and true or false
 				refreshDrinks()
@@ -79,6 +80,7 @@ local function buildDrinkMacroSettings()
 				{
 					var = "preferMageFood",
 					text = L["Prefer mage food"],
+					desc = L["preferMageFoodDesc"],
 					func = function(value)
 						addon.db.preferMageFood = value and true or false
 						refreshDrinks()
@@ -120,6 +122,7 @@ local function buildDrinkMacroSettings()
 				{
 					var = "minManaFoodValue",
 					text = L["Minimum mana restore for food"],
+					desc = L["minManaFoodValueDesc"],
 					get = function() return addon.db.minManaFoodValue or 50 end,
 					set = function(value)
 						value = tonumber(value) or 50
@@ -258,6 +261,7 @@ local function buildDrinkMacroSettings()
 	addon.functions.SettingsCreateCheckbox(cDrink, {
 		var = "healthUseRecuperate",
 		text = L["Use Recuperate out of combat"],
+		desc = L["healthUseRecuperateDesc"],
 		func = function(value)
 			addon.db.healthUseRecuperate = value and true or false
 			refreshHealthMacro()
@@ -273,6 +277,7 @@ local function buildDrinkMacroSettings()
 	addon.functions.SettingsCreateCheckbox(cDrink, {
 		var = "healthUseCombatPotions",
 		text = L["Use Combat potions for health macro"],
+		desc = L["healthUseCombatPotionsDesc"],
 		func = setCombatPotionUsage,
 		parentCheck = healthParentCheck,
 		parent = true,
@@ -379,6 +384,7 @@ local function buildDrinkMacroSettings()
 	addon.functions.SettingsCreateCheckbox(cDrink, {
 		var = "healthUseCustomSpells",
 		text = L["Use custom spells"] or "Use custom spells",
+		desc = L["healthUseCustomSpellsDesc"],
 		func = setCustomSpellsUsage,
 		parentCheck = healthParentCheck,
 		parent = true,
@@ -424,6 +430,7 @@ local function buildDrinkMacroSettings()
 	addon.functions.SettingsCreateButton(cDrink, {
 		var = "healthCustomAdd",
 		text = L["Add SpellID"] or "Add SpellID",
+		desc = L["healthCustomAddDesc"],
 		func = function()
 			if not customSpellsEnabled() then return end
 			local dialog = StaticPopupDialogs["EQOL_ADD_HEALTH_SPELL"]
@@ -463,6 +470,7 @@ local function buildDrinkMacroSettings()
 	addon.functions.SettingsCreateDropdown(cDrink, {
 		var = "healthCustomRemove",
 		text = L["Custom Spells"] or "Custom Spells",
+		desc = L["healthCustomRemoveDesc"],
 		parentCheck = customSpellsEnabled,
 		parent = true,
 		element = customSpellsParent,

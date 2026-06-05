@@ -178,6 +178,7 @@ end
 local charDisplayDropdown = addon.functions.SettingsCreateMultiDropdown(cGearUpgrade, {
 	var = "charframe_display",
 	text = L["gearDisplayElements"] or "Elements",
+	desc = L["charframeDisplayDesc"],
 	options = {
 		{ value = "ilvl", text = STAT_AVERAGE_ITEM_LEVEL, tooltip = L["gearDisplayOptionItemLevelDesc"] },
 		{ value = "tracks", text = L["gearDisplayOptionTracks"] or "Upgrade tracks", tooltip = L["gearDisplayOptionTracksDesc"] or "Show the upgrade track abbreviation on equipped gear slots." },
@@ -196,7 +197,7 @@ local charDisplayDropdown = addon.functions.SettingsCreateMultiDropdown(cGearUpg
 local enchantDisplayDropdown = addon.functions.SettingsCreateDropdown(cGearUpgrade, {
 	var = "charEnchantDisplayMode",
 	text = L["gearEnchantDisplayMode"] or "Enchant display",
-	desc = L["gearEnchantDisplayModeDesc"] or "Choose whether applied enchants, missing enchants, and the missing enchant icon should be shown.",
+	desc = L["gearEnchantDisplayModeDesc"],
 	list = enchantDisplayModeOptions,
 	order = enchantDisplayModeOrder,
 	default = ENCHANT_DISPLAY_MODE_FULL_ICON,
@@ -214,6 +215,7 @@ local enchantDisplayDropdown = addon.functions.SettingsCreateDropdown(cGearUpgra
 addon.functions.SettingsCreateColorPicker(cGearUpgrade, {
 	var = "missingEnchantOverlayColor",
 	text = L["gearDisplayOptionMissingEnchantOverlayColor"] or "Missing enchant overlay color",
+	desc = L["gearMissingEnchantOverlayColorDesc"],
 	hasOpacity = true,
 	element = enchantDisplayDropdown and enchantDisplayDropdown.element,
 	parentCheck = function()
@@ -232,6 +234,7 @@ addon.functions.SettingsCreateDropdown(cGearUpgrade, {
 		OUTSIDE = L["outsideNearGems"] or "Outside (next to gems)",
 	},
 	text = L["Upgrade track position"] or "Upgrade track position",
+	desc = L["gearTrackPositionDesc"],
 	get = function() return addon.db["charTrackPosition"] or "LEFT" end,
 	set = function(key)
 		addon.db["charTrackPosition"] = key
@@ -259,6 +262,7 @@ addon.functions.SettingsCreateDropdown(cGearUpgrade, {
 		OUTSIDE = L["outsideNearGems"] or "Outside (next to gems)",
 	},
 	text = L["Item level position"],
+	desc = L["gearIlvlPositionDesc"],
 	get = function() return addon.db["charIlvlPosition"] or "TOPRIGHT" end,
 	set = function(key)
 		addon.db["charIlvlPosition"] = key
@@ -285,6 +289,7 @@ addon.functions.SettingsCreateDropdown(cGearUpgrade, {
 		BOTTOMRIGHT = L["Bottom Right"],
 	},
 	text = L["flyoutIlvlPosition"] or "Equipment flyout item level position",
+	desc = L["gearFlyoutIlvlPositionDesc"],
 	get = function() return addon.db["flyoutIlvlPosition"] or "TOPRIGHT" end,
 	set = function(key)
 		addon.db["flyoutIlvlPosition"] = key
@@ -303,6 +308,7 @@ addon.functions.SettingsCreateHeadline(cGearUpgrade, L["ilvlTextStyleHeader"] or
 local ilvlQualityColorCheckbox = addon.functions.SettingsCreateCheckbox(cGearUpgrade, {
 	var = "ilvlUseItemQualityColor",
 	text = L["ilvlUseQualityColor"] or "Use item-quality colors",
+	desc = L["gearIlvlUseQualityColorDesc"],
 	func = function(value)
 		addon.db["ilvlUseItemQualityColor"] = value and true or false
 		refreshItemLevelDisplays()
@@ -314,6 +320,7 @@ local ilvlQualityColorCheckbox = addon.functions.SettingsCreateCheckbox(cGearUpg
 addon.functions.SettingsCreateColorPicker(cGearUpgrade, {
 	var = "ilvlTextColor",
 	text = L["ilvlCustomColor"] or "Custom item level color",
+	desc = L["gearIlvlCustomColorDesc"],
 	hasOpacity = true,
 	element = ilvlQualityColorCheckbox and ilvlQualityColorCheckbox.element,
 	parentCheck = function() return addon.db["ilvlUseItemQualityColor"] ~= true end,
@@ -324,6 +331,7 @@ addon.functions.SettingsCreateColorPicker(cGearUpgrade, {
 addon.functions.SettingsCreateScrollDropdown(cGearUpgrade, {
 	var = "ilvlFontFace",
 	text = L["ilvlFontLabel"] or "Item level font",
+	desc = L["gearIlvlFontLabelDesc"],
 	listFunc = buildIlvlFontDropdown,
 	order = ilvlFontOrder,
 	default = addon.functions.GetGlobalFontConfigKey and addon.functions.GetGlobalFontConfigKey() or "__EQOL_GLOBAL_FONT__",
@@ -344,6 +352,7 @@ addon.functions.SettingsCreateScrollDropdown(cGearUpgrade, {
 addon.functions.SettingsCreateSlider(cGearUpgrade, {
 	var = "ilvlFontSize",
 	text = L["ilvlFontSize"] or "Item level font size",
+	desc = L["gearIlvlFontSizeDesc"],
 	min = 8,
 	max = 32,
 	step = 1,
@@ -367,6 +376,7 @@ addon.functions.SettingsCreateSlider(cGearUpgrade, {
 addon.functions.SettingsCreateDropdown(cGearUpgrade, {
 	var = "ilvlFontOutline",
 	text = L["ilvlFontOutline"] or "Item level font outline",
+	desc = L["gearIlvlFontOutlineDesc"],
 	list = ilvlOutlineOptions,
 	order = ilvlOutlineOrder,
 	default = ilvlGlobalFontStyleKey,

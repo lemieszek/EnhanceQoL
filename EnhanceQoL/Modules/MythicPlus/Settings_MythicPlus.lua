@@ -64,11 +64,13 @@ local function buildSettings()
 		{
 			var = "portalHideMissing",
 			text = L["portalHideMissing"],
+			desc = L["portalHideMissingDesc"],
 			func = function(v) addon.db["portalHideMissing"] = v end,
 		},
 	}
 	table.insert(data, {
 		text = L["portalShowTooltip"],
+		desc = L["portalShowTooltipDesc"],
 		var = "portalShowTooltip",
 		func = function(value) addon.db["portalShowTooltip"] = value end,
 	})
@@ -224,6 +226,7 @@ local function buildSettings()
 	addon.functions.SettingsCreateCheckbox(cGameplay, {
 		var = "talentReminderLoadOnReadyCheck",
 		text = L["talentReminderLoadOnReadyCheck"]:format(READY_CHECK),
+		desc = L["talentReminderLoadOnReadyCheckDesc"],
 		func = function(v)
 			addon.db["talentReminderLoadOnReadyCheck"] = v
 			addon.MythicPlus.functions.checkLoadout()
@@ -237,6 +240,7 @@ local function buildSettings()
 	local soundDifference = addon.functions.SettingsCreateCheckbox(cGameplay, {
 		var = "talentReminderSoundOnDifference",
 		text = L["talentReminderSoundOnDifference"],
+		desc = L["talentReminderSoundOnDifferenceDesc"],
 		func = function(v)
 			addon.db["talentReminderSoundOnDifference"] = v
 			addon.MythicPlus.functions.checkLoadout()
@@ -251,6 +255,7 @@ local function buildSettings()
 	local customSound = addon.functions.SettingsCreateCheckbox(cGameplay, {
 		var = "talentReminderUseCustomSound",
 		text = L["talentReminderUseCustomSound"],
+		desc = L["talentReminderUseCustomSoundDesc"],
 		func = function(v) addon.db["talentReminderUseCustomSound"] = v end,
 		parent = true,
 		element = soundDifference.element,
@@ -268,6 +273,7 @@ local function buildSettings()
 	addon.functions.SettingsCreateSoundDropdown(cGameplay, {
 		var = "talentReminderCustomSoundFile",
 		text = L["talentReminderCustomSound"],
+		desc = L["talentReminderCustomSoundFileDesc"],
 		listFunc = buildTalentSoundOptions,
 		order = talentSoundOrder,
 		default = "",
@@ -290,6 +296,7 @@ local function buildSettings()
 	local showActiveBuild = addon.functions.SettingsCreateCheckbox(cGameplay, {
 		var = "talentReminderShowActiveBuild",
 		text = L["talentReminderShowActiveBuild"],
+		desc = L["talentReminderShowActiveBuildDesc"],
 		func = function(v)
 			addon.db["talentReminderShowActiveBuild"] = v
 			addon.MythicPlus.functions.updateActiveTalentText()

@@ -3096,6 +3096,7 @@ local bagDisplayDropdown = gateNativeBagSetting(addon.functions.SettingsCreateMu
 	var = "bagDisplayOptions",
 	storage = false,
 	text = L["bagDisplayElements"] or "Bag indicators",
+	desc = L["bagDisplayElementsDesc"],
 	options = {
 		{ value = "ilvl", text = L["showIlvlOnBagItems"], tooltip = L["showIlvlOnBagItemsDesc"] },
 		{ value = "upgrade", text = L["showUpgradeArrowOnBagItems"], tooltip = L["showUpgradeArrowOnBagItemsDesc"] },
@@ -3122,6 +3123,7 @@ gateNativeBagSetting(addon.functions.SettingsCreateDropdown(cInventory, {
 		OUTSIDE = L["Outside"] or "Outside",
 	},
 	text = L["Item level position"],
+	desc = L["bagIlvlPositionDesc"],
 	get = function() return addon.db["bagIlvlPosition"] or "TOPLEFT" end,
 	set = function(key)
 		addon.db["bagIlvlPosition"] = key
@@ -3144,6 +3146,7 @@ gateNativeBagSetting(addon.functions.SettingsCreateDropdown(cInventory, {
 		OUTSIDE = L["Outside"] or "Outside",
 	},
 	text = L["Upgrade track position"] or "Upgrade track position",
+	desc = L["bagTrackPositionDesc"],
 	get = function() return addon.db["bagTrackPosition"] or "OUTSIDE" end,
 	set = function(key)
 		addon.db["bagTrackPosition"] = key
@@ -3165,6 +3168,7 @@ gateNativeBagSetting(addon.functions.SettingsCreateDropdown(cInventory, {
 		BOTTOMRIGHT = L["Bottom Right"],
 	},
 	text = L["bagUpgradeIconPosition"],
+	desc = L["bagUpgradeIconPositionDesc"],
 	get = function() return addon.db["bagUpgradeIconPosition"] or "TOPLEFT" end,
 	set = function(key)
 		addon.db["bagUpgradeIconPosition"] = key
@@ -3218,6 +3222,7 @@ gateNativeBagSetting(addon.functions.SettingsCreateMultiDropdown(cInventory, {
 	var = "bagItemLevelTargets",
 	storage = false,
 	text = L["bagItemLevelTargets"] or "Item level targets",
+	desc = L["bagItemLevelTargetsDesc"],
 	options = {
 		{ value = "bank", text = BANK, tooltip = L["showIlvlOnBankFrameDesc"] },
 		{ value = "merchant", text = MERCHANT, tooltip = L["showIlvlOnMerchantframeDesc"] },
@@ -3308,6 +3313,7 @@ gateNativeBagSetting(addon.functions.SettingsCreateDropdown(cInventory, {
 		REVERSE = L["bagSortOrderReverse"] or "Reverse (Right-to-Left)",
 	},
 	text = L["bagSortOrderDirection"] or "Sort order direction",
+	desc = L["bagSortOrderDirectionDesc"],
 	get = function() return addon.db["bagSortOrderDirection"] or "DEFAULT" end,
 	set = function(key)
 		addon.db["bagSortOrderDirection"] = key
@@ -3339,6 +3345,7 @@ gateNativeBagSetting(addon.functions.SettingsCreateDropdown(cInventory, {
 		REVERSE = L["bagLootOrderReverse"] or "Reverse (Left-to-Right)",
 	},
 	text = L["bagLootOrderDirection"] or "Loot order direction",
+	desc = L["bagLootOrderDirectionDesc"],
 	get = function() return addon.db["bagLootOrderDirection"] or "DEFAULT" end,
 	set = function(key)
 		addon.db["bagLootOrderDirection"] = key

@@ -278,7 +278,7 @@ local questingData = {
 	{
 		var = "autoChooseQuest",
 		text = L["autoChooseQuest"],
-		desc = L["autoChooseQuestDesc"] or L["interruptWithShift"],
+		desc = L["autoChooseQuestDesc"],
 		func = function(key) addon.db["autoChooseQuest"] = key end,
 		default = false,
 		children = {
@@ -310,6 +310,7 @@ local questingData = {
 			{
 				var = "ignoreDailyQuests",
 				text = L["ignoreDailyQuests"]:format(QUESTS_LABEL),
+				desc = L["ignoreDailyQuestsDesc"],
 				func = function(key) addon.db["ignoreDailyQuests"] = key end,
 				default = false,
 				sType = "checkbox",
@@ -323,6 +324,7 @@ local questingData = {
 			{
 				var = "ignoreWarbandCompleted",
 				text = L["ignoreWarbandCompleted"]:format(ACCOUNT_COMPLETED_QUEST_LABEL, QUESTS_LABEL),
+				desc = L["ignoreWarbandCompletedDesc"],
 				func = function(key) addon.db["ignoreWarbandCompleted"] = key end,
 				default = false,
 				sType = "checkbox",
@@ -336,6 +338,7 @@ local questingData = {
 			{
 				var = "ignoreTrivialQuests",
 				text = L["ignoreTrivialQuests"]:format(QUESTS_LABEL),
+				desc = L["ignoreTrivialQuestsDesc"],
 				func = function(key) addon.db["ignoreTrivialQuests"] = key end,
 				default = false,
 				sType = "checkbox",
@@ -379,6 +382,7 @@ local questingData = {
 	{
 		var = "questWowheadLink",
 		text = L["questWowheadLink"],
+		desc = L["questWowheadLinkDesc"],
 		func = function(key) addon.db["questWowheadLink"] = key end,
 		default = false,
 	},
@@ -429,6 +433,7 @@ local trackerData = {
 			{
 				var = "questTrackerQuestCountOffsetX",
 				text = L["Horizontal offset"],
+				desc = L["questTrackerQuestCountOffsetXDesc"],
 				parentCheck = function()
 					return addon.SettingsLayout.elements["questTrackerShowQuestCount"]
 						and addon.SettingsLayout.elements["questTrackerShowQuestCount"].setting
@@ -449,6 +454,7 @@ local trackerData = {
 			{
 				var = "questTrackerQuestCountOffsetY",
 				text = L["Vertical offset"],
+				desc = L["questTrackerQuestCountOffsetYDesc"],
 				parentCheck = function()
 					return addon.SettingsLayout.elements["questTrackerShowQuestCount"]
 						and addon.SettingsLayout.elements["questTrackerShowQuestCount"].setting

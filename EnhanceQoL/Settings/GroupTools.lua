@@ -149,6 +149,7 @@ if gameplayCategory then
 	addon.functions.SettingsCreateDropdown(gameplayCategory, {
 		var = DB.focusMarker,
 		text = L["groupToolsFocusMarkerMarker"] or "Focus marker",
+		desc = L["groupToolsFocusMarkerMarkerDesc"],
 		listFunc = buildFocusMarkerOptions,
 		order = focusMarkerOrder,
 		default = 5,
@@ -162,6 +163,7 @@ if gameplayCategory then
 	addon.functions.SettingsCreateCheckbox(gameplayCategory, {
 		var = DB.focusMarkerAnnounce,
 		text = L["groupToolsFocusMarkerAnnounce"] or "Announce on ready check",
+		desc = L["groupToolsFocusMarkerAnnounceDesc"],
 		get = function() return addon.db and addon.db[DB.focusMarkerAnnounce] == true end,
 		func = function(value) setFocusMarkerSetting("announce", value) end,
 		default = true,
@@ -173,6 +175,7 @@ if gameplayCategory then
 	addon.functions.SettingsCreateInput(gameplayCategory, {
 		var = DB.focusMarkerMessage,
 		text = L["groupToolsFocusMarkerAnnounceMessage"] or "Ready check message",
+		desc = L["groupToolsFocusMarkerAnnounceMessageDesc"],
 		default = "",
 		get = function() return addon.db and addon.db[DB.focusMarkerMessage] or "" end,
 		set = function(value) setFocusMarkerSetting("message", value) end,
@@ -188,6 +191,7 @@ if gameplayCategory then
 	addon.functions.SettingsCreateButton(gameplayCategory, {
 		var = "groupToolsFocusMarkerUpdateMacroButton",
 		text = L["groupToolsFocusMarkerUpdateMacro"] or "Update macro",
+		desc = L["groupToolsFocusMarkerUpdateMacroDesc"],
 		func = function()
 			if FocusMarker and FocusMarker.WriteMacro then FocusMarker:WriteMacro(true) end
 		end,

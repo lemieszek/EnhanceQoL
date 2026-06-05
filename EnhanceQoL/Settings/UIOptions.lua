@@ -666,6 +666,7 @@ local function createLabelControls(category, expandable)
 	macroOverride = addon.functions.SettingsCreateCheckbox(category, {
 		var = "actionBarMacroFontOverride",
 		text = L["actionBarMacroFontOverride"] or "Change macro font",
+		desc = L["actionBarMacroFontOverrideDesc"],
 		func = function(value)
 			if value then
 				addon.db["hideMacroNames"] = false
@@ -683,6 +684,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateScrollDropdown(category, {
 		var = "actionBarMacroFontFace",
 		text = L["actionBarMacroFontLabel"] or "Macro name font",
+		desc = L["actionBarMacroFontFaceDesc"],
 		listFunc = buildOverrideFontDropdown,
 		order = fontOrder,
 		default = globalFontKey,
@@ -706,6 +708,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateDropdown(category, {
 		var = "actionBarMacroFontOutline",
 		text = L["Font outline"] or "Font outline",
+		desc = L["actionBarMacroFontOutlineDesc"],
 		list = globalFontStyleOptions,
 		order = globalFontStyleOrder,
 		default = globalFontStyleKey,
@@ -724,6 +727,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateSlider(category, {
 		var = "actionBarMacroFontSize",
 		text = L["actionBarMacroFontSize"] or "Macro font size",
+		desc = L["actionBarMacroFontSizeDesc"],
 		min = 8,
 		max = 24,
 		step = 1,
@@ -751,6 +755,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateColorPicker(category, {
 		var = "actionBarMacroFontColor",
 		text = L["actionBarMacroFontColor"] or "Macro text color",
+		desc = L["actionBarMacroFontColorDesc"],
 		callback = function()
 			if ActionBarLabels and ActionBarLabels.RefreshAllMacroNameVisibility then ActionBarLabels.RefreshAllMacroNameVisibility() end
 		end,
@@ -764,6 +769,7 @@ local function createLabelControls(category, expandable)
 	local hotkeyOverride = addon.functions.SettingsCreateCheckbox(category, {
 		var = "actionBarHotkeyFontOverride",
 		text = L["actionBarHotkeyFontOverride"] or "Change keybind font",
+		desc = L["actionBarHotkeyFontOverrideDesc"],
 		func = function(value)
 			addon.db.actionBarHotkeyFontOverride = value and true or false
 			if ActionBarLabels and ActionBarLabels.RefreshAllHotkeyVisibility then ActionBarLabels.RefreshAllHotkeyVisibility() end
@@ -777,6 +783,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateScrollDropdown(category, {
 		var = "actionBarHotkeyFontFace",
 		text = L["actionBarHotkeyFontLabel"] or "Keybind font",
+		desc = L["actionBarHotkeyFontFaceDesc"],
 		listFunc = buildOverrideFontDropdown,
 		order = fontOrder,
 		default = globalFontKey,
@@ -800,6 +807,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateDropdown(category, {
 		var = "actionBarHotkeyFontOutline",
 		text = L["Font outline"] or "Font outline",
+		desc = L["actionBarHotkeyFontOutlineDesc"],
 		list = globalFontStyleOptions,
 		order = globalFontStyleOrder,
 		default = globalFontStyleKey,
@@ -818,6 +826,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateSlider(category, {
 		var = "actionBarHotkeyFontSize",
 		text = L["actionBarHotkeyFontSize"] or "Keybind font size",
+		desc = L["actionBarHotkeyFontSizeDesc"],
 		min = 8,
 		max = 24,
 		step = 1,
@@ -845,6 +854,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateColorPicker(category, {
 		var = "actionBarHotkeyFontColor",
 		text = L["actionBarHotkeyFontColor"] or "Keybind text color",
+		desc = L["actionBarHotkeyFontColorDesc"],
 		callback = function()
 			if ActionBarLabels and ActionBarLabels.RefreshAllHotkeyStyles then ActionBarLabels.RefreshAllHotkeyStyles() end
 		end,
@@ -858,6 +868,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateDropdown(category, {
 		var = "actionBarHotkeyAnchor",
 		text = L["actionBarHotkeyAnchor"] or "Keybind anchor",
+		desc = L["actionBarHotkeyAnchorDesc"],
 		list = textAnchorOptions,
 		order = textAnchorOrder,
 		default = "TOPRIGHT",
@@ -875,6 +886,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateSlider(category, {
 		var = "actionBarHotkeyOffsetX",
 		text = L["actionBarHotkeyOffsetX"] or "Keybind offset X",
+		desc = L["actionBarHotkeyOffsetXDesc"],
 		min = -50,
 		max = 50,
 		step = 1,
@@ -893,6 +905,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateSlider(category, {
 		var = "actionBarHotkeyOffsetY",
 		text = L["actionBarHotkeyOffsetY"] or "Keybind offset Y",
+		desc = L["actionBarHotkeyOffsetYDesc"],
 		min = -50,
 		max = 50,
 		step = 1,
@@ -911,6 +924,7 @@ local function createLabelControls(category, expandable)
 	local countOverride = addon.functions.SettingsCreateCheckbox(category, {
 		var = "actionBarCountFontOverride",
 		text = L["actionBarCountFontOverride"] or "Change charge/stack font",
+		desc = L["actionBarCountFontOverrideDesc"],
 		func = function(value)
 			addon.db.actionBarCountFontOverride = value and true or false
 			if ActionBarLabels and ActionBarLabels.RefreshAllCountStyles then ActionBarLabels.RefreshAllCountStyles() end
@@ -923,6 +937,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateScrollDropdown(category, {
 		var = "actionBarCountFontFace",
 		text = L["actionBarCountFontLabel"] or "Charge/stack font",
+		desc = L["actionBarCountFontFaceDesc"],
 		listFunc = buildOverrideFontDropdown,
 		order = fontOrder,
 		default = globalFontKey,
@@ -945,6 +960,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateDropdown(category, {
 		var = "actionBarCountFontOutline",
 		text = L["Font outline"] or "Font outline",
+		desc = L["actionBarCountFontOutlineDesc"],
 		list = globalFontStyleOptions,
 		order = globalFontStyleOrder,
 		default = globalFontStyleKey,
@@ -962,6 +978,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateSlider(category, {
 		var = "actionBarCountFontSize",
 		text = L["actionBarCountFontSize"] or "Charge/stack font size",
+		desc = L["actionBarCountFontSizeDesc"],
 		min = 8,
 		max = 24,
 		step = 1,
@@ -988,6 +1005,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateColorPicker(category, {
 		var = "actionBarCountFontColor",
 		text = L["actionBarCountFontColor"] or "Charge/stack text color",
+		desc = L["actionBarCountFontColorDesc"],
 		callback = function()
 			if ActionBarLabels and ActionBarLabels.RefreshAllCountStyles then ActionBarLabels.RefreshAllCountStyles() end
 		end,
@@ -1001,6 +1019,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateDropdown(category, {
 		var = "actionBarCountAnchor",
 		text = L["actionBarCountAnchor"] or "Charge/stack anchor",
+		desc = L["actionBarCountAnchorDesc"],
 		list = textAnchorOptions,
 		order = textAnchorOrder,
 		default = "BOTTOMRIGHT",
@@ -1018,6 +1037,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateSlider(category, {
 		var = "actionBarCountOffsetX",
 		text = L["actionBarCountOffsetX"] or "Charge/stack offset X",
+		desc = L["actionBarCountOffsetXDesc"],
 		min = -50,
 		max = 50,
 		step = 1,
@@ -1036,6 +1056,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateSlider(category, {
 		var = "actionBarCountOffsetY",
 		text = L["actionBarCountOffsetY"] or "Charge/stack offset Y",
+		desc = L["actionBarCountOffsetYDesc"],
 		min = -50,
 		max = 50,
 		step = 1,
@@ -1353,13 +1374,14 @@ local function createSpellActivationOverlayDropdown(category, expandable)
 				SetSpellActivationOverlayVisibility(key, desired)
 			end
 		end,
-		desc = L["spellActivationOverlayDesc"] or "Visible while any selected condition is true.",
+		desc = L["spellActivationOverlayDesc"],
 		parentSection = expandable,
 	})
 
 	local customAlphaToggle = addon.functions.SettingsCreateCheckbox(category, {
 		var = "spellActivationOverlayUseCustomAlpha",
 		text = L["spellActivationOverlayUseCustomAlpha"] or "Use custom alpha",
+		desc = L["spellActivationOverlayUseCustomAlphaDesc"],
 		default = false,
 		get = function() return addon.db and addon.db.spellActivationOverlayUseCustomAlpha end,
 		set = function(value)
@@ -1391,6 +1413,7 @@ local function createSpellActivationOverlayDropdown(category, expandable)
 	addon.functions.SettingsCreateSlider(category, {
 		var = "spellActivationOverlayActiveAlpha",
 		text = L["spellActivationOverlayActiveAlpha"] or "Active alpha",
+		desc = L["spellActivationOverlayActiveAlphaDesc"],
 		min = 0,
 		max = 100,
 		step = 1,
@@ -1405,6 +1428,7 @@ local function createSpellActivationOverlayDropdown(category, expandable)
 	addon.functions.SettingsCreateSlider(category, {
 		var = "spellActivationOverlayHiddenAlpha",
 		text = L["spellActivationOverlayHiddenAlpha"] or "Hidden alpha",
+		desc = L["spellActivationOverlayHiddenAlphaDesc"],
 		min = 0,
 		max = 100,
 		step = 1,
@@ -1645,6 +1669,7 @@ local function createNameplatesCategory()
 		{
 			var = "UnitNamePlayerGuild",
 			text = L["UnitNamePlayerGuild"],
+			desc = L["UnitNamePlayerGuildDesc"],
 			get = function() return getCVarOptionState("UnitNamePlayerGuild") end,
 			func = function(value) setCVarOptionState("UnitNamePlayerGuild", value) end,
 			default = false,
@@ -1653,6 +1678,7 @@ local function createNameplatesCategory()
 		{
 			var = "UnitNamePlayerPVPTitle",
 			text = L["UnitNamePlayerPVPTitle"],
+			desc = L["UnitNamePlayerPVPTitleDesc"],
 			get = function() return getCVarOptionState("UnitNamePlayerPVPTitle") end,
 			func = function(value) setCVarOptionState("UnitNamePlayerPVPTitle", value) end,
 			default = false,
@@ -2515,6 +2541,7 @@ local function createCastbarCategory()
 	addon.functions.SettingsCreateMultiDropdown(category, {
 		var = "hiddenCastBars",
 		text = L["castBarsToHide2"],
+		desc = L["hiddenCastBarsDesc"],
 		optionfunc = getCastbarOptions,
 		isSelectedFunc = function(key)
 			if not key then return false end

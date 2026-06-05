@@ -2420,6 +2420,7 @@ function addon.functions.initDungeonFrame()
 	addon.functions.SettingsCreateCheckbox(addon.SettingsLayout.characterInspectCategory, {
 		var = "randomMountUseAll",
 		text = L["Use all mounts for random mount"] or "Use all mounts for random mount",
+		desc = L["randomMountUseAllDesc"],
 		func = function(value)
 			addon.db["randomMountUseAll"] = value and true or false
 			if addon.MountActions and addon.MountActions.MarkRandomCacheDirty then addon.MountActions:MarkRandomCacheDirty() end
@@ -2449,6 +2450,7 @@ function addon.functions.initDungeonFrame()
 	addon.functions.SettingsCreateCheckbox(addon.SettingsLayout.characterInspectCategory, {
 		var = "randomMountDruidNoShiftWhileMounted",
 		text = L["randomMountDruidNoShiftWhileMounted"],
+		desc = L["randomMountDruidNoShiftWhileMountedDesc"],
 		func = function(value) addon.db["randomMountDruidNoShiftWhileMounted"] = value and true or false end,
 		default = false,
 		parentSection = expandable,
@@ -2536,6 +2538,7 @@ if cChar and sectionDungeon then
 	addon.functions.SettingsCreateDropdown(cChar, {
 		var = "PullTimerType",
 		text = L["Pull Timer"],
+		desc = L["PullTimerTypeDesc"],
 		type = Settings.VarType.Number,
 		default = 2,
 		list = listPull,
@@ -2551,6 +2554,7 @@ if cChar and sectionDungeon then
 	addon.functions.SettingsCreateCheckbox(cChar, {
 		var = "noChatOnPullTimer",
 		text = L["noChatOnPullTimer"],
+		desc = L["noChatOnPullTimerDesc"],
 		func = function(v) addon.db["noChatOnPullTimer"] = v end,
 		parent = true,
 		element = keystoneEnable.element,
@@ -2561,6 +2565,7 @@ if cChar and sectionDungeon then
 	addon.functions.SettingsCreateSlider(cChar, {
 		var = "pullTimerLongTime",
 		text = L["Pull Timer"],
+		desc = L["pullTimerLongTimeDesc"],
 		min = 0,
 		max = 60,
 		step = 1,
@@ -2576,6 +2581,7 @@ if cChar and sectionDungeon then
 	addon.functions.SettingsCreateSlider(cChar, {
 		var = "pullTimerShortTime",
 		text = L["sliderShortTime"],
+		desc = L["pullTimerShortTimeDesc"],
 		min = 0,
 		max = 60,
 		step = 1,
@@ -2749,6 +2755,7 @@ data = {
 	{
 		var = "autoChooseDelvePower",
 		text = L["autoChooseDelvePower"],
+		desc = L["autoChooseDelvePowerDesc"],
 		func = function(value) addon.db["autoChooseDelvePower"] = value and true or false end,
 		parentSection = sectionDungeon,
 	},
@@ -2795,7 +2802,7 @@ data = {
 		text = L["groupfinderSkipRoleSelect"],
 		var = "groupfinderSkipRoleSelect",
 		func = function(value) addon.db["groupfinderSkipRoleSelect"] = value end,
-		desc = L["interruptWithShift"],
+		desc = L["groupfinderSkipRoleSelectDesc"],
 		parentSection = sectionGroupFinder,
 		children = {
 			{
@@ -2820,18 +2827,21 @@ data = {
 	{
 		var = "persistSignUpNote",
 		text = L["Persist LFG signup note"],
+		desc = L["persistSignUpNoteDesc"],
 		func = function(value) addon.db["persistSignUpNote"] = value end,
 		parentSection = sectionGroupFinder,
 	},
 	{
 		var = "skipSignUpDialog",
 		text = L["Quick signup"],
+		desc = L["skipSignUpDialogDesc"],
 		func = function(value) addon.db["skipSignUpDialog"] = value end,
 		parentSection = sectionGroupFinder,
 	},
 	{
 		var = "lfgSortByRio",
 		text = L["lfgSortByRio"],
+		desc = L["lfgSortByRioDesc"],
 		func = function(value)
 			addon.db["lfgSortByRio"] = value
 			if addon.functions.UpdateGroupFinderApplicantEventRegistration then addon.functions.UpdateGroupFinderApplicantEventRegistration() end
@@ -2841,6 +2851,7 @@ data = {
 	{
 		var = "enableChatIMRaiderIO",
 		text = L["enableChatIMRaiderIO"],
+		desc = L["enableChatIMRaiderIODesc"],
 		func = function(value) addon.db["enableChatIMRaiderIO"] = value end,
 		parentSection = sectionGroupFinder,
 	},
@@ -2865,6 +2876,7 @@ end
 table.insert(data, {
 	var = "groupfinderShowDungeonScoreFrame",
 	text = L["groupfinderShowDungeonScoreFrame"]:format(DUNGEON_SCORE),
+	desc = L["groupfinderShowDungeonScoreFrameDesc"],
 	func = function(v)
 		addon.db["groupfinderShowDungeonScoreFrame"] = v
 		if addon.MythicPlus and addon.MythicPlus.functions and addon.MythicPlus.functions.toggleFrame then addon.MythicPlus.functions.toggleFrame() end

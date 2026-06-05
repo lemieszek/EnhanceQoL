@@ -9126,6 +9126,7 @@ local function registerSettingsUI()
 		addon.functions.SettingsCreateCheckbox(standalonePrivateAuraCategory, {
 			var = "ufStandalonePrivateAurasEnabled",
 			text = L["UFStandalonePrivateAurasEnable"] or "Enable standalone private aura anchor",
+			desc = L["UFStandalonePrivateAurasEnableDesc"],
 			default = false,
 			get = function()
 				local cfg = ensureStandalonePrivateAuraConfig()
