@@ -2006,10 +2006,10 @@ L["Health tertiary delimiter"] = "Tertiäres Gesundheitstrennzeichen"
 L["Health Text"] = "Gesundheitstext"
 L["Health text color"] = "Textfarbe"
 L["HealthBar"] = "Lebensleiste"
-L["healthCustomSpellsHint"] = "Wenn du einen Zauber im Dropdown auswählst, wird er entfernt (das Feld bleibt absichtlich leer).\
-Das Makro nutzt alle benutzerdefinierten Zauber, die du kennst."
 L["healthCustomAddDesc"] = "Fügt der Prioritätsliste des Heilmakros eine Zauber-ID hinzu."
 L["healthCustomRemoveDesc"] = "Entfernt einen Zauber aus der Prioritätsliste des Heilmakros."
+L["healthCustomSpellsHint"] = "Wenn du einen Zauber im Dropdown auswählst, wird er entfernt (das Feld bleibt absichtlich leer).\
+Das Makro nutzt alle benutzerdefinierten Zauber, die du kennst."
 L["healthMacroLimitReached"] = "Health-Makro: Makro-Limit erreicht. Bitte einen Slot freigeben."
 L["healthMacroTipReset"] = "Tipp: Damit der Dämonische Gesundheitsstein im Kampf ggf. erneut genutzt werden kann, verwende `reset=60`."
 L["healthMacroWillUse"] = "Wird verwenden (in Reihenfolge): %s"
