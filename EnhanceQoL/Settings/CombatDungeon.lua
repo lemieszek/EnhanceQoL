@@ -2299,29 +2299,28 @@ function addon.functions.initDungeonFrame()
 			iconKey = "markers",
 			expanded = false,
 			colorizeTitle = false,
+			modernOnly = true,
 		})
 		addon.SettingsLayout.gameplayMarkersSection = sectionMarkers
 	end
 
-	if addon.variables.keybindFindings and next(addon.variables.keybindFindings) then
-		if not sectionMarkers then
-			sectionMarkers = addon.functions.SettingsCreateExpandableSection(addon.SettingsLayout.characterInspectCategory, {
-				name = L["Markers"],
-				configPageKey = "Markers",
-				iconKey = "markers",
-				expanded = false,
-				colorizeTitle = false,
-			})
-			addon.SettingsLayout.gameplayMarkersSection = sectionMarkers
-		end
-		addon.functions.SettingsCreateHeadline(addon.SettingsLayout.characterInspectCategory, L["WorldMarkers"], {
-			parentSection = sectionMarkers,
-		})
-		addon.functions.SettingsCreateText(addon.SettingsLayout.characterInspectCategory, "|cff99e599" .. L["WorldMarkerCycle"] .. "|r", { parentSection = sectionMarkers })
-	end
-	for _, v in pairs(addon.variables.keybindFindings) do
-		addon.functions.SettingsCreateKeybind(addon.SettingsLayout.characterInspectCategory, v, sectionMarkers)
-	end
+	addon.functions.SettingsCreateHeadline(addon.SettingsLayout.characterInspectCategory, L["WorldMarkers"], {
+		parentSection = sectionMarkers,
+	})
+	addon.functions.SettingsCreateButton(addon.SettingsLayout.characterInspectCategory, {
+		var = "worldMarkerKeybindings",
+		text = L["WorldMarkerKeybindings"] or "World marker keybindings",
+		desc = L["WorldMarkerKeybindingsDesc"]
+			or "Assign keybindings for cycling world markers and clearing all world markers.",
+		label = _G.KEY_BINDINGS or "Key Bindings",
+		buttonText = _G.KEY_BINDINGS or "Key Bindings",
+		parentSection = sectionMarkers,
+		onClick = function()
+			if Settings and Settings.OpenToCategory and Settings.KEYBINDINGS_CATEGORY_ID then
+				Settings.OpenToCategory(Settings.KEYBINDINGS_CATEGORY_ID, L["WorldMarkers"] or "World Markers")
+			end
+		end,
+	})
 
 	if LFGListFrame and LFGListFrame.SearchPanel and LFGListFrame.SearchPanel.FilterButton and LFGListFrame.SearchPanel.FilterButton.ResetButton then
 		lfgPoint, lfgRelativeTo, lfgRelativePoint, lfgXOfs, lfgYOfs = LFGListFrame.SearchPanel.FilterButton.ResetButton:GetPoint()

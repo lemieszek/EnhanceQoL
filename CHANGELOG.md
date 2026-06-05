@@ -17,6 +17,7 @@
 - Settings Center / Resource Bars: Moved Resource Bars into its own modern-only `EQoL Suites` page and removed those controls from the combined Bars & Resources page.
 - Settings Center / Resource Bars: Added clearer modern descriptions for Resource Bars mode, Shared mode, Classic mode, auto-enable behavior, and per-specialization bar selection.
 - Settings Center / Resource Bars: Mode switching now hides inactive Shared or Classic options instead of leaving disabled rows visible.
+- Settings Center / Markers: Migrated World Marker keybinding guidance to a single modern-only row that explains cycle and clear bindings and opens Blizzard Key Bindings directly.
 
 ### 🐛 Fixed
 
