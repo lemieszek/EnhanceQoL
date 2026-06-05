@@ -88,7 +88,6 @@ lib.LOCALES = {
 		configCenterDensityCompact = "Compact",
 		configCenterDropdownFallbackDesc = "Choose one of the available options.",
 		configCenterInputFallbackDesc = "Enter the value used by this setting.",
-		configCenterLegacyBlizzard = "Legacy Blizzard Settings",
 		configCenterMultiDropdownFallbackDesc = "Choose one or more options.",
 		configCenterNoResults = "No settings found.",
 		configCenterOpenButton = "Open",
@@ -118,7 +117,6 @@ lib.LOCALES = {
 		configCenterDensityCompact = "Kompakt",
 		configCenterDropdownFallbackDesc = "Wähle eine der verfügbaren Optionen.",
 		configCenterInputFallbackDesc = "Gib den Wert für diese Einstellung ein.",
-		configCenterLegacyBlizzard = "Alte Blizzard-Einstellungen",
 		configCenterMultiDropdownFallbackDesc = "Wähle eine oder mehrere Optionen.",
 		configCenterNoResults = "Keine Einstellungen gefunden.",
 		configCenterOpenButton = "Öffnen",
@@ -148,7 +146,6 @@ lib.LOCALES = {
 		configCenterDensityCompact = "Compacto",
 		configCenterDropdownFallbackDesc = "Elige una de las opciones disponibles.",
 		configCenterInputFallbackDesc = "Introduce el valor usado por este ajuste.",
-		configCenterLegacyBlizzard = "Ajustes clásicos de Blizzard",
 		configCenterMultiDropdownFallbackDesc = "Elige una o más opciones.",
 		configCenterNoResults = "No se encontraron ajustes.",
 		configCenterOpenButton = "Abrir",
@@ -178,7 +175,6 @@ lib.LOCALES = {
 		configCenterDensityCompact = "Compacto",
 		configCenterDropdownFallbackDesc = "Elige una de las opciones disponibles.",
 		configCenterInputFallbackDesc = "Introduce el valor usado por este ajuste.",
-		configCenterLegacyBlizzard = "Ajustes clásicos de Blizzard",
 		configCenterMultiDropdownFallbackDesc = "Elige una o más opciones.",
 		configCenterNoResults = "No se encontraron ajustes.",
 		configCenterOpenButton = "Abrir",
@@ -208,7 +204,6 @@ lib.LOCALES = {
 		configCenterDensityCompact = "Compact",
 		configCenterDropdownFallbackDesc = "Choisissez une des options disponibles.",
 		configCenterInputFallbackDesc = "Saisissez la valeur utilisée par ce réglage.",
-		configCenterLegacyBlizzard = "Réglages Blizzard classiques",
 		configCenterMultiDropdownFallbackDesc = "Choisissez une ou plusieurs options.",
 		configCenterNoResults = "Aucun réglage trouvé.",
 		configCenterOpenButton = "Ouvrir",
@@ -238,7 +233,6 @@ lib.LOCALES = {
 		configCenterDensityCompact = "Compatta",
 		configCenterDropdownFallbackDesc = "Scegli una delle opzioni disponibili.",
 		configCenterInputFallbackDesc = "Inserisci il valore usato da questa impostazione.",
-		configCenterLegacyBlizzard = "Impostazioni Blizzard classiche",
 		configCenterMultiDropdownFallbackDesc = "Scegli una o più opzioni.",
 		configCenterNoResults = "Nessuna impostazione trovata.",
 		configCenterOpenButton = "Apri",
@@ -268,7 +262,6 @@ lib.LOCALES = {
 		configCenterDensityCompact = "간결",
 		configCenterDropdownFallbackDesc = "사용 가능한 옵션 중 하나를 선택합니다.",
 		configCenterInputFallbackDesc = "이 설정에서 사용할 값을 입력합니다.",
-		configCenterLegacyBlizzard = "기존 Blizzard 설정",
 		configCenterMultiDropdownFallbackDesc = "하나 이상의 옵션을 선택합니다.",
 		configCenterNoResults = "설정을 찾을 수 없습니다.",
 		configCenterOpenButton = "열기",
@@ -298,7 +291,6 @@ lib.LOCALES = {
 		configCenterDensityCompact = "Compacto",
 		configCenterDropdownFallbackDesc = "Escolha uma das opções disponíveis.",
 		configCenterInputFallbackDesc = "Digite o valor usado por esta configuração.",
-		configCenterLegacyBlizzard = "Configurações clássicas da Blizzard",
 		configCenterMultiDropdownFallbackDesc = "Escolha uma ou mais opções.",
 		configCenterNoResults = "Nenhuma configuração encontrada.",
 		configCenterOpenButton = "Abrir",
@@ -328,7 +320,6 @@ lib.LOCALES = {
 		configCenterDensityCompact = "Компактно",
 		configCenterDropdownFallbackDesc = "Выберите один из доступных вариантов.",
 		configCenterInputFallbackDesc = "Введите значение для этого параметра.",
-		configCenterLegacyBlizzard = "Старые настройки Blizzard",
 		configCenterMultiDropdownFallbackDesc = "Выберите один или несколько вариантов.",
 		configCenterNoResults = "Настройки не найдены.",
 		configCenterOpenButton = "Открыть",
@@ -358,7 +349,6 @@ lib.LOCALES = {
 		configCenterDensityCompact = "紧凑",
 		configCenterDropdownFallbackDesc = "选择一个可用选项。",
 		configCenterInputFallbackDesc = "输入此设置使用的值。",
-		configCenterLegacyBlizzard = "旧版 Blizzard 设置",
 		configCenterMultiDropdownFallbackDesc = "选择一个或多个选项。",
 		configCenterNoResults = "未找到设置。",
 		configCenterOpenButton = "打开",
@@ -388,7 +378,6 @@ lib.LOCALES = {
 		configCenterDensityCompact = "精簡",
 		configCenterDropdownFallbackDesc = "選擇一個可用選項。",
 		configCenterInputFallbackDesc = "輸入此設定使用的值。",
-		configCenterLegacyBlizzard = "舊版 Blizzard 設定",
 		configCenterMultiDropdownFallbackDesc = "選擇一個或多個選項。",
 		configCenterNoResults = "找不到設定。",
 		configCenterOpenButton = "開啟",
@@ -1611,20 +1600,28 @@ local function getOptionValue(option, key)
 		if value == nil then value = option[1] end
 		if value ~= nil then return value end
 	end
+	if type(option) == "string" then
+		return option
+	end
 	return key
 end
 
 local function getControlOptions(control)
 	local list = control.values or control.options or control.list
 	local optionfunc = control.optionfunc or control.listFunc
+	local optionOrder
 	if type(optionfunc) == "function" then
-		local ok, result = pcall(optionfunc)
+		local ok, result, resultOrder = pcall(optionfunc)
 		if ok and type(result) == "table" then
 			list = result
+			if type(resultOrder) == "table" then
+				optionOrder = resultOrder
+			end
 		end
 	end
 	local options = {}
-	local order = type(control.orderList) == "table" and control.orderList
+	local order = type(optionOrder) == "table" and optionOrder
+		or type(control.orderList) == "table" and control.orderList
 		or type(control.order) == "table" and control.order
 	local seen
 	if type(list) ~= "table" then
@@ -1872,12 +1869,6 @@ function lib.GetColorOverridesRowHeight(control)
 		return COMPLEX_ROW_HEIGHT
 	end
 	return math.max(COMPLEX_ROW_HEIGHT, 78 + (math.ceil(count / 2) * 36))
-end
-
-local function openLegacySettingsForControl(app, control)
-	if app.opts and type(app.opts.openLegacySettings) == "function" then
-		app.opts.openLegacySettings(control)
-	end
 end
 
 local function makeFlatButton(parent, text, width, height, iconSource, iconIsAtlas)
@@ -2650,11 +2641,22 @@ local function setDropdownMenuScrollMode(rootDescription, control, optionCount)
 	end
 end
 
-function lib.PlaySoundDropdownPreview(control, option)
-	if not control or not option then
+function lib.PlaySoundDropdownPreview(control, optionOrValue, optionLabel)
+	if not control or optionOrValue == nil then
 		return
 	end
-	local value = option.value
+	local option
+	local value
+	if type(optionOrValue) == "table" then
+		option = optionOrValue
+		value = option.value
+	else
+		value = optionOrValue
+		option = {
+			value = value,
+			label = optionLabel,
+		}
+	end
 	if value == nil or value == "" then
 		return
 	end
@@ -2738,7 +2740,10 @@ function lib.AttachSoundPreviewInitializer(description, control, option)
 				end
 			end)
 			preview:SetScript("OnClick", function(self)
-				lib.PlaySoundDropdownPreview(self.EQOLControl, self.EQOLOption)
+				if self.StopPropagation then
+					self:StopPropagation()
+				end
+				lib.PlaySoundDropdownPreview(self.EQOLControl, self.EQOLSoundValue, self.EQOLSoundLabel)
 			end)
 			button.EQOLSoundPreview = preview
 		end
@@ -2747,17 +2752,42 @@ function lib.AttachSoundPreviewInitializer(description, control, option)
 			if _G.GameTooltip then
 				_G.GameTooltip:Hide()
 			end
+			preview.EQOLControl = nil
+			preview.EQOLSoundValue = nil
+			preview.EQOLSoundLabel = nil
+			preview.EQOLOption = nil
 			return
 		end
 		preview.EQOLControl = control
-		preview.EQOLOption = option
+		preview.EQOLSoundValue = option.value
+		preview.EQOLSoundLabel = option.label
+		preview.EQOLOption = nil
 		preview.Icon:SetVertexColor(0.78, 0.72, 0.62, 1)
 		preview:Show()
 	end)
 end
 
+function lib.AttachSoundPreviewCleanupInitializer(description)
+	if not (description and description.AddInitializer) then
+		return
+	end
+	description:AddInitializer(function(button)
+		local preview = button and button.EQOLSoundPreview
+		if preview then
+			preview.EQOLControl = nil
+			preview.EQOLOption = nil
+			preview.EQOLSoundValue = nil
+			preview.EQOLSoundLabel = nil
+			preview:Hide()
+		end
+	end)
+end
+
 local function addConfigureFallback(row, app, control, text, opts)
 	opts = opts or {}
+	if not (control and control.type == "keybind") then
+		return nil
+	end
 	local L = getLocale(app)
 	local button = makeFlatButton(
 		row,
@@ -2779,7 +2809,9 @@ local function addConfigureFallback(row, app, control, text, opts)
 		if not app:IsControlEnabled(control) then
 			return
 		end
-		openLegacySettingsForControl(app, control)
+		if app.opts and type(app.opts.openLegacySettings) == "function" then
+			app.opts.openLegacySettings(control)
+		end
 	end)
 	return button
 end
@@ -3022,6 +3054,8 @@ local function addDropdownWidget(row, app, control, opts)
 				end, option.value)
 				if getControlType(control) == "sounddropdown" then
 					lib.AttachSoundPreviewInitializer(radio, control, option)
+				else
+					lib.AttachSoundPreviewCleanupInitializer(radio)
 				end
 			end
 		end)
@@ -3095,7 +3129,8 @@ local function addMultiDropdownWidget(row, app, control, opts)
 					end
 					refreshSummary()
 				end
-				rootDescription:CreateCheckbox(option.label, isSelected, setSelected, option.value)
+				local check = rootDescription:CreateCheckbox(option.label, isSelected, setSelected, option.value)
+				lib.AttachSoundPreviewCleanupInitializer(check)
 			end
 		end)
 	end)
@@ -3605,9 +3640,10 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 	elseif controlType == "button" then
 		title:SetPoint("RIGHT", row, "RIGHT", hasNewBadge and -154 or -18, 0)
 		if not compact then
+			desc.Text:SetText(control.description or "")
 			desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
 			desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
-			desc:SetHeight(36)
+			desc:SetHeight(control.description and control.description ~= "" and 36 or 1)
 		end
 		local button = makeFlatButton(row, control.buttonText or (_G.OKAY or "OK"), 112, 26)
 		button:SetPoint(compact and "RIGHT" or "BOTTOMRIGHT", row, compact and "RIGHT" or "BOTTOMRIGHT", -14, compact and 0 or 14)
@@ -3632,14 +3668,14 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 			desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
 			desc:SetHeight(36)
 		end
-		local fallbackText = controlType == "keybind" and control.buttonText or nil
-		addConfigureFallback(row, app, control, fallbackText, {
-			point = compact and { "RIGHT", row, "RIGHT", -14, 0 } or { "BOTTOMRIGHT", row, "BOTTOMRIGHT", -14, 14 },
-			width = 150,
-		})
-		local badgeText = controlType == "keybind" and (_G.KEY_BINDINGS or "Key Bindings") or (control.level == "advanced" and "Advanced" or "Legacy")
-		local badge = addStatusChip(row, badgeText, TEXT.muted, 92)
-		badge:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", textLeft, 15)
+		if controlType == "keybind" then
+			addConfigureFallback(row, app, control, control.buttonText, {
+				point = compact and { "RIGHT", row, "RIGHT", -14, 0 } or { "BOTTOMRIGHT", row, "BOTTOMRIGHT", -14, 14 },
+				width = 150,
+			})
+			local badge = addStatusChip(row, _G.KEY_BINDINGS or "Key Bindings", TEXT.muted, 92)
+			badge:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", textLeft, 15)
+		end
 	end
 
 	if hasNewBadge then
@@ -3653,12 +3689,6 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 		state.y = snap(state.content, state.y - 10)
 	end
 	return row
-end
-
-local function openLegacySettings(app)
-	if app.opts and type(app.opts.openLegacySettings) == "function" then
-		app.opts.openLegacySettings()
-	end
 end
 
 local function resetCurrentPage(state)
@@ -5078,7 +5108,7 @@ local function createFrame(app)
 
 	frame.SidebarScroll = CreateFrame("ScrollFrame", nil, frame.SidebarShell, "UIPanelScrollFrameTemplate")
 	frame.SidebarScroll:SetPoint("TOPLEFT", frame.SidebarShell, "TOPLEFT", 8, -8)
-	frame.SidebarScroll:SetPoint("BOTTOMRIGHT", frame.SidebarShell, "BOTTOMRIGHT", -28, 54)
+	frame.SidebarScroll:SetPoint("BOTTOMRIGHT", frame.SidebarShell, "BOTTOMRIGHT", -28, 8)
 	frame.SidebarScroll._EQOLScrollStep = 44
 	skinScrollFrame(frame.SidebarScroll)
 
@@ -5087,11 +5117,6 @@ local function createFrame(app)
 	frame.Sidebar:SetHeight(1)
 	frame.Sidebar:SetPoint("TOPLEFT", frame.SidebarScroll, "TOPLEFT", 0, 0)
 	frame.SidebarScroll:SetScrollChild(frame.Sidebar)
-
-	local legacyLabel = L["configCenterLegacyBlizzard"] or "Legacy Blizzard Settings"
-	frame.LegacyButton = makeFlatButton(frame.SidebarShell, legacyLabel, 184, 30, getAppIconTexture(app, "advanced"))
-	frame.LegacyButton:SetPoint("BOTTOMLEFT", frame.SidebarShell, "BOTTOMLEFT", 8, 11)
-	frame.LegacyButton:SetScript("OnClick", function() openLegacySettings(app) end)
 
 	frame.ResizeGrip = CreateFrame("Button", nil, frame)
 	frame.ResizeGrip:SetSize(22, 22)

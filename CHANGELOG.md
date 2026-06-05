@@ -2,9 +2,22 @@
 
 ## [11.0.0-alpha7] - 2026-06-05
 
+### 🔄 Changed
+
+- Settings Center / EQoL Suites: Moved the standalone EQoL Castbar toggle into its own Castbar page with overview and detail descriptions.
+- Settings Center / Data Panels: Added clearer descriptions for tooltip hints, context-menu modifiers and panel creation.
+- Settings Center: Switched the remaining Interface settings to modern-only registration and removed the old Blizzard Settings tree content.
+- Settings Center: Removed the global Legacy Blizzard Settings button from the modern settings shell while keeping keybind rows linked to Blizzard Key Bindings.
+
 ### 🐛 Fixed
 
 - Settings Center / Interface: Fixed dynamically visible Unit Frames and Castbars controls resolving to the generic Settings page instead of their owning Interface subpages.
+- Settings Center / Interface: Fixed unheaded Interface settings groups, including Nameplates and Tooltip IDs, appearing below later sections instead of first.
+- Settings Center / Interface: Fixed Combat Text dependent controls staying editable while Combat Text is disabled.
+- Settings Center / Interface: Fixed the Health Text explanation showing as a page note instead of on the Player, Target and Boss health text rows.
+- Settings Center / Data Panels: Fixed the Add Panel action missing its modern button text and description.
+- Settings Center / Mover: Fixed standalone hint text disappearing from modern pages when no previous control existed to attach it to.
+- Settings Center: Fixed recycled dropdown menu rows keeping sound preview icons in non-sound dropdowns and LSM sound previews using unstable option indexes instead of the selected sound key.
 
 ## [11.0.0-alpha6] - 2026-06-05
 

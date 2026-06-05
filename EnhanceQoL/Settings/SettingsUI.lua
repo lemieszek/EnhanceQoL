@@ -24,6 +24,7 @@ addon.ConfigControlOrder = addon.ConfigControlOrder or 0
 addon.ConfigLastControlByPageID = addon.ConfigLastControlByPageID or {}
 addon.ConfigLastControlBySection = addon.ConfigLastControlBySection or {}
 addon.ConfigModernOnlySections = addon.ConfigModernOnlySections or {}
+addon.ConfigModernOnlySettings = true
 
 local rootCategoryMap = {
 	UI = "interface",
@@ -35,6 +36,21 @@ local rootCategoryMap = {
 	SUITES = "suites",
 	PROFILES = "profiles",
 }
+
+local function createModernCategory(id, name)
+	local category = {
+		id = tostring(id or name or "modern"),
+		name = name or id or "Modern",
+		modernOnly = true,
+	}
+	function category:GetID()
+		return self.id
+	end
+	function category:GetName()
+		return self.name
+	end
+	return category
+end
 
 local newSettingsAssetRoot = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\"
 local function newSettingsAsset(fileName)
@@ -71,6 +87,7 @@ local pageIconKeysByStableID = {
 	DialogsConfirmations = "dialogsconfirmations",
 	DungeonsMythicPlus = "dungeons",
 	EconomyCraftingOrders = "crafting",
+	EQoLCastbar = "castbar",
 	GearUpgrades = "gearupgrades",
 	GroupToolsCombatAlerts = "combat",
 	GroupToolsFocusMarker = "focus",
@@ -132,6 +149,7 @@ local pageDescriptionKeysByStableID = {
 	DialogsConfirmations = "configCenterPageCardDescDialogsConfirmations",
 	DungeonsMythicPlus = "configCenterPageCardDescDungeons",
 	EconomyCraftingOrders = "configCenterPageCardDescCraftingOrders",
+	EQoLCastbar = "configCenterPageCardDescEQoLCastbar",
 	FriendsCommunities = "configCenterPageCardDescFriendsCommunities",
 	GearUpgrades = "configCenterPageCardDescGearUpgrades",
 	GoldTracking = "configCenterPageCardDescTrackingMoney",
@@ -509,7 +527,10 @@ local function ensureConfigApp()
 			return count
 		end,
 		openLegacySettings = function(control)
-			if control and control.type == "keybind" and Settings and Settings.OpenToCategory and Settings.KEYBINDINGS_CATEGORY_ID then
+			if not (control and control.type == "keybind") then
+				return
+			end
+			if Settings and Settings.OpenToCategory and Settings.KEYBINDINGS_CATEGORY_ID then
 				local scrollToElementName
 				if control.bindingIndex and GetBinding then
 					local _, bindingCategory = GetBinding(control.bindingIndex)
@@ -518,8 +539,6 @@ local function ensureConfigApp()
 					end
 				end
 				Settings.OpenToCategory(Settings.KEYBINDINGS_CATEGORY_ID, scrollToElementName)
-			elseif Settings and Settings.OpenToCategory and addon.SettingsLayout and addon.SettingsLayout.rootCategory then
-				Settings.OpenToCategory(addon.SettingsLayout.rootCategory:GetID())
 			end
 		end,
 	})
@@ -612,6 +631,7 @@ local function resolveConfigSection(sectionOrParentCheck)
 end
 
 local function isModernOnlySection(sectionOrParentCheck)
+	if addon.ConfigModernOnlySettings == true then return true end
 	local section = resolveConfigSection(sectionOrParentCheck)
 	return section and addon.ConfigModernOnlySections and addon.ConfigModernOnlySections[section] == true
 end
@@ -942,6 +962,13 @@ end
 ---------------------------------------------------------
 function addon.functions.SettingsCreateCategory(parent, treeName, sort, newTagID)
 	if nil == parent then parent = addon.SettingsLayout.rootCategory end
+	if addon.ConfigModernOnlySettings == true then
+		local category = createModernCategory(newTagID or treeName, treeName)
+		addon.SettingsLayout.knownCategoryID = addon.SettingsLayout.knownCategoryID or {}
+		addon.SettingsLayout.knownCategoryID[category:GetID()] = true
+		registerLegacyCategory(category, treeName, newTagID)
+		return category, nil
+	end
 	local cat, layout = SettingsLib:CreateCategory(parent, treeName, sort, newTagID, prefix)
 	addon.SettingsLayout.knownCategoryID = addon.SettingsLayout.knownCategoryID or {}
 	addon.SettingsLayout.knownCategoryID[cat:GetID()] = true
@@ -1572,6 +1599,11 @@ function addon.functions.SettingsCreateText(cat, text, extra)
 				text = text,
 				order = extra.order or addon.ConfigControlOrder or 0,
 			})
+		elseif pageID and app:GetPage(pageID) and app.RegisterPageNote then
+			app:RegisterPageNote(pageID, {
+				text = text,
+				order = extra.order or 1000,
+			})
 		end
 	end
 	return element
@@ -1655,7 +1687,7 @@ end
 
 function addon.functions.SettingsCreateExpandableSection(cat, cbData)
 	local section
-	if cbData.modernOnly then
+	if addon.ConfigModernOnlySettings == true or cbData.modernOnly then
 		section = createModernOnlySection(cbData)
 		addon.ConfigModernOnlySections[section] = true
 	else
@@ -1707,9 +1739,13 @@ function addon.functions.SettingsCreateExpandableSection(cat, cbData)
 	return section
 end
 
-local cat, layout = SettingsLib:CreateRootCategory(addonName, false)
-
-addon.SettingsLayout.rootCategory = cat
-addon.SettingsLayout.rootLayout = layout
+if addon.ConfigModernOnlySettings == true then
+	addon.SettingsLayout.rootCategory = createModernCategory(addonName, addonName)
+	addon.SettingsLayout.rootLayout = nil
+else
+	local cat, layout = SettingsLib:CreateRootCategory(addonName, false)
+	addon.SettingsLayout.rootCategory = cat
+	addon.SettingsLayout.rootLayout = layout
+end
 
 ensureConfigApp()

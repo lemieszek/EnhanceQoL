@@ -120,8 +120,6 @@ addon.functions.SettingsCreateHeadline(cUnitFrame, L["Health Text"], {
 	parentSection = expandWith(shouldShowHealthTextSection),
 })
 
-addon.functions.SettingsCreateText(cUnitFrame, "|cff99e599" .. string.format(L["HealthTextExplain2"], VIDEO_OPTIONS_DISABLED) .. "|r", { parentSection = expandWith(shouldShowHealthTextSection) })
-
 local healthTextOrder = { "OFF", "PERCENT", "ABS", "BOTH", "CURMAX", "CURMAXPERCENT" }
 local healthTextOptions = {
 	OFF = VIDEO_OPTIONS_DISABLED,
@@ -131,11 +129,13 @@ local healthTextOptions = {
 	CURMAX = L["Current/Max"] or "Current/Max",
 	CURMAXPERCENT = L["Current/Max Percent"] or "Current/Max (percent)",
 }
+local healthTextDesc = string.format(L["HealthTextExplain2"], VIDEO_OPTIONS_DISABLED)
 
 addon.functions.SettingsCreateDropdown(cUnitFrame, {
 	list = healthTextOptions,
 	order = healthTextOrder,
 	text = L["PlayerHealthText"],
+	desc = healthTextDesc,
 	get = function() return addon.db["healthTextPlayerMode"] or "OFF" end,
 	set = function(key)
 		addon.db["healthTextPlayerMode"] = key
@@ -152,6 +152,7 @@ addon.functions.SettingsCreateDropdown(cUnitFrame, {
 	list = healthTextOptions,
 	order = healthTextOrder,
 	text = L["TargetHealthText"],
+	desc = healthTextDesc,
 	get = function() return addon.db["healthTextTargetMode"] or "OFF" end,
 	set = function(key)
 		addon.db["healthTextTargetMode"] = key
@@ -168,6 +169,7 @@ addon.functions.SettingsCreateDropdown(cUnitFrame, {
 	list = healthTextOptions,
 	order = healthTextOrder,
 	text = L["BossHealthText"],
+	desc = healthTextDesc,
 	get = function() return addon.db["healthTextBossMode"] or "OFF" end,
 	set = function(key)
 		addon.db["healthTextBossMode"] = key

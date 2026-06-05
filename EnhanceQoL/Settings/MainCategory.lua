@@ -157,7 +157,9 @@ local function createRootSlashCommandHints(category)
 	end
 end
 
-createRootSlashCommandHints(addon.SettingsLayout.rootCategory)
+if addon.ConfigModernOnlySettings ~= true then
+	createRootSlashCommandHints(addon.SettingsLayout.rootCategory)
+end
 
 for _, entry in ipairs(rootCategories) do
 	addon.SettingsLayout["root" .. entry.id] = addon.functions.SettingsCreateCategory(nil, entry.label, nil, entry.id)

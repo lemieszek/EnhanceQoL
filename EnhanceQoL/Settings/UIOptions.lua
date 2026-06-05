@@ -1665,6 +1665,12 @@ local function createNameplatesCategory()
 	})
 	addon.SettingsLayout.uiNameplatesExpandable = expandable
 
+	addon.functions.SettingsCreateHeadline(category, _G.SETTINGS or "Settings", {
+		parentSection = expandable,
+		groupID = "settings",
+		order = 1,
+	})
+
 	local nameplateData = {
 		{
 			var = "UnitNamePlayerGuild",
@@ -2384,7 +2390,7 @@ local function createCastbarCategory()
 	addon.functions.SettingsCreateHeadline(category, L["CombatText"] or "Combat text", {
 		parentSection = expandable,
 	})
-	addon.functions.SettingsCreateCheckbox(category, {
+	local combatTextEnabled = addon.functions.SettingsCreateCheckbox(category, {
 		var = "combatTextEnabled",
 		text = L["combatTextEnabled"] or "Enable combat text",
 		desc = L["combatTextDesc"],
@@ -2394,6 +2400,9 @@ local function createCastbarCategory()
 		end,
 		parentSection = expandable,
 	})
+	local function isCombatTextEnabled()
+		return combatTextEnabled and combatTextEnabled.setting and combatTextEnabled.setting:GetValue() == true
+	end
 	local combatAlwaysVisible = addon.functions.SettingsCreateCheckbox(category, {
 		var = "combatTextAlwaysVisible",
 		text = L["combatTextAlwaysVisible"] or "Always show combat text",
@@ -2408,6 +2417,9 @@ local function createCastbarCategory()
 				end
 			end
 		end,
+		parent = true,
+		element = combatTextEnabled and combatTextEnabled.element,
+		parentCheck = isCombatTextEnabled,
 		parentSection = expandable,
 	})
 	local combatAlwaysModeCombatOnly = addon.CombatText and addon.CombatText.ALWAYS_VISIBLE_MODE_COMBAT_ONLY or "COMBAT_ONLY"
@@ -2435,7 +2447,7 @@ local function createCastbarCategory()
 		end,
 		parent = true,
 		element = combatAlwaysVisible and combatAlwaysVisible.element,
-		parentCheck = function() return combatAlwaysVisible and combatAlwaysVisible.setting and combatAlwaysVisible.setting:GetValue() == true end,
+		parentCheck = function() return isCombatTextEnabled() and combatAlwaysVisible and combatAlwaysVisible.setting and combatAlwaysVisible.setting:GetValue() == true end,
 		parentSection = expandable,
 	})
 	addon.functions.SettingsCreateInput(category, {
@@ -2454,6 +2466,9 @@ local function createCastbarCategory()
 		inputWidth = 180,
 		placeholder = addon.CombatText and addon.CombatText.GetDefaultEnterText and addon.CombatText:GetDefaultEnterText() or L["combatTextEnter"] or "+Combat",
 		selectAllOnFocus = true,
+		parent = true,
+		element = combatTextEnabled and combatTextEnabled.element,
+		parentCheck = isCombatTextEnabled,
 		parentSection = expandable,
 	})
 	addon.functions.SettingsCreateInput(category, {
@@ -2472,6 +2487,9 @@ local function createCastbarCategory()
 		inputWidth = 180,
 		placeholder = addon.CombatText and addon.CombatText.GetDefaultLeaveText and addon.CombatText:GetDefaultLeaveText() or L["combatTextLeave"] or "-Combat",
 		selectAllOnFocus = true,
+		parent = true,
+		element = combatTextEnabled and combatTextEnabled.element,
+		parentCheck = isCombatTextEnabled,
 		parentSection = expandable,
 	})
 	addon.functions.SettingsCreateText(category, "|cffffd700" .. (L["combatTextEditModeHint"] or "Configure text size, font, color, and position in Edit Mode.") .. "|r", {
@@ -2521,20 +2539,45 @@ local function createCastbarCategory()
 		end
 		return addon.functions.RegisterConfigParentSection(parentCheck, expandable)
 	end
+
+	local function createStandaloneCastbarSuite()
+		local suiteCategory = addon.SettingsLayout.rootUI
+		local suiteExpandable = addon.SettingsLayout.suitesCastbarSection
+		if not suiteExpandable then
+			suiteExpandable = addon.functions.SettingsCreateExpandableSection(suiteCategory, {
+				name = L["Castbar"] or L["CastBars2"] or "Castbar",
+				description = L["configCenterPageDescEQoLCastbar"] or "Enable and configure the standalone EQoL player castbar. Size, position and style are handled in Edit Mode.",
+				expanded = false,
+				colorizeTitle = false,
+				newTagID = "EQoLCastbar",
+				configPageKey = "EQoLCastbar",
+				iconKey = "castbar",
+				modernCategory = "suites",
+				modernOnly = true,
+			})
+			addon.SettingsLayout.suitesCastbarSection = suiteExpandable
+		end
+
+		addon.functions.SettingsCreateCheckbox(suiteCategory, {
+			var = "useCustomPlayerCastbar",
+			text = L["useCustomPlayerCastbar"] or "Enable castbar",
+			desc = L["useCustomPlayerCastbarDesc"] or "Enable the EQoL castbar.",
+			get = function() return isCustomCastbarEnabled() end,
+			func = function(value)
+				local castCfg = getCastbarConfig()
+				castCfg.enabled = value and true or false
+				refreshCastbar()
+			end,
+			default = false,
+			parentSection = suiteExpandable,
+		})
+		addon.functions.SettingsCreateText(suiteCategory, "|cffffd700" .. (L["useCustomPlayerCastbarHint"] or "Configure size, position, and style in Edit Mode.") .. "|r", {
+			parentSection = suiteExpandable,
+		})
+	end
+	createStandaloneCastbarSuite()
+
 	addon.functions.SettingsCreateHeadline(category, L["CastBars2"], {
-		parentSection = expandable,
-	})
-	addon.functions.SettingsCreateCheckbox(category, {
-		var = "useCustomPlayerCastbar",
-		text = L["useCustomPlayerCastbar"] or "Enable castbar",
-		desc = L["useCustomPlayerCastbarDesc"] or "Enable the EQoL castbar.",
-		get = function() return isCustomCastbarEnabled() end,
-		func = function(value)
-			local castCfg = getCastbarConfig()
-			castCfg.enabled = value and true or false
-			refreshCastbar()
-		end,
-		default = false,
 		parentSection = expandable,
 	})
 
