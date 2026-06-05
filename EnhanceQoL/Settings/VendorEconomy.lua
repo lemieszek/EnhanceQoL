@@ -165,12 +165,14 @@ local function isAutoRepairGuildBankEnabled()
 		and addon.SettingsLayout.elements["autoRepairGuildBank"].setting:GetValue() == true
 end
 
-local cVendorEconomy = addon.SettingsLayout.rootECONOMY
+local cVendorEconomy = nil
 addon.SettingsLayout.vendorEconomyCategory = cVendorEconomy
 
 local vendorsExpandable = addon.functions.SettingsCreateExpandableSection(cVendorEconomy, {
 	name = L["VendorsServices"],
 	configPageKey = "VendorsServices",
+	modernCategory = "economy",
+	modernOnly = true,
 	iconKey = "vendorsservices",
 	expanded = false,
 	colorizeTitle = false,
@@ -224,6 +226,8 @@ addon.functions.SettingsCreateCheckboxes(cVendorEconomy, data)
 local bankExpandable = addon.functions.SettingsCreateExpandableSection(cVendorEconomy, {
 	name = BANK,
 	newTagID = "Bank",
+	modernCategory = "economy",
+	modernOnly = true,
 	iconKey = "bank",
 	expanded = false,
 	colorizeTitle = false,
@@ -435,6 +439,8 @@ addon.functions.SettingsCreateCheckboxes(cVendorEconomy, data)
 local merchantExpandable = addon.functions.SettingsCreateExpandableSection(cVendorEconomy, {
 	name = L["MerchantUI"],
 	configPageKey = "Merchant",
+	modernCategory = "economy",
+	modernOnly = true,
 	iconKey = "vendor",
 	expanded = false,
 	colorizeTitle = false,
@@ -497,6 +503,8 @@ addon.functions.SettingsCreateCheckboxes(cVendorEconomy, data)
 local auctionHouseExpandable = addon.functions.SettingsCreateExpandableSection(cVendorEconomy, {
 	name = BUTTON_LAG_AUCTIONHOUSE,
 	configPageKey = "AuctionHouse",
+	modernCategory = "economy",
+	modernOnly = true,
 	iconKey = "auction",
 	expanded = false,
 	colorizeTitle = false,
@@ -592,6 +600,8 @@ addon.functions.SettingsCreateDropdown(cVendorEconomy, {
 local craftingOrdersExpandable = addon.functions.SettingsCreateExpandableSection(cVendorEconomy, {
 	name = _G["PLACE_CRAFTING_ORDERS"] or "Crafting Orders",
 	newTagID = "EconomyCraftingOrders",
+	modernCategory = "economy",
+	modernOnly = true,
 	iconKey = "crafting",
 	expanded = false,
 	colorizeTitle = false,

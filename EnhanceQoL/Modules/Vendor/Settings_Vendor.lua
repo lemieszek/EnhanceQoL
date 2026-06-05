@@ -89,6 +89,20 @@ local function buildList(listKey)
 	return list
 end
 
+local function listHasItems(listKey)
+	return next(addon.db[listKey] or {}) ~= nil
+end
+
+local function buildRemoveList(listKey)
+	local list = buildList(listKey)
+	local order = listOrders[listKey]
+	if not listHasItems(listKey) then
+		list[""] = L["vendorNoItemsToRemove"]
+		if order then table.insert(order, "") end
+	end
+	return list
+end
+
 local function addItemToList(listKey, id)
 	if not id then return end
 	addon.db[listKey] = addon.db[listKey] or {}
@@ -170,12 +184,14 @@ local function showRemovePopup(dialogKey, prompt, listKey, label, id)
 end
 
 local function buildSettings()
-	local cVendor = addon.SettingsLayout.rootECONOMY
+	local cVendor = nil
 	addon.SettingsLayout.vendorCategory = cVendor
 
 	local quickActionsExpandable = addon.functions.SettingsCreateExpandableSection(cVendor, {
 		name = L["vendorQuickActions"] or "Vendor - Quick Actions",
 		configPageKey = "VendorQuickActions",
+		modernCategory = "economy",
+		modernOnly = true,
 		iconKey = "vendor",
 		expanded = false,
 		colorizeTitle = false,
@@ -231,6 +247,8 @@ local function buildSettings()
 	local autoSellExpandable = addon.functions.SettingsCreateExpandableSection(cVendor, {
 		name = L["vendorAutoSellRules"] or "Vendor - Auto-Sell Rules",
 		newTagID = "AutoSellRules",
+		modernCategory = "economy",
+		modernOnly = true,
 		iconKey = "autosell",
 		expanded = false,
 		colorizeTitle = false,
@@ -438,24 +456,28 @@ local function buildSettings()
 	local includeExcludeExpandable = addon.functions.SettingsCreateExpandableSection(cVendor, {
 		name = L["vendorIncludeExclude"] or "Vendor - Include / Exclude",
 		configPageKey = "VendorIncludeExclude",
+		modernCategory = "economy",
+		modernOnly = true,
 		iconKey = "includelists",
 		expanded = false,
 		colorizeTitle = false,
 	})
 
 	addon.functions.SettingsCreateHeadline(cVendor, L["Include"] or "Include", { parentSection = includeExcludeExpandable })
-	addon.functions.SettingsCreateText(cVendor, L["vendorAddItemToInclude"], { parentSection = includeExcludeExpandable })
 	addon.functions.SettingsCreateButton(cVendor, {
 		var = "vendorIncludeAdd",
-		text = ADD,
+		text = L["vendorIncludeAdd"],
+		desc = L["vendorIncludeAddDesc"],
+		buttonText = ADD,
 		func = function() showAddPopup("EQOL_VENDOR_INCLUDE_ADD", L["vendorAddItemToInclude"], "vendorIncludeSellList") end,
 		parentSection = includeExcludeExpandable,
 	})
 
 	addon.functions.SettingsCreateScrollDropdown(cVendor, {
 		var = "vendorIncludeRemove",
-		text = REMOVE,
-		listFunc = function() return buildList("vendorIncludeSellList") end,
+		text = L["vendorIncludeRemove"],
+		desc = L["vendorIncludeRemoveDesc"],
+		listFunc = function() return buildRemoveList("vendorIncludeSellList") end,
 		order = listOrders.vendorIncludeSellList,
 		default = "",
 		get = function() return "" end,
@@ -465,25 +487,28 @@ local function buildSettings()
 			if not id then return end
 			addon.db.vendorIncludeSellList = addon.db.vendorIncludeSellList or {}
 			local label = addon.db.vendorIncludeSellList[id] or tostring(id)
-			showRemovePopup("EQOL_VENDOR_INCLUDE_REMOVE", L["Remove %s from the include list?"], "vendorIncludeSellList", label, id)
+			showRemovePopup("EQOL_VENDOR_INCLUDE_REMOVE", L["vendorIncludeRemoveConfirm"], "vendorIncludeSellList", label, id)
 			clearDropdownSelection("vendorIncludeRemove")
 		end,
+		isEnabled = function() return listHasItems("vendorIncludeSellList") end,
 		parentSection = includeExcludeExpandable,
 	})
 
 	addon.functions.SettingsCreateHeadline(cVendor, L["Exclude"] or "Exclude", { parentSection = includeExcludeExpandable })
-	addon.functions.SettingsCreateText(cVendor, L["vendorAddItemToExclude"], { parentSection = includeExcludeExpandable })
 	addon.functions.SettingsCreateButton(cVendor, {
 		var = "vendorExcludeAdd",
-		text = ADD,
+		text = L["vendorExcludeAdd"],
+		desc = L["vendorExcludeAddDesc"],
+		buttonText = ADD,
 		func = function() showAddPopup("EQOL_VENDOR_EXCLUDE_ADD", L["vendorAddItemToExclude"], "vendorExcludeSellList") end,
 		parentSection = includeExcludeExpandable,
 	})
 
 	addon.functions.SettingsCreateScrollDropdown(cVendor, {
 		var = "vendorExcludeRemove",
-		text = REMOVE,
-		listFunc = function() return buildList("vendorExcludeSellList") end,
+		text = L["vendorExcludeRemove"],
+		desc = L["vendorExcludeRemoveDesc"],
+		listFunc = function() return buildRemoveList("vendorExcludeSellList") end,
 		order = listOrders.vendorExcludeSellList,
 		default = "",
 		get = function() return "" end,
@@ -496,12 +521,15 @@ local function buildSettings()
 			showRemovePopup("EQOL_VENDOR_EXCLUDE_REMOVE", L["vendorExcludeRemoveConfirm"], "vendorExcludeSellList", label, id)
 			clearDropdownSelection("vendorExcludeRemove")
 		end,
+		isEnabled = function() return listHasItems("vendorExcludeSellList") end,
 		parentSection = includeExcludeExpandable,
 	})
 
 	local destroyQueueExpandable = addon.functions.SettingsCreateExpandableSection(cVendor, {
 		name = L["vendorDestroyQueue"] or "Vendor - Destroy Queue",
 		configPageKey = "VendorDestroyQueue",
+		modernCategory = "economy",
+		modernOnly = true,
 		iconKey = "includelists",
 		expanded = false,
 		colorizeTitle = false,
@@ -540,7 +568,9 @@ local function buildSettings()
 		},
 		{
 			var = "vendorDestroyAdd",
-			text = ADD,
+			text = L["vendorDestroyAdd"],
+			desc = L["vendorDestroyAddDesc"],
+			buttonText = ADD,
 			sType = "button",
 			parent = true,
 			parentCheck = function() return isChecked("vendorDestroyEnable") end,
@@ -553,14 +583,16 @@ local function buildSettings()
 		{
 			var = "vendorDestroyRemove",
 			text = L["vendorDestroyRemove"],
+			desc = L["vendorDestroyRemoveDesc"],
 			sType = "scrolldropdown",
 			parent = true,
 			parentCheck = function() return isChecked("vendorDestroyEnable") end,
-			listFunc = function() return buildList("vendorIncludeDestroyList") end,
+			listFunc = function() return buildRemoveList("vendorIncludeDestroyList") end,
 			order = listOrders.vendorIncludeDestroyList,
 			default = "",
 			get = function() return "" end,
 			set = function(value) removeItemFromList("vendorIncludeDestroyList", value) end,
+			isEnabled = function() return isChecked("vendorDestroyEnable") and listHasItems("vendorIncludeDestroyList") end,
 		},
 	}
 	local destroyEntries = {

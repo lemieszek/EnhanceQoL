@@ -141,6 +141,7 @@ local pageDescriptionKeysByStableID = {
 	MacrosConsumables = "configCenterPageCardDescMacrosConsumables",
 	Mailbox = "configCenterPageCardDescMailbox",
 	MapNavigation = "configCenterPageCardDescMapNavigation",
+	Merchant = "configCenterPageCardDescMerchant",
 	MouseAccessibility = "configCenterPageCardDescMovementInput",
 	MovementInput = "configCenterPageCardDescMovementInput",
 	Mover = "configCenterPageCardDescMover",
@@ -168,7 +169,10 @@ local pageDescriptionKeysByStableID = {
 	UFProfiles = "configCenterPageCardDescProfilesUnitFrames",
 	ufStandalonePrivateAurasExpandable = "configCenterPageCardDescStandalonePrivateAuras",
 	UnitFrames = "configCenterPageCardDescUnitFrames",
+	VendorDestroyQueue = "configCenterPageCardDescVendorDestroyQueue",
+	VendorIncludeExclude = "configCenterPageCardDescVendorIncludeExclude",
 	VendorQuickActions = "configCenterPageCardDescVendor",
+	VendorsServices = "configCenterPageCardDescRepairOptions",
 	VisibilityFrames = "configCenterPageCardDescVisibilityFrames",
 }
 

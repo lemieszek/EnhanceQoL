@@ -72,7 +72,7 @@ lib.DEFAULT_DASHBOARD_INTRO = "Review settings, quick actions, and configuration
 lib.LOCALES = {
 	enUS = {
 		configCenterAbout = "About",
-		configCenterAdvancedSettingDesc = "Configure this advanced setting.",
+		configCenterAdvancedSettingDesc = "Open the related editor or action for this setting.",
 		configCenterButtonFallbackDesc = "Run this action.",
 		configCenterChange = "Change",
 		configCenterCheckboxDropdownFallbackDesc = "Enable this setting and choose its related option.",
@@ -102,7 +102,7 @@ lib.LOCALES = {
 	},
 	deDE = {
 		configCenterAbout = "Überblick",
-		configCenterAdvancedSettingDesc = "Konfiguriere diese erweiterte Einstellung.",
+		configCenterAdvancedSettingDesc = "Öffnet den zugehörigen Editor oder die Aktion für diese Einstellung.",
 		configCenterButtonFallbackDesc = "Führe diese Aktion aus.",
 		configCenterChange = "Ändern",
 		configCenterCheckboxDropdownFallbackDesc = "Aktiviere diese Einstellung und wähle die zugehörige Option.",
@@ -132,7 +132,7 @@ lib.LOCALES = {
 	},
 	esES = {
 		configCenterAbout = "Acerca de",
-		configCenterAdvancedSettingDesc = "Configura este ajuste avanzado.",
+		configCenterAdvancedSettingDesc = "Abre el editor o la acción relacionada con este ajuste.",
 		configCenterButtonFallbackDesc = "Ejecuta esta acción.",
 		configCenterChange = "Cambiar",
 		configCenterCheckboxDropdownFallbackDesc = "Activa este ajuste y elige su opción relacionada.",
@@ -162,7 +162,7 @@ lib.LOCALES = {
 	},
 	esMX = {
 		configCenterAbout = "Acerca de",
-		configCenterAdvancedSettingDesc = "Configura este ajuste avanzado.",
+		configCenterAdvancedSettingDesc = "Abre el editor o la acción relacionada con este ajuste.",
 		configCenterButtonFallbackDesc = "Ejecuta esta acción.",
 		configCenterChange = "Cambiar",
 		configCenterCheckboxDropdownFallbackDesc = "Activa este ajuste y elige su opción relacionada.",
@@ -192,7 +192,7 @@ lib.LOCALES = {
 	},
 	frFR = {
 		configCenterAbout = "À propos",
-		configCenterAdvancedSettingDesc = "Configurez ce réglage avancé.",
+		configCenterAdvancedSettingDesc = "Ouvre l’éditeur ou l’action associé à ce réglage.",
 		configCenterButtonFallbackDesc = "Exécute cette action.",
 		configCenterChange = "Modifier",
 		configCenterCheckboxDropdownFallbackDesc = "Activez ce réglage et choisissez l’option associée.",
@@ -222,7 +222,7 @@ lib.LOCALES = {
 	},
 	itIT = {
 		configCenterAbout = "Informazioni",
-		configCenterAdvancedSettingDesc = "Configura questa impostazione avanzata.",
+		configCenterAdvancedSettingDesc = "Apre l’editor o l’azione collegata a questa impostazione.",
 		configCenterButtonFallbackDesc = "Esegui questa azione.",
 		configCenterChange = "Cambia",
 		configCenterCheckboxDropdownFallbackDesc = "Attiva questa impostazione e scegli l’opzione correlata.",
@@ -252,7 +252,7 @@ lib.LOCALES = {
 	},
 	koKR = {
 		configCenterAbout = "정보",
-		configCenterAdvancedSettingDesc = "이 고급 설정을 구성합니다.",
+		configCenterAdvancedSettingDesc = "이 설정과 관련된 편집기 또는 동작을 엽니다.",
 		configCenterButtonFallbackDesc = "이 동작을 실행합니다.",
 		configCenterChange = "변경",
 		configCenterCheckboxDropdownFallbackDesc = "이 설정을 활성화하고 관련 옵션을 선택합니다.",
@@ -282,7 +282,7 @@ lib.LOCALES = {
 	},
 	ptBR = {
 		configCenterAbout = "Sobre",
-		configCenterAdvancedSettingDesc = "Configure esta configuração avançada.",
+		configCenterAdvancedSettingDesc = "Abre o editor ou a ação relacionada a esta configuração.",
 		configCenterButtonFallbackDesc = "Executa esta ação.",
 		configCenterChange = "Alterar",
 		configCenterCheckboxDropdownFallbackDesc = "Ative esta configuração e escolha a opção relacionada.",
@@ -312,7 +312,7 @@ lib.LOCALES = {
 	},
 	ruRU = {
 		configCenterAbout = "Описание",
-		configCenterAdvancedSettingDesc = "Настройте этот расширенный параметр.",
+		configCenterAdvancedSettingDesc = "Открывает связанный редактор или действие для этой настройки.",
 		configCenterButtonFallbackDesc = "Выполнить это действие.",
 		configCenterChange = "Изменить",
 		configCenterCheckboxDropdownFallbackDesc = "Включите этот параметр и выберите связанную опцию.",
@@ -342,7 +342,7 @@ lib.LOCALES = {
 	},
 	zhCN = {
 		configCenterAbout = "关于",
-		configCenterAdvancedSettingDesc = "配置此高级设置。",
+		configCenterAdvancedSettingDesc = "打开与此设置相关的编辑器或操作。",
 		configCenterButtonFallbackDesc = "执行此操作。",
 		configCenterChange = "更改",
 		configCenterCheckboxDropdownFallbackDesc = "启用此设置并选择相关选项。",
@@ -372,7 +372,7 @@ lib.LOCALES = {
 	},
 	zhTW = {
 		configCenterAbout = "關於",
-		configCenterAdvancedSettingDesc = "設定此進階選項。",
+		configCenterAdvancedSettingDesc = "開啟與此設定相關的編輯器或動作。",
 		configCenterButtonFallbackDesc = "執行此動作。",
 		configCenterChange = "變更",
 		configCenterCheckboxDropdownFallbackDesc = "啟用此設定並選擇相關選項。",
@@ -3306,7 +3306,7 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 		descText = lib.CompactDescription(control.description)
 	elseif layoutType == "complex" then
 		local L = getLocale(app)
-		descText = L["configCenterAdvancedSettingDesc"] or "Configure this advanced setting."
+		descText = L["configCenterAdvancedSettingDesc"] or "Open the related editor or action for this setting."
 	elseif layoutType == "stacked" or controlType == "button" or controlType == "coloroverrides" then
 		descText = lib.GetFallbackControlDescription(app, control)
 	else
