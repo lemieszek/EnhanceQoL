@@ -8,6 +8,8 @@
 - Settings Center: Added generic info pages for rich help content so add-ons can register text, command lists, action buttons, and images without creating fake settings rows.
 - Settings Center: Added a Quick Reference & Help page linked from the dashboard with EnhanceQoL slash commands and macro examples.
 - Settings Center: Added a Support & Feedback page linked from the dashboard with a copyable Discord invite.
+- Settings Center: Added a persistent Comfortable/Compact density toggle for modern detail pages so dense settings pages can show more options at once while keeping descriptions available on hover.
+- Settings Center: Added a resize grip to the modern settings frame with persistent size memory.
 
 ### 🔄 Changed
 
@@ -17,6 +19,8 @@
 
 - Settings Center: Lowered the main window strata so addon editors and dialog-style tools can layer above it consistently.
 - Settings Center: Fixed modern-only sliders and dropdowns not persisting changes when their setter used the modern single-value callback shape.
+- Settings Center: Replaced the resize grip placeholder with a native diagonal corner grabber and avoided expensive full content rebuilds while resizing.
+- Settings Center: Fixed resize edge cases by using manual cursor-based resizing with a lower minimum height and stable top-left anchoring.
 
 ## [11.0.0-alpha3] - 2026-06-04
 

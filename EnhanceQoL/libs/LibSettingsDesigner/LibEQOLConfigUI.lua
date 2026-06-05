@@ -35,6 +35,8 @@ local PAGE_LAYOUT = {
 	scrollInset = 8,
 	scrollBottomPad = 20,
 	sidePanelTopOffset = 48,
+	windowMinWidth = 1080,
+	windowMinHeight = 640,
 }
 local GRID_GAP = 12
 local STATUS_TILE_HEIGHT = 72
@@ -82,6 +84,8 @@ lib.LOCALES = {
 		configCenterControlSlider = "Slider",
 		configCenterCurrent = "Current",
 		configCenterDashboard = "Dashboard",
+		configCenterDensityComfortable = "Comfortable",
+		configCenterDensityCompact = "Compact",
 		configCenterDropdownFallbackDesc = "Choose one of the available options.",
 		configCenterInputFallbackDesc = "Enter the value used by this setting.",
 		configCenterLegacyBlizzard = "Legacy Blizzard Settings",
@@ -110,6 +114,8 @@ lib.LOCALES = {
 		configCenterControlSlider = "Schieberegler",
 		configCenterCurrent = "Aktuell",
 		configCenterDashboard = "Dashboard",
+		configCenterDensityComfortable = "Komfortabel",
+		configCenterDensityCompact = "Kompakt",
 		configCenterDropdownFallbackDesc = "Wähle eine der verfügbaren Optionen.",
 		configCenterInputFallbackDesc = "Gib den Wert für diese Einstellung ein.",
 		configCenterLegacyBlizzard = "Alte Blizzard-Einstellungen",
@@ -138,6 +144,8 @@ lib.LOCALES = {
 		configCenterControlSlider = "Deslizador",
 		configCenterCurrent = "Actual",
 		configCenterDashboard = "Panel",
+		configCenterDensityComfortable = "Cómodo",
+		configCenterDensityCompact = "Compacto",
 		configCenterDropdownFallbackDesc = "Elige una de las opciones disponibles.",
 		configCenterInputFallbackDesc = "Introduce el valor usado por este ajuste.",
 		configCenterLegacyBlizzard = "Ajustes clásicos de Blizzard",
@@ -166,6 +174,8 @@ lib.LOCALES = {
 		configCenterControlSlider = "Deslizador",
 		configCenterCurrent = "Actual",
 		configCenterDashboard = "Panel",
+		configCenterDensityComfortable = "Cómodo",
+		configCenterDensityCompact = "Compacto",
 		configCenterDropdownFallbackDesc = "Elige una de las opciones disponibles.",
 		configCenterInputFallbackDesc = "Introduce el valor usado por este ajuste.",
 		configCenterLegacyBlizzard = "Ajustes clásicos de Blizzard",
@@ -194,6 +204,8 @@ lib.LOCALES = {
 		configCenterControlSlider = "Curseur",
 		configCenterCurrent = "Actuel",
 		configCenterDashboard = "Tableau de bord",
+		configCenterDensityComfortable = "Confort",
+		configCenterDensityCompact = "Compact",
 		configCenterDropdownFallbackDesc = "Choisissez une des options disponibles.",
 		configCenterInputFallbackDesc = "Saisissez la valeur utilisée par ce réglage.",
 		configCenterLegacyBlizzard = "Réglages Blizzard classiques",
@@ -222,6 +234,8 @@ lib.LOCALES = {
 		configCenterControlSlider = "Cursore",
 		configCenterCurrent = "Attuale",
 		configCenterDashboard = "Panoramica",
+		configCenterDensityComfortable = "Comoda",
+		configCenterDensityCompact = "Compatta",
 		configCenterDropdownFallbackDesc = "Scegli una delle opzioni disponibili.",
 		configCenterInputFallbackDesc = "Inserisci il valore usato da questa impostazione.",
 		configCenterLegacyBlizzard = "Impostazioni Blizzard classiche",
@@ -250,6 +264,8 @@ lib.LOCALES = {
 		configCenterControlSlider = "슬라이더",
 		configCenterCurrent = "현재",
 		configCenterDashboard = "대시보드",
+		configCenterDensityComfortable = "여유",
+		configCenterDensityCompact = "간결",
 		configCenterDropdownFallbackDesc = "사용 가능한 옵션 중 하나를 선택합니다.",
 		configCenterInputFallbackDesc = "이 설정에서 사용할 값을 입력합니다.",
 		configCenterLegacyBlizzard = "기존 Blizzard 설정",
@@ -278,6 +294,8 @@ lib.LOCALES = {
 		configCenterControlSlider = "Controle deslizante",
 		configCenterCurrent = "Atual",
 		configCenterDashboard = "Painel",
+		configCenterDensityComfortable = "Confortável",
+		configCenterDensityCompact = "Compacto",
 		configCenterDropdownFallbackDesc = "Escolha uma das opções disponíveis.",
 		configCenterInputFallbackDesc = "Digite o valor usado por esta configuração.",
 		configCenterLegacyBlizzard = "Configurações clássicas da Blizzard",
@@ -306,6 +324,8 @@ lib.LOCALES = {
 		configCenterControlSlider = "Ползунок",
 		configCenterCurrent = "Текущее",
 		configCenterDashboard = "Панель",
+		configCenterDensityComfortable = "Удобно",
+		configCenterDensityCompact = "Компактно",
 		configCenterDropdownFallbackDesc = "Выберите один из доступных вариантов.",
 		configCenterInputFallbackDesc = "Введите значение для этого параметра.",
 		configCenterLegacyBlizzard = "Старые настройки Blizzard",
@@ -334,6 +354,8 @@ lib.LOCALES = {
 		configCenterControlSlider = "滑块",
 		configCenterCurrent = "当前",
 		configCenterDashboard = "仪表盘",
+		configCenterDensityComfortable = "舒适",
+		configCenterDensityCompact = "紧凑",
 		configCenterDropdownFallbackDesc = "选择一个可用选项。",
 		configCenterInputFallbackDesc = "输入此设置使用的值。",
 		configCenterLegacyBlizzard = "旧版 Blizzard 设置",
@@ -362,6 +384,8 @@ lib.LOCALES = {
 		configCenterControlSlider = "滑桿",
 		configCenterCurrent = "目前",
 		configCenterDashboard = "儀表板",
+		configCenterDensityComfortable = "舒適",
+		configCenterDensityCompact = "精簡",
 		configCenterDropdownFallbackDesc = "選擇一個可用選項。",
 		configCenterInputFallbackDesc = "輸入此設定使用的值。",
 		configCenterLegacyBlizzard = "舊版 Blizzard 設定",
@@ -903,9 +927,28 @@ local function hasUsefulDescription(control)
 	return type(control and control.description) == "string" and control.description:gsub("%s+", "") ~= ""
 end
 
-local function getSettingRowHeight(control)
+function lib.IsCompactDensity(state)
+	return state and state.density == "compact"
+end
+
+local function getSettingRowHeight(control, state)
 	local layoutType = getControlLayoutType(control)
 	local controlType = getControlType(control)
+	if lib.IsCompactDensity(state) then
+		if layoutType == "boolean" then
+			return 44
+		end
+		if controlType == "slider" then
+			return 66
+		end
+		if controlType == "coloroverrides" then
+			return lib.GetColorOverridesRowHeight(control)
+		end
+		if layoutType == "stacked" then
+			return 62
+		end
+		return 64
+	end
 	if layoutType == "boolean" then
 		return BOOLEAN_ROW_HEIGHT
 	end
@@ -1200,6 +1243,22 @@ function lib.CompactDescription(text)
 	return text:sub(1, 115):gsub("%s+%S*$", "") .. "..."
 end
 
+function lib.GetDensityLabel(app, density)
+	local L = getLocale(app)
+	if density == "compact" then
+		return L["configCenterDensityCompact"] or "Compact"
+	end
+	return L["configCenterDensityComfortable"] or "Comfortable"
+end
+
+function lib.UpdateDensityButton(frame, state)
+	if not frame or not frame.DensityButton then
+		return
+	end
+	local label = lib.GetDensityLabel(state and state.app, state and state.density)
+	frame.DensityButton.Text:SetText(label)
+end
+
 function lib.GetPageAboutText(app, page)
 	return getPageDescription(app, page)
 end
@@ -1329,8 +1388,25 @@ function lib.HideControlNotePanel(state)
 	end
 end
 
-function lib.ShowControlNotePanel(state, row, control)
+function lib.GetControlHoverNotes(state, control)
 	local notes = lib.NormalizeNoteList(control)
+	if lib.IsCompactDensity(state) and hasUsefulDescription(control) then
+		local exists = false
+		for _, note in ipairs(notes) do
+			if note.text == control.description then
+				exists = true
+				break
+			end
+		end
+		if not exists then
+			notes[#notes + 1] = { text = control.description, order = -1000 }
+		end
+	end
+	return notes
+end
+
+function lib.ShowControlNotePanel(state, row, control)
+	local notes = lib.GetControlHoverNotes(state, control)
 	if #notes == 0 or not state or not state.frame or not row then
 		return
 	end
@@ -1382,7 +1458,7 @@ function lib.ShowControlNotePanel(state, row, control)
 end
 
 function lib.AttachControlNoteHover(row, state, control)
-	local notes = lib.NormalizeNoteList(control)
+	local notes = lib.GetControlHoverNotes(state, control)
 	if #notes == 0 then
 		return
 	end
@@ -3103,7 +3179,8 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 	local _ = pathText
 	local controlType = getControlType(control)
 	local layoutType = getControlLayoutType(control)
-	local rowHeight = getSettingRowHeight(control)
+	local compact = lib.IsCompactDensity(state)
+	local rowHeight = getSettingRowHeight(control, state)
 	local rowWidth = width or parent and (parent:GetWidth() - 24) or state.pageLeftWidth or state.contentWidth or 620
 	local row
 	if parent then
@@ -3148,13 +3225,23 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 	end
 	local desc = createText(row, FONT_MUTED, descText or "", TEXT.muted)
 	desc.Text:SetWordWrap(true)
+	if compact then
+		desc:Hide()
+	end
 	local hasNewBadge = lib.IsControlNew(app, control)
 
 	if layoutType == "boolean" then
-		title:SetPoint("RIGHT", row, "RIGHT", hasNewBadge and -154 or -88, 0)
-		desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -5)
-		desc:SetPoint("RIGHT", row, "RIGHT", -88, 0)
-		desc:SetHeight(30)
+		if compact then
+			title:ClearAllPoints()
+			title:SetPoint("LEFT", row, "LEFT", textLeft, 0)
+			title:SetPoint("RIGHT", row, "RIGHT", hasNewBadge and -154 or -88, 0)
+			title:SetHeight(20)
+		else
+			title:SetPoint("RIGHT", row, "RIGHT", hasNewBadge and -154 or -88, 0)
+			desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -5)
+			desc:SetPoint("RIGHT", row, "RIGHT", -88, 0)
+			desc:SetHeight(30)
+		end
 		addToggleWidget(row, app, control)
 	elseif layoutType == "stacked" then
 		local valueWidth = controlType == "slider" and 96 or 0
@@ -3167,7 +3254,7 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 		local controlWidth = getFieldControlWidth(rowWidth)
 		if controlType == "slider" then
 			local hasDescription = hasUsefulDescription(control)
-			if hasDescription then
+			if hasDescription and not compact then
 				desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -2)
 				desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
 				desc:SetHeight(22)
@@ -3180,7 +3267,7 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 			local hasRangeLabels = control.min ~= nil or control.max ~= nil
 			local labelWidth = hasRangeLabels and SLIDER_SCALE_LABEL_WIDTH or 0
 			local sliderGap = hasRangeLabels and SLIDER_SCALE_GAP or 0
-			local sliderY = 10
+			local sliderY = compact and 8 or 10
 			local sliderWidth = getSliderControlWidth(rowWidth, labelWidth, sliderGap)
 			local slider = addSliderWidget(row, app, control, {
 				point = { "BOTTOMLEFT", row, "BOTTOMLEFT", FIELD_CONTROL_LEFT + labelWidth + sliderGap, sliderY },
@@ -3200,10 +3287,12 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 				maxLabel.Text:SetJustifyV("MIDDLE")
 			end
 		elseif controlType == "dropdown" or controlType == "sounddropdown" then
-			desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
-			desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
-			desc:SetHeight(32)
-			local controlPoint = { "BOTTOMLEFT", row, "BOTTOMLEFT", FIELD_CONTROL_LEFT, 15 }
+			if not compact then
+				desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
+				desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+				desc:SetHeight(32)
+			end
+			local controlPoint = { "BOTTOMLEFT", row, "BOTTOMLEFT", FIELD_CONTROL_LEFT, compact and 8 or 15 }
 			addDropdownWidget(row, app, control, {
 				point = controlPoint,
 				width = controlWidth,
@@ -3213,10 +3302,12 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 				},
 			})
 		elseif controlType == "multidropdown" then
-			desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
-			desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
-			desc:SetHeight(32)
-			local controlPoint = { "BOTTOMLEFT", row, "BOTTOMLEFT", FIELD_CONTROL_LEFT, 15 }
+			if not compact then
+				desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
+				desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+				desc:SetHeight(32)
+			end
+			local controlPoint = { "BOTTOMLEFT", row, "BOTTOMLEFT", FIELD_CONTROL_LEFT, compact and 8 or 15 }
 			addMultiDropdownWidget(row, app, control, {
 				point = controlPoint,
 				width = controlWidth,
@@ -3227,13 +3318,15 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 			})
 		elseif controlType == "checkboxdropdown" then
 			title:SetPoint("RIGHT", row, "RIGHT", -88, 0)
-			desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
-			desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
-			desc:SetHeight(32)
+			if not compact then
+				desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
+				desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+				desc:SetHeight(32)
+			end
 			addToggleWidget(row, app, control, {
 				point = { "TOPRIGHT", row, "TOPRIGHT", -16, -12 },
 			})
-			local controlPoint = { "BOTTOMLEFT", row, "BOTTOMLEFT", FIELD_CONTROL_LEFT, 15 }
+			local controlPoint = { "BOTTOMLEFT", row, "BOTTOMLEFT", FIELD_CONTROL_LEFT, compact and 8 or 15 }
 			addDropdownWidget(row, app, control, {
 				point = controlPoint,
 				width = controlWidth,
@@ -3253,19 +3346,23 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 				row.value.Text:SetText(lib.GetCheckboxDropdownText(app, control))
 			end
 		elseif controlType == "input" then
-			desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
-			desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
-			desc:SetHeight(32)
-			local controlPoint = { "BOTTOMLEFT", row, "BOTTOMLEFT", FIELD_CONTROL_LEFT, 15 }
+			if not compact then
+				desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
+				desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+				desc:SetHeight(32)
+			end
+			local controlPoint = { "BOTTOMLEFT", row, "BOTTOMLEFT", FIELD_CONTROL_LEFT, compact and 8 or 15 }
 			addInputWidget(row, app, control, {
 				point = controlPoint,
 				width = controlWidth,
 			})
 		elseif controlType == "colorpicker" then
-			desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
-			desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
-			desc:SetHeight(32)
-			local controlPoint = { "BOTTOMLEFT", row, "BOTTOMLEFT", FIELD_CONTROL_LEFT, 15 }
+			if not compact then
+				desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
+				desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+				desc:SetHeight(32)
+			end
+			local controlPoint = { "BOTTOMLEFT", row, "BOTTOMLEFT", FIELD_CONTROL_LEFT, compact and 8 or 15 }
 			addColorWidget(row, app, control, {
 				point = controlPoint,
 				configure = {
@@ -3290,11 +3387,13 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 		})
 	elseif controlType == "button" then
 		title:SetPoint("RIGHT", row, "RIGHT", hasNewBadge and -154 or -18, 0)
-		desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
-		desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
-		desc:SetHeight(36)
+		if not compact then
+			desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
+			desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+			desc:SetHeight(36)
+		end
 		local button = makeFlatButton(row, control.buttonText or (_G.OKAY or "OK"), 112, 26)
-		button:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -14, 14)
+		button:SetPoint(compact and "RIGHT" or "BOTTOMRIGHT", row, compact and "RIGHT" or "BOTTOMRIGHT", -14, compact and 0 or 14)
 		row.actionButton = button
 		button:SetScript("OnClick", function()
 			if not app:IsControlEnabled(control) then
@@ -3308,12 +3407,14 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 		end)
 	else
 		title:SetPoint("RIGHT", row, "RIGHT", hasNewBadge and -154 or -18, 0)
-		desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
-		desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
-		desc:SetHeight(36)
+		if not compact then
+			desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
+			desc:SetPoint("RIGHT", row, "RIGHT", -18, 0)
+			desc:SetHeight(36)
+		end
 		local fallbackText = controlType == "keybind" and control.buttonText or nil
 		addConfigureFallback(row, app, control, fallbackText, {
-			point = { "BOTTOMRIGHT", row, "BOTTOMRIGHT", -14, 14 },
+			point = compact and { "RIGHT", row, "RIGHT", -14, 0 } or { "BOTTOMRIGHT", row, "BOTTOMRIGHT", -14, 14 },
 			width = 150,
 		})
 		local badgeText = controlType == "keybind" and (_G.KEY_BINDINGS or "Key Bindings") or (control.level == "advanced" and "Advanced" or "Legacy")
@@ -3912,7 +4013,7 @@ local function addGroupSection(state, group, pagePath)
 	local controlsHeight = 0
 	if not collapsed then
 		for _, control in ipairs(group.controls) do
-			controlsHeight = controlsHeight + getSettingRowHeight(control)
+			controlsHeight = controlsHeight + getSettingRowHeight(control, state)
 		end
 	end
 	local rowGap = collapsed and 0 or math.max(#group.controls - 1, 0) * 2
@@ -3949,7 +4050,7 @@ local function addGroupSection(state, group, pagePath)
 	if not collapsed then
 		local y = -46
 		for index, control in ipairs(group.controls) do
-			local rowHeight = getSettingRowHeight(control)
+			local rowHeight = getSettingRowHeight(control, state)
 			local rowWidth = (state.pageSectionWidth or state.pageLeftWidth or 420) - 24
 			local row = addSettingRow(state, control, pagePath, section, y, rowWidth)
 			if index == #group.controls and row.Separator then
@@ -4198,7 +4299,7 @@ local function renderSearch(state, query)
 			end)
 			state.y = state.y - 8
 		else
-			local rowHeight = getSettingRowHeight(control)
+			local rowHeight = getSettingRowHeight(control, state)
 			local card = createContentFrame(state, rowHeight + 52)
 			applyBackdrop(card, CARD_BG, CARD_BORDER)
 			createPixelBorder(card, CARD_BORDER)
@@ -4441,7 +4542,58 @@ function StateMixin:SetPage(pageID, focusControlID)
 	self:RenderContent()
 end
 
+function StateMixin:SetDensity(density)
+	density = density == "compact" and "compact" or "comfortable"
+	if self.density == density then
+		return
+	end
+	self:SaveCurrentContentScroll()
+	self.density = density
+	if self.app and self.app.opts and type(self.app.opts.setDensity) == "function" then
+		pcall(self.app.opts.setDensity, density)
+	end
+	lib._densityByApp = lib._densityByApp or {}
+	lib._densityByApp[self.app.id or self.app.title or "default"] = density
+	lib.UpdateDensityButton(self.frame, self)
+	self.restoreContentScrollKey = self:GetContentScrollKey()
+	self.resetContentScroll = true
+	self:RenderContent()
+end
+
+function lib.GetStoredFrameSize(app)
+	if app and app.opts and type(app.opts.getSize) == "function" then
+		local ok, width, height = pcall(app.opts.getSize)
+		if ok then
+			width = tonumber(width)
+			height = tonumber(height)
+			if width and height then
+				return width, height
+			end
+		end
+	end
+	local savedSize = lib._sizeByApp and lib._sizeByApp[app.id or app.title or "default"]
+	return savedSize and tonumber(savedSize.width), savedSize and tonumber(savedSize.height)
+end
+
+function lib.SaveFrameSize(app, width, height)
+	width = math.max(PAGE_LAYOUT.windowMinWidth, tonumber(width) or WINDOW_WIDTH)
+	height = math.max(PAGE_LAYOUT.windowMinHeight, tonumber(height) or WINDOW_HEIGHT)
+	lib._sizeByApp = lib._sizeByApp or {}
+	lib._sizeByApp[app.id or app.title or "default"] = { width = width, height = height }
+	if app and app.opts and type(app.opts.setSize) == "function" then
+		pcall(app.opts.setSize, width, height)
+	end
+end
+
 local function initializeState(frame, app)
+	local density
+	if app and app.opts and type(app.opts.getDensity) == "function" then
+		local ok, value = pcall(app.opts.getDensity)
+		if ok and (value == "compact" or value == "comfortable") then
+			density = value
+		end
+	end
+	density = density or (lib._densityByApp and lib._densityByApp[app.id or app.title or "default"]) or "comfortable"
 	local state = {
 		app = app,
 		frame = frame,
@@ -4456,6 +4608,7 @@ local function initializeState(frame, app)
 		view = "dashboard",
 		selectedCategoryID = nil,
 		selectedPageID = nil,
+		density = density,
 		y = -2,
 		sidebarY = -6,
 	}
@@ -4476,10 +4629,22 @@ local function createFrame(app)
 	local contentGap = 12
 	local contentTop = topInset + topBarHeight + contentGap
 	local frame = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
-	frame:SetSize(WINDOW_WIDTH, WINDOW_HEIGHT)
+	local storedWidth, storedHeight = lib.GetStoredFrameSize(app)
+	local savedWidth = math.max(PAGE_LAYOUT.windowMinWidth, storedWidth or WINDOW_WIDTH)
+	local savedHeight = math.max(PAGE_LAYOUT.windowMinHeight, storedHeight or WINDOW_HEIGHT)
+	frame:SetSize(savedWidth, savedHeight)
 	frame:SetPoint("CENTER")
 	frame:SetFrameStrata("HIGH")
 	frame:SetMovable(true)
+	if frame.SetResizable then
+		frame:SetResizable(true)
+	end
+	if frame.SetResizeBounds then
+		frame:SetResizeBounds(PAGE_LAYOUT.windowMinWidth, PAGE_LAYOUT.windowMinHeight, math.max(PAGE_LAYOUT.windowMinWidth, (UIParent:GetWidth() or WINDOW_WIDTH) - 80), math.max(PAGE_LAYOUT.windowMinHeight, (UIParent:GetHeight() or WINDOW_HEIGHT) - 80))
+	elseif frame.SetMinResize and frame.SetMaxResize then
+		frame:SetMinResize(PAGE_LAYOUT.windowMinWidth, PAGE_LAYOUT.windowMinHeight)
+		frame:SetMaxResize(math.max(PAGE_LAYOUT.windowMinWidth, (UIParent:GetWidth() or WINDOW_WIDTH) - 80), math.max(PAGE_LAYOUT.windowMinHeight, (UIParent:GetHeight() or WINDOW_HEIGHT) - 80))
+	end
 	frame:EnableMouse(true)
 	frame:RegisterForDrag("LeftButton")
 	frame:SetScript("OnDragStart", frame.StartMoving)
@@ -4521,7 +4686,7 @@ local function createFrame(app)
 
 	frame.Title = frame.TopBar:CreateFontString(nil, "OVERLAY", FONT_TITLE)
 	frame.Title:SetPoint("LEFT", frame.HeaderIcon, "RIGHT", 10, 0)
-	frame.Title:SetPoint("RIGHT", frame.TopBar, "RIGHT", -470, 0)
+	frame.Title:SetPoint("RIGHT", frame.TopBar, "RIGHT", -600, 0)
 	frame.Title:SetJustifyH("LEFT")
 	frame.Title:SetText(app.opts and app.opts.settingsTitle or L["configCenterTitle"] or (getAppTitle(app) .. " Settings"))
 	frame.Title:SetShadowColor(0, 0, 0, 0.95)
@@ -4560,9 +4725,20 @@ local function createFrame(app)
 		setFrameBackdrop(self, { 0.120, 0.105, 0.075, 0.95 }, { 0.55, 0.42, 0.18, 0.82 })
 	end)
 
+	frame.DensityButton = makeFlatButton(frame.TopBar, L["configCenterDensityComfortable"] or "Comfortable", 118, 28)
+	frame.DensityButton:SetPoint("RIGHT", frame.ResetButton, "LEFT", -12, 0)
+	setFrameBackdrop(frame.DensityButton, { 0.100, 0.090, 0.070, 0.88 }, { 0.46, 0.36, 0.18, 0.70 })
+	setTextColor(frame.DensityButton.Text, TEXT.topbarGold)
+	frame.DensityButton:SetScript("OnEnter", function(self)
+		setFrameBackdrop(self, { 0.165, 0.135, 0.080, 0.98 }, CARD_BORDER_HOVER)
+	end)
+	frame.DensityButton:SetScript("OnLeave", function(self)
+		setFrameBackdrop(self, { 0.100, 0.090, 0.070, 0.88 }, { 0.46, 0.36, 0.18, 0.70 })
+	end)
+
 	frame.SearchShell = CreateFrame("Frame", nil, frame.TopBar, "BackdropTemplate")
 	frame.SearchShell:SetSize(286, 28)
-	frame.SearchShell:SetPoint("RIGHT", frame.ResetButton, "LEFT", -12, 0)
+	frame.SearchShell:SetPoint("RIGHT", frame.DensityButton, "LEFT", -12, 0)
 	applyBackdrop(frame.SearchShell, { 0.035, 0.034, 0.032, 0.95 }, { 0.30, 0.28, 0.22, 0.90 })
 
 	frame.SearchIcon = frame.SearchShell:CreateTexture(nil, "OVERLAY")
@@ -4652,6 +4828,84 @@ local function createFrame(app)
 	frame.LegacyButton:SetPoint("BOTTOMLEFT", frame.SidebarShell, "BOTTOMLEFT", 8, 11)
 	frame.LegacyButton:SetScript("OnClick", function() openLegacySettings(app) end)
 
+	frame.ResizeGrip = CreateFrame("Button", nil, frame)
+	frame.ResizeGrip:SetSize(22, 22)
+	frame.ResizeGrip:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 17, -12)
+	frame.ResizeGrip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+	frame.ResizeGrip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight", "ADD")
+	frame.ResizeGrip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+	if frame.ResizeGrip:GetNormalTexture() then
+		frame.ResizeGrip:GetNormalTexture():SetVertexColor(TEXT.gold[1], TEXT.gold[2], TEXT.gold[3], 0.62)
+	end
+	if frame.ResizeGrip:GetHighlightTexture() then
+		frame.ResizeGrip:GetHighlightTexture():SetVertexColor(TEXT.gold[1], TEXT.gold[2], TEXT.gold[3], 0.92)
+	end
+	if frame.ResizeGrip:GetPushedTexture() then
+		frame.ResizeGrip:GetPushedTexture():SetVertexColor(TEXT.gold[1], TEXT.gold[2], TEXT.gold[3], 0.82)
+	end
+	frame.ResizeGrip:SetScript("OnEnter", function(self)
+		if self:GetNormalTexture() then
+			self:GetNormalTexture():SetVertexColor(TEXT.gold[1], TEXT.gold[2], TEXT.gold[3], 0.82)
+		end
+	end)
+	frame.ResizeGrip:SetScript("OnLeave", function(self)
+		if self:GetNormalTexture() then
+			self:GetNormalTexture():SetVertexColor(TEXT.gold[1], TEXT.gold[2], TEXT.gold[3], 0.62)
+		end
+	end)
+	frame.ResizeGrip:SetScript("OnMouseDown", function(self)
+		self._eqolResizing = true
+		self._eqolStartWidth = frame:GetWidth()
+		self._eqolStartHeight = frame:GetHeight()
+		self._eqolLastWidth = self._eqolStartWidth
+		self._eqolLastHeight = self._eqolStartHeight
+		self._eqolRenderElapsed = 0
+		local cursorX, cursorY = GetCursorPosition()
+		local scale = UIParent and UIParent.GetEffectiveScale and UIParent:GetEffectiveScale() or 1
+		self._eqolStartCursorX = cursorX / scale
+		self._eqolStartCursorY = cursorY / scale
+		self._eqolAnchorLeft = frame:GetLeft()
+		self._eqolAnchorTop = frame:GetTop()
+		if self._eqolAnchorLeft and self._eqolAnchorTop then
+			frame:ClearAllPoints()
+			frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", self._eqolAnchorLeft, self._eqolAnchorTop)
+		end
+	end)
+	frame.ResizeGrip:SetScript("OnMouseUp", function(self)
+		self._eqolResizing = nil
+		lib.SaveFrameSize(app, frame:GetWidth(), frame:GetHeight())
+		if frame._LibEQOLConfigState then
+			frame._LibEQOLConfigState:RenderContent()
+		end
+	end)
+	frame.ResizeGrip:SetScript("OnHide", function(self)
+		self._eqolResizing = nil
+	end)
+	frame.ResizeGrip:SetScript("OnUpdate", function(self, elapsed)
+		if not self._eqolResizing then
+			return
+		end
+		self._eqolRenderElapsed = (self._eqolRenderElapsed or 0) + (elapsed or 0)
+		if self._eqolRenderElapsed < 0.04 then
+			return
+		end
+		self._eqolRenderElapsed = 0
+		local cursorX, cursorY = GetCursorPosition()
+		local scale = UIParent and UIParent.GetEffectiveScale and UIParent:GetEffectiveScale() or 1
+		cursorX = cursorX / scale
+		cursorY = cursorY / scale
+		local width = math.max(PAGE_LAYOUT.windowMinWidth, (self._eqolStartWidth or WINDOW_WIDTH) + (cursorX - (self._eqolStartCursorX or cursorX)))
+		local height = math.max(PAGE_LAYOUT.windowMinHeight, (self._eqolStartHeight or WINDOW_HEIGHT) - (cursorY - (self._eqolStartCursorY or cursorY)))
+		if width ~= self._eqolLastWidth or height ~= self._eqolLastHeight then
+			self._eqolLastWidth = width
+			self._eqolLastHeight = height
+			frame:SetSize(width, height)
+			if frame._LibEQOLConfigState then
+				updateContentMetrics(frame._LibEQOLConfigState)
+			end
+		end
+	end)
+
 	frame.ContentShell = CreateFrame("Frame", nil, frame, "BackdropTemplate")
 	frame.ContentShell:SetPoint("TOPLEFT", frame.SidebarShell, "TOPRIGHT", 8, 0)
 	frame.ContentShell:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -outerInsetRight, outerInsetY)
@@ -4688,8 +4942,13 @@ local function createFrame(app)
 	frame.ResetButton:SetScript("OnClick", function()
 		confirmResetCurrentPage(state)
 	end)
+	frame.DensityButton:SetScript("OnClick", function()
+		state:SetDensity(lib.IsCompactDensity(state) and "comfortable" or "compact")
+	end)
+	lib.UpdateDensityButton(frame, state)
 	frame:SetScript("OnSizeChanged", function()
-		if frame:IsShown() then
+		lib.SaveFrameSize(app, frame:GetWidth(), frame:GetHeight())
+		if frame:IsShown() and not (frame.ResizeGrip and frame.ResizeGrip._eqolResizing) then
 			state:RenderContent()
 		end
 	end)

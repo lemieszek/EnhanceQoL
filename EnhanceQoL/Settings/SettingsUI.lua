@@ -278,6 +278,26 @@ local function ensureConfigApp()
 		pageDescriptionKeys = pageDescriptionKeysByStableID,
 		addonFolder = addonName,
 		assetRoot = "Interface\\AddOns\\EnhanceQoL\\libs\\LibSettingsDesigner\\Assets\\",
+		getDensity = function()
+			return addon.db and addon.db.configCenterDensity or "comfortable"
+		end,
+		setDensity = function(value)
+			if not addon.db then return end
+			addon.db.configCenterDensity = value == "compact" and "compact" or "comfortable"
+		end,
+		getSize = function()
+			local size = addon.db and addon.db.configCenterSize
+			if type(size) == "table" then
+				return size.width, size.height
+			end
+		end,
+		setSize = function(width, height)
+			if not addon.db then return end
+			addon.db.configCenterSize = {
+				width = width,
+				height = height,
+			}
+		end,
 		categoryIconTextures = {
 			dashboard = newSettingsAsset("Cogwheel.tga"),
 			economy = newSettingsAsset("Economy.tga"),
