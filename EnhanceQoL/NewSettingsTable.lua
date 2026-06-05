@@ -9,6 +9,9 @@ addon.variables.NewVersionTableEQOL = {
 	EQOL_damageMeterEnabled = true,
 	EQOL_damageMeterUpdateRate = true,
 
+	-- 11.0.0-alpha4 Guild bank repair contexts
+	EQOL_autoRepairGuildBankContexts = true,
+
 	-- 10.21.0 Profile import protection
 	EQOL_ProfilesAddOn = true,
 	EQOL_importProtection = true,

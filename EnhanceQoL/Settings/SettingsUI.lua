@@ -175,6 +175,98 @@ local function splitVersionBadge(version)
 	return version, nil
 end
 
+local function showConfigCenterCopyURL(url)
+	if not StaticPopupDialogs["ENHANCEQOL_COPY_URL"] then
+		StaticPopupDialogs["ENHANCEQOL_COPY_URL"] = {
+			text = L["copyUrlPopupText"],
+			button1 = OKAY,
+			hasEditBox = true,
+			timeout = 0,
+			whileDead = true,
+			hideOnEscape = true,
+			preferredIndex = 3,
+			OnShow = function(self, data)
+				local editBox = self.editBox or self.GetEditBox and self:GetEditBox()
+				if not editBox then return end
+				editBox:SetAutoFocus(true)
+				editBox:SetText(data or "")
+				editBox:HighlightText()
+				editBox:SetCursorPosition(0)
+			end,
+			EditBoxOnEscapePressed = function(self) self:GetParent():Hide() end,
+		}
+	end
+	StaticPopup_Show("ENHANCEQOL_COPY_URL", nil, nil, url)
+end
+
+local function getConfigCenterSlashCommandContent()
+	local settingEnabledNote = L["rootSlashCommandNoteSettingEnabled"] or "Only if enabled in settings."
+	local macroNote = L["rootSlashCommandNoteUseInMacro"] or "Use this in a macro."
+	return {
+		{
+			title = L["rootSlashCommandsHeader"] or "Slash Commands",
+			entries = {
+				{ type = "text", text = L["rootSlashCommandsDesc"] or "Type these in chat." },
+				{ type = "text", text = L["rootSlashCommandsConflictDesc"] or "Aliases may be taken by another add-on." },
+			},
+		},
+		{
+			title = L["General"] or "General",
+			entries = {
+				{ type = "command", commands = { "/eqol" }, desc = L["rootSlashCommandSettingsDesc"] or "Open the EnhanceQoL settings." },
+				{ type = "command", commands = { "/rl" }, desc = L["rootSlashCommandReloadUIDesc"] or "Reload UI.", note = settingEnabledNote },
+			},
+		},
+		{
+			title = L["rootSlashCommandsUIHeader"] or "UI & Editors",
+			entries = {
+				{ type = "command", commands = { "/ecd", "/cpe" }, desc = L["rootSlashCommandCooldownPanelsDesc"] or "Open the Cooldown Panels editor." },
+				{ type = "command", commands = { "/cdm", "/wa" }, desc = L["rootSlashCommandCooldownViewerDesc"] or "Open the Blizzard Cooldown Viewer settings.", note = settingEnabledNote },
+				{ type = "command", commands = { "/em", "/edit", "/editmode" }, desc = L["rootSlashCommandEditModeDesc"] or "Open Edit Mode.", note = settingEnabledNote },
+				{ type = "command", commands = { "/kb" }, desc = L["rootSlashCommandQuickKeybindDesc"] or "Open Quick Keybind Mode.", note = settingEnabledNote },
+				{ type = "command", commands = { "/ccb", "/clickcast" }, desc = L["rootSlashCommandClickCastDesc"] or "Open Click Cast Bindings.", note = settingEnabledNote },
+			},
+		},
+		{
+			title = L["Unit Frames"] or "Unit Frames",
+			entries = {
+				{ type = "command", commands = { "/eqol hbp" }, desc = L["rootSlashCommandHealerBuffPlacementDesc"] or "Open the healer buff placement editor for party or raid frames." },
+			},
+		},
+		{
+			title = L["rootSlashCommandsNavigationHeader"] or "Navigation & Group",
+			entries = {
+				{ type = "command", commands = { "/way" }, usage = " [mapID] 37.8 61.2", desc = L["rootSlashCommandWayDesc"] or "Set a waypoint on the world map.", note = settingEnabledNote },
+				{ type = "command", commands = { "/pull" }, usage = " [seconds]", desc = L["rootSlashCommandPullTimerDesc"] or "Start the Blizzard pull countdown.", note = settingEnabledNote },
+			},
+		},
+		{
+			title = L["rootSlashCommandsMacroHeader"] or "Macro Examples",
+			entries = {
+				{ type = "command", commands = { "/click EQOLRandomHearthstoneButton LeftButton 1" }, desc = L["rootSlashCommandRandomHearthstoneDesc"] or "Use random hearthstone." },
+				{ type = "command", commands = { "/click EQOLRandomMountButton LeftButton 1" }, desc = L["rootSlashCommandRandomMountDesc"] or "Use random mount." },
+				{ type = "command", commands = { "/click EQOLRepairMountButton LeftButton 1" }, desc = L["rootSlashCommandRepairMountDesc"] or "Use repair mount.", note = macroNote },
+				{ type = "command", commands = { "/click EQOLAuctionMountButton LeftButton 1" }, desc = L["rootSlashCommandAuctionMountDesc"] or "Use Auction House mount.", note = macroNote },
+			},
+		},
+		{
+			title = L["rootSlashCommandsSocialHeader"] or "Chat & Social",
+			entries = {
+				{ type = "command", commands = { "/eim" }, desc = L["rootSlashCommandInstantMessengerDesc"] or "Open the Instant Messenger window.", note = L["rootSlashCommandNoteChatIMEnabled"] or "Only if Instant Messenger is enabled." },
+				{ type = "command", commands = { "/eil" }, desc = L["rootSlashCommandIgnoreDesc"] or "Open the enhanced ignore list.", note = L["rootSlashCommandNoteIgnoreEnabled"] or "Only if Ignore is enabled." },
+			},
+		},
+		{
+			title = L["rootSlashCommandsDiagnosticsHeader"] or "Diagnostics & Utilities",
+			entries = {
+				{ type = "command", commands = { "/eqol aag" }, usage = " <gossipOptionID>", desc = L["rootSlashCommandAutoGossipAddDesc"] or "Add a gossip option ID to the auto-select list." },
+				{ type = "command", commands = { "/eqol rag" }, usage = " <gossipOptionID>", desc = L["rootSlashCommandAutoGossipRemoveDesc"] or "Remove a gossip option ID from the auto-select list." },
+				{ type = "command", commands = { "/eqol lag" }, desc = L["rootSlashCommandAutoGossipListDesc"] or "List the gossip option IDs from the current gossip window." },
+			},
+		},
+	}
+end
+
 local function ensureConfigApp()
 	if addon.ConfigApp or not ConfigLib then return addon.ConfigApp end
 
@@ -288,16 +380,13 @@ local function ensureConfigApp()
 						title = L["configCenterQuickReference"],
 						description = L["configCenterQuickReferenceDesc"],
 						iconKey = "help",
+						pageID = "help.quick-reference",
 					},
 					{
 						title = L["configCenterSupportFeedback"],
 						description = L["configCenterSupportFeedbackDesc"],
 						iconKey = "support",
-						onClick = function()
-							if Settings and Settings.OpenToCategory and addon.SettingsLayout and addon.SettingsLayout.rootCategory then
-								Settings.OpenToCategory(addon.SettingsLayout.rootCategory:GetID())
-							end
-						end,
+						pageID = "help.support-feedback",
 					},
 				},
 				status = {
@@ -405,6 +494,37 @@ local function ensureConfigApp()
 	app:RegisterCategory({ id = "sound", title = _G["SOUND"] or "Sound", order = 600, iconAtlas = "poi-door-arrow-down" })
 	app:RegisterCategory({ id = "suites", title = L["configCenterSuites"] or "EQoL Suites", order = 700, iconAtlas = "communities-icon-notification" })
 	app:RegisterCategory({ id = "profiles", title = L["Profiles"] or "Profiles", order = 800, iconAtlas = "services-icon-warning" })
+	app:RegisterPage({
+		id = "help.quick-reference",
+		title = L["configCenterQuickReference"],
+		description = L["configCenterQuickReferenceDesc"],
+		iconKey = "help",
+		layout = "info",
+		content = getConfigCenterSlashCommandContent(),
+	})
+	app:RegisterPage({
+		id = "help.support-feedback",
+		title = L["configCenterSupportFeedback"],
+		description = L["configCenterSupportFeedbackDesc"],
+		iconKey = "support",
+		layout = "info",
+		content = {
+			{
+				title = L["configCenterSupportDiscordTitle"],
+				entries = {
+					{ type = "text", text = L["configCenterSupportDiscordDesc"] },
+					{
+						type = "button",
+						text = L["configCenterSupportDiscordButton"],
+						width = 220,
+						onClick = function()
+							showConfigCenterCopyURL(L["configCenterSupportDiscordURL"] or "https://discord.gg/kqQfG9YhVn")
+						end,
+					},
+				},
+			},
+		},
+	})
 	app:SetDefaultPage("dashboard")
 
 	addon.ConfigApp = app
@@ -474,29 +594,68 @@ end
 
 local function createModernOnlySetting(key, cbData)
 	local setting = {}
+	local function valuesMatch(left, right)
+		if left == right then return true end
+		if type(left) == "number" or type(right) == "number" then
+			left = tonumber(left)
+			right = tonumber(right)
+			return left ~= nil and right ~= nil and math.abs(left - right) < 0.000001
+		end
+		return false
+	end
+	local function readValue()
+		if cbData and type(cbData.get) == "function" then
+			local ok, value = pcall(cbData.get)
+			if ok then return value, true end
+		end
+		if cbData and cbData.var and addon.db then
+			local value = addon.db[cbData.var]
+			if cbData.subvar then
+				if type(value) == "table" and value[cbData.subvar] ~= nil then
+					return value[cbData.subvar], true
+				end
+			elseif value ~= nil then
+				return value, true
+			end
+		end
+		if cbData and cbData.default ~= nil then
+			return cbData.default, true
+		end
+		return nil, false
+	end
+	local function writeValue(value)
+		if not (cbData and cbData.var) then return false end
+		addon.db = addon.db or {}
+		if cbData.subvar then
+			addon.db[cbData.var] = type(addon.db[cbData.var]) == "table" and addon.db[cbData.var] or {}
+			addon.db[cbData.var][cbData.subvar] = value
+		else
+			addon.db[cbData.var] = value
+		end
+		return true
+	end
+	local function didPersist(value)
+		local current, known = readValue()
+		return known and valuesMatch(current, value)
+	end
 	local function setValue(value)
 		if cbData and type(cbData.func) == "function" then
-			cbData.func(value)
+			local ok = pcall(cbData.func, value)
+			if ok and didPersist(value) then return end
+			if ok and not (cbData.get or cbData.var) then return end
+			writeValue(value)
 		elseif cbData and type(cbData.set) == "function" then
-			cbData.set(nil, value)
-		elseif cbData and cbData.var then
-			addon.db = addon.db or {}
-			if cbData.subvar then
-				addon.db[cbData.var] = type(addon.db[cbData.var]) == "table" and addon.db[cbData.var] or {}
-				addon.db[cbData.var][cbData.subvar] = value
-			else
-				addon.db[cbData.var] = value
-			end
+			local ok = pcall(cbData.set, value, value)
+			if ok and didPersist(value) then return end
+			if ok and not (cbData.get or cbData.var) then return end
+			writeValue(value)
+		else
+			writeValue(value)
 		end
 	end
 	function setting:GetValue()
-		if cbData and type(cbData.get) == "function" then return cbData.get() end
-		if cbData and cbData.var and addon.db then
-			local value = addon.db[cbData.var]
-			if cbData.subvar and type(value) == "table" then value = value[cbData.subvar] end
-			if value ~= nil then return value end
-		end
-		return cbData and cbData.default
+		local value = readValue()
+		return value
 	end
 	function setting:SetValue(value) setValue(value) end
 	function setting:GetVariable()

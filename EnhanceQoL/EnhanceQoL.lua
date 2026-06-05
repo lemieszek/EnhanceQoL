@@ -36,6 +36,15 @@ local TooltipUtil = _G.TooltipUtil
 local GetTime = GetTime
 local GetActiveQuestID = _G.GetActiveQuestID
 
+local AUTO_REPAIR_GUILD_BANK_CONTEXT_DEFAULTS = {
+	world = true,
+	party = true,
+	dungeon = true,
+	mythicPlus = true,
+	raid = true,
+	pvp = true,
+}
+
 local EQOL = select(2, ...)
 EQOL.C = {}
 
@@ -3443,6 +3452,7 @@ local function initMisc()
 	addon.functions.InitDBValue("hideRaidTools", false)
 	addon.functions.InitDBValue("autoRepair", false)
 	addon.functions.InitDBValue("autoRepairGuildBank", false)
+	addon.functions.InitDBValue("autoRepairGuildBankContexts", AUTO_REPAIR_GUILD_BANK_CONTEXT_DEFAULTS)
 	addon.functions.InitPrivateDBValue("autoWarbandGold", false)
 	addon.functions.InitPrivateDBValue("autoWarbandGoldTargetGold", 10000)
 	addon.functions.InitPrivateDBValue("autoWarbandGoldPerCharacter", {})
@@ -3545,11 +3555,34 @@ local function initMisc()
 		end
 	end
 
+	local function getCurrentAutoRepairGuildBankContext()
+		local inInstance, instanceType = false, nil
+		if IsInInstance then inInstance, instanceType = IsInInstance() end
+		local difficultyID = GetInstanceInfo and select(3, GetInstanceInfo()) or nil
+
+		if inInstance then
+			if instanceType == "raid" then return "raid" end
+			if instanceType == "party" then return difficultyID == 8 and "mythicPlus" or "dungeon" end
+			if instanceType == "pvp" or instanceType == "arena" then return "pvp" end
+		end
+
+		if IsInRaid and IsInRaid() then return "raid" end
+		if IsInGroup and IsInGroup() then return "party" end
+		return "world"
+	end
+
+	function addon.functions.ShouldUseGuildBankAutoRepairForCurrentContext()
+		local selection = addon.db and addon.db["autoRepairGuildBankContexts"]
+		if type(selection) ~= "table" then return true end
+		local context = getCurrentAutoRepairGuildBankContext()
+		return selection[context] == true
+	end
+
 	hooksecurefunc(MerchantFrame, "Show", function(self, button)
 		if addon.db["autoRepair"] and CanMerchantRepair() then
 			local repairAllCost = GetRepairAllCost()
 			if repairAllCost and repairAllCost > 0 then
-				local usedGuildBank = addon.db["autoRepairGuildBank"] and CanGuildBankRepair()
+				local usedGuildBank = addon.db["autoRepairGuildBank"] and CanGuildBankRepair() and addon.functions.ShouldUseGuildBankAutoRepairForCurrentContext()
 				if usedGuildBank then
 					RepairAllItems(true)
 				else

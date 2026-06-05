@@ -1,5 +1,23 @@
 # Changelog
 
+## [11.0.0-alpha4] - 2026-06-04
+
+### ✨ Added
+
+- Economy / Vendors: Added a Guild Bank repair context selector so automatic guild-bank repairs can be limited to World, Party, Dungeons, Mythic+, Raid, or PvP.
+- Settings Center: Added generic info pages for rich help content so add-ons can register text, command lists, action buttons, and images without creating fake settings rows.
+- Settings Center: Added a Quick Reference & Help page linked from the dashboard with EnhanceQoL slash commands and macro examples.
+- Settings Center: Added a Support & Feedback page linked from the dashboard with a copyable Discord invite.
+
+### 🔄 Changed
+
+- Settings Center: Dashboard help cards now open modern in-center pages instead of routing back to Blizzard Settings.
+
+### 🐛 Fixed
+
+- Settings Center: Lowered the main window strata so addon editors and dialog-style tools can layer above it consistently.
+- Settings Center: Fixed modern-only sliders and dropdowns not persisting changes when their setter used the modern single-value callback shape.
+
 ## [11.0.0-alpha3] - 2026-06-04
 
 ### ✨ Added

@@ -6,6 +6,18 @@ local mailboxContactsOrder = {}
 local moneyTrackerOrder = {}
 local warbandRemoveOrder = {}
 local warbandTargetOrder = {}
+local autoRepairGuildBankContextOptions = {
+	{ value = "world", text = L["World"] or WORLD or "World" },
+	{ value = "party", text = PARTY or "Party" },
+	{ value = "dungeon", text = DUNGEONS or "Dungeons" },
+	{ value = "mythicPlus", text = PLAYER_DIFFICULTY_MYTHIC_PLUS or "Mythic+" },
+	{ value = "raid", text = RAID or "Raid" },
+	{ value = "pvp", text = PVP or "PvP" },
+}
+local autoRepairGuildBankContextKeys = {}
+for _, option in ipairs(autoRepairGuildBankContextOptions) do
+	autoRepairGuildBankContextKeys[option.value] = true
+end
 
 local function getPrivateDB() return addon.functions.GetPrivateDB and addon.functions.GetPrivateDB() or addon.privateDB or {} end
 
@@ -116,6 +128,43 @@ local function removeWarbandGoldCharacter(guid)
 	clearSettingsSelection("autoWarbandGoldRemoveCharacter")
 end
 
+local function getAutoRepairGuildBankContexts()
+	if type(addon.db["autoRepairGuildBankContexts"]) ~= "table" then
+		addon.db["autoRepairGuildBankContexts"] = {
+			world = true,
+			party = true,
+			dungeon = true,
+			mythicPlus = true,
+			raid = true,
+			pvp = true,
+		}
+	end
+	return addon.db["autoRepairGuildBankContexts"]
+end
+
+local function setAutoRepairGuildBankContexts(selection)
+	local nextSelection = {}
+	if type(selection) == "table" then
+		for key, enabled in pairs(selection) do
+			if autoRepairGuildBankContextKeys[key] and enabled == true then nextSelection[key] = true end
+		end
+	end
+	addon.db["autoRepairGuildBankContexts"] = nextSelection
+end
+
+local function isAutoRepairEnabled()
+	return addon.SettingsLayout.elements["autoRepair"]
+		and addon.SettingsLayout.elements["autoRepair"].setting
+		and addon.SettingsLayout.elements["autoRepair"].setting:GetValue() == true
+end
+
+local function isAutoRepairGuildBankEnabled()
+	return isAutoRepairEnabled()
+		and addon.SettingsLayout.elements["autoRepairGuildBank"]
+		and addon.SettingsLayout.elements["autoRepairGuildBank"].setting
+		and addon.SettingsLayout.elements["autoRepairGuildBank"].setting:GetValue() == true
+end
+
 local cVendorEconomy = addon.SettingsLayout.rootECONOMY
 addon.SettingsLayout.vendorEconomyCategory = cVendorEconomy
 
@@ -149,6 +198,20 @@ local data = {
 				default = false,
 				type = Settings.VarType.Boolean,
 				sType = "checkbox",
+				children = {
+					{
+						var = "autoRepairGuildBankContexts",
+						text = L["autoRepairGuildBankContexts"],
+						desc = L["autoRepairGuildBankContextsDesc"],
+						options = autoRepairGuildBankContextOptions,
+						getSelection = getAutoRepairGuildBankContexts,
+						setSelection = setAutoRepairGuildBankContexts,
+						customDefaultText = L["All"] or ALL or "All",
+						sType = "multidropdown",
+						parent = true,
+						parentCheck = isAutoRepairGuildBankEnabled,
+					},
+				},
 			},
 		},
 	},

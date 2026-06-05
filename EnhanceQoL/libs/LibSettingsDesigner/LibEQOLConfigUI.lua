@@ -3604,13 +3604,19 @@ function lib.AddDashboardCards(state, cards)
 		for column = 1, 2 do
 			local card = cards[index + column - 1]
 			if card then
+				local onClick = card.onClick
+				if not onClick and card.pageID then
+					onClick = function()
+						state:SetPage(card.pageID)
+					end
+				end
 				addDashboardCard(
 					row,
 					column,
 					card.title,
 					card.description or card.desc,
 					card.icon or getAppIconTexture(state.app, card.iconKey or "advanced"),
-					card.onClick
+					onClick
 				)
 			end
 		end
@@ -3956,6 +3962,140 @@ local function addGroupSection(state, group, pagePath)
 	return section
 end
 
+function lib.GetInfoPageCommandText(entry)
+	if type(entry) ~= "table" then
+		return ""
+	end
+	local commands = type(entry.commands) == "table" and entry.commands or {}
+	local commandText = table.concat(commands, ", ")
+	if entry.usage and entry.usage ~= "" then
+		commandText = commandText .. entry.usage
+	end
+	local text = ("|cff00ff98%s|r %s"):format(commandText, entry.desc or "")
+	if entry.note and entry.note ~= "" then
+		text = ("%s |cff909090- %s|r"):format(text, entry.note)
+	end
+	return text
+end
+
+function lib.GetInfoPageBlockHeight(block, width)
+	if type(block) ~= "table" then
+		return 0
+	end
+	local height = block.title and 42 or 16
+	for _, entry in ipairs(block.entries or block.blocks or {}) do
+		local entryType = entry.type or "text"
+		if entryType == "spacer" then
+			height = height + (tonumber(entry.height) or 10)
+		elseif entryType == "button" then
+			height = height + 40
+		elseif entryType == "command" then
+			height = height + lib.EstimateTextHeight(lib.GetInfoPageCommandText(entry), width, 15, 24) + 8
+		elseif entryType == "image" or entry.image or entry.texture then
+			height = height + (tonumber(entry.height) or 180) + 10
+		else
+			height = height + lib.EstimateTextHeight(entry.text or entry.desc or "", width, 15, 22) + 8
+		end
+	end
+	return math.max(64, height + 12)
+end
+
+function lib.RenderInfoPageBlock(state, block)
+	if type(block) ~= "table" then
+		return nil
+	end
+	local width = state.pageSectionWidth or state.pageLeftWidth or 420
+	local sectionWidth = math.max(240, width - 28)
+	local height = lib.GetInfoPageBlockHeight(block, sectionWidth)
+	local section = createPageLeftFrame(state, height)
+	applyBackdrop(section, DETAIL_SECTION_BG, DETAIL_COLORS.sectionBorder)
+	createPixelBorder(section, DETAIL_COLORS.sectionBorder)
+
+	local y = -14
+	if block.title then
+		local title = createText(section, FONT_HEADER, block.title, TEXT.gold)
+		title:SetPoint("TOPLEFT", section, "TOPLEFT", 14, y)
+		title:SetPoint("RIGHT", section, "RIGHT", -14, 0)
+		title:SetHeight(22)
+		y = y - 32
+	end
+
+	for _, entry in ipairs(block.entries or block.blocks or {}) do
+		local entryType = entry.type or "text"
+		if entryType == "spacer" then
+			y = y - (tonumber(entry.height) or 10)
+		elseif entryType == "button" then
+			local button = makeFlatButton(section, entry.text or entry.label or (_G.OKAY or "OK"), tonumber(entry.width) or 190, 28, entry.icon, entry.iconAtlas == true)
+			button:SetPoint("TOPLEFT", section, "TOPLEFT", 14, y)
+			button:SetScript("OnClick", function()
+				if type(entry.onClick) == "function" then
+					entry.onClick(entry, state.app)
+				end
+			end)
+			y = y - 40
+		elseif entryType == "command" then
+			local text = lib.GetInfoPageCommandText(entry)
+			local textHeight = lib.EstimateTextHeight(text, sectionWidth - 12, 15, 24)
+			local line = createText(section, FONT_TEXT, text, TEXT.main)
+			line:SetPoint("TOPLEFT", section, "TOPLEFT", 26, y)
+			line:SetPoint("RIGHT", section, "RIGHT", -14, 0)
+			line:SetHeight(textHeight)
+			y = y - textHeight - 8
+		elseif entryType == "image" or entry.image or entry.texture then
+			local imageWidth = math.min(sectionWidth, tonumber(entry.width) or sectionWidth)
+			local imageHeight = tonumber(entry.height) or math.floor(imageWidth * 0.56)
+			local image = section:CreateTexture(nil, "ARTWORK")
+			image:SetTexture(entry.image or entry.texture)
+			image:SetPoint("TOPLEFT", section, "TOPLEFT", 14, y)
+			image:SetSize(imageWidth, imageHeight)
+			y = y - imageHeight - 10
+		else
+			local text = createText(section, entry.font or FONT_TEXT, entry.text or entry.desc or "", entry.color or TEXT.muted)
+			local textHeight = lib.EstimateTextHeight(entry.text or entry.desc or "", sectionWidth, 15, 22)
+			text:SetPoint("TOPLEFT", section, "TOPLEFT", 14, y)
+			text:SetPoint("RIGHT", section, "RIGHT", -14, 0)
+			text:SetHeight(textHeight)
+			y = y - textHeight - 8
+		end
+	end
+	state.y = state.y - 12
+	return section
+end
+
+function lib.RenderInfoPage(state, page, pagePath)
+	local app = state.app
+	local category = app.categoriesByID[page.category or ""]
+	if state.sidePanelMode == "right" then
+		addPageLeftColumnShell(state)
+		addPageFixedHeader(state, category, pagePath)
+		addContentScrollbarRail(state)
+		addPageSidePanel(state, page, category)
+	end
+
+	local header = createPageLeftFrame(state, 74)
+	local iconSource, iconIsAtlas = resolvePageIcon(app, page)
+	local icon = createIconPlate(header, iconSource, 54, iconIsAtlas)
+	icon:SetPoint("TOPLEFT", header, "TOPLEFT", 0, -10)
+	local title = createText(header, FONT_TITLE, page.title or page.id, TEXT.main)
+	title:SetPoint("LEFT", icon, "RIGHT", 16, 0)
+	title:SetPoint("RIGHT", header, "RIGHT", -6, 0)
+	title:SetHeight(30)
+	state.y = state.y - 8
+
+	local blocks = page.content or page.blocks or page.infoBlocks
+	if type(blocks) ~= "table" or #blocks == 0 then
+		local empty = createPageLeftFrame(state, 72)
+		applyBackdrop(empty, DETAIL_SECTION_BG, DETAIL_COLORS.sectionBorder)
+		local emptyText = createText(empty, FONT_MUTED, getLocale(app)["configCenterNoResults"] or "No settings found.", TEXT.muted)
+		emptyText:SetPoint("TOPLEFT", empty, "TOPLEFT", 14, -14)
+		emptyText:SetPoint("BOTTOMRIGHT", empty, "BOTTOMRIGHT", -14, 14)
+	else
+		for _, block in ipairs(blocks) do
+			lib.RenderInfoPageBlock(state, block)
+		end
+	end
+end
+
 local function renderPage(state, pageID)
 	local app = state.app
 	local page = app:GetPage(pageID)
@@ -3965,6 +4105,10 @@ local function renderPage(state, pageID)
 	end
 	local category = app.categoriesByID[page.category or ""]
 	local pagePath = getPagePath(app, page)
+	if page.layout == "info" or page.type == "info" or page.content or page.infoBlocks then
+		lib.RenderInfoPage(state, page, pagePath)
+		return
+	end
 
 	if state.sidePanelMode == "right" then
 		addPageLeftColumnShell(state)
@@ -4334,7 +4478,7 @@ local function createFrame(app)
 	local frame = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
 	frame:SetSize(WINDOW_WIDTH, WINDOW_HEIGHT)
 	frame:SetPoint("CENTER")
-	frame:SetFrameStrata("DIALOG")
+	frame:SetFrameStrata("HIGH")
 	frame:SetMovable(true)
 	frame:EnableMouse(true)
 	frame:RegisterForDrag("LeftButton")
