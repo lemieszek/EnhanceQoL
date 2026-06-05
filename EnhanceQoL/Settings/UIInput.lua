@@ -626,6 +626,16 @@ data = {
 		parentSection = interfaceExpandable,
 	},
 	{
+		var = "hideQuickJoinToast",
+		text = L["hideQuickJoinToast"],
+		desc = L["hideQuickJoinToastDesc"],
+		func = function(v)
+			addon.db["hideQuickJoinToast"] = v and true or false
+			addon.functions.toggleQuickJoinToastButton(addon.db["hideQuickJoinToast"])
+		end,
+		parentSection = interfaceExpandable,
+	},
+	{
 		var = "hideRaidTools",
 		text = L["Hide Raid Tools in Party"],
 		func = function(v)

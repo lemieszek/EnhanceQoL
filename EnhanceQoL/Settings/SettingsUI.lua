@@ -138,6 +138,7 @@ local pageDescriptionKeysByStableID = {
 	GroupFinder = "configCenterPageCardDescGroupFinder",
 	GroupToolsCombatAlerts = "configCenterPageCardDescCombatAlerts",
 	GroupToolsFocusMarker = "configCenterPageCardDescFocusMarker",
+	InstantMessenger = "configCenterPageCardDescInstantMessenger",
 	Loot = "configCenterPageCardDescLoot",
 	MacrosConsumables = "configCenterPageCardDescMacrosConsumables",
 	Mailbox = "configCenterPageCardDescMailbox",

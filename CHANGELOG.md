@@ -4,6 +4,7 @@
 
 ### ✨ Added
 
+- Damage Meter: Added optional segment linking so changing the selected segment in one Damage Meter window can switch all Damage Meter windows to the same segment.
 - Settings Center: Added direct numeric editing for slider values by clicking the highlighted current value.
 
 ### 🔄 Changed
@@ -23,6 +24,9 @@
 - Settings Center / Profiles: Added a Profile Management section to the AddOn profile page so active/default profile controls appear before copy, delete, create and export/import actions.
 - Settings Center / Sound: Migrated Audio Device, Sounds to Mute, Additional Sounds and Shared Media pages to modern-only rendering and removed the old Blizzard Settings root category for Sound.
 - Settings Center / Economy: Migrated Economy pages to modern-only rendering and removed the old Blizzard Settings root category for Economy.
+- Settings Center / Interface: Moved the Quick Join button visibility setting from Instant Messenger to Popups & UI Tweaks and renamed it to describe the actual Blizzard button.
+- Settings Center / Social: Migrated Social, Chat, Mailbox, Privacy and Friends pages to modern-only rendering and removed the old Blizzard Settings root category for Social.
+- Settings Center / Social: Added clearer descriptions for invite blocking, automatic group invites, advanced ignore list options, Communities privacy and friends-list styling controls.
 
 ### 🐛 Fixed
 

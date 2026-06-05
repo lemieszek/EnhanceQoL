@@ -7,6 +7,7 @@ addon.variables.NewVersionTableEQOL = {
 	EQOL_damageMeterAutomaticClear = true,
 	EQOL_damageMeterEditModeSample = true,
 	EQOL_damageMeterEnabled = true,
+	EQOL_damageMeterLinkSegments = true,
 	EQOL_damageMeterUpdateRate = true,
 
 	-- 11.0.0-alpha4 Guild bank repair contexts

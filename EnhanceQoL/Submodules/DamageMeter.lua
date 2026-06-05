@@ -1782,6 +1782,16 @@ function DamageMeter:GetEffectiveSessionLabel(index)
 	return sessionType == "overall" and (L["damageMeterOverall"] or "Overall") or (L["damageMeterCurrent"] or "Current")
 end
 
+function DamageMeter:ForEachLinkedSessionWindow(index, callback)
+	if db().damageMeterLinkSegments == true then
+		for windowIndex = 1, getWindowCount() do
+			callback(windowIndex)
+		end
+	else
+		callback(index)
+	end
+end
+
 function DamageMeter:SetTemporaryDamageMeterType(index, damageMeterType)
 	local temporary = self:GetTemporarySelection(index)
 	temporary.damageMeterType = normalizeDamageMeterTypeKey(damageMeterType)
@@ -1796,11 +1806,14 @@ function DamageMeter:GetAvailableCombatSessions()
 end
 
 function DamageMeter:SetTemporarySessionType(index, sessionType)
-	local temporary = self:GetTemporarySelection(index)
-	temporary.sessionID = nil
-	temporary.sessionName = nil
-	temporary.sessionDurationSeconds = nil
-	temporary.sessionType = sessionType == "overall" and "overall" or "current"
+	sessionType = sessionType == "overall" and "overall" or "current"
+	self:ForEachLinkedSessionWindow(index, function(windowIndex)
+		local temporary = self:GetTemporarySelection(windowIndex)
+		temporary.sessionID = nil
+		temporary.sessionName = nil
+		temporary.sessionDurationSeconds = nil
+		temporary.sessionType = sessionType
+	end)
 	self:InvalidateLiveEventWatch()
 	self:ScheduleRefresh()
 end
@@ -1808,11 +1821,14 @@ end
 function DamageMeter:SetTemporarySessionID(index, sessionID, sessionName, durationSeconds)
 	sessionID = tonumber(sessionID)
 	if not sessionID then return end
-	local temporary = self:GetTemporarySelection(index)
-	temporary.sessionType = nil
-	temporary.sessionID = sessionID
-	temporary.sessionName = sessionName
-	temporary.sessionDurationSeconds = durationSeconds
+	durationSeconds = safeNumber(durationSeconds)
+	self:ForEachLinkedSessionWindow(index, function(windowIndex)
+		local temporary = self:GetTemporarySelection(windowIndex)
+		temporary.sessionType = nil
+		temporary.sessionID = sessionID
+		temporary.sessionName = sessionName
+		temporary.sessionDurationSeconds = durationSeconds
+	end)
 	self:InvalidateLiveEventWatch()
 	self:ScheduleRefresh()
 end
@@ -6227,6 +6243,21 @@ function DamageMeter:SetConfigValue(index, key, value)
 	if key == "damageMeterType" or key == "sessionType" or key == "roleSpecificType" or key == "tankDamageMeterType" or key == "healerDamageMeterType" or key == "damagerDamageMeterType" then
 		self:InvalidateLiveEventWatch()
 	end
+	if key == "sessionType" and db().damageMeterLinkSegments == true then
+		local sessionType = config.sessionType == "overall" and "overall" or "current"
+		local windows = self:GetWindowsDB()
+		for windowIndex = 1, getWindowCount() do
+			windows[windowIndex].sessionType = sessionType
+			local temporary = self:GetTemporarySelection(windowIndex)
+			temporary.sessionID = nil
+			temporary.sessionName = nil
+			temporary.sessionDurationSeconds = nil
+			temporary.sessionType = nil
+			self:MarkWindowStyleDirty(windowIndex)
+		end
+		self:Refresh()
+		return
+	end
 	if key == "damageMeterType" or key == "roleSpecificType" or key == "tankDamageMeterType" or key == "healerDamageMeterType" or key == "damagerDamageMeterType" then self:UpdateEventState() end
 	self:MarkWindowStyleDirty(index)
 	if self:IsInEditMode() and config.tooltipPreview == true then
@@ -6336,6 +6367,11 @@ function DamageMeter:BuildWindowSettings(index)
 		end, function() return buildWindowCopyOptions(index) end, settingsId, 160, function() return getWindowCount() > 1 and db().damageMeterSyncSettings ~= true end),
 		{ name = L["Behavior"] or "Behavior", kind = SettingType.Collapsible, id = behaviorId, defaultCollapsed = true },
 		checkboxSetting(L["damageMeterAlwaysShowPlayer"] or "Always show player", function() return cfg().alwaysShowPlayer == true end, function(value) self:SetConfigValue(index, "alwaysShowPlayer", value) end, behaviorId),
+		checkboxSetting(L["damageMeterLinkSegments"] or "Link segments", function() return db().damageMeterLinkSegments == true end, function(value)
+			db().damageMeterLinkSegments = value == true
+			self:InvalidateLiveEventWatch()
+			self:Refresh()
+		end, behaviorId, nil, L["damageMeterLinkSegmentsDesc"] or "When enabled, changing the selected segment in one Damage Meter window switches all Damage Meter windows to that segment."),
 		dropdownSetting(L["damageMeterSession"] or "Session", function() return cfg().sessionType end, function(value) self:SetConfigValue(index, "sessionType", value == "overall" and "overall" or "current") end, {
 			{ value = "current", label = L["damageMeterCurrent"] or "Current" },
 			{ value = "overall", label = L["damageMeterOverall"] or "Overall" },

@@ -6,7 +6,6 @@ local rootCategories = {
 	{ id = "UI", label = _G["INTERFACE_LABEL"] },
 	{ id = "GENERAL", label = _G["GENERAL"] },
 	{ id = "GAMEPLAY", label = _G["SETTING_GROUP_GAMEPLAY"] },
-	{ id = "SOCIAL", label = _G["SOCIAL_LABEL"] },
 }
 
 local function buildSlashCommandHint(commands, desc, usage, note)
