@@ -247,6 +247,11 @@ local function buildDrinkMacroSettings()
 	local healthEnable = addon.functions.SettingsCreateCheckbox(cDrink, {
 		var = "healthMacroEnabled",
 		text = L["Enable Health Macro"],
+		richNote = {
+			blocks = {
+				{ text = string.format(L["%s - place on your bar (updates outside combat)"], "EnhanceQoLHealthMacro") },
+			},
+		},
 		func = function(value)
 			addon.db.healthMacroEnabled = value and true or false
 			refreshHealthMacro()
@@ -503,7 +508,6 @@ local function buildDrinkMacroSettings()
 		}
 	)
 
-	addon.functions.SettingsCreateText(cDrink, string.format(L["%s - place on your bar (updates outside combat)"], "EnhanceQoLHealthMacro"), { parentSection = convenienceSection })
 	if addon.variables and addon.variables.unitClass == "WARLOCK" then addon.functions.SettingsCreateText(cDrink, L["healthMacroTipReset"], { parentSection = convenienceSection }) end
 
 	addon.functions.SettingsCreateHeadline(cDrink, L["Flask Macro"] or "Flask Macro", { parentSection = convenienceSection })

@@ -2857,21 +2857,16 @@ data = {
 	},
 }
 
-if keystoneEnable then
-	table.insert(data, {
-		var = "groupfinderShowPartyKeystone",
-		text = L["groupfinderShowPartyKeystone"],
-		desc = L["groupfinderShowPartyKeystoneDesc"],
-		func = function(v)
-			addon.db["groupfinderShowPartyKeystone"] = v
-			if addon.MythicPlus and addon.MythicPlus.functions and addon.MythicPlus.functions.togglePartyKeystone then addon.MythicPlus.functions.togglePartyKeystone() end
-		end,
-		parent = true,
-		element = keystoneEnable.element,
-		parentCheck = isKeystoneEnabled,
-		parentSection = sectionGroupFinder,
-	})
-end
+table.insert(data, {
+	var = "groupfinderShowPartyKeystone",
+	text = L["groupfinderShowPartyKeystone"],
+	desc = L["groupfinderShowPartyKeystoneDesc"],
+	func = function(v)
+		addon.db["groupfinderShowPartyKeystone"] = v
+		if addon.MythicPlus and addon.MythicPlus.functions and addon.MythicPlus.functions.togglePartyKeystone then addon.MythicPlus.functions.togglePartyKeystone() end
+	end,
+	parentSection = sectionGroupFinder,
+})
 
 table.insert(data, {
 	var = "groupfinderShowDungeonScoreFrame",

@@ -44,16 +44,18 @@ local function buildSettings()
 			var = "teleportsWorldMapEnabled",
 			text = L["teleportsWorldMapEnabled"],
 			desc = L["teleportsWorldMapEnabledDesc"],
+			richNotes = {
+				{ text = L["teleportsWorldMapEnabledDesc"], order = -1000 },
+				{
+					blocks = {
+						{ text = "|cffffd700" .. L["teleportsWorldMapHelp"] .. "|r" },
+					},
+				},
+			},
 			func = function(v)
 				addon.db["teleportsWorldMapEnabled"] = v
 				if addon.MythicPlus and addon.MythicPlus.functions and addon.MythicPlus.functions.RefreshWorldMapTeleportPanel then addon.MythicPlus.functions.RefreshWorldMapTeleportPanel() end
 			end,
-			children = {
-				{
-					text = "|cffffd700" .. L["teleportsWorldMapHelp"] .. "|r",
-					sType = "hint",
-				},
-			},
 		},
 		{
 			var = "teleportsWorldMapShowSeason",
@@ -101,8 +103,8 @@ local function buildSettings()
 		end,
 		customDefaultText = L["teleportsPreferredHearthstoneRandom"] or "All owned Hearthstones",
 		hideSummary = false,
-		summary = function(selection, texts)
-			if type(selection) ~= "table" or next(selection) == nil or not texts or #texts == 0 then return L["teleportsPreferredHearthstoneRandom"] or "All owned Hearthstones" end
+		summary = function(selection)
+			if type(selection) ~= "table" or next(selection) == nil then return L["teleportsPreferredHearthstoneRandom"] or "All owned Hearthstones" end
 			return nil
 		end,
 		set = function(selection)
@@ -209,6 +211,8 @@ local function buildSettings()
 		end
 		return talentSoundOptions
 	end
+
+	addon.functions.SettingsCreateHeadline(cGameplay, SETTINGS, { parentSection = sectionTalent })
 
 	local talentEnable = addon.functions.SettingsCreateCheckbox(cGameplay, {
 		var = "talentReminderEnabled",

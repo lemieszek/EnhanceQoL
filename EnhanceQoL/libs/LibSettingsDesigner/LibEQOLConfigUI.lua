@@ -1415,6 +1415,9 @@ function lib.GetControlHoverNotes(state, control)
 			notes[#notes + 1] = { text = control.description, order = -1000 }
 		end
 	end
+	table.sort(notes, function(a, b)
+		return (tonumber(a.order) or 0) < (tonumber(b.order) or 0)
+	end)
 	return notes
 end
 

@@ -279,6 +279,11 @@ local questingData = {
 		var = "autoChooseQuest",
 		text = L["autoChooseQuest"],
 		desc = L["autoChooseQuestDesc"],
+		richNote = {
+			blocks = {
+				{ text = "|cff99e599" .. L["ignoreNPCTipp"] .. "|r" },
+			},
+		},
 		func = function(key) addon.db["autoChooseQuest"] = key end,
 		default = false,
 		children = {
@@ -348,10 +353,6 @@ local questingData = {
 						and addon.SettingsLayout.elements["autoChooseQuest"].setting:GetValue() == true
 				end,
 				parent = true,
-			},
-			{
-				text = "|cff99e599" .. L["ignoreNPCTipp"] .. "|r",
-				sType = "hint",
 			},
 			{
 				listFunc = function()
