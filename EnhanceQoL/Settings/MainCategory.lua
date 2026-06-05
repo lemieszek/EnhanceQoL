@@ -1,6 +1,5 @@
 local addonName, addon = ...
 local L = LibStub("AceLocale-3.0"):GetLocale(addonName)
-local SettingsLib = LibStub("LibEQOLSettingsMode-1.0")
 local ConfigLib = LibStub("LibEQOLConfig-1.0", true)
 
 local rootCategories = {

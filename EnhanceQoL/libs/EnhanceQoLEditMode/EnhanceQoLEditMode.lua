@@ -1,23 +1,15 @@
-local MODULE_MAJOR, BASE_MAJOR, MINOR = "LibEQOLEditMode-1.0", "LibEQOL-1.0", 21000000
+local MODULE_MAJOR, MINOR = "EnhanceQoLEditMode-1.0", 21000000
 local LibStub = _G.LibStub
 assert(LibStub, MODULE_MAJOR .. " requires LibStub")
 local C_Timer = _G.C_Timer
 
--- Primary sublib name; BASE_MAJOR remains as an alias for existing callers.
 local moduleLib, moduleMinor = LibStub:GetLibrary(MODULE_MAJOR, true)
-local baseLib, baseMinor = LibStub:GetLibrary(BASE_MAJOR, true)
-local lib = moduleLib or baseLib
-local oldMinor = moduleMinor or baseMinor
-
-if baseMinor and (not oldMinor or baseMinor > oldMinor) then
-	lib, oldMinor = baseLib, baseMinor
-end
+local lib = moduleLib
+local oldMinor = moduleMinor
 
 if oldMinor and oldMinor >= MINOR then
 	LibStub.libs[MODULE_MAJOR] = lib
 	LibStub.minors[MODULE_MAJOR] = oldMinor
-	LibStub.libs[BASE_MAJOR] = lib
-	LibStub.minors[BASE_MAJOR] = oldMinor
 	return
 end
 
@@ -27,8 +19,6 @@ else
 	LibStub.libs[MODULE_MAJOR] = lib
 	LibStub.minors[MODULE_MAJOR] = MINOR
 end
-LibStub.libs[BASE_MAJOR] = lib
-LibStub.minors[BASE_MAJOR] = MINOR
 
 -- Namespaces/state ----------------------------------------------------------------
 lib.internal = lib.internal or {}
@@ -465,7 +455,7 @@ function Util:DebugTraceDialogChildren(label)
 	if not Internal.debugEnabled then return end
 	local dlg = Internal.dialog
 	if not dlg or not dlg.Settings then
-		print("[LibEQOL] Debug", label or "", "dialog/settings missing")
+		print("[EnhanceQoLEditMode] Debug", label or "", "dialog/settings missing")
 		return
 	end
 	local shown, total = 0, 0
@@ -473,7 +463,7 @@ function Util:DebugTraceDialogChildren(label)
 		total = total + 1
 		if child:IsShown() then shown = shown + 1 end
 	end
-	print(string.format("[LibEQOL] Debug %s: %d shown / %d total children", label or "", shown, total))
+	print(string.format("[EnhanceQoLEditMode] Debug %s: %d shown / %d total children", label or "", shown, total))
 end
 Internal.DebugTraceDialogChildren = Util.DebugTraceDialogChildren
 
@@ -3569,7 +3559,7 @@ function Internal.CreateDialog()
 	hideLabelButton:SetScript("OnEnter", function()
 		if not GameTooltip then return end
 		GameTooltip:SetOwner(hideLabelButton, "ANCHOR_RIGHT")
-		local state = dialog.selection and dialog.selection.overlayHidden and HUD_EDIT_MODE_SHOW or HUD_EDIT_MODE_HIDE
+		local state = dialog.selection and dialog.selection.overlayHidden and _G.HUD_EDIT_MODE_SHOW or _G.HUD_EDIT_MODE_HIDE
 		GameTooltip:SetText((state or "Toggle") .. " highlight")
 		GameTooltip:Show()
 	end)

@@ -8,6 +8,7 @@
 - Settings Center / Data Panels: Added clearer descriptions for tooltip hints, context-menu modifiers and panel creation.
 - Settings Center: Switched the remaining Interface settings to modern-only registration and removed the old Blizzard Settings tree content.
 - Settings Center: Removed the global Legacy Blizzard Settings button from the modern settings shell while keeping keybind rows linked to Blizzard Key Bindings.
+- Settings Center: Removed the old shared settings library stack and release-time LibEQOL download; Edit Mode now uses a private vendored EnhanceQoL EditMode bridge.
 
 ### 🐛 Fixed
 

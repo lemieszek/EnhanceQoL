@@ -79,7 +79,7 @@ local refreshTrackingPage
 local refreshOverlaysPage
 local updateScrollContainer
 local createScrollContainer
-local refreshSettingsModeUI
+local refreshSettingsUI
 local updateCategoryModeCard
 local createCategoryModeOnboardingFrame
 local applyLayoutPageMode
@@ -5462,7 +5462,7 @@ updateCategoryModeCard = function(frame)
 	end
 end
 
-refreshSettingsModeUI = function(frame)
+refreshSettingsUI = function(frame)
 	if not frame then
 		return
 	end
@@ -5762,7 +5762,7 @@ local function createSettingsFrame()
 	frame.Pages.tracking = createTrackingPage(pageContainer)
 
 	frame:SetScript("OnShow", function()
-		refreshSettingsModeUI(frame)
+		refreshSettingsUI(frame)
 		local selectedPage = normalizeSettingsPageID(settingsState.selectedPage or PAGE_ORDER[1].id)
 		setPageSelection(selectedPage)
 		addon.RefreshSettingsFrame(selectedPage)
@@ -5785,7 +5785,7 @@ function addon.RefreshSettingsFrame(pageID, refreshAll)
 	end
 
 	local settings = getSettings()
-	refreshSettingsModeUI(frame)
+	refreshSettingsUI(frame)
 	local selectedPage = normalizeSettingsPageID(pageID or settingsState.selectedPage or PAGE_ORDER[1].id)
 
 	local function refreshSinglePage(targetPageID)
@@ -5827,7 +5827,7 @@ function addon.OpenSettings(pageID)
 	frame:Show()
 	frame:Raise()
 	if wasShown then
-		refreshSettingsModeUI(frame)
+		refreshSettingsUI(frame)
 		local selectedPage = normalizeSettingsPageID(pageID or settingsState.selectedPage or PAGE_ORDER[1].id)
 		setPageSelection(selectedPage)
 		addon.RefreshSettingsFrame(selectedPage)

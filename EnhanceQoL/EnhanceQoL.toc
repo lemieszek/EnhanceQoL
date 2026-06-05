@@ -41,7 +41,7 @@ libs\LibOpenKeystone\LibOpenKeystone.lua
 libs\AceSerializer-3.0\AceSerializer-3.0.xml
 libs\AceComm-3.0\AceComm-3.0.xml
 libs\LibSettingsDesigner\LibSettingsDesigner.xml
-libs\LibEQOL\LibEQOL.xml
+libs\EnhanceQoLEditMode\EnhanceQoLEditMode.lua
 Bindings\Slider.xml
 Sounds\sounds.lua
 General\functions.lua
