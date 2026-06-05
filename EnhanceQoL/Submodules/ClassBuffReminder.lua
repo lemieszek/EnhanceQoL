@@ -46,63 +46,48 @@ Reminder.AURA_UPDATE_DELAY = 0.5
 Reminder.RUNTIME_UPDATE_DELAY = 0.5
 Reminder.ROSTER_UPDATE_DELAY = 0.75
 
-local DB = {
-	ENABLED = "classBuffReminderEnabled",
-	SHOW_PARTY = "classBuffReminderShowParty",
-	SHOW_RAID = "classBuffReminderShowRaid",
-	SHOW_SOLO = "classBuffReminderShowSolo",
-	HIDE_IN_RESTED_AREA = "classBuffReminderHideInRestedArea",
-	ONLY_OUT_OF_COMBAT = "classBuffReminderOnlyOutOfCombat",
-	ROLE_FILTER_ENABLED = "classBuffReminderRoleFilterEnabled",
-	ROLE_FILTER_CONTEXT = "classBuffReminderRoleFilterContext",
-	HIDE_FOR_HEALER = "classBuffReminderHideForHealer",
-	HIDE_FOR_TANK = "classBuffReminderHideForTank",
-	HIDE_FOR_DAMAGER = "classBuffReminderHideForDamager",
-	HIDE_FOR_NONE = "classBuffReminderHideForNoRole",
-	SHOW_IF_ONLY_PROVIDER = "classBuffReminderShowIfOnlyProvider",
-	GLOW = "classBuffReminderGlow",
-	GLOW_STYLE = "classBuffReminderGlowStyle",
-	GLOW_INSET = "classBuffReminderGlowInset",
-	GLOW_COLOR = "classBuffReminderGlowColor",
-	SOUND_ON_MISSING = "classBuffReminderSoundOnMissing",
-	MISSING_SOUND = "classBuffReminderMissingSound",
-	DISPLAY_MODE = "classBuffReminderDisplayMode",
-	GROWTH_DIRECTION = "classBuffReminderGrowthDirection",
-	GROWTH_FROM_CENTER = "classBuffReminderGrowthFromCenter",
-	TRACK_FLASKS = "classBuffReminderTrackFlasks",
-	TRACK_FLASKS_INSTANCE_ONLY = "classBuffReminderTrackFlasksInstanceOnly",
-	TRACK_FOOD = "classBuffReminderTrackFood",
-	TRACK_FOOD_INSTANCE_ONLY = "classBuffReminderTrackFoodInstanceOnly",
-	TRACK_WEAPON_BUFFS = "classBuffReminderTrackWeaponBuffs",
-	TRACK_WEAPON_BUFFS_INSTANCE_ONLY = "classBuffReminderTrackWeaponBuffsInstanceOnly",
-	SCALE = "classBuffReminderScale",
-	ICON_SIZE = "classBuffReminderIconSize",
-	FONT_SIZE = "classBuffReminderFontSize",
-	ICON_GAP = "classBuffReminderIconGap",
-	BORDER_ENABLED = "classBuffReminderBorderEnabled",
-	BORDER_TEXTURE = "classBuffReminderBorderTexture",
-	BORDER_SIZE = "classBuffReminderBorderSize",
-	BORDER_OFFSET = "classBuffReminderBorderOffset",
-	BORDER_COLOR = "classBuffReminderBorderColor",
-	XY_TEXT_SIZE = "classBuffReminderXYTextSize",
-	XY_TEXT_OUTLINE = "classBuffReminderXYTextOutline",
-	XY_TEXT_COLOR = "classBuffReminderXYTextColor",
-	XY_TEXT_OFFSET_X = "classBuffReminderXYTextOffsetX",
-	XY_TEXT_OFFSET_Y = "classBuffReminderXYTextOffsetY",
-}
-local EXPIRING_WARNING_DB = {
-	GLOBAL = "classBuffReminderExpiringWarningMinutes",
-	CLASS_BUFFS_USE_GLOBAL = "classBuffReminderExpiringWarningClassBuffsUseGlobal",
-	CLASS_BUFFS = "classBuffReminderExpiringWarningClassBuffsMinutes",
-	FLASKS_USE_GLOBAL = "classBuffReminderExpiringWarningFlasksUseGlobal",
-	FLASKS = "classBuffReminderExpiringWarningFlasksMinutes",
-	FOOD_USE_GLOBAL = "classBuffReminderExpiringWarningFoodUseGlobal",
-	FOOD = "classBuffReminderExpiringWarningFoodMinutes",
-	RUNES_USE_GLOBAL = "classBuffReminderExpiringWarningRunesUseGlobal",
-	RUNES = "classBuffReminderExpiringWarningRunesMinutes",
-	WEAPON_BUFFS_USE_GLOBAL = "classBuffReminderExpiringWarningWeaponBuffsUseGlobal",
-	WEAPON_BUFFS = "classBuffReminderExpiringWarningWeaponBuffsMinutes",
-}
+local DB_ENABLED = "classBuffReminderEnabled"
+local DB_SHOW_PARTY = "classBuffReminderShowParty"
+local DB_SHOW_RAID = "classBuffReminderShowRaid"
+local DB_SHOW_SOLO = "classBuffReminderShowSolo"
+local DB_HIDE_IN_RESTED_AREA = "classBuffReminderHideInRestedArea"
+local DB_ONLY_OUT_OF_COMBAT = "classBuffReminderOnlyOutOfCombat"
+local DB_ROLE_FILTER_ENABLED = "classBuffReminderRoleFilterEnabled"
+local DB_ROLE_FILTER_CONTEXT = "classBuffReminderRoleFilterContext"
+local DB_HIDE_FOR_HEALER = "classBuffReminderHideForHealer"
+local DB_HIDE_FOR_TANK = "classBuffReminderHideForTank"
+local DB_HIDE_FOR_DAMAGER = "classBuffReminderHideForDamager"
+local DB_HIDE_FOR_NONE = "classBuffReminderHideForNoRole"
+local DB_SHOW_IF_ONLY_PROVIDER = "classBuffReminderShowIfOnlyProvider"
+local DB_GLOW = "classBuffReminderGlow"
+local DB_GLOW_STYLE = "classBuffReminderGlowStyle"
+local DB_GLOW_INSET = "classBuffReminderGlowInset"
+local DB_GLOW_COLOR = "classBuffReminderGlowColor"
+local DB_SOUND_ON_MISSING = "classBuffReminderSoundOnMissing"
+local DB_MISSING_SOUND = "classBuffReminderMissingSound"
+local DB_DISPLAY_MODE = "classBuffReminderDisplayMode"
+local DB_GROWTH_DIRECTION = "classBuffReminderGrowthDirection"
+local DB_GROWTH_FROM_CENTER = "classBuffReminderGrowthFromCenter"
+local DB_TRACK_FLASKS = "classBuffReminderTrackFlasks"
+local DB_TRACK_FLASKS_INSTANCE_ONLY = "classBuffReminderTrackFlasksInstanceOnly"
+local DB_TRACK_FOOD = "classBuffReminderTrackFood"
+local DB_TRACK_FOOD_INSTANCE_ONLY = "classBuffReminderTrackFoodInstanceOnly"
+local DB_TRACK_WEAPON_BUFFS = "classBuffReminderTrackWeaponBuffs"
+local DB_TRACK_WEAPON_BUFFS_INSTANCE_ONLY = "classBuffReminderTrackWeaponBuffsInstanceOnly"
+local DB_SCALE = "classBuffReminderScale"
+local DB_ICON_SIZE = "classBuffReminderIconSize"
+local DB_FONT_SIZE = "classBuffReminderFontSize"
+local DB_ICON_GAP = "classBuffReminderIconGap"
+local DB_BORDER_ENABLED = "classBuffReminderBorderEnabled"
+local DB_BORDER_TEXTURE = "classBuffReminderBorderTexture"
+local DB_BORDER_SIZE = "classBuffReminderBorderSize"
+local DB_BORDER_OFFSET = "classBuffReminderBorderOffset"
+local DB_BORDER_COLOR = "classBuffReminderBorderColor"
+local DB_XY_TEXT_SIZE = "classBuffReminderXYTextSize"
+local DB_XY_TEXT_OUTLINE = "classBuffReminderXYTextOutline"
+local DB_XY_TEXT_COLOR = "classBuffReminderXYTextColor"
+local DB_XY_TEXT_OFFSET_X = "classBuffReminderXYTextOffsetX"
+local DB_XY_TEXT_OFFSET_Y = "classBuffReminderXYTextOffsetY"
 local BORDER_SIZE_MIN = 1
 local BORDER_SIZE_MAX = 24
 local BORDER_OFFSET_MIN = -20
@@ -308,17 +293,6 @@ Reminder.defaults = Reminder.defaults
 		trackPets = false,
 		trackPetsContent = Reminder.CreateDefaultTrackingContentSelection(),
 		trackPetsInstanceOnly = false,
-		expiringWarningMinutes = 0,
-		expiringWarningClassBuffsUseGlobal = true,
-		expiringWarningClassBuffsMinutes = 0,
-		expiringWarningFlasksUseGlobal = true,
-		expiringWarningFlasksMinutes = 0,
-		expiringWarningFoodUseGlobal = true,
-		expiringWarningFoodMinutes = 0,
-		expiringWarningRunesUseGlobal = true,
-		expiringWarningRunesMinutes = 0,
-		expiringWarningWeaponBuffsUseGlobal = true,
-		expiringWarningWeaponBuffsMinutes = 0,
 		ignorePetDefensive = false,
 		ignorePetPassive = false,
 		hidePetReminderText = false,
@@ -365,17 +339,6 @@ if type(defaults.trackWeaponBuffsContent) ~= "table" then defaults.trackWeaponBu
 if defaults.trackPets == nil then defaults.trackPets = false end
 if defaults.trackPetsInstanceOnly == nil then defaults.trackPetsInstanceOnly = false end
 if type(defaults.trackPetsContent) ~= "table" then defaults.trackPetsContent = Reminder.CreateDefaultTrackingContentSelection() end
-if defaults.expiringWarningMinutes == nil then defaults.expiringWarningMinutes = 0 end
-if defaults.expiringWarningClassBuffsUseGlobal == nil then defaults.expiringWarningClassBuffsUseGlobal = true end
-if defaults.expiringWarningClassBuffsMinutes == nil then defaults.expiringWarningClassBuffsMinutes = 0 end
-if defaults.expiringWarningFlasksUseGlobal == nil then defaults.expiringWarningFlasksUseGlobal = true end
-if defaults.expiringWarningFlasksMinutes == nil then defaults.expiringWarningFlasksMinutes = 0 end
-if defaults.expiringWarningFoodUseGlobal == nil then defaults.expiringWarningFoodUseGlobal = true end
-if defaults.expiringWarningFoodMinutes == nil then defaults.expiringWarningFoodMinutes = 0 end
-if defaults.expiringWarningRunesUseGlobal == nil then defaults.expiringWarningRunesUseGlobal = true end
-if defaults.expiringWarningRunesMinutes == nil then defaults.expiringWarningRunesMinutes = 0 end
-if defaults.expiringWarningWeaponBuffsUseGlobal == nil then defaults.expiringWarningWeaponBuffsUseGlobal = true end
-if defaults.expiringWarningWeaponBuffsMinutes == nil then defaults.expiringWarningWeaponBuffsMinutes = 0 end
 if defaults.ignorePetDefensive == nil then defaults.ignorePetDefensive = false end
 if defaults.ignorePetPassive == nil then defaults.ignorePetPassive = false end
 if defaults.borderEnabled == nil then defaults.borderEnabled = false end
@@ -984,16 +947,9 @@ local function normalizeGlowInset(value)
 	return math.floor(inset + 0.5)
 end
 
-local function normalizeExpiringWarningMinutes(value)
-	local minutes = clamp(value, 0, 60, defaults.expiringWarningMinutes or 0)
-	if minutes == nil then minutes = defaults.expiringWarningMinutes or 0 end
-	return math.floor((minutes * 10) + 0.5) / 10
-end
-
 Reminder.NormalizeGlowStyle = normalizeGlowStyle
 Reminder.NormalizeGlowInset = normalizeGlowInset
 Reminder.NormalizeRoleFilterContext = normalizeRoleFilterContext
-Reminder.NormalizeExpiringWarningMinutes = normalizeExpiringWarningMinutes
 
 local function textOutlineFlags(value)
 	local outline = normalizeTextOutline(value)
@@ -1051,16 +1007,13 @@ local function providerHasKnownSpells(provider)
 	return hasKnownSpellInList(provider.knownSpellIds or provider.spellIds)
 end
 
-local function unitHasAuraBySpellId(unit, spellId, kind)
+local function unitHasAuraBySpellId(unit, spellId)
 	spellId = normalizeSpellId(spellId)
 	if not spellId then return false end
 	if type(unit) ~= "string" or unit == "" then return false end
 
 	if C_UnitAuras and C_UnitAuras.GetUnitAuraBySpellID then
-		local aura = C_UnitAuras.GetUnitAuraBySpellID(unit, spellId)
-		if aura ~= nil then
-			if kind == false or not (Reminder and Reminder.IsAuraExpiringSoon) or Reminder:IsAuraExpiringSoon(aura, kind or "CLASS_BUFF") ~= true then return true end
-		end
+		if C_UnitAuras.GetUnitAuraBySpellID(unit, spellId) ~= nil then return true end
 	end
 
 	if C_UnitAuras and C_UnitAuras.GetAuraSlots and C_UnitAuras.GetAuraDataBySlot then
@@ -1076,9 +1029,7 @@ local function unitHasAuraBySpellId(unit, spellId, kind)
 						if issecretvalue and issecretvalue(isHelpful) then isHelpful = nil end
 						if isHelpful ~= false then
 							local auraSpellId = normalizeSpellId(aura.spellId)
-							if auraSpellId and auraSpellId == spellId then
-								if kind == false or not (Reminder and Reminder.IsAuraExpiringSoon) or Reminder:IsAuraExpiringSoon(aura, kind or "CLASS_BUFF") ~= true then return true end
-							end
+							if auraSpellId and auraSpellId == spellId then return true end
 						end
 					end
 				end
@@ -1092,141 +1043,10 @@ local function unitHasAuraBySpellId(unit, spellId, kind)
 	-- Some weapon-imbue auras can surface with an alternate spellID but keep the same aura name.
 	local spellName = safeGetSpellName(spellId)
 	if type(spellName) == "string" and spellName ~= "" and Reminder and Reminder.UnitHasAnyAuraName then
-		if Reminder:UnitHasAnyAuraName(unit, { spellName }, kind) then return true end
+		if Reminder:UnitHasAnyAuraName(unit, { spellName }) then return true end
 	end
 
 	return false
-end
-
-local function getAuraRemainingSeconds(aura)
-	if type(aura) ~= "table" then return nil end
-	local expirationTime = aura.expirationTime
-	if issecretvalue and issecretvalue(expirationTime) then expirationTime = nil end
-	expirationTime = tonumber(expirationTime)
-	if not expirationTime or expirationTime <= 0 then return nil end
-	local now = GetTimePreciseSec and (tonumber(GetTimePreciseSec()) or 0) or (GetTime and (tonumber(GetTime()) or 0) or 0)
-	local remaining = expirationTime - now
-	if remaining < 0 then remaining = 0 end
-	return remaining
-end
-
-function Reminder:GetExpiringWarningThresholdSeconds(kind)
-	local minutes
-	if kind == "CLASS_BUFF" then
-		minutes = getValue(EXPIRING_WARNING_DB.CLASS_BUFFS_USE_GLOBAL, defaults.expiringWarningClassBuffsUseGlobal) == true
-			and getValue(EXPIRING_WARNING_DB.GLOBAL, defaults.expiringWarningMinutes)
-			or getValue(EXPIRING_WARNING_DB.CLASS_BUFFS, defaults.expiringWarningClassBuffsMinutes)
-	elseif kind == "FLASK" then
-		minutes = getValue(EXPIRING_WARNING_DB.FLASKS_USE_GLOBAL, defaults.expiringWarningFlasksUseGlobal) == true
-			and getValue(EXPIRING_WARNING_DB.GLOBAL, defaults.expiringWarningMinutes)
-			or getValue(EXPIRING_WARNING_DB.FLASKS, defaults.expiringWarningFlasksMinutes)
-	elseif kind == "FOOD" then
-		minutes = getValue(EXPIRING_WARNING_DB.FOOD_USE_GLOBAL, defaults.expiringWarningFoodUseGlobal) == true
-			and getValue(EXPIRING_WARNING_DB.GLOBAL, defaults.expiringWarningMinutes)
-			or getValue(EXPIRING_WARNING_DB.FOOD, defaults.expiringWarningFoodMinutes)
-	elseif kind == "RUNES" then
-		minutes = getValue(EXPIRING_WARNING_DB.RUNES_USE_GLOBAL, defaults.expiringWarningRunesUseGlobal) == true
-			and getValue(EXPIRING_WARNING_DB.GLOBAL, defaults.expiringWarningMinutes)
-			or getValue(EXPIRING_WARNING_DB.RUNES, defaults.expiringWarningRunesMinutes)
-	elseif kind == "WEAPON_BUFF" then
-		minutes = getValue(EXPIRING_WARNING_DB.WEAPON_BUFFS_USE_GLOBAL, defaults.expiringWarningWeaponBuffsUseGlobal) == true
-			and getValue(EXPIRING_WARNING_DB.GLOBAL, defaults.expiringWarningMinutes)
-			or getValue(EXPIRING_WARNING_DB.WEAPON_BUFFS, defaults.expiringWarningWeaponBuffsMinutes)
-	else
-		minutes = getValue(EXPIRING_WARNING_DB.GLOBAL, defaults.expiringWarningMinutes)
-	end
-	minutes = normalizeExpiringWarningMinutes(minutes)
-	return minutes > 0 and (minutes * 60) or 0
-end
-
-function Reminder:TrackNextExpiringWarningCheck(remainingSeconds, thresholdSeconds)
-	remainingSeconds = tonumber(remainingSeconds)
-	thresholdSeconds = tonumber(thresholdSeconds)
-	if not remainingSeconds or not thresholdSeconds or thresholdSeconds <= 0 or remainingSeconds <= thresholdSeconds then return end
-	local delay = remainingSeconds - thresholdSeconds
-	if delay < 1 then delay = 1 end
-	if not self.nextExpiringWarningDelay or delay < self.nextExpiringWarningDelay then self.nextExpiringWarningDelay = delay end
-end
-
-function Reminder:IsRemainingDurationExpiringSoon(remainingSeconds, kind)
-	local threshold = self:GetExpiringWarningThresholdSeconds(kind)
-	if threshold <= 0 then return false end
-	remainingSeconds = tonumber(remainingSeconds)
-	if not remainingSeconds then return false end
-	if remainingSeconds <= threshold then return true end
-	self:TrackNextExpiringWarningCheck(remainingSeconds, threshold)
-	return false
-end
-
-function Reminder:ScheduleNextExpiringWarningUpdate()
-	local delay = tonumber(self.nextExpiringWarningDelay)
-	self.nextExpiringWarningDelay = nil
-	if not delay or delay <= 0 or not (C_Timer and C_Timer.NewTimer) then return end
-	if self.expiringWarningTimer then
-		self.expiringWarningTimer:Cancel()
-		self.expiringWarningTimer = nil
-	end
-	self.expiringWarningTimer = C_Timer.NewTimer(delay, function()
-		Reminder.expiringWarningTimer = nil
-		Reminder:MarkAuraStatesDirty()
-		Reminder:RequestUpdate(true)
-	end)
-end
-
-function Reminder:ClearExpiringWarningUpdate()
-	self.nextExpiringWarningDelay = nil
-	if self.expiringWarningTimer then
-		self.expiringWarningTimer:Cancel()
-		self.expiringWarningTimer = nil
-	end
-end
-
-function Reminder:IsAuraExpiringSoon(aura, kind)
-	return self:IsRemainingDurationExpiringSoon(getAuraRemainingSeconds(aura), kind)
-end
-
-function Reminder:SchedulePassiveExpiringWarningChecks()
-	if not canEvaluateUnit("player") then return end
-
-	local checkFlask = self:CanCheckFlaskReminder() and self:GetExpiringWarningThresholdSeconds("FLASK") > 0
-	local checkFood = self:CanCheckFoodReminder() and self:GetExpiringWarningThresholdSeconds("FOOD") > 0
-	local checkRunes = self:CanCheckRuneReminder() and self:GetExpiringWarningThresholdSeconds("RUNES") > 0
-	local checkWeaponBuffs = self:CanCheckWeaponBuffReminder() and self:GetExpiringWarningThresholdSeconds("WEAPON_BUFF") > 0
-	if not (checkFlask or checkFood or checkRunes or checkWeaponBuffs) then return end
-
-	local context = { playerAuraSnapshot = self:GetPlayerAuraPresenceSnapshot() }
-	if checkFlask then self:GetFlaskMissingEntry(context) end
-	if checkFood then self:GetFoodMissingEntry(context) end
-	if checkRunes then self:GetRuneMissingEntry(context) end
-	if checkWeaponBuffs then self:GetWeaponBuffMissingEntry(context) end
-end
-
-function Reminder:HideDisplayAndScheduleExpiringWarning(frame)
-	self:ScheduleNextExpiringWarningUpdate()
-	self:SetGlowShown(false)
-	self.missingActive = false
-	if frame then frame:Hide() end
-end
-
-function Reminder:FindMatchingAuraInfo(unit, matcher)
-	if type(unit) ~= "string" or unit == "" or type(matcher) ~= "function" then return nil, false end
-	if not (C_UnitAuras and C_UnitAuras.GetAuraSlots and C_UnitAuras.GetAuraDataBySlot) then return nil, false end
-
-	local continuationToken
-	for _ = 1, AURA_SLOT_SCAN_GUARD do
-		local slots, slotCount, nextToken = getHelpfulAuraSlotBuffer(unit, continuationToken)
-		for i = 2, slotCount do
-			local slot = slots[i]
-			if not (issecretvalue and issecretvalue(slot)) then
-				local aura = C_UnitAuras.GetAuraDataBySlot(unit, slot)
-				if aura and matcher(aura) then return aura, true end
-			end
-		end
-
-		if nextToken == nil then break end
-		continuationToken = nextToken
-	end
-	return nil, true
 end
 
 local function playerHasEnchantId(enchantId)
@@ -1428,7 +1248,7 @@ function Reminder:GetCurrentSpecId()
 	return specId
 end
 
-function Reminder:IsEnabled() return getValue(DB.ENABLED, defaults.enabled) == true end
+function Reminder:IsEnabled() return getValue(DB_ENABLED, defaults.enabled) == true end
 
 function Reminder:GetTrackingContentOptions()
 	local options = {}
@@ -1441,10 +1261,10 @@ function Reminder:GetTrackingContentOptions()
 	return options
 end
 
-function Reminder:IsFlaskTrackingEnabled() return getValue(DB.TRACK_FLASKS, defaults.trackFlasks) == true end
+function Reminder:IsFlaskTrackingEnabled() return getValue(DB_TRACK_FLASKS, defaults.trackFlasks) == true end
 
 function Reminder:GetFlaskTrackingContentSelection()
-	return Reminder.GetTrackingContentSelection(TRACKING_CONTENT.db.FLASKS, DB.TRACK_FLASKS_INSTANCE_ONLY, defaults.trackFlasksContent)
+	return Reminder.GetTrackingContentSelection(TRACKING_CONTENT.db.FLASKS, DB_TRACK_FLASKS_INSTANCE_ONLY, defaults.trackFlasksContent)
 end
 
 function Reminder:SetFlaskTrackingContentSelection(selection)
@@ -1453,10 +1273,10 @@ function Reminder:SetFlaskTrackingContentSelection(selection)
 	self:RequestUpdate(true)
 end
 
-function Reminder:IsFoodTrackingEnabled() return getValue(DB.TRACK_FOOD, defaults.trackFood) == true end
+function Reminder:IsFoodTrackingEnabled() return getValue(DB_TRACK_FOOD, defaults.trackFood) == true end
 
 function Reminder:GetFoodTrackingContentSelection()
-	return Reminder.GetTrackingContentSelection(TRACKING_CONTENT.db.FOOD, DB.TRACK_FOOD_INSTANCE_ONLY, defaults.trackFoodContent)
+	return Reminder.GetTrackingContentSelection(TRACKING_CONTENT.db.FOOD, DB_TRACK_FOOD_INSTANCE_ONLY, defaults.trackFoodContent)
 end
 
 function Reminder:SetFoodTrackingContentSelection(selection)
@@ -1477,10 +1297,10 @@ function Reminder:SetRuneTrackingContentSelection(selection)
 	self:RequestUpdate(true)
 end
 
-function Reminder:IsWeaponBuffTrackingEnabled() return getValue(DB.TRACK_WEAPON_BUFFS, defaults.trackWeaponBuffs) == true end
+function Reminder:IsWeaponBuffTrackingEnabled() return getValue(DB_TRACK_WEAPON_BUFFS, defaults.trackWeaponBuffs) == true end
 
 function Reminder:GetWeaponBuffTrackingContentSelection()
-	return Reminder.GetTrackingContentSelection(TRACKING_CONTENT.db.WEAPON_BUFFS, DB.TRACK_WEAPON_BUFFS_INSTANCE_ONLY, defaults.trackWeaponBuffsContent)
+	return Reminder.GetTrackingContentSelection(TRACKING_CONTENT.db.WEAPON_BUFFS, DB_TRACK_WEAPON_BUFFS_INSTANCE_ONLY, defaults.trackWeaponBuffsContent)
 end
 
 function Reminder:SetWeaponBuffTrackingContentSelection(selection)
@@ -1647,7 +1467,7 @@ function Reminder:IsTrackingContentSelected(selection, requireCurrentExpansionIn
 	return selection[token] == true
 end
 
-function Reminder:IsHideInRestedAreaEnabled() return getValue(DB.HIDE_IN_RESTED_AREA, defaults.hideInRestedArea) == true end
+function Reminder:IsHideInRestedAreaEnabled() return getValue(DB_HIDE_IN_RESTED_AREA, defaults.hideInRestedArea) == true end
 
 function Reminder:IsPlayerInRestedArea()
 	if not IsResting then return false end
@@ -1744,7 +1564,7 @@ function Reminder:GetGroupContext()
 	return GROUP_CONTEXT_SOLO
 end
 
-function Reminder:IsOnlyOutOfCombatEnabled() return getValue(DB.ONLY_OUT_OF_COMBAT, defaults.onlyOutOfCombat) == true end
+function Reminder:IsOnlyOutOfCombatEnabled() return getValue(DB_ONLY_OUT_OF_COMBAT, defaults.onlyOutOfCombat) == true end
 
 function Reminder:IsRuntimeEvaluationBlockedByCombat()
 	if self:IsOnlyOutOfCombatEnabled() ~= true then return false end
@@ -1752,7 +1572,7 @@ function Reminder:IsRuntimeEvaluationBlockedByCombat()
 	return InCombatLockdown() == true
 end
 
-function Reminder:IsRoleFilterEnabled() return getValue(DB.ROLE_FILTER_ENABLED, defaults.roleFilterEnabled) == true end
+function Reminder:IsRoleFilterEnabled() return getValue(DB_ROLE_FILTER_ENABLED, defaults.roleFilterEnabled) == true end
 
 function Reminder:DoesRoleFilterApplyToCurrentContext()
 	if self:IsRoleFilterEnabled() ~= true then return false end
@@ -1760,7 +1580,7 @@ function Reminder:DoesRoleFilterApplyToCurrentContext()
 	local context = self:GetGroupContext()
 	if context == GROUP_CONTEXT_SOLO then return false end
 
-	local filterContext = normalizeRoleFilterContext(getValue(DB.ROLE_FILTER_CONTEXT, defaults.roleFilterContext))
+	local filterContext = normalizeRoleFilterContext(getValue(DB_ROLE_FILTER_CONTEXT, defaults.roleFilterContext))
 	if filterContext == ROLE_FILTER_CONTEXT_PARTY_ONLY then return context == GROUP_CONTEXT_PARTY end
 	if filterContext == ROLE_FILTER_CONTEXT_RAID_ONLY then return context == GROUP_CONTEXT_RAID end
 	return context == GROUP_CONTEXT_PARTY or context == GROUP_CONTEXT_RAID
@@ -1801,10 +1621,10 @@ function Reminder:IsPlayerRoleHiddenBySettings()
 	if self:DoesRoleFilterApplyToCurrentContext() ~= true then return false end
 
 	local role = self:GetPlayerRoleToken()
-	if role == "HEALER" then return getValue(DB.HIDE_FOR_HEALER, defaults.hideForHealer) == true end
-	if role == "TANK" then return getValue(DB.HIDE_FOR_TANK, defaults.hideForTank) == true end
-	if role == "DAMAGER" then return getValue(DB.HIDE_FOR_DAMAGER, defaults.hideForDamager) == true end
-	return getValue(DB.HIDE_FOR_NONE, defaults.hideForNoRole) == true
+	if role == "HEALER" then return getValue(DB_HIDE_FOR_HEALER, defaults.hideForHealer) == true end
+	if role == "TANK" then return getValue(DB_HIDE_FOR_TANK, defaults.hideForTank) == true end
+	if role == "DAMAGER" then return getValue(DB_HIDE_FOR_DAMAGER, defaults.hideForDamager) == true end
+	return getValue(DB_HIDE_FOR_NONE, defaults.hideForNoRole) == true
 end
 
 function Reminder:IsOnlyClassProvider()
@@ -1827,7 +1647,7 @@ end
 function Reminder:ShouldEvaluateGroupResponsibilities(provider)
 	if type(provider) ~= "table" then return true end
 	if self:IsPlayerRoleHiddenBySettings() ~= true then return true end
-	if getValue(DB.SHOW_IF_ONLY_PROVIDER, defaults.showIfOnlyProvider) == true and self:IsOnlyClassProvider() then return true end
+	if getValue(DB_SHOW_IF_ONLY_PROVIDER, defaults.showIfOnlyProvider) == true and self:IsOnlyClassProvider() then return true end
 	return false
 end
 
@@ -2001,9 +1821,6 @@ function Reminder:GetPlayerAuraPresenceSnapshot()
 		spellIds = {},
 		names = {},
 		icons = {},
-		spellIdRemaining = {},
-		nameRemaining = {},
-		iconRemaining = {},
 		instanceSpellIds = {},
 		instanceNames = {},
 		instanceIcons = {},
@@ -2016,14 +1833,6 @@ function Reminder:GetPlayerAuraPresenceSnapshot()
 	snapshot.supported = true
 
 	local continuationToken
-	local function storeRemaining(target, key, remaining)
-		if key == nil then return end
-		if remaining == nil then
-			target[key] = false
-			return
-		end
-		if target[key] == nil or (target[key] ~= false and remaining > target[key]) then target[key] = remaining end
-	end
 	for _ = 1, AURA_SLOT_SCAN_GUARD do
 		local slots, slotCount, nextToken = getHelpfulAuraSlotBuffer("player", continuationToken)
 		for i = 2, slotCount do
@@ -2034,10 +1843,8 @@ function Reminder:GetPlayerAuraPresenceSnapshot()
 					if Reminder.IsRelevantHelpfulPlayerAura(aura) then
 						local auraId = normalizeAuraInstanceId(aura.auraInstanceID)
 						local auraSpellId = normalizeSpellId(aura.spellId)
-						local remaining = getAuraRemainingSeconds(aura)
 						if auraSpellId then
 							snapshot.spellIds[auraSpellId] = true
-							storeRemaining(snapshot.spellIdRemaining, auraSpellId, remaining)
 							if auraId then snapshot.instanceSpellIds[auraId] = auraSpellId end
 						end
 
@@ -2045,7 +1852,6 @@ function Reminder:GetPlayerAuraPresenceSnapshot()
 						if issecretvalue and issecretvalue(auraName) then auraName = nil end
 						if type(auraName) == "string" and auraName ~= "" then
 							snapshot.names[auraName] = true
-							storeRemaining(snapshot.nameRemaining, auraName, remaining)
 							if auraId then snapshot.instanceNames[auraId] = auraName end
 						end
 
@@ -2054,7 +1860,6 @@ function Reminder:GetPlayerAuraPresenceSnapshot()
 						auraIcon = tonumber(auraIcon)
 						if auraIcon and auraIcon > 0 then
 							snapshot.icons[auraIcon] = true
-							storeRemaining(snapshot.iconRemaining, auraIcon, remaining)
 							if auraId then snapshot.instanceIcons[auraId] = auraIcon end
 						end
 					end
@@ -2070,39 +1875,33 @@ function Reminder:GetPlayerAuraPresenceSnapshot()
 	return snapshot
 end
 
-function Reminder:AuraSnapshotEntryIsAcceptable(remaining, kind)
-	if not kind then return true end
-	if remaining == false or remaining == nil then return true end
-	return self:IsRemainingDurationExpiringSoon(remaining, kind) ~= true
-end
-
-function Reminder:AuraSnapshotHasAnySpellId(snapshot, spellIds, kind)
+function Reminder:AuraSnapshotHasAnySpellId(snapshot, spellIds)
 	if type(snapshot) ~= "table" or type(spellIds) ~= "table" then return false end
 	local present = snapshot.spellIds
 	if type(present) ~= "table" then return false end
 	for i = 1, #spellIds do
 		local spellId = normalizeSpellId(spellIds[i])
-		if spellId and present[spellId] and self:AuraSnapshotEntryIsAcceptable(snapshot.spellIdRemaining and snapshot.spellIdRemaining[spellId], kind) then return true end
+		if spellId and present[spellId] then return true end
 	end
 	return false
 end
 
-function Reminder:AuraSnapshotHasAnyName(snapshot, auraNames, kind)
+function Reminder:AuraSnapshotHasAnyName(snapshot, auraNames)
 	if type(snapshot) ~= "table" or type(auraNames) ~= "table" then return false end
 	local present = snapshot.names
 	if type(present) ~= "table" then return false end
 	for i = 1, #auraNames do
 		local auraName = auraNames[i]
-		if type(auraName) == "string" and auraName ~= "" and present[auraName] and self:AuraSnapshotEntryIsAcceptable(snapshot.nameRemaining and snapshot.nameRemaining[auraName], kind) then return true end
+		if type(auraName) == "string" and auraName ~= "" and present[auraName] then return true end
 	end
 	return false
 end
 
-function Reminder:AuraSnapshotHasIcon(snapshot, iconId, kind)
+function Reminder:AuraSnapshotHasIcon(snapshot, iconId)
 	iconId = tonumber(iconId)
 	if not iconId or iconId <= 0 or type(snapshot) ~= "table" then return false end
 	local present = snapshot.icons
-	return type(present) == "table" and present[iconId] == true and self:AuraSnapshotEntryIsAcceptable(snapshot.iconRemaining and snapshot.iconRemaining[iconId], kind) or false
+	return type(present) == "table" and present[iconId] == true or false
 end
 
 local function nowSeconds()
@@ -2324,13 +2123,13 @@ function Reminder:GetFlaskMissingEntry(evalContext)
 
 	local hasFlaskAura
 	if snapshot and snapshot.supported == true then
-		hasFlaskAura = self:AuraSnapshotHasAnySpellId(snapshot, SHARED_FLASK_AURA_IDS, "FLASK")
-		if not hasFlaskAura and #prepared.spellIds > 0 and self:AuraSnapshotHasAnySpellId(snapshot, prepared.spellIds, "FLASK") then hasFlaskAura = true end
-		if not hasFlaskAura and #prepared.auraNames > 0 and self:AuraSnapshotHasAnyName(snapshot, prepared.auraNames, "FLASK") then hasFlaskAura = true end
+		hasFlaskAura = self:AuraSnapshotHasAnySpellId(snapshot, SHARED_FLASK_AURA_IDS)
+		if not hasFlaskAura and #prepared.spellIds > 0 and self:AuraSnapshotHasAnySpellId(snapshot, prepared.spellIds) then hasFlaskAura = true end
+		if not hasFlaskAura and #prepared.auraNames > 0 and self:AuraSnapshotHasAnyName(snapshot, prepared.auraNames) then hasFlaskAura = true end
 	else
-		hasFlaskAura = self:UnitHasAnyAuraSpellId("player", SHARED_FLASK_AURA_IDS, "FLASK")
-		if not hasFlaskAura and #prepared.spellIds > 0 and self:UnitHasAnyAuraSpellId("player", prepared.spellIds, "FLASK") then hasFlaskAura = true end
-		if not hasFlaskAura and #prepared.auraNames > 0 and self:UnitHasAnyAuraName("player", prepared.auraNames, "FLASK") then hasFlaskAura = true end
+		hasFlaskAura = self:UnitHasAnyAuraSpellId("player", SHARED_FLASK_AURA_IDS)
+		if not hasFlaskAura and #prepared.spellIds > 0 and self:UnitHasAnyAuraSpellId("player", prepared.spellIds) then hasFlaskAura = true end
+		if not hasFlaskAura and #prepared.auraNames > 0 and self:UnitHasAnyAuraName("player", prepared.auraNames) then hasFlaskAura = true end
 	end
 	if hasFlaskAura then return nil end
 
@@ -2354,13 +2153,13 @@ function Reminder:GetFoodMissingEntry(evalContext)
 
 	local hasFoodAura
 	if snapshot and snapshot.supported == true then
-		hasFoodAura = self:AuraSnapshotHasIcon(snapshot, SHARED_FOOD_AURA_ICON_ID, "FOOD")
-		if not hasFoodAura and #prepared.spellIds > 0 and self:AuraSnapshotHasAnySpellId(snapshot, prepared.spellIds, "FOOD") then hasFoodAura = true end
-		if not hasFoodAura and #prepared.auraNames > 0 and self:AuraSnapshotHasAnyName(snapshot, prepared.auraNames, "FOOD") then hasFoodAura = true end
+		hasFoodAura = self:AuraSnapshotHasIcon(snapshot, SHARED_FOOD_AURA_ICON_ID)
+		if not hasFoodAura and #prepared.spellIds > 0 and self:AuraSnapshotHasAnySpellId(snapshot, prepared.spellIds) then hasFoodAura = true end
+		if not hasFoodAura and #prepared.auraNames > 0 and self:AuraSnapshotHasAnyName(snapshot, prepared.auraNames) then hasFoodAura = true end
 	else
-		hasFoodAura = self:UnitHasAuraIcon("player", SHARED_FOOD_AURA_ICON_ID, "FOOD")
-		if not hasFoodAura and #prepared.spellIds > 0 and self:UnitHasAnyAuraSpellId("player", prepared.spellIds, "FOOD") then hasFoodAura = true end
-		if not hasFoodAura and #prepared.auraNames > 0 and self:UnitHasAnyAuraName("player", prepared.auraNames, "FOOD") then hasFoodAura = true end
+		hasFoodAura = self:UnitHasAuraIcon("player", SHARED_FOOD_AURA_ICON_ID)
+		if not hasFoodAura and #prepared.spellIds > 0 and self:UnitHasAnyAuraSpellId("player", prepared.spellIds) then hasFoodAura = true end
+		if not hasFoodAura and #prepared.auraNames > 0 and self:UnitHasAnyAuraName("player", prepared.auraNames) then hasFoodAura = true end
 	end
 	if hasFoodAura then return nil end
 
@@ -2383,13 +2182,13 @@ function Reminder:GetRuneMissingEntry(evalContext)
 
 	local hasRuneAura
 	if snapshot and snapshot.supported == true then
-		hasRuneAura = self:AuraSnapshotHasAnySpellId(snapshot, Reminder.runeTracking.auraIds, "RUNES")
-		if not hasRuneAura and #prepared.spellIds > 0 and self:AuraSnapshotHasAnySpellId(snapshot, prepared.spellIds, "RUNES") then hasRuneAura = true end
-		if not hasRuneAura and #prepared.auraNames > 0 and self:AuraSnapshotHasAnyName(snapshot, prepared.auraNames, "RUNES") then hasRuneAura = true end
+		hasRuneAura = self:AuraSnapshotHasAnySpellId(snapshot, Reminder.runeTracking.auraIds)
+		if not hasRuneAura and #prepared.spellIds > 0 and self:AuraSnapshotHasAnySpellId(snapshot, prepared.spellIds) then hasRuneAura = true end
+		if not hasRuneAura and #prepared.auraNames > 0 and self:AuraSnapshotHasAnyName(snapshot, prepared.auraNames) then hasRuneAura = true end
 	else
-		hasRuneAura = self:UnitHasAnyAuraSpellId("player", Reminder.runeTracking.auraIds, "RUNES")
-		if not hasRuneAura and #prepared.spellIds > 0 and self:UnitHasAnyAuraSpellId("player", prepared.spellIds, "RUNES") then hasRuneAura = true end
-		if not hasRuneAura and #prepared.auraNames > 0 and self:UnitHasAnyAuraName("player", prepared.auraNames, "RUNES") then hasRuneAura = true end
+		hasRuneAura = self:UnitHasAnyAuraSpellId("player", Reminder.runeTracking.auraIds)
+		if not hasRuneAura and #prepared.spellIds > 0 and self:UnitHasAnyAuraSpellId("player", prepared.spellIds) then hasRuneAura = true end
+		if not hasRuneAura and #prepared.auraNames > 0 and self:UnitHasAnyAuraName("player", prepared.auraNames) then hasRuneAura = true end
 	end
 	if hasRuneAura then return nil end
 
@@ -2408,18 +2207,16 @@ function Reminder:GetWeaponBuffMissingEntry(evalContext)
 	local missingRequirements = 0
 	local hasMainWeapon = isPlayerMainhandEnchantableWeapon()
 	local hasOffhandWeapon = isPlayerOffhandEnchantableWeapon()
-	local hasMainEnchant, mainExpirationMS, _, _, hasOffhandEnchant, offhandExpirationMS = GetWeaponEnchantInfo()
-	local mainExpiring = hasMainEnchant == true and self:IsRemainingDurationExpiringSoon((tonumber(mainExpirationMS) or 0) / 1000, "WEAPON_BUFF")
-	local offhandExpiring = hasOffhandEnchant == true and self:IsRemainingDurationExpiringSoon((tonumber(offhandExpirationMS) or 0) / 1000, "WEAPON_BUFF")
+	local hasMainEnchant, _, _, _, hasOffhandEnchant = GetWeaponEnchantInfo()
 
 	if hasMainWeapon then
 		totalRequirements = totalRequirements + 1
-		if hasMainEnchant ~= true or mainExpiring == true then missingRequirements = missingRequirements + 1 end
+		if hasMainEnchant ~= true then missingRequirements = missingRequirements + 1 end
 	end
 
 	if hasOffhandWeapon then
 		totalRequirements = totalRequirements + 1
-		if hasOffhandEnchant ~= true or offhandExpiring == true then missingRequirements = missingRequirements + 1 end
+		if hasOffhandEnchant ~= true then missingRequirements = missingRequirements + 1 end
 	end
 
 	if totalRequirements <= 0 or missingRequirements <= 0 then return nil end
@@ -2639,16 +2436,16 @@ function Reminder:GetSupplementalMissingEntries(evalContext)
 	return entries
 end
 
-function Reminder:UnitHasAnyAuraSpellId(unit, spellIds, kind)
+function Reminder:UnitHasAnyAuraSpellId(unit, spellIds)
 	if type(spellIds) ~= "table" then return false end
 	for i = 1, #spellIds do
 		local sid = normalizeSpellId(spellIds[i])
-		if sid and unitHasAuraBySpellId(unit, sid, kind) then return true end
+		if sid and unitHasAuraBySpellId(unit, sid) then return true end
 	end
 	return false
 end
 
-function Reminder:UnitHasAnyAuraName(unit, auraNames, kind)
+function Reminder:UnitHasAnyAuraName(unit, auraNames)
 	if type(auraNames) ~= "table" then return false end
 	if type(unit) ~= "string" or unit == "" then return false end
 	if not (C_UnitAuras and C_UnitAuras.GetAuraSlots and C_UnitAuras.GetAuraDataBySlot) then return false end
@@ -2672,9 +2469,7 @@ function Reminder:UnitHasAnyAuraName(unit, auraNames, kind)
 					if issecretvalue and issecretvalue(isHelpful) then isHelpful = nil end
 					if isHelpful ~= false then
 						local activeName = aura.name
-						if not (issecretvalue and issecretvalue(activeName)) and type(activeName) == "string" and targetNames[activeName] then
-							if kind == false or self:IsAuraExpiringSoon(aura, kind or "CLASS_BUFF") ~= true then return true end
-						end
+						if not (issecretvalue and issecretvalue(activeName)) and type(activeName) == "string" and targetNames[activeName] then return true end
 					end
 				end
 			end
@@ -2687,8 +2482,8 @@ function Reminder:UnitHasAnyAuraName(unit, auraNames, kind)
 	return false
 end
 
-function Reminder:UnitHasAnyAuraSpellIdOrDerivedName(unit, spellIds, kind)
-	if self:UnitHasAnyAuraSpellId(unit, spellIds, kind) then return true end
+function Reminder:UnitHasAnyAuraSpellIdOrDerivedName(unit, spellIds)
+	if self:UnitHasAnyAuraSpellId(unit, spellIds) then return true end
 	if type(spellIds) ~= "table" then return false end
 
 	local auraNames = {}
@@ -2702,10 +2497,10 @@ function Reminder:UnitHasAnyAuraSpellIdOrDerivedName(unit, spellIds, kind)
 	end
 
 	if #auraNames <= 0 then return false end
-	return self:UnitHasAnyAuraName(unit, auraNames, kind)
+	return self:UnitHasAnyAuraName(unit, auraNames)
 end
 
-function Reminder:UnitHasAuraIcon(unit, iconId, kind)
+function Reminder:UnitHasAuraIcon(unit, iconId)
 	iconId = tonumber(iconId)
 	if not iconId or iconId <= 0 then return false end
 	if type(unit) ~= "string" or unit == "" then return false end
@@ -2725,9 +2520,7 @@ function Reminder:UnitHasAuraIcon(unit, iconId, kind)
 						local auraIcon = aura.icon
 						if issecretvalue and issecretvalue(auraIcon) then auraIcon = nil end
 						auraIcon = tonumber(auraIcon)
-						if auraIcon and auraIcon == iconId then
-							if kind == false or self:IsAuraExpiringSoon(aura, kind or "CLASS_BUFF") ~= true then return true end
-						end
+						if auraIcon and auraIcon == iconId then return true end
 					end
 				end
 			end
@@ -3731,25 +3524,25 @@ function Reminder:InvalidateProviderAvailabilityCache()
 	self:InvalidateGroupBuffStateCaches()
 end
 
-function Reminder:GetGrowthDirection() return normalizeGrowthDirection(getValue(DB.GROWTH_DIRECTION, defaults.growthDirection)) end
+function Reminder:GetGrowthDirection() return normalizeGrowthDirection(getValue(DB_GROWTH_DIRECTION, defaults.growthDirection)) end
 
-function Reminder:GetGlowStyle() return normalizeGlowStyle(getValue(DB.GLOW_STYLE, defaults.glowStyle)) end
+function Reminder:GetGlowStyle() return normalizeGlowStyle(getValue(DB_GLOW_STYLE, defaults.glowStyle)) end
 
-function Reminder:GetGlowInset() return normalizeGlowInset(getValue(DB.GLOW_INSET, defaults.glowInset)) end
-function Reminder:GetGlowColor() return normalizeColor(getValue(DB.GLOW_COLOR, defaults.glowColor), defaults.glowColor) end
-function Reminder:GetGrowthFromCenter() return getValue(DB.GROWTH_FROM_CENTER, defaults.growthFromCenter) == true end
-function Reminder:IsBorderEnabled() return getValue(DB.BORDER_ENABLED, defaults.borderEnabled) == true end
-function Reminder:GetBorderTextureKey() return normalizeBorderTexture(getValue(DB.BORDER_TEXTURE, defaults.borderTexture)) end
-function Reminder:GetBorderSize() return normalizeBorderSize(getValue(DB.BORDER_SIZE, defaults.borderSize)) end
-function Reminder:GetBorderOffset() return normalizeBorderOffset(getValue(DB.BORDER_OFFSET, defaults.borderOffset)) end
-function Reminder:GetBorderColor() return normalizeColor(getValue(DB.BORDER_COLOR, defaults.borderColor), defaults.borderColor) end
+function Reminder:GetGlowInset() return normalizeGlowInset(getValue(DB_GLOW_INSET, defaults.glowInset)) end
+function Reminder:GetGlowColor() return normalizeColor(getValue(DB_GLOW_COLOR, defaults.glowColor), defaults.glowColor) end
+function Reminder:GetGrowthFromCenter() return getValue(DB_GROWTH_FROM_CENTER, defaults.growthFromCenter) == true end
+function Reminder:IsBorderEnabled() return getValue(DB_BORDER_ENABLED, defaults.borderEnabled) == true end
+function Reminder:GetBorderTextureKey() return normalizeBorderTexture(getValue(DB_BORDER_TEXTURE, defaults.borderTexture)) end
+function Reminder:GetBorderSize() return normalizeBorderSize(getValue(DB_BORDER_SIZE, defaults.borderSize)) end
+function Reminder:GetBorderOffset() return normalizeBorderOffset(getValue(DB_BORDER_OFFSET, defaults.borderOffset)) end
+function Reminder:GetBorderColor() return normalizeColor(getValue(DB_BORDER_COLOR, defaults.borderColor), defaults.borderColor) end
 
 function Reminder:GetIconCountTextStyle()
-	local size = clamp(getValue(DB.XY_TEXT_SIZE, defaults.xyTextSize), 8, 64, defaults.xyTextSize)
-	local outline = normalizeTextOutline(getValue(DB.XY_TEXT_OUTLINE, defaults.xyTextOutline))
-	local r, g, b, a = normalizeColor(getValue(DB.XY_TEXT_COLOR, defaults.xyTextColor), defaults.xyTextColor)
-	local offsetX = clamp(getValue(DB.XY_TEXT_OFFSET_X, defaults.xyTextOffsetX), -60, 60, defaults.xyTextOffsetX)
-	local offsetY = clamp(getValue(DB.XY_TEXT_OFFSET_Y, defaults.xyTextOffsetY), -60, 60, defaults.xyTextOffsetY)
+	local size = clamp(getValue(DB_XY_TEXT_SIZE, defaults.xyTextSize), 8, 64, defaults.xyTextSize)
+	local outline = normalizeTextOutline(getValue(DB_XY_TEXT_OUTLINE, defaults.xyTextOutline))
+	local r, g, b, a = normalizeColor(getValue(DB_XY_TEXT_COLOR, defaults.xyTextColor), defaults.xyTextColor)
+	local offsetX = clamp(getValue(DB_XY_TEXT_OFFSET_X, defaults.xyTextOffsetX), -60, 60, defaults.xyTextOffsetX)
+	local offsetY = clamp(getValue(DB_XY_TEXT_OFFSET_Y, defaults.xyTextOffsetY), -60, 60, defaults.xyTextOffsetY)
 	return size, outline, r, g, b, a, offsetX, offsetY
 end
 
@@ -3790,7 +3583,7 @@ end
 function Reminder:GetMissingSoundOptions() return self:BuildMissingSoundOptions() end
 
 function Reminder:ResolveMissingSound()
-	local rawKey = getValue(DB.MISSING_SOUND, defaults.missingSound)
+	local rawKey = getValue(DB_MISSING_SOUND, defaults.missingSound)
 	if type(rawKey) ~= "string" then rawKey = "" end
 
 	local keys, map, pathToKey = self:GetMissingSoundOptions()
@@ -3807,13 +3600,13 @@ function Reminder:NormalizeMissingSoundSelection()
 	if not addon.db then return end
 
 	local _, map, pathToKey = self:GetMissingSoundOptions()
-	local current = addon.db[DB.MISSING_SOUND]
+	local current = addon.db[DB_MISSING_SOUND]
 	if type(current) ~= "string" then current = "" end
 
 	local normalized = current
 	if normalized ~= "" and type(pathToKey) == "table" and pathToKey[normalized] and type(map) == "table" and map[pathToKey[normalized]] then normalized = pathToKey[normalized] end
 
-	if normalized ~= current then addon.db[DB.MISSING_SOUND] = normalized end
+	if normalized ~= current then addon.db[DB_MISSING_SOUND] = normalized end
 end
 
 function Reminder:ScheduleInitialSoundSync()
@@ -3844,7 +3637,7 @@ function Reminder:GetMissingSoundFile()
 end
 
 function Reminder:PlayMissingSound(force)
-	if not force and getValue(DB.SOUND_ON_MISSING, defaults.soundOnMissing) ~= true then return end
+	if not force and getValue(DB_SOUND_ON_MISSING, defaults.soundOnMissing) ~= true then return end
 
 	local _, _, soundFile = self:ResolveMissingSound()
 	if soundFile and PlaySoundFile then PlaySoundFile(soundFile, "Master") end
@@ -3870,9 +3663,7 @@ function Reminder:GetUnitAuraState(unit)
 	if not state then
 		state = {
 			trackedByInstance = {},
-			trackedExpiringByInstance = {},
 			trackedCount = 0,
-			expiringCount = 0,
 			hasBuff = false,
 			initialized = false,
 			unitIdentity = nil,
@@ -3882,9 +3673,7 @@ function Reminder:GetUnitAuraState(unit)
 		self.unitAuraStates[unit] = state
 	end
 	if type(state.trackedByInstance) ~= "table" then state.trackedByInstance = {} end
-	if type(state.trackedExpiringByInstance) ~= "table" then state.trackedExpiringByInstance = {} end
 	if type(state.trackedCount) ~= "number" then state.trackedCount = 0 end
-	if type(state.expiringCount) ~= "number" then state.expiringCount = 0 end
 	return state
 end
 
@@ -3897,9 +3686,7 @@ end
 function Reminder:ClearTrackedAuraState(state)
 	if type(state) ~= "table" then return end
 	if type(state.trackedByInstance) == "table" then wipeTable(state.trackedByInstance) end
-	if type(state.trackedExpiringByInstance) == "table" then wipeTable(state.trackedExpiringByInstance) end
 	state.trackedCount = 0
-	state.expiringCount = 0
 	state.hasBuff = false
 	state.initialized = false
 end
@@ -4176,21 +3963,13 @@ function Reminder:AddProviderAuraToState(state, aura, provider)
 	local auraId, spellId = self:GetTrackableProviderAuraData(aura, provider)
 	if not auraId then return false end
 
-	local expiring = self:IsAuraExpiringSoon(aura, "CLASS_BUFF")
 	if state.trackedByInstance[auraId] == nil then
 		state.trackedByInstance[auraId] = spellId
 		state.trackedCount = (state.trackedCount or 0) + 1
 	else
 		state.trackedByInstance[auraId] = spellId
 	end
-	local wasExpiring = state.trackedExpiringByInstance[auraId] == true
-	state.trackedExpiringByInstance[auraId] = expiring == true or nil
-	if expiring == true and not wasExpiring then
-		state.expiringCount = (state.expiringCount or 0) + 1
-	elseif expiring ~= true and wasExpiring then
-		state.expiringCount = math.max(0, (state.expiringCount or 0) - 1)
-	end
-	state.hasBuff = ((state.trackedCount or 0) - (state.expiringCount or 0)) > 0
+	state.hasBuff = (state.trackedCount or 0) > 0
 	return true
 end
 
@@ -4200,11 +3979,9 @@ function Reminder:RemoveProviderAuraFromState(state, auraId)
 	if not auraId or state.trackedByInstance[auraId] == nil then return false end
 
 	state.trackedByInstance[auraId] = nil
-	if state.trackedExpiringByInstance[auraId] == true then state.expiringCount = math.max(0, (state.expiringCount or 0) - 1) end
-	state.trackedExpiringByInstance[auraId] = nil
 	state.trackedCount = (state.trackedCount or 0) - 1
 	if state.trackedCount < 0 then state.trackedCount = 0 end
-	state.hasBuff = ((state.trackedCount or 0) - (state.expiringCount or 0)) > 0
+	state.hasBuff = state.trackedCount > 0
 	return true
 end
 
@@ -4242,7 +4019,7 @@ function Reminder:FullRefreshUnitAuraState(unit, provider)
 		continuationToken = nextToken
 	end
 
-	state.hasBuff = ((state.trackedCount or 0) - (state.expiringCount or 0)) > 0
+	state.hasBuff = (state.trackedCount or 0) > 0
 	state.initialized = true
 	return state
 end
@@ -4294,11 +4071,7 @@ function Reminder:ApplyDeltaToUnitAuraState(unit, updateInfo, provider)
 				local aura = C_UnitAuras.GetAuraDataByAuraInstanceID(unit, auraId)
 				if aura then
 					local trackedAuraId = self:GetTrackableProviderAuraData(aura, provider)
-					if trackedAuraId ~= auraId then
-						self:RemoveProviderAuraFromState(state, auraId)
-					else
-						self:AddProviderAuraToState(state, aura, provider)
-					end
+					if trackedAuraId ~= auraId then self:RemoveProviderAuraFromState(state, auraId) end
 				else
 					self:RemoveProviderAuraFromState(state, auraId)
 				end
@@ -4306,7 +4079,7 @@ function Reminder:ApplyDeltaToUnitAuraState(unit, updateInfo, provider)
 		end
 	end
 
-	state.hasBuff = ((state.trackedCount or 0) - (state.expiringCount or 0)) > 0
+	state.hasBuff = (state.trackedCount or 0) > 0
 	state.initialized = true
 	return state
 end
@@ -4459,9 +4232,7 @@ function Reminder:GetGroupBuffUnitState(cache, unit)
 	if type(state) ~= "table" then
 		state = {
 			trackedByInstance = {},
-			trackedExpiringByInstance = {},
 			trackedCount = 0,
-			expiringCount = 0,
 			hasBuff = false,
 			initialized = false,
 			unitIdentity = nil,
@@ -4469,18 +4240,14 @@ function Reminder:GetGroupBuffUnitState(cache, unit)
 		cache.unitStates[unit] = state
 	end
 	if type(state.trackedByInstance) ~= "table" then state.trackedByInstance = {} end
-	if type(state.trackedExpiringByInstance) ~= "table" then state.trackedExpiringByInstance = {} end
 	if type(state.trackedCount) ~= "number" then state.trackedCount = 0 end
-	if type(state.expiringCount) ~= "number" then state.expiringCount = 0 end
 	return state
 end
 
 function Reminder:ClearGroupBuffUnitState(state)
 	if type(state) ~= "table" then return end
 	if type(state.trackedByInstance) == "table" then wipeTable(state.trackedByInstance) end
-	if type(state.trackedExpiringByInstance) == "table" then wipeTable(state.trackedExpiringByInstance) end
 	state.trackedCount = 0
-	state.expiringCount = 0
 	state.hasBuff = false
 	state.initialized = false
 end
@@ -4523,21 +4290,13 @@ function Reminder:AddGroupBuffAuraToState(state, aura, cache)
 	local auraId, spellId = self:GetTrackableGroupBuffAuraData(aura, cache)
 	if not auraId then return false end
 
-	local expiring = self:IsAuraExpiringSoon(aura, "CLASS_BUFF")
 	if state.trackedByInstance[auraId] == nil then
 		state.trackedByInstance[auraId] = spellId
 		state.trackedCount = (state.trackedCount or 0) + 1
 	else
 		state.trackedByInstance[auraId] = spellId
 	end
-	local wasExpiring = state.trackedExpiringByInstance[auraId] == true
-	state.trackedExpiringByInstance[auraId] = expiring == true or nil
-	if expiring == true and not wasExpiring then
-		state.expiringCount = (state.expiringCount or 0) + 1
-	elseif expiring ~= true and wasExpiring then
-		state.expiringCount = math.max(0, (state.expiringCount or 0) - 1)
-	end
-	state.hasBuff = ((state.trackedCount or 0) - (state.expiringCount or 0)) > 0
+	state.hasBuff = (state.trackedCount or 0) > 0
 	return true
 end
 
@@ -4547,11 +4306,9 @@ function Reminder:RemoveGroupBuffAuraFromState(state, auraId)
 	if not auraId or state.trackedByInstance[auraId] == nil then return false end
 
 	state.trackedByInstance[auraId] = nil
-	if state.trackedExpiringByInstance[auraId] == true then state.expiringCount = math.max(0, (state.expiringCount or 0) - 1) end
-	state.trackedExpiringByInstance[auraId] = nil
 	state.trackedCount = (state.trackedCount or 0) - 1
 	if state.trackedCount < 0 then state.trackedCount = 0 end
-	state.hasBuff = ((state.trackedCount or 0) - (state.expiringCount or 0)) > 0
+	state.hasBuff = state.trackedCount > 0
 	return true
 end
 
@@ -4588,7 +4345,7 @@ function Reminder:FullRefreshGroupBuffUnitState(cache, unit)
 		continuationToken = nextToken
 	end
 
-	state.hasBuff = ((state.trackedCount or 0) - (state.expiringCount or 0)) > 0
+	state.hasBuff = (state.trackedCount or 0) > 0
 	state.initialized = true
 	return state
 end
@@ -4637,11 +4394,7 @@ function Reminder:ApplyDeltaToGroupBuffUnitState(cache, unit, updateInfo)
 				local aura = C_UnitAuras.GetAuraDataByAuraInstanceID(unit, auraId)
 				if aura then
 					local trackedAuraId = self:GetTrackableGroupBuffAuraData(aura, cache)
-					if trackedAuraId ~= auraId then
-						if self:RemoveGroupBuffAuraFromState(state, auraId) then changed = true end
-					elseif self:AddGroupBuffAuraToState(state, aura, cache) then
-						changed = true
-					end
+					if trackedAuraId ~= auraId and self:RemoveGroupBuffAuraFromState(state, auraId) then changed = true end
 				else
 					if self:RemoveGroupBuffAuraFromState(state, auraId) then changed = true end
 				end
@@ -4649,7 +4402,7 @@ function Reminder:ApplyDeltaToGroupBuffUnitState(cache, unit, updateInfo)
 		end
 	end
 
-	state.hasBuff = ((state.trackedCount or 0) - (state.expiringCount or 0)) > 0
+	state.hasBuff = (state.trackedCount or 0) > 0
 	state.initialized = true
 	return state, changed
 end
@@ -5135,9 +4888,9 @@ function Reminder:RenderSelfMissingIcons(missingEntries)
 		return false
 	end
 
-	local scale = clamp(getValue(DB.SCALE, defaults.scale), 0.5, 2, defaults.scale)
-	local iconSize = clamp(getValue(DB.ICON_SIZE, defaults.iconSize), 14, 120, defaults.iconSize)
-	local iconGap = clamp(getValue(DB.ICON_GAP, defaults.iconGap), 0, 40, defaults.iconGap)
+	local scale = clamp(getValue(DB_SCALE, defaults.scale), 0.5, 2, defaults.scale)
+	local iconSize = clamp(getValue(DB_ICON_SIZE, defaults.iconSize), 14, 120, defaults.iconSize)
+	local iconGap = clamp(getValue(DB_ICON_GAP, defaults.iconGap), 0, 40, defaults.iconGap)
 	local xyTextSize, xyTextOutline, xyTextR, xyTextG, xyTextB, xyTextA, xyOffsetX, xyOffsetY = self:GetIconCountTextStyle()
 	local scaledIconSize = math.max(14, math.floor((iconSize * scale) + 0.5))
 	local scaledIconGap = math.max(0, math.floor((iconGap * scale) + 0.5))
@@ -5403,12 +5156,12 @@ function Reminder:ApplyVisualSettings()
 	local frame = self:EnsureFrame()
 	if not frame then return end
 
-	local scale = clamp(getValue(DB.SCALE, defaults.scale), 0.5, 2, defaults.scale)
-	local iconSize = clamp(getValue(DB.ICON_SIZE, defaults.iconSize), 14, 120, defaults.iconSize)
-	local fontSize = clamp(getValue(DB.FONT_SIZE, defaults.fontSize), 9, 30, defaults.fontSize)
-	local iconGap = clamp(getValue(DB.ICON_GAP, defaults.iconGap), 0, 40, defaults.iconGap)
-	local displayMode = normalizeDisplayMode(getValue(DB.DISPLAY_MODE, defaults.displayMode))
-	local growthDirection = normalizeGrowthDirection(getValue(DB.GROWTH_DIRECTION, defaults.growthDirection))
+	local scale = clamp(getValue(DB_SCALE, defaults.scale), 0.5, 2, defaults.scale)
+	local iconSize = clamp(getValue(DB_ICON_SIZE, defaults.iconSize), 14, 120, defaults.iconSize)
+	local fontSize = clamp(getValue(DB_FONT_SIZE, defaults.fontSize), 9, 30, defaults.fontSize)
+	local iconGap = clamp(getValue(DB_ICON_GAP, defaults.iconGap), 0, 40, defaults.iconGap)
+	local displayMode = normalizeDisplayMode(getValue(DB_DISPLAY_MODE, defaults.displayMode))
+	local growthDirection = normalizeGrowthDirection(getValue(DB_GROWTH_DIRECTION, defaults.growthDirection))
 	local xyTextSize, xyTextOutline, xyTextR, xyTextG, xyTextB, xyTextA, xyOffsetX, xyOffsetY = self:GetIconCountTextStyle()
 	local borderEnabled = self:IsBorderEnabled()
 	local borderTexture = self:GetBorderTextureKey()
@@ -5425,27 +5178,27 @@ function Reminder:ApplyVisualSettings()
 	local framePadding = math.max(4, math.floor((6 * scale) + 0.5))
 
 	if addon.db then
-		if addon.db[DB.DISPLAY_MODE] ~= displayMode then addon.db[DB.DISPLAY_MODE] = displayMode end
-		if addon.db[DB.SCALE] ~= scale then addon.db[DB.SCALE] = scale end
-		if addon.db[DB.ICON_SIZE] ~= iconSize then addon.db[DB.ICON_SIZE] = iconSize end
-		if addon.db[DB.FONT_SIZE] ~= fontSize then addon.db[DB.FONT_SIZE] = fontSize end
-		if addon.db[DB.ICON_GAP] ~= iconGap then addon.db[DB.ICON_GAP] = iconGap end
-		if addon.db[DB.GROWTH_DIRECTION] ~= growthDirection then addon.db[DB.GROWTH_DIRECTION] = growthDirection end
-		if addon.db[DB.BORDER_ENABLED] ~= borderEnabled then addon.db[DB.BORDER_ENABLED] = borderEnabled end
-		if addon.db[DB.BORDER_TEXTURE] ~= borderTexture then addon.db[DB.BORDER_TEXTURE] = borderTexture end
-		if addon.db[DB.BORDER_SIZE] ~= borderSize then addon.db[DB.BORDER_SIZE] = borderSize end
-		if addon.db[DB.BORDER_OFFSET] ~= borderOffset then addon.db[DB.BORDER_OFFSET] = borderOffset end
-		if addon.db[DB.XY_TEXT_SIZE] ~= xyTextSize then addon.db[DB.XY_TEXT_SIZE] = xyTextSize end
-		if addon.db[DB.XY_TEXT_OUTLINE] ~= xyTextOutline then addon.db[DB.XY_TEXT_OUTLINE] = xyTextOutline end
-		if addon.db[DB.XY_TEXT_OFFSET_X] ~= xyOffsetX then addon.db[DB.XY_TEXT_OFFSET_X] = xyOffsetX end
-		if addon.db[DB.XY_TEXT_OFFSET_Y] ~= xyOffsetY then addon.db[DB.XY_TEXT_OFFSET_Y] = xyOffsetY end
-		local currentBorderColor = addon.db[DB.BORDER_COLOR]
+		if addon.db[DB_DISPLAY_MODE] ~= displayMode then addon.db[DB_DISPLAY_MODE] = displayMode end
+		if addon.db[DB_SCALE] ~= scale then addon.db[DB_SCALE] = scale end
+		if addon.db[DB_ICON_SIZE] ~= iconSize then addon.db[DB_ICON_SIZE] = iconSize end
+		if addon.db[DB_FONT_SIZE] ~= fontSize then addon.db[DB_FONT_SIZE] = fontSize end
+		if addon.db[DB_ICON_GAP] ~= iconGap then addon.db[DB_ICON_GAP] = iconGap end
+		if addon.db[DB_GROWTH_DIRECTION] ~= growthDirection then addon.db[DB_GROWTH_DIRECTION] = growthDirection end
+		if addon.db[DB_BORDER_ENABLED] ~= borderEnabled then addon.db[DB_BORDER_ENABLED] = borderEnabled end
+		if addon.db[DB_BORDER_TEXTURE] ~= borderTexture then addon.db[DB_BORDER_TEXTURE] = borderTexture end
+		if addon.db[DB_BORDER_SIZE] ~= borderSize then addon.db[DB_BORDER_SIZE] = borderSize end
+		if addon.db[DB_BORDER_OFFSET] ~= borderOffset then addon.db[DB_BORDER_OFFSET] = borderOffset end
+		if addon.db[DB_XY_TEXT_SIZE] ~= xyTextSize then addon.db[DB_XY_TEXT_SIZE] = xyTextSize end
+		if addon.db[DB_XY_TEXT_OUTLINE] ~= xyTextOutline then addon.db[DB_XY_TEXT_OUTLINE] = xyTextOutline end
+		if addon.db[DB_XY_TEXT_OFFSET_X] ~= xyOffsetX then addon.db[DB_XY_TEXT_OFFSET_X] = xyOffsetX end
+		if addon.db[DB_XY_TEXT_OFFSET_Y] ~= xyOffsetY then addon.db[DB_XY_TEXT_OFFSET_Y] = xyOffsetY end
+		local currentBorderColor = addon.db[DB_BORDER_COLOR]
 		if type(currentBorderColor) ~= "table" or currentBorderColor.r ~= borderR or currentBorderColor.g ~= borderG or currentBorderColor.b ~= borderB or currentBorderColor.a ~= borderA then
-			addon.db[DB.BORDER_COLOR] = { r = borderR, g = borderG, b = borderB, a = borderA }
+			addon.db[DB_BORDER_COLOR] = { r = borderR, g = borderG, b = borderB, a = borderA }
 		end
-		local currentColor = addon.db[DB.XY_TEXT_COLOR]
+		local currentColor = addon.db[DB_XY_TEXT_COLOR]
 		if type(currentColor) ~= "table" or currentColor.r ~= xyTextR or currentColor.g ~= xyTextG or currentColor.b ~= xyTextB or currentColor.a ~= xyTextA then
-			addon.db[DB.XY_TEXT_COLOR] = { r = xyTextR, g = xyTextG, b = xyTextB, a = xyTextA }
+			addon.db[DB_XY_TEXT_COLOR] = { r = xyTextR, g = xyTextG, b = xyTextB, a = xyTextA }
 		end
 	end
 
@@ -5668,13 +5421,13 @@ end
 
 function Reminder:IsGroupModeAllowed()
 	local context = self:GetGroupContext()
-	if context == GROUP_CONTEXT_RAID then return getValue(DB.SHOW_RAID, defaults.showRaid) == true end
-	if context == GROUP_CONTEXT_PARTY then return getValue(DB.SHOW_PARTY, defaults.showParty) == true end
-	return getValue(DB.SHOW_SOLO, defaults.showSolo) == true
+	if context == GROUP_CONTEXT_RAID then return getValue(DB_SHOW_RAID, defaults.showRaid) == true end
+	if context == GROUP_CONTEXT_PARTY then return getValue(DB_SHOW_PARTY, defaults.showParty) == true end
+	return getValue(DB_SHOW_SOLO, defaults.showSolo) == true
 end
 
 function Reminder:ShouldRegisterRuntimeEvents()
-	if getValue(DB.ENABLED, defaults.enabled) ~= true then return false end
+	if getValue(DB_ENABLED, defaults.enabled) ~= true then return false end
 	if self.runtimeProviderValid ~= true then self:RefreshProviderCache(false) end
 	if self.hasProviderCached == true then return true end
 	return self:IsFlaskTrackingEnabled() or self:IsFoodTrackingEnabled() or self:IsRuneTrackingEnabled() or self:IsWeaponBuffTrackingEnabled() or self:CanCheckPetReminder()
@@ -5684,7 +5437,7 @@ function Reminder:Render(provider, missing, total, supplementalEntries, effectiv
 	local frame = self:EnsureFrame()
 	if not frame then return end
 
-	local displayMode = normalizeDisplayMode(getValue(DB.DISPLAY_MODE, defaults.displayMode))
+	local displayMode = normalizeDisplayMode(getValue(DB_DISPLAY_MODE, defaults.displayMode))
 	local title = self:GetProviderName(provider)
 	local selfMissingEntries = self:GetSelfMissingEntries(provider)
 	local supplemental = type(supplementalEntries) == "table" and supplementalEntries or nil
@@ -5756,7 +5509,7 @@ function Reminder:Render(provider, missing, total, supplementalEntries, effectiv
 	end
 	frame:Show()
 
-	local showGlow = getValue(DB.GLOW, defaults.glow) == true and ((tonumber(effectiveMissing) or tonumber(missing) or 0) > 0)
+	local showGlow = getValue(DB_GLOW, defaults.glow) == true and ((tonumber(effectiveMissing) or tonumber(missing) or 0) > 0)
 	self:SetGlowShown(showGlow)
 end
 
@@ -5764,7 +5517,7 @@ function Reminder:RenderEditModePreview()
 	local frame = self:EnsureFrame()
 	if not frame then return end
 
-	local displayMode = normalizeDisplayMode(getValue(DB.DISPLAY_MODE, defaults.displayMode))
+	local displayMode = normalizeDisplayMode(getValue(DB_DISPLAY_MODE, defaults.displayMode))
 	local provider = self:GetProvider()
 	if provider then
 		self:Render(provider, 2, 5)
@@ -5786,7 +5539,6 @@ end
 
 function Reminder:UpdateDisplay()
 	self:FlushPendingAuraUpdates()
-	self.nextExpiringWarningDelay = nil
 	local frame = self:EnsureFrame()
 	if not frame then return end
 
@@ -5801,35 +5553,40 @@ function Reminder:UpdateDisplay()
 	self:HideSamplePreview()
 	self:HideSelfMissingIcons()
 
-	if getValue(DB.ENABLED, defaults.enabled) ~= true then
-		self:ClearExpiringWarningUpdate()
+	if getValue(DB_ENABLED, defaults.enabled) ~= true then
 		self:SetGlowShown(false)
 		self.missingActive = false
 		frame:Hide()
 		return
 	end
 
-	self:SchedulePassiveExpiringWarningChecks()
-
 	local groupModeAllowed = self:IsGroupModeAllowed()
 	local petSoloModeAllowed = groupModeAllowed ~= true and self:GetGroupContext() == GROUP_CONTEXT_SOLO and self:CanCheckPetReminder()
 	if groupModeAllowed ~= true and petSoloModeAllowed ~= true then
-		self:HideDisplayAndScheduleExpiringWarning(frame)
+		self:SetGlowShown(false)
+		self.missingActive = false
+		frame:Hide()
 		return
 	end
 
 	if self:IsHideInRestedAreaEnabled() == true and self:IsPlayerInRestedArea() == true then
-		self:HideDisplayAndScheduleExpiringWarning(frame)
+		self:SetGlowShown(false)
+		self.missingActive = false
+		frame:Hide()
 		return
 	end
 
 	if not canEvaluateUnit("player") then
-		self:HideDisplayAndScheduleExpiringWarning(frame)
+		self:SetGlowShown(false)
+		self.missingActive = false
+		frame:Hide()
 		return
 	end
 
 	if self:IsRuntimeEvaluationBlockedByCombat() then
-		self:HideDisplayAndScheduleExpiringWarning(frame)
+		self:SetGlowShown(false)
+		self.missingActive = false
+		frame:Hide()
 		return
 	end
 
@@ -5852,7 +5609,9 @@ function Reminder:UpdateDisplay()
 		elseif self:CanCheckPetReminder() then
 			provider = self:GetPetOnlyProvider()
 		else
-			self:HideDisplayAndScheduleExpiringWarning(frame)
+			self:SetGlowShown(false)
+			self.missingActive = false
+			frame:Hide()
 			return
 		end
 	end
@@ -5889,7 +5648,9 @@ function Reminder:UpdateDisplay()
 		end
 	end
 	if total <= 0 and supplementalMissing <= 0 then
-		self:HideDisplayAndScheduleExpiringWarning(frame)
+		self:SetGlowShown(false)
+		self.missingActive = false
+		frame:Hide()
 		return
 	end
 
@@ -5898,14 +5659,15 @@ function Reminder:UpdateDisplay()
 	if self.suppressNextMissingSound == true and effectiveMissing <= 0 then self.suppressNextMissingSound = false end
 
 	if effectiveMissing <= 0 then
-		self:HideDisplayAndScheduleExpiringWarning(frame)
+		self:SetGlowShown(false)
+		self.missingActive = false
+		frame:Hide()
 		return
 	end
 
 	self:UpdateMissingStateAndSound(effectiveMissing)
 
 	self:Render(provider, missing, total, supplementalEntries, effectiveMissing)
-	self:ScheduleNextExpiringWarningUpdate()
 end
 
 function Reminder:RequestUpdate(immediate, delay, reschedule)
@@ -6207,29 +5969,29 @@ local function editModeSetColor(key, value, fallback)
 end
 
 local function editModeSetGlowStyle(value)
-	if addon.db then addon.db[DB.GLOW_STYLE] = normalizeGlowStyle(value) end
+	if addon.db then addon.db[DB_GLOW_STYLE] = normalizeGlowStyle(value) end
 	Reminder:RequestUpdate(true)
 end
 
 local function editModeSetGlowInset(value)
-	if addon.db then addon.db[DB.GLOW_INSET] = normalizeGlowInset(value) end
+	if addon.db then addon.db[DB_GLOW_INSET] = normalizeGlowInset(value) end
 	Reminder:RequestUpdate(true)
 end
 
 local function editModeSetDisplayMode(value)
-	if addon.db then addon.db[DB.DISPLAY_MODE] = normalizeDisplayMode(value) end
+	if addon.db then addon.db[DB_DISPLAY_MODE] = normalizeDisplayMode(value) end
 	Reminder:ApplyVisualSettings()
 	Reminder:RequestUpdate(true)
 end
 
 local function editModeSetGrowthDirection(value)
-	if addon.db then addon.db[DB.GROWTH_DIRECTION] = normalizeGrowthDirection(value) end
+	if addon.db then addon.db[DB_GROWTH_DIRECTION] = normalizeGrowthDirection(value) end
 	Reminder:ApplyVisualSettings()
 	Reminder:RequestUpdate(true)
 end
 
 local function editModeSetGrowthFromCenter(value)
-	if addon.db then addon.db[DB.GROWTH_FROM_CENTER] = value == true end
+	if addon.db then addon.db[DB_GROWTH_FROM_CENTER] = value == true end
 	Reminder:ApplyVisualSettings()
 	Reminder:RequestUpdate(true)
 end
@@ -6243,19 +6005,19 @@ function Reminder.EditModeRefreshRuntimeAfterTrackingChange()
 end
 
 local function editModeSetTrackFlasks(value)
-	if addon.db then addon.db[DB.TRACK_FLASKS] = value == true end
+	if addon.db then addon.db[DB_TRACK_FLASKS] = value == true end
 	Reminder:InvalidateFlaskCache()
 	Reminder.EditModeRefreshRuntimeAfterTrackingChange()
 end
 
 local function editModeSetTrackFood(value)
-	if addon.db then addon.db[DB.TRACK_FOOD] = value == true end
+	if addon.db then addon.db[DB_TRACK_FOOD] = value == true end
 	Reminder:InvalidateFoodCache()
 	Reminder.EditModeRefreshRuntimeAfterTrackingChange()
 end
 
 local function editModeSetRoleFilterContext(value)
-	if addon.db then addon.db[DB.ROLE_FILTER_CONTEXT] = normalizeRoleFilterContext(value) end
+	if addon.db then addon.db[DB_ROLE_FILTER_CONTEXT] = normalizeRoleFilterContext(value) end
 	Reminder:RequestUpdate(true)
 end
 
@@ -6270,7 +6032,7 @@ function Reminder:EditModeSetMissingSound(value)
 		else
 			chosen = ""
 		end
-		addon.db[DB.MISSING_SOUND] = chosen or ""
+		addon.db[DB_MISSING_SOUND] = chosen or ""
 	end
 	self.initialSoundSyncDone = false
 	self:NormalizeMissingSoundSelection()
@@ -6278,19 +6040,7 @@ function Reminder:EditModeSetMissingSound(value)
 	self:RequestUpdate(true)
 end
 
-local function editModeSetExpiringWarningMinutes(key, value)
-	if addon.db then addon.db[key] = normalizeExpiringWarningMinutes(value) end
-	Reminder:MarkAuraStatesDirty()
-	Reminder:RequestUpdate(true)
-end
-
-local function editModeSetExpiringWarningUseGlobal(key, value)
-	if addon.db then addon.db[key] = value == true end
-	Reminder:MarkAuraStatesDirty()
-	Reminder:RequestUpdate(true)
-end
-
-function Reminder:IsEditModeIconOnlyModeActive() return normalizeDisplayMode(getValue(DB.DISPLAY_MODE, defaults.displayMode)) == DISPLAY_MODE_ICON_ONLY end
+function Reminder:IsEditModeIconOnlyModeActive() return normalizeDisplayMode(getValue(DB_DISPLAY_MODE, defaults.displayMode)) == DISPLAY_MODE_ICON_ONLY end
 
 local editModeSettingsBuilders = {}
 
@@ -6314,40 +6064,40 @@ function editModeSettingsBuilders.buildClassBuffs()
 			kind = SettingType.Checkbox,
 			parentId = "classBuffs",
 			default = defaults.showParty,
-			get = function() return getValue(DB.SHOW_PARTY, defaults.showParty) == true end,
-			set = function(_, value) editModeSetBool(DB.SHOW_PARTY, value) end,
+			get = function() return getValue(DB_SHOW_PARTY, defaults.showParty) == true end,
+			set = function(_, value) editModeSetBool(DB_SHOW_PARTY, value) end,
 		},
 		{
 			name = L["ClassBuffReminderShowRaid"] or "Track in raid",
 			kind = SettingType.Checkbox,
 			parentId = "classBuffs",
 			default = defaults.showRaid,
-			get = function() return getValue(DB.SHOW_RAID, defaults.showRaid) == true end,
-			set = function(_, value) editModeSetBool(DB.SHOW_RAID, value) end,
+			get = function() return getValue(DB_SHOW_RAID, defaults.showRaid) == true end,
+			set = function(_, value) editModeSetBool(DB_SHOW_RAID, value) end,
 		},
 		{
 			name = L["ClassBuffReminderShowSolo"] or "Show while solo",
 			kind = SettingType.Checkbox,
 			parentId = "classBuffs",
 			default = defaults.showSolo,
-			get = function() return getValue(DB.SHOW_SOLO, defaults.showSolo) == true end,
-			set = function(_, value) editModeSetBool(DB.SHOW_SOLO, value) end,
+			get = function() return getValue(DB_SHOW_SOLO, defaults.showSolo) == true end,
+			set = function(_, value) editModeSetBool(DB_SHOW_SOLO, value) end,
 		},
 		{
 			name = L["ClassBuffReminderHideInRestedArea"] or "Don't show in rested areas",
 			kind = SettingType.Checkbox,
 			parentId = "classBuffs",
 			default = defaults.hideInRestedArea == true,
-			get = function() return getValue(DB.HIDE_IN_RESTED_AREA, defaults.hideInRestedArea) == true end,
-			set = function(_, value) editModeSetBool(DB.HIDE_IN_RESTED_AREA, value) end,
+			get = function() return getValue(DB_HIDE_IN_RESTED_AREA, defaults.hideInRestedArea) == true end,
+			set = function(_, value) editModeSetBool(DB_HIDE_IN_RESTED_AREA, value) end,
 		},
 		{
 			name = L["ClassBuffReminderGlow"] or "Glow when missing",
 			kind = SettingType.Checkbox,
 			parentId = "classBuffs",
 			default = defaults.glow,
-			get = function() return getValue(DB.GLOW, defaults.glow) == true end,
-			set = function(_, value) editModeSetBool(DB.GLOW, value) end,
+			get = function() return getValue(DB_GLOW, defaults.glow) == true end,
+			set = function(_, value) editModeSetBool(DB_GLOW, value) end,
 		},
 		{
 			name = L["Glow style"] or "Glow style",
@@ -6355,15 +6105,15 @@ function editModeSettingsBuilders.buildClassBuffs()
 			parentId = "classBuffs",
 			height = 180,
 			default = defaults.glowStyle,
-			get = function() return normalizeGlowStyle(getValue(DB.GLOW_STYLE, defaults.glowStyle)) end,
+			get = function() return normalizeGlowStyle(getValue(DB_GLOW_STYLE, defaults.glowStyle)) end,
 			set = function(_, value) editModeSetGlowStyle(value) end,
 			generator = function(_, root)
 				for _, option in ipairs(Reminder.GLOW_STYLE_OPTIONS or {}) do
 					local label = L[option.labelKey] or option.fallback
-					root:CreateRadio(label, function() return normalizeGlowStyle(getValue(DB.GLOW_STYLE, defaults.glowStyle)) == option.value end, function() editModeSetGlowStyle(option.value) end)
+					root:CreateRadio(label, function() return normalizeGlowStyle(getValue(DB_GLOW_STYLE, defaults.glowStyle)) == option.value end, function() editModeSetGlowStyle(option.value) end)
 				end
 			end,
-			isEnabled = function() return getValue(DB.GLOW, defaults.glow) == true end,
+			isEnabled = function() return getValue(DB_GLOW, defaults.glow) == true end,
 		},
 		{
 			name = L["Glow inset"] or "Glow inset",
@@ -6373,10 +6123,10 @@ function editModeSettingsBuilders.buildClassBuffs()
 			minValue = -(Reminder.GLOW_INSET_RANGE or 20),
 			maxValue = Reminder.GLOW_INSET_RANGE or 20,
 			valueStep = 1,
-			get = function() return normalizeGlowInset(getValue(DB.GLOW_INSET, defaults.glowInset)) end,
+			get = function() return normalizeGlowInset(getValue(DB_GLOW_INSET, defaults.glowInset)) end,
 			set = function(_, value) editModeSetGlowInset(value) end,
 			formatter = function(value) return tostring(math.floor((tonumber(value) or defaults.glowInset or 0) + 0.5)) end,
-			isEnabled = function() return getValue(DB.GLOW, defaults.glow) == true end,
+			isEnabled = function() return getValue(DB_GLOW, defaults.glow) == true end,
 		},
 		{
 			name = L["Glow color"] or "Glow color",
@@ -6388,7 +6138,7 @@ function editModeSettingsBuilders.buildClassBuffs()
 				return { r = r, g = g, b = b, a = a }
 			end,
 			set = function(_, value) editModeSetColor("classBuffReminderGlowColor", value, defaults.glowColor) end,
-			isEnabled = function() return getValue(DB.GLOW, defaults.glow) == true end,
+			isEnabled = function() return getValue(DB_GLOW, defaults.glow) == true end,
 		},
 	}
 end
@@ -6406,16 +6156,16 @@ function editModeSettingsBuilders.buildFilters()
 			kind = SettingType.Checkbox,
 			parentId = "filters",
 			default = defaults.onlyOutOfCombat == true,
-			get = function() return getValue(DB.ONLY_OUT_OF_COMBAT, defaults.onlyOutOfCombat) == true end,
-			set = function(_, value) editModeSetBool(DB.ONLY_OUT_OF_COMBAT, value) end,
+			get = function() return getValue(DB_ONLY_OUT_OF_COMBAT, defaults.onlyOutOfCombat) == true end,
+			set = function(_, value) editModeSetBool(DB_ONLY_OUT_OF_COMBAT, value) end,
 		},
 		{
 			name = L["ClassBuffReminderRoleFilterEnabled"] or "Enable role responsibility filter",
 			kind = SettingType.Checkbox,
 			parentId = "filters",
 			default = defaults.roleFilterEnabled == true,
-			get = function() return getValue(DB.ROLE_FILTER_ENABLED, defaults.roleFilterEnabled) == true end,
-			set = function(_, value) editModeSetBool(DB.ROLE_FILTER_ENABLED, value) end,
+			get = function() return getValue(DB_ROLE_FILTER_ENABLED, defaults.roleFilterEnabled) == true end,
+			set = function(_, value) editModeSetBool(DB_ROLE_FILTER_ENABLED, value) end,
 		},
 		{
 			name = L["ClassBuffReminderRoleFilterContext"] or "Apply role filter in",
@@ -6423,129 +6173,72 @@ function editModeSettingsBuilders.buildFilters()
 			parentId = "filters",
 			height = 120,
 			default = defaults.roleFilterContext,
-			get = function() return normalizeRoleFilterContext(getValue(DB.ROLE_FILTER_CONTEXT, defaults.roleFilterContext)) end,
+			get = function() return normalizeRoleFilterContext(getValue(DB_ROLE_FILTER_CONTEXT, defaults.roleFilterContext)) end,
 			set = function(_, value) editModeSetRoleFilterContext(value) end,
 			generator = function(_, root)
 				root:CreateRadio(
 					L["ClassBuffReminderRoleFilterContextAnyGroup"] or "Any group",
-					function() return normalizeRoleFilterContext(getValue(DB.ROLE_FILTER_CONTEXT, defaults.roleFilterContext)) == ROLE_FILTER_CONTEXT_ANY_GROUP end,
+					function() return normalizeRoleFilterContext(getValue(DB_ROLE_FILTER_CONTEXT, defaults.roleFilterContext)) == ROLE_FILTER_CONTEXT_ANY_GROUP end,
 					function() editModeSetRoleFilterContext(ROLE_FILTER_CONTEXT_ANY_GROUP) end
 				)
 				root:CreateRadio(
 					L["ClassBuffReminderRoleFilterContextRaidOnly"] or "Raid only",
-					function() return normalizeRoleFilterContext(getValue(DB.ROLE_FILTER_CONTEXT, defaults.roleFilterContext)) == ROLE_FILTER_CONTEXT_RAID_ONLY end,
+					function() return normalizeRoleFilterContext(getValue(DB_ROLE_FILTER_CONTEXT, defaults.roleFilterContext)) == ROLE_FILTER_CONTEXT_RAID_ONLY end,
 					function() editModeSetRoleFilterContext(ROLE_FILTER_CONTEXT_RAID_ONLY) end
 				)
 				root:CreateRadio(
 					L["ClassBuffReminderRoleFilterContextPartyOnly"] or "Party only",
-					function() return normalizeRoleFilterContext(getValue(DB.ROLE_FILTER_CONTEXT, defaults.roleFilterContext)) == ROLE_FILTER_CONTEXT_PARTY_ONLY end,
+					function() return normalizeRoleFilterContext(getValue(DB_ROLE_FILTER_CONTEXT, defaults.roleFilterContext)) == ROLE_FILTER_CONTEXT_PARTY_ONLY end,
 					function() editModeSetRoleFilterContext(ROLE_FILTER_CONTEXT_PARTY_ONLY) end
 				)
 			end,
-			isShown = function() return getValue(DB.ROLE_FILTER_ENABLED, defaults.roleFilterEnabled) == true end,
+			isShown = function() return getValue(DB_ROLE_FILTER_ENABLED, defaults.roleFilterEnabled) == true end,
 		},
 		{
 			name = L["ClassBuffReminderHideForHealer"] or "Hide reminder for healers",
 			kind = SettingType.Checkbox,
 			parentId = "filters",
 			default = defaults.hideForHealer == true,
-			get = function() return getValue(DB.HIDE_FOR_HEALER, defaults.hideForHealer) == true end,
-			set = function(_, value) editModeSetBool(DB.HIDE_FOR_HEALER, value) end,
-			isShown = function() return getValue(DB.ROLE_FILTER_ENABLED, defaults.roleFilterEnabled) == true end,
+			get = function() return getValue(DB_HIDE_FOR_HEALER, defaults.hideForHealer) == true end,
+			set = function(_, value) editModeSetBool(DB_HIDE_FOR_HEALER, value) end,
+			isShown = function() return getValue(DB_ROLE_FILTER_ENABLED, defaults.roleFilterEnabled) == true end,
 		},
 		{
 			name = L["ClassBuffReminderHideForTank"] or "Hide reminder for tanks",
 			kind = SettingType.Checkbox,
 			parentId = "filters",
 			default = defaults.hideForTank == true,
-			get = function() return getValue(DB.HIDE_FOR_TANK, defaults.hideForTank) == true end,
-			set = function(_, value) editModeSetBool(DB.HIDE_FOR_TANK, value) end,
-			isShown = function() return getValue(DB.ROLE_FILTER_ENABLED, defaults.roleFilterEnabled) == true end,
+			get = function() return getValue(DB_HIDE_FOR_TANK, defaults.hideForTank) == true end,
+			set = function(_, value) editModeSetBool(DB_HIDE_FOR_TANK, value) end,
+			isShown = function() return getValue(DB_ROLE_FILTER_ENABLED, defaults.roleFilterEnabled) == true end,
 		},
 		{
 			name = L["ClassBuffReminderHideForDamager"] or "Hide reminder for damage dealers",
 			kind = SettingType.Checkbox,
 			parentId = "filters",
 			default = defaults.hideForDamager == true,
-			get = function() return getValue(DB.HIDE_FOR_DAMAGER, defaults.hideForDamager) == true end,
-			set = function(_, value) editModeSetBool(DB.HIDE_FOR_DAMAGER, value) end,
-			isShown = function() return getValue(DB.ROLE_FILTER_ENABLED, defaults.roleFilterEnabled) == true end,
+			get = function() return getValue(DB_HIDE_FOR_DAMAGER, defaults.hideForDamager) == true end,
+			set = function(_, value) editModeSetBool(DB_HIDE_FOR_DAMAGER, value) end,
+			isShown = function() return getValue(DB_ROLE_FILTER_ENABLED, defaults.roleFilterEnabled) == true end,
 		},
 		{
 			name = L["ClassBuffReminderHideForNoRole"] or "Hide reminder for unassigned roles",
 			kind = SettingType.Checkbox,
 			parentId = "filters",
 			default = defaults.hideForNoRole == true,
-			get = function() return getValue(DB.HIDE_FOR_NONE, defaults.hideForNoRole) == true end,
-			set = function(_, value) editModeSetBool(DB.HIDE_FOR_NONE, value) end,
-			isShown = function() return getValue(DB.ROLE_FILTER_ENABLED, defaults.roleFilterEnabled) == true end,
+			get = function() return getValue(DB_HIDE_FOR_NONE, defaults.hideForNoRole) == true end,
+			set = function(_, value) editModeSetBool(DB_HIDE_FOR_NONE, value) end,
+			isShown = function() return getValue(DB_ROLE_FILTER_ENABLED, defaults.roleFilterEnabled) == true end,
 		},
 		{
 			name = L["ClassBuffReminderShowIfOnlyProvider"] or "Show when I am the only class provider",
 			kind = SettingType.Checkbox,
 			parentId = "filters",
 			default = defaults.showIfOnlyProvider ~= false,
-			get = function() return getValue(DB.SHOW_IF_ONLY_PROVIDER, defaults.showIfOnlyProvider) == true end,
-			set = function(_, value) editModeSetBool(DB.SHOW_IF_ONLY_PROVIDER, value) end,
-			isShown = function() return getValue(DB.ROLE_FILTER_ENABLED, defaults.roleFilterEnabled) == true end,
+			get = function() return getValue(DB_SHOW_IF_ONLY_PROVIDER, defaults.showIfOnlyProvider) == true end,
+			set = function(_, value) editModeSetBool(DB_SHOW_IF_ONLY_PROVIDER, value) end,
+			isShown = function() return getValue(DB_ROLE_FILTER_ENABLED, defaults.roleFilterEnabled) == true end,
 		},
-	}
-end
-
-function editModeSettingsBuilders.buildExpiringWarnings()
-	local function slider(label, dbKey, defaultValue, parentId, isShown)
-		return {
-			name = label,
-			kind = SettingType.Slider,
-			parentId = parentId,
-			default = defaultValue,
-			minValue = 0,
-			maxValue = 60,
-			valueStep = 0.5,
-			get = function() return normalizeExpiringWarningMinutes(getValue(dbKey, defaultValue)) end,
-			set = function(_, value) editModeSetExpiringWarningMinutes(dbKey, value) end,
-			formatter = function(value)
-				local minutes = normalizeExpiringWarningMinutes(value)
-				if minutes <= 0 then return OFF or "Off" end
-				return string.format(L["ClassBuffReminderExpiringWarningMinutesFmt"] or "%.1f min", minutes)
-			end,
-			isShown = isShown,
-		}
-	end
-
-	local function useGlobal(label, useGlobalKey, defaultValue, parentId)
-		return {
-			name = label,
-			kind = SettingType.Checkbox,
-			parentId = parentId,
-			default = defaultValue == true,
-			get = function() return getValue(useGlobalKey, defaultValue) == true end,
-			set = function(_, value) editModeSetExpiringWarningUseGlobal(useGlobalKey, value) end,
-		}
-	end
-
-	local function customShown(useGlobalKey, defaultValue)
-		return function() return getValue(useGlobalKey, defaultValue) ~= true end
-	end
-
-	return {
-		{
-			name = L["ClassBuffReminderSectionExpiringWarnings"] or "Expiring Buff Warnings",
-			kind = SettingType.Collapsible,
-			id = "expiringWarnings",
-			defaultCollapsed = true,
-		},
-		slider(L["ClassBuffReminderExpiringWarningGlobal"] or "Global warning time", EXPIRING_WARNING_DB.GLOBAL, defaults.expiringWarningMinutes, "expiringWarnings"),
-		useGlobal(L["ClassBuffReminderExpiringWarningClassBuffsUseGlobal"] or "Class buffs use global time", EXPIRING_WARNING_DB.CLASS_BUFFS_USE_GLOBAL, defaults.expiringWarningClassBuffsUseGlobal, "expiringWarnings"),
-		slider(L["ClassBuffReminderExpiringWarningClassBuffs"] or "Class buffs warning time", EXPIRING_WARNING_DB.CLASS_BUFFS, defaults.expiringWarningClassBuffsMinutes, "expiringWarnings", customShown(EXPIRING_WARNING_DB.CLASS_BUFFS_USE_GLOBAL, defaults.expiringWarningClassBuffsUseGlobal)),
-		useGlobal(L["ClassBuffReminderExpiringWarningFlasksUseGlobal"] or "Flasks use global time", EXPIRING_WARNING_DB.FLASKS_USE_GLOBAL, defaults.expiringWarningFlasksUseGlobal, "expiringWarnings"),
-		slider(L["ClassBuffReminderExpiringWarningFlasks"] or "Flasks warning time", EXPIRING_WARNING_DB.FLASKS, defaults.expiringWarningFlasksMinutes, "expiringWarnings", customShown(EXPIRING_WARNING_DB.FLASKS_USE_GLOBAL, defaults.expiringWarningFlasksUseGlobal)),
-		useGlobal(L["ClassBuffReminderExpiringWarningFoodUseGlobal"] or "Food uses global time", EXPIRING_WARNING_DB.FOOD_USE_GLOBAL, defaults.expiringWarningFoodUseGlobal, "expiringWarnings"),
-		slider(L["ClassBuffReminderExpiringWarningFood"] or "Food warning time", EXPIRING_WARNING_DB.FOOD, defaults.expiringWarningFoodMinutes, "expiringWarnings", customShown(EXPIRING_WARNING_DB.FOOD_USE_GLOBAL, defaults.expiringWarningFoodUseGlobal)),
-		useGlobal(L["ClassBuffReminderExpiringWarningRunesUseGlobal"] or "Augment runes use global time", EXPIRING_WARNING_DB.RUNES_USE_GLOBAL, defaults.expiringWarningRunesUseGlobal, "expiringWarnings"),
-		slider(L["ClassBuffReminderExpiringWarningRunes"] or "Augment runes warning time", EXPIRING_WARNING_DB.RUNES, defaults.expiringWarningRunesMinutes, "expiringWarnings", customShown(EXPIRING_WARNING_DB.RUNES_USE_GLOBAL, defaults.expiringWarningRunesUseGlobal)),
-		useGlobal(L["ClassBuffReminderExpiringWarningWeaponBuffsUseGlobal"] or "Weapon buffs use global time", EXPIRING_WARNING_DB.WEAPON_BUFFS_USE_GLOBAL, defaults.expiringWarningWeaponBuffsUseGlobal, "expiringWarnings"),
-		slider(L["ClassBuffReminderExpiringWarningWeaponBuffs"] or "Weapon buffs warning time", EXPIRING_WARNING_DB.WEAPON_BUFFS, defaults.expiringWarningWeaponBuffsMinutes, "expiringWarnings", customShown(EXPIRING_WARNING_DB.WEAPON_BUFFS_USE_GLOBAL, defaults.expiringWarningWeaponBuffsUseGlobal)),
 	}
 end
 
@@ -6562,7 +6255,7 @@ function editModeSettingsBuilders.buildConsumables()
 			kind = SettingType.Checkbox,
 			parentId = "flasks",
 			default = defaults.trackFlasks == true,
-			get = function() return getValue(DB.TRACK_FLASKS, defaults.trackFlasks) == true end,
+			get = function() return getValue(DB_TRACK_FLASKS, defaults.trackFlasks) == true end,
 			set = function(_, value) editModeSetTrackFlasks(value) end,
 		},
 		{
@@ -6577,7 +6270,7 @@ function editModeSettingsBuilders.buildConsumables()
 			tooltip = L["ClassBuffReminderTrackingContentDesc"] or "Choose where this reminder should be active. Multiple entries can be selected.",
 			customDefaultText = _G.NONE or "None",
 			hideSummary = true,
-			isShown = function() return getValue(DB.TRACK_FLASKS, defaults.trackFlasks) == true end,
+			isShown = function() return getValue(DB_TRACK_FLASKS, defaults.trackFlasks) == true end,
 		},
 		{
 			name = L["ClassBuffReminderSectionFood"] or "Food",
@@ -6590,7 +6283,7 @@ function editModeSettingsBuilders.buildConsumables()
 			kind = SettingType.Checkbox,
 			parentId = "food",
 			default = defaults.trackFood == true,
-			get = function() return getValue(DB.TRACK_FOOD, defaults.trackFood) == true end,
+			get = function() return getValue(DB_TRACK_FOOD, defaults.trackFood) == true end,
 			set = function(_, value) editModeSetTrackFood(value) end,
 		},
 		{
@@ -6605,7 +6298,7 @@ function editModeSettingsBuilders.buildConsumables()
 			tooltip = L["ClassBuffReminderTrackingContentDesc"] or "Choose where this reminder should be active. Multiple entries can be selected.",
 			customDefaultText = _G.NONE or "None",
 			hideSummary = true,
-			isShown = function() return getValue(DB.TRACK_FOOD, defaults.trackFood) == true end,
+			isShown = function() return getValue(DB_TRACK_FOOD, defaults.trackFood) == true end,
 		},
 		{
 			name = L["ClassBuffReminderSectionRunes"] or "Augment Runes",
@@ -6650,9 +6343,9 @@ function editModeSettingsBuilders.buildConsumables()
 			kind = SettingType.Checkbox,
 			parentId = "weaponBuffs",
 			default = defaults.trackWeaponBuffs == true,
-			get = function() return getValue(DB.TRACK_WEAPON_BUFFS, defaults.trackWeaponBuffs) == true end,
+			get = function() return getValue(DB_TRACK_WEAPON_BUFFS, defaults.trackWeaponBuffs) == true end,
 			set = function(_, value)
-				if addon.db then addon.db[DB.TRACK_WEAPON_BUFFS] = value == true end
+				if addon.db then addon.db[DB_TRACK_WEAPON_BUFFS] = value == true end
 				Reminder:InvalidateWeaponBuffCache()
 				Reminder.EditModeRefreshRuntimeAfterTrackingChange()
 			end,
@@ -6669,7 +6362,7 @@ function editModeSettingsBuilders.buildConsumables()
 			tooltip = L["ClassBuffReminderTrackingContentDesc"] or "Choose where this reminder should be active. Multiple entries can be selected.",
 			customDefaultText = _G.NONE or "None",
 			hideSummary = true,
-			isShown = function() return getValue(DB.TRACK_WEAPON_BUFFS, defaults.trackWeaponBuffs) == true end,
+			isShown = function() return getValue(DB_TRACK_WEAPON_BUFFS, defaults.trackWeaponBuffs) == true end,
 		},
 		{
 			name = L["ClassBuffReminderSectionPets"] or "Pets",
@@ -6754,8 +6447,8 @@ function editModeSettingsBuilders.buildSound()
 			kind = SettingType.Checkbox,
 			parentId = "sound",
 			default = defaults.soundOnMissing,
-			get = function() return getValue(DB.SOUND_ON_MISSING, defaults.soundOnMissing) == true end,
-			set = function(_, value) editModeSetBool(DB.SOUND_ON_MISSING, value) end,
+			get = function() return getValue(DB_SOUND_ON_MISSING, defaults.soundOnMissing) == true end,
+			set = function(_, value) editModeSetBool(DB_SOUND_ON_MISSING, value) end,
 		},
 		{
 			name = L["ClassBuffReminderMissingSound"] or "Missing sound",
@@ -6777,7 +6470,7 @@ function editModeSettingsBuilders.buildSound()
 					end)
 				end
 			end,
-			isEnabled = function() return getValue(DB.SOUND_ON_MISSING, defaults.soundOnMissing) == true end,
+			isEnabled = function() return getValue(DB_SOUND_ON_MISSING, defaults.soundOnMissing) == true end,
 		},
 	}
 end
@@ -6795,17 +6488,17 @@ function editModeSettingsBuilders.buildLayout()
 			kind = SettingType.Dropdown,
 			parentId = "anchorSize",
 			height = 80,
-			get = function() return normalizeDisplayMode(getValue(DB.DISPLAY_MODE, defaults.displayMode)) end,
+			get = function() return normalizeDisplayMode(getValue(DB_DISPLAY_MODE, defaults.displayMode)) end,
 			set = function(_, value) editModeSetDisplayMode(value) end,
 			generator = function(_, root)
 				root:CreateRadio(
 					L["ClassBuffReminderDisplayModeFull"] or "Full",
-					function() return normalizeDisplayMode(getValue(DB.DISPLAY_MODE, defaults.displayMode)) == DISPLAY_MODE_FULL end,
+					function() return normalizeDisplayMode(getValue(DB_DISPLAY_MODE, defaults.displayMode)) == DISPLAY_MODE_FULL end,
 					function() editModeSetDisplayMode(DISPLAY_MODE_FULL) end
 				)
 				root:CreateRadio(
 					L["ClassBuffReminderDisplayModeIconOnly"] or "Icon only (X/Y)",
-					function() return normalizeDisplayMode(getValue(DB.DISPLAY_MODE, defaults.displayMode)) == DISPLAY_MODE_ICON_ONLY end,
+					function() return normalizeDisplayMode(getValue(DB_DISPLAY_MODE, defaults.displayMode)) == DISPLAY_MODE_ICON_ONLY end,
 					function() editModeSetDisplayMode(DISPLAY_MODE_ICON_ONLY) end
 				)
 			end,
@@ -6815,27 +6508,27 @@ function editModeSettingsBuilders.buildLayout()
 			kind = SettingType.Dropdown,
 			parentId = "anchorSize",
 			height = 120,
-			get = function() return normalizeGrowthDirection(getValue(DB.GROWTH_DIRECTION, defaults.growthDirection)) end,
+			get = function() return normalizeGrowthDirection(getValue(DB_GROWTH_DIRECTION, defaults.growthDirection)) end,
 			set = function(_, value) editModeSetGrowthDirection(value) end,
 			generator = function(_, root)
 				root:CreateRadio(
 					L["Right"] or "Right",
-					function() return normalizeGrowthDirection(getValue(DB.GROWTH_DIRECTION, defaults.growthDirection)) == GROWTH_RIGHT end,
+					function() return normalizeGrowthDirection(getValue(DB_GROWTH_DIRECTION, defaults.growthDirection)) == GROWTH_RIGHT end,
 					function() editModeSetGrowthDirection(GROWTH_RIGHT) end
 				)
 				root:CreateRadio(
 					L["Left"] or "Left",
-					function() return normalizeGrowthDirection(getValue(DB.GROWTH_DIRECTION, defaults.growthDirection)) == GROWTH_LEFT end,
+					function() return normalizeGrowthDirection(getValue(DB_GROWTH_DIRECTION, defaults.growthDirection)) == GROWTH_LEFT end,
 					function() editModeSetGrowthDirection(GROWTH_LEFT) end
 				)
 				root:CreateRadio(
 					L["Up"] or "Up",
-					function() return normalizeGrowthDirection(getValue(DB.GROWTH_DIRECTION, defaults.growthDirection)) == GROWTH_UP end,
+					function() return normalizeGrowthDirection(getValue(DB_GROWTH_DIRECTION, defaults.growthDirection)) == GROWTH_UP end,
 					function() editModeSetGrowthDirection(GROWTH_UP) end
 				)
 				root:CreateRadio(
 					L["Down"] or "Down",
-					function() return normalizeGrowthDirection(getValue(DB.GROWTH_DIRECTION, defaults.growthDirection)) == GROWTH_DOWN end,
+					function() return normalizeGrowthDirection(getValue(DB_GROWTH_DIRECTION, defaults.growthDirection)) == GROWTH_DOWN end,
 					function() editModeSetGrowthDirection(GROWTH_DOWN) end
 				)
 			end,
@@ -6845,7 +6538,7 @@ function editModeSettingsBuilders.buildLayout()
 			kind = SettingType.Checkbox,
 			parentId = "anchorSize",
 			default = defaults.growthFromCenter == true,
-			get = function() return getValue(DB.GROWTH_FROM_CENTER, defaults.growthFromCenter) == true end,
+			get = function() return getValue(DB_GROWTH_FROM_CENTER, defaults.growthFromCenter) == true end,
 			set = function(_, value) editModeSetGrowthFromCenter(value) end,
 		},
 		{
@@ -6856,8 +6549,8 @@ function editModeSettingsBuilders.buildLayout()
 			minValue = 0.5,
 			maxValue = 2,
 			valueStep = 0.05,
-			get = function() return clamp(getValue(DB.SCALE, defaults.scale), 0.5, 2, defaults.scale) end,
-			set = function(_, value) editModeSetNumber(DB.SCALE, value, 0.5, 2, defaults.scale) end,
+			get = function() return clamp(getValue(DB_SCALE, defaults.scale), 0.5, 2, defaults.scale) end,
+			set = function(_, value) editModeSetNumber(DB_SCALE, value, 0.5, 2, defaults.scale) end,
 			formatter = function(value) return string.format("%.2f", tonumber(value) or defaults.scale) end,
 		},
 		{
@@ -6868,8 +6561,8 @@ function editModeSettingsBuilders.buildLayout()
 			minValue = 14,
 			maxValue = 120,
 			valueStep = 1,
-			get = function() return clamp(getValue(DB.ICON_SIZE, defaults.iconSize), 14, 120, defaults.iconSize) end,
-			set = function(_, value) editModeSetNumber(DB.ICON_SIZE, value, 14, 120, defaults.iconSize) end,
+			get = function() return clamp(getValue(DB_ICON_SIZE, defaults.iconSize), 14, 120, defaults.iconSize) end,
+			set = function(_, value) editModeSetNumber(DB_ICON_SIZE, value, 14, 120, defaults.iconSize) end,
 			formatter = function(value) return tostring(math.floor((tonumber(value) or defaults.iconSize) + 0.5)) end,
 		},
 		{
@@ -6880,8 +6573,8 @@ function editModeSettingsBuilders.buildLayout()
 			minValue = 0,
 			maxValue = 40,
 			valueStep = 1,
-			get = function() return clamp(getValue(DB.ICON_GAP, defaults.iconGap), 0, 40, defaults.iconGap) end,
-			set = function(_, value) editModeSetNumber(DB.ICON_GAP, value, 0, 40, defaults.iconGap) end,
+			get = function() return clamp(getValue(DB_ICON_GAP, defaults.iconGap), 0, 40, defaults.iconGap) end,
+			set = function(_, value) editModeSetNumber(DB_ICON_GAP, value, 0, 40, defaults.iconGap) end,
 			formatter = function(value) return tostring(math.floor((tonumber(value) or defaults.iconGap) + 0.5)) end,
 		},
 		{
@@ -6892,8 +6585,8 @@ function editModeSettingsBuilders.buildLayout()
 			minValue = 9,
 			maxValue = 30,
 			valueStep = 1,
-			get = function() return clamp(getValue(DB.FONT_SIZE, defaults.fontSize), 9, 30, defaults.fontSize) end,
-			set = function(_, value) editModeSetNumber(DB.FONT_SIZE, value, 9, 30, defaults.fontSize) end,
+			get = function() return clamp(getValue(DB_FONT_SIZE, defaults.fontSize), 9, 30, defaults.fontSize) end,
+			set = function(_, value) editModeSetNumber(DB_FONT_SIZE, value, 9, 30, defaults.fontSize) end,
 			formatter = function(value) return tostring(math.floor((tonumber(value) or defaults.fontSize) + 0.5)) end,
 			isShown = function() return not Reminder:IsEditModeIconOnlyModeActive() end,
 		},
@@ -6905,8 +6598,8 @@ function editModeSettingsBuilders.buildLayout()
 			minValue = 8,
 			maxValue = 64,
 			valueStep = 1,
-			get = function() return clamp(getValue(DB.XY_TEXT_SIZE, defaults.xyTextSize), 8, 64, defaults.xyTextSize) end,
-			set = function(_, value) editModeSetNumber(DB.XY_TEXT_SIZE, value, 8, 64, defaults.xyTextSize) end,
+			get = function() return clamp(getValue(DB_XY_TEXT_SIZE, defaults.xyTextSize), 8, 64, defaults.xyTextSize) end,
+			set = function(_, value) editModeSetNumber(DB_XY_TEXT_SIZE, value, 8, 64, defaults.xyTextSize) end,
 			formatter = function(value) return tostring(math.floor((tonumber(value) or defaults.xyTextSize) + 0.5)) end,
 			isShown = function() return Reminder:IsEditModeIconOnlyModeActive() end,
 		},
@@ -6915,45 +6608,45 @@ function editModeSettingsBuilders.buildLayout()
 			kind = SettingType.Dropdown,
 			parentId = "anchorSize",
 			height = 120,
-			get = function() return normalizeTextOutline(getValue(DB.XY_TEXT_OUTLINE, defaults.xyTextOutline)) end,
+			get = function() return normalizeTextOutline(getValue(DB_XY_TEXT_OUTLINE, defaults.xyTextOutline)) end,
 			set = function(_, value)
-				if addon.db then addon.db[DB.XY_TEXT_OUTLINE] = normalizeTextOutline(value) end
+				if addon.db then addon.db[DB_XY_TEXT_OUTLINE] = normalizeTextOutline(value) end
 				Reminder:ApplyVisualSettings()
 				Reminder:RequestUpdate(true)
 			end,
 			generator = function(_, root)
 				root:CreateRadio(
 					NONE,
-					function() return normalizeTextOutline(getValue(DB.XY_TEXT_OUTLINE, defaults.xyTextOutline)) == TEXT_OUTLINE_NONE end,
+					function() return normalizeTextOutline(getValue(DB_XY_TEXT_OUTLINE, defaults.xyTextOutline)) == TEXT_OUTLINE_NONE end,
 					function()
-						if addon.db then addon.db[DB.XY_TEXT_OUTLINE] = normalizeTextOutline(TEXT_OUTLINE_NONE) end
+						if addon.db then addon.db[DB_XY_TEXT_OUTLINE] = normalizeTextOutline(TEXT_OUTLINE_NONE) end
 						Reminder:ApplyVisualSettings()
 						Reminder:RequestUpdate(true)
 					end
 				)
 				root:CreateRadio(
 					L["Outline"] or "Outline",
-					function() return normalizeTextOutline(getValue(DB.XY_TEXT_OUTLINE, defaults.xyTextOutline)) == TEXT_OUTLINE_OUTLINE end,
+					function() return normalizeTextOutline(getValue(DB_XY_TEXT_OUTLINE, defaults.xyTextOutline)) == TEXT_OUTLINE_OUTLINE end,
 					function()
-						if addon.db then addon.db[DB.XY_TEXT_OUTLINE] = normalizeTextOutline(TEXT_OUTLINE_OUTLINE) end
+						if addon.db then addon.db[DB_XY_TEXT_OUTLINE] = normalizeTextOutline(TEXT_OUTLINE_OUTLINE) end
 						Reminder:ApplyVisualSettings()
 						Reminder:RequestUpdate(true)
 					end
 				)
 				root:CreateRadio(
 					L["Thick outline"] or "Thick outline",
-					function() return normalizeTextOutline(getValue(DB.XY_TEXT_OUTLINE, defaults.xyTextOutline)) == TEXT_OUTLINE_THICK end,
+					function() return normalizeTextOutline(getValue(DB_XY_TEXT_OUTLINE, defaults.xyTextOutline)) == TEXT_OUTLINE_THICK end,
 					function()
-						if addon.db then addon.db[DB.XY_TEXT_OUTLINE] = normalizeTextOutline(TEXT_OUTLINE_THICK) end
+						if addon.db then addon.db[DB_XY_TEXT_OUTLINE] = normalizeTextOutline(TEXT_OUTLINE_THICK) end
 						Reminder:ApplyVisualSettings()
 						Reminder:RequestUpdate(true)
 					end
 				)
 				root:CreateRadio(
 					L["Monochrome outline"] or "Monochrome outline",
-					function() return normalizeTextOutline(getValue(DB.XY_TEXT_OUTLINE, defaults.xyTextOutline)) == TEXT_OUTLINE_MONO end,
+					function() return normalizeTextOutline(getValue(DB_XY_TEXT_OUTLINE, defaults.xyTextOutline)) == TEXT_OUTLINE_MONO end,
 					function()
-						if addon.db then addon.db[DB.XY_TEXT_OUTLINE] = normalizeTextOutline(TEXT_OUTLINE_MONO) end
+						if addon.db then addon.db[DB_XY_TEXT_OUTLINE] = normalizeTextOutline(TEXT_OUTLINE_MONO) end
 						Reminder:ApplyVisualSettings()
 						Reminder:RequestUpdate(true)
 					end
@@ -6968,10 +6661,10 @@ function editModeSettingsBuilders.buildLayout()
 			default = defaults.xyTextColor,
 			hasOpacity = true,
 			get = function()
-				local r, g, b, a = normalizeColor(getValue(DB.XY_TEXT_COLOR, defaults.xyTextColor), defaults.xyTextColor)
+				local r, g, b, a = normalizeColor(getValue(DB_XY_TEXT_COLOR, defaults.xyTextColor), defaults.xyTextColor)
 				return { r = r, g = g, b = b, a = a }
 			end,
-			set = function(_, value) editModeSetColor(DB.XY_TEXT_COLOR, value, defaults.xyTextColor) end,
+			set = function(_, value) editModeSetColor(DB_XY_TEXT_COLOR, value, defaults.xyTextColor) end,
 			isShown = function() return Reminder:IsEditModeIconOnlyModeActive() end,
 		},
 		{
@@ -6982,8 +6675,8 @@ function editModeSettingsBuilders.buildLayout()
 			minValue = -60,
 			maxValue = 60,
 			valueStep = 1,
-			get = function() return clamp(getValue(DB.XY_TEXT_OFFSET_X, defaults.xyTextOffsetX), -60, 60, defaults.xyTextOffsetX) end,
-			set = function(_, value) editModeSetNumber(DB.XY_TEXT_OFFSET_X, value, -60, 60, defaults.xyTextOffsetX) end,
+			get = function() return clamp(getValue(DB_XY_TEXT_OFFSET_X, defaults.xyTextOffsetX), -60, 60, defaults.xyTextOffsetX) end,
+			set = function(_, value) editModeSetNumber(DB_XY_TEXT_OFFSET_X, value, -60, 60, defaults.xyTextOffsetX) end,
 			formatter = function(value) return tostring(math.floor((tonumber(value) or defaults.xyTextOffsetX) + 0.5)) end,
 			isShown = function() return Reminder:IsEditModeIconOnlyModeActive() end,
 		},
@@ -6995,8 +6688,8 @@ function editModeSettingsBuilders.buildLayout()
 			minValue = -60,
 			maxValue = 60,
 			valueStep = 1,
-			get = function() return clamp(getValue(DB.XY_TEXT_OFFSET_Y, defaults.xyTextOffsetY), -60, 60, defaults.xyTextOffsetY) end,
-			set = function(_, value) editModeSetNumber(DB.XY_TEXT_OFFSET_Y, value, -60, 60, defaults.xyTextOffsetY) end,
+			get = function() return clamp(getValue(DB_XY_TEXT_OFFSET_Y, defaults.xyTextOffsetY), -60, 60, defaults.xyTextOffsetY) end,
+			set = function(_, value) editModeSetNumber(DB_XY_TEXT_OFFSET_Y, value, -60, 60, defaults.xyTextOffsetY) end,
 			formatter = function(value) return tostring(math.floor((tonumber(value) or defaults.xyTextOffsetY) + 0.5)) end,
 			isShown = function() return Reminder:IsEditModeIconOnlyModeActive() end,
 		},
@@ -7103,7 +6796,6 @@ function editModeSettingsBuilders.buildAll()
 	local settings = {}
 	editModeSettingsBuilders.appendEntries(settings, editModeSettingsBuilders.buildClassBuffs())
 	editModeSettingsBuilders.appendEntries(settings, editModeSettingsBuilders.buildFilters())
-	editModeSettingsBuilders.appendEntries(settings, editModeSettingsBuilders.buildExpiringWarnings())
 	editModeSettingsBuilders.appendEntries(settings, editModeSettingsBuilders.buildConsumables())
 	editModeSettingsBuilders.appendEntries(settings, editModeSettingsBuilders.buildSound())
 	editModeSettingsBuilders.appendEntries(settings, editModeSettingsBuilders.buildLayout())
@@ -7147,7 +6839,7 @@ function Reminder:RegisterEditMode()
 			Reminder:RequestUpdate(true)
 			RunNextFrame(function() Reminder:RequestUpdate(true) end)
 		end,
-		isEnabled = function() return addon.db and addon.db[DB.ENABLED] == true end,
+		isEnabled = function() return addon.db and addon.db[DB_ENABLED] == true end,
 		settings = settings,
 		collapseExclusive = true,
 		-- Runtime visibility is controlled by UpdateDisplay/Render.
@@ -7166,7 +6858,7 @@ function Reminder:UnregisterEditMode()
 end
 
 function Reminder:OnSettingChanged()
-	local enabled = getValue(DB.ENABLED, defaults.enabled) == true
+	local enabled = getValue(DB_ENABLED, defaults.enabled) == true
 	local runtimeActive = self:ShouldRegisterRuntimeEvents()
 	if runtimeActive and not self.eventsRegistered then self.suppressNextMissingSound = true end
 	if runtimeActive then

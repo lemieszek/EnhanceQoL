@@ -38,17 +38,6 @@ local DB = {
 	TRACK_WEAPON_BUFFS = "classBuffReminderTrackWeaponBuffs",
 	TRACK_WEAPON_BUFFS_CONTENT = "classBuffReminderTrackWeaponBuffsContent",
 	TRACK_WEAPON_BUFFS_INSTANCE_ONLY = "classBuffReminderTrackWeaponBuffsInstanceOnly",
-	EXPIRING_WARNING_GLOBAL = "classBuffReminderExpiringWarningMinutes",
-	EXPIRING_WARNING_CLASS_BUFFS_USE_GLOBAL = "classBuffReminderExpiringWarningClassBuffsUseGlobal",
-	EXPIRING_WARNING_CLASS_BUFFS = "classBuffReminderExpiringWarningClassBuffsMinutes",
-	EXPIRING_WARNING_FLASKS_USE_GLOBAL = "classBuffReminderExpiringWarningFlasksUseGlobal",
-	EXPIRING_WARNING_FLASKS = "classBuffReminderExpiringWarningFlasksMinutes",
-	EXPIRING_WARNING_FOOD_USE_GLOBAL = "classBuffReminderExpiringWarningFoodUseGlobal",
-	EXPIRING_WARNING_FOOD = "classBuffReminderExpiringWarningFoodMinutes",
-	EXPIRING_WARNING_RUNES_USE_GLOBAL = "classBuffReminderExpiringWarningRunesUseGlobal",
-	EXPIRING_WARNING_RUNES = "classBuffReminderExpiringWarningRunesMinutes",
-	EXPIRING_WARNING_WEAPON_BUFFS_USE_GLOBAL = "classBuffReminderExpiringWarningWeaponBuffsUseGlobal",
-	EXPIRING_WARNING_WEAPON_BUFFS = "classBuffReminderExpiringWarningWeaponBuffsMinutes",
 	TRACK_PETS = "classBuffReminderTrackPets",
 	TRACK_PETS_CONTENT = "classBuffReminderTrackPetsContent",
 	TRACK_PETS_INSTANCE_ONLY = "classBuffReminderTrackPetsInstanceOnly",
@@ -129,17 +118,6 @@ local defaults = (Reminder and Reminder.defaults)
 		trackPets = false,
 		trackPetsContent = createDefaultTrackingContentSelection(),
 		trackPetsInstanceOnly = false,
-		expiringWarningMinutes = 0,
-		expiringWarningClassBuffsUseGlobal = true,
-		expiringWarningClassBuffsMinutes = 0,
-		expiringWarningFlasksUseGlobal = true,
-		expiringWarningFlasksMinutes = 0,
-		expiringWarningFoodUseGlobal = true,
-		expiringWarningFoodMinutes = 0,
-		expiringWarningRunesUseGlobal = true,
-		expiringWarningRunesMinutes = 0,
-		expiringWarningWeaponBuffsUseGlobal = true,
-		expiringWarningWeaponBuffsMinutes = 0,
 		ignorePetDefensive = false,
 		ignorePetPassive = false,
 		hidePetReminderText = false,
@@ -178,17 +156,6 @@ if defaults.trackWeaponBuffs == nil then defaults.trackWeaponBuffs = false end
 if type(defaults.trackWeaponBuffsContent) ~= "table" then defaults.trackWeaponBuffsContent = createDefaultTrackingContentSelection() end
 if defaults.trackPets == nil then defaults.trackPets = false end
 if type(defaults.trackPetsContent) ~= "table" then defaults.trackPetsContent = createDefaultTrackingContentSelection() end
-if defaults.expiringWarningMinutes == nil then defaults.expiringWarningMinutes = 0 end
-if defaults.expiringWarningClassBuffsUseGlobal == nil then defaults.expiringWarningClassBuffsUseGlobal = true end
-if defaults.expiringWarningClassBuffsMinutes == nil then defaults.expiringWarningClassBuffsMinutes = 0 end
-if defaults.expiringWarningFlasksUseGlobal == nil then defaults.expiringWarningFlasksUseGlobal = true end
-if defaults.expiringWarningFlasksMinutes == nil then defaults.expiringWarningFlasksMinutes = 0 end
-if defaults.expiringWarningFoodUseGlobal == nil then defaults.expiringWarningFoodUseGlobal = true end
-if defaults.expiringWarningFoodMinutes == nil then defaults.expiringWarningFoodMinutes = 0 end
-if defaults.expiringWarningRunesUseGlobal == nil then defaults.expiringWarningRunesUseGlobal = true end
-if defaults.expiringWarningRunesMinutes == nil then defaults.expiringWarningRunesMinutes = 0 end
-if defaults.expiringWarningWeaponBuffsUseGlobal == nil then defaults.expiringWarningWeaponBuffsUseGlobal = true end
-if defaults.expiringWarningWeaponBuffsMinutes == nil then defaults.expiringWarningWeaponBuffsMinutes = 0 end
 if defaults.ignorePetDefensive == nil then defaults.ignorePetDefensive = false end
 if defaults.ignorePetPassive == nil then defaults.ignorePetPassive = false end
 if defaults.borderEnabled == nil then defaults.borderEnabled = false end
@@ -516,17 +483,6 @@ function addon.functions.initClassBuffReminder()
 	init(DB.TRACK_FOOD, defaults.trackFood)
 	init(DB.TRACK_WEAPON_BUFFS, defaults.trackWeaponBuffs)
 	init(DB.TRACK_PETS, defaults.trackPets)
-	init(DB.EXPIRING_WARNING_GLOBAL, defaults.expiringWarningMinutes)
-	init(DB.EXPIRING_WARNING_CLASS_BUFFS_USE_GLOBAL, defaults.expiringWarningClassBuffsUseGlobal)
-	init(DB.EXPIRING_WARNING_CLASS_BUFFS, defaults.expiringWarningClassBuffsMinutes)
-	init(DB.EXPIRING_WARNING_FLASKS_USE_GLOBAL, defaults.expiringWarningFlasksUseGlobal)
-	init(DB.EXPIRING_WARNING_FLASKS, defaults.expiringWarningFlasksMinutes)
-	init(DB.EXPIRING_WARNING_FOOD_USE_GLOBAL, defaults.expiringWarningFoodUseGlobal)
-	init(DB.EXPIRING_WARNING_FOOD, defaults.expiringWarningFoodMinutes)
-	init(DB.EXPIRING_WARNING_RUNES_USE_GLOBAL, defaults.expiringWarningRunesUseGlobal)
-	init(DB.EXPIRING_WARNING_RUNES, defaults.expiringWarningRunesMinutes)
-	init(DB.EXPIRING_WARNING_WEAPON_BUFFS_USE_GLOBAL, defaults.expiringWarningWeaponBuffsUseGlobal)
-	init(DB.EXPIRING_WARNING_WEAPON_BUFFS, defaults.expiringWarningWeaponBuffsMinutes)
 	init(DB.IGNORE_PET_PASSIVE, defaults.ignorePetPassive)
 	init(DB.IGNORE_PET_DEFENSIVE, defaults.ignorePetDefensive)
 	init(DB.SCALE, defaults.scale)
