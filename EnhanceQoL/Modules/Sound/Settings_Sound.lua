@@ -288,7 +288,7 @@ local extraSoundOptionsNoneLabel
 local function buildExtraSoundOptions()
 	local noneLabel = NONE
 	local version = (addon.functions and addon.functions.GetLSMMediaVersion and addon.functions.GetLSMMediaVersion("sound")) or 0
-	if extraSoundOptionsCache and extraSoundOptionsVersion == version and extraSoundOptionsNoneLabel == noneLabel then return extraSoundOptionsCache end
+	if extraSoundOptionsCache and extraSoundOptionsVersion == version and extraSoundOptionsNoneLabel == noneLabel then return extraSoundOptionsCache, extraSoundOrder end
 
 	wipeTable(extraSoundOptionsCache)
 	wipeTable(extraSoundOrder)
@@ -306,7 +306,7 @@ local function buildExtraSoundOptions()
 
 	extraSoundOptionsVersion = version
 	extraSoundOptionsNoneLabel = noneLabel
-	return extraSoundOptionsCache
+	return extraSoundOptionsCache, extraSoundOrder
 end
 
 local function getExtraSound(eventName)

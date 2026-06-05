@@ -181,7 +181,7 @@ local function buildSettings()
 	local talentSoundCacheVersion = -1
 	local function buildTalentSoundOptions()
 		local version = (addon.functions and addon.functions.GetLSMMediaVersion and addon.functions.GetLSMMediaVersion("sound")) or 0
-		if talentSoundCacheVersion == version then return talentSoundOptions end
+		if talentSoundCacheVersion == version then return talentSoundOptions, talentSoundOrder end
 		talentSoundCacheVersion = version
 
 		local list, order
@@ -212,7 +212,7 @@ local function buildSettings()
 		for i = 1, #(order or {}) do
 			talentSoundOrder[i] = order[i]
 		end
-		return talentSoundOptions
+		return talentSoundOptions, talentSoundOrder
 	end
 
 	addon.functions.SettingsCreateHeadline(cGameplay, SETTINGS, { parentSection = sectionTalent })

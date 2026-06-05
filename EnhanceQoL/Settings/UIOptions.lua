@@ -227,7 +227,7 @@ local function buildFocusInterruptSoundDropdown()
 		focusInterruptSoundOrder[i] = order[i]
 	end
 
-	return list or {}
+	return list or {}, order or focusInterruptSoundOrder
 end
 
 local function previewFocusInterruptSound(value)

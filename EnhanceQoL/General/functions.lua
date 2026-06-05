@@ -316,14 +316,15 @@ function addon.functions.GetLSMMediaDropdown(mediaType, includeEmptyOption, empt
 	local key = normalizeMediaType(mediaType)
 	if not key then return EMPTY_TABLE, EMPTY_TABLE end
 
-	local version = addon.functions.GetLSMMediaVersion(key)
+	local cache = getLSMCache(key)
+	local version = cache and cache.version or 0
 	local noneLabel = (type(emptyLabel) == "string" and emptyLabel) or ""
 	local includeEmpty = includeEmptyOption == true
 	local cacheKey = key .. "|" .. (includeEmpty and "1" or "0") .. "|" .. noneLabel
 	local cached = LSM_DROPDOWN_CACHE[cacheKey]
 	if cached and cached.version == version then return cached.list, cached.order end
 
-	local names = addon.functions.GetLSMMediaNames(key)
+	local names = cache and cache.names or EMPTY_TABLE
 	local list = {}
 	local order = {}
 	if includeEmpty then

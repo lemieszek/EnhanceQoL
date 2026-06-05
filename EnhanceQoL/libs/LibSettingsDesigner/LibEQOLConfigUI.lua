@@ -1593,17 +1593,26 @@ local function getOptionLabel(option, key)
 	return option
 end
 
-local function getOptionValue(option, key)
+local function getOptionValue(option, key, arrayEntry)
 	if type(option) == "table" then
 		local value = option.value
 		if value == nil then value = option.key end
 		if value == nil then value = option[1] end
 		if value ~= nil then return value end
 	end
-	if type(option) == "string" then
+	if arrayEntry and type(option) == "string" then
 		return option
 	end
 	return key
+end
+
+local function snapshotArray(list)
+	if type(list) ~= "table" then return nil end
+	local snapshot = {}
+	for index = 1, #list do
+		snapshot[index] = list[index]
+	end
+	return snapshot
 end
 
 local function getControlOptions(control)
@@ -1620,9 +1629,9 @@ local function getControlOptions(control)
 		end
 	end
 	local options = {}
-	local order = type(optionOrder) == "table" and optionOrder
+	local order = snapshotArray(type(optionOrder) == "table" and optionOrder
 		or type(control.orderList) == "table" and control.orderList
-		or type(control.order) == "table" and control.order
+		or type(control.order) == "table" and control.order)
 	local seen
 	if type(list) ~= "table" then
 		return options
@@ -1630,7 +1639,7 @@ local function getControlOptions(control)
 	if not order and #list > 0 then
 		for index, option in ipairs(list) do
 			options[#options + 1] = {
-				value = getOptionValue(option, index),
+				value = getOptionValue(option, index, true),
 				label = tostring(getOptionLabel(option, index) or index),
 			}
 		end
@@ -1642,7 +1651,7 @@ local function getControlOptions(control)
 			if key ~= "_order" and list[key] ~= nil then
 				local option = list[key]
 				options[#options + 1] = {
-					value = getOptionValue(option, key),
+					value = getOptionValue(option, key, false),
 					label = tostring(getOptionLabel(option, key) or key),
 				}
 				seen[key] = true
@@ -1652,7 +1661,7 @@ local function getControlOptions(control)
 	for key, option in pairs(list) do
 		if key ~= "_order" and (not seen or not seen[key]) then
 			options[#options + 1] = {
-				value = getOptionValue(option, key),
+				value = getOptionValue(option, key, false),
 				label = tostring(getOptionLabel(option, key) or key),
 			}
 		end
@@ -2708,79 +2717,106 @@ function lib.PlaySoundDropdownPreview(control, optionOrValue, optionLabel)
 	end
 end
 
+local function resetSoundPreviewButton(button)
+	local preview = button and button.EQOLSoundPreview
+	if not preview then return end
+	preview.EQOLControl = nil
+	preview.EQOLOption = nil
+	preview.EQOLSoundValue = nil
+	preview.EQOLSoundLabel = nil
+	if preview.Icon then
+		preview.Icon:SetVertexColor(0.78, 0.72, 0.62, 1)
+	end
+	if _G.GameTooltip and _G.GameTooltip.GetOwner and _G.GameTooltip:GetOwner() == preview then
+		_G.GameTooltip:Hide()
+	end
+	preview:Hide()
+end
+
+local function ensureSoundPreviewButton(button)
+	if not button then return nil end
+	local preview = button.EQOLSoundPreview
+	if preview then return preview end
+
+	preview = CreateFrame("Button", nil, button)
+	preview:SetSize(18, 18)
+	preview:SetFrameLevel((button:GetFrameLevel() or 1) + 2)
+	preview:SetMotionScriptsWhileDisabled(true)
+	if preview.SetMouseClickEnabled then preview:SetMouseClickEnabled(true) end
+	if preview.SetPropagateMouseClicks then preview:SetPropagateMouseClicks(false) end
+	if preview.SetPropagateMouseMotion then preview:SetPropagateMouseMotion(false) end
+	local icon = preview:CreateTexture(nil, "ARTWORK")
+	icon:SetAllPoints()
+	icon:SetTexture("Interface\\Common\\VoiceChat-Speaker")
+	icon:SetVertexColor(0.78, 0.72, 0.62, 1)
+	preview.Icon = icon
+	preview:SetScript("OnEnter", function(self)
+		if self.Icon then self.Icon:SetVertexColor(1, 0.82, 0.35, 1) end
+		if _G.GameTooltip then
+			_G.GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+			_G.GameTooltip:SetText(self.EQOLSoundLabel or self.EQOLSoundValue or _G.PREVIEW or _G.SOUND or "Preview")
+			local tooltip = self.EQOLControl and self.EQOLControl.previewTooltip
+			if tooltip and tooltip ~= "" then
+				_G.GameTooltip:AddLine(tooltip, 1, 1, 1, true)
+			elseif _G.SOUND then
+				_G.GameTooltip:AddLine(_G.SOUND, 1, 1, 1, true)
+			end
+			_G.GameTooltip:Show()
+		end
+	end)
+	preview:SetScript("OnLeave", function(self)
+		if self.Icon then self.Icon:SetVertexColor(0.78, 0.72, 0.62, 1) end
+		if _G.GameTooltip then
+			_G.GameTooltip:Hide()
+		end
+	end)
+	preview:SetScript("OnClick", function(self, mouseButton)
+		if mouseButton and mouseButton ~= "LeftButton" then return end
+		if self.StopPropagation then self:StopPropagation() end
+		lib.PlaySoundDropdownPreview(self.EQOLControl, self.EQOLSoundValue, self.EQOLSoundLabel)
+	end)
+	button.EQOLSoundPreview = preview
+	if button.HookScript and not button.EQOLSoundPreviewOnHideHooked then
+		button:HookScript("OnHide", resetSoundPreviewButton)
+		button.EQOLSoundPreviewOnHideHooked = true
+	end
+	return preview
+end
+
 function lib.AttachSoundPreviewInitializer(description, control, option)
 	if not (description and description.AddInitializer) then
 		return
 	end
+	local soundValue = option and option.value
+	local soundLabel = option and option.label
 	description:AddInitializer(function(button)
-		local preview = button.EQOLSoundPreview
-		if not preview then
-			preview = CreateFrame("Button", nil, button)
-			preview:SetSize(18, 18)
-			preview:SetPoint("RIGHT", button, "RIGHT", -8, 0)
-			preview:SetFrameLevel((button:GetFrameLevel() or 1) + 2)
-			preview:SetMotionScriptsWhileDisabled(true)
-			local icon = preview:CreateTexture(nil, "ARTWORK")
-			icon:SetAllPoints()
-			icon:SetTexture("Interface\\Common\\VoiceChat-Speaker")
-			icon:SetVertexColor(0.78, 0.72, 0.62, 1)
-			preview.Icon = icon
-			preview:SetScript("OnEnter", function(self)
-				self.Icon:SetVertexColor(1, 0.82, 0.35, 1)
-				if _G.GameTooltip then
-					_G.GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-					_G.GameTooltip:SetText(_G.PREVIEW or _G.SOUND or "Preview")
-					_G.GameTooltip:Show()
-				end
-			end)
-			preview:SetScript("OnLeave", function(self)
-				self.Icon:SetVertexColor(0.78, 0.72, 0.62, 1)
-				if _G.GameTooltip then
-					_G.GameTooltip:Hide()
-				end
-			end)
-			preview:SetScript("OnClick", function(self)
-				if self.StopPropagation then
-					self:StopPropagation()
-				end
-				lib.PlaySoundDropdownPreview(self.EQOLControl, self.EQOLSoundValue, self.EQOLSoundLabel)
-			end)
-			button.EQOLSoundPreview = preview
-		end
-		if not option or option.value == nil or option.value == "" then
-			preview:Hide()
-			if _G.GameTooltip then
-				_G.GameTooltip:Hide()
-			end
-			preview.EQOLControl = nil
-			preview.EQOLSoundValue = nil
-			preview.EQOLSoundLabel = nil
-			preview.EQOLOption = nil
-			return
-		end
+		resetSoundPreviewButton(button)
+		if soundValue == nil or soundValue == "" then return end
+		local preview = ensureSoundPreviewButton(button)
+		if not preview then return end
+		preview:ClearAllPoints()
+		preview:SetPoint("RIGHT", button, "RIGHT", -8, 0)
+		preview:SetFrameLevel((button:GetFrameLevel() or 1) + 2)
 		preview.EQOLControl = control
-		preview.EQOLSoundValue = option.value
-		preview.EQOLSoundLabel = option.label
+		preview.EQOLSoundValue = soundValue
+		preview.EQOLSoundLabel = soundLabel
 		preview.EQOLOption = nil
-		preview.Icon:SetVertexColor(0.78, 0.72, 0.62, 1)
+		if preview.Icon then preview.Icon:SetVertexColor(0.78, 0.72, 0.62, 1) end
 		preview:Show()
 	end)
+	if description.AddResetter then
+		description:AddResetter(resetSoundPreviewButton)
+	end
 end
 
 function lib.AttachSoundPreviewCleanupInitializer(description)
 	if not (description and description.AddInitializer) then
 		return
 	end
-	description:AddInitializer(function(button)
-		local preview = button and button.EQOLSoundPreview
-		if preview then
-			preview.EQOLControl = nil
-			preview.EQOLOption = nil
-			preview.EQOLSoundValue = nil
-			preview.EQOLSoundLabel = nil
-			preview:Hide()
-		end
-	end)
+	description:AddInitializer(resetSoundPreviewButton)
+	if description.AddResetter then
+		description:AddResetter(resetSoundPreviewButton)
+	end
 end
 
 local function addConfigureFallback(row, app, control, text, opts)
