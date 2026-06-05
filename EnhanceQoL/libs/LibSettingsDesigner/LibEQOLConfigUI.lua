@@ -2647,6 +2647,112 @@ local function setDropdownMenuScrollMode(rootDescription, control, optionCount)
 	end
 end
 
+function lib.PlaySoundDropdownPreview(control, option)
+	if not control or not option then
+		return
+	end
+	local value = option.value
+	if value == nil or value == "" then
+		return
+	end
+	if type(control.previewSoundFunc) == "function" then
+		local ok = pcall(control.previewSoundFunc, value, option, control)
+		if ok then
+			return
+		end
+	end
+
+	local sound
+	if type(control.soundResolver) == "function" then
+		local ok, resolved = pcall(control.soundResolver, value, option, control)
+		if ok and resolved then
+			sound = resolved
+		else
+			ok, resolved = pcall(control.soundResolver, value)
+			if ok and resolved then
+				sound = resolved
+			end
+		end
+	end
+	if not sound and LibStub then
+		local lsm = LibStub("LibSharedMedia-3.0", true)
+		if lsm then
+			sound = lsm:Fetch("sound", value, true)
+		end
+	end
+	sound = sound or value
+
+	local channel
+	if type(control.getPlaybackChannel) == "function" then
+		local ok, result = pcall(control.getPlaybackChannel, control)
+		if ok then
+			channel = result
+		end
+	end
+	channel = channel or control.playbackChannel
+
+	local soundID = tonumber(sound)
+	if soundID and _G.PlaySound then
+		_G.PlaySound(soundID, channel or "Master")
+	elseif type(sound) == "string" and sound ~= "" and _G.PlaySoundFile then
+		if channel and channel ~= "" then
+			_G.PlaySoundFile(sound, channel)
+		else
+			_G.PlaySoundFile(sound)
+		end
+	end
+end
+
+function lib.AttachSoundPreviewInitializer(description, control, option)
+	if not (description and description.AddInitializer) then
+		return
+	end
+	description:AddInitializer(function(button)
+		local preview = button.EQOLSoundPreview
+		if not preview then
+			preview = CreateFrame("Button", nil, button)
+			preview:SetSize(18, 18)
+			preview:SetPoint("RIGHT", button, "RIGHT", -8, 0)
+			preview:SetFrameLevel((button:GetFrameLevel() or 1) + 2)
+			preview:SetMotionScriptsWhileDisabled(true)
+			local icon = preview:CreateTexture(nil, "ARTWORK")
+			icon:SetAllPoints()
+			icon:SetTexture("Interface\\Common\\VoiceChat-Speaker")
+			icon:SetVertexColor(0.78, 0.72, 0.62, 1)
+			preview.Icon = icon
+			preview:SetScript("OnEnter", function(self)
+				self.Icon:SetVertexColor(1, 0.82, 0.35, 1)
+				if _G.GameTooltip then
+					_G.GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+					_G.GameTooltip:SetText(_G.PREVIEW or _G.SOUND or "Preview")
+					_G.GameTooltip:Show()
+				end
+			end)
+			preview:SetScript("OnLeave", function(self)
+				self.Icon:SetVertexColor(0.78, 0.72, 0.62, 1)
+				if _G.GameTooltip then
+					_G.GameTooltip:Hide()
+				end
+			end)
+			preview:SetScript("OnClick", function(self)
+				lib.PlaySoundDropdownPreview(self.EQOLControl, self.EQOLOption)
+			end)
+			button.EQOLSoundPreview = preview
+		end
+		if not option or option.value == nil or option.value == "" then
+			preview:Hide()
+			if _G.GameTooltip then
+				_G.GameTooltip:Hide()
+			end
+			return
+		end
+		preview.EQOLControl = control
+		preview.EQOLOption = option
+		preview.Icon:SetVertexColor(0.78, 0.72, 0.62, 1)
+		preview:Show()
+	end)
+end
+
 local function addConfigureFallback(row, app, control, text, opts)
 	opts = opts or {}
 	local L = getLocale(app)
@@ -2893,7 +2999,7 @@ local function addDropdownWidget(row, app, control, opts)
 				return app:GetControlValue(control)
 			end
 			for _, option in ipairs(menuOptions) do
-				rootDescription:CreateRadio(option.label, function(value)
+				local radio = rootDescription:CreateRadio(option.label, function(value)
 					return tostring(getCurrentValue()) == tostring(value)
 				end, function(value)
 					if opts.setValue then
@@ -2911,6 +3017,9 @@ local function addDropdownWidget(row, app, control, opts)
 						lib.RefreshVisibleRows(row._state)
 					end
 				end, option.value)
+				if getControlType(control) == "sounddropdown" then
+					lib.AttachSoundPreviewInitializer(radio, control, option)
+				end
 			end
 		end)
 	end)
