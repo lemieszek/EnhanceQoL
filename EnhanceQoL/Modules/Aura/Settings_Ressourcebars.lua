@@ -5528,17 +5528,21 @@ addon.Aura.functions.AddResourceBarsProfileSettings = function()
 	end
 	scopeOrder[#scopeOrder + 1] = "ALL_CLASSES"
 
-	local cProfiles = addon.SettingsLayout.rootPROFILES
+	local profilesCategory = nil
 
-	local expandableProfile = addon.functions.SettingsCreateExpandableSection(cProfiles, {
+	local expandableProfile = addon.functions.SettingsCreateExpandableSection(profilesCategory, {
 		name = L["Resource Bars"],
 		configPageKey = "ProfilesResourceBars",
+		description = L["configCenterPageCardDescProfilesResourceBars"] or L["configCenterPageCardDescBarsResources"],
 		iconKey = "resource",
 		expanded = false,
 		colorizeTitle = false,
+		newTagID = "ProfilesResourceBars",
+		modernCategory = "profiles",
+		modernOnly = true,
 	})
 
-	addon.functions.SettingsCreateDropdown(cProfiles, {
+	addon.functions.SettingsCreateDropdown(profilesCategory, {
 		var = "resourceBarsProfileScope",
 		text = L["ProfileScope"] or (L["Apply to"] or "Apply to"),
 		list = scopeList,
@@ -5549,7 +5553,7 @@ addon.Aura.functions.AddResourceBarsProfileSettings = function()
 		parentSection = expandableProfile,
 	})
 
-	addon.functions.SettingsCreateButton(cProfiles, {
+	addon.functions.SettingsCreateButton(profilesCategory, {
 		var = "resourceBarsExport",
 		text = L["Export"] or "Export",
 		func = function()
@@ -5587,7 +5591,7 @@ addon.Aura.functions.AddResourceBarsProfileSettings = function()
 		parentSection = expandableProfile,
 	})
 
-	addon.functions.SettingsCreateButton(cProfiles, {
+	addon.functions.SettingsCreateButton(profilesCategory, {
 		var = "resourceBarsImport",
 		text = L["Import"] or "Import",
 		func = function()

@@ -9182,7 +9182,7 @@ local function registerSettingsUI()
 			addon.db.ufProfileScope = scopeOptions[val] and val or "ALL"
 		end
 
-		local cProfiles = addon.SettingsLayout.rootPROFILES
+		local profilesCategory = nil
 		local profileOrderActive, profileOrderGlobal, profileOrderCopy, profileOrderDelete = {}, {}, {}, {}
 		local noOverrideLabel = L["No override"] or "No override"
 
@@ -9231,15 +9231,21 @@ local function registerSettingsUI()
 			end
 		end
 
-		local expandableProfile = addon.functions.SettingsCreateExpandableSection(cProfiles, {
+		local expandableProfile = addon.functions.SettingsCreateExpandableSection(profilesCategory, {
 			name = L["CustomUnitFrames"],
-			iconKey = "settingspage",
+			configPageKey = "UFProfiles",
+			description = L["configCenterPageCardDescProfilesUnitFrames"] or L["configCenterPageDescUnitFrames"],
+			iconKey = "unitframes",
 			expanded = false,
 			colorizeTitle = false,
 			newTagID = "UFProfiles",
+			modernCategory = "profiles",
+			modernOnly = true,
 		})
 
-		addon.functions.SettingsCreateDropdown(cProfiles, {
+		addon.functions.SettingsCreateHeadline(profilesCategory, L["ProfileManagement"] or "Profile management", { parentSection = expandableProfile })
+
+		addon.functions.SettingsCreateDropdown(profilesCategory, {
 			var = "ufProfileActive",
 			text = L["Active profile"] or (L["Active profile"] or "Active profile"),
 			listFunc = function() return buildProfileList(profileOrderActive) end,
@@ -9260,7 +9266,7 @@ local function registerSettingsUI()
 			parentSection = expandableProfile,
 		})
 
-		addon.functions.SettingsCreateDropdown(cProfiles, {
+		addon.functions.SettingsCreateDropdown(profilesCategory, {
 			var = "ufProfileGlobal",
 			text = L["Global profile"] or (L["Global profile"] or "Global profile"),
 			listFunc = function() return buildProfileList(profileOrderGlobal) end,
@@ -9281,7 +9287,7 @@ local function registerSettingsUI()
 			parentSection = expandableProfile,
 		})
 
-		addon.functions.SettingsCreateDropdown(cProfiles, {
+		addon.functions.SettingsCreateDropdown(profilesCategory, {
 			var = "ufProfileCopy",
 			text = L["Copy settings from profile"] or (L["Copy settings from profile"] or "Copy settings from profile"),
 			listFunc = function()
@@ -9322,7 +9328,7 @@ local function registerSettingsUI()
 			parentSection = expandableProfile,
 		})
 
-		addon.functions.SettingsCreateDropdown(cProfiles, {
+		addon.functions.SettingsCreateDropdown(profilesCategory, {
 			var = "ufProfileDelete",
 			text = L["Delete profile"] or (L["Delete profile"] or "Delete profile"),
 			listFunc = function()
@@ -9364,7 +9370,7 @@ local function registerSettingsUI()
 			parentSection = expandableProfile,
 		})
 
-		addon.functions.SettingsCreateButton(cProfiles, {
+		addon.functions.SettingsCreateButton(profilesCategory, {
 			var = "ufProfileCreate",
 			text = L["UFProfileAdd"] or (L["ProfileName"] or "Add a new profile"),
 			func = function()
@@ -9407,7 +9413,7 @@ local function registerSettingsUI()
 			parentSection = expandableProfile,
 		})
 
-		addon.functions.SettingsCreateHeadline(cProfiles, L["UFProfileSpecMappingHeader"] or "Specialization profile mapping", { parentSection = expandableProfile })
+		addon.functions.SettingsCreateHeadline(profilesCategory, L["UFProfileSpecMappingHeader"] or "Specialization profile mapping", { parentSection = expandableProfile })
 
 		local specDropdownOrders = {}
 		local classID = addon.variables and addon.variables.unitClassID
@@ -9422,7 +9428,7 @@ local function registerSettingsUI()
 				local specID, specName = GetSpecializationInfoForClassID(classID, specIndex)
 				if specID and specName then
 					specDropdownOrders[specID] = {}
-					addon.functions.SettingsCreateDropdown(cProfiles, {
+					addon.functions.SettingsCreateDropdown(profilesCategory, {
 						var = string.format("ufProfileSpecMap_%d", specID),
 						text = (L["UFProfileSpecMapping"] or "%s profile"):format(specName),
 						listFunc = function()
@@ -9455,9 +9461,9 @@ local function registerSettingsUI()
 			end
 		end
 
-		addon.functions.SettingsCreateHeadline(cProfiles, L["Export / Import"] or "Export / Import", { parentSection = expandableProfile })
+		addon.functions.SettingsCreateHeadline(profilesCategory, L["Export / Import"] or "Export / Import", { parentSection = expandableProfile })
 
-		addon.functions.SettingsCreateDropdown(cProfiles, {
+		addon.functions.SettingsCreateDropdown(profilesCategory, {
 			var = "ufProfileScope",
 			text = L["ProfileScope"] or (L["Apply to"] or "Apply to"),
 			list = scopeOptions,
@@ -9468,7 +9474,7 @@ local function registerSettingsUI()
 			parentSection = expandableProfile,
 		})
 
-		addon.functions.SettingsCreateButton(cProfiles, {
+		addon.functions.SettingsCreateButton(profilesCategory, {
 			var = "ufExportProfile",
 			text = L["Export"] or "Export",
 			func = function()
@@ -9507,7 +9513,7 @@ local function registerSettingsUI()
 			parentSection = expandableProfile,
 		})
 
-		addon.functions.SettingsCreateButton(cProfiles, {
+		addon.functions.SettingsCreateButton(profilesCategory, {
 			var = "ufImportProfile",
 			text = L["Import"] or "Import",
 			func = function()

@@ -9,8 +9,14 @@
 - Settings Center / Combat Alerts: Moved Combat Alerts to a modern-only Gameplay page and added clearer descriptions for death alerts, no-target reminders, sounds, TTS and role rules.
 - Settings Center / Combat Alerts: Added row-level descriptions for Death Alert and No Target Indicator so the purpose of each feature is visible directly in the modern page.
 - Settings Center / Private Auras: Moved Standalone Private Auras to a modern-only Gameplay page with clearer descriptions for the movable private aura anchor and Edit Mode placement.
+- Settings Center / Profiles: Migrated profile pages to modern-only rendering, including AddOn, Bags Categories, Damage Meter, Healer Buff Placement, Resource Bars and Unit Frames profiles.
+- Settings Center / Profiles: Removed the old Blizzard Settings root category for Profiles; profile pages now register directly into the modern Profiles category.
+- Settings Center / Profiles: Split global Font settings and Import Protection into their own Profile subpages so they can be found directly.
+- Settings Center / Profiles: Added a Profile Management section to the AddOn profile page so active/default profile controls appear before copy, delete, create and export/import actions.
 
 ### 🐛 Fixed
+
+- Settings Center: Lowered the modern settings window to MEDIUM frame strata so it layers more naturally with other addon editor windows.
 
 ## [11.0.0-alpha4] - 2026-06-04
 

@@ -43,17 +43,22 @@ local IMPORT_PROTECTION_DEFS = {
 	{ key = IMPORT_PROTECTION.UNIT_FRAMES, labelKey = "ProfileImportProtectionUnitFrames", fallback = "Unit Frames" },
 }
 
-local cProfiles = addon.SettingsLayout.rootPROFILES
+local profilesCategory = nil
 
-local expandable = addon.functions.SettingsCreateExpandableSection(cProfiles, {
+local expandable = addon.functions.SettingsCreateExpandableSection(profilesCategory, {
 	name = L["AddOn"],
 	configPageKey = "ProfilesAddOn",
+	description = L["configCenterPageCardDescAddOn"],
 	iconKey = "addonprofile",
 	expanded = false,
 	colorizeTitle = false,
 	newTagID = "ProfilesAddOn",
+	modernCategory = "profiles",
+	modernOnly = true,
 })
 
+local importProtectionExpandable
+local fontExpandable
 local bagsCategoriesExpandable
 local damageMeterExpandable
 local hbpExpandable
@@ -334,7 +339,7 @@ local function showOverwriteProfileFontSettingsPopup(mode)
 end
 
 local function createGlobalFontSettings(section)
-	addon.functions.SettingsCreateScrollDropdown(cProfiles, {
+	addon.functions.SettingsCreateScrollDropdown(profilesCategory, {
 		var = "globalFontFace",
 		text = L["globalFontConfigLabel"] or "Global font",
 		listFunc = buildGlobalFontDropdown,
@@ -358,7 +363,7 @@ local function createGlobalFontSettings(section)
 			NONE = _G.NONE or "None",
 			OUTLINE = L["Outline"] or "Outline",
 		}, { "NONE", "OUTLINE" }
-		addon.functions.SettingsCreateScrollDropdown(cProfiles, {
+		addon.functions.SettingsCreateScrollDropdown(profilesCategory, {
 			var = "globalFontStyle",
 			text = L["globalFontStyleConfigLabel"] or "Global font style",
 			list = globalStyleOptions,
@@ -381,14 +386,14 @@ local function createGlobalFontSettings(section)
 		})
 	end
 
-	addon.functions.SettingsCreateButton(cProfiles, {
+	addon.functions.SettingsCreateButton(profilesCategory, {
 		var = "overwriteAllFontsToGlobal",
 		text = L["OverwriteAllFontsToGlobal"] or "Fonts global",
 		func = function() showOverwriteProfileFontSettingsPopup("font") end,
 		parentSection = section,
 	})
 
-	addon.functions.SettingsCreateButton(cProfiles, {
+	addon.functions.SettingsCreateButton(profilesCategory, {
 		var = "overwriteAllFontStylingToGlobal",
 		text = L["OverwriteAllFontStylingToGlobal"] or "Styles global",
 		func = function() showOverwriteProfileFontSettingsPopup("style") end,
@@ -1333,7 +1338,8 @@ local data = {
 	parentSection = expandable,
 }
 
-addon.functions.SettingsCreateDropdown(cProfiles, data)
+addon.functions.SettingsCreateHeadline(profilesCategory, L["ProfileManagement"] or "Profile management", { parentSection = expandable })
+addon.functions.SettingsCreateDropdown(profilesCategory, data)
 
 data = {
 	listFunc = function() return buildSortedProfileList(profileOrderGlobal) end,
@@ -1347,9 +1353,9 @@ data = {
 	parentSection = expandable,
 }
 
-addon.functions.SettingsCreateDropdown(cProfiles, data)
-addon.functions.SettingsCreateText(cProfiles, L["ProfileUseGlobalDesc"], { parentSection = expandable })
-addon.functions.SettingsCreateButton(cProfiles, {
+addon.functions.SettingsCreateDropdown(profilesCategory, data)
+addon.functions.SettingsCreateText(profilesCategory, L["ProfileUseGlobalDesc"], { parentSection = expandable })
+addon.functions.SettingsCreateButton(profilesCategory, {
 	var = "profileApplyDefaultToAll",
 	text = L["ProfileApplyDefaultToAll"] or "Apply default profile to all characters",
 	desc = L["ProfileApplyDefaultToAllDesc"] or "Sets the active profile of every known character to the default profile. Reload required.",
@@ -1396,7 +1402,7 @@ data = {
 	parentSection = expandable,
 }
 
-addon.functions.SettingsCreateDropdown(cProfiles, data)
+addon.functions.SettingsCreateDropdown(profilesCategory, data)
 
 data = {
 	listFunc = function()
@@ -1433,7 +1439,7 @@ data = {
 	parentSection = expandable,
 }
 
-addon.functions.SettingsCreateDropdown(cProfiles, data)
+addon.functions.SettingsCreateDropdown(profilesCategory, data)
 
 data = {
 	var = "AddProfile",
@@ -1441,22 +1447,11 @@ data = {
 	func = function() StaticPopup_Show("EQOL_CREATE_PROFILE") end,
 	parentSection = expandable,
 }
-addon.functions.SettingsCreateButton(cProfiles, data)
+addon.functions.SettingsCreateButton(profilesCategory, data)
 
-addon.functions.SettingsCreateHeadline(cProfiles, L["Export / Import"] or "Export / Import", { parentSection = expandable })
+addon.functions.SettingsCreateHeadline(profilesCategory, L["Export / Import"] or "Export / Import", { parentSection = expandable })
 
-addon.functions.SettingsCreateMultiDropdown(cProfiles, {
-	var = IMPORT_PROTECTION_KEY,
-	text = L["ProfileImportProtection"] or "Protected import sections",
-	desc = L["ProfileImportProtectionDesc"] or "Selected sections stay unchanged when importing full profiles or external installer profiles.",
-	listFunc = buildImportProtectionDropdown,
-	order = importProtectionOrder,
-	getSelection = getImportProtectionSelection,
-	setSelection = setImportProtectionSelection,
-	parentSection = expandable,
-})
-
-addon.functions.SettingsCreateButton(cProfiles, {
+addon.functions.SettingsCreateButton(profilesCategory, {
 	var = "profileExport",
 	text = L["Export profile"] or (L["Export"] or "Export"),
 	func = function()
@@ -1488,7 +1483,7 @@ addon.functions.SettingsCreateButton(cProfiles, {
 	parentSection = expandable,
 })
 
-addon.functions.SettingsCreateButton(cProfiles, {
+addon.functions.SettingsCreateButton(profilesCategory, {
 	var = "profileImport",
 	text = L["Import profile"] or (L["Import"] or "Import"),
 	func = function()
@@ -1531,16 +1526,56 @@ addon.functions.SettingsCreateButton(cProfiles, {
 	parentSection = expandable,
 })
 
-addon.functions.SettingsCreateHeadline(cProfiles, L["Font"] or "Font", { parentSection = expandable })
-createGlobalFontSettings(expandable)
+importProtectionExpandable = addon.functions.SettingsCreateExpandableSection(profilesCategory, {
+	name = L["ProfileImportProtection"] or "Import Protection",
+	configPageKey = "ProfilesImportProtection",
+	description = L["configCenterPageCardDescProfilesImportProtection"] or L["ProfileImportProtectionDesc"],
+	iconKey = "importexport",
+	expanded = false,
+	colorizeTitle = false,
+	newTagID = "ProfilesImportProtection",
+	modernCategory = "profiles",
+	modernOnly = true,
+})
 
-bagsCategoriesExpandable = addon.functions.SettingsCreateExpandableSection(cProfiles, {
+addon.functions.SettingsCreateHeadline(profilesCategory, L["ProfileImportProtection"] or "Import Protection", { parentSection = importProtectionExpandable })
+
+addon.functions.SettingsCreateMultiDropdown(profilesCategory, {
+	var = IMPORT_PROTECTION_KEY,
+	text = L["ProfileImportProtection"] or "Protected import sections",
+	desc = L["ProfileImportProtectionDesc"] or "Selected sections stay unchanged when importing full profiles or external installer profiles.",
+	listFunc = buildImportProtectionDropdown,
+	order = importProtectionOrder,
+	getSelection = getImportProtectionSelection,
+	setSelection = setImportProtectionSelection,
+	parentSection = importProtectionExpandable,
+})
+
+fontExpandable = addon.functions.SettingsCreateExpandableSection(profilesCategory, {
+	name = L["Font"] or "Font",
+	configPageKey = "ProfilesGlobalFont",
+	description = L["configCenterPageCardDescProfilesGlobalFont"],
+	iconKey = "settingspage",
+	expanded = false,
+	colorizeTitle = false,
+	newTagID = "ProfilesGlobalFont",
+	modernCategory = "profiles",
+	modernOnly = true,
+})
+
+addon.functions.SettingsCreateHeadline(profilesCategory, L["Font"] or "Font", { parentSection = fontExpandable })
+createGlobalFontSettings(fontExpandable)
+
+bagsCategoriesExpandable = addon.functions.SettingsCreateExpandableSection(profilesCategory, {
 	name = L["Bags categories"] or "Bags categories",
 	configPageKey = "ProfilesBagsCategories",
+	description = L["configCenterPageCardDescBagsCategories"],
 	iconKey = "bagscategories",
 	expanded = false,
 	colorizeTitle = false,
 	newTagID = "ProfilesBagsCategories",
+	modernCategory = "profiles",
+	modernOnly = true,
 })
 
 if bagsCategoriesExpandable and bagsCategoriesExpandable.AddShownPredicate then
@@ -1549,7 +1584,7 @@ if bagsCategoriesExpandable and bagsCategoriesExpandable.AddShownPredicate then
 	end)
 end
 
-addon.functions.SettingsCreateButton(cProfiles, {
+addon.functions.SettingsCreateButton(profilesCategory, {
 	var = "bagsCategoriesExport",
 	text = L["Export Bags categories"] or "Export Bags categories",
 	func = function()
@@ -1563,7 +1598,7 @@ addon.functions.SettingsCreateButton(cProfiles, {
 	parentSection = bagsCategoriesExpandable,
 })
 
-addon.functions.SettingsCreateButton(cProfiles, {
+addon.functions.SettingsCreateButton(profilesCategory, {
 	var = "bagsCategoriesImport",
 	text = L["Import Bags categories"] or "Import Bags categories",
 	func = function()
@@ -1579,16 +1614,19 @@ addon.functions.SettingsCreateButton(cProfiles, {
 	parentSection = bagsCategoriesExpandable,
 })
 
-damageMeterExpandable = addon.functions.SettingsCreateExpandableSection(cProfiles, {
+damageMeterExpandable = addon.functions.SettingsCreateExpandableSection(profilesCategory, {
 	name = L["damageMeterTitle"] or "Damage Meter",
 	configPageKey = "ProfilesDamageMeter",
+	description = L["configCenterPageCardDescProfilesDamageMeter"],
 	iconAtlas = "icons_64x64_damage",
 	expanded = false,
 	colorizeTitle = false,
 	newTagID = "ProfilesDamageMeter",
+	modernCategory = "profiles",
+	modernOnly = true,
 })
 
-addon.functions.SettingsCreateButton(cProfiles, {
+addon.functions.SettingsCreateButton(profilesCategory, {
 	var = "damageMeterExport",
 	text = string.format("%s %s", L["Export"] or "Export", L["damageMeterTitle"] or "Damage Meter"),
 	func = function()
@@ -1602,7 +1640,7 @@ addon.functions.SettingsCreateButton(cProfiles, {
 	parentSection = damageMeterExpandable,
 })
 
-addon.functions.SettingsCreateButton(cProfiles, {
+addon.functions.SettingsCreateButton(profilesCategory, {
 	var = "damageMeterImport",
 	text = string.format("%s %s", L["Import"] or "Import", L["damageMeterTitle"] or "Damage Meter"),
 	func = function()
@@ -1618,16 +1656,19 @@ addon.functions.SettingsCreateButton(cProfiles, {
 	parentSection = damageMeterExpandable,
 })
 
-hbpExpandable = addon.functions.SettingsCreateExpandableSection(cProfiles, {
+hbpExpandable = addon.functions.SettingsCreateExpandableSection(profilesCategory, {
 	name = L["Healer Buff Placement"] or "Healer Buff Placement",
 	configPageKey = "ProfilesHBP",
+	description = L["configCenterPageCardDescProfilesHealerBuffPlacement"],
 	iconAtlas = "UI-LFG-RoleIcon-Healer",
 	expanded = false,
 	colorizeTitle = false,
 	newTagID = "ProfilesHBP",
+	modernCategory = "profiles",
+	modernOnly = true,
 })
 
-addon.functions.SettingsCreateButton(cProfiles, {
+addon.functions.SettingsCreateButton(profilesCategory, {
 	var = "hbpExport",
 	text = L["Export Healer Buff Placement"] or "Export Healer Buff Placement",
 	func = function()
@@ -1641,7 +1682,7 @@ addon.functions.SettingsCreateButton(cProfiles, {
 	parentSection = hbpExpandable,
 })
 
-addon.functions.SettingsCreateButton(cProfiles, {
+addon.functions.SettingsCreateButton(profilesCategory, {
 	var = "hbpImport",
 	text = L["Import Healer Buff Placement"] or "Import Healer Buff Placement",
 	func = function()
