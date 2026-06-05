@@ -4,7 +4,47 @@
 
 ### ✨ Added
 
+- Settings Center: Added deep links to individual settings and sections so internal buttons and search results can open a page, expand the matching section, and scroll directly to the relevant control.
+- Settings Center: Added sound preview buttons to sound dropdown menus so available sounds can be tested directly from the modern dropdown list.
 - Settings Center / Interface, General and Gameplay: Added missing descriptions for many controls and page areas so modern setting rows explain what the option affects before deeper migration work continues.
+- Settings Center / Action Bars: Added descriptions for macro text, keybind text, charge/stack text, font, anchor, offset and color controls.
+- Settings Center / Bags & Inventory: Added descriptions for bag indicators, item level positions, upgrade tracks, upgrade icons, item level targets, sort direction and loot direction.
+- Settings Center / Gear & Upgrades: Added descriptions for character-frame and inspect-frame indicators, item level styling, missing enchant overlays, upgrade tracks and equipment flyout item levels.
+- Settings Center / Gameplay: Added clearer descriptions for quest automation, ignored quest types, Wowhead links, pull timers, Group Finder helpers, delve automation, random mounts, teleport options, Talent Reminder and macro helpers.
+- Settings Center / Mouse & Accessibility: Added descriptions for mouse ring, combat overlays, cast/GCD progress, screen crosshair, mouse trail and trail density options.
+- Settings Center / Social and Group Tools: Added descriptions for Focus Marker controls and related macro/update actions.
+
+### 🔄 Changed
+
+- Settings Center / General: Migrated General pages to modern-only rendering and removed the old General root category from the Blizzard Settings tree.
+- Settings Center / Gameplay: Migrated Gameplay pages to modern-only rendering and removed the old Gameplay root category from the Blizzard Settings tree.
+- Settings Center / Class Buff Reminder: Migrated Class Buff Reminder to modern-only rendering and routed Flask/Buff Food shortcut buttons into the modern Macros & Consumables page.
+- Settings Center / Drink and Health Macros: Migrated macro helper settings to modern-only rendering and attached the `EnhanceQoLHealthMacro` placement note to the Health Macro toggle.
+- Settings Center / Gear & Upgrades: Reworked Character Frame, Inspect Frame and shared item-level formatting controls so dependent rows are hidden until the relevant indicator is selected.
+- Settings Center / Bags & Inventory: Reworked native bag indicator controls so item level, upgrade and target options are hidden until their matching bag indicator is selected.
+- Settings Center / Loot & Rewards: Reworked loot toast filters into clearer modern sections, including per-rarity sections and a proper Include add action.
+- Settings Center / Dialogs & Confirmations: Sorted auto-confirm dialog options alphabetically in the modern multi-select menu.
+- Settings Center / Group Finder: Made party-member Mythic+ keystone info independent from the Keystone Helper toggle.
+- Settings Center / Talent Reminder: Moved the main Settings section above the specialization/profile detail blocks.
+- Settings Center / Teleports: Moved World Map Teleport usage help into the setting note so the normal description stays readable first.
+- Settings Center / Private Auras: Removed the redundant Edit Mode row from the modern Standalone Private Auras page.
+- Settings Center: Raised the modern settings frame back to `DIALOG` strata with a high frame level so it stays above addon editor windows.
+
+### ❌ Removed
+
+- Settings Center / General: Removed the base-game auto-dismount CVar option from the modern Movement & Input page.
+
+### 🐛 Fixed
+
+- Settings Center: Fixed setting notes showing before the normal description in hover help; descriptions now appear first unless a note explicitly overrides ordering.
+- Settings Center: Fixed modern-only keybinding rows trying to create legacy Blizzard Settings initializers.
+- Settings Center: Fixed modern deep links from legacy helper buttons only opening the page instead of jumping to the exact target setting.
+- Settings Center: Fixed deep-linked collapsed sections staying collapsed after navigation.
+- Settings Center: Fixed multi-dropdown summary text for selected Hearthstones continuing to show the default "All owned Hearthstones" label after custom selections.
+- Settings Center: Fixed controls with `refreshOnChange` not rebuilding the visible page when dependent controls need to be hidden or shown.
+- Settings Center: Fixed another main-file local variable warning by keeping new navigation helpers off the LibSettingsDesigner main chunk local list.
+- Settings Center / Gear & Upgrades: Fixed the missing `gearInspectDisplayDesc` locale key across supported locales.
+- Settings Center / Questing: Fixed the NPC ignore tip being attached to the wrong setting in the modern tooltip.
 
 ## [11.0.0-alpha5] - 2026-06-05
 
