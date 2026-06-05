@@ -16,6 +16,7 @@ local expandable = addon.functions.SettingsCreateExpandableSection(cMouse, {
 	newTagID = "MouseAndAccessibility",
 	configPageKey = "MouseAccessibility",
 	iconKey = "mouseaccessibility",
+	modernOnly = true,
 	expanded = false,
 	colorizeTitle = false,
 })

@@ -16,6 +16,7 @@ local dialogExpandable = addon.functions.SettingsCreateExpandableSection(cGenera
 	name = L["DialogsAndConfirmations"] or "Dialogs & Confirmations",
 	configPageKey = "DialogsConfirmations",
 	iconKey = "dialogsconfirmations",
+	modernOnly = true,
 	expanded = false,
 	colorizeTitle = false,
 })
@@ -106,6 +107,7 @@ local utilitiesExpandable = addon.functions.SettingsCreateExpandableSection(cGen
 	name = L["UIUtilities"] or "UI Utilities",
 	configPageKey = "UIUtilities",
 	iconKey = "uiutilities",
+	modernOnly = true,
 	expanded = false,
 	colorizeTitle = false,
 })

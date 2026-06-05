@@ -1,10 +1,10 @@
 local addonName, addon = ...
 local L = LibStub("AceLocale-3.0"):GetLocale(addonName)
 local SettingsLib = LibStub("LibEQOLSettingsMode-1.0")
+local ConfigLib = LibStub("LibEQOLConfig-1.0", true)
 
 local rootCategories = {
 	{ id = "UI", label = _G["INTERFACE_LABEL"] },
-	{ id = "GENERAL", label = _G["GENERAL"] },
 	{ id = "GAMEPLAY", label = _G["SETTING_GROUP_GAMEPLAY"] },
 }
 
@@ -162,4 +162,18 @@ createRootSlashCommandHints(addon.SettingsLayout.rootCategory)
 
 for _, entry in ipairs(rootCategories) do
 	addon.SettingsLayout["root" .. entry.id] = addon.functions.SettingsCreateCategory(nil, entry.label, nil, entry.id)
+end
+
+addon.SettingsLayout.rootGENERAL = {
+	GetID = function() return "GENERAL" end,
+}
+
+if ConfigLib then
+	local app = ConfigLib:GetAddOn(addonName)
+	if app then
+		app:RegisterLegacyCategory(addon.SettingsLayout.rootGENERAL, {
+			categoryID = "general",
+			title = _G["GENERAL"],
+		})
+	end
 end

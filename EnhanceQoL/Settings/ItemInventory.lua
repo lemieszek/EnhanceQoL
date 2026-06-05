@@ -2911,6 +2911,7 @@ local expandable = addon.functions.SettingsCreateExpandableSection(cInventory, {
 	newTagID = "BagsInventory",
 	iconKey = "bags",
 	isVisible = shouldShowNativeBagSettings,
+	modernOnly = true,
 	expanded = false,
 	colorizeTitle = false,
 })

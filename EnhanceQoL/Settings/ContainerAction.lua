@@ -8,6 +8,7 @@ local expandable = addon.functions.SettingsCreateExpandableSection(cContainer, {
 	name = L["ContainerActions"],
 	configPageKey = "ContainerActions",
 	iconKey = "containeractions",
+	modernOnly = true,
 	expanded = false,
 	colorizeTitle = false,
 })

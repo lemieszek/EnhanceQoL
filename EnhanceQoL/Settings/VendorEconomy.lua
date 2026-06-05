@@ -733,6 +733,7 @@ function addon.functions.settingsAddGold()
 		name = L["GoldTracking"],
 		configPageKey = "GoldTracking",
 		iconKey = "goldtracking",
+		modernOnly = true,
 		expanded = false,
 		colorizeTitle = false,
 	})

@@ -39,6 +39,7 @@ local cLoot = addon.SettingsLayout.rootGENERAL
 local expandable = addon.functions.SettingsCreateExpandableSection(cLoot, {
 	name = L["Loot"],
 	iconKey = "loot",
+	modernOnly = true,
 	expanded = false,
 	colorizeTitle = false,
 	newTagID = "Loot",
