@@ -4,8 +4,13 @@
 
 ### ✨ Added
 
+- Settings Center: Added direct numeric editing for slider values by clicking the highlighted current value.
+
 ### 🔄 Changed
 
+- Economy / Auto-Sell Rules: Reworked the modern page into a behavior section followed by separate rarity sections instead of one large Settings block.
+- Economy / Auto-Sell Rules: Moved "Only auto sell when Shift is held" and the 12-item buyback safety option from Vendor Quick Actions into Auto-Sell Rules.
+- Settings Center / Sound: Added clearer overview-card descriptions for Audio Device, Additional Sounds, Shared Media, Deep Voice Sounds and Sounds to Mute.
 - Settings Center / Combat Alerts: Moved Combat Alerts to a modern-only Gameplay page and added clearer descriptions for death alerts, no-target reminders, sounds, TTS and role rules.
 - Settings Center / Combat Alerts: Added row-level descriptions for Death Alert and No Target Indicator so the purpose of each feature is visible directly in the modern page.
 - Settings Center / Private Auras: Moved Standalone Private Auras to a modern-only Gameplay page with clearer descriptions for the movable private aura anchor and Edit Mode placement.
@@ -17,6 +22,8 @@
 
 ### 🐛 Fixed
 
+- Economy / Warband Gold: Improved the default target gold description and kept ignored-character multi-select entries in their provided name-sorted order.
+- Settings Center: Fixed long slider scale labels being clipped by widening the min/max label area when needed.
 - Settings Center: Lowered the modern settings window to MEDIUM frame strata so it layers more naturally with other addon editor windows.
 - Settings Center: Fixed long dropdown and multi-select context menus overflowing the screen by enabling Blizzard scroll mode for large option lists.
 - Settings Center / Shared Media: Fixed Enable all and Disable all leaving visible sound toggles in their old state until the page was reopened.

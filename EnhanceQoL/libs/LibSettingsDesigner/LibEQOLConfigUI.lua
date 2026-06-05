@@ -979,6 +979,13 @@ local function getSliderControlWidth(rowWidth, labelWidth, sliderGap)
 	)
 end
 
+function lib.GetSliderScaleLabelWidth(control)
+	local minText = lib.FormatControlValue(control, control and control.min)
+	local maxText = lib.FormatControlValue(control, control and control.max)
+	local length = math.max(#tostring(minText or ""), #tostring(maxText or ""))
+	return math.max(SLIDER_SCALE_LABEL_WIDTH, math.min(76, length * 7 + 10))
+end
+
 local function getAddonIcon(app)
 	return app and app.opts and app.opts.icon or ICON_TEXTURES.dashboard or ASSET.fallback
 end
@@ -1568,7 +1575,7 @@ local function callFormatter(formatter, value, control)
 	return nil
 end
 
-local function formatControlValue(control, value)
+function lib.FormatControlValue(control, value)
 	local text = callFormatter(control.valueFormatter or control.formatter, value, control)
 	if not text then
 		if type(value) == "number" then
@@ -1620,6 +1627,15 @@ local function getControlOptions(control)
 	if type(list) ~= "table" then
 		return options
 	end
+	if not order and #list > 0 then
+		for index, option in ipairs(list) do
+			options[#options + 1] = {
+				value = getOptionValue(option, index),
+				label = tostring(getOptionLabel(option, index) or index),
+			}
+		end
+		return options
+	end
 	if order then
 		seen = {}
 		for _, key in ipairs(order) do
@@ -1655,7 +1671,7 @@ local function getDropdownValueText(control, value)
 			return option.label
 		end
 	end
-	return formatControlValue(control, value)
+	return lib.FormatControlValue(control, value)
 end
 
 function lib.GetCheckboxDropdownOptions(control)
@@ -1954,7 +1970,7 @@ local function refreshControlRow(app, control, row)
 		elseif row.editBox.Disable then
 			row.editBox:Disable()
 		end
-		row.editBox:SetText(formatControlValue(control, app:GetControlValue(control)))
+		row.editBox:SetText(lib.FormatControlValue(control, app:GetControlValue(control)))
 	end
 	if row.value then
 		if row.refreshValue then
@@ -1968,7 +1984,7 @@ local function refreshControlRow(app, control, row)
 			row.value.Text:SetText(getDropdownValueText(control, value))
 		else
 			local value = app:GetControlValue(control)
-			row.value.Text:SetText(formatControlValue(control, value))
+			row.value.Text:SetText(lib.FormatControlValue(control, value))
 		end
 		setTextColor(row.value.Text, enabled and TEXT.main or TEXT.disabled)
 	end
@@ -2770,8 +2786,50 @@ local function addSliderWidget(row, app, control, opts)
 			fill:Show()
 			fill:SetWidth(fillWidth)
 		end
-		valueText.Text:SetText(formatControlValue(control, value))
+		valueText.Text:SetText(lib.FormatControlValue(control, value))
 	end
+
+	local valueEdit = CreateFrame("EditBox", nil, row, "InputBoxTemplate")
+	valueEdit:SetSize(96, 22)
+	valueEdit:SetPoint("CENTER", valueText, "CENTER", 0, 0)
+	valueEdit:SetAutoFocus(false)
+	valueEdit:Hide()
+	row.sliderValueEdit = valueEdit
+
+	local function closeValueEdit(commit)
+		if commit and app:IsControlEnabled(control) then
+			local value = normalize(tonumber(valueEdit:GetText()))
+			app:SetControlValue(control, value)
+			slider.updating = true
+			slider:SetValue(value)
+			slider.updating = false
+			slider:SyncVisual(value)
+			lib.RefreshVisibleRows(row._state)
+		end
+		valueEdit:Hide()
+		valueText:Show()
+	end
+
+	local function openValueEdit()
+		if not app:IsControlEnabled(control) then
+			return
+		end
+		valueText:Hide()
+		valueEdit:SetText(tostring(app:GetControlValue(control) or minValue))
+		valueEdit:Show()
+		valueEdit:SetFocus()
+		valueEdit:HighlightText()
+	end
+
+	valueText:EnableMouse(true)
+	valueText:SetScript("OnMouseUp", openValueEdit)
+	valueEdit:SetScript("OnEnterPressed", function() closeValueEdit(true) end)
+	valueEdit:SetScript("OnEscapePressed", function() closeValueEdit(false) end)
+	valueEdit:SetScript("OnEditFocusLost", function(self)
+		if self:IsShown() then
+			closeValueEdit(true)
+		end
+	end)
 
 	slider:SetScript("OnValueChanged", function(self, rawValue)
 		local value = normalize(rawValue)
@@ -3296,7 +3354,7 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 			valueText:SetPoint("TOPRIGHT", row, "TOPRIGHT", -18, -12)
 			valueText:SetSize(valueWidth, 20)
 			local hasRangeLabels = control.min ~= nil or control.max ~= nil
-			local labelWidth = hasRangeLabels and SLIDER_SCALE_LABEL_WIDTH or 0
+			local labelWidth = hasRangeLabels and lib.GetSliderScaleLabelWidth(control) or 0
 			local sliderGap = hasRangeLabels and SLIDER_SCALE_GAP or 0
 			local sliderY = compact and 8 or 10
 			local sliderWidth = getSliderControlWidth(rowWidth, labelWidth, sliderGap)
@@ -3306,12 +3364,12 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 				valueText = valueText,
 			})
 			if hasRangeLabels then
-				local minLabel = createText(row, FONT_MUTED, formatControlValue(control, control.min), TEXT.subtle, "RIGHT")
+				local minLabel = createText(row, FONT_MUTED, lib.FormatControlValue(control, control.min), TEXT.subtle, "RIGHT")
 				minLabel:SetPoint("RIGHT", slider, "LEFT", -sliderGap, 0)
 				minLabel:SetSize(labelWidth, 18)
 				minLabel.Text:SetJustifyH("RIGHT")
 				minLabel.Text:SetJustifyV("MIDDLE")
-				local maxLabel = createText(row, FONT_MUTED, formatControlValue(control, control.max), TEXT.subtle, "LEFT")
+				local maxLabel = createText(row, FONT_MUTED, lib.FormatControlValue(control, control.max), TEXT.subtle, "LEFT")
 				maxLabel:SetPoint("LEFT", slider, "RIGHT", sliderGap, 0)
 				maxLabel:SetSize(labelWidth, 18)
 				maxLabel.Text:SetJustifyH("LEFT")

@@ -192,17 +192,6 @@ local function buildSettings()
 			end,
 		},
 		{
-			var = "vendorSwapAutoSellShift",
-			text = L["vendorSwapAutoSellShift"],
-			func = function(value) addon.db["vendorSwapAutoSellShift"] = value and true or false end,
-		},
-		{
-			var = "vendorOnly12Items",
-			text = L["vendorOnly12Items"],
-			desc = L["vendorOnly12ItemsDesc"],
-			func = function(value) addon.db["vendorOnly12Items"] = value and true or false end,
-		},
-		{
 			var = "vendorAltClickInclude",
 			text = L["vendorAltClickInclude"],
 			desc = L["vendorAltClickIncludeDesc"],
@@ -247,6 +236,27 @@ local function buildSettings()
 		colorizeTitle = false,
 	})
 
+	addon.functions.SettingsCreateHeadline(cVendor, L["Behavior"] or "Behavior", {
+		parentSection = autoSellExpandable,
+		groupID = "autosell.behavior",
+		order = 10,
+	})
+	addon.functions.SettingsCreateCheckboxes(cVendor, {
+		{
+			var = "vendorSwapAutoSellShift",
+			text = L["vendorSwapAutoSellShift"],
+			func = function(value) addon.db["vendorSwapAutoSellShift"] = value and true or false end,
+			parentSection = autoSellExpandable,
+		},
+		{
+			var = "vendorOnly12Items",
+			text = L["vendorOnly12Items"],
+			desc = L["vendorOnly12ItemsDesc"],
+			func = function(value) addon.db["vendorOnly12Items"] = value and true or false end,
+			parentSection = autoSellExpandable,
+		},
+	})
+
 	local qualities = {
 		{ q = 0, key = "Poor" },
 		{ q = 1, key = "Common" },
@@ -265,7 +275,10 @@ local function buildSettings()
 		local tabName = addon.Vendor.variables.tabNames[quality]
 		local colorHex = ITEM_QUALITY_COLORS[quality] and ITEM_QUALITY_COLORS[quality].hex or ""
 		local label = _G["ITEM_QUALITY" .. quality .. "_DESC"] or tabName
-		addon.functions.SettingsCreateText(cVendor, string.format("%s%s|r", colorHex, label), { parentSection = autoSellExpandable })
+		addon.functions.SettingsCreateHeadline(cVendor, string.format("%s%s|r", colorHex, label), {
+			parentSection = autoSellExpandable,
+			groupID = "autosell." .. string.lower(info.key),
+		})
 
 		local enable = addon.functions.SettingsCreateCheckbox(cVendor, {
 			var = "vendor" .. tabName .. "Enable",
