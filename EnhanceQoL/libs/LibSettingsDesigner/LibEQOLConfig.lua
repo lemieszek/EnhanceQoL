@@ -656,6 +656,33 @@ function AppMixin:GetPageControls(pageOrID)
 	return controls
 end
 
+function AppMixin:GetPageCustomizedCount(pageOrID)
+	local page = type(pageOrID) == "string" and self.pagesByID[pageOrID] or pageOrID
+	if not page or not self:IsPageVisible(page) then
+		return 0
+	end
+	local count = 0
+	for _, control in ipairs(page.controls or {}) do
+		if self:IsControlVisible(control) and self:IsControlCustomized(control) then
+			count = count + 1
+		end
+	end
+	return count
+end
+
+function AppMixin:GetCategoryCustomizedCount(categoryID)
+	if not categoryID then
+		return 0
+	end
+	local count = 0
+	for _, page in ipairs(self.pages) do
+		if page.category == categoryID and self:IsPageVisible(page) then
+			count = count + self:GetPageCustomizedCount(page)
+		end
+	end
+	return count
+end
+
 function AppMixin:GetPage(pageID)
 	return self.pagesByID[pageID]
 end

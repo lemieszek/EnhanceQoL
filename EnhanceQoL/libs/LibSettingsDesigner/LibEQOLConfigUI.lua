@@ -75,6 +75,7 @@ lib.LOCALES = {
 		configCenterAdvancedSettingDesc = "Open the related editor or action for this setting.",
 		configCenterButtonFallbackDesc = "Run this action.",
 		configCenterChange = "Change",
+		configCenterChanged = "changed",
 		configCenterCheckboxDropdownFallbackDesc = "Enable this setting and choose its related option.",
 		configCenterColorFallbackDesc = "Choose a color for this setting.",
 		configCenterConfigure = "Configure",
@@ -104,6 +105,7 @@ lib.LOCALES = {
 		configCenterAdvancedSettingDesc = "Öffnet den zugehörigen Editor oder die Aktion für diese Einstellung.",
 		configCenterButtonFallbackDesc = "Führe diese Aktion aus.",
 		configCenterChange = "Ändern",
+		configCenterChanged = "geändert",
 		configCenterCheckboxDropdownFallbackDesc = "Aktiviere diese Einstellung und wähle die zugehörige Option.",
 		configCenterColorFallbackDesc = "Wähle eine Farbe für diese Einstellung.",
 		configCenterConfigure = "Konfigurieren",
@@ -133,6 +135,7 @@ lib.LOCALES = {
 		configCenterAdvancedSettingDesc = "Abre el editor o la acción relacionada con este ajuste.",
 		configCenterButtonFallbackDesc = "Ejecuta esta acción.",
 		configCenterChange = "Cambiar",
+		configCenterChanged = "cambiados",
 		configCenterCheckboxDropdownFallbackDesc = "Activa este ajuste y elige su opción relacionada.",
 		configCenterColorFallbackDesc = "Elige un color para este ajuste.",
 		configCenterConfigure = "Configurar",
@@ -162,6 +165,7 @@ lib.LOCALES = {
 		configCenterAdvancedSettingDesc = "Abre el editor o la acción relacionada con este ajuste.",
 		configCenterButtonFallbackDesc = "Ejecuta esta acción.",
 		configCenterChange = "Cambiar",
+		configCenterChanged = "cambiados",
 		configCenterCheckboxDropdownFallbackDesc = "Activa este ajuste y elige su opción relacionada.",
 		configCenterColorFallbackDesc = "Elige un color para este ajuste.",
 		configCenterConfigure = "Configurar",
@@ -191,6 +195,7 @@ lib.LOCALES = {
 		configCenterAdvancedSettingDesc = "Ouvre l’éditeur ou l’action associé à ce réglage.",
 		configCenterButtonFallbackDesc = "Exécute cette action.",
 		configCenterChange = "Modifier",
+		configCenterChanged = "modifiés",
 		configCenterCheckboxDropdownFallbackDesc = "Activez ce réglage et choisissez l’option associée.",
 		configCenterColorFallbackDesc = "Choisissez une couleur pour ce réglage.",
 		configCenterConfigure = "Configurer",
@@ -220,6 +225,7 @@ lib.LOCALES = {
 		configCenterAdvancedSettingDesc = "Apre l’editor o l’azione collegata a questa impostazione.",
 		configCenterButtonFallbackDesc = "Esegui questa azione.",
 		configCenterChange = "Cambia",
+		configCenterChanged = "modificate",
 		configCenterCheckboxDropdownFallbackDesc = "Attiva questa impostazione e scegli l’opzione correlata.",
 		configCenterColorFallbackDesc = "Scegli un colore per questa impostazione.",
 		configCenterConfigure = "Configura",
@@ -249,6 +255,7 @@ lib.LOCALES = {
 		configCenterAdvancedSettingDesc = "이 설정과 관련된 편집기 또는 동작을 엽니다.",
 		configCenterButtonFallbackDesc = "이 동작을 실행합니다.",
 		configCenterChange = "변경",
+		configCenterChanged = "변경됨",
 		configCenterCheckboxDropdownFallbackDesc = "이 설정을 활성화하고 관련 옵션을 선택합니다.",
 		configCenterColorFallbackDesc = "이 설정에 사용할 색상을 선택합니다.",
 		configCenterConfigure = "구성",
@@ -278,6 +285,7 @@ lib.LOCALES = {
 		configCenterAdvancedSettingDesc = "Abre o editor ou a ação relacionada a esta configuração.",
 		configCenterButtonFallbackDesc = "Executa esta ação.",
 		configCenterChange = "Alterar",
+		configCenterChanged = "alteradas",
 		configCenterCheckboxDropdownFallbackDesc = "Ative esta configuração e escolha a opção relacionada.",
 		configCenterColorFallbackDesc = "Escolha uma cor para esta configuração.",
 		configCenterConfigure = "Configurar",
@@ -307,6 +315,7 @@ lib.LOCALES = {
 		configCenterAdvancedSettingDesc = "Открывает связанный редактор или действие для этой настройки.",
 		configCenterButtonFallbackDesc = "Выполнить это действие.",
 		configCenterChange = "Изменить",
+		configCenterChanged = "изменено",
 		configCenterCheckboxDropdownFallbackDesc = "Включите этот параметр и выберите связанную опцию.",
 		configCenterColorFallbackDesc = "Выберите цвет для этого параметра.",
 		configCenterConfigure = "Настроить",
@@ -336,6 +345,7 @@ lib.LOCALES = {
 		configCenterAdvancedSettingDesc = "打开与此设置相关的编辑器或操作。",
 		configCenterButtonFallbackDesc = "执行此操作。",
 		configCenterChange = "更改",
+		configCenterChanged = "已更改",
 		configCenterCheckboxDropdownFallbackDesc = "启用此设置并选择相关选项。",
 		configCenterColorFallbackDesc = "为此设置选择颜色。",
 		configCenterConfigure = "配置",
@@ -365,6 +375,7 @@ lib.LOCALES = {
 		configCenterAdvancedSettingDesc = "開啟與此設定相關的編輯器或動作。",
 		configCenterButtonFallbackDesc = "執行此動作。",
 		configCenterChange = "變更",
+		configCenterChanged = "已變更",
 		configCenterCheckboxDropdownFallbackDesc = "啟用此設定並選擇相關選項。",
 		configCenterColorFallbackDesc = "為此設定選擇顏色。",
 		configCenterConfigure = "設定",
@@ -1138,6 +1149,32 @@ local function getVisiblePageControls(app, page)
 		end
 	end
 	return controls
+end
+
+function lib.GetPageCustomizedCount(app, page)
+	if app and type(app.GetPageCustomizedCount) == "function" then
+		return app:GetPageCustomizedCount(page)
+	end
+	local count = 0
+	for _, control in ipairs(getVisiblePageControls(app, page)) do
+		if app and type(app.IsControlCustomized) == "function" and app:IsControlCustomized(control) then
+			count = count + 1
+		end
+	end
+	return count
+end
+
+function lib.GetCategoryCustomizedCount(app, categoryID)
+	if app and type(app.GetCategoryCustomizedCount) == "function" then
+		return app:GetCategoryCustomizedCount(categoryID)
+	end
+	local count = 0
+	if app and type(app.GetPages) == "function" then
+		for _, page in ipairs(app:GetPages(categoryID)) do
+			count = count + lib.GetPageCustomizedCount(app, page)
+		end
+	end
+	return count
 end
 
 local function getAppTitle(app)
@@ -1998,6 +2035,8 @@ local function refreshControlRow(app, control, row)
 		"colorButton",
 		"swatch",
 		"actionButton",
+		"sliderDecreaseButton",
+		"sliderIncreaseButton",
 	}) do
 		local button = row[buttonKey]
 		if button then
@@ -2891,6 +2930,9 @@ local function addSliderWidget(row, app, control, opts)
 		minValue, maxValue = maxValue, minValue
 	end
 	local step = tonumber(control.step) or 1
+	local showStepButtons = opts.stepButtons ~= false and step and step > 0
+	local stepButtonSize = 18
+	local stepButtonGap = 6
 
 	local function clamp(value)
 		value = tonumber(value) or minValue
@@ -2908,12 +2950,68 @@ local function addSliderWidget(row, app, control, opts)
 		return value
 	end
 
-	local track = CreateFrame("Frame", nil, row)
-	track:SetSize(sliderWidth, sliderHitHeight)
+	local container = CreateFrame("Frame", nil, row)
+	container:SetSize(sliderWidth, sliderHitHeight)
 	if opts.point then
-		track:SetPoint(opts.point[1], opts.point[2], opts.point[3], opts.point[4], opts.point[5])
+		container:SetPoint(opts.point[1], opts.point[2], opts.point[3], opts.point[4], opts.point[5])
 	else
-		track:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", FIELD_CONTROL_LEFT, 10)
+		container:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", FIELD_CONTROL_LEFT, 10)
+	end
+
+	local function createStepButton(text)
+		local button = CreateFrame("Button", nil, container, "BackdropTemplate")
+		button:SetSize(stepButtonSize, stepButtonSize)
+		applyBackdrop(button, { 0.045, 0.042, 0.036, 0.90 }, { 0.42, 0.34, 0.20, 0.42 })
+		button.Text = button:CreateFontString(nil, "OVERLAY", FONT_TEXT)
+		button.Text:SetAllPoints(button)
+		button.Text:SetJustifyH("CENTER")
+		button.Text:SetJustifyV("MIDDLE")
+		button.Text:SetText(text)
+		setTextColor(button.Text, TEXT.muted)
+		button._eqolApplyVisual = function(self)
+			if self._eqolDisabled then
+				applyBackdrop(self, DISABLED_CONTROL_BG, DISABLED_CONTROL_BORDER)
+				if self.Text then setTextColor(self.Text, TEXT.disabled) end
+			else
+				applyBackdrop(self, { 0.045, 0.042, 0.036, 0.90 }, { 0.42, 0.34, 0.20, 0.42 })
+				if self.Text then setTextColor(self.Text, TEXT.muted) end
+			end
+		end
+		button:SetScript("OnEnter", function(self)
+			if self._eqolDisabled then
+				return
+			end
+			applyBackdrop(self, { 0.105, 0.082, 0.045, 0.92 }, { TEXT.gold[1], TEXT.gold[2], TEXT.gold[3], 0.62 })
+			if self.Text then setTextColor(self.Text, TEXT.gold) end
+		end)
+		button:SetScript("OnLeave", function(self)
+			if self._eqolApplyVisual then
+				self:_eqolApplyVisual()
+			end
+		end)
+		return button
+	end
+
+	local decreaseButton
+	local increaseButton
+	if showStepButtons then
+		decreaseButton = createStepButton("<")
+		decreaseButton:SetPoint("LEFT", container, "LEFT", 0, 0)
+		increaseButton = createStepButton(">")
+		increaseButton:SetPoint("RIGHT", container, "RIGHT", 0, 0)
+		row.sliderDecreaseButton = decreaseButton
+		row.sliderIncreaseButton = increaseButton
+	end
+
+	local track = CreateFrame("Frame", nil, row)
+	local trackWidth = showStepButtons and math.max(80, sliderWidth - ((stepButtonSize + stepButtonGap) * 2)) or sliderWidth
+	track:SetSize(trackWidth, sliderHitHeight)
+	if showStepButtons then
+		track:SetPoint("LEFT", decreaseButton, "RIGHT", stepButtonGap, 0)
+		track:SetPoint("RIGHT", increaseButton, "LEFT", -stepButtonGap, 0)
+	else
+		track:SetPoint("LEFT", container, "LEFT", 0, 0)
+		track:SetPoint("RIGHT", container, "RIGHT", 0, 0)
 	end
 
 	local bar = track:CreateTexture(nil, "BACKGROUND")
@@ -2954,7 +3052,7 @@ local function addSliderWidget(row, app, control, opts)
 		percent = math.max(0, math.min(1, percent))
 		local barWidth = bar:GetWidth()
 		if not barWidth or barWidth <= 0 then
-			barWidth = sliderWidth
+			barWidth = trackWidth
 		end
 		local fillWidth = barWidth * percent
 		if fillWidth <= 0.5 then
@@ -2966,6 +3064,16 @@ local function addSliderWidget(row, app, control, opts)
 		valueText.Text:SetText(lib.FormatControlValue(control, value))
 	end
 
+	local function commitSliderValue(value)
+		value = normalize(value)
+		app:SetControlValue(control, value)
+		slider.updating = true
+		slider:SetValue(value)
+		slider.updating = false
+		slider:SyncVisual(value)
+		lib.RefreshVisibleRows(row._state)
+	end
+
 	local valueEdit = CreateFrame("EditBox", nil, row, "InputBoxTemplate")
 	valueEdit:SetSize(96, 22)
 	valueEdit:SetPoint("CENTER", valueText, "CENTER", 0, 0)
@@ -2975,13 +3083,7 @@ local function addSliderWidget(row, app, control, opts)
 
 	local function closeValueEdit(commit)
 		if commit and app:IsControlEnabled(control) then
-			local value = normalize(tonumber(valueEdit:GetText()))
-			app:SetControlValue(control, value)
-			slider.updating = true
-			slider:SetValue(value)
-			slider.updating = false
-			slider:SyncVisual(value)
-			lib.RefreshVisibleRows(row._state)
+			commitSliderValue(tonumber(valueEdit:GetText()))
 		end
 		valueEdit:Hide()
 		valueText:Show()
@@ -3023,10 +3125,32 @@ local function addSliderWidget(row, app, control, opts)
 		lib.RefreshVisibleRows(row._state)
 	end)
 
+	local function adjustByStep(direction)
+		if not app:IsControlEnabled(control) then
+			return
+		end
+		local current = tonumber(app:GetControlValue(control)) or tonumber(control.default) or minValue
+		commitSliderValue(current + ((step or 1) * direction))
+	end
+
+	if decreaseButton then
+		decreaseButton:SetScript("OnClick", function()
+			adjustByStep(-1)
+		end)
+	end
+	if increaseButton then
+		increaseButton:SetScript("OnClick", function()
+			adjustByStep(1)
+		end)
+	end
+
 	slider.Track = track
 	slider.Bar = bar
 	slider.Fill = fill
+	slider.ScaleLeftAnchor = container
+	slider.ScaleRightAnchor = container
 	row.slider = slider
+	row.sliderContainer = container
 	row.sliderTrack = track
 	row.sliderBar = bar
 	row.sliderFill = fill
@@ -3564,12 +3688,12 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 			})
 			if hasRangeLabels then
 				local minLabel = createText(row, FONT_MUTED, lib.FormatControlValue(control, control.min), TEXT.subtle, "RIGHT")
-				minLabel:SetPoint("RIGHT", slider, "LEFT", -sliderGap, 0)
+				minLabel:SetPoint("RIGHT", slider.ScaleLeftAnchor or slider, "LEFT", -sliderGap, 0)
 				minLabel:SetSize(labelWidth, 18)
 				minLabel.Text:SetJustifyH("RIGHT")
 				minLabel.Text:SetJustifyV("MIDDLE")
 				local maxLabel = createText(row, FONT_MUTED, lib.FormatControlValue(control, control.max), TEXT.subtle, "LEFT")
-				maxLabel:SetPoint("LEFT", slider, "RIGHT", sliderGap, 0)
+				maxLabel:SetPoint("LEFT", slider.ScaleRightAnchor or slider, "RIGHT", sliderGap, 0)
 				maxLabel:SetSize(labelWidth, 18)
 				maxLabel.Text:SetJustifyH("LEFT")
 				maxLabel.Text:SetJustifyV("MIDDLE")
@@ -3780,6 +3904,7 @@ end
 
 local function addPageCard(state, page, row, index, columns)
 	local controlCount = #getVisiblePageControls(state.app, page)
+	local customizedCount = lib.GetPageCustomizedCount(state.app, page)
 	local card = row and createGridCard(state, row, index, columns or 2, PAGE_CARD_HEIGHT)
 		or createContentFrame(state, PAGE_CARD_HEIGHT)
 	styleRaisedTile(card, true)
@@ -3796,9 +3921,10 @@ local function addPageCard(state, page, row, index, columns)
 
 	local title = createText(card, FONT_HEADER, page.title or page.id, TEXT.main)
 	title:SetPoint("TOPLEFT", card, "TOPLEFT", textLeft, -24)
-	title:SetPoint("RIGHT", card, "RIGHT", lib.IsPageOrChildNew(state.app, page) and -82 or -rightInset, 0)
+	local hasNewBadge = lib.IsPageOrChildNew(state.app, page)
+	title:SetPoint("RIGHT", card, "RIGHT", hasNewBadge and -82 or -rightInset, 0)
 	title:SetHeight(22)
-	if lib.IsPageOrChildNew(state.app, page) then
+	if hasNewBadge then
 		local newBadge = lib.CreateNewBadge(card)
 		newBadge:SetPoint("TOPRIGHT", card, "TOPRIGHT", -16, -18)
 	end
@@ -3816,8 +3942,16 @@ local function addPageCard(state, page, row, index, columns)
 	local metaText = getSettingCountText(state.app, controlCount)
 	local meta = createText(card, FONT_MUTED, metaText, TEXT.gold)
 	meta:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", textLeft, 14)
-	meta:SetPoint("RIGHT", card, "RIGHT", -rightInset, 0)
+	meta:SetSize(92, 16)
 	meta:SetHeight(16)
+	if customizedCount > 0 then
+		local L = getLocale(state.app)
+		local changedText = tostring(customizedCount) .. " " .. (L["configCenterChanged"] or "changed")
+		local changed = createText(card, FONT_MUTED, changedText, GREEN)
+		changed:SetPoint("LEFT", meta, "RIGHT", 8, 0)
+		changed:SetPoint("RIGHT", card, "RIGHT", -rightInset, 0)
+		changed:SetHeight(16)
+	end
 	if not row then
 		state.y = state.y - 10
 	end
@@ -4297,6 +4431,14 @@ end
 local function addGroupSection(state, group, pagePath)
 	local collapsed = state.collapsedGroups and state.collapsedGroups[group.id] == true
 	local controlsHeight = 0
+	local customizedCount = 0
+	for _, control in ipairs(group.controls or {}) do
+		if state.app and type(state.app.IsControlCustomized) == "function" and state.app:IsControlVisible(control)
+			and state.app:IsControlCustomized(control)
+		then
+			customizedCount = customizedCount + 1
+		end
+	end
 	if not collapsed then
 		for _, control in ipairs(group.controls) do
 			controlsHeight = controlsHeight + getSettingRowHeight(control, state)
@@ -4315,10 +4457,15 @@ local function addGroupSection(state, group, pagePath)
 	applyBackdrop(header, DETAIL_COLORS.sectionHeaderBg, { 0, 0, 0, 0 })
 	header.Text = header:CreateFontString(nil, "OVERLAY", FONT_HEADER)
 	header.Text:SetPoint("LEFT", header, "LEFT", 14, 0)
-	header.Text:SetPoint("RIGHT", header, "RIGHT", -34, 0)
+	header.Text:SetPoint("RIGHT", header, "RIGHT", customizedCount > 0 and -78 or -34, 0)
 	header.Text:SetJustifyH("LEFT")
 	header.Text:SetText(group.title or group.id)
 	setTextColor(header.Text, TEXT.main)
+	if customizedCount > 0 then
+		local width = math.max(30, (#tostring(customizedCount) * 9) + 18)
+		local chip = addStatusChip(header, tostring(customizedCount), TEXT.gold, width)
+		chip:SetPoint("RIGHT", header, "RIGHT", -36, 0)
+	end
 	header.Chevron = createCollapseArrow(header, state.app, 12, collapsed)
 	header.Chevron:SetPoint("RIGHT", header, "RIGHT", -14, 0)
 	header:SetScript("OnClick", function()
@@ -4709,6 +4856,7 @@ function StateMixin:RenderSidebar()
 
 	for _, category in ipairs(self.app:GetCategories()) do
 		if category.hidden ~= true and category.visible ~= false then
+			local isNewCategory = lib.IsCategoryNew(self.app, category.id)
 			local row = createSidebarFrame(self, 44)
 			applyBackdrop(row, SIDEBAR_BG, { 0.42, 0.34, 0.20, 0.16 })
 			row.Accent = row:CreateTexture(nil, "OVERLAY")
@@ -4721,10 +4869,10 @@ function StateMixin:RenderSidebar()
 			row.Icon:SetPoint("LEFT", row, "LEFT", 12, 0)
 			row.Text = row:CreateFontString(nil, "OVERLAY", FONT_TEXT)
 			row.Text:SetPoint("LEFT", row.Icon, "RIGHT", 10, 0)
-			row.Text:SetPoint("RIGHT", row, "RIGHT", lib.IsCategoryNew(self.app, category.id) and -64 or -12, 0)
+			row.Text:SetPoint("RIGHT", row, "RIGHT", isNewCategory and -64 or -12, 0)
 			row.Text:SetJustifyH("LEFT")
 			row.Text:SetText(category.title or category.id)
-			if lib.IsCategoryNew(self.app, category.id) then
+			if isNewCategory then
 				row.NewBadge = lib.CreateNewBadge(row)
 				row.NewBadge:SetPoint("RIGHT", row, "RIGHT", -10, 0)
 			end
