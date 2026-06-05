@@ -12,6 +12,7 @@
 - Economy / Auto-Sell Rules: Moved "Only auto sell when Shift is held" and the 12-item buyback safety option from Vendor Quick Actions into Auto-Sell Rules.
 - Economy / Include / Exclude: Reworked add/remove rows with clearer labels, descriptions, popup prompts, and disabled empty-state remove dropdowns.
 - Economy / Destroy Queue: Reworked add/remove rows with clearer labels, descriptions, and a disabled empty-state remove dropdown.
+- Settings Center / Economy: Added clearer overview-card descriptions for Auction House, Merchant UI, Repair Options, Destroy Queue and Include / Exclude.
 - Settings Center / Sound: Added clearer overview-card descriptions for Audio Device, Additional Sounds, Shared Media, Deep Voice Sounds and Sounds to Mute.
 - Settings Center / Combat Alerts: Moved Combat Alerts to a modern-only Gameplay page and added clearer descriptions for death alerts, no-target reminders, sounds, TTS and role rules.
 - Settings Center / Combat Alerts: Added row-level descriptions for Death Alert and No Target Indicator so the purpose of each feature is visible directly in the modern page.
@@ -21,6 +22,7 @@
 - Settings Center / Profiles: Split global Font settings and Import Protection into their own Profile subpages so they can be found directly.
 - Settings Center / Profiles: Added a Profile Management section to the AddOn profile page so active/default profile controls appear before copy, delete, create and export/import actions.
 - Settings Center / Sound: Migrated Audio Device, Sounds to Mute, Additional Sounds and Shared Media pages to modern-only rendering and removed the old Blizzard Settings root category for Sound.
+- Settings Center / Economy: Migrated Economy pages to modern-only rendering and removed the old Blizzard Settings root category for Economy.
 
 ### 🐛 Fixed
 

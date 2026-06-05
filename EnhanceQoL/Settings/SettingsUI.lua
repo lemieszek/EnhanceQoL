@@ -113,6 +113,7 @@ local pageIconKeysByStableID = {
 local pageDescriptionKeysByStableID = {
 	ActionBarsAndButtons = "configCenterPageCardDescActionBars",
 	ActionTracker = "configCenterPageCardDescActionTracker",
+	AuctionHouse = "configCenterPageCardDescAuctionHouse",
 	AutoSellRules = "configCenterPageCardDescAutoSell",
 	BagsInventory = "configCenterPageCardDescBagsInventory",
 	Bank = "configCenterPageCardDescBank",
