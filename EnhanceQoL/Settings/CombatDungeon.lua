@@ -2294,8 +2294,10 @@ function addon.functions.initDungeonFrame()
 	local sectionMarkers = addon.SettingsLayout.gameplayMarkersSection
 	if not sectionMarkers then
 		sectionMarkers = addon.functions.SettingsCreateExpandableSection(cChar, {
-			name = L["Markers"],
+			name = L["WorldMarkers"] or "World Markers",
 			configPageKey = "Markers",
+			description = L["configCenterPageCardDescMarkers"]
+				or "Configure keybindings for cycling and clearing world markers.",
 			iconKey = "markers",
 			expanded = false,
 			colorizeTitle = false,
