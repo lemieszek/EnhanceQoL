@@ -3418,6 +3418,9 @@ local function addSettingRow(state, control, pathText, parent, yOffset, width)
 			elseif type(control.setValue) == "function" then
 				control.setValue()
 			end
+			if control.refreshOnChange then
+				lib.RefreshVisibleRows(row._state)
+			end
 		end)
 	else
 		title:SetPoint("RIGHT", row, "RIGHT", hasNewBadge and -154 or -18, 0)

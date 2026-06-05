@@ -17,6 +17,7 @@
 ### 🐛 Fixed
 
 - Settings Center: Lowered the modern settings window to MEDIUM frame strata so it layers more naturally with other addon editor windows.
+- Settings Center / Shared Media: Fixed Enable all and Disable all leaving visible sound toggles in their old state until the page was reopened.
 
 ## [11.0.0-alpha4] - 2026-06-04
 

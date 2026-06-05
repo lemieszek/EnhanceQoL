@@ -58,12 +58,14 @@ local function CreateSoundSection(title, varPrefix, sounds)
 		var = varPrefix .. "EnableAll",
 		text = L["Enable All"],
 		func = function() SetAllSounds(true) end,
+		refreshOnChange = true,
 	})
 
 	CreateButton({
 		var = varPrefix .. "DisableAll",
 		text = L["Disable All"],
 		func = function() SetAllSounds(false) end,
+		refreshOnChange = true,
 	})
 
 	for _, sound in ipairs(sounds) do
