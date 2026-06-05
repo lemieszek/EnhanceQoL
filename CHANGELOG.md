@@ -1,5 +1,11 @@
 # Changelog
 
+## [11.0.0-alpha7] - 2026-06-05
+
+### 🐛 Fixed
+
+- Settings Center / Interface: Fixed dynamically visible Unit Frames and Castbars controls resolving to the generic Settings page instead of their owning Interface subpages.
+
 ## [11.0.0-alpha6] - 2026-06-05
 
 ### ✨ Added

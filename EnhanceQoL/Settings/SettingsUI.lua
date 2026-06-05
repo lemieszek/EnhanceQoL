@@ -572,7 +572,10 @@ end
 local function resolveLegacyPageID(app, cbData, category)
 	if not app then return nil end
 	if cbData and cbData.pageID then return cbData.pageID end
-	if cbData and cbData.parentSection and app.legacySections then return app.legacySections[cbData.parentSection] end
+	if cbData and cbData.parentSection and app.legacySections then
+		local pageID = app.legacySections[cbData.parentSection]
+		if pageID then return pageID end
+	end
 	if cbData and cbData.parentSection and addon.ConfigSectionByParentCheck and app.legacySections then
 		local section = addon.ConfigSectionByParentCheck[cbData.parentSection]
 		if section then return app.legacySections[section] end
