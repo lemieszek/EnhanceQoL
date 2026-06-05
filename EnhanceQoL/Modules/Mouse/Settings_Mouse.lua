@@ -576,7 +576,6 @@ data = {
 addon.functions.SettingsCreateCheckboxes(cMouse, data)
 
 addon.functions.SettingsCreateHeadline(cMouse, L["mouseTrail"], { parentSection = expandable })
-addon.functions.SettingsCreateText(cMouse, "|cff99e599" .. L["Trailinfo"] .. "|r", { parentSection = expandable })
 
 data = {
 	{
@@ -652,6 +651,12 @@ data = {
 				order = { 1, 2, 3, 4, 5 },
 				text = L["mouseTrailDensity"],
 				desc = L["mouseTrailDensityDesc"],
+				richNote = {
+					title = L["mouseTrailDensity"],
+					blocks = {
+						{ text = "|cff99e599" .. L["Trailinfo"] .. "|r" },
+					},
+				},
 				get = function() return addon.db["mouseTrailDensity"] or 1 end,
 				set = function(key)
 					addon.db["mouseTrailDensity"] = key

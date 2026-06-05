@@ -1,8 +1,6 @@
 local addonName, addon = ...
 
 local L = LibStub("AceLocale-3.0"):GetLocale(addonName)
-local getCVarOptionState = addon.functions.GetCVarOptionState or function() return false end
-local setCVarOptionState = addon.functions.SetCVarOptionState or function() end
 
 local function applyParentSection(entries, section)
 	for _, entry in ipairs(entries or {}) do
@@ -13,29 +11,6 @@ end
 
 local cGeneral = addon.SettingsLayout.rootGENERAL
 addon.SettingsLayout.systemCategory = cGeneral
-
-local movementExpandable = addon.functions.SettingsCreateExpandableSection(cGeneral, {
-	name = L["cvarCategoryMovementInput"] or "Movement & Input",
-	configPageKey = "MovementInput",
-	iconKey = "movementinput",
-	expanded = false,
-	colorizeTitle = false,
-})
-
-local movementData = {
-	{
-		var = "autoDismount",
-		text = L["autoDismount"],
-		desc = L["autoDismountDesc"],
-		get = function() return getCVarOptionState("autoDismount") end,
-		func = function(value) setCVarOptionState("autoDismount", value) end,
-		default = false,
-	},
-}
-
-table.sort(movementData, function(a, b) return a.text < b.text end)
-applyParentSection(movementData, movementExpandable)
-addon.functions.SettingsCreateCheckboxes(cGeneral, movementData)
 
 local dialogExpandable = addon.functions.SettingsCreateExpandableSection(cGeneral, {
 	name = L["DialogsAndConfirmations"] or "Dialogs & Confirmations",
@@ -86,37 +61,41 @@ local function applyDialogConfirmSelection(selection)
 	addon.db["confirmHighCostItem"] = selection.highcost == true
 end
 
+local dialogAutoConfirmOptions = {
+	{
+		value = "patron",
+		text = (L["confirmPatronOrderDialog"]):format(PROFESSIONS_CRAFTER_ORDER_TAB_NPC),
+		tooltip = L["confirmPatronOrderDialogDesc"],
+	},
+	{
+		value = "trade",
+		text = L["confirmTimerRemovalTrade"],
+		tooltip = L["confirmTimerRemovalTradeDesc"],
+	},
+	{
+		value = "socket",
+		text = L["confirmSocketReplace"],
+		tooltip = L["confirmSocketReplaceDesc"],
+	},
+	{
+		value = "token",
+		text = L["confirmPurchaseTokenItem"],
+		tooltip = L["confirmPurchaseTokenItemDesc"],
+	},
+	{
+		value = "highcost",
+		text = L["confirmHighCostItem"],
+		tooltip = L["confirmHighCostItemDesc"],
+	},
+}
+
+table.sort(dialogAutoConfirmOptions, function(a, b) return tostring(a.text) < tostring(b.text) end)
+
 addon.functions.SettingsCreateMultiDropdown(cGeneral, {
 	var = "dialogAutoConfirm",
 	text = L["dialogAutoConfirm"] or "Auto-confirm dialogs",
 	desc = L["dialogAutoConfirmDesc"],
-	options = {
-		{
-			value = "patron",
-			text = (L["confirmPatronOrderDialog"]):format(PROFESSIONS_CRAFTER_ORDER_TAB_NPC),
-			tooltip = L["confirmPatronOrderDialogDesc"],
-		},
-		{
-			value = "trade",
-			text = L["confirmTimerRemovalTrade"],
-			tooltip = L["confirmTimerRemovalTradeDesc"],
-		},
-		{
-			value = "socket",
-			text = L["confirmSocketReplace"],
-			tooltip = L["confirmSocketReplaceDesc"],
-		},
-		{
-			value = "token",
-			text = L["confirmPurchaseTokenItem"],
-			tooltip = L["confirmPurchaseTokenItemDesc"],
-		},
-		{
-			value = "highcost",
-			text = L["confirmHighCostItem"],
-			tooltip = L["confirmHighCostItemDesc"],
-		},
-	},
+	options = dialogAutoConfirmOptions,
 	isSelectedFunc = function(key) return isDialogConfirmSelected(key) end,
 	setSelectedFunc = function(key, selected) setDialogConfirmOption(key, selected) end,
 	setSelection = applyDialogConfirmSelection,

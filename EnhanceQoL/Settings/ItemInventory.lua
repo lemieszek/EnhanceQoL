@@ -3106,6 +3106,7 @@ local bagDisplayDropdown = gateNativeBagSetting(addon.functions.SettingsCreateMu
 	isSelectedFunc = function(key) return isBagDisplaySelected(key) end,
 	setSelectedFunc = function(key, selected) setBagDisplayOption(key, selected) end,
 	setSelection = applyBagDisplaySelection,
+	refreshOnChange = true,
 	parentSection = expandable,
 }))
 
@@ -3131,6 +3132,7 @@ gateNativeBagSetting(addon.functions.SettingsCreateDropdown(cInventory, {
 	end,
 	parent = bagDisplayDropdown,
 	parentCheck = function() return isBagDisplaySelected("ilvl") end,
+	hiddenWhen = function() return not isBagDisplaySelected("ilvl") end,
 	default = "BOTTOMLEFT",
 	var = "bagIlvlPosition",
 	type = Settings.VarType.String,
@@ -3154,6 +3156,7 @@ gateNativeBagSetting(addon.functions.SettingsCreateDropdown(cInventory, {
 	end,
 	parent = bagDisplayDropdown,
 	parentCheck = function() return isBagDisplaySelected("track") end,
+	hiddenWhen = function() return not isBagDisplaySelected("track") end,
 	default = "OUTSIDE",
 	var = "bagTrackPosition",
 	type = Settings.VarType.String,
@@ -3185,6 +3188,7 @@ gateNativeBagSetting(addon.functions.SettingsCreateDropdown(cInventory, {
 	end,
 	parent = bagDisplayDropdown,
 	parentCheck = function() return isBagDisplaySelected("upgrade") end,
+	hiddenWhen = function() return not isBagDisplaySelected("upgrade") end,
 	default = "TOPRIGHT",
 	var = "bagUpgradeIconPosition",
 	type = Settings.VarType.String,
@@ -3230,6 +3234,9 @@ gateNativeBagSetting(addon.functions.SettingsCreateMultiDropdown(cInventory, {
 	isSelectedFunc = function(key) return isBagItemLevelTargetSelected(key) end,
 	setSelectedFunc = function(key, selected) setBagItemLevelTarget(key, selected) end,
 	setSelection = applyBagItemLevelTargets,
+	parent = bagDisplayDropdown,
+	parentCheck = function() return isBagDisplaySelected("ilvl") end,
+	hiddenWhen = function() return not isBagDisplaySelected("ilvl") end,
 	parentSection = expandable,
 }))
 

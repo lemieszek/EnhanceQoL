@@ -14,11 +14,12 @@ local expandable = addon.functions.SettingsCreateExpandableSection(cGearUpgrade,
 	iconKey = "gearupgrades",
 	expanded = false,
 	colorizeTitle = false,
+	modernOnly = true,
 })
 addon.SettingsLayout.gearUpgradeCategory = cGearUpgrade
 addon.SettingsLayout.gearUpgradeSection = expandable
 
-addon.functions.SettingsCreateHeadline(cGearUpgrade, L["Show on Character Frame"], { parentSection = expandable })
+addon.functions.SettingsCreateHeadline(cGearUpgrade, L["gearDisplayElements"] or "Elements", { parentSection = expandable })
 
 local function ensureDisplayOptions()
 	if addon.functions and addon.functions.ensureDisplayDB then
@@ -87,6 +88,16 @@ local function applyCharDisplaySelection(selection)
 	addon.functions.calculateDurability()
 	if addon.MovementSpeedStat and addon.MovementSpeedStat.Disable then addon.MovementSpeedStat.Disable() end
 	if addon.CharacterStatsFormatting and addon.CharacterStatsFormatting.Disable then addon.CharacterStatsFormatting.Disable() end
+end
+
+local isInspectDisplaySelected
+
+local function isAnyItemLevelDisplaySelected()
+	return isCharDisplaySelected("ilvl") or isInspectDisplaySelected and isInspectDisplaySelected("ilvl")
+end
+
+local function isAnyEnchantDisplaySelected()
+	return isCharDisplaySelected("enchants") or isInspectDisplaySelected and isInspectDisplaySelected("enchants")
 end
 
 local ilvlFontOrder = {}
@@ -177,7 +188,7 @@ end
 
 local charDisplayDropdown = addon.functions.SettingsCreateMultiDropdown(cGearUpgrade, {
 	var = "charframe_display",
-	text = L["gearDisplayElements"] or "Elements",
+	text = L["Show on Character Frame"],
 	desc = L["charframeDisplayDesc"],
 	options = {
 		{ value = "ilvl", text = STAT_AVERAGE_ITEM_LEVEL, tooltip = L["gearDisplayOptionItemLevelDesc"] },
@@ -191,6 +202,51 @@ local charDisplayDropdown = addon.functions.SettingsCreateMultiDropdown(cGearUpg
 	isSelectedFunc = function(key) return isCharDisplaySelected(key) end,
 	setSelectedFunc = function(key, selected) setCharDisplayOption(key, selected) end,
 	setSelection = applyCharDisplaySelection,
+	refreshOnChange = true,
+	parentSection = expandable,
+})
+
+function isInspectDisplaySelected(key)
+	ensureDisplayOptions()
+	local t = addon.db.inspectDisplayOptions
+	if key == "ilvl" then return t.ilvl == true end
+	if key == "gems" then return t.gems == true end
+	if key == "enchants" then return t.enchants == true end
+	if key == "gemtip" then return t.gemtip == true end
+	return false
+end
+
+local function setInspectDisplayOption(key, value)
+	ensureDisplayOptions()
+	addon.db.inspectDisplayOptions[key] = value and true or false
+	refreshItemLevelDisplays()
+end
+
+local function applyInspectDisplaySelection(selection)
+	selection = selection or {}
+	ensureDisplayOptions()
+	addon.db.inspectDisplayOptions.ilvl = selection.ilvl == true
+	addon.db.inspectDisplayOptions.gems = selection.gems == true
+	addon.db.inspectDisplayOptions.enchants = selection.enchants == true
+	addon.db.inspectDisplayOptions.gemtip = selection.gemtip == true
+	refreshItemLevelDisplays()
+end
+
+addon.functions.SettingsCreateMultiDropdown(cGearUpgrade, {
+	var = "inspectframe_display",
+	storage = false,
+	text = L["Show on Inspect Frame"],
+	desc = L["gearInspectDisplayDesc"] or L["charframeDisplayDesc"],
+	options = {
+		{ value = "ilvl", text = STAT_AVERAGE_ITEM_LEVEL, tooltip = L["gearDisplayOptionItemLevelDesc"] },
+		{ value = "gems", text = AUCTION_CATEGORY_GEMS, tooltip = L["gearDisplayOptionGemsDesc"] },
+		{ value = "enchants", text = ENCHANTS, tooltip = L["gearDisplayOptionEnchantsDesc"] },
+		{ value = "gemtip", text = L["Gem slot tooltip"], tooltip = L["gearDisplayOptionGemTooltipDesc"] },
+	},
+	isSelectedFunc = function(key) return isInspectDisplaySelected(key) end,
+	setSelectedFunc = function(key, selected) setInspectDisplayOption(key, selected) end,
+	setSelection = applyInspectDisplaySelection,
+	refreshOnChange = true,
 	parentSection = expandable,
 })
 
@@ -208,7 +264,8 @@ local enchantDisplayDropdown = addon.functions.SettingsCreateDropdown(cGearUpgra
 		refreshItemLevelDisplays()
 	end,
 	parent = charDisplayDropdown,
-	parentCheck = function() return isCharDisplaySelected("enchants") end,
+	parentCheck = isAnyEnchantDisplaySelected,
+	hiddenWhen = function() return not isAnyEnchantDisplaySelected() end,
 	parentSection = expandable,
 })
 
@@ -220,7 +277,11 @@ addon.functions.SettingsCreateColorPicker(cGearUpgrade, {
 	element = enchantDisplayDropdown and enchantDisplayDropdown.element,
 	parentCheck = function()
 		local mode = normalizeEnchantDisplayMode(addon.db["charEnchantDisplayMode"], addon.db["showMissingEnchantOverlayOnCharframe"])
-		return isCharDisplaySelected("enchants") and modeShowsMissingOverlay(mode)
+		return isAnyEnchantDisplaySelected() and modeShowsMissingOverlay(mode)
+	end,
+	hiddenWhen = function()
+		local mode = normalizeEnchantDisplayMode(addon.db["charEnchantDisplayMode"], addon.db["showMissingEnchantOverlayOnCharframe"])
+		return not isAnyEnchantDisplaySelected() or not modeShowsMissingOverlay(mode)
 	end,
 	parentSection = expandable,
 })
@@ -242,6 +303,7 @@ addon.functions.SettingsCreateDropdown(cGearUpgrade, {
 	end,
 	parent = charDisplayDropdown,
 	parentCheck = function() return isCharDisplaySelected("tracks") end,
+	hiddenWhen = function() return not isCharDisplaySelected("tracks") end,
 	default = "LEFT",
 	var = "charTrackPosition",
 	type = Settings.VarType.String,
@@ -270,6 +332,7 @@ addon.functions.SettingsCreateDropdown(cGearUpgrade, {
 	end,
 	parent = charDisplayDropdown,
 	parentCheck = function() return isCharDisplaySelected("ilvl") end,
+	hiddenWhen = function() return not isCharDisplaySelected("ilvl") end,
 	default = "TOPRIGHT",
 	var = "charIlvlPosition",
 	type = Settings.VarType.String,
@@ -297,13 +360,12 @@ addon.functions.SettingsCreateDropdown(cGearUpgrade, {
 	end,
 	parent = charDisplayDropdown,
 	parentCheck = function() return isCharDisplaySelected("ilvl") end,
+	hiddenWhen = function() return not isCharDisplaySelected("ilvl") end,
 	default = "TOPRIGHT",
 	var = "flyoutIlvlPosition",
 	type = Settings.VarType.String,
 	parentSection = expandable,
 })
-
-addon.functions.SettingsCreateHeadline(cGearUpgrade, L["ilvlTextStyleHeader"] or "Item level text style", { parentSection = expandable })
 
 local ilvlQualityColorCheckbox = addon.functions.SettingsCreateCheckbox(cGearUpgrade, {
 	var = "ilvlUseItemQualityColor",
@@ -314,6 +376,8 @@ local ilvlQualityColorCheckbox = addon.functions.SettingsCreateCheckbox(cGearUpg
 		refreshItemLevelDisplays()
 	end,
 	default = true,
+	parentCheck = isAnyItemLevelDisplaySelected,
+	hiddenWhen = function() return not isAnyItemLevelDisplaySelected() end,
 	parentSection = expandable,
 })
 
@@ -323,7 +387,8 @@ addon.functions.SettingsCreateColorPicker(cGearUpgrade, {
 	desc = L["gearIlvlCustomColorDesc"],
 	hasOpacity = true,
 	element = ilvlQualityColorCheckbox and ilvlQualityColorCheckbox.element,
-	parentCheck = function() return addon.db["ilvlUseItemQualityColor"] ~= true end,
+	parentCheck = function() return isAnyItemLevelDisplaySelected() and addon.db["ilvlUseItemQualityColor"] ~= true end,
+	hiddenWhen = function() return not isAnyItemLevelDisplaySelected() or addon.db["ilvlUseItemQualityColor"] == true end,
 	callback = function() refreshItemLevelDisplays() end,
 	parentSection = expandable,
 })
@@ -346,6 +411,8 @@ addon.functions.SettingsCreateScrollDropdown(cGearUpgrade, {
 		addon.db.ilvlFontFace = key
 		refreshItemLevelDisplays()
 	end,
+	parentCheck = isAnyItemLevelDisplaySelected,
+	hiddenWhen = function() return not isAnyItemLevelDisplaySelected() end,
 	parentSection = expandable,
 })
 
@@ -370,6 +437,8 @@ addon.functions.SettingsCreateSlider(cGearUpgrade, {
 		addon.db.ilvlFontSize = value
 		refreshItemLevelDisplays()
 	end,
+	parentCheck = isAnyItemLevelDisplaySelected,
+	hiddenWhen = function() return not isAnyItemLevelDisplaySelected() end,
 	parentSection = expandable,
 })
 
@@ -385,49 +454,8 @@ addon.functions.SettingsCreateDropdown(cGearUpgrade, {
 		addon.db.ilvlFontOutline = normalizeIlvlFontStyle(key, ilvlGlobalFontStyleKey)
 		refreshItemLevelDisplays()
 	end,
-	parentSection = expandable,
-})
-
-addon.functions.SettingsCreateHeadline(cGearUpgrade, L["Show on Inspect Frame"], { parentSection = expandable })
-
-local function isInspectDisplaySelected(key)
-	ensureDisplayOptions()
-	local t = addon.db.inspectDisplayOptions
-	if key == "ilvl" then return t.ilvl == true end
-	if key == "gems" then return t.gems == true end
-	if key == "enchants" then return t.enchants == true end
-	if key == "gemtip" then return t.gemtip == true end
-	return false
-end
-
-local function setInspectDisplayOption(key, value)
-	ensureDisplayOptions()
-	addon.db.inspectDisplayOptions[key] = value and true or false
-	refreshItemLevelDisplays()
-end
-
-local function applyInspectDisplaySelection(selection)
-	selection = selection or {}
-	ensureDisplayOptions()
-	addon.db.inspectDisplayOptions.ilvl = selection.ilvl == true
-	addon.db.inspectDisplayOptions.gems = selection.gems == true
-	addon.db.inspectDisplayOptions.enchants = selection.enchants == true
-	addon.db.inspectDisplayOptions.gemtip = selection.gemtip == true
-	refreshItemLevelDisplays()
-end
-
-addon.functions.SettingsCreateMultiDropdown(cGearUpgrade, {
-	var = "inspectframe_display",
-	text = L["gearDisplayElements"] or "Elements",
-	options = {
-		{ value = "ilvl", text = STAT_AVERAGE_ITEM_LEVEL, tooltip = L["gearDisplayOptionItemLevelDesc"] },
-		{ value = "gems", text = AUCTION_CATEGORY_GEMS, tooltip = L["gearDisplayOptionGemsDesc"] },
-		{ value = "enchants", text = ENCHANTS, tooltip = L["gearDisplayOptionEnchantsDesc"] },
-		{ value = "gemtip", text = L["Gem slot tooltip"], tooltip = L["gearDisplayOptionGemTooltipDesc"] },
-	},
-	isSelectedFunc = function(key) return isInspectDisplaySelected(key) end,
-	setSelectedFunc = function(key, selected) setInspectDisplayOption(key, selected) end,
-	setSelection = applyInspectDisplaySelection,
+	parentCheck = isAnyItemLevelDisplaySelected,
+	hiddenWhen = function() return not isAnyItemLevelDisplaySelected() end,
 	parentSection = expandable,
 })
 

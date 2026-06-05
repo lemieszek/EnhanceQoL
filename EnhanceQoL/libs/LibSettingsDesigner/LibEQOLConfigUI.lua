@@ -3081,7 +3081,15 @@ local function addMultiDropdownWidget(row, app, control, opts)
 					if type(control.callback) == "function" then
 						pcall(control.callback, option)
 					end
-					lib.RefreshVisibleRows(row._state)
+					if control.refreshOnChange and row._state then
+						C_Timer.After(0, function()
+							if row._state and row._state.frame and row._state.frame:IsShown() then
+								row._state:RenderContent()
+							end
+						end)
+					else
+						lib.RefreshVisibleRows(row._state)
+					end
 					refreshSummary()
 				end
 				rootDescription:CreateCheckbox(option.label, isSelected, setSelected, option.value)
@@ -3172,7 +3180,15 @@ local function addToggleWidget(row, app, control, opts)
 			return
 		end
 		app:SetControlValue(control, not self:GetChecked())
-		lib.RefreshVisibleRows(row._state)
+		if control.refreshOnChange and row._state then
+			C_Timer.After(0, function()
+				if row._state and row._state.frame and row._state.frame:IsShown() then
+					row._state:RenderContent()
+				end
+			end)
+		else
+			lib.RefreshVisibleRows(row._state)
+		end
 	end)
 
 	row.check = switch
