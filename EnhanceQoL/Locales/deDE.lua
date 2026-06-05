@@ -1871,6 +1871,7 @@ L["gearIlvlFontOutlineDesc"] = "Wählt den Konturstil für Gegenstandsstufen-Ove
 L["gearIlvlFontSizeDesc"] = "Legt die Schriftgröße für Gegenstandsstufen-Overlays fest."
 L["gearIlvlPositionDesc"] = "Wählt, wo Gegenstandsstufentext im Charakterfenster angezeigt wird."
 L["gearIlvlUseQualityColorDesc"] = "Färbt Gegenstandsstufentext nach Gegenstandsqualität statt mit einer festen Farbe."
+L["gearInspectDisplayDesc"] = "Wählt, welche Ausrüstungshinweise im Betrachten-Fenster angezeigt werden."
 L["gearMissingEnchantOverlayColorDesc"] = "Wählt die Overlay-Farbe für fehlende Verzauberungen."
 L["gearTrackPositionDesc"] = "Wählt, wo Aufwertungspfad-Text im Charakterfenster angezeigt wird."
 L["gemHelperHideTracker"] = "Sockelstein-Tracker ausblenden"

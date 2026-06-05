@@ -1871,6 +1871,7 @@ L["gearIlvlFontOutlineDesc"] = "Choose the outline style for item level text ove
 L["gearIlvlFontSizeDesc"] = "Set the font size for item level text overlays."
 L["gearIlvlPositionDesc"] = "Choose where item level text appears on character frame items."
 L["gearIlvlUseQualityColorDesc"] = "Color item level text by item quality instead of a fixed custom color."
+L["gearInspectDisplayDesc"] = "Choose which gear indicators are shown on the inspect frame."
 L["gearMissingEnchantOverlayColorDesc"] = "Choose the overlay color used for missing enchants."
 L["gearTrackPositionDesc"] = "Choose where upgrade track text appears on character frame items."
 L["gemHelperHideTracker"] = "Hide socketed gem tracker"

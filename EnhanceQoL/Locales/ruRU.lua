@@ -1871,6 +1871,7 @@ L["gearIlvlFontOutlineDesc"] = "Настраивает индикаторы эк
 L["gearIlvlFontSizeDesc"] = "Настраивает индикаторы экипировки персонажа."
 L["gearIlvlPositionDesc"] = "Настраивает индикаторы экипировки персонажа."
 L["gearIlvlUseQualityColorDesc"] = "Настраивает индикаторы экипировки персонажа."
+L["gearInspectDisplayDesc"] = "Выберите, какие индикаторы экипировки показывать в окне осмотра."
 L["gearMissingEnchantOverlayColorDesc"] = "Настраивает индикаторы экипировки персонажа."
 L["gearTrackPositionDesc"] = "Настраивает индикаторы экипировки персонажа."
 L["gemHelperHideTracker"] = "Скрыть отслеживание вставленных самоцветов"

@@ -1871,6 +1871,7 @@ L["gearIlvlFontOutlineDesc"] = "Configura los indicadores de equipo en el person
 L["gearIlvlFontSizeDesc"] = "Configura los indicadores de equipo en el personaje."
 L["gearIlvlPositionDesc"] = "Configura los indicadores de equipo en el personaje."
 L["gearIlvlUseQualityColorDesc"] = "Configura los indicadores de equipo en el personaje."
+L["gearInspectDisplayDesc"] = "Elige qué indicadores de equipo se muestran en la ventana de inspección."
 L["gearMissingEnchantOverlayColorDesc"] = "Configura los indicadores de equipo en el personaje."
 L["gearTrackPositionDesc"] = "Configura los indicadores de equipo en el personaje."
 L["gemHelperHideTracker"] = "Ocultar el rastreador de gemas engarzadas"

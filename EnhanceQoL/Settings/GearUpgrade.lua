@@ -236,7 +236,7 @@ addon.functions.SettingsCreateMultiDropdown(cGearUpgrade, {
 	var = "inspectframe_display",
 	storage = false,
 	text = L["Show on Inspect Frame"],
-	desc = L["gearInspectDisplayDesc"] or L["charframeDisplayDesc"],
+	desc = L["gearInspectDisplayDesc"],
 	options = {
 		{ value = "ilvl", text = STAT_AVERAGE_ITEM_LEVEL, tooltip = L["gearDisplayOptionItemLevelDesc"] },
 		{ value = "gems", text = AUCTION_CATEGORY_GEMS, tooltip = L["gearDisplayOptionGemsDesc"] },
