@@ -1177,6 +1177,19 @@ function lib.GetCategoryCustomizedCount(app, categoryID)
 	return count
 end
 
+function lib.GetGroupCustomizedCount(app, group)
+	local count = 0
+	for _, control in ipairs((group and group.controls) or {}) do
+		if app and type(app.IsControlVisible) == "function" and type(app.IsControlCustomized) == "function"
+			and app:IsControlVisible(control)
+			and app:IsControlCustomized(control)
+		then
+			count = count + 1
+		end
+	end
+	return count
+end
+
 local function getAppTitle(app)
 	return (app and app.opts and app.opts.title) or (app and app.id) or "Settings"
 end
@@ -2085,12 +2098,35 @@ local function refreshControlRow(app, control, row)
 end
 
 function lib.RefreshVisibleRows(state)
-	if not state or type(state.controlRows) ~= "table" then
+	if not state then
 		return
 	end
-	for _, entry in ipairs(state.controlRows) do
-		if entry.row and entry.control then
-			refreshControlRow(state.app, entry.control, entry.row)
+	if type(state.controlRows) == "table" then
+		for _, entry in ipairs(state.controlRows) do
+			if entry.row and entry.control then
+				refreshControlRow(state.app, entry.control, entry.row)
+			end
+		end
+	end
+	if type(state.groupCountHeaders) == "table" then
+		for _, entry in ipairs(state.groupCountHeaders) do
+			if entry.header and entry.group and entry.chip then
+				local count = lib.GetGroupCustomizedCount(state.app, entry.group)
+				local shown = count > 0
+				entry.chip:SetShown(shown)
+				if shown then
+					local width = math.max(30, (#tostring(count) * 9) + 18)
+					entry.chip:SetSize(width, 20)
+					if entry.chip.Text then
+						entry.chip.Text:SetText(tostring(count))
+					end
+				end
+				if entry.header.Text then
+					entry.header.Text:ClearAllPoints()
+					entry.header.Text:SetPoint("LEFT", entry.header, "LEFT", 14, 0)
+					entry.header.Text:SetPoint("RIGHT", entry.header, "RIGHT", shown and -78 or -34, 0)
+				end
+			end
 		end
 	end
 end
@@ -4431,14 +4467,7 @@ end
 local function addGroupSection(state, group, pagePath)
 	local collapsed = state.collapsedGroups and state.collapsedGroups[group.id] == true
 	local controlsHeight = 0
-	local customizedCount = 0
-	for _, control in ipairs(group.controls or {}) do
-		if state.app and type(state.app.IsControlCustomized) == "function" and state.app:IsControlVisible(control)
-			and state.app:IsControlCustomized(control)
-		then
-			customizedCount = customizedCount + 1
-		end
-	end
+	local customizedCount = lib.GetGroupCustomizedCount(state.app, group)
 	if not collapsed then
 		for _, control in ipairs(group.controls) do
 			controlsHeight = controlsHeight + getSettingRowHeight(control, state)
@@ -4461,11 +4490,16 @@ local function addGroupSection(state, group, pagePath)
 	header.Text:SetJustifyH("LEFT")
 	header.Text:SetText(group.title or group.id)
 	setTextColor(header.Text, TEXT.main)
-	if customizedCount > 0 then
-		local width = math.max(30, (#tostring(customizedCount) * 9) + 18)
-		local chip = addStatusChip(header, tostring(customizedCount), TEXT.gold, width)
-		chip:SetPoint("RIGHT", header, "RIGHT", -36, 0)
-	end
+	local width = math.max(30, (#tostring(customizedCount) * 9) + 18)
+	local chip = addStatusChip(header, tostring(customizedCount), TEXT.gold, width)
+	chip:SetPoint("RIGHT", header, "RIGHT", -36, 0)
+	chip:SetShown(customizedCount > 0)
+	state.groupCountHeaders = state.groupCountHeaders or {}
+	state.groupCountHeaders[#state.groupCountHeaders + 1] = {
+		header = header,
+		chip = chip,
+		group = group,
+	}
 	header.Chevron = createCollapseArrow(header, state.app, 12, collapsed)
 	header.Chevron:SetPoint("RIGHT", header, "RIGHT", -14, 0)
 	header:SetScript("OnClick", function()
@@ -4765,6 +4799,7 @@ function StateMixin:RenderContent()
 	updateContentMetrics(self)
 	clearContent(self)
 	clearFixedContent(self)
+	self.groupCountHeaders = {}
 	local query = self.frame.SearchBox:GetText() or ""
 	if query ~= "" then
 		self.resetSearchScroll = self.lastSearchQuery ~= query
