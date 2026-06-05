@@ -11,8 +11,7 @@ local L = LibStub("AceLocale-3.0"):GetLocale("EnhanceQoL_SharedMedia")
 addon.SharedMedia = addon.SharedMedia or {}
 addon.SharedMedia.functions = addon.SharedMedia.functions or {}
 
-local cSharedMedia = addon.SettingsLayout.rootSOUND
-addon.SettingsLayout.sharedMediaCategory = cSharedMedia
+local sharedMediaCategory = nil
 
 local function ToggleSound(sound, value)
 	addon.SharedMedia.functions.UpdateSound(sound.key, value and true or false)
@@ -25,12 +24,14 @@ local function CreateSoundSection(title, varPrefix, sounds)
 	if not sounds or #sounds == 0 then return end
 	local pageKey = varPrefix == "SharedMediaDeepVoice" and "SharedMediaDeepVoiceSounds" or "SharedMedia"
 
-	local section = addon.functions.SettingsCreateExpandableSection(cSharedMedia, {
+	local section = addon.functions.SettingsCreateExpandableSection(sharedMediaCategory, {
 		name = title,
 		configPageKey = pageKey,
 		iconKey = "soundsettings",
 		expanded = false,
 		colorizeTitle = false,
+		modernCategory = "sound",
+		modernOnly = true,
 	})
 
 	local soundSettings = {}
@@ -38,12 +39,12 @@ local function CreateSoundSection(title, varPrefix, sounds)
 
 	local function CreateButton(data)
 		data.parentSection = section
-		return addon.functions.SettingsCreateButton(cSharedMedia, data)
+		return addon.functions.SettingsCreateButton(sharedMediaCategory, data)
 	end
 
 	local function CreateCheckbox(data)
 		data.parentSection = section
-		return addon.functions.SettingsCreateCheckbox(cSharedMedia, data)
+		return addon.functions.SettingsCreateCheckbox(sharedMediaCategory, data)
 	end
 
 	local function SetAllSounds(state)

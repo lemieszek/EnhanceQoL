@@ -13,10 +13,12 @@
 - Settings Center / Profiles: Removed the old Blizzard Settings root category for Profiles; profile pages now register directly into the modern Profiles category.
 - Settings Center / Profiles: Split global Font settings and Import Protection into their own Profile subpages so they can be found directly.
 - Settings Center / Profiles: Added a Profile Management section to the AddOn profile page so active/default profile controls appear before copy, delete, create and export/import actions.
+- Settings Center / Sound: Migrated Audio Device, Sounds to Mute, Additional Sounds and Shared Media pages to modern-only rendering and removed the old Blizzard Settings root category for Sound.
 
 ### 🐛 Fixed
 
 - Settings Center: Lowered the modern settings window to MEDIUM frame strata so it layers more naturally with other addon editor windows.
+- Settings Center: Fixed long dropdown and multi-select context menus overflowing the screen by enabling Blizzard scroll mode for large option lists.
 - Settings Center / Shared Media: Fixed Enable all and Disable all leaving visible sound toggles in their old state until the page was reopened.
 
 ## [11.0.0-alpha4] - 2026-06-04

@@ -2618,6 +2618,19 @@ local function addDashboardStatusPanel(state, stats, statusConfig)
 	return panel
 end
 
+local function setDropdownMenuScrollMode(rootDescription, control, optionCount)
+	if not (rootDescription and rootDescription.SetScrollMode) then
+		return
+	end
+	local height = tonumber(control and control.menuHeight)
+	if not height and (tonumber(optionCount) or 0) > 12 then
+		height = 320
+	end
+	if height then
+		rootDescription:SetScrollMode(height)
+	end
+end
+
 local function addConfigureFallback(row, app, control, text, opts)
 	opts = opts or {}
 	local L = getLocale(app)
@@ -2813,13 +2826,15 @@ local function addDropdownWidget(row, app, control, opts)
 			return
 		end
 		MenuUtil.CreateContextMenu(owner, function(_, rootDescription)
+			local menuOptions = opts.options or getControlOptions(control)
+			setDropdownMenuScrollMode(rootDescription, control, #menuOptions)
 			local function getCurrentValue()
 				if opts.getValue then
 					return opts.getValue()
 				end
 				return app:GetControlValue(control)
 			end
-			for _, option in ipairs(opts.options or getControlOptions(control)) do
+			for _, option in ipairs(menuOptions) do
 				rootDescription:CreateRadio(option.label, function(value)
 					return tostring(getCurrentValue()) == tostring(value)
 				end, function(value)
@@ -2878,7 +2893,9 @@ local function addMultiDropdownWidget(row, app, control, opts)
 			return
 		end
 		MenuUtil.CreateContextMenu(owner, function(_, rootDescription)
-			for _, option in ipairs(getControlOptions(control)) do
+			local menuOptions = getControlOptions(control)
+			setDropdownMenuScrollMode(rootDescription, control, #menuOptions)
+			for _, option in ipairs(menuOptions) do
 				local function isSelected(value)
 					return lib.IsMultiOptionSelected(lib.GetMultiSelection(app, control), value)
 				end
