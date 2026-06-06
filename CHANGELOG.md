@@ -1,36 +1,19 @@
 # Changelog
 
-<!--@eqol-beta@-->
-## [11.0.0-beta2] - 2026-06-06
+## [11.0.0] - 2026-06-06
+
+### ℹ️ Important
+
+- EnhanceQoL now uses a new modern Settings Center instead of the old Blizzard Settings tree, with dashboard, search, deep links, category pages, richer descriptions, version changelog display and modern controls for addon settings.
 
 ### ✨ Added
 
 - Bags: Added a configurable Profession Quality overlay for crafted gear and profession items.
-- Cooldown Panels: Added a Blizzard alert texture picker for State textures, with rendered previews, search, live preview selection and FileDataID display.
-- Sound: Added a mute toggle for Blizzard's Raid Warning sound under Interface / General.
-- Unit Frames: Added an optional separate target-of-target name text for the Target frame, with its own anchor, font size and X/Y offset controls.
-
-### 🐛 Fixed
-
-- Bags: Restored missing icons for the Bags settings side navigation.
-- Chat History: Fixed text selection and scrollbar interaction in the copy window.
-- Nameplates: Fixed EQOL threat colors depending on Blizzard's native threat health bar color option, allowing configured threat warning/lost colors to apply independently.
-- Unit Frames / Raid Frames: Fixed grouped raid header spans not being snapped to even pixels, which could cause player names to jitter during automatic raid resizing.
-
----
-
-## [11.0.0-beta1] - 2026-06-06
-
-### ℹ️ Important
-
-- EnhanceQoL now uses a new modern Settings Center instead of the old Blizzard Settings tree, with dashboard, search, deep links, category pages, richer descriptions and modern controls for addon settings.
-
-### ✨ Added
-
-- Damage Meter: Added optional segment linking across Damage Meter windows.
-- Damage Meter: Added a per-window option to keep manually selected meter types, allowing separate windows to stay on choices like Damage Done and Healing Done after reloads.
+- Cooldown Panels: Added a Blizzard alert texture picker for State textures with rendered previews, search, live preview selection and FileDataID display.
+- Damage Meter: Added optional segment linking and a per-window option to keep manually selected meter types after reloads.
 - Economy: Added guild-bank repair context selection for automatic guild-bank repairs.
-- Unit Frames, Castbars and Resource Bars: Added configurable text anchors for cast names, cast durations and resource bar values.
+- Sound: Added a mute toggle for Blizzard's Raid Warning sound.
+- Unit Frames, Castbars and Resource Bars: Added configurable text anchors for cast names, cast durations, resource bar values and target-of-target name text.
 
 ### ❌ Removed
 
@@ -39,18 +22,21 @@
 ### 🐛 Fixed
 
 - Action Bars / Button Text: Fixed keybind anchor positions using the HotKey text box width instead of the actual text anchor point.
+- Bags: Fixed new characters without purchased character bank tabs being unable to switch to the integrated character bank purchase view.
+- Bags: Restored missing icons for the Bags settings side navigation.
+- Chat History: Fixed text selection and scrollbar interaction in the copy window.
 - Class Buff Reminder: Fixed phased or otherwise unreachable raid members keeping class-buff reminders active when they were missing a buff that could not be applied.
 - Cooldown Panels: Fixed bar value text for normal cooldown entries not updating reliably in combat when the bar used a native cooldown duration object.
 - Cooldown Panels: Fixed Paste Entry Style copying tracked aura identity fields instead of only applying the visual style.
 - Damage Meter: Fixed restricted combat-data tooltip refresh errors and several tooltip row rendering issues.
 - Mythic Plus / Dungeon Finder: Fixed current-season dungeon score hover handling for missing Group Finder map IDs.
+- Nameplates: Fixed EQOL threat colors depending on Blizzard's native threat health bar color option, allowing configured threat warning and lost colors to apply independently.
 - Tooltips: Fixed realm language flags falling back to locale text such as [frFR] inside instances.
 - Unit Frames: Fixed custom player, target, focus and pet portrait fields not being exposed on EQOL unit frames.
 - Unit Frames: Fixed the player absorb overlay sometimes staying at zero width after logging in with an active shield.
-- Unit Frames / Healer Buff Placement: Added an Anchor outside frame option so HBP indicators can be positioned slightly outside party and raid frames.
-- Bags: Fixed new characters without purchased character bank tabs being unable to switch to the integrated character bank purchase view.
+- Unit Frames / Raid Frames: Fixed grouped raid header spans not being snapped to even pixels, which could cause player names to jitter during automatic raid resizing.
 
-<!--@end-eqol-beta@-->
+---
 
 ## [10.24.0] - 2026-06-02
 
