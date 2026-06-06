@@ -14,4 +14,7 @@ addon.variables.NewVersionTableEQOL = {
 
 	-- 10.21.0 Profile import protection
 	EQOL_importProtection = true,
+
+	-- 10.21.0 Sound mute
+	EQOL_sounds_interface_general_RAID_WARNING = true,
 }

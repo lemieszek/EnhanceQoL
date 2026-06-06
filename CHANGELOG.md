@@ -3,9 +3,14 @@
 <!--@eqol-beta@-->
 ## [11.0.0-beta2] - 2026-06-06
 
+### ✨ Added
+
+- Sound: Added a mute toggle for Blizzard's Raid Warning sound under Interface / General.
+
 ### 🐛 Fixed
 
 - Chat History: Fixed text selection and scrollbar interaction in the copy window.
+- Unit Frames / Raid Frames: Fixed grouped raid header spans not being snapped to even pixels, which could cause player names to jitter during automatic raid resizing.
 
 ---
 

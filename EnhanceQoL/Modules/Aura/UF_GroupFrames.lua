@@ -12370,10 +12370,10 @@ function GF:UpdatePreviewLayout(kind)
 				baseGroupWidth = w
 				baseGroupHeight = h * unitsPerColumn + spacing * max(0, unitsPerColumn - 1)
 			end
-			groupWidth = roundToPixel(groupWidth, scale)
-			groupHeight = roundToPixel(groupHeight, scale)
-			baseGroupWidth = roundToPixel(baseGroupWidth, scale)
-			baseGroupHeight = roundToPixel(baseGroupHeight, scale)
+			groupWidth = roundToEvenPixel(groupWidth, scale)
+			groupHeight = roundToEvenPixel(groupHeight, scale)
+			baseGroupWidth = roundToEvenPixel(baseGroupWidth, scale)
+			baseGroupHeight = roundToEvenPixel(baseGroupHeight, scale)
 			if isHorizontal then
 				if groupGrowth == "LEFT" or groupGrowth == "RIGHT" then
 					totalSpan = groupWidth * groupedPreviewBlockCount + visualColumnSpacing * max(0, groupedPreviewBlockCount - 1)
@@ -14066,8 +14066,8 @@ function GF:ApplyHeaderAttributes(kind, options)
 				perHeaderW = w
 				perHeaderH = h * unitsPer + spacing * max(0, unitsPer - 1)
 			end
-			perHeaderW = roundToPixel(perHeaderW, scale)
-			perHeaderH = roundToPixel(perHeaderH, scale)
+			perHeaderW = roundToEvenPixel(perHeaderW, scale)
+			perHeaderH = roundToEvenPixel(perHeaderH, scale)
 			local runtimeGroupCount = #groupSpecs
 			local viewportGroupCount = max(1, floor((tonumber(raidMaxColumns) or 1) + 0.5))
 			local groupViewportScale = (
@@ -14089,11 +14089,11 @@ function GF:ApplyHeaderAttributes(kind, options)
 			)
 			local renderedPerHeaderW, renderedPerHeaderH
 			if isHorizontal then
-				renderedPerHeaderW = roundToPixel(groupRenderW * unitsPer + spacing * max(0, unitsPer - 1), scale)
+				renderedPerHeaderW = roundToEvenPixel(groupRenderW * unitsPer + spacing * max(0, unitsPer - 1), scale)
 				renderedPerHeaderH = groupRenderH
 			else
 				renderedPerHeaderW = groupRenderW
-				renderedPerHeaderH = roundToPixel(groupRenderH * unitsPer + spacing * max(0, unitsPer - 1), scale)
+				renderedPerHeaderH = roundToEvenPixel(groupRenderH * unitsPer + spacing * max(0, unitsPer - 1), scale)
 			end
 			local groupCenterOffsetX, groupCenterOffsetY = 0, 0
 			if centerGrowthActive and runtimeGroupCount > 0 then
