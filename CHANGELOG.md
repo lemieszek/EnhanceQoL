@@ -1,5 +1,13 @@
 # Changelog
 
+## [11.0.3] - 2026-06-06
+
+### 🐛 Fixed
+
+- Talent Reminder: Fixed loadout dropdown options in the modern Settings Center not refreshing after talent loadouts were created, deleted or updated during the same session.
+
+---
+
 ## [11.0.2] - 2026-06-06
 
 ### 🐛 Fixed
