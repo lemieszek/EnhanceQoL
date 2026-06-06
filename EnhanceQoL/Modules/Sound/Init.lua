@@ -733,6 +733,9 @@ addon.Sounds.soundFiles = {
 			["readycheck"] = {
 				567478,
 			},
+			["RAID_WARNING"] = {
+				567397,
+			},
 			["coinsound"] = {
 				567428,
 			},

@@ -3,7 +3,7 @@ local addonName, addon = ...
 addon.EditMode = addon.EditMode or {}
 local EditMode = addon.EditMode
 
-local LibEditMode = LibStub("LibEQOLEditMode-1.0")
+local LibEditMode = LibStub("EnhanceQoLEditMode-1.0")
 
 local DEFAULT_LAYOUT = "_Global"
 local SHARED_STORAGE_KEY = "editModeData"

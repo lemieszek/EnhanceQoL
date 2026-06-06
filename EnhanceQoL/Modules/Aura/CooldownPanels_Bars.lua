@@ -404,6 +404,15 @@ Bars.GetLiveBarValueText = function(state)
 	return Bars.GetCooldownValueText(state.icon, state.fillDurationObject, state.startTime, state.duration, state.rate)
 end
 
+Bars.UseNativeDurationValueText = Bars.UseNativeDurationValueText or function(state, durationObject)
+	if not (state and durationObject) then return end
+	state.valueTextIsChargeDuration = true
+	state.chargeDurationTextActive = true
+	state.chargeDurationTextNative = true
+	state.chargeDurationTextObject = durationObject
+	state.chargeDurationTextSegmentIndex = nil
+end
+
 Bars.ResolveStackDisplay = function(panelId, entryId, resolvedType, icon, runtimeData)
 	local displayText = nil
 	local rawValue = nil
@@ -3314,6 +3323,7 @@ buildBarState = function(panelId, entryId, entry, icon, preview, runtimeDataOver
 					state.duration = safeNumber(duration)
 					state.rate = safeNumber(rate) or 1
 					state.fillDurationObject = durationObject
+					Bars.UseNativeDurationValueText(state, durationObject)
 				else
 					progress = 1
 				end
@@ -3341,6 +3351,7 @@ buildBarState = function(panelId, entryId, entry, icon, preview, runtimeDataOver
 					state.duration = safeNumber(duration)
 					state.rate = safeNumber(rate) or 1
 					state.fillDurationObject = durationObject
+					Bars.UseNativeDurationValueText(state, durationObject)
 				else
 					progress = 1
 				end
@@ -3364,10 +3375,7 @@ buildBarState = function(panelId, entryId, entry, icon, preview, runtimeDataOver
 				cooldownValueVisible = true
 				cooldownVisibilityActive = true
 				state.fillDurationObject = durationObject
-				state.valueTextIsChargeDuration = true
-				state.chargeDurationTextActive = true
-				state.chargeDurationTextNative = true
-				state.chargeDurationTextObject = durationObject
+				Bars.UseNativeDurationValueText(state, durationObject)
 				state.timerDirection = cdp.BAR_STATUS_TIMER_DIRECTION_REMAINING
 			elseif runtimeData and auraActive then
 				local fallbackProgress = getCooldownProgress(runtimeData.cooldownStart, runtimeData.cooldownDuration, runtimeData.cooldownRate)

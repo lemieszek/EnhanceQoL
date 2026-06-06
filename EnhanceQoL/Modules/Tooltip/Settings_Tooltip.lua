@@ -13,7 +13,11 @@ local cTooltip = addon.SettingsLayout.rootUI
 
 local expandable = addon.functions.SettingsCreateExpandableSection(cTooltip, {
 	name = L["Tooltip"],
+	description = L["configCenterTooltipDesc"] or "Customize tooltip content, IDs, icons, realms and visibility.",
+	configPageID = "interface.tooltips",
+	searchtags = { "tooltip", "item id", "spell id", "npc id", "realm", "guild" },
 	newTagID = "Tooltip",
+	iconKey = "tooltip",
 	expanded = false,
 	colorizeTitle = false,
 })
@@ -25,12 +29,20 @@ local modifierList = {
 }
 local modifierListOrder = { "SHIFT", "ALT", "CTRL" }
 
+addon.functions.SettingsCreateHeadline(cTooltip, {
+	name = _G.SETTINGS or "Settings",
+	parentSection = expandable,
+	groupID = "settings",
+	order = 1,
+})
+
 addon.functions.SettingsCreateCheckbox(cTooltip, {
 	var = "TooltipIDRequireModifier",
 	text = L["TooltipIDRequireModifier"],
 	desc = L["TooltipIDRequireModifierDesc"],
 	func = function(value) addon.db["TooltipIDRequireModifier"] = value and true or false end,
 	default = false,
+	order = 1,
 	parentSection = expandable,
 })
 
@@ -42,6 +54,7 @@ addon.functions.SettingsCreateDropdown(cTooltip, {
 	get = function() return addon.db["TooltipIDModifier"] or "ALT" end,
 	set = function(value) addon.db["TooltipIDModifier"] = value end,
 	default = "ALT",
+	order = 2,
 	parent = true,
 	element = addon.SettingsLayout.elements["TooltipIDRequireModifier"] and addon.SettingsLayout.elements["TooltipIDRequireModifier"].element,
 	parentCheck = function()

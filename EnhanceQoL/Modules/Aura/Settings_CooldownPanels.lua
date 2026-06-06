@@ -14,7 +14,11 @@ if not (cat and addon.functions and addon.functions.SettingsCreateExpandableSect
 
 local expandable = addon.functions.SettingsCreateExpandableSection(cat, {
 	name = L["Cooldown Panels"] or "Cooldown Panels",
+	description = L["configCenterPageDescCooldownPanels"]
+		or "Create and manage custom cooldown panels, then edit tracked abilities, layout and visibility in the panel editor.",
 	newTagID = "CooldownPanels",
+	iconKey = "cooldownpanels",
+	modernCategory = "suites",
 	expanded = false,
 	colorizeTitle = false,
 })
@@ -25,11 +29,19 @@ local function withCooldownPanels(action)
 	action(panels)
 end
 
+local function openEditorExclusively(panels)
+	if not (panels and panels.OpenEditor) then return end
+	local editorFrame = panels:OpenEditor()
+	if addon.functions.HideConfigCenterUntilFrameHidden then
+		addon.functions.HideConfigCenterUntilFrameHidden(editorFrame)
+	end
+end
+
 addon.functions.SettingsCreateButton(cat, {
 	text = L["CooldownPanelOpenEditor"] or "Open Cooldown Panel Editor",
 	func = function()
 		withCooldownPanels(function(panels)
-			if panels.OpenEditor then panels:OpenEditor() end
+			openEditorExclusively(panels)
 		end)
 	end,
 	parentSection = expandable,
@@ -41,7 +53,7 @@ addon.functions.SettingsCreateButton(cat, {
 		withCooldownPanels(function(panels)
 			local panelId = panels:CreatePanel(L["CooldownPanelNewPanel"] or "New Panel")
 			if panelId then panels:SelectPanel(panelId) end
-			if panels.OpenEditor then panels:OpenEditor() end
+			openEditorExclusively(panels)
 		end)
 	end,
 	parentSection = expandable,

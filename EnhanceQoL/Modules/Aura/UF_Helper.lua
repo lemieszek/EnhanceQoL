@@ -613,7 +613,7 @@ function H.setupAbsorbOverShift(healthBar, overAbsorbBar, height, maxHeight, anc
 	overAbsorbBar:SetReverseFill(not healthBar:GetReverseFill())
 end
 
-function H.applyAbsorbClampLayout(bar, healthBar, height, maxHeight, reverseHealth, anchorTop)
+function H.applyAbsorbClampLayout(bar, healthBar, height, maxHeight, reverseHealth, anchorTop, fallbackWidth)
 	if not bar or not healthBar then return end
 	bar:ClearAllPoints()
 	local anchor = (healthBar.GetStatusBarTexture and healthBar:GetStatusBarTexture()) or healthBar
@@ -636,7 +636,12 @@ function H.applyAbsorbClampLayout(bar, healthBar, height, maxHeight, reverseHeal
 		end
 		bar:SetHeight(desired)
 	end
-	if healthBar.GetWidth then bar:SetWidth(healthBar:GetWidth() or 0) end
+	local width = healthBar.GetWidth and healthBar:GetWidth() or 0
+	if not width or width <= 0 then
+		local fallback = tonumber(fallbackWidth)
+		if fallback and fallback > 0 then width = fallback end
+	end
+	bar:SetWidth(width or 0)
 end
 
 function H.trim(str)

@@ -7,6 +7,7 @@ addon.name = addonName
 addon.Bags = addon.Bags or {}
 addon.Bags.functions = addon.Bags.functions or {}
 addon.Bags.variables = addon.Bags.variables or {}
+addon.Bags.Core = addon.Bags.Core or {}
 addon.functions = addon.functions or {}
 
 function addon.Bags.IsEnabled()

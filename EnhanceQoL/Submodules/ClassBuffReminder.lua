@@ -113,6 +113,7 @@ local TRACKING_CONTENT = {
 	PARTY_NORMAL = "partyNormal",
 	PARTY_HEROIC = "partyHeroic",
 	PARTY_MYTHIC = "partyMythic",
+	PARTY_MYTHIC_PLUS = "partyMythicPlus",
 	RAID_LFR = "raidLfr",
 	RAID_NORMAL = "raidNormal",
 	RAID_HEROIC = "raidHeroic",
@@ -134,6 +135,7 @@ TRACKING_CONTENT.order = {
 	TRACKING_CONTENT.PARTY_NORMAL,
 	TRACKING_CONTENT.PARTY_HEROIC,
 	TRACKING_CONTENT.PARTY_MYTHIC,
+	TRACKING_CONTENT.PARTY_MYTHIC_PLUS,
 	TRACKING_CONTENT.RAID_LFR,
 	TRACKING_CONTENT.RAID_NORMAL,
 	TRACKING_CONTENT.RAID_HEROIC,
@@ -147,6 +149,7 @@ TRACKING_CONTENT.keys = {
 	[TRACKING_CONTENT.PARTY_NORMAL] = true,
 	[TRACKING_CONTENT.PARTY_HEROIC] = true,
 	[TRACKING_CONTENT.PARTY_MYTHIC] = true,
+	[TRACKING_CONTENT.PARTY_MYTHIC_PLUS] = true,
 	[TRACKING_CONTENT.RAID_LFR] = true,
 	[TRACKING_CONTENT.RAID_NORMAL] = true,
 	[TRACKING_CONTENT.RAID_HEROIC] = true,
@@ -169,6 +172,9 @@ TRACKING_CONTENT.difficulties = {
 		},
 		mythic = {
 			[((_G.DifficultyUtil and _G.DifficultyUtil.ID) or {}).DungeonMythic or 23] = true,
+		},
+		mythicPlus = {
+			[((_G.DifficultyUtil and _G.DifficultyUtil.ID) or {}).DungeonChallenge or 8] = true,
 		},
 	},
 	raid = {
@@ -212,6 +218,12 @@ function Reminder.CreateDefaultTrackingContentSelection()
 		[TRACKING_CONTENT.RAID_HEROIC] = true,
 		[TRACKING_CONTENT.RAID_MYTHIC] = true,
 	}
+end
+
+function Reminder.CreateDefaultPetTrackingContentSelection()
+	local selection = Reminder.CreateDefaultTrackingContentSelection()
+	selection[TRACKING_CONTENT.PARTY_MYTHIC_PLUS] = true
+	return selection
 end
 
 function Reminder.CreateLegacyInstanceTrackingContentSelection()
@@ -291,7 +303,7 @@ Reminder.defaults = Reminder.defaults
 		trackWeaponBuffsContent = Reminder.CreateDefaultTrackingContentSelection(),
 		trackWeaponBuffsInstanceOnly = false,
 		trackPets = false,
-		trackPetsContent = Reminder.CreateDefaultTrackingContentSelection(),
+		trackPetsContent = Reminder.CreateDefaultPetTrackingContentSelection(),
 		trackPetsInstanceOnly = false,
 		ignorePetDefensive = false,
 		ignorePetPassive = false,
@@ -338,7 +350,7 @@ if defaults.trackWeaponBuffsInstanceOnly == nil then defaults.trackWeaponBuffsIn
 if type(defaults.trackWeaponBuffsContent) ~= "table" then defaults.trackWeaponBuffsContent = Reminder.CreateDefaultTrackingContentSelection() end
 if defaults.trackPets == nil then defaults.trackPets = false end
 if defaults.trackPetsInstanceOnly == nil then defaults.trackPetsInstanceOnly = false end
-if type(defaults.trackPetsContent) ~= "table" then defaults.trackPetsContent = Reminder.CreateDefaultTrackingContentSelection() end
+if type(defaults.trackPetsContent) ~= "table" then defaults.trackPetsContent = Reminder.CreateDefaultPetTrackingContentSelection() end
 if defaults.ignorePetDefensive == nil then defaults.ignorePetDefensive = false end
 if defaults.ignorePetPassive == nil then defaults.ignorePetPassive = false end
 if defaults.borderEnabled == nil then defaults.borderEnabled = false end
@@ -683,6 +695,7 @@ function Reminder.GetTrackingContentLabel(key)
 	if key == TRACKING_CONTENT.PARTY_NORMAL then return Reminder.BuildContentDifficultyLabel(_G.PARTY or "Party", _G.PLAYER_DIFFICULTY1 or _G.NORMAL or "Normal") end
 	if key == TRACKING_CONTENT.PARTY_HEROIC then return Reminder.BuildContentDifficultyLabel(_G.PARTY or "Party", _G.PLAYER_DIFFICULTY2 or _G.HEROIC or "Heroic") end
 	if key == TRACKING_CONTENT.PARTY_MYTHIC then return Reminder.BuildContentDifficultyLabel(_G.PARTY or "Party", _G.PLAYER_DIFFICULTY6 or "Mythic") end
+	if key == TRACKING_CONTENT.PARTY_MYTHIC_PLUS then return L["ClassBuffReminderTrackingContentMythicPlus"] or Reminder.BuildContentDifficultyLabel(_G.PARTY or "Party", _G.PLAYER_DIFFICULTY_MYTHIC_PLUS or "Mythic+") end
 	if key == TRACKING_CONTENT.RAID_LFR then return Reminder.BuildContentDifficultyLabel(_G.RAID or "Raid", _G.PLAYER_DIFFICULTY3 or "LFR") end
 	if key == TRACKING_CONTENT.RAID_NORMAL then return Reminder.BuildContentDifficultyLabel(_G.RAID or "Raid", _G.PLAYER_DIFFICULTY1 or _G.NORMAL or "Normal") end
 	if key == TRACKING_CONTENT.RAID_HEROIC then return Reminder.BuildContentDifficultyLabel(_G.RAID or "Raid", _G.PLAYER_DIFFICULTY2 or _G.HEROIC or "Heroic") end
@@ -715,6 +728,14 @@ local function canEvaluateUnit(unit)
 	if not (UnitExists and UnitExists(unit)) then return false end
 	if not (UnitIsConnected and UnitIsConnected(unit)) then return false end
 	if UnitIsDeadOrGhost and UnitIsDeadOrGhost(unit) then return false end
+	return true
+end
+
+function Reminder.CanActOnMissingGroupBuffUnit(unit)
+	if isPlayerUnit(unit) then return true end
+	if UnitIsVisible and UnitIsVisible(unit) == false then return false end
+	local unitPhaseReason = _G.UnitPhaseReason
+	if unitPhaseReason and unitPhaseReason(unit) ~= nil then return false end
 	return true
 end
 
@@ -1320,6 +1341,13 @@ function Reminder:ShouldIgnorePetPassiveReminder()
 end
 
 function Reminder:GetPetTrackingContentSelection()
+	local stored = addon.db and addon.db[TRACKING_CONTENT.db.PETS] or nil
+	if addon.db and addon.db["classBuffReminderPetsMythicPlusContentMigrated"] ~= true then
+		if type(stored) == "table" and stored[TRACKING_CONTENT.PARTY_MYTHIC] == true and stored[TRACKING_CONTENT.PARTY_MYTHIC_PLUS] == nil then
+			stored[TRACKING_CONTENT.PARTY_MYTHIC_PLUS] = true
+		end
+		addon.db["classBuffReminderPetsMythicPlusContentMigrated"] = true
+	end
 	return Reminder.GetTrackingContentSelection(TRACKING_CONTENT.db.PETS, "classBuffReminderTrackPetsInstanceOnly", defaults.trackPetsContent)
 end
 
@@ -1338,7 +1366,7 @@ function Reminder:GetConsumableTrackingContentToken()
 	local difficultyID = GetInstanceInfo and tonumber((select(3, GetInstanceInfo()))) or nil
 
 	if instanceType == "party" then
-		if difficultyID == (((_G.DifficultyUtil and _G.DifficultyUtil.ID) or {}).DungeonChallenge or 8) then return nil end
+		if difficultyID and TRACKING_CONTENT.difficulties.party.mythicPlus[difficultyID] then return TRACKING_CONTENT.PARTY_MYTHIC_PLUS end
 		if difficultyID and TRACKING_CONTENT.difficulties.party.follower[difficultyID] then return TRACKING_CONTENT.PARTY_FOLLOWER end
 		if difficultyID and TRACKING_CONTENT.difficulties.party.heroic[difficultyID] then return TRACKING_CONTENT.PARTY_HEROIC end
 		if difficultyID and TRACKING_CONTENT.difficulties.party.mythic[difficultyID] then return TRACKING_CONTENT.PARTY_MYTHIC end
@@ -1478,7 +1506,7 @@ function Reminder:IsFlaskEnvironmentRestricted()
 	if self.consumableTrackingBlockedByCombat == true then return true end
 	if InCombatLockdown and InCombatLockdown() then return true end
 	-- Generic addon restrictions can include transient states unrelated to local consumable checks.
-	-- Mythic+ is already excluded via GetConsumableTrackingContentToken returning nil.
+	-- Basic combat restrictions also cover Mythic+, which resolves to its own tracking content token.
 	return false
 end
 
@@ -4096,6 +4124,7 @@ function Reminder:GetGroupUnitMissingStatus(provider, unit)
 	if isAIFollowerUnit(unit) then return GROUP_UNIT_STATUS_INELIGIBLE end
 	if not (UnitExists and UnitExists(unit) and UnitIsConnected and UnitIsConnected(unit) and not UnitIsDeadOrGhost(unit)) then return GROUP_UNIT_STATUS_INELIGIBLE end
 	if self:UnitHasProviderBuff(unit, provider) then return GROUP_UNIT_STATUS_PRESENT end
+	if not Reminder.CanActOnMissingGroupBuffUnit(unit) then return GROUP_UNIT_STATUS_INELIGIBLE end
 	return GROUP_UNIT_STATUS_MISSING
 end
 
@@ -4421,6 +4450,7 @@ function Reminder:GetGroupBuffUnitMissingStatus(cache, unit)
 	if not state then return GROUP_UNIT_STATUS_INELIGIBLE end
 	if state.initialized ~= true then state = self:FullRefreshGroupBuffUnitState(cache, unit) end
 	if state and state.hasBuff == true then return GROUP_UNIT_STATUS_PRESENT end
+	if not Reminder.CanActOnMissingGroupBuffUnit(unit) then return GROUP_UNIT_STATUS_INELIGIBLE end
 	return GROUP_UNIT_STATUS_MISSING
 end
 
@@ -5430,7 +5460,7 @@ function Reminder:ShouldRegisterRuntimeEvents()
 	if getValue(DB_ENABLED, defaults.enabled) ~= true then return false end
 	if self.runtimeProviderValid ~= true then self:RefreshProviderCache(false) end
 	if self.hasProviderCached == true then return true end
-	return self:IsFlaskTrackingEnabled() or self:IsFoodTrackingEnabled() or self:IsRuneTrackingEnabled() or self:IsWeaponBuffTrackingEnabled() or self:CanCheckPetReminder()
+	return self:IsFlaskTrackingEnabled() or self:IsFoodTrackingEnabled() or self:IsRuneTrackingEnabled() or self:IsWeaponBuffTrackingEnabled() or self:IsPetTrackingEnabled()
 end
 
 function Reminder:Render(provider, missing, total, supplementalEntries, effectiveMissing)
@@ -5723,6 +5753,12 @@ function Reminder:HandleEvent(event, unit, updateInfo)
 		return
 	end
 
+	if event == "UNIT_PHASE" then
+		self:MarkAuraStatesDirty()
+		self:RequestUpdate(false, Reminder.RUNTIME_UPDATE_DELAY, true)
+		return
+	end
+
 	if event == "PLAYER_ROLES_ASSIGNED" or event == "ROLE_CHANGED_INFORM" then
 		self:InvalidateSelfProviderStatus()
 		self:InvalidateFlaskCache()
@@ -5902,6 +5938,7 @@ function Reminder:RegisterEvents()
 	self.eventFrame:RegisterEvent("PLAYER_LOGIN")
 	self.eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 	self.eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
+	self.eventFrame:RegisterEvent("UNIT_PHASE")
 	self.eventFrame:RegisterEvent("PLAYER_ROLES_ASSIGNED")
 	self.eventFrame:RegisterEvent("ROLE_CHANGED_INFORM")
 	self.eventFrame:RegisterEvent("READY_CHECK")

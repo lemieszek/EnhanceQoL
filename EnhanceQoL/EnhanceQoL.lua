@@ -36,6 +36,15 @@ local TooltipUtil = _G.TooltipUtil
 local GetTime = GetTime
 local GetActiveQuestID = _G.GetActiveQuestID
 
+local AUTO_REPAIR_GUILD_BANK_CONTEXT_DEFAULTS = {
+	world = true,
+	party = true,
+	dungeon = true,
+	mythicPlus = true,
+	raid = true,
+	pvp = true,
+}
+
 local EQOL = select(2, ...)
 EQOL.C = {}
 
@@ -617,30 +626,6 @@ local function MigrateLegacyVisibilityFlags()
 	MigrateLegacyVisibilityFlag("hideBagsBar", "unitframeSettingBagsBar")
 	MigrateLegacyVisibilityFlag("hideBuffFrame", "unitframeSettingBuffFrame")
 	MigrateLegacyVisibilityFlag("hideDebuffFrame", "unitframeSettingDebuffFrame")
-end
-
-local function CleanupRemovedCVarOverrides()
-	if not addon.db then return end
-
-	local overrides = addon.db.cvarOverrides
-	if type(overrides) ~= "table" then return end
-
-	local cvarOptions = addon.variables and addon.variables.cvarOptions
-	if type(cvarOptions) ~= "table" then return end
-
-	local staleKeys
-	for cvarKey in pairs(overrides) do
-		if cvarOptions[cvarKey] == nil then
-			staleKeys = staleKeys or {}
-			staleKeys[#staleKeys + 1] = cvarKey
-		end
-	end
-
-	if not staleKeys then return end
-
-	for _, cvarKey in ipairs(staleKeys) do
-		overrides[cvarKey] = nil
-	end
 end
 
 local function StopFrameFade(target)
@@ -3183,69 +3168,9 @@ local function setCVarValue(cvarKey, newValue)
 
 	if currentValue == newValue then return end
 
-	local guard = addon.variables.cvarEnforceGuard
-	if not guard then
-		guard = {}
-		addon.variables.cvarEnforceGuard = guard
-	end
-
-	guard[cvarKey] = true
 	C_CVar.SetCVar(cvarKey, newValue)
 end
 addon.functions.setCVarValue = setCVarValue
-
-local function initializePersistentCVars()
-	if not addon.db then return end
-
-	CleanupRemovedCVarOverrides()
-
-	local overrides = addon.db.cvarOverrides or {}
-	addon.db.cvarOverrides = overrides
-
-	local persistentKeys = addon.variables.cvarPersistentKeys
-	if persistentKeys then
-		wipe(persistentKeys)
-	else
-		persistentKeys = {}
-		addon.variables.cvarPersistentKeys = persistentKeys
-	end
-
-	if not addon.variables.cvarEnforceGuard then addon.variables.cvarEnforceGuard = {} end
-
-	local persistenceEnabled = addon.db.cvarPersistenceEnabled and true or false
-
-	for cvarKey, optionData in pairs(addon.variables.cvarOptions) do
-		if optionData.persistent then
-			persistentKeys[cvarKey] = true
-
-			if optionData.register and nil == GetCVar(cvarKey) then C_CVar.RegisterCVar(cvarKey, optionData.trueValue) end
-
-			local currentValue = GetCVar(cvarKey)
-			if currentValue ~= nil then
-				currentValue = tostring(currentValue)
-			elseif optionData.falseValue ~= nil then
-				currentValue = tostring(optionData.falseValue)
-			elseif optionData.trueValue ~= nil then
-				currentValue = tostring(optionData.trueValue)
-			else
-				currentValue = "0"
-			end
-
-			if overrides[cvarKey] == nil then
-				overrides[cvarKey] = currentValue
-			else
-				overrides[cvarKey] = tostring(overrides[cvarKey])
-			end
-
-			if persistenceEnabled then
-				local desiredValue = overrides[cvarKey]
-				if desiredValue and currentValue ~= desiredValue then setCVarValue(cvarKey, desiredValue) end
-			end
-		end
-	end
-end
-
-addon.functions.initializePersistentCVars = initializePersistentCVars
 
 -- removed: addPartyFrame (party settings relocated to Social/UI sections)
 
@@ -3527,6 +3452,7 @@ local function initMisc()
 	addon.functions.InitDBValue("hideRaidTools", false)
 	addon.functions.InitDBValue("autoRepair", false)
 	addon.functions.InitDBValue("autoRepairGuildBank", false)
+	addon.functions.InitDBValue("autoRepairGuildBankContexts", AUTO_REPAIR_GUILD_BANK_CONTEXT_DEFAULTS)
 	addon.functions.InitPrivateDBValue("autoWarbandGold", false)
 	addon.functions.InitPrivateDBValue("autoWarbandGoldTargetGold", 10000)
 	addon.functions.InitPrivateDBValue("autoWarbandGoldPerCharacter", {})
@@ -3545,6 +3471,7 @@ local function initMisc()
 	addon.functions.InitDBValue("damageMeterAutomaticClearInstances", { party = true, raid = true })
 	addon.functions.InitDBValue("damageMeterUpdateRate", 0.1)
 	addon.functions.InitDBValue("damageMeterWindowCount", 1)
+	addon.functions.InitDBValue("damageMeterLinkSegments", false)
 	addon.functions.InitDBValue("damageMeterSyncSettings", false)
 	addon.functions.InitDBValue("damageMeterEditModeSample", true)
 	addon.functions.InitDBValue("damageMeterWindows", {})
@@ -3629,11 +3556,34 @@ local function initMisc()
 		end
 	end
 
+	local function getCurrentAutoRepairGuildBankContext()
+		local inInstance, instanceType = false, nil
+		if IsInInstance then inInstance, instanceType = IsInInstance() end
+		local difficultyID = GetInstanceInfo and select(3, GetInstanceInfo()) or nil
+
+		if inInstance then
+			if instanceType == "raid" then return "raid" end
+			if instanceType == "party" then return difficultyID == 8 and "mythicPlus" or "dungeon" end
+			if instanceType == "pvp" or instanceType == "arena" then return "pvp" end
+		end
+
+		if IsInRaid and IsInRaid() then return "raid" end
+		if IsInGroup and IsInGroup() then return "party" end
+		return "world"
+	end
+
+	function addon.functions.ShouldUseGuildBankAutoRepairForCurrentContext()
+		local selection = addon.db and addon.db["autoRepairGuildBankContexts"]
+		if type(selection) ~= "table" then return true end
+		local context = getCurrentAutoRepairGuildBankContext()
+		return selection[context] == true
+	end
+
 	hooksecurefunc(MerchantFrame, "Show", function(self, button)
 		if addon.db["autoRepair"] and CanMerchantRepair() then
 			local repairAllCost = GetRepairAllCost()
 			if repairAllCost and repairAllCost > 0 then
-				local usedGuildBank = addon.db["autoRepairGuildBank"] and CanGuildBankRepair()
+				local usedGuildBank = addon.db["autoRepairGuildBank"] and CanGuildBankRepair() and addon.functions.ShouldUseGuildBankAutoRepairForCurrentContext()
 				if usedGuildBank then
 					RepairAllItems(true)
 				else
@@ -4570,6 +4520,8 @@ local function initUI()
 	addon.functions.InitDBValue("alwaysUserCurExpAuctionHouse", false)
 	addon.functions.InitDBValue("alwaysUserCurExpCraftingOrders", false)
 	addon.functions.InitDBValue("enableExtendedMerchant", false)
+	addon.functions.InitDBValue("configCenterDensity", "comfortable")
+	addon.functions.InitDBValue("configCenterSize", { width = 1080, height = 700 })
 	addon.functions.InitDBValue("showInstanceDifficulty", false)
 	addon.functions.InitDBValue("instanceDifficultyAnchor", "CENTER")
 	addon.functions.InitDBValue("instanceDifficultyOffsetX", 0)
@@ -4586,7 +4538,10 @@ local function initUI()
 		LFR = { r = 1.00, g = 1.00, b = 1.00 }, -- LFR: White (editable)
 		TW = { r = 1.00, g = 1.00, b = 1.00 }, -- Timewalking: White (editable)
 	}
+	addon.dbDefaults = addon.dbDefaults or {}
+	if type(addon.dbDefaults["instanceDifficultyColors"]) ~= "table" then addon.dbDefaults["instanceDifficultyColors"] = {} end
 	for k, v in pairs(defaultColors) do
+		if type(addon.dbDefaults["instanceDifficultyColors"][k]) ~= "table" then addon.dbDefaults["instanceDifficultyColors"][k] = { r = v.r, g = v.g, b = v.b, a = v.a or 1 } end
 		if type(addon.db["instanceDifficultyColors"][k]) ~= "table" then addon.db["instanceDifficultyColors"][k] = v end
 	end
 	-- addon.functions.InitDBValue("instanceDifficultyUseIcon", false)
@@ -6176,7 +6131,7 @@ end
 
 local function initCharacter() addon.functions.initItemInventory() end
 
-local function OpenSettingsRoot()
+local function OpenLegacySettingsRoot()
 	if not (Settings and Settings.OpenToCategory) then return end
 	if not (addon.SettingsLayout and addon.SettingsLayout.rootCategory) then return end
 
@@ -6191,7 +6146,23 @@ local function OpenSettingsRoot()
 	Settings.OpenToCategory(addon.SettingsLayout.rootCategory:GetID())
 end
 
+local OpenModernSettingsRoot
+
+local function OpenSettingsRoot()
+	OpenModernSettingsRoot()
+end
+
+OpenModernSettingsRoot = function()
+	if addon.functions and addon.functions.OpenConfigCenter then
+		addon.functions.OpenConfigCenter()
+		return
+	end
+	OpenLegacySettingsRoot()
+end
+
+addon.functions.OpenLegacySettingsRoot = OpenLegacySettingsRoot
 addon.functions.OpenSettingsRoot = OpenSettingsRoot
+addon.functions.OpenModernSettingsRoot = OpenModernSettingsRoot
 
 function addon.functions.checkReloadFrame()
 	if addon.variables.requireReload == false then return end
@@ -7143,7 +7114,6 @@ local eventHandlers = {
 			if addon.functions.CleanupOldStuff then addon.functions.CleanupOldStuff() end
 			if addon.functions.MigratePrivateProfileData then addon.functions.MigratePrivateProfileData(addon.db) end
 			if addon.functions.CleanupPrivateProfileData then addon.functions.CleanupPrivateProfileData() end
-			if addon.functions.initializePersistentCVars then addon.functions.initializePersistentCVars() end
 
 			loadMain()
 			EQOL.PersistSignUpNote()
@@ -7161,37 +7131,6 @@ local eventHandlers = {
 		end
 		if arg1 == "Blizzard_ItemInteractionUI" then addon.functions.toggleInstantCatalystButton(addon.db["instantCatalystEnabled"]) end
 	end,
-	["CVAR_UPDATE"] = function(cvarName, value)
-		local persistentKeys = addon.variables.cvarPersistentKeys
-		if not persistentKeys or not persistentKeys[cvarName] then return end
-
-		if not addon.db then return end
-
-		local guard = addon.variables.cvarEnforceGuard
-		local persistenceEnabled = addon.db and addon.db.cvarPersistenceEnabled and true or false
-		if guard and guard[cvarName] then
-			guard[cvarName] = nil
-			if not persistenceEnabled then return end
-		end
-
-		local overrides = addon.db.cvarOverrides or {}
-		addon.db.cvarOverrides = overrides
-
-		local currentValue = value
-		if currentValue == nil then currentValue = GetCVar(cvarName) end
-		if currentValue ~= nil then currentValue = tostring(currentValue) end
-
-		if overrides[cvarName] == nil or not persistenceEnabled then
-			overrides[cvarName] = currentValue
-			if not persistenceEnabled then return end
-		else
-			overrides[cvarName] = tostring(overrides[cvarName])
-		end
-
-		local desiredValue = overrides[cvarName]
-		if desiredValue and currentValue ~= desiredValue then setCVarValue(cvarName, desiredValue) end
-	end,
-
 	["GOSSIP_CLOSED"] = function()
 		addon.variables.gossipClicked = {} -- clear all already clicked gossips
 	end,

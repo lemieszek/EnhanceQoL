@@ -575,7 +575,7 @@ local function AddRealmInfo(tooltip, realm)
 	if IsRealmInfoFieldEnabled("language", "TooltipRealmShowLanguage") then
 		local language = GetRealmLanguageLabel(info.locale)
 		if language then
-			local flag = GetRealmFlagPlaceholder(info, not isTooltipRestricted())
+			local flag = GetRealmFlagPlaceholder(info, true)
 			if flag then language = flag .. " " .. language end
 			ensureHeader()
 			tooltip:AddDoubleLine(L["TooltipRealmLanguage"], ColorText(language))
@@ -1188,7 +1188,7 @@ local function ShowCopyURL(url)
 	if type(url) ~= "string" or url == "" then return end
 	if not StaticPopupDialogs["ENHANCEQOL_COPY_URL"] then
 		StaticPopupDialogs["ENHANCEQOL_COPY_URL"] = {
-			text = "Copy URL:",
+			text = L["copyUrlPopupText"],
 			button1 = OKAY,
 			hasEditBox = true,
 			timeout = 0,
@@ -1728,7 +1728,7 @@ local function registerTooltipHooks()
 			if not btn then return end
 			btn:AddInitializer(function()
 				btn:SetTooltip(function(tt)
-					GameTooltip_SetTitle(tt, "Wowhead")
+					GameTooltip_SetTitle(tt, L["wowhead"])
 					GameTooltip_AddNormalLine(tt, ("npc=%d"):format(npcID))
 				end)
 			end)

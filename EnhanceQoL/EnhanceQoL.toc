@@ -40,7 +40,8 @@ libs\LibSharedMedia-3.0\lib.xml
 libs\LibOpenKeystone\LibOpenKeystone.lua
 libs\AceSerializer-3.0\AceSerializer-3.0.xml
 libs\AceComm-3.0\AceComm-3.0.xml
-libs\LibEQOL\LibEQOL.xml
+libs\LibSettingsDesigner\LibSettingsDesigner.xml
+libs\EnhanceQoLEditMode\EnhanceQoLEditMode.lua
 Bindings\Slider.xml
 Sounds\sounds.lua
 General\functions.lua
@@ -51,6 +52,7 @@ Core\SharedAnchors.lua
 Modules\ActionBarLabels.lua
 Core\Cleanup.lua
 EnhanceQoL.lua
+GeneratedChangelog.lua
 Core\DataHub.lua
 Core\DataPanel.lua
 Core\ChallengeMapLabels.lua

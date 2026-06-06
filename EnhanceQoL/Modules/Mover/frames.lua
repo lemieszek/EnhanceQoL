@@ -428,6 +428,8 @@ local frames = {
 		group = "professions",
 		names = { "ProfessionsCustomerOrdersFrame" },
 		addon = "Blizzard_ProfessionsCustomerOrders",
+		handlesRelative = { "TitleContainer" },
+		handlesOnly = true,
 		defaultEnabled = true,
 	},
 	{
@@ -657,6 +659,8 @@ local frames = {
 		group = "professions",
 		names = { "ProfessionsFrame" },
 		addon = "Blizzard_Professions",
+		handlesRelative = { "TitleContainer" },
+		handlesOnly = true,
 		defaultEnabled = true,
 	},
 	{
@@ -882,6 +886,7 @@ function addon.Mover.functions.InitRegistry()
 
 	initSettingsDefaults()
 	if addon.Mover.functions.EnsureScaleCaptureFrame then addon.Mover.functions.EnsureScaleCaptureFrame() end
+	if addon.Mover.functions.InstallScaleFitHook then addon.Mover.functions.InstallScaleFitHook() end
 
 	for groupId, group in pairs(groups) do
 		local order = groupOrder[groupId] or group.order

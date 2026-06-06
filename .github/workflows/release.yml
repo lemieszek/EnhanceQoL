@@ -28,13 +28,11 @@ jobs:
         run: |
           git fetch --tags --force
 
-      - name: Install LibEQOL
-        uses: R41z0r/LibEQOL@v1.0.0
-        with:
-          destination: EnhanceQoL/libs
-
       - name: Prepare packager gates
         run: bash scripts/prepare_packager_gates.sh "${GITHUB_REF_NAME}"
+
+      - name: Generate ingame changelog
+        run: python3 scripts/generate_changelog_lua.py "${GITHUB_REF_NAME}"
 
       - name: Validate gated package Lua
         uses: nebularg/actions-luacheck@v1
@@ -71,7 +69,7 @@ jobs:
             "EnhanceQoL/Core/EditMode.lua"
             "EnhanceQoL/Core/EditModeLib.lua"
             "EnhanceQoL/Locales"
-            "EnhanceQoL/libs/LibEQOL"
+            "EnhanceQoL/libs/EnhanceQoLEditMode"
             "EnhanceQoL/libs/LibSharedMedia-3.0"
             "EnhanceQoL/libs/AceLocale-3.0"
             "EnhanceQoL/libs/AceSerializer-3.0"

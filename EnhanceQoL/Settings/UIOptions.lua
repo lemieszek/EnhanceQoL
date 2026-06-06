@@ -227,7 +227,7 @@ local function buildFocusInterruptSoundDropdown()
 		focusInterruptSoundOrder[i] = order[i]
 	end
 
-	return list or {}
+	return list or {}, order or focusInterruptSoundOrder
 end
 
 local function previewFocusInterruptSound(value)
@@ -319,6 +319,7 @@ local function createActionBarVisibility(category, expandable)
 				var = info.var .. "_visibility",
 				storage = false,
 				text = info.text or info.name or info.var,
+				desc = L["ActionbarVisibilityRuleSelectionDesc"],
 				options = ABRule,
 				isSelectedFunc = function(key)
 					local cfg = NormalizeActionBarVisibilityConfig(info.var)
@@ -665,6 +666,7 @@ local function createLabelControls(category, expandable)
 	macroOverride = addon.functions.SettingsCreateCheckbox(category, {
 		var = "actionBarMacroFontOverride",
 		text = L["actionBarMacroFontOverride"] or "Change macro font",
+		desc = L["actionBarMacroFontOverrideDesc"],
 		func = function(value)
 			if value then
 				addon.db["hideMacroNames"] = false
@@ -682,6 +684,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateScrollDropdown(category, {
 		var = "actionBarMacroFontFace",
 		text = L["actionBarMacroFontLabel"] or "Macro name font",
+		desc = L["actionBarMacroFontFaceDesc"],
 		listFunc = buildOverrideFontDropdown,
 		order = fontOrder,
 		default = globalFontKey,
@@ -705,6 +708,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateDropdown(category, {
 		var = "actionBarMacroFontOutline",
 		text = L["Font outline"] or "Font outline",
+		desc = L["actionBarMacroFontOutlineDesc"],
 		list = globalFontStyleOptions,
 		order = globalFontStyleOrder,
 		default = globalFontStyleKey,
@@ -723,6 +727,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateSlider(category, {
 		var = "actionBarMacroFontSize",
 		text = L["actionBarMacroFontSize"] or "Macro font size",
+		desc = L["actionBarMacroFontSizeDesc"],
 		min = 8,
 		max = 24,
 		step = 1,
@@ -750,6 +755,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateColorPicker(category, {
 		var = "actionBarMacroFontColor",
 		text = L["actionBarMacroFontColor"] or "Macro text color",
+		desc = L["actionBarMacroFontColorDesc"],
 		callback = function()
 			if ActionBarLabels and ActionBarLabels.RefreshAllMacroNameVisibility then ActionBarLabels.RefreshAllMacroNameVisibility() end
 		end,
@@ -763,6 +769,7 @@ local function createLabelControls(category, expandable)
 	local hotkeyOverride = addon.functions.SettingsCreateCheckbox(category, {
 		var = "actionBarHotkeyFontOverride",
 		text = L["actionBarHotkeyFontOverride"] or "Change keybind font",
+		desc = L["actionBarHotkeyFontOverrideDesc"],
 		func = function(value)
 			addon.db.actionBarHotkeyFontOverride = value and true or false
 			if ActionBarLabels and ActionBarLabels.RefreshAllHotkeyVisibility then ActionBarLabels.RefreshAllHotkeyVisibility() end
@@ -776,6 +783,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateScrollDropdown(category, {
 		var = "actionBarHotkeyFontFace",
 		text = L["actionBarHotkeyFontLabel"] or "Keybind font",
+		desc = L["actionBarHotkeyFontFaceDesc"],
 		listFunc = buildOverrideFontDropdown,
 		order = fontOrder,
 		default = globalFontKey,
@@ -799,6 +807,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateDropdown(category, {
 		var = "actionBarHotkeyFontOutline",
 		text = L["Font outline"] or "Font outline",
+		desc = L["actionBarHotkeyFontOutlineDesc"],
 		list = globalFontStyleOptions,
 		order = globalFontStyleOrder,
 		default = globalFontStyleKey,
@@ -817,6 +826,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateSlider(category, {
 		var = "actionBarHotkeyFontSize",
 		text = L["actionBarHotkeyFontSize"] or "Keybind font size",
+		desc = L["actionBarHotkeyFontSizeDesc"],
 		min = 8,
 		max = 24,
 		step = 1,
@@ -844,6 +854,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateColorPicker(category, {
 		var = "actionBarHotkeyFontColor",
 		text = L["actionBarHotkeyFontColor"] or "Keybind text color",
+		desc = L["actionBarHotkeyFontColorDesc"],
 		callback = function()
 			if ActionBarLabels and ActionBarLabels.RefreshAllHotkeyStyles then ActionBarLabels.RefreshAllHotkeyStyles() end
 		end,
@@ -857,6 +868,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateDropdown(category, {
 		var = "actionBarHotkeyAnchor",
 		text = L["actionBarHotkeyAnchor"] or "Keybind anchor",
+		desc = L["actionBarHotkeyAnchorDesc"],
 		list = textAnchorOptions,
 		order = textAnchorOrder,
 		default = "TOPRIGHT",
@@ -874,6 +886,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateSlider(category, {
 		var = "actionBarHotkeyOffsetX",
 		text = L["actionBarHotkeyOffsetX"] or "Keybind offset X",
+		desc = L["actionBarHotkeyOffsetXDesc"],
 		min = -50,
 		max = 50,
 		step = 1,
@@ -892,6 +905,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateSlider(category, {
 		var = "actionBarHotkeyOffsetY",
 		text = L["actionBarHotkeyOffsetY"] or "Keybind offset Y",
+		desc = L["actionBarHotkeyOffsetYDesc"],
 		min = -50,
 		max = 50,
 		step = 1,
@@ -910,6 +924,7 @@ local function createLabelControls(category, expandable)
 	local countOverride = addon.functions.SettingsCreateCheckbox(category, {
 		var = "actionBarCountFontOverride",
 		text = L["actionBarCountFontOverride"] or "Change charge/stack font",
+		desc = L["actionBarCountFontOverrideDesc"],
 		func = function(value)
 			addon.db.actionBarCountFontOverride = value and true or false
 			if ActionBarLabels and ActionBarLabels.RefreshAllCountStyles then ActionBarLabels.RefreshAllCountStyles() end
@@ -922,6 +937,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateScrollDropdown(category, {
 		var = "actionBarCountFontFace",
 		text = L["actionBarCountFontLabel"] or "Charge/stack font",
+		desc = L["actionBarCountFontFaceDesc"],
 		listFunc = buildOverrideFontDropdown,
 		order = fontOrder,
 		default = globalFontKey,
@@ -944,6 +960,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateDropdown(category, {
 		var = "actionBarCountFontOutline",
 		text = L["Font outline"] or "Font outline",
+		desc = L["actionBarCountFontOutlineDesc"],
 		list = globalFontStyleOptions,
 		order = globalFontStyleOrder,
 		default = globalFontStyleKey,
@@ -961,6 +978,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateSlider(category, {
 		var = "actionBarCountFontSize",
 		text = L["actionBarCountFontSize"] or "Charge/stack font size",
+		desc = L["actionBarCountFontSizeDesc"],
 		min = 8,
 		max = 24,
 		step = 1,
@@ -987,6 +1005,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateColorPicker(category, {
 		var = "actionBarCountFontColor",
 		text = L["actionBarCountFontColor"] or "Charge/stack text color",
+		desc = L["actionBarCountFontColorDesc"],
 		callback = function()
 			if ActionBarLabels and ActionBarLabels.RefreshAllCountStyles then ActionBarLabels.RefreshAllCountStyles() end
 		end,
@@ -1000,6 +1019,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateDropdown(category, {
 		var = "actionBarCountAnchor",
 		text = L["actionBarCountAnchor"] or "Charge/stack anchor",
+		desc = L["actionBarCountAnchorDesc"],
 		list = textAnchorOptions,
 		order = textAnchorOrder,
 		default = "BOTTOMRIGHT",
@@ -1017,6 +1037,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateSlider(category, {
 		var = "actionBarCountOffsetX",
 		text = L["actionBarCountOffsetX"] or "Charge/stack offset X",
+		desc = L["actionBarCountOffsetXDesc"],
 		min = -50,
 		max = 50,
 		step = 1,
@@ -1035,6 +1056,7 @@ local function createLabelControls(category, expandable)
 	addon.functions.SettingsCreateSlider(category, {
 		var = "actionBarCountOffsetY",
 		text = L["actionBarCountOffsetY"] or "Charge/stack offset Y",
+		desc = L["actionBarCountOffsetYDesc"],
 		min = -50,
 		max = 50,
 		step = 1,
@@ -1078,6 +1100,17 @@ local function createLabelControls(category, expandable)
 		var = "actionBarFullRangeColoring",
 		text = L["fullButtonRangeColoring"],
 		desc = L["fullButtonRangeColoringDesc"],
+		richNote = {
+			title = L["fullButtonRangeColoring"],
+			blocks = {
+				{ text = L["fullButtonRangeColoringDesc"] },
+				{
+					image = "Interface\\AddOns\\EnhanceQoL\\Assets\\NewSettings\\Examples\\FullRangeColoring.tga",
+					width = 172,
+					height = 180,
+				},
+			},
+		},
 		func = function(value)
 			addon.db["actionBarFullRangeColoring"] = value
 			if ActionBarLabels and ActionBarLabels.UpdateRangeOverlayEvents then ActionBarLabels.UpdateRangeOverlayEvents() end
@@ -1125,17 +1158,13 @@ local function createActionBarCategory()
 
 	local expandable = addon.functions.SettingsCreateExpandableSection(category, {
 		name = L["ActionBarsAndButtons"] or "Action Bars & Buttons",
+		configPageKey = "ActionBarsAndButtons",
+		iconKey = "actionbar",
+		modernOnly = true,
+		description = L["configCenterPageDescActionBars"]
+			or "Configure action bar visibility, button growth, borders, keybind text, macro labels and cooldown text.",
 		expanded = false,
 		colorizeTitle = false,
-	})
-
-	addon.functions.SettingsCreateCheckbox(category, {
-		var = "AutoPushSpellToActionBar",
-		text = L["AutoPushSpellToActionBar"],
-		get = function() return getCVarOptionState("AutoPushSpellToActionBar") end,
-		func = function(value) setCVarOptionState("AutoPushSpellToActionBar", value) end,
-		default = false,
-		parentSection = expandable,
 	})
 
 	createActionBarVisibility(category, expandable)
@@ -1345,13 +1374,14 @@ local function createSpellActivationOverlayDropdown(category, expandable)
 				SetSpellActivationOverlayVisibility(key, desired)
 			end
 		end,
-		desc = L["spellActivationOverlayDesc"] or "Visible while any selected condition is true.",
+		desc = L["spellActivationOverlayDesc"],
 		parentSection = expandable,
 	})
 
 	local customAlphaToggle = addon.functions.SettingsCreateCheckbox(category, {
 		var = "spellActivationOverlayUseCustomAlpha",
 		text = L["spellActivationOverlayUseCustomAlpha"] or "Use custom alpha",
+		desc = L["spellActivationOverlayUseCustomAlphaDesc"],
 		default = false,
 		get = function() return addon.db and addon.db.spellActivationOverlayUseCustomAlpha end,
 		set = function(value)
@@ -1383,6 +1413,7 @@ local function createSpellActivationOverlayDropdown(category, expandable)
 	addon.functions.SettingsCreateSlider(category, {
 		var = "spellActivationOverlayActiveAlpha",
 		text = L["spellActivationOverlayActiveAlpha"] or "Active alpha",
+		desc = L["spellActivationOverlayActiveAlphaDesc"],
 		min = 0,
 		max = 100,
 		step = 1,
@@ -1397,6 +1428,7 @@ local function createSpellActivationOverlayDropdown(category, expandable)
 	addon.functions.SettingsCreateSlider(category, {
 		var = "spellActivationOverlayHiddenAlpha",
 		text = L["spellActivationOverlayHiddenAlpha"] or "Hidden alpha",
+		desc = L["spellActivationOverlayHiddenAlphaDesc"],
 		min = 0,
 		max = 100,
 		step = 1,
@@ -1414,7 +1446,11 @@ local function createFrameCategory()
 
 	local expandable = addon.functions.SettingsCreateExpandableSection(category, {
 		name = L["VisibilityAndFadingFrames"] or "Visibility & Fading (Frames)",
+		description = L["configCenterPageDescVisibilityFrames"]
+			or "Control when supported Blizzard frames are shown, hidden or faded during combat, targeting and mouseover states.",
 		newTagID = "VisibilityFrames",
+		iconKey = "visibility",
+		modernOnly = true,
 		expanded = false,
 		colorizeTitle = false,
 	})
@@ -1429,13 +1465,6 @@ local function createFrameCategory()
 	end
 	table.sort(frames, function(a, b) return (a.text or a.name or "") < (b.text or b.name or "") end)
 
-	local function expandWith(predicate)
-		return function()
-			if expandable and expandable.IsExpanded and expandable:IsExpanded() == false then return false end
-			return predicate()
-		end
-	end
-
 	for _, info in ipairs(frames) do
 		if info.var and info.name then
 			local options = getFrameRuleOptions(info)
@@ -1445,6 +1474,7 @@ local function createFrameCategory()
 					var = info.var .. "_visibility",
 					storage = false,
 					text = info.text or info.name or info.var,
+					desc = L["visibilityFrameRuleSelectionDesc"],
 					options = options,
 					isSelectedFunc = function(key)
 						local cfg = NormalizeUnitFrameVisibilityConfig(info.var)
@@ -1452,7 +1482,14 @@ local function createFrameCategory()
 					end,
 					setSelectedFunc = function(key, shouldSelect) setFrameRule(info, key, shouldSelect) end,
 					isEnabled = function() return shouldShow() end,
-					parentSection = expandWith(shouldShow),
+					hiddenWhen = function() return not shouldShow() end,
+					richNote = {
+						title = L["CustomUnitFrames"] or L["Unit Frames"] or "EQoL Unit Frames",
+						text = L["visibilityRule_lockedByUF"]
+							or "Visibility is controlled by Enhanced Unit Frames. Disable them to change this setting.",
+						visible = function() return not shouldShow() end,
+					},
+					parentSection = expandable,
 				})
 			end
 		end
@@ -1619,16 +1656,26 @@ local function createNameplatesCategory()
 
 	local expandable = addon.functions.SettingsCreateExpandableSection(category, {
 		name = label,
+		description = L["configCenterPageDescNameplates"]
+			or "Adjust player names, nameplate text, markers, mob colors and dungeon-specific nameplate behavior.",
 		expanded = false,
 		colorizeTitle = false,
 		newTagID = "Nameplates",
+		iconKey = "nameplate",
 	})
 	addon.SettingsLayout.uiNameplatesExpandable = expandable
+
+	addon.functions.SettingsCreateHeadline(category, _G.SETTINGS or "Settings", {
+		parentSection = expandable,
+		groupID = "settings",
+		order = 1,
+	})
 
 	local nameplateData = {
 		{
 			var = "UnitNamePlayerGuild",
 			text = L["UnitNamePlayerGuild"],
+			desc = L["UnitNamePlayerGuildDesc"],
 			get = function() return getCVarOptionState("UnitNamePlayerGuild") end,
 			func = function(value) setCVarOptionState("UnitNamePlayerGuild", value) end,
 			default = false,
@@ -1637,6 +1684,7 @@ local function createNameplatesCategory()
 		{
 			var = "UnitNamePlayerPVPTitle",
 			text = L["UnitNamePlayerPVPTitle"],
+			desc = L["UnitNamePlayerPVPTitleDesc"],
 			get = function() return getCVarOptionState("UnitNamePlayerPVPTitle") end,
 			func = function(value) setCVarOptionState("UnitNamePlayerPVPTitle", value) end,
 			default = false,
@@ -2133,6 +2181,7 @@ local function createNameplatesCategory()
 		addon.functions.SettingsCreateColorPicker(category, {
 			var = var,
 			text = text,
+			modernDefault = function() return addon.dbDefaults and addon.dbDefaults[var] or nil end,
 			callback = function()
 				if addon.functions.RefreshDefaultNameplateMobColors then addon.functions.RefreshDefaultNameplateMobColors() end
 			end,
@@ -2169,6 +2218,7 @@ local function createNameplatesCategory()
 	addon.functions.SettingsCreateColorPicker(category, {
 		var = DEFAULT_NAMEPLATE_FEATURE_KEYS.mobColorTankMode,
 		text = L["nameplateMobColorTankMode"] or "Tank mode color",
+		modernDefault = function() return addon.dbDefaults and addon.dbDefaults[DEFAULT_NAMEPLATE_FEATURE_KEYS.mobColorTankMode] or nil end,
 		callback = function()
 			if addon.functions.RefreshDefaultNameplateMobColors then addon.functions.RefreshDefaultNameplateMobColors() end
 		end,
@@ -2215,9 +2265,12 @@ local function createCastbarCategory()
 
 	local expandable = addon.functions.SettingsCreateExpandableSection(category, {
 		name = label,
+		description = L["configCenterPageDescCastbarsCooldowns"]
+			or "Configure cast bars, GCD and cooldown displays, combat text, focus interrupt alerts and timing helpers.",
 		expanded = false,
 		colorizeTitle = false,
 		newTagID = "CastbarsAndCooldowns",
+		iconKey = "castbar",
 	})
 	addon.SettingsLayout.uiCastbarsExpandable = expandable
 
@@ -2337,7 +2390,7 @@ local function createCastbarCategory()
 	addon.functions.SettingsCreateHeadline(category, L["CombatText"] or "Combat text", {
 		parentSection = expandable,
 	})
-	addon.functions.SettingsCreateCheckbox(category, {
+	local combatTextEnabled = addon.functions.SettingsCreateCheckbox(category, {
 		var = "combatTextEnabled",
 		text = L["combatTextEnabled"] or "Enable combat text",
 		desc = L["combatTextDesc"],
@@ -2347,6 +2400,9 @@ local function createCastbarCategory()
 		end,
 		parentSection = expandable,
 	})
+	local function isCombatTextEnabled()
+		return combatTextEnabled and combatTextEnabled.setting and combatTextEnabled.setting:GetValue() == true
+	end
 	local combatAlwaysVisible = addon.functions.SettingsCreateCheckbox(category, {
 		var = "combatTextAlwaysVisible",
 		text = L["combatTextAlwaysVisible"] or "Always show combat text",
@@ -2361,6 +2417,9 @@ local function createCastbarCategory()
 				end
 			end
 		end,
+		parent = true,
+		element = combatTextEnabled and combatTextEnabled.element,
+		parentCheck = isCombatTextEnabled,
 		parentSection = expandable,
 	})
 	local combatAlwaysModeCombatOnly = addon.CombatText and addon.CombatText.ALWAYS_VISIBLE_MODE_COMBAT_ONLY or "COMBAT_ONLY"
@@ -2388,7 +2447,7 @@ local function createCastbarCategory()
 		end,
 		parent = true,
 		element = combatAlwaysVisible and combatAlwaysVisible.element,
-		parentCheck = function() return combatAlwaysVisible and combatAlwaysVisible.setting and combatAlwaysVisible.setting:GetValue() == true end,
+		parentCheck = function() return isCombatTextEnabled() and combatAlwaysVisible and combatAlwaysVisible.setting and combatAlwaysVisible.setting:GetValue() == true end,
 		parentSection = expandable,
 	})
 	addon.functions.SettingsCreateInput(category, {
@@ -2407,6 +2466,9 @@ local function createCastbarCategory()
 		inputWidth = 180,
 		placeholder = addon.CombatText and addon.CombatText.GetDefaultEnterText and addon.CombatText:GetDefaultEnterText() or L["combatTextEnter"] or "+Combat",
 		selectAllOnFocus = true,
+		parent = true,
+		element = combatTextEnabled and combatTextEnabled.element,
+		parentCheck = isCombatTextEnabled,
 		parentSection = expandable,
 	})
 	addon.functions.SettingsCreateInput(category, {
@@ -2425,6 +2487,9 @@ local function createCastbarCategory()
 		inputWidth = 180,
 		placeholder = addon.CombatText and addon.CombatText.GetDefaultLeaveText and addon.CombatText:GetDefaultLeaveText() or L["combatTextLeave"] or "-Combat",
 		selectAllOnFocus = true,
+		parent = true,
+		element = combatTextEnabled and combatTextEnabled.element,
+		parentCheck = isCombatTextEnabled,
 		parentSection = expandable,
 	})
 	addon.functions.SettingsCreateText(category, "|cffffd700" .. (L["combatTextEditModeHint"] or "Configure text size, font, color, and position in Edit Mode.") .. "|r", {
@@ -2468,31 +2533,58 @@ local function createCastbarCategory()
 	end
 	local function shouldShowCastbarDropdown() return #getCastbarOptions() > 0 end
 	local function expandWith(predicate)
-		return function()
+		local parentCheck = function()
 			if expandable and expandable.IsExpanded and expandable:IsExpanded() == false then return false end
 			return predicate()
 		end
+		return addon.functions.RegisterConfigParentSection(parentCheck, expandable)
 	end
+
+	local function createStandaloneCastbarSuite()
+		local suiteCategory = addon.SettingsLayout.rootUI
+		local suiteExpandable = addon.SettingsLayout.suitesCastbarSection
+		if not suiteExpandable then
+			suiteExpandable = addon.functions.SettingsCreateExpandableSection(suiteCategory, {
+				name = L["Castbar"] or L["CastBars2"] or "Castbar",
+				description = L["configCenterPageDescEQoLCastbar"] or "Enable and configure the standalone EQoL player castbar. Size, position and style are handled in Edit Mode.",
+				expanded = false,
+				colorizeTitle = false,
+				newTagID = "EQoLCastbar",
+				configPageKey = "EQoLCastbar",
+				iconKey = "castbar",
+				modernCategory = "suites",
+				modernOnly = true,
+			})
+			addon.SettingsLayout.suitesCastbarSection = suiteExpandable
+		end
+
+		addon.functions.SettingsCreateCheckbox(suiteCategory, {
+			var = "useCustomPlayerCastbar",
+			text = L["useCustomPlayerCastbar"] or "Enable castbar",
+			desc = L["useCustomPlayerCastbarDesc"] or "Enable the EQoL castbar.",
+			get = function() return isCustomCastbarEnabled() end,
+			func = function(value)
+				local castCfg = getCastbarConfig()
+				castCfg.enabled = value and true or false
+				refreshCastbar()
+			end,
+			default = false,
+			parentSection = suiteExpandable,
+		})
+		addon.functions.SettingsCreateText(suiteCategory, "|cffffd700" .. (L["useCustomPlayerCastbarHint"] or "Configure size, position, and style in Edit Mode.") .. "|r", {
+			parentSection = suiteExpandable,
+		})
+	end
+	createStandaloneCastbarSuite()
+
 	addon.functions.SettingsCreateHeadline(category, L["CastBars2"], {
-		parentSection = expandable,
-	})
-	addon.functions.SettingsCreateCheckbox(category, {
-		var = "useCustomPlayerCastbar",
-		text = L["useCustomPlayerCastbar"] or "Enable castbar",
-		desc = L["useCustomPlayerCastbarDesc"] or "Enable the EQoL castbar.",
-		get = function() return isCustomCastbarEnabled() end,
-		func = function(value)
-			local castCfg = getCastbarConfig()
-			castCfg.enabled = value and true or false
-			refreshCastbar()
-		end,
-		default = false,
 		parentSection = expandable,
 	})
 
 	addon.functions.SettingsCreateMultiDropdown(category, {
 		var = "hiddenCastBars",
 		text = L["castBarsToHide2"],
+		desc = L["hiddenCastBarsDesc"],
 		optionfunc = getCastbarOptions,
 		isSelectedFunc = function(key)
 			if not key then return false end
@@ -2517,10 +2609,12 @@ local function ensureBarsResourcesCategory()
 	local expandable = addon.SettingsLayout.uiBarsResourcesExpandable
 	if not expandable then
 		expandable = addon.functions.SettingsCreateExpandableSection(category, {
-			name = L["BarsAndResources"] or "Bars & Resources",
+			name = L["BarsAndResources"] or "XP & Absorb Bars",
+			description = L["configCenterPageDescBarsResources"]
+				or "Configure the XP and reputation bar plus the standalone absorb tracker.",
 			expanded = false,
 			colorizeTitle = false,
-			newTagID = "ResourceBars",
+			iconKey = "resource",
 		})
 		addon.SettingsLayout.uiBarsResourcesExpandable = expandable
 	end

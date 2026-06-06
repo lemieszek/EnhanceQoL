@@ -798,6 +798,31 @@ function addon.Mover.functions.applyFrameSettings(frame, entry)
 	frame._eqol_isApplying = nil
 end
 
+function addon.Mover.functions.ReapplyFrameScaleAfterFit(frame)
+	if not (frame and db and db.enabled and db.scaleEnabled) then return end
+	local name = frame.GetName and frame:GetName() or nil
+	local entry = name and addon.Mover.functions.GetEntryForFrameName(name) or nil
+	if not (entry and isEntryActive(entry)) then return end
+	local frameDb = ensureFrameDb(entry)
+	if not resolveScale(frame, frameDb) then return end
+	addon.Mover.functions.applyFrameSettings(frame, entry)
+end
+
+function addon.Mover.functions.InstallScaleFitHook()
+	if addon.Mover.variables.scaleFitHooked then return end
+	if hooksecurefunc and _G.UIPanelUpdateScaleForFit then
+		hooksecurefunc("UIPanelUpdateScaleForFit", function(frame)
+			addon.Mover.functions.ReapplyFrameScaleAfterFit(frame)
+		end)
+		addon.Mover.variables.scaleFitHooked = true
+	elseif hooksecurefunc and _G.UpdateScaleForFit then
+		hooksecurefunc("UpdateScaleForFit", function(frame)
+			addon.Mover.functions.ReapplyFrameScaleAfterFit(frame)
+		end)
+		addon.Mover.variables.scaleFitHooked = true
+	end
+end
+
 function addon.Mover.functions.StoreFramePosition(frame, entry)
 	local resolved = resolveEntry(entry) or addon.Mover.functions.GetEntryForFrameName(frame:GetName() or "")
 	if not resolved then return end
@@ -1123,6 +1148,9 @@ function addon.Mover.functions.createHooks(frame, entry)
 	frame:HookScript("OnShow", function(self)
 		if not self._eqolDefaultPoints then captureDefaultPoints(self) end
 		addon.Mover.functions.applyFrameSettings(self, resolved)
+		RunNextFrame(function()
+			if self and self.IsShown and self:IsShown() then addon.Mover.functions.applyFrameSettings(self, resolved) end
+		end)
 	end)
 	if not resolved.skipOnHide then
 		frame:HookScript("OnHide", function(self)

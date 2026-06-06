@@ -41,6 +41,7 @@ local function buildSettings()
 
 	local expandable = addon.functions.SettingsCreateExpandableSection(cLayout, {
 		name = categoryLabel,
+		iconKey = "mover",
 		expanded = false,
 		colorizeTitle = false,
 		newTagID = "Mover",

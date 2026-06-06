@@ -816,8 +816,8 @@ function H.CreateCustomSortEditor(opts)
 	local onReorder = opts.onReorder
 	local getClassLabel = opts.getClassLabel or H.GetLocalizedClassName
 	local getClassColor = opts.getClassColor or H.GetClassColor
-	local titleText = opts.title or "Custom Sort Order"
-	local subtitleText = opts.subtitle or "Drag entries to reorder. Applies to Raid custom sorting."
+	local titleText = opts.title or L["customSortEditorDefaultTitle"]
+	local subtitleText = opts.subtitle or L["customSortEditorDefaultSubtitle"]
 
 	local frame = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
 	frame:SetSize(size.w or 420, size.h or 520)
@@ -857,7 +857,7 @@ function H.CreateCustomSortEditor(opts)
 
 	local roleHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	roleHeader:SetPoint("TOPLEFT", subtitle, "BOTTOMLEFT", 0, -16)
-	roleHeader:SetText("Role Priority")
+	roleHeader:SetText(L["rolePriorityHeader"])
 	frame.RoleHeader = roleHeader
 
 	local roleContainer = CreateFrame("Frame", nil, frame)
@@ -867,7 +867,7 @@ function H.CreateCustomSortEditor(opts)
 
 	local classHeader = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	classHeader:SetPoint("TOPLEFT", roleContainer, "BOTTOMLEFT", 0, -16)
-	classHeader:SetText("Class Priority")
+	classHeader:SetText(L["classPriorityHeader"])
 	frame.ClassHeader = classHeader
 
 	local classContainer = CreateFrame("Frame", nil, frame)

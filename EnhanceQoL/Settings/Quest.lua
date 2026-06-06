@@ -20,8 +20,10 @@ addon.SettingsLayout.questCategory = cQuest
 local questingExpandable = addon.functions.SettingsCreateExpandableSection(cQuest, {
 	name = L["QuestingAndCinematics"] or "Questing & Cinematics",
 	newTagID = "Questing",
+	iconKey = "questing",
 	expanded = false,
 	colorizeTitle = false,
+	modernOnly = true,
 })
 
 local REMOVE_IGNORED_QUEST_NPC_DIALOG = addonName .. "QuestIgnoredNPCRemove"
@@ -277,7 +279,12 @@ local questingData = {
 	{
 		var = "autoChooseQuest",
 		text = L["autoChooseQuest"],
-		desc = L["autoChooseQuestDesc"] or L["interruptWithShift"],
+		desc = L["autoChooseQuestDesc"],
+		richNote = {
+			blocks = {
+				{ text = "|cff99e599" .. L["ignoreNPCTipp"] .. "|r" },
+			},
+		},
 		func = function(key) addon.db["autoChooseQuest"] = key end,
 		default = false,
 		children = {
@@ -309,6 +316,7 @@ local questingData = {
 			{
 				var = "ignoreDailyQuests",
 				text = L["ignoreDailyQuests"]:format(QUESTS_LABEL),
+				desc = L["ignoreDailyQuestsDesc"],
 				func = function(key) addon.db["ignoreDailyQuests"] = key end,
 				default = false,
 				sType = "checkbox",
@@ -322,6 +330,7 @@ local questingData = {
 			{
 				var = "ignoreWarbandCompleted",
 				text = L["ignoreWarbandCompleted"]:format(ACCOUNT_COMPLETED_QUEST_LABEL, QUESTS_LABEL),
+				desc = L["ignoreWarbandCompletedDesc"],
 				func = function(key) addon.db["ignoreWarbandCompleted"] = key end,
 				default = false,
 				sType = "checkbox",
@@ -335,6 +344,7 @@ local questingData = {
 			{
 				var = "ignoreTrivialQuests",
 				text = L["ignoreTrivialQuests"]:format(QUESTS_LABEL),
+				desc = L["ignoreTrivialQuestsDesc"],
 				func = function(key) addon.db["ignoreTrivialQuests"] = key end,
 				default = false,
 				sType = "checkbox",
@@ -344,10 +354,6 @@ local questingData = {
 						and addon.SettingsLayout.elements["autoChooseQuest"].setting:GetValue() == true
 				end,
 				parent = true,
-			},
-			{
-				text = "|cff99e599" .. L["ignoreNPCTipp"] .. "|r",
-				sType = "hint",
 			},
 			{
 				listFunc = function()
@@ -378,6 +384,7 @@ local questingData = {
 	{
 		var = "questWowheadLink",
 		text = L["questWowheadLink"],
+		desc = L["questWowheadLinkDesc"],
 		func = function(key) addon.db["questWowheadLink"] = key end,
 		default = false,
 	},
@@ -428,6 +435,7 @@ local trackerData = {
 			{
 				var = "questTrackerQuestCountOffsetX",
 				text = L["Horizontal offset"],
+				desc = L["questTrackerQuestCountOffsetXDesc"],
 				parentCheck = function()
 					return addon.SettingsLayout.elements["questTrackerShowQuestCount"]
 						and addon.SettingsLayout.elements["questTrackerShowQuestCount"].setting
@@ -448,6 +456,7 @@ local trackerData = {
 			{
 				var = "questTrackerQuestCountOffsetY",
 				text = L["Vertical offset"],
+				desc = L["questTrackerQuestCountOffsetYDesc"],
 				parentCheck = function()
 					return addon.SettingsLayout.elements["questTrackerShowQuestCount"]
 						and addon.SettingsLayout.elements["questTrackerShowQuestCount"].setting
@@ -628,7 +637,7 @@ function addon.functions.initQuest()
 	local function EQOL_ShowCopyURL(url)
 		if not StaticPopupDialogs["ENHANCEQOL_COPY_URL"] then
 			StaticPopupDialogs["ENHANCEQOL_COPY_URL"] = {
-				text = "Copy URL:",
+					text = L["copyUrlPopupText"],
 				button1 = OKAY,
 				hasEditBox = true,
 				timeout = 0,
@@ -667,10 +676,10 @@ function addon.functions.initQuest()
 		end
 		if not qid then return end
 		root:CreateDivider()
-		local btn = root:CreateButton("Copy Wowhead URL", function() EQOL_ShowCopyURL(("https://www.wowhead.com/quest=%d"):format(qid)) end)
+		local btn = root:CreateButton(L["CopyWowheadURL"], function() EQOL_ShowCopyURL(("https://www.wowhead.com/quest=%d"):format(qid)) end)
 		btn:AddInitializer(function()
 			btn:SetTooltip(function(tt)
-				GameTooltip_SetTitle(tt, "Wowhead")
+				GameTooltip_SetTitle(tt, L["wowhead"])
 				GameTooltip_AddNormalLine(tt, ("quest=%d"):format(qid))
 			end)
 		end)

@@ -8440,12 +8440,13 @@ end
 
 local function getAuraKindFlags(unit, aura, helpfulFilter, harmfulFilter, externalFilter, dispelFilter, wantBuff, wantDebuff, wantExternals, wantsDispel, wantsHealerBuffPlacement, contextKind)
 	if not (unit and aura and aura.auraInstanceID) then return nil end
-	if UF.GlobalAuraIgnore and UF.GlobalAuraIgnore.ShouldIgnoreAura and UF.GlobalAuraIgnore.ShouldIgnoreAura(contextKind, aura) then return nil end
+	local globallyIgnored = UF.GlobalAuraIgnore and UF.GlobalAuraIgnore.ShouldIgnoreAura and UF.GlobalAuraIgnore.ShouldIgnoreAura(contextKind, aura)
+	if globallyIgnored and not wantsHealerBuffPlacement then return nil end
 	local flags
 	local harmfulMatch, helpfulMatch
 
 	if wantBuff or wantsHealerBuffPlacement then
-		helpfulMatch = UFHelper.IsAuraFilteredIn(unit, aura, helpfulFilter)
+		helpfulMatch = not globallyIgnored and UFHelper.IsAuraFilteredIn(unit, aura, helpfulFilter)
 		if helpfulMatch then flags = setAuraFlag(flags, AURA_KIND_HELPFUL) end
 		if wantsHealerBuffPlacement and UFHelper.IsHelpfulAura(aura, true) and aura.spellId and UF.GroupFramesHealerBuffs and UF.GroupFramesHealerBuffs.GetFamilyFromSpell then
 			local healerTracked = UF.GroupFramesHealerBuffs.GetFamilyFromSpell(aura.spellId) ~= nil
@@ -8453,13 +8454,13 @@ local function getAuraKindFlags(unit, aura, helpfulFilter, harmfulFilter, extern
 		end
 	end
 
-	if (wantDebuff or wantsDispel) and not helpfulMatch then
+	if (wantDebuff or wantsDispel) and not globallyIgnored and not helpfulMatch then
 		harmfulMatch = UFHelper.IsAuraFilteredIn(unit, aura, harmfulFilter)
 		if wantDebuff and harmfulMatch then flags = setAuraFlag(flags, AURA_KIND_HARMFUL) end
 	end
 
-	if wantExternals and not harmfulMatch and UFHelper.IsAuraFilteredIn(unit, aura, externalFilter) then flags = setAuraFlag(flags, AURA_KIND_EXTERNAL) end
-	if wantsDispel and UFHelper.IsAuraFilteredIn(unit, aura, dispelFilter) then flags = setAuraFlag(flags, AURA_KIND_DISPEL) end
+	if wantExternals and not globallyIgnored and not harmfulMatch and UFHelper.IsAuraFilteredIn(unit, aura, externalFilter) then flags = setAuraFlag(flags, AURA_KIND_EXTERNAL) end
+	if wantsDispel and not globallyIgnored and UFHelper.IsAuraFilteredIn(unit, aura, dispelFilter) then flags = setAuraFlag(flags, AURA_KIND_DISPEL) end
 
 	return flags
 end
@@ -12369,10 +12370,10 @@ function GF:UpdatePreviewLayout(kind)
 				baseGroupWidth = w
 				baseGroupHeight = h * unitsPerColumn + spacing * max(0, unitsPerColumn - 1)
 			end
-			groupWidth = roundToPixel(groupWidth, scale)
-			groupHeight = roundToPixel(groupHeight, scale)
-			baseGroupWidth = roundToPixel(baseGroupWidth, scale)
-			baseGroupHeight = roundToPixel(baseGroupHeight, scale)
+			groupWidth = roundToEvenPixel(groupWidth, scale)
+			groupHeight = roundToEvenPixel(groupHeight, scale)
+			baseGroupWidth = roundToEvenPixel(baseGroupWidth, scale)
+			baseGroupHeight = roundToEvenPixel(baseGroupHeight, scale)
 			if isHorizontal then
 				if groupGrowth == "LEFT" or groupGrowth == "RIGHT" then
 					totalSpan = groupWidth * groupedPreviewBlockCount + visualColumnSpacing * max(0, groupedPreviewBlockCount - 1)
@@ -12637,7 +12638,7 @@ function GF:ToggleCustomSortEditor(kind)
 	if not editor then return end
 	if editor.Title and editor.Title.SetText then
 		local label = (kind == "party" and (PARTY or "Party")) or (RAID or "Raid")
-		editor.Title:SetText("Custom Sort Order (" .. label .. ")")
+			editor.Title:SetText((L["customSortEditorTitle"]):format(label))
 	end
 	local sameKind = editor._eqolKind == kind
 	editor._eqolKind = kind
@@ -14065,8 +14066,8 @@ function GF:ApplyHeaderAttributes(kind, options)
 				perHeaderW = w
 				perHeaderH = h * unitsPer + spacing * max(0, unitsPer - 1)
 			end
-			perHeaderW = roundToPixel(perHeaderW, scale)
-			perHeaderH = roundToPixel(perHeaderH, scale)
+			perHeaderW = roundToEvenPixel(perHeaderW, scale)
+			perHeaderH = roundToEvenPixel(perHeaderH, scale)
 			local runtimeGroupCount = #groupSpecs
 			local viewportGroupCount = max(1, floor((tonumber(raidMaxColumns) or 1) + 0.5))
 			local groupViewportScale = (
@@ -14088,11 +14089,11 @@ function GF:ApplyHeaderAttributes(kind, options)
 			)
 			local renderedPerHeaderW, renderedPerHeaderH
 			if isHorizontal then
-				renderedPerHeaderW = roundToPixel(groupRenderW * unitsPer + spacing * max(0, unitsPer - 1), scale)
+				renderedPerHeaderW = roundToEvenPixel(groupRenderW * unitsPer + spacing * max(0, unitsPer - 1), scale)
 				renderedPerHeaderH = groupRenderH
 			else
 				renderedPerHeaderW = groupRenderW
-				renderedPerHeaderH = roundToPixel(groupRenderH * unitsPer + spacing * max(0, unitsPer - 1), scale)
+				renderedPerHeaderH = roundToEvenPixel(groupRenderH * unitsPer + spacing * max(0, unitsPer - 1), scale)
 			end
 			local groupCenterOffsetX, groupCenterOffsetY = 0, 0
 			if centerGrowthActive and runtimeGroupCount > 0 then

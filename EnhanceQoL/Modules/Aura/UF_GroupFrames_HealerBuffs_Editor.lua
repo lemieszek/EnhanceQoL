@@ -131,6 +131,7 @@ end
 
 local function clampGroupOffsetsForFrame(group, frameWidth, frameHeight)
 	if type(group) ~= "table" then return 0, 0 end
+	if group.anchorOutside == true then return roundInt(group.x or 0), roundInt(group.y or 0) end
 	local style = tostring(group.style or ""):upper()
 	if style == "BAR" and HB and HB.GetBarDisplaySize and HB.ClampOffsetsForRegion then
 		local barWidth, barHeight, useSizedPlacement = HB.GetBarDisplaySize(group, frameWidth, frameHeight)
@@ -1550,6 +1551,8 @@ function Editor:EnsureFrame()
 	controls.GroupAnchorLabel:SetText(tr("Anchor", "Anchor"))
 	controls.GroupAnchor = createDropdown(groupControlParent, 160)
 	controls.GroupAnchor:SetPoint("TOPLEFT", controls.GroupAnchorLabel, "TOPRIGHT", 0, 12)
+	controls.GroupAnchorOutside = createCheck(groupControlParent, tr("Anchor outside frame", "Anchor outside frame"))
+	controls.GroupAnchorOutside:SetPoint("TOPLEFT", controls.GroupAnchorLabel, "BOTTOMLEFT", -4, -8)
 
 	controls.GroupGrowthLabel = groupControlParent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	controls.GroupGrowthLabel:SetPoint("TOPLEFT", controls.GroupAnchorLabel, "BOTTOMLEFT", 0, -18)
@@ -1722,6 +1725,7 @@ function Editor:EnsureFrame()
 		end
 
 		placeDropdown(controls.GroupAnchorLabel, controls.GroupAnchor)
+		placeCheck(controls.GroupAnchorOutside)
 		placeDropdown(controls.GroupGrowthLabel, controls.GroupGrowth)
 		placeDropdown(controls.GroupBarOrientationLabel, controls.GroupBarOrientation)
 
@@ -2481,6 +2485,20 @@ function Editor:EnsureFrame()
 		Editor:RefreshRuntimeNow()
 	end)
 
+	controls.GroupAnchorOutside:SetScript("OnClick", function(self)
+		if Editor._controlUpdateLock then return end
+		local group = groupFromSelection()
+		if not group then
+			self:SetChecked(false)
+			return
+		end
+		group.anchorOutside = self:GetChecked() == true
+		clampSelectedGroupToPreview(group)
+		Editor:RefreshGroupControls()
+		Editor:RefreshPreview()
+		Editor:RefreshRuntimeNow()
+	end)
+
 	setDropdown(controls.GroupGrowth, HB.GROWTH_OPTIONS, nil, function(value)
 		local group = groupFromSelection()
 		if not group then return end
@@ -3128,6 +3146,7 @@ function Editor:RefreshGroupControls()
 
 		controls.GroupName:SetText(group.name or "")
 		setDropdown(controls.GroupAnchor, HB.ANCHOR_OPTIONS, group.anchorPoint or "CENTER", controls.GroupAnchor._eqolOnSelect)
+		controls.GroupAnchorOutside:SetChecked(group.anchorOutside == true)
 		setDropdown(controls.GroupGrowth, HB.GROWTH_OPTIONS, group.growth or "RIGHTDOWN", controls.GroupGrowth._eqolOnSelect)
 		setDropdown(controls.GroupBarOrientation, HB.ORIENTATION_OPTIONS, group.barOrientation or "HORIZONTAL", controls.GroupBarOrientation._eqolOnSelect)
 
@@ -3241,6 +3260,7 @@ function Editor:RefreshGroupControls()
 
 		setControlEnabled(controls.GroupName, true)
 		setFieldState(controls.GroupAnchorLabel, controls.GroupAnchor, showAnchor, true)
+		setCheckState(controls.GroupAnchorOutside, showAnchor, true, group.anchorOutside == true)
 		setFieldState(controls.GroupGrowthLabel, controls.GroupGrowth, showGrowth, true)
 		setFieldState(controls.GroupBarOrientationLabel, controls.GroupBarOrientation, showBar, true)
 		setSliderState(controls.PerRowLabel, controls.PerRow, controls.PerRowValue, showGrid, true)
@@ -3278,6 +3298,7 @@ function Editor:RefreshGroupControls()
 		controls.GroupName:SetText("")
 		setControlEnabled(controls.GroupName, false)
 		setFieldState(controls.GroupAnchorLabel, controls.GroupAnchor, false, false)
+		setCheckState(controls.GroupAnchorOutside, false, false, false)
 		setFieldState(controls.GroupGrowthLabel, controls.GroupGrowth, false, false)
 		setFieldState(controls.GroupBarOrientationLabel, controls.GroupBarOrientation, false, false)
 		setSliderState(controls.PerRowLabel, controls.PerRow, controls.PerRowValue, false, false)

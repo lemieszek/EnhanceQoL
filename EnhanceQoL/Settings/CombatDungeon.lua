@@ -1396,12 +1396,11 @@ local function getNameplateMobColor(dbKey, unit)
 	return color
 end
 
--- Mirror Blizzard threat health bar priority so EQoL can customize the color
--- without suppressing the default Health Bar Color state on nameplates.
+-- Keep Blizzard's threat priority, but calculate it for EQOL's own mob colors
+-- even when Blizzard's native threat health bar color option is disabled.
 local function getNameplateThreatStatus(unitFrame)
 	if not nameplateMobColorState.isActive then return nil end
 	if not unitFrame or issecretvalue(unitFrame) then return nil end
-	if not unitFrame.displayThreatHealthBarColor then return nil end
 
 	local threatUnit = unitFrame.displayedUnit
 	if issecretvalue(threatUnit) then threatUnit = nil end
@@ -2201,8 +2200,11 @@ function addon.functions.initDungeonFrame()
 
 	local combatLogSection = addon.functions.SettingsCreateExpandableSection(cChar, {
 		name = L["combatLogSection"] or "Combat logging",
+		configPageKey = "CombatLogging",
+		iconKey = "combatlogging",
 		expanded = false,
 		colorizeTitle = false,
+		modernOnly = true,
 	})
 
 	local combatLogEnabled = addon.functions.SettingsCreateCheckbox(cChar, {
@@ -2292,30 +2294,35 @@ function addon.functions.initDungeonFrame()
 	local sectionMarkers = addon.SettingsLayout.gameplayMarkersSection
 	if not sectionMarkers then
 		sectionMarkers = addon.functions.SettingsCreateExpandableSection(cChar, {
-			name = L["Markers"],
+			name = L["WorldMarkers"] or "World Markers",
+			configPageKey = "Markers",
+			description = L["configCenterPageCardDescMarkers"]
+				or "Configure keybindings for cycling and clearing world markers.",
+			iconKey = "markers",
 			expanded = false,
 			colorizeTitle = false,
+			modernOnly = true,
 		})
 		addon.SettingsLayout.gameplayMarkersSection = sectionMarkers
 	end
 
-	if addon.variables.keybindFindings and next(addon.variables.keybindFindings) then
-		if not sectionMarkers then
-			sectionMarkers = addon.functions.SettingsCreateExpandableSection(addon.SettingsLayout.characterInspectCategory, {
-				name = L["Markers"],
-				expanded = false,
-				colorizeTitle = false,
-			})
-			addon.SettingsLayout.gameplayMarkersSection = sectionMarkers
-		end
-		addon.functions.SettingsCreateHeadline(addon.SettingsLayout.characterInspectCategory, L["WorldMarkers"], {
-			parentSection = sectionMarkers,
-		})
-		addon.functions.SettingsCreateText(addon.SettingsLayout.characterInspectCategory, "|cff99e599" .. L["WorldMarkerCycle"] .. "|r", { parentSection = sectionMarkers })
-	end
-	for _, v in pairs(addon.variables.keybindFindings) do
-		addon.functions.SettingsCreateKeybind(addon.SettingsLayout.characterInspectCategory, v, sectionMarkers)
-	end
+	addon.functions.SettingsCreateHeadline(addon.SettingsLayout.characterInspectCategory, L["WorldMarkers"], {
+		parentSection = sectionMarkers,
+	})
+	addon.functions.SettingsCreateButton(addon.SettingsLayout.characterInspectCategory, {
+		var = "worldMarkerKeybindings",
+		text = L["WorldMarkerKeybindings"] or "World marker keybindings",
+		desc = L["WorldMarkerKeybindingsDesc"]
+			or "Assign keybindings for cycling world markers and clearing all world markers.",
+		label = _G.KEY_BINDINGS or "Key Bindings",
+		buttonText = _G.KEY_BINDINGS or "Key Bindings",
+		parentSection = sectionMarkers,
+		onClick = function()
+			if Settings and Settings.OpenToCategory and Settings.KEYBINDINGS_CATEGORY_ID then
+				Settings.OpenToCategory(Settings.KEYBINDINGS_CATEGORY_ID, L["WorldMarkers"] or "World Markers")
+			end
+		end,
+	})
 
 	if LFGListFrame and LFGListFrame.SearchPanel and LFGListFrame.SearchPanel.FilterButton and LFGListFrame.SearchPanel.FilterButton.ResetButton then
 		lfgPoint, lfgRelativeTo, lfgRelativePoint, lfgXOfs, lfgYOfs = LFGListFrame.SearchPanel.FilterButton.ResetButton:GetPoint()
@@ -2400,8 +2407,11 @@ function addon.functions.initDungeonFrame()
 		expandable = addon.functions.SettingsCreateExpandableSection(addon.SettingsLayout.characterInspectCategory, {
 			name = L["MacrosAndConsumables"] or "Macros & Consumables",
 			newTagID = "MacrosAndConsumables",
+			configPageKey = "MacrosConsumables",
+			iconKey = "macros",
 			expanded = false,
 			colorizeTitle = false,
+			modernOnly = true,
 		})
 		addon.SettingsLayout.gameplayConvenienceSection = expandable
 	end
@@ -2411,6 +2421,7 @@ function addon.functions.initDungeonFrame()
 	addon.functions.SettingsCreateCheckbox(addon.SettingsLayout.characterInspectCategory, {
 		var = "randomMountUseAll",
 		text = L["Use all mounts for random mount"] or "Use all mounts for random mount",
+		desc = L["randomMountUseAllDesc"],
 		func = function(value)
 			addon.db["randomMountUseAll"] = value and true or false
 			if addon.MountActions and addon.MountActions.MarkRandomCacheDirty then addon.MountActions:MarkRandomCacheDirty() end
@@ -2440,6 +2451,7 @@ function addon.functions.initDungeonFrame()
 	addon.functions.SettingsCreateCheckbox(addon.SettingsLayout.characterInspectCategory, {
 		var = "randomMountDruidNoShiftWhileMounted",
 		text = L["randomMountDruidNoShiftWhileMounted"],
+		desc = L["randomMountDruidNoShiftWhileMountedDesc"],
 		func = function(value) addon.db["randomMountDruidNoShiftWhileMounted"] = value and true or false end,
 		default = false,
 		parentSection = expandable,
@@ -2472,9 +2484,11 @@ local sectionDungeon = addon.SettingsLayout.gameplayDungeonsMythicSection
 if not sectionDungeon then
 	sectionDungeon = addon.functions.SettingsCreateExpandableSection(cChar, {
 		name = L["DungeonsMythicPlus"],
+		iconKey = "dungeons",
 		expanded = false,
 		colorizeTitle = false,
 		newTagID = "DungeonsMythicPlus",
+		modernOnly = true,
 	})
 	addon.SettingsLayout.gameplayDungeonsMythicSection = sectionDungeon
 end
@@ -2526,6 +2540,7 @@ if cChar and sectionDungeon then
 	addon.functions.SettingsCreateDropdown(cChar, {
 		var = "PullTimerType",
 		text = L["Pull Timer"],
+		desc = L["PullTimerTypeDesc"],
 		type = Settings.VarType.Number,
 		default = 2,
 		list = listPull,
@@ -2541,6 +2556,7 @@ if cChar and sectionDungeon then
 	addon.functions.SettingsCreateCheckbox(cChar, {
 		var = "noChatOnPullTimer",
 		text = L["noChatOnPullTimer"],
+		desc = L["noChatOnPullTimerDesc"],
 		func = function(v) addon.db["noChatOnPullTimer"] = v end,
 		parent = true,
 		element = keystoneEnable.element,
@@ -2551,6 +2567,7 @@ if cChar and sectionDungeon then
 	addon.functions.SettingsCreateSlider(cChar, {
 		var = "pullTimerLongTime",
 		text = L["Pull Timer"],
+		desc = L["pullTimerLongTimeDesc"],
 		min = 0,
 		max = 60,
 		step = 1,
@@ -2566,6 +2583,7 @@ if cChar and sectionDungeon then
 	addon.functions.SettingsCreateSlider(cChar, {
 		var = "pullTimerShortTime",
 		text = L["sliderShortTime"],
+		desc = L["pullTimerShortTimeDesc"],
 		min = 0,
 		max = 60,
 		step = 1,
@@ -2578,6 +2596,22 @@ if cChar and sectionDungeon then
 		parentSection = sectionDungeon,
 	})
 
+	local damageMeterSection = addon.SettingsLayout.suitesDamageMeterSection
+	if not damageMeterSection then
+		damageMeterSection = addon.functions.SettingsCreateExpandableSection(cChar, {
+			name = L["damageMeterTitle"] or "Damage Meter",
+			configPageKey = "DamageMeter",
+			description = L["damageMeterEditModeHint"],
+			iconAtlas = "icons_64x64_damage",
+			modernCategory = "suites",
+			modernOnly = true,
+			expanded = false,
+			colorizeTitle = false,
+			newTagID = "damageMeterEnabled",
+		})
+		addon.SettingsLayout.suitesDamageMeterSection = damageMeterSection
+	end
+
 	local damageMeterEnable = addon.functions.SettingsCreateCheckbox(cChar, {
 		var = "damageMeterEnabled",
 		text = L["damageMeterEnabled"],
@@ -2586,7 +2620,7 @@ if cChar and sectionDungeon then
 			addon.db["damageMeterEnabled"] = value == true
 			if addon.DamageMeter and addon.DamageMeter.UpdateEventState then addon.DamageMeter:UpdateEventState() end
 		end,
-		parentSection = sectionDungeon,
+		parentSection = damageMeterSection,
 	})
 	local function isDamageMeterEnabled() return damageMeterEnable and damageMeterEnable.setting and damageMeterEnable.setting:GetValue() == true end
 	addon.functions.SettingsCreateSlider(cChar, {
@@ -2605,7 +2639,7 @@ if cChar and sectionDungeon then
 		parent = true,
 		element = damageMeterEnable.element,
 		parentCheck = isDamageMeterEnabled,
-		parentSection = sectionDungeon,
+		parentSection = damageMeterSection,
 	})
 	addon.functions.SettingsCreateCheckbox(cChar, {
 		var = "damageMeterEditModeSample",
@@ -2618,7 +2652,7 @@ if cChar and sectionDungeon then
 		parent = true,
 		element = damageMeterEnable.element,
 		parentCheck = isDamageMeterEnabled,
-		parentSection = sectionDungeon,
+		parentSection = damageMeterSection,
 	})
 
 	-- Objective Tracker
@@ -2723,6 +2757,7 @@ data = {
 	{
 		var = "autoChooseDelvePower",
 		text = L["autoChooseDelvePower"],
+		desc = L["autoChooseDelvePowerDesc"],
 		func = function(value) addon.db["autoChooseDelvePower"] = value and true or false end,
 		parentSection = sectionDungeon,
 	},
@@ -2737,8 +2772,11 @@ local sectionGroupFinder = addon.SettingsLayout.gameplayGroupFinderSection
 if not sectionGroupFinder then
 	sectionGroupFinder = addon.functions.SettingsCreateExpandableSection(cChar, {
 		name = L["Group Finder"],
+		configPageKey = "GroupFinder",
+		iconKey = "groupfinder",
 		expanded = false,
 		colorizeTitle = false,
+		modernOnly = true,
 	})
 	addon.SettingsLayout.gameplayGroupFinderSection = sectionGroupFinder
 end
@@ -2767,7 +2805,7 @@ data = {
 		text = L["groupfinderSkipRoleSelect"],
 		var = "groupfinderSkipRoleSelect",
 		func = function(value) addon.db["groupfinderSkipRoleSelect"] = value end,
-		desc = L["interruptWithShift"],
+		desc = L["groupfinderSkipRoleSelectDesc"],
 		parentSection = sectionGroupFinder,
 		children = {
 			{
@@ -2792,18 +2830,21 @@ data = {
 	{
 		var = "persistSignUpNote",
 		text = L["Persist LFG signup note"],
+		desc = L["persistSignUpNoteDesc"],
 		func = function(value) addon.db["persistSignUpNote"] = value end,
 		parentSection = sectionGroupFinder,
 	},
 	{
 		var = "skipSignUpDialog",
 		text = L["Quick signup"],
+		desc = L["skipSignUpDialogDesc"],
 		func = function(value) addon.db["skipSignUpDialog"] = value end,
 		parentSection = sectionGroupFinder,
 	},
 	{
 		var = "lfgSortByRio",
 		text = L["lfgSortByRio"],
+		desc = L["lfgSortByRioDesc"],
 		func = function(value)
 			addon.db["lfgSortByRio"] = value
 			if addon.functions.UpdateGroupFinderApplicantEventRegistration then addon.functions.UpdateGroupFinderApplicantEventRegistration() end
@@ -2813,30 +2854,27 @@ data = {
 	{
 		var = "enableChatIMRaiderIO",
 		text = L["enableChatIMRaiderIO"],
+		desc = L["enableChatIMRaiderIODesc"],
 		func = function(value) addon.db["enableChatIMRaiderIO"] = value end,
 		parentSection = sectionGroupFinder,
 	},
 }
 
-if keystoneEnable then
-	table.insert(data, {
-		var = "groupfinderShowPartyKeystone",
-		text = L["groupfinderShowPartyKeystone"],
-		desc = L["groupfinderShowPartyKeystoneDesc"],
-		func = function(v)
-			addon.db["groupfinderShowPartyKeystone"] = v
-			if addon.MythicPlus and addon.MythicPlus.functions and addon.MythicPlus.functions.togglePartyKeystone then addon.MythicPlus.functions.togglePartyKeystone() end
-		end,
-		parent = true,
-		element = keystoneEnable.element,
-		parentCheck = isKeystoneEnabled,
-		parentSection = sectionGroupFinder,
-	})
-end
+table.insert(data, {
+	var = "groupfinderShowPartyKeystone",
+	text = L["groupfinderShowPartyKeystone"],
+	desc = L["groupfinderShowPartyKeystoneDesc"],
+	func = function(v)
+		addon.db["groupfinderShowPartyKeystone"] = v
+		if addon.MythicPlus and addon.MythicPlus.functions and addon.MythicPlus.functions.togglePartyKeystone then addon.MythicPlus.functions.togglePartyKeystone() end
+	end,
+	parentSection = sectionGroupFinder,
+})
 
 table.insert(data, {
 	var = "groupfinderShowDungeonScoreFrame",
 	text = L["groupfinderShowDungeonScoreFrame"]:format(DUNGEON_SCORE),
+	desc = L["groupfinderShowDungeonScoreFrameDesc"],
 	func = function(v)
 		addon.db["groupfinderShowDungeonScoreFrame"] = v
 		if addon.MythicPlus and addon.MythicPlus.functions and addon.MythicPlus.functions.toggleFrame then addon.MythicPlus.functions.toggleFrame() end
@@ -2887,8 +2925,10 @@ if not sectionDeathRes then
 	sectionDeathRes = addon.functions.SettingsCreateExpandableSection(cChar, {
 		name = L["DeathResurrect"],
 		newTagID = "DeathResurrect",
+		iconKey = "death",
 		expanded = false,
 		colorizeTitle = false,
+		modernOnly = true,
 	})
 	addon.SettingsLayout.gameplayDeathResSection = sectionDeathRes
 end

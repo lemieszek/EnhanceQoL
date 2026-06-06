@@ -53,7 +53,13 @@ def extract_notes(changelog, tag):
     return "\n".join(section).strip()
 
 
-def chunks(text, size=3900):
+EMBED_DESCRIPTION_LIMIT = 4096
+EMBED_MESSAGE_LIMIT = 6000
+DISCORD_SAFETY_MARGIN = 200
+PATCHNOTE_CHUNK_SIZE = EMBED_DESCRIPTION_LIMIT - DISCORD_SAFETY_MARGIN
+
+
+def chunks(text, size=PATCHNOTE_CHUNK_SIZE):
     remaining = text.strip()
     while len(remaining) > size:
         split_at = remaining.rfind("\n", 0, size)
@@ -81,6 +87,41 @@ def post(webhook, payload):
             raise RuntimeError(f"Discord returned HTTP {response.status}")
 
 
+def build_payloads(tag, kind, notes, release_url):
+    color = 0x57F287 if kind == "release" else 0xFEE75C
+    title_kind = "Release" if kind == "release" else kind.capitalize()
+    note_chunks = list(chunks(notes))
+    payloads = []
+
+    for index, part in enumerate(note_chunks):
+        suffix = f" ({index + 1}/{len(note_chunks)})" if len(note_chunks) > 1 else ""
+        title = f"EnhanceQoL {tag} {title_kind}{suffix}"
+        if len(title) + len(part) > EMBED_MESSAGE_LIMIT:
+            raise ValueError("Discord embed chunk exceeds the per-message embed character limit.")
+
+        embed = {
+            "title": title,
+            "description": part,
+            "color": color,
+        }
+        if release_url:
+            embed["url"] = release_url
+
+        content = f"EnhanceQoL {tag} has been released."
+        if index > 0:
+            content = f"EnhanceQoL {tag} patchnotes continued."
+
+        payloads.append(
+            {
+                "username": "EnhanceQoL Releases",
+                "content": content,
+                "embeds": [embed],
+            }
+        )
+
+    return payloads
+
+
 def main():
     tag = os.environ.get("TAG_NAME") or os.environ.get("GITHUB_REF_NAME")
     if not tag:
@@ -104,35 +145,16 @@ def main():
 
     repo = os.environ.get("GITHUB_REPOSITORY", "")
     release_url = f"https://github.com/{repo}/releases/tag/{tag}" if repo else None
-    color = 0x57F287 if kind == "release" else 0xFEE75C
-    title_kind = "Release" if kind == "release" else kind.capitalize()
-
-    note_chunks = list(chunks(notes))
-    embeds = []
-    for index, part in enumerate(note_chunks[:10]):
-        suffix = f" ({index + 1}/{len(note_chunks)})" if len(note_chunks) > 1 else ""
-        embed = {
-            "title": f"EnhanceQoL {tag} {title_kind}{suffix}",
-            "description": part,
-            "color": color,
-        }
-        if release_url:
-            embed["url"] = release_url
-        embeds.append(embed)
-
-    payload = {
-        "username": "EnhanceQoL Releases",
-        "content": f"EnhanceQoL {tag} has been released.",
-        "embeds": embeds,
-    }
+    payloads = build_payloads(tag, kind, notes, release_url)
 
     try:
-        post(webhook, payload)
+        for payload in payloads:
+            post(webhook, payload)
     except urllib.error.HTTPError as error:
         print(f"Discord webhook failed with HTTP {error.code}: {error.read().decode('utf-8', 'replace')}", file=sys.stderr)
         return 1
 
-    print(f"Posted {kind} patchnotes for {tag} to Discord.")
+    print(f"Posted {kind} patchnotes for {tag} to Discord in {len(payloads)} message(s).")
     return 0
 
 

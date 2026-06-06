@@ -1795,6 +1795,12 @@ local defaults = {
 			nameStrata = nil,
 			nameFrameLevelOffset = 5,
 			nameUseReactionColor = false,
+			targetTargetName = {
+				enabled = false,
+				anchor = "RIGHT",
+				offset = { x = 0, y = 0 },
+				fontSize = nil,
+			},
 			levelColor = { 1, 0.85, 0, 1 },
 			levelStrata = nil,
 			levelFrameLevelOffset = 5,
@@ -2830,6 +2836,7 @@ local function copySettings(fromUnit, toUnit, opts)
 			{ "status", "nameStrata" },
 			{ "status", "nameFrameLevelOffset" },
 			{ "status", "nameUseReactionColor" },
+			{ "status", "targetTargetName" },
 			{ "status", "nameAnchor" },
 			{ "status", "nameOffset" },
 			{ "status", "nameMaxChars" },
@@ -8333,7 +8340,10 @@ local function updateStatus(cfg, unit)
 	local showLevel = shouldShowLevel(scfg, unit)
 	local showUnitStatus = usCfg.enabled == true
 	local showCombatIndicator = UF.SupportsCombatIndicator(unit) and ciCfg.enabled ~= false
-	local showStatus = showName or showLevel or showUnitStatus or showCombatIndicator
+	local ttDef = defStatus.targetTargetName or {}
+	local ttCfg = scfg.targetTargetName or ttDef
+	local showTargetTargetName = unit == UNIT.TARGET and (ttCfg.enabled == true or scfg.showTargetTargetName == true)
+	local showStatus = showName or showLevel or showUnitStatus or showCombatIndicator or showTargetTargetName
 	local leaderCfg = cfg.leaderIcon or (def and def.leaderIcon) or {}
 	local showLeaderIndicator = (unit == UNIT.PLAYER or unit == UNIT.TARGET or unit == UNIT.FOCUS) and leaderCfg.enabled == true
 	local showStatusFrame = showStatus or showLeaderIndicator
@@ -8367,6 +8377,14 @@ local function updateStatus(cfg, unit)
 			st.nameText:SetWidth(max(1, nameWidth))
 			st._eqolNameTextWidth = nil
 		end
+	end
+	if st.targetTargetText then
+		UFHelper.applyFont(st.targetTargetText, scfg.font, ttCfg.fontSize or nameFontSize, scfg.fontOutline)
+		local ttAnchor = ttCfg.anchor or "RIGHT"
+		st.targetTargetText:ClearAllPoints()
+		st.targetTargetText:SetPoint(ttAnchor, st.status, ttAnchor, (ttCfg.offset and ttCfg.offset.x) or 0, (ttCfg.offset and ttCfg.offset.y) or 0)
+		if st.targetTargetText.SetJustifyH then st.targetTargetText:SetJustifyH(ttAnchor) end
+		st.targetTargetText:SetShown(showTargetTargetName)
 	end
 	if st.levelText then
 		UFHelper.applyFont(st.levelText, scfg.font, levelFontSize, scfg.fontOutline)
@@ -9328,6 +9346,10 @@ local function ensureFrames(unit)
 	end
 	st.nameText = st.nameText or st.nameTextLayer:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	if st.nameText.GetParent and st.nameText:GetParent() ~= st.nameTextLayer then st.nameText:SetParent(st.nameTextLayer) end
+	if unit == UNIT.TARGET then
+		st.targetTargetText = st.targetTargetText or st.nameTextLayer:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+		if st.targetTargetText.GetParent and st.targetTargetText:GetParent() ~= st.nameTextLayer then st.targetTargetText:SetParent(st.nameTextLayer) end
+	end
 	st.levelText = st.levelText or st.levelTextLayer:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	if st.levelText.GetParent and st.levelText:GetParent() ~= st.levelTextLayer then st.levelText:SetParent(st.levelTextLayer) end
 	st.unitStatusText = st.statusTextLayer:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -9396,6 +9418,7 @@ local function applyBars(cfg, unit)
 		if unit == UNIT.PLAYER and UFHelper and UFHelper.IsPrimaryPowerAllowed then powerEnabled = UFHelper.IsPrimaryPowerAllowed(pcfg, defP, powerToken, powerEnum, unit) ~= false end
 	end
 	local healthHeight = cfg.healthHeight or def.healthHeight or (st.health.GetHeight and st.health:GetHeight()) or 0
+	local healthLayoutWidth = max(MIN_WIDTH, cfg.width or def.width or (st.health.GetWidth and st.health:GetWidth()) or 0)
 	st.health:SetStatusBarTexture(UFHelper.resolveTexture(hc.texture))
 	if st.health.SetStatusBarDesaturated then st.health:SetStatusBarDesaturated(UF.ShouldDesaturateHealthTexture(hc)) end
 	UFHelper.configureSpecialTexture(st.health, "HEALTH", hc.texture, hc)
@@ -9504,7 +9527,7 @@ local function applyBars(cfg, unit)
 					if not absorbDontOverflow and UFHelper.setupAbsorbOverShift then UFHelper.setupAbsorbOverShift(st.health, st.absorb, absorbHeight, healthHeight, absorbAnchorTop == true) end
 				end
 				if overlayClip and st.absorb2.GetParent and st.absorb2:GetParent() ~= overlayClip then st.absorb2:SetParent(overlayClip) end
-				UFHelper.applyAbsorbClampLayout(st.absorb2, st.health, absorbHeight, healthHeight, reverseHealth, absorbAnchorTop == true)
+				UFHelper.applyAbsorbClampLayout(st.absorb2, st.health, absorbHeight, healthHeight, reverseHealth, absorbAnchorTop == true, healthLayoutWidth)
 				syncTextFrameLevels(st)
 			end
 			setFrameLevelAbove(st.absorb2, st.health, 1)
@@ -9621,6 +9644,41 @@ local function applyBars(cfg, unit)
 	syncTextFrameLevels(st)
 end
 
+function UF.ResolveNameTextColor(unit, scfg, defStatus)
+	local nc
+	local nr, ng, nb, na
+	local isPlayerUnit = UnitIsPlayer and UnitIsPlayer(unit)
+	if scfg.nameColorMode == "CUSTOM" then
+		nc = scfg.nameColor or { 1, 1, 1, 1 }
+		nr, ng, nb, na = nc[1] or 1, nc[2] or 1, nc[3] or 1, nc[4] or 1
+	else
+		if isPlayerUnit then
+			local class = select(2, UnitClass(unit))
+			local cr, cg, cb, ca = getClassColor(class)
+			if cr then
+				nr, ng, nb, na = cr, cg, cb, ca
+			end
+		else
+			local useReactionColor = scfg.nameUseReactionColor
+			if useReactionColor == nil then useReactionColor = defStatus.nameUseReactionColor == true end
+			if useReactionColor == true and UFHelper and UFHelper.getNPCHealthColor then
+				nr, ng, nb, na = UFHelper.getNPCHealthColor(unit)
+			end
+			if not nr and UFHelper and UFHelper.getNPCSelectionKey and UFHelper.getNPCSelectionKey(unit) then
+				local fallback = NORMAL_FONT_COLOR
+				nr = (fallback and (fallback.r or fallback[1])) or 1
+				ng = (fallback and (fallback.g or fallback[2])) or 0.82
+				nb = (fallback and (fallback.b or fallback[3])) or 0
+				na = (fallback and (fallback.a or fallback[4])) or 1
+			end
+		end
+	end
+	if not nr then
+		nr, ng, nb, na = 1, 1, 1, 1
+	end
+	return nr, ng, nb, na
+end
+
 local function updateNameAndLevel(cfg, unit, levelOverride)
 	local st = states[unit]
 	if not st then return end
@@ -9636,39 +9694,21 @@ local function updateNameAndLevel(cfg, unit, levelOverride)
 	if st.nameText then
 		local scfg = cfg.status or {}
 		local defStatus = (defaultsFor(unit) and defaultsFor(unit).status) or {}
-		local nc
-		local nr, ng, nb, na
-		local isPlayerUnit = UnitIsPlayer and UnitIsPlayer(unit)
-		if scfg.nameColorMode == "CUSTOM" then
-			nc = scfg.nameColor or { 1, 1, 1, 1 }
-			nr, ng, nb, na = nc[1] or 1, nc[2] or 1, nc[3] or 1, nc[4] or 1
-		else
-			if isPlayerUnit then
-				local class = select(2, UnitClass(unit))
-				local cr, cg, cb, ca = getClassColor(class)
-				if cr then
-					nr, ng, nb, na = cr, cg, cb, ca
-				end
-			else
-				local useReactionColor = scfg.nameUseReactionColor
-				if useReactionColor == nil then useReactionColor = defStatus.nameUseReactionColor == true end
-				if useReactionColor == true and UFHelper and UFHelper.getNPCHealthColor then
-					nr, ng, nb, na = UFHelper.getNPCHealthColor(unit)
-				end
-				if not nr and UFHelper and UFHelper.getNPCSelectionKey and UFHelper.getNPCSelectionKey(unit) then
-					local fallback = NORMAL_FONT_COLOR
-					nr = (fallback and (fallback.r or fallback[1])) or 1
-					ng = (fallback and (fallback.g or fallback[2])) or 0.82
-					nb = (fallback and (fallback.b or fallback[3])) or 0
-					na = (fallback and (fallback.a or fallback[4])) or 1
-				end
-			end
-		end
-		if not nr then
-			nr, ng, nb, na = 1, 1, 1, 1
-		end
+		local nr, ng, nb, na = UF.ResolveNameTextColor(unit, scfg, defStatus)
 		st.nameText:SetText(UnitName(unit) or "")
 		st.nameText:SetTextColor(nr, ng, nb, na)
+	end
+	if st.targetTargetText then
+		local scfg = cfg.status or {}
+		local ttCfg = scfg.targetTargetName or {}
+		local enabled = ttCfg.enabled == true or scfg.showTargetTargetName == true
+		if unit == UNIT.TARGET and enabled and UnitExists and UnitExists(UNIT.TARGET_TARGET) then
+			local nr, ng, nb, na = UF.ResolveNameTextColor(UNIT.TARGET_TARGET, scfg, (defaultsFor(unit) and defaultsFor(unit).status) or {})
+			st.targetTargetText:SetTextColor(nr, ng, nb, na)
+			st.targetTargetText:SetText((UnitName and UnitName(UNIT.TARGET_TARGET)) or "")
+		else
+			st.targetTargetText:SetText("")
+		end
 	end
 	if st.levelText then
 		local scfg = cfg.status or {}
@@ -12021,6 +12061,12 @@ onEvent = function(self, event, unit, ...)
 	elseif event == "UNIT_TARGET" and unit == UNIT.TARGET then
 		local totCfg = getCfg(UNIT.TARGET_TARGET)
 		if totCfg.enabled then updateTargetTargetFrame(totCfg) end
+		local targetCfg = getCfg(UNIT.TARGET)
+		local targetStatusCfg = targetCfg and targetCfg.status
+		local targetTargetNameCfg = targetStatusCfg and targetStatusCfg.targetTargetName
+		if (targetTargetNameCfg and targetTargetNameCfg.enabled == true) or (targetStatusCfg and targetStatusCfg.showTargetTargetName == true) then
+			updateNameAndLevel(targetCfg, UNIT.TARGET)
+		end
 	elseif event == "UNIT_SPELLCAST_SENT" then
 		if unit == UNIT.PLAYER then
 			local st = states[unit]

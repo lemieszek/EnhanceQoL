@@ -2902,17 +2902,20 @@ end
 
 local cInventory = addon.SettingsLayout.rootGENERAL
 
+local function shouldShowNativeBagSettings()
+	return not (addon.db and addon.db["enableBagsModule"] == true)
+end
+
 local expandable = addon.functions.SettingsCreateExpandableSection(cInventory, {
 	name = L["ItemsInventory"],
 	newTagID = "BagsInventory",
+	iconKey = "bags",
+	isVisible = shouldShowNativeBagSettings,
+	modernOnly = true,
 	expanded = false,
 	colorizeTitle = false,
 })
 addon.SettingsLayout.bagsInventorySection = expandable
-
-local function shouldShowNativeBagSettings()
-	return not (addon.db and addon.db["enableBagsModule"] == true)
-end
 
 local function refreshSettingsLayout()
 	if SettingsInbound and SettingsInbound.RepairDisplay then
@@ -2932,15 +2935,31 @@ local function gateNativeBagSetting(entry)
 	end
 	return entry
 end
+gateNativeBagSetting(expandable)
 
 if addon.Bags then
 	addon.Bags.integrated = true
+	local bagsSuiteExpandable = addon.SettingsLayout.suitesBagsSection
+	if not bagsSuiteExpandable then
+		bagsSuiteExpandable = addon.functions.SettingsCreateExpandableSection(cInventory, {
+			name = L["configCenterBags"] or "Bags",
+			configPageKey = "Bags",
+			description = L["bagsModuleEnableDesc"],
+			iconKey = "bags",
+			modernCategory = "suites",
+			modernOnly = true,
+			expanded = false,
+			colorizeTitle = false,
+		})
+		addon.SettingsLayout.suitesBagsSection = bagsSuiteExpandable
+	end
+
 	addon.functions.SettingsCreateCheckbox(cInventory, {
 		var = "enableBagsModule",
 		text = L["bagsModuleEnable"] or "Enable Bags module",
 		desc = L["bagsModuleEnableDesc"] or "Opt-in replacement for the default bag window. Disabling after it was enabled takes full effect after a UI reload.",
 		default = false,
-		parentSection = expandable,
+		parentSection = bagsSuiteExpandable,
 		get = function()
 			return addon.db and addon.db.enableBagsModule == true
 		end,
@@ -2967,6 +2986,7 @@ if addon.Bags then
 		})
 	end
 
+assert(addon.SettingsLayout.gearUpgradeSection, "GearUpgrade section must be registered before durability warning settings")
 addon.functions.SettingsCreateCheckbox(cInventory, {
 	var = DURABILITY_WARNING_DB_ENABLED,
 	text = L["DurabilityWarningEnable"] or "Low durability warning",
@@ -2980,7 +3000,7 @@ addon.functions.SettingsCreateCheckbox(cInventory, {
 			DurabilityWarning:Disable()
 		end
 	end,
-	parentSection = expandable,
+	parentSection = addon.SettingsLayout.gearUpgradeSection,
 })
 
 if shouldShowNativeBagSettings() then
@@ -3077,6 +3097,7 @@ local bagDisplayDropdown = gateNativeBagSetting(addon.functions.SettingsCreateMu
 	var = "bagDisplayOptions",
 	storage = false,
 	text = L["bagDisplayElements"] or "Bag indicators",
+	desc = L["bagDisplayElementsDesc"],
 	options = {
 		{ value = "ilvl", text = L["showIlvlOnBagItems"], tooltip = L["showIlvlOnBagItemsDesc"] },
 		{ value = "upgrade", text = L["showUpgradeArrowOnBagItems"], tooltip = L["showUpgradeArrowOnBagItemsDesc"] },
@@ -3086,6 +3107,7 @@ local bagDisplayDropdown = gateNativeBagSetting(addon.functions.SettingsCreateMu
 	isSelectedFunc = function(key) return isBagDisplaySelected(key) end,
 	setSelectedFunc = function(key, selected) setBagDisplayOption(key, selected) end,
 	setSelection = applyBagDisplaySelection,
+	refreshOnChange = true,
 	parentSection = expandable,
 }))
 
@@ -3103,6 +3125,7 @@ gateNativeBagSetting(addon.functions.SettingsCreateDropdown(cInventory, {
 		OUTSIDE = L["Outside"] or "Outside",
 	},
 	text = L["Item level position"],
+	desc = L["bagIlvlPositionDesc"],
 	get = function() return addon.db["bagIlvlPosition"] or "TOPLEFT" end,
 	set = function(key)
 		addon.db["bagIlvlPosition"] = key
@@ -3110,6 +3133,7 @@ gateNativeBagSetting(addon.functions.SettingsCreateDropdown(cInventory, {
 	end,
 	parent = bagDisplayDropdown,
 	parentCheck = function() return isBagDisplaySelected("ilvl") end,
+	hiddenWhen = function() return not isBagDisplaySelected("ilvl") end,
 	default = "BOTTOMLEFT",
 	var = "bagIlvlPosition",
 	type = Settings.VarType.String,
@@ -3125,6 +3149,7 @@ gateNativeBagSetting(addon.functions.SettingsCreateDropdown(cInventory, {
 		OUTSIDE = L["Outside"] or "Outside",
 	},
 	text = L["Upgrade track position"] or "Upgrade track position",
+	desc = L["bagTrackPositionDesc"],
 	get = function() return addon.db["bagTrackPosition"] or "OUTSIDE" end,
 	set = function(key)
 		addon.db["bagTrackPosition"] = key
@@ -3132,6 +3157,7 @@ gateNativeBagSetting(addon.functions.SettingsCreateDropdown(cInventory, {
 	end,
 	parent = bagDisplayDropdown,
 	parentCheck = function() return isBagDisplaySelected("track") end,
+	hiddenWhen = function() return not isBagDisplaySelected("track") end,
 	default = "OUTSIDE",
 	var = "bagTrackPosition",
 	type = Settings.VarType.String,
@@ -3146,6 +3172,7 @@ gateNativeBagSetting(addon.functions.SettingsCreateDropdown(cInventory, {
 		BOTTOMRIGHT = L["Bottom Right"],
 	},
 	text = L["bagUpgradeIconPosition"],
+	desc = L["bagUpgradeIconPositionDesc"],
 	get = function() return addon.db["bagUpgradeIconPosition"] or "TOPLEFT" end,
 	set = function(key)
 		addon.db["bagUpgradeIconPosition"] = key
@@ -3162,6 +3189,7 @@ gateNativeBagSetting(addon.functions.SettingsCreateDropdown(cInventory, {
 	end,
 	parent = bagDisplayDropdown,
 	parentCheck = function() return isBagDisplaySelected("upgrade") end,
+	hiddenWhen = function() return not isBagDisplaySelected("upgrade") end,
 	default = "TOPRIGHT",
 	var = "bagUpgradeIconPosition",
 	type = Settings.VarType.String,
@@ -3199,6 +3227,7 @@ gateNativeBagSetting(addon.functions.SettingsCreateMultiDropdown(cInventory, {
 	var = "bagItemLevelTargets",
 	storage = false,
 	text = L["bagItemLevelTargets"] or "Item level targets",
+	desc = L["bagItemLevelTargetsDesc"],
 	options = {
 		{ value = "bank", text = BANK, tooltip = L["showIlvlOnBankFrameDesc"] },
 		{ value = "merchant", text = MERCHANT, tooltip = L["showIlvlOnMerchantframeDesc"] },
@@ -3206,6 +3235,9 @@ gateNativeBagSetting(addon.functions.SettingsCreateMultiDropdown(cInventory, {
 	isSelectedFunc = function(key) return isBagItemLevelTargetSelected(key) end,
 	setSelectedFunc = function(key, selected) setBagItemLevelTarget(key, selected) end,
 	setSelection = applyBagItemLevelTargets,
+	parent = bagDisplayDropdown,
+	parentCheck = function() return isBagDisplaySelected("ilvl") end,
+	hiddenWhen = function() return not isBagDisplaySelected("ilvl") end,
 	parentSection = expandable,
 }))
 
@@ -3289,6 +3321,7 @@ gateNativeBagSetting(addon.functions.SettingsCreateDropdown(cInventory, {
 		REVERSE = L["bagSortOrderReverse"] or "Reverse (Right-to-Left)",
 	},
 	text = L["bagSortOrderDirection"] or "Sort order direction",
+	desc = L["bagSortOrderDirectionDesc"],
 	get = function() return addon.db["bagSortOrderDirection"] or "DEFAULT" end,
 	set = function(key)
 		addon.db["bagSortOrderDirection"] = key
@@ -3320,6 +3353,7 @@ gateNativeBagSetting(addon.functions.SettingsCreateDropdown(cInventory, {
 		REVERSE = L["bagLootOrderReverse"] or "Reverse (Left-to-Right)",
 	},
 	text = L["bagLootOrderDirection"] or "Loot order direction",
+	desc = L["bagLootOrderDirectionDesc"],
 	get = function() return addon.db["bagLootOrderDirection"] or "DEFAULT" end,
 	set = function(key)
 		addon.db["bagLootOrderDirection"] = key

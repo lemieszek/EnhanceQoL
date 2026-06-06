@@ -12,7 +12,10 @@ local refreshWorldMapCoordinates
 
 local mapExpandable = addon.functions.SettingsCreateExpandableSection(cMapNav, {
 	name = L["MapNavigation"],
+	description = L["configCenterPageDescMapNavigation"]
+		or "Customize world map coordinates, square minimap layout, minimap stats, loot spec shortcuts and minimap button storage.",
 	newTagID = "MapNavigation",
+	iconKey = "map",
 	expanded = false,
 	colorizeTitle = false,
 })
@@ -1595,14 +1598,6 @@ data = {
 			if addon.functions.applyMinimapButtonMouseover then addon.functions.applyMinimapButtonMouseover() end
 		end,
 		default = false,
-		parentCheck = function()
-			return not (
-				addon.SettingsLayout.elements["enableMinimapButtonBin"]
-				and addon.SettingsLayout.elements["enableMinimapButtonBin"].setting
-				and addon.SettingsLayout.elements["enableMinimapButtonBin"].setting:GetValue() == true
-			)
-		end,
-		notify = "enableMinimapButtonBin",
 		parentSection = mapExpandable,
 	},
 	{

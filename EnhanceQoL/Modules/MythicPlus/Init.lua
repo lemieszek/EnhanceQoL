@@ -373,7 +373,7 @@ function addon.MythicPlus.functions.addPullButton()
 		if addon.db["PullTimerType"] == 3 or addon.db["PullTimerType"] == 4 then
 			C_ChatInfo.SendAddonMessage("D4", ("PT\t%d\t%d"):format(duration, instanceId), IsInGroup(2) and "INSTANCE_CHAT" or "RAID")
 		end
-		if not addon.db["noChatOnPullTimer"] then C_ChatInfo.SendChatMessage(("PULL in %ds"):format(duration), "PARTY") end
+			if not addon.db["noChatOnPullTimer"] then C_ChatInfo.SendChatMessage((L["mpPullInSeconds"]):format(duration), "PARTY") end
 
 		-- ticker updates local countdown (also handles chat, optional)
 		self.ticker = C_Timer.NewTicker(1, function(t)
@@ -396,14 +396,14 @@ function addon.MythicPlus.functions.addPullButton()
 					self.ring:SetRotation(0)
 				end
 
-				if not addon.db["noChatOnPullTimer"] then C_ChatInfo.SendChatMessage(">>PULL NOW<<", "PARTY") end
+					if not addon.db["noChatOnPullTimer"] then C_ChatInfo.SendChatMessage(L["mpPullNow"], "PARTY") end
 				if addon.db["autoKeyStart"] and C_ChallengeMode.GetSlottedKeystoneInfo() then
 					C_ChallengeMode.StartChallengeMode()
 					ChallengesKeystoneFrame:Hide()
 				end
 			else
 				self.timerCountdown:SetText(self.remaining)
-				if not addon.db["noChatOnPullTimer"] then C_ChatInfo.SendChatMessage(("PULL in %d"):format(self.remaining), "PARTY") end
+					if not addon.db["noChatOnPullTimer"] then C_ChatInfo.SendChatMessage((L["mpPullInSecond"]):format(self.remaining), "PARTY") end
 			end
 		end)
 		self.running = true
@@ -421,7 +421,7 @@ function addon.MythicPlus.functions.addPullButton()
 		if not InCombatLockdown or not InCombatLockdown() then
 			C_PartyInfo.DoCountdown(0) -- abort Blizzard countdown
 		end
-		if not addon.db["noChatOnPullTimer"] then C_ChatInfo.SendChatMessage("PULL Canceled", "PARTY") end
+			if not addon.db["noChatOnPullTimer"] then C_ChatInfo.SendChatMessage(L["mpPullCanceled"], "PARTY") end
 	end
 
 	rcButton:RegisterForClicks("RightButtonDown", "LeftButtonDown")

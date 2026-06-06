@@ -9,6 +9,7 @@ local cUnitFrame = addon.SettingsLayout.rootUI
 
 local expandable = addon.functions.SettingsCreateExpandableSection(cUnitFrame, {
 	name = UNITFRAME_LABEL,
+	iconKey = "unitframes",
 	expanded = false,
 	colorizeTitle = false,
 	newTagID = "UnitFrames",
@@ -29,11 +30,42 @@ local function isEQoLUnitEnabled(unit)
 	return cfg and cfg.enabled == true
 end
 
+local function isEQoLGroupFramesEnabled(kind)
+	local groupFrames = addon.Aura and addon.Aura.UF and addon.Aura.UF.GroupFrames
+	if groupFrames and groupFrames.GetConfig then
+		local cfg = groupFrames:GetConfig(kind)
+		return cfg and cfg.enabled == true
+	end
+	local cfg = addon.db and addon.db.ufGroupFrames and addon.db.ufGroupFrames[kind]
+	return cfg and cfg.enabled == true
+end
+
+local function shouldShowPlayerFrameSettings()
+	return not isEQoLUnitEnabled("player")
+end
+
+local function shouldShowPetFrameSettings()
+	return not isEQoLUnitEnabled("pet")
+end
+
+local function shouldShowBossFrameSettings()
+	return not isEQoLUnitEnabled("boss")
+end
+
+local function shouldShowPartyFrameSettings()
+	return not isEQoLGroupFramesEnabled("party")
+end
+
+local function shouldShowRaidFrameSettings()
+	return not isEQoLGroupFramesEnabled("raid")
+end
+
 local function expandWith(predicate)
-	return function()
+	local parentCheck = function()
 		if expandable and expandable.IsExpanded and expandable:IsExpanded() == false then return false end
 		return predicate()
 	end
+	return addon.functions.RegisterConfigParentSection(parentCheck, expandable)
 end
 
 addon.functions.SettingsCreateHeadline(cUnitFrame, COMBAT_TEXT_LABEL, { parentSection = expandable })
@@ -51,6 +83,7 @@ local data = {
 			end
 		end,
 		parentSection = expandable,
+		isVisible = shouldShowPlayerFrameSettings,
 	},
 	{
 		var = "hideHitIndicatorPet",
@@ -60,6 +93,7 @@ local data = {
 			if v and PetHitIndicator then PetHitIndicator:Hide() end
 		end,
 		parentSection = expandable,
+		isVisible = shouldShowPetFrameSettings,
 	},
 	{
 		var = "floatingCombatTextCombatDamage_v2",
@@ -80,13 +114,11 @@ local data = {
 }
 addon.functions.SettingsCreateCheckboxes(cUnitFrame, data)
 
-local function shouldShowHealthTextSection() return not isEQoLUnitEnabled("player") or not isEQoLUnitEnabled("target") or not isEQoLUnitEnabled("boss") end
+local function shouldShowHealthTextSection() return shouldShowPlayerFrameSettings() or not isEQoLUnitEnabled("target") or shouldShowBossFrameSettings() end
 
 addon.functions.SettingsCreateHeadline(cUnitFrame, L["Health Text"], {
 	parentSection = expandWith(shouldShowHealthTextSection),
 })
-
-addon.functions.SettingsCreateText(cUnitFrame, "|cff99e599" .. string.format(L["HealthTextExplain2"], VIDEO_OPTIONS_DISABLED) .. "|r", { parentSection = expandWith(shouldShowHealthTextSection) })
 
 local healthTextOrder = { "OFF", "PERCENT", "ABS", "BOTH", "CURMAX", "CURMAXPERCENT" }
 local healthTextOptions = {
@@ -97,11 +129,13 @@ local healthTextOptions = {
 	CURMAX = L["Current/Max"] or "Current/Max",
 	CURMAXPERCENT = L["Current/Max Percent"] or "Current/Max (percent)",
 }
+local healthTextDesc = string.format(L["HealthTextExplain2"], VIDEO_OPTIONS_DISABLED)
 
 addon.functions.SettingsCreateDropdown(cUnitFrame, {
 	list = healthTextOptions,
 	order = healthTextOrder,
 	text = L["PlayerHealthText"],
+	desc = healthTextDesc,
 	get = function() return addon.db["healthTextPlayerMode"] or "OFF" end,
 	set = function(key)
 		addon.db["healthTextPlayerMode"] = key
@@ -112,11 +146,13 @@ addon.functions.SettingsCreateDropdown(cUnitFrame, {
 	type = Settings.VarType.String,
 	sType = "dropdown",
 	parentSection = expandWith(function() return not isEQoLUnitEnabled("player") end),
+	isVisible = shouldShowPlayerFrameSettings,
 })
 addon.functions.SettingsCreateDropdown(cUnitFrame, {
 	list = healthTextOptions,
 	order = healthTextOrder,
 	text = L["TargetHealthText"],
+	desc = healthTextDesc,
 	get = function() return addon.db["healthTextTargetMode"] or "OFF" end,
 	set = function(key)
 		addon.db["healthTextTargetMode"] = key
@@ -127,11 +163,13 @@ addon.functions.SettingsCreateDropdown(cUnitFrame, {
 	type = Settings.VarType.String,
 	sType = "dropdown",
 	parentSection = expandWith(function() return not isEQoLUnitEnabled("target") end),
+	isVisible = function() return not isEQoLUnitEnabled("target") end,
 })
 addon.functions.SettingsCreateDropdown(cUnitFrame, {
 	list = healthTextOptions,
 	order = healthTextOrder,
 	text = L["BossHealthText"],
+	desc = healthTextDesc,
 	get = function() return addon.db["healthTextBossMode"] or "OFF" end,
 	set = function(key)
 		addon.db["healthTextBossMode"] = key
@@ -142,6 +180,7 @@ addon.functions.SettingsCreateDropdown(cUnitFrame, {
 	type = Settings.VarType.String,
 	sType = "dropdown",
 	parentSection = expandWith(function() return not isEQoLUnitEnabled("boss") end),
+	isVisible = shouldShowBossFrameSettings,
 })
 
 addon.functions.SettingsCreateHeadline(cUnitFrame, (L["UnitFrameUFExplain"]:format(_G.RAID or "RAID", _G.PARTY or "Party", _G.PLAYER or "Player")), {
@@ -157,6 +196,7 @@ data = {
 			addon.functions.togglePartyFrameTitle(v)
 		end,
 		parentSection = expandable,
+		isVisible = shouldShowPartyFrameSettings,
 	},
 	{
 		var = "hideRestingGlow",
@@ -166,6 +206,7 @@ data = {
 			if addon.functions.ApplyRestingVisuals then addon.functions.ApplyRestingVisuals() end
 		end,
 		parentSection = expandable,
+		isVisible = shouldShowPlayerFrameSettings,
 	},
 	{
 		var = "unitFrameScaleEnabled",
@@ -204,6 +245,9 @@ data = {
 				parentSection = expandable,
 			},
 		},
+		isVisible = function()
+			return shouldShowPartyFrameSettings() or shouldShowRaidFrameSettings()
+		end,
 	},
 }
 table.sort(data, function(a, b) return a.text < b.text end)

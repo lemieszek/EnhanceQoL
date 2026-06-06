@@ -7174,6 +7174,93 @@ local function buildUnitSettings(unit)
 	)
 	nameOffsetYSetting.isEnabled = isNameEnabled
 	list[#list + 1] = nameOffsetYSetting
+
+	if unit == "target" then
+		local targetTargetNameDef = statusDef.targetTargetName or {}
+		local function isTargetTargetNameEnabled()
+			local cfg = getValue(unit, { "status", "targetTargetName" }, nil)
+			if type(cfg) == "table" and cfg.enabled ~= nil then return cfg.enabled == true end
+			return getValue(unit, { "status", "showTargetTargetName" }, false) == true
+		end
+		local showTargetTargetNameSetting = checkbox(
+			L["UFShowTargetTargetName"] or "Show target-of-target name",
+			isTargetTargetNameEnabled,
+			function(val)
+				setValue(unit, { "status", "targetTargetName", "enabled" }, val and true or false)
+				setValue(unit, { "status", "showTargetTargetName" }, nil)
+				refresh()
+			end,
+			targetTargetNameDef.enabled == true,
+			"name"
+		)
+		list[#list + 1] = showTargetTargetNameSetting
+
+		local targetTargetAnchorSetting = radioDropdown(
+			L["UFTargetTargetNameAnchor"] or "Target-of-target anchor",
+			UF.ui.anchorOptions,
+			function() return getValue(unit, { "status", "targetTargetName", "anchor" }, targetTargetNameDef.anchor or "RIGHT") end,
+			function(val)
+				setValue(unit, { "status", "targetTargetName", "anchor" }, val or targetTargetNameDef.anchor or "RIGHT")
+				refresh()
+			end,
+			targetTargetNameDef.anchor or "RIGHT",
+			"name"
+		)
+		targetTargetAnchorSetting.isShown = isTargetTargetNameEnabled
+		list[#list + 1] = targetTargetAnchorSetting
+
+		local targetTargetFontSizeSetting = slider(
+			L["UFTargetTargetNameFontSize"] or "Target-of-target font size",
+			8,
+			30,
+			1,
+			function() return getValue(unit, { "status", "targetTargetName", "fontSize" }, targetTargetNameDef.fontSize or statusDef.nameFontSize or statusDef.fontSize or 14) end,
+			function(val)
+				setValue(unit, { "status", "targetTargetName", "fontSize" }, val or targetTargetNameDef.fontSize or statusDef.nameFontSize or statusDef.fontSize or 14)
+				refreshSelf()
+			end,
+			targetTargetNameDef.fontSize or statusDef.nameFontSize or statusDef.fontSize or 14,
+			"name",
+			true
+		)
+		targetTargetFontSizeSetting.isShown = isTargetTargetNameEnabled
+		list[#list + 1] = targetTargetFontSizeSetting
+
+		local targetTargetOffsetXSetting = slider(
+			L["UFTargetTargetNameX"] or "Target-of-target X offset",
+			-OFFSET_RANGE,
+			OFFSET_RANGE,
+			1,
+			function() return getValue(unit, { "status", "targetTargetName", "offset", "x" }, (targetTargetNameDef.offset and targetTargetNameDef.offset.x) or 0) end,
+			function(val)
+				setValue(unit, { "status", "targetTargetName", "offset", "x" }, val or 0)
+				refresh()
+			end,
+			(targetTargetNameDef.offset and targetTargetNameDef.offset.x) or 0,
+			"name",
+			true
+		)
+		targetTargetOffsetXSetting.isShown = isTargetTargetNameEnabled
+		list[#list + 1] = targetTargetOffsetXSetting
+
+		local targetTargetOffsetYSetting = slider(
+			L["UFTargetTargetNameY"] or "Target-of-target Y offset",
+			-OFFSET_RANGE,
+			OFFSET_RANGE,
+			1,
+			function() return getValue(unit, { "status", "targetTargetName", "offset", "y" }, (targetTargetNameDef.offset and targetTargetNameDef.offset.y) or 0) end,
+			function(val)
+				setValue(unit, { "status", "targetTargetName", "offset", "y" }, val or 0)
+				refresh()
+			end,
+			(targetTargetNameDef.offset and targetTargetNameDef.offset.y) or 0,
+			"name",
+			true
+		)
+		targetTargetOffsetYSetting.isShown = isTargetTargetNameEnabled
+		list[#list + 1] = targetTargetOffsetYSetting
+	end
+
 	list[#list + 1] = { name = "", kind = UF.ui.settingType.Divider, parentId = "name" }
 
 	list[#list + 1] = { name = LEVEL or "Level", kind = UF.ui.settingType.Collapsible, id = "level", defaultCollapsed = true }
@@ -8800,7 +8887,12 @@ local function registerSettingsUI()
 	if not expandable then
 		expandable = addon.functions.SettingsCreateExpandableSection(cUF, {
 			name = L["CustomUnitFrames"] or "EQoL Unit Frames",
+			description = L["configCenterPageDescUnitFrames"]
+				or "Customize player, target, focus, party and group frames, including layout, bars, auras, text and profiles.",
 			newTagID = "CustomUnitFrames",
+			iconKey = "unitframes",
+			modernCategory = "suites",
+			modernOnly = true,
 			expanded = false,
 			colorizeTitle = false,
 		})
@@ -8817,9 +8909,25 @@ local function registerSettingsUI()
 		addon.db.ufGroupFrames[kind] = addon.db.ufGroupFrames[kind] or {}
 		return addon.db.ufGroupFrames[kind]
 	end
+	local frameToggleDesc = L["UFFrameToggleEditModeDesc"] or "Enable this frame here, then adjust layout and position in Edit Mode."
+	local function hasClassColorConsumer()
+		if ensureConfig("player").enabled == true then return true end
+		if ensureConfig("target").enabled == true then return true end
+		if ensureConfig("targettarget").enabled == true then return true end
+		local partyCfg = getGroupFramesConfig("party")
+		if partyCfg and partyCfg.enabled == true then return true end
+		local raidCfg = getGroupFramesConfig("raid")
+		if raidCfg and raidCfg.enabled == true then return true end
+		local mtCfg = getGroupFramesConfig("mt")
+		if mtCfg and mtCfg.enabled == true then return true end
+		local maCfg = getGroupFramesConfig("ma")
+		return maCfg and maCfg.enabled == true
+	end
+	addon.functions.SettingsCreateHeadline(cUF, L["UFGroupFrames"] or "Group Frames", { parentSection = expandable, order = 20 })
 	addon.functions.SettingsCreateCheckbox(cUF, {
 		var = "ufEnablePartyGroupFrames",
 		text = L["UFGroupFramesPartyEnable"] or "Enable party frames",
+		desc = frameToggleDesc,
 		default = false,
 		get = function()
 			local cfg = getGroupFramesConfig("party")
@@ -8846,6 +8954,7 @@ local function registerSettingsUI()
 	addon.functions.SettingsCreateCheckbox(cUF, {
 		var = "ufEnableRaidGroupFrames",
 		text = L["UFGroupFramesRaidEnable"] or "Enable raid frames",
+		desc = frameToggleDesc,
 		default = false,
 		get = function()
 			local cfg = getGroupFramesConfig("raid")
@@ -8872,6 +8981,7 @@ local function registerSettingsUI()
 	addon.functions.SettingsCreateCheckbox(cUF, {
 		var = "ufEnableMainTankGroupFrames",
 		text = L["UFGroupFramesMTEnable"] or "Enable Main Tank frames",
+		desc = frameToggleDesc,
 		default = false,
 		get = function()
 			local cfg = getGroupFramesConfig("mt")
@@ -8898,6 +9008,7 @@ local function registerSettingsUI()
 	addon.functions.SettingsCreateCheckbox(cUF, {
 		var = "ufEnableMainAssistGroupFrames",
 		text = L["UFGroupFramesMAEnable"] or "Enable Main Assist frames",
+		desc = frameToggleDesc,
 		default = false,
 		get = function()
 			local cfg = getGroupFramesConfig("ma")
@@ -8926,6 +9037,7 @@ local function registerSettingsUI()
 		addon.functions.SettingsCreateCheckbox(cUF, {
 			var = varName,
 			text = label,
+			desc = frameToggleDesc,
 			default = def.enabled or false,
 			get = function() return ensureConfig(unit).enabled == true end,
 			func = function(val)
@@ -8953,13 +9065,8 @@ local function registerSettingsUI()
 		return def.enabled or false
 	end
 
+	addon.functions.SettingsCreateHeadline(cUF, L["UFSoloFrames"] or "Solo Frames", { parentSection = expandable, order = 10 })
 	addToggle("player", L["UFPlayerEnable"] or "Enable custom player frame", "ufEnablePlayer")
-	local castbarSetting = _G.HUD_EDIT_MODE_SETTING_UNIT_FRAME_CAST_BAR_UNDERNEATH or "Castbar underneath"
-	addon.functions.SettingsCreateText(
-		cUF,
-		(L["UFPlayerCastbarHint"] or 'Uses Blizzard\'s Player Castbar.\nBefore enabling, open Edit Mode\nand make sure the Player Frame setting\n"%s" is unchecked.'):format(castbarSetting),
-		{ parentSection = expandable }
-	)
 	addToggle("target", L["UFTargetEnable"] or "Enable custom target frame", "ufEnableTarget")
 	addToggle("targettarget", L["UFToTEnable"] or "Enable target-of-target frame", "ufEnableToT")
 	addToggle("pet", L["UFPetEnable"] or "Enable pet frame", "ufEnablePet")
@@ -8967,6 +9074,7 @@ local function registerSettingsUI()
 	addon.functions.SettingsCreateCheckbox(cUF, {
 		var = "ufEnableBoss",
 		text = L["UFBossEnable"] or "Enable boss frames",
+		desc = frameToggleDesc,
 		default = false,
 		get = function() return ensureConfig("boss").enabled == true end,
 		func = function(val)
@@ -9045,6 +9153,7 @@ local function registerSettingsUI()
 		var = "ufUseCustomClassColors",
 		text = L["ufUseCustomClassColors"] or "Use custom class colors for unit frames",
 		desc = L["ufUseCustomClassColorsDesc"] or "Overrides class colors used by Enhance QoL unit frames.",
+		isEnabled = hasClassColorConsumer,
 		func = function(value)
 			if UFProfiles and UFProfiles.SetUseCustomClassColors then
 				UFProfiles.SetUseCustomClassColors(value and true or false)
@@ -9079,66 +9188,59 @@ local function registerSettingsUI()
 		parent = classColorParent,
 		parentCheck = function()
 			local entry = addon.SettingsLayout.elements["ufUseCustomClassColors"]
-			return entry and entry.setting and entry.setting:GetValue() == true
+			return hasClassColorConsumer() and entry and entry.setting and entry.setting:GetValue() == true
 		end,
 		parentSection = expandable,
 	})
 
+	local standalonePrivateAuraCategory = addon.SettingsLayout.rootGAMEPLAY
 	local standalonePrivateAuraExpandable = addon.SettingsLayout.expUFStandalonePrivateAuras
-	if not standalonePrivateAuraExpandable then
-		standalonePrivateAuraExpandable = addon.functions.SettingsCreateExpandableSection(cUF, {
+	if standalonePrivateAuraCategory and not standalonePrivateAuraExpandable then
+		standalonePrivateAuraExpandable = addon.functions.SettingsCreateExpandableSection(standalonePrivateAuraCategory, {
 			name = L["UFStandalonePrivateAuras"] or "Standalone Private Auras",
+			description = L["configCenterPageCardDescStandalonePrivateAuras"],
 			expanded = false,
 			colorizeTitle = false,
-			parentSection = expandable,
 			newTagID = "ufStandalonePrivateAurasExpandable",
+			iconKey = "privateaura",
+			modernCategory = "gameplay",
+			modernOnly = true,
 		})
 		addon.SettingsLayout.expUFStandalonePrivateAuras = standalonePrivateAuraExpandable
 	end
 
-	addon.functions.SettingsCreateCheckbox(cUF, {
-		var = "ufStandalonePrivateAurasEnabled",
-		text = L["UFStandalonePrivateAurasEnable"] or "Enable standalone private aura anchor",
-		default = false,
-		get = function()
-			local cfg = ensureStandalonePrivateAuraConfig()
-			return cfg.enabled == true
-		end,
-		func = function(value)
-			local cfg = ensureStandalonePrivateAuraConfig()
-			cfg.enabled = value and true or false
-			local feature = addon.Aura and addon.Aura.StandalonePrivateAuras
-			if feature and feature.OnSettingChanged then
-				feature:OnSettingChanged(cfg.enabled == true)
-			elseif feature and feature.Refresh then
-				feature:Refresh()
-			end
-			if value == false then
-				addon.variables.requireReload = true
-				if addon.functions and addon.functions.checkReloadFrame then addon.functions.checkReloadFrame() end
-			end
-		end,
-		parentSection = standalonePrivateAuraExpandable,
-	})
-	addon.functions.SettingsCreateText(
-		cUF,
-		L["UFStandalonePrivateAurasHint"] or "Configure placement, size, wrapping, and display options in Edit Mode.",
-		{ parentSection = standalonePrivateAuraExpandable }
-	)
-	addon.functions.SettingsCreateButton(cUF, {
-		var = "ufStandalonePrivateAurasEditMode",
-		text = _G.HUD_EDIT_MODE_MENU or "Edit Mode",
-		func = function()
-			if EditModeManagerFrame and ShowUIPanel then
-				ShowUIPanel(EditModeManagerFrame)
-			elseif EditModeManagerFrame and EditModeManagerFrame.Show then
-				EditModeManagerFrame:Show()
-			end
-			local feature = addon.Aura and addon.Aura.StandalonePrivateAuras
-			if feature and feature.OpenEditMode then feature:OpenEditMode() end
-		end,
-		parentSection = standalonePrivateAuraExpandable,
-	})
+	if standalonePrivateAuraCategory and standalonePrivateAuraExpandable then
+		addon.functions.SettingsCreateCheckbox(standalonePrivateAuraCategory, {
+			var = "ufStandalonePrivateAurasEnabled",
+			text = L["UFStandalonePrivateAurasEnable"] or "Enable standalone private aura anchor",
+			desc = L["UFStandalonePrivateAurasEnableDesc"],
+			default = false,
+			get = function()
+				local cfg = ensureStandalonePrivateAuraConfig()
+				return cfg.enabled == true
+			end,
+			func = function(value)
+				local cfg = ensureStandalonePrivateAuraConfig()
+				cfg.enabled = value and true or false
+				local feature = addon.Aura and addon.Aura.StandalonePrivateAuras
+				if feature and feature.OnSettingChanged then
+					feature:OnSettingChanged(cfg.enabled == true)
+				elseif feature and feature.Refresh then
+					feature:Refresh()
+				end
+				if value == false then
+					addon.variables.requireReload = true
+					if addon.functions and addon.functions.checkReloadFrame then addon.functions.checkReloadFrame() end
+				end
+			end,
+			parentSection = standalonePrivateAuraExpandable,
+		})
+		addon.functions.SettingsCreateText(
+			standalonePrivateAuraCategory,
+			L["UFStandalonePrivateAurasHint"] or "Use Edit Mode to position the standalone private aura anchor and adjust size, wrapping and display behavior.",
+			{ parentSection = standalonePrivateAuraExpandable }
+		)
+	end
 
 	do -- Profile management + export/import
 		if UFProfiles and UFProfiles.Initialize then UFProfiles.Initialize() end
@@ -9168,7 +9270,7 @@ local function registerSettingsUI()
 			addon.db.ufProfileScope = scopeOptions[val] and val or "ALL"
 		end
 
-		local cProfiles = addon.SettingsLayout.rootPROFILES
+		local profilesCategory = nil
 		local profileOrderActive, profileOrderGlobal, profileOrderCopy, profileOrderDelete = {}, {}, {}, {}
 		local noOverrideLabel = L["No override"] or "No override"
 
@@ -9217,14 +9319,21 @@ local function registerSettingsUI()
 			end
 		end
 
-		local expandableProfile = addon.functions.SettingsCreateExpandableSection(cProfiles, {
+		local expandableProfile = addon.functions.SettingsCreateExpandableSection(profilesCategory, {
 			name = L["CustomUnitFrames"],
+			configPageKey = "UFProfiles",
+			description = L["configCenterPageCardDescProfilesUnitFrames"] or L["configCenterPageDescUnitFrames"],
+			iconKey = "unitframes",
 			expanded = false,
 			colorizeTitle = false,
 			newTagID = "UFProfiles",
+			modernCategory = "profiles",
+			modernOnly = true,
 		})
 
-		addon.functions.SettingsCreateDropdown(cProfiles, {
+		addon.functions.SettingsCreateHeadline(profilesCategory, L["ProfileManagement"] or "Profile management", { parentSection = expandableProfile })
+
+		addon.functions.SettingsCreateDropdown(profilesCategory, {
 			var = "ufProfileActive",
 			text = L["Active profile"] or (L["Active profile"] or "Active profile"),
 			listFunc = function() return buildProfileList(profileOrderActive) end,
@@ -9245,7 +9354,7 @@ local function registerSettingsUI()
 			parentSection = expandableProfile,
 		})
 
-		addon.functions.SettingsCreateDropdown(cProfiles, {
+		addon.functions.SettingsCreateDropdown(profilesCategory, {
 			var = "ufProfileGlobal",
 			text = L["Global profile"] or (L["Global profile"] or "Global profile"),
 			listFunc = function() return buildProfileList(profileOrderGlobal) end,
@@ -9266,7 +9375,7 @@ local function registerSettingsUI()
 			parentSection = expandableProfile,
 		})
 
-		addon.functions.SettingsCreateDropdown(cProfiles, {
+		addon.functions.SettingsCreateDropdown(profilesCategory, {
 			var = "ufProfileCopy",
 			text = L["Copy settings from profile"] or (L["Copy settings from profile"] or "Copy settings from profile"),
 			listFunc = function()
@@ -9307,7 +9416,7 @@ local function registerSettingsUI()
 			parentSection = expandableProfile,
 		})
 
-		addon.functions.SettingsCreateDropdown(cProfiles, {
+		addon.functions.SettingsCreateDropdown(profilesCategory, {
 			var = "ufProfileDelete",
 			text = L["Delete profile"] or (L["Delete profile"] or "Delete profile"),
 			listFunc = function()
@@ -9349,7 +9458,7 @@ local function registerSettingsUI()
 			parentSection = expandableProfile,
 		})
 
-		addon.functions.SettingsCreateButton(cProfiles, {
+		addon.functions.SettingsCreateButton(profilesCategory, {
 			var = "ufProfileCreate",
 			text = L["UFProfileAdd"] or (L["ProfileName"] or "Add a new profile"),
 			func = function()
@@ -9392,7 +9501,7 @@ local function registerSettingsUI()
 			parentSection = expandableProfile,
 		})
 
-		addon.functions.SettingsCreateHeadline(cProfiles, L["UFProfileSpecMappingHeader"] or "Specialization profile mapping", { parentSection = expandableProfile })
+		addon.functions.SettingsCreateHeadline(profilesCategory, L["UFProfileSpecMappingHeader"] or "Specialization profile mapping", { parentSection = expandableProfile })
 
 		local specDropdownOrders = {}
 		local classID = addon.variables and addon.variables.unitClassID
@@ -9407,7 +9516,7 @@ local function registerSettingsUI()
 				local specID, specName = GetSpecializationInfoForClassID(classID, specIndex)
 				if specID and specName then
 					specDropdownOrders[specID] = {}
-					addon.functions.SettingsCreateDropdown(cProfiles, {
+					addon.functions.SettingsCreateDropdown(profilesCategory, {
 						var = string.format("ufProfileSpecMap_%d", specID),
 						text = (L["UFProfileSpecMapping"] or "%s profile"):format(specName),
 						listFunc = function()
@@ -9440,9 +9549,9 @@ local function registerSettingsUI()
 			end
 		end
 
-		addon.functions.SettingsCreateHeadline(cProfiles, L["Export / Import"] or "Export / Import", { parentSection = expandableProfile })
+		addon.functions.SettingsCreateHeadline(profilesCategory, L["Export / Import"] or "Export / Import", { parentSection = expandableProfile })
 
-		addon.functions.SettingsCreateDropdown(cProfiles, {
+		addon.functions.SettingsCreateDropdown(profilesCategory, {
 			var = "ufProfileScope",
 			text = L["ProfileScope"] or (L["Apply to"] or "Apply to"),
 			list = scopeOptions,
@@ -9453,7 +9562,7 @@ local function registerSettingsUI()
 			parentSection = expandableProfile,
 		})
 
-		addon.functions.SettingsCreateButton(cProfiles, {
+		addon.functions.SettingsCreateButton(profilesCategory, {
 			var = "ufExportProfile",
 			text = L["Export"] or "Export",
 			func = function()
@@ -9492,7 +9601,7 @@ local function registerSettingsUI()
 			parentSection = expandableProfile,
 		})
 
-		addon.functions.SettingsCreateButton(cProfiles, {
+		addon.functions.SettingsCreateButton(profilesCategory, {
 			var = "ufImportProfile",
 			text = L["Import"] or "Import",
 			func = function()

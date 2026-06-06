@@ -316,14 +316,15 @@ function addon.functions.GetLSMMediaDropdown(mediaType, includeEmptyOption, empt
 	local key = normalizeMediaType(mediaType)
 	if not key then return EMPTY_TABLE, EMPTY_TABLE end
 
-	local version = addon.functions.GetLSMMediaVersion(key)
+	local cache = getLSMCache(key)
+	local version = cache and cache.version or 0
 	local noneLabel = (type(emptyLabel) == "string" and emptyLabel) or ""
 	local includeEmpty = includeEmptyOption == true
 	local cacheKey = key .. "|" .. (includeEmpty and "1" or "0") .. "|" .. noneLabel
 	local cached = LSM_DROPDOWN_CACHE[cacheKey]
 	if cached and cached.version == version then return cached.list, cached.order end
 
-	local names = addon.functions.GetLSMMediaNames(key)
+	local names = cache and cache.names or EMPTY_TABLE
 	local list = {}
 	local order = {}
 	if includeEmpty then
@@ -651,7 +652,21 @@ function addon.functions.CleanupPrivateProfileData()
 	end
 end
 
+local function copyDefaultValue(value, depth)
+	depth = (depth or 0) + 1
+	if depth > 8 or type(value) ~= "table" then
+		return value
+	end
+	local copy = {}
+	for childKey, childValue in pairs(value) do
+		copy[childKey] = copyDefaultValue(childValue, depth)
+	end
+	return copy
+end
+
 function addon.functions.InitDBValue(key, defaultValue)
+	addon.dbDefaults = addon.dbDefaults or {}
+	if addon.dbDefaults[key] == nil and defaultValue ~= nil then addon.dbDefaults[key] = copyDefaultValue(defaultValue) end
 	if addon.db[key] == nil then addon.db[key] = defaultValue end
 end
 

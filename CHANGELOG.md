@@ -1,25 +1,40 @@
 # Changelog
 
-<!--@eqol-beta@-->
-## [10.25.0-beta2] - 2026-06-02
+## [11.0.0] - 2026-06-06
 
-### 🐛 Fixed
+### ℹ️ Important
 
-- Mythic Plus / Dungeon Finder: Fixed the Mythic+ score frame hover highlight for current-season dungeons whose Group Finder map IDs were not present in the teleport compendium data.
-
----
-<!--@end-eqol-beta@-->
-
-## [10.25.0-beta1] - 2026-06-02
+- EnhanceQoL now uses a new modern Settings Center instead of the old Blizzard Settings tree, with dashboard, search, deep links, category pages, richer descriptions, version changelog display and modern controls for addon settings.
 
 ### ✨ Added
 
-- Unit Frames / Castbar and Resource Bars: Added configurable text anchors for cast names, cast durations, and resource bar values so text can stay pinned to the desired position while bars resize.
+- Bags: Added a configurable Profession Quality overlay for crafted gear and profession items.
+- Cooldown Panels: Added a Blizzard alert texture picker for State textures with rendered previews, search, live preview selection and FileDataID display.
+- Damage Meter: Added optional segment linking and a per-window option to keep manually selected meter types after reloads.
+- Economy: Added guild-bank repair context selection for automatic guild-bank repairs.
+- Sound: Added a mute toggle for Blizzard's Raid Warning sound.
+- Unit Frames, Castbars and Resource Bars: Added configurable text anchors for cast names, cast durations, resource bar values and target-of-target name text.
+
+### ❌ Removed
+
+- System / CVar: Removed the deprecated Persist CVar values option and its storage logic.
 
 ### 🐛 Fixed
 
-- Unit Frames: Exposed custom player, target, focus, and pet portrait fields on the EQOL unit frames.
-- Bags: Fixed new characters without purchased character bank tabs being unable to switch to the character bank purchase view when the integrated bank is enabled.
+- Action Bars / Button Text: Fixed keybind anchor positions using the HotKey text box width instead of the actual text anchor point.
+- Bags: Fixed new characters without purchased character bank tabs being unable to switch to the integrated character bank purchase view.
+- Bags: Restored missing icons for the Bags settings side navigation.
+- Chat History: Fixed text selection and scrollbar interaction in the copy window.
+- Class Buff Reminder: Fixed phased or otherwise unreachable raid members keeping class-buff reminders active when they were missing a buff that could not be applied.
+- Cooldown Panels: Fixed bar value text for normal cooldown entries not updating reliably in combat when the bar used a native cooldown duration object.
+- Cooldown Panels: Fixed Paste Entry Style copying tracked aura identity fields instead of only applying the visual style.
+- Damage Meter: Fixed restricted combat-data tooltip refresh errors and several tooltip row rendering issues.
+- Mythic Plus / Dungeon Finder: Fixed current-season dungeon score hover handling for missing Group Finder map IDs.
+- Nameplates: Fixed EQOL threat colors depending on Blizzard's native threat health bar color option, allowing configured threat warning and lost colors to apply independently.
+- Tooltips: Fixed realm language flags falling back to locale text such as [frFR] inside instances.
+- Unit Frames: Fixed custom player, target, focus and pet portrait fields not being exposed on EQOL unit frames.
+- Unit Frames: Fixed the player absorb overlay sometimes staying at zero width after logging in with an active shield.
+- Unit Frames / Raid Frames: Fixed grouped raid header spans not being snapped to even pixels, which could cause player names to jitter during automatic raid resizing.
 
 ---
 

@@ -1558,7 +1558,7 @@ local function updateKeystoneInfo()
 					-- Dungeonname (zum Beispiel rechtsbündig)
 					local dungeonText = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 					dungeonText:SetPoint("TOPLEFT", button, "TOPRIGHT", 5, 0)
-					dungeonText:SetText(mapData.mapName or "Unknown Dungeon")
+						dungeonText:SetText(mapData.mapName or L["unknownDungeon"])
 
 					-- Hintergrund
 					local bg = button:CreateTexture(nil, "BACKGROUND")

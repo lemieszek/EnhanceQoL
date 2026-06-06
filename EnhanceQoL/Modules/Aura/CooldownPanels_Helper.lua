@@ -2312,7 +2312,7 @@ function Helper.NormalizePanel(panel, defaults)
 	if type(panel.entries) ~= "table" then panel.entries = {} end
 	if type(panel.order) ~= "table" then panel.order = {} end
 	if panel.enabled == nil then panel.enabled = true end
-	if type(panel.name) ~= "string" or panel.name == "" then panel.name = "Cooldown Panel" end
+		if type(panel.name) ~= "string" or panel.name == "" then panel.name = L["cooldownPanelDefaultName"] end
 	if Helper.IsFixedLayout(panel.layout) then
 		local maxColumn, maxRow = Helper.EnsureFixedSlotAssignments(panel)
 		if panel.layout.fixedGridColumns <= 0 and maxColumn > 0 then panel.layout.fixedGridColumns = math.max(panel.layout.fixedGridColumns, maxColumn) end
@@ -2580,7 +2580,7 @@ function Helper.CreatePanel(name, defaults)
 	if layout.staticTextStyle == nil or layout.staticTextStyle == "" then layout.staticTextStyle = globalStyle end
 	layout.fixedGroups = {}
 	return {
-		name = (type(name) == "string" and name ~= "" and name) or "Cooldown Panel",
+			name = (type(name) == "string" and name ~= "" and name) or L["cooldownPanelDefaultName"],
 		enabled = true,
 		point = "CENTER",
 		x = 0,

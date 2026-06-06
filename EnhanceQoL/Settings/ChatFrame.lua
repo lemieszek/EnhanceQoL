@@ -51,11 +51,15 @@ local function getChatIMSoundDropdownOptions()
 	return chatIMSoundOptions
 end
 
-local cChatFrame = addon.SettingsLayout.rootSOCIAL
+local cChatFrame = nil
 addon.SettingsLayout.chatframeCategory = cChatFrame
 
 local chatWindowExpandable = addon.functions.SettingsCreateExpandableSection(cChatFrame, {
 	name = L["ChatWindow"] or "Chat Window",
+	configPageKey = "ChatWindow",
+	modernCategory = "social",
+	modernOnly = true,
+	iconKey = "chatwindow",
 	expanded = false,
 	colorizeTitle = false,
 })
@@ -211,7 +215,7 @@ local data = {
 						and addon.SettingsLayout.elements["chatFrameFadeEnabled"].setting
 						and addon.SettingsLayout.elements["chatFrameFadeEnabled"].setting:GetValue() == true
 				end,
-				get = function() return addon.db and addon.db.chatFrameFadeTimeVisible or 30 end,
+				get = function() return addon.db and addon.db.chatFrameFadeTimeVisible or 120 end,
 				set = function(value)
 					addon.db["chatFrameFadeTimeVisible"] = value
 					if addon.functions.ApplyChatFrameFade then addon.functions.ApplyChatFrameFade() end
@@ -220,7 +224,8 @@ local data = {
 				max = 300,
 				step = 1,
 				parent = true,
-				default = 30,
+				default = 120,
+				modernDefault = function() return addon.dbDefaults and addon.dbDefaults.chatFrameFadeTimeVisible or 120 end,
 				sType = "slider",
 			},
 			{
@@ -253,21 +258,15 @@ addon.functions.SettingsCreateCheckboxes(cChatFrame, data)
 
 local chatIMExpandable = addon.functions.SettingsCreateExpandableSection(cChatFrame, {
 	name = L["InstantMessenger"] or "Instant Messenger",
+	modernCategory = "social",
+	modernOnly = true,
+	iconKey = "instantmessenger",
 	expanded = false,
 	colorizeTitle = false,
 	newTagID = "InstantMessenger",
 })
 
 addon.functions.SettingsCreateText(cChatFrame, "|cff99e599" .. L["RightClickCloseTab"] .. "|r", { parentSection = chatIMExpandable })
-addon.functions.SettingsCreateCheckbox(cChatFrame, {
-	var = "hideQuickJoinToast",
-	text = HIDE .. " " .. COMMUNITIES_NOTIFICATION_SETTINGS_DIALOG_QUICK_JOIN_LABEL,
-	func = function(v)
-		addon.db["hideQuickJoinToast"] = v
-		addon.functions.toggleQuickJoinToastButton(addon.db["hideQuickJoinToast"])
-	end,
-	parentSection = chatIMExpandable,
-})
 
 data = {
 	{
@@ -419,7 +418,7 @@ data = {
 						and addon.SettingsLayout.elements["enableChatIM"].setting
 						and addon.SettingsLayout.elements["enableChatIM"].setting:GetValue() == true
 				end,
-				get = function() return addon.db and addon.db.chatIMMaxHistory or 30 end,
+				get = function() return addon.db and addon.db.chatIMMaxHistory or 250 end,
 				set = function(value)
 					addon.db["chatIMMaxHistory"] = value
 					if addon.ChatIM and addon.ChatIM.SetMaxHistoryLines then addon.ChatIM:SetMaxHistoryLines(value) end
@@ -428,7 +427,8 @@ data = {
 				max = 1000,
 				step = 1,
 				parent = true,
-				default = 300,
+				default = 250,
+				modernDefault = function() return addon.dbDefaults and addon.dbDefaults.chatIMMaxHistory or 250 end,
 				sType = "slider",
 			},
 		},
@@ -508,6 +508,10 @@ addon.functions.SettingsCreateButton(cChatFrame, data)
 
 local chatHistoryExpandable = addon.functions.SettingsCreateExpandableSection(cChatFrame, {
 	name = L["CH_TITLE_HISTORY"] or "Chat History",
+	configPageKey = "ChatHistory",
+	modernCategory = "social",
+	modernOnly = true,
+	iconKey = "chathistory",
 	expanded = false,
 	colorizeTitle = false,
 })
@@ -566,6 +570,14 @@ local CHAT_FILTER_OPTIONS = {
 	{ key = "MAIL", label = makeFilterLabel("MAIL", "Interface\\MailFrame\\Mail-Icon", MAIL_LABEL or MAIL or INBOX or "Mail") },
 	{ key = "MONSTER", label = makeFilterLabel("MONSTER", nil, EXAMPLE_TARGET_MONSTER or "Monster") },
 }
+
+local function getDefaultChatChannelFilterSelection()
+	local defaults = {}
+	for _, opt in ipairs(CHAT_FILTER_OPTIONS) do
+		defaults[opt.key] = true
+	end
+	return defaults
+end
 
 data = {
 	{
@@ -702,8 +714,8 @@ data = {
 			},
 			{
 				var = "chatHistoryButtonOffsetX",
-				text = "History button offset X",
-				desc = "Adjust horizontal offset of the Chat History toggle button relative to Quick Join.",
+				text = L["chatHistoryButtonOffsetX"],
+				desc = L["chatHistoryButtonOffsetXDesc"],
 				parentCheck = function()
 					return addon.SettingsLayout.elements["enableChatHistory"]
 						and addon.SettingsLayout.elements["enableChatHistory"].setting
@@ -723,8 +735,8 @@ data = {
 			},
 			{
 				var = "chatHistoryButtonOffsetY",
-				text = "History button offset Y",
-				desc = "Adjust vertical offset of the Chat History toggle button relative to Quick Join.",
+				text = L["chatHistoryButtonOffsetY"],
+				desc = L["chatHistoryButtonOffsetYDesc"],
 				parentCheck = function()
 					return addon.SettingsLayout.elements["enableChatHistory"]
 						and addon.SettingsLayout.elements["enableChatHistory"].setting
@@ -744,8 +756,8 @@ data = {
 			},
 			{
 				var = "chatHistoryShowButton",
-				text = "Show History toggle icon",
-				desc = "Show a small icon below the Quick Join toast to open/close Chat History.",
+				text = L["chatHistoryShowButton"],
+				desc = L["chatHistoryShowButtonDesc"],
 				parentCheck = function()
 					return addon.SettingsLayout.elements["enableChatHistory"]
 						and addon.SettingsLayout.elements["enableChatHistory"].setting
@@ -832,6 +844,7 @@ data = {
 				parent = true,
 				sType = "multidropdown",
 				options = categoryOptions,
+				modernDefault = getDefaultChatChannelFilterSelection,
 				isSelectedFunc = function(key) return addon.db.chatChannelFiltersEnable[key] end,
 				setSelectedFunc = function(key, shouldSelect)
 					addon.db.chatChannelFiltersEnable[key] = shouldSelect and true or false
@@ -850,6 +863,10 @@ addon.functions.SettingsCreateCheckboxes(cChatFrame, data)
 
 local chatBubblesExpandable = addon.functions.SettingsCreateExpandableSection(cChatFrame, {
 	name = L["ChatBubbles"] or "Chat Bubbles",
+	configPageKey = "ChatBubbles",
+	modernCategory = "social",
+	modernOnly = true,
+	iconKey = "chatbubbles",
 	expanded = false,
 	colorizeTitle = false,
 })
@@ -896,8 +913,11 @@ addon.functions.SettingsCreateCheckboxes(cChatFrame, data)
 
 function addon.functions.initChatFrame()
 	addon.db.chatChannelFiltersEnable = addon.db.chatChannelFiltersEnable or {}
+	addon.dbDefaults = addon.dbDefaults or {}
+	if type(addon.dbDefaults.chatChannelFiltersEnable) ~= "table" then addon.dbDefaults.chatChannelFiltersEnable = {} end
 	for _, opt in ipairs(CHAT_FILTER_OPTIONS) do
 		table.insert(categoryOptions, { value = opt.key, text = opt.label })
+		if addon.dbDefaults.chatChannelFiltersEnable[opt.key] == nil then addon.dbDefaults.chatChannelFiltersEnable[opt.key] = true end
 		if addon.db.chatChannelFiltersEnable[opt.key] == nil then addon.db.chatChannelFiltersEnable[opt.key] = true end
 	end
 	if addon.ChatIM and addon.ChatIM.ChannelHistory then addon.ChatIM.ChannelHistory.filterOptions = addon.ChatIM.ChannelHistory.filterOptions or CHAT_FILTER_OPTIONS end

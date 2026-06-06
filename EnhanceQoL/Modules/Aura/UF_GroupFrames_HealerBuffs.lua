@@ -701,6 +701,7 @@ function HB.CreateDefaultGroup(id)
 		name = getDefaultGroupName(id),
 		style = STYLE_ICON,
 		anchorPoint = "CENTER",
+		anchorOutside = false,
 		x = 0,
 		y = 0,
 		growth = "RIGHTDOWN",
@@ -756,6 +757,7 @@ local function normalizeGroup(group, id)
 	if group.name == nil or group.name == "" then group.name = getDefaultGroupName(group.id) end
 	group.style = normalizeStyle(group.style)
 	group.anchorPoint = normalizeAnchor(group.anchorPoint)
+	group.anchorOutside = group.anchorOutside == true
 	group.x = roundInt(clamp(group.x, -300, 300, 0))
 	group.y = roundInt(clamp(group.y, -300, 300, 0))
 	group.growth = normalizeGrowth(group.growth)
@@ -2106,6 +2108,7 @@ local function didGroupRenderStateChange(cache, compiled, group, activeRules, fa
 		or cache.styleRevision ~= styleRevision
 		or cache.layoutRevision ~= layoutRevision
 		or cache.ruleCount ~= #activeRules
+		or cache.anchorOutside ~= group.anchorOutside
 		or cache.indicatorBorderEnabled ~= group.indicatorBorderEnabled
 		or cache.indicatorBorderTexture ~= group.indicatorBorderTexture
 		or cache.indicatorBorderSize ~= group.indicatorBorderSize
@@ -2153,6 +2156,7 @@ local function didGroupRenderStateChange(cache, compiled, group, activeRules, fa
 	cache.styleRevision = styleRevision
 	cache.layoutRevision = layoutRevision
 	cache.ruleCount = #activeRules
+	cache.anchorOutside = group.anchorOutside
 	cache.indicatorBorderEnabled = group.indicatorBorderEnabled
 	cache.indicatorBorderTexture = group.indicatorBorderTexture
 	cache.indicatorBorderSize = group.indicatorBorderSize
@@ -2190,6 +2194,7 @@ local function didBarRenderStateChange(cache, group, groupId, layoutRevision, tr
 		or cache.barReverseFill ~= group.barReverseFill
 		or cache.inset ~= group.inset
 		or cache.anchorPoint ~= group.anchorPoint
+		or cache.anchorOutside ~= group.anchorOutside
 		or cache.x ~= group.x
 		or cache.y ~= group.y
 		or cache.colorRuleId ~= colorRuleId
@@ -2212,6 +2217,7 @@ local function didBarRenderStateChange(cache, group, groupId, layoutRevision, tr
 	cache.barReverseFill = group.barReverseFill
 	cache.inset = group.inset
 	cache.anchorPoint = group.anchorPoint
+	cache.anchorOutside = group.anchorOutside
 	cache.x = group.x
 	cache.y = group.y
 	cache.colorRuleId = colorRuleId
@@ -2257,6 +2263,7 @@ local function didBorderRenderStateChange(cache, group, groupId, layoutRevision,
 		or cache.borderFrameLevelOffset ~= group.borderFrameLevelOffset
 		or cache.inset ~= group.inset
 		or cache.anchorPoint ~= group.anchorPoint
+		or cache.anchorOutside ~= group.anchorOutside
 		or cache.x ~= group.x
 		or cache.y ~= group.y
 		or cache.colorRuleId ~= colorRuleId
@@ -2272,6 +2279,7 @@ local function didBorderRenderStateChange(cache, group, groupId, layoutRevision,
 	cache.borderFrameLevelOffset = group.borderFrameLevelOffset
 	cache.inset = group.inset
 	cache.anchorPoint = group.anchorPoint
+	cache.anchorOutside = group.anchorOutside
 	cache.x = group.x
 	cache.y = group.y
 	cache.colorRuleId = colorRuleId
@@ -2463,7 +2471,8 @@ local function getStyleAnchoredOffsets(root, group, inset)
 	local rootW = root.GetWidth and root:GetWidth() or 0
 	local rootH = root.GetHeight and root:GetHeight() or 0
 	if rootW <= 0 or rootH <= 0 then return 0, 0 end
-	local x, y = HB.ClampOffsets(group.anchorPoint, group.x, group.y, rootW, rootH, inset or 0)
+	local x, y = group.x or 0, group.y or 0
+	if group.anchorOutside ~= true then x, y = HB.ClampOffsets(group.anchorPoint, x, y, rootW, rootH, inset or 0) end
 	local scale = getEffectiveScale(root)
 	return roundToPixel(x or 0, scale), roundToPixel(y or 0, scale)
 end
@@ -2497,7 +2506,8 @@ local function renderBar(st, group, trackedAura, colorRule)
 	bar:SetStatusBarColor(r, g, b, a)
 	bar:SetMinMaxValues(0, 1)
 	if useSizedPlacement then
-		local ox, oy = HB.ClampOffsetsForRegion(group.anchorPoint, group.x, group.y, rootWidth, rootHeight, barWidth, barHeight, inset)
+		local ox, oy = group.x or 0, group.y or 0
+		if group.anchorOutside ~= true then ox, oy = HB.ClampOffsetsForRegion(group.anchorPoint, ox, oy, rootWidth, rootHeight, barWidth, barHeight, inset) end
 		setSinglePointCached(bar, group.anchorPoint or "CENTER", st.healerBuffRoot, group.anchorPoint or "CENTER", ox, oy)
 		setSizeCached(bar, barWidth, barHeight)
 		bar._hbBarWidth = nil

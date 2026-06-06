@@ -1406,7 +1406,7 @@ registerEditModeBars = function()
 							local order = root.order or {}
 							local function addPanelEntry(panelId, panel)
 								if not panel or panel.enabled == false then return end
-								local label = string.format("Panel %s: %s", tostring(panelId), panel.name or "Cooldown Panel")
+									local label = (L["cooldownPanelReferenceLabel"]):format(tostring(panelId), panel.name or L["cooldownPanelDefaultName"])
 								add("EQOL_CooldownPanel" .. tostring(panelId), label)
 							end
 							if #order > 0 then
@@ -5190,13 +5190,32 @@ local function buildSpecToggles(specIndex, specName, available, expandable)
 end
 
 local settingsBuilt = false
+local function ensureResourceBarsSuiteSection(cat)
+	local expandable = addon.SettingsLayout.suitesResourceBarsSection
+	if expandable then return expandable end
+
+	expandable = addon.functions.SettingsCreateExpandableSection(cat, {
+		name = L["Resource Bars"] or "Resource Bars",
+		configPageKey = "ResourceBars",
+		description = L["configCenterPageDescBarsResources"]
+			or "Adjust class resources, resource and status bars, XP, absorb and player resource displays.",
+		expanded = false,
+		colorizeTitle = false,
+		iconKey = "resource",
+		modernCategory = "suites",
+		modernOnly = true,
+	})
+	addon.SettingsLayout.suitesResourceBarsSection = expandable
+	return expandable
+end
+
 local function buildSettings()
 	if settingsBuilt then return end
 	local cat = addon.SettingsLayout.rootUI
 
 	if not cat then return end
 
-	local expandable = addon.SettingsLayout.uiBarsResourcesExpandable
+	local expandable = ensureResourceBarsSuiteSection(cat)
 	if not expandable then return end
 
 	settingsBuilt = true
@@ -5208,7 +5227,7 @@ local function buildSettings()
 		{
 			var = "enableResourceFrame",
 			text = L["Resource Bars"],
-			desc = L["Resource Bars"],
+			desc = L["ResourceBarsEnableDesc"] or "Enable movable resource bars for health, power and class-specific resources.",
 			get = function() return addon.db["enableResourceFrame"] end,
 			func = function(val)
 				addon.db["enableResourceFrame"] = val and true or false
@@ -5262,6 +5281,12 @@ local function buildSettings()
 	local function specModeParentCheck()
 		return addon.db["enableResourceFrame"] == true and currentClassMode() ~= "SHARED"
 	end
+	local function sharedModeHidden()
+		return currentClassMode() ~= "SHARED"
+	end
+	local function specModeHidden()
+		return currentClassMode() == "SHARED"
+	end
 
 	do
 		local modeVar = "rb_mode_class"
@@ -5269,6 +5294,9 @@ local function buildSettings()
 		addon.functions.SettingsCreateDropdown(cat, {
 			var = modeVar,
 			text = _G.MODE or "Mode",
+			desc = L["ResourceBarsModeDesc"] or "Select the layout mode for resource bars.",
+			note = L["ResourceBarsModeNote"]
+				or "Shared uses one set of bars for the current class. Classic lets each specialization choose its own enabled bars.",
 			values = RESOURCE_MODE_OPTIONS,
 			order = RESOURCE_MODE_ORDER,
 			get = function() return currentClassMode() end,
@@ -5291,6 +5319,7 @@ local function buildSettings()
 			parent = resourceBarsParent,
 			parentSection = expandable,
 			parentCheck = function() return addon.db["enableResourceFrame"] == true end,
+			refreshOnChange = true,
 		})
 	end
 
@@ -5298,12 +5327,14 @@ local function buildSettings()
 		parent = resourceBarsParent,
 		parentSection = expandable,
 		parentCheck = sharedModeParentCheck,
+		hiddenWhen = sharedModeHidden,
 	})
 
 	addon.functions.SettingsCreateText(cat, "|cff99e599" .. (L["ResourceBarsModeShared"] or "Shared") .. "|r", {
 		parent = resourceBarsParent,
 		parentSection = expandable,
 		parentCheck = sharedModeParentCheck,
+		hiddenWhen = sharedModeHidden,
 	})
 
 	local sharedEnableOptions = AUTO_ENABLE_OPTIONS
@@ -5321,6 +5352,7 @@ local function buildSettings()
 		var = "resourceBarsSharedEnabled",
 		storage = false,
 		text = L["ResourceBarsModeShared"] or "Shared",
+		desc = L["ResourceBarsModeSharedDesc"] or "Choose which shared resource bars are active for this class.",
 		options = sharedEnableOptions,
 		order = sharedEnableOrder,
 		isSelectedFunc = function(key)
@@ -5332,14 +5364,17 @@ local function buildSettings()
 		parent = resourceBarsParent,
 		parentCheck = sharedModeParentCheck,
 		parentSection = expandable,
+		hiddenWhen = sharedModeHidden,
 	})
 
 	addon.functions.SettingsCreateButton(cat, {
 		var = "resourceBarsSharedAllClasses",
 		text = L["ResourceBarsEnableSharedAllClasses"] or "Enable Shared for all classes",
+		desc = L["ResourceBarsEnableSharedAllClassesDesc"] or "Switch every class and specialization to Shared mode and create the shared bar slots.",
 		parent = resourceBarsParent,
 		parentSection = expandable,
 		parentCheck = sharedModeParentCheck,
+		hiddenWhen = sharedModeHidden,
 		func = function()
 			local popupKey = "EQOL_RESOURCEBARS_ENABLE_SHARED_ALL_CLASSES"
 			StaticPopupDialogs[popupKey] = StaticPopupDialogs[popupKey]
@@ -5377,6 +5412,7 @@ local function buildSettings()
 	addon.functions.SettingsCreateMultiDropdown(cat, {
 		var = "resourceBarsAutoEnable",
 		text = L["AutoEnableAllBars"] or "Auto-enable bars for new characters",
+		desc = L["ResourceBarsAutoEnableDesc"] or "Choose which resource bars should be enabled automatically when a specialization is initialized.",
 		options = AUTO_ENABLE_OPTIONS,
 		order = AUTO_ENABLE_ORDER,
 		isSelectedFunc = function(key)
@@ -5399,30 +5435,36 @@ local function buildSettings()
 		parent = resourceBarsParent,
 		parentSection = expandable,
 		parentCheck = specModeParentCheck,
+		hiddenWhen = specModeHidden,
 	})
 
 	addon.functions.SettingsCreateText(cat, "", {
 		parent = resourceBarsParent,
 		parentSection = expandable,
 		parentCheck = specModeParentCheck,
+		hiddenWhen = specModeHidden,
 	})
 
 	addon.functions.SettingsCreateText(cat, "|cff99e599" .. (L["ResourceBarsModeSpec"] or "Classic") .. "|r", {
 		parent = resourceBarsParent,
 		parentSection = expandable,
 		parentCheck = specModeParentCheck,
+		hiddenWhen = specModeHidden,
 	})
 
 	addon.functions.SettingsCreateText(cat, "|cff99e599" .. L["ResourceBarsSpecHint"] .. "|r", {
 		parent = resourceBarsParent,
 		parentSection = expandable,
 		parentCheck = specModeParentCheck,
+		hiddenWhen = specModeHidden,
 	})
 
 	for _, row in ipairs(specRows) do
 		local entry = buildSpecToggles(row.index, row.name, row.available or {}, expandable)
 		if entry then
 			entry.parent = resourceBarsParent
+			entry.desc = entry.desc or L["ResourceBarsSpecSelectionDesc"] or "Choose which resource bars are enabled for this specialization."
+			entry.hiddenWhen = entry.hiddenWhen or specModeHidden
 			addon.functions.SettingsCreateMultiDropdown(cat, entry)
 		end
 	end
@@ -5486,25 +5528,32 @@ addon.Aura.functions.AddResourceBarsProfileSettings = function()
 	end
 	scopeOrder[#scopeOrder + 1] = "ALL_CLASSES"
 
-	local cProfiles = addon.SettingsLayout.rootPROFILES
+	local profilesCategory = nil
 
-	local expandableProfile = addon.functions.SettingsCreateExpandableSection(cProfiles, {
+	local expandableProfile = addon.functions.SettingsCreateExpandableSection(profilesCategory, {
 		name = L["Resource Bars"],
+		configPageKey = "ProfilesResourceBars",
+		description = L["configCenterPageCardDescProfilesResourceBars"] or L["configCenterPageCardDescBarsResources"],
+		iconKey = "resource",
 		expanded = false,
 		colorizeTitle = false,
+		newTagID = "ProfilesResourceBars",
+		modernCategory = "profiles",
+		modernOnly = true,
 	})
 
-	addon.functions.SettingsCreateDropdown(cProfiles, {
+	addon.functions.SettingsCreateDropdown(profilesCategory, {
 		var = "resourceBarsProfileScope",
 		text = L["ProfileScope"] or (L["Apply to"] or "Apply to"),
 		list = scopeList,
 		get = getScope,
 		set = setScope,
 		default = "ALL",
+		trackCustomized = false,
 		parentSection = expandableProfile,
 	})
 
-	addon.functions.SettingsCreateButton(cProfiles, {
+	addon.functions.SettingsCreateButton(profilesCategory, {
 		var = "resourceBarsExport",
 		text = L["Export"] or "Export",
 		func = function()
@@ -5542,7 +5591,7 @@ addon.Aura.functions.AddResourceBarsProfileSettings = function()
 		parentSection = expandableProfile,
 	})
 
-	addon.functions.SettingsCreateButton(cProfiles, {
+	addon.functions.SettingsCreateButton(profilesCategory, {
 		var = "resourceBarsImport",
 		text = L["Import"] or "Import",
 		func = function()

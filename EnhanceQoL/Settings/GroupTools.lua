@@ -52,11 +52,12 @@ end
 
 local focusMarkerOrder = { 1, 2, 3, 4, 5, 6, 7, 8 }
 
-local function createFeatureToggle(category, section, feature, dbKey, titleKey, titleFallback, hintKey, hintFallback)
+local function createFeatureToggle(category, section, feature, dbKey, titleKey, titleFallback, hintKey, hintFallback, descKey, descFallback)
 	addon.functions.SettingsCreateHeadline(category, L[titleKey] or titleFallback, { parentSection = section })
 	local checkbox = addon.functions.SettingsCreateCheckbox(category, {
 		var = dbKey,
 		text = ENABLE_TEXT,
+		desc = descKey and (L[descKey] or descFallback) or nil,
 		get = function() return isEnabled(dbKey) end,
 		func = function(value) setEnabled(feature, value) end,
 		default = false,
@@ -81,13 +82,18 @@ if unitFrameCategory and unitFrameSection then
 	)
 end
 
-local combatCategory = addon.SettingsLayout.rootUI
+local combatCategory = addon.SettingsLayout.rootGAMEPLAY
 if combatCategory then
 	local combatSection = addon.functions.SettingsCreateExpandableSection(combatCategory, {
 		name = L["groupToolsCombatAlertsSection"] or "Combat Alerts",
+		description = L["configCenterPageDescCombatAlerts"]
+			or "Configure combat warnings such as death alerts and no-target reminders, including text, sound, TTS, role rules and Edit Mode placement.",
 		expanded = false,
 		colorizeTitle = false,
 		newTagID = "GroupToolsCombatAlerts",
+		iconKey = "combat",
+		modernCategory = "gameplay",
+		modernOnly = true,
 	})
 	addon.SettingsLayout.groupToolsCombatAlertsSection = combatSection
 
@@ -99,7 +105,9 @@ if combatCategory then
 		"groupToolsDeathAlert",
 		"Death Alert",
 		"groupToolsDeathAlertEditModeHint",
-		"Configure text, sound, TTS, role overrides, font, and position in Edit Mode."
+		"Configure text, sound, TTS, role overrides, font, and position in Edit Mode.",
+		"groupToolsDeathAlertDesc",
+		"Shows a configurable alert when a party or raid member dies, with optional text, sound and text-to-speech output."
 	)
 	createFeatureToggle(
 		combatCategory,
@@ -109,7 +117,9 @@ if combatCategory then
 		"groupToolsNoTargetIndicator",
 		"No Target Indicator",
 		"groupToolsNoTargetEditModeHint",
-		"Configure text, sound, font, target handling, and position in Edit Mode."
+		"Configure text, sound, font, target handling, and position in Edit Mode.",
+		"groupToolsNoTargetDesc",
+		"Shows a warning when you are in combat without a valid target, so target loss is easier to notice."
 	)
 end
 
@@ -120,6 +130,8 @@ if gameplayCategory then
 		expanded = false,
 		colorizeTitle = false,
 		newTagID = "GroupToolsFocusMarker",
+		iconKey = "focus",
+		modernOnly = true,
 	})
 	addon.SettingsLayout.groupToolsFocusMarkerSection = focusSection
 
@@ -138,6 +150,7 @@ if gameplayCategory then
 	addon.functions.SettingsCreateDropdown(gameplayCategory, {
 		var = DB.focusMarker,
 		text = L["groupToolsFocusMarkerMarker"] or "Focus marker",
+		desc = L["groupToolsFocusMarkerMarkerDesc"],
 		listFunc = buildFocusMarkerOptions,
 		order = focusMarkerOrder,
 		default = 5,
@@ -151,6 +164,7 @@ if gameplayCategory then
 	addon.functions.SettingsCreateCheckbox(gameplayCategory, {
 		var = DB.focusMarkerAnnounce,
 		text = L["groupToolsFocusMarkerAnnounce"] or "Announce on ready check",
+		desc = L["groupToolsFocusMarkerAnnounceDesc"],
 		get = function() return addon.db and addon.db[DB.focusMarkerAnnounce] == true end,
 		func = function(value) setFocusMarkerSetting("announce", value) end,
 		default = true,
@@ -162,6 +176,7 @@ if gameplayCategory then
 	addon.functions.SettingsCreateInput(gameplayCategory, {
 		var = DB.focusMarkerMessage,
 		text = L["groupToolsFocusMarkerAnnounceMessage"] or "Ready check message",
+		desc = L["groupToolsFocusMarkerAnnounceMessageDesc"],
 		default = "",
 		get = function() return addon.db and addon.db[DB.focusMarkerMessage] or "" end,
 		set = function(value) setFocusMarkerSetting("message", value) end,
@@ -177,6 +192,7 @@ if gameplayCategory then
 	addon.functions.SettingsCreateButton(gameplayCategory, {
 		var = "groupToolsFocusMarkerUpdateMacroButton",
 		text = L["groupToolsFocusMarkerUpdateMacro"] or "Update macro",
+		desc = L["groupToolsFocusMarkerUpdateMacroDesc"],
 		func = function()
 			if FocusMarker and FocusMarker.WriteMacro then FocusMarker:WriteMacro(true) end
 		end,
