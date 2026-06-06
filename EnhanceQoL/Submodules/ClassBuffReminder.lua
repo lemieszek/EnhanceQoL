@@ -734,7 +734,8 @@ end
 function Reminder.CanActOnMissingGroupBuffUnit(unit)
 	if isPlayerUnit(unit) then return true end
 	if UnitIsVisible and UnitIsVisible(unit) == false then return false end
-	if UnitPhaseReason and UnitPhaseReason(unit) ~= nil then return false end
+	local unitPhaseReason = _G.UnitPhaseReason
+	if unitPhaseReason and unitPhaseReason(unit) ~= nil then return false end
 	return true
 end
 
