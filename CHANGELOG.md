@@ -4,7 +4,7 @@
 
 ### 🐛 Fixed
 
-- Resource Bars / Shared Mode: Fixed non-Balance Druids being able to resolve Astral Power as the shared Main resource during shapeshift refreshes.
+- Resource Bars / Shared Mode: Fixed non-Balance Druids being able to resolve Astral Power as the shared Main resource during shapeshift refreshes, and prevented driver-controlled bars from briefly flashing during rebuilds.
 
 ---
 

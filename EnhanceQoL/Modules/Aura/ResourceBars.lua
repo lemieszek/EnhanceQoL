@@ -4640,7 +4640,7 @@ function ResourceBars.SyncSharedSlotProxyFrame(slot, specIndex)
 		local point, relativeTo, relativePoint, x, y = liveFrame:GetPoint(1)
 		frame:SetPoint(point or "TOPLEFT", relativeTo or UIParent, relativePoint or point or "TOPLEFT", x or 0, y or 0)
 		frame:SetSize(liveFrame:GetWidth() or cfg.width or widthDefault, liveFrame:GetHeight() or cfg.height or heightDefault)
-		frame:Show()
+		if not ResourceBars.ShouldDeferShowToVisibilityDriver or not ResourceBars.ShouldDeferShowToVisibilityDriver(frame, cfg) then frame:Show() end
 		return frame
 	end
 
@@ -4679,7 +4679,7 @@ function ResourceBars.SyncSharedSlotProxyFrame(slot, specIndex)
 	end
 	frame:SetSize(width, height)
 	frame:SetPoint(anchor.point or "TOPLEFT", relative or UIParent, anchor.relativePoint or anchor.point or "TOPLEFT", anchor.x or 0, anchor.y or 0)
-	frame:Show()
+	if not ResourceBars.ShouldDeferShowToVisibilityDriver or not ResourceBars.ShouldDeferShowToVisibilityDriver(frame, cfg) then frame:Show() end
 	return frame
 end
 
@@ -6767,7 +6767,9 @@ function ResourceBars.ReuseExistingPowerBar(type, sharedSlot)
 	else
 		powerbar[type] = bar
 	end
-	if not bar:IsShown() then bar:Show() end
+	if not ResourceBars.ShouldDeferShowToVisibilityDriver or not ResourceBars.ShouldDeferShowToVisibilityDriver(bar, settings) then
+		if not bar:IsShown() then bar:Show() end
+	end
 	if type == "RUNES" then ResourceBars.ForceRuneRecolor() end
 	updatePowerBar(type)
 	if type == "RUNES" then
@@ -6966,7 +6968,7 @@ local function createPowerBar(type, anchor, sharedSlot)
 	-- Dragging disabled outside Edit Mode; positioning handled via Edit Mode
 	bar:SetMovable(false)
 	bar:EnableMouse(shouldEnableBarMouse(settings))
-	bar:Show()
+	if not ResourceBars.ShouldDeferShowToVisibilityDriver or not ResourceBars.ShouldDeferShowToVisibilityDriver(bar, settings) then bar:Show() end
 	if type == "RUNES" then ResourceBars.ForceRuneRecolor() end
 	updatePowerBar(type)
 	if type == "RUNES" then
@@ -7187,7 +7189,7 @@ local function setPowerbars(opts)
 			bar._cfg = ResourceBars.GetFrameRuntimeConfig(pType, bar)
 			bar._rbDesiredVisible = wantVisible and true or false
 			if wantVisible then
-				if not bar:IsShown() then bar:Show() end
+				if (not ResourceBars.ShouldDeferShowToVisibilityDriver or not ResourceBars.ShouldDeferShowToVisibilityDriver(bar, bar._cfg)) and not bar:IsShown() then bar:Show() end
 			else
 				if bar:IsShown() then bar:Hide() end
 			end
@@ -7205,7 +7207,7 @@ local function setPowerbars(opts)
 		local showHealth = healthEnabled and true or false
 		healthBar._rbDesiredVisible = showHealth and true or false
 		if showHealth then
-			if not healthBar:IsShown() then healthBar:Show() end
+			if (not ResourceBars.ShouldDeferShowToVisibilityDriver or not ResourceBars.ShouldDeferShowToVisibilityDriver(healthBar, healthCfg)) and not healthBar:IsShown() then healthBar:Show() end
 		else
 			if healthBar:IsShown() then healthBar:Hide() end
 		end
@@ -7701,6 +7703,14 @@ function visibilityLogic:BuildDriver(cfg)
 	end
 	self.driverCache[cfg] = { signature = driverSignature, expr = expr, usesManualVisibility = false, visibilityCfg = visibilityCfg }
 	return expr, false, visibilityCfg
+end
+
+function ResourceBars.ShouldDeferShowToVisibilityDriver(frame, cfg)
+	if not frame or not cfg then return false end
+	if tostring(addon.variables and addon.variables.unitClass or "") ~= "DRUID" then return false end
+	if addon.EditMode and addon.EditMode.IsInEditMode and addon.EditMode:IsInEditMode() then return false end
+	local expr, usesManualVisibility = visibilityLogic:BuildDriver(cfg)
+	return expr ~= nil and usesManualVisibility ~= true
 end
 
 function visibilityLogic:IsPetBattleActive()
