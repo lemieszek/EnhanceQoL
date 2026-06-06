@@ -7,6 +7,7 @@ from pathlib import Path
 HEADING_RE = re.compile(r"^## \[(?P<tag>[^\]]+)\](?:\s+-\s+(?P<date>.*))?$")
 SUBHEADING_RE = re.compile(r"^###\s+(?P<title>.+)$")
 PRERELEASE_RE = re.compile(r"^(?P<base>.+?)-(?:alpha|beta|rc)\d*$", re.IGNORECASE)
+SEMVER_RE = re.compile(r"^(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)$")
 HEADING_ICON_PREFIX_RE = re.compile(r"^[^\w\[\(]+", re.UNICODE)
 
 
@@ -97,6 +98,26 @@ def prerelease_base(tag):
     return match.group("base") if match else None
 
 
+def patch_family(tag):
+    match = SEMVER_RE.match(tag or "")
+    if not match:
+        return None
+
+    patch = int(match.group("patch"))
+    if patch <= 0:
+        return None
+
+    return f"{match.group('major')}.{match.group('minor')}"
+
+
+def release_in_patch_family(release_tag, family):
+    match = SEMVER_RE.match(release_tag or "")
+    if not match:
+        return False
+
+    return f"{match.group('major')}.{match.group('minor')}" == family
+
+
 def select_releases(releases, tag):
     if not releases:
         return []
@@ -108,16 +129,29 @@ def select_releases(releases, tag):
         selected_tag = releases[0]["tag"]
 
     base = prerelease_base(selected_tag)
-    if not base:
-        return [releases[index]]
+    if base:
+        selected = []
+        include_family = patch_family(base)
+        for release in releases:
+            if prerelease_base(release["tag"]) == base:
+                selected.append(release)
+            elif selected and include_family and release_in_patch_family(release["tag"], include_family):
+                selected.append(release)
+            elif selected:
+                break
+        return selected or [releases[index]]
 
-    selected = []
-    for release in releases:
-        if prerelease_base(release["tag"]) == base:
-            selected.append(release)
-        elif selected:
-            break
-    return selected or [releases[index]]
+    family = patch_family(selected_tag)
+    if family:
+        selected = []
+        for release in releases[index:]:
+            if release_in_patch_family(release["tag"], family):
+                selected.append(release)
+            else:
+                break
+        return selected or [releases[index]]
+
+    return [releases[index]]
 
 
 def build_lua(releases, source_tag):
@@ -156,7 +190,12 @@ def build_lua(releases, source_tag):
 
 def main():
     parser = argparse.ArgumentParser(description="Generate an ingame Lua changelog from CHANGELOG.md.")
-    parser.add_argument("tag", nargs="?", default="", help="Release tag to select. Prerelease tags include the current prerelease cycle.")
+    parser.add_argument(
+        "tag",
+        nargs="?",
+        default="",
+        help="Release tag to select. Patch releases include earlier entries from the same major/minor series.",
+    )
     parser.add_argument("--changelog", default="CHANGELOG.md")
     parser.add_argument("--output", default="EnhanceQoL/GeneratedChangelog.lua")
     args = parser.parse_args()

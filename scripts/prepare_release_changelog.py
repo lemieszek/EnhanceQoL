@@ -6,6 +6,8 @@ from pathlib import Path
 
 
 HEADING = re.compile(r"^## \[(?P<tag>[^\]]+)\].*$")
+PRERELEASE_RE = re.compile(r"^(?P<base>.+?)-(?:alpha|beta|rc)\d*$", re.IGNORECASE)
+SEMVER_RE = re.compile(r"^(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)$")
 
 
 def parse_sections(changelog):
@@ -34,13 +36,59 @@ def parse_sections(changelog):
 
 def release_sections(changelog, tag):
     lines, sections = parse_sections(changelog)
-    for section in sections:
-        if section["tag"] != tag:
-            continue
+    index = next((i for i, section in enumerate(sections) if section["tag"] == tag), None)
+    if index is None:
+        return lines, []
 
-        return lines, [section]
+    base = prerelease_base(tag)
+    if base:
+        selected = []
+        include_family = patch_family(base)
+        for section in sections:
+            if prerelease_base(section["tag"]) == base:
+                selected.append(section)
+            elif selected and include_family and section_in_patch_family(section, include_family):
+                selected.append(section)
+            elif selected:
+                break
+        return lines, selected or [sections[index]]
 
-    return lines, []
+    family = patch_family(tag)
+    if family:
+        selected = []
+        for section in sections[index:]:
+            if section_in_patch_family(section, family):
+                selected.append(section)
+            else:
+                break
+        return lines, selected or [sections[index]]
+
+    return lines, [sections[index]]
+
+
+def prerelease_base(tag):
+    match = PRERELEASE_RE.match(tag or "")
+    return match.group("base") if match else None
+
+
+def patch_family(tag):
+    match = SEMVER_RE.match(tag or "")
+    if not match:
+        return None
+
+    patch = int(match.group("patch"))
+    if patch <= 0:
+        return None
+
+    return f"{match.group('major')}.{match.group('minor')}"
+
+
+def section_in_patch_family(section, family):
+    match = SEMVER_RE.match(section["tag"] or "")
+    if not match:
+        return False
+
+    return f"{match.group('major')}.{match.group('minor')}" == family
 
 
 def build_changelog(lines, selected):
@@ -57,7 +105,9 @@ def build_changelog(lines, selected):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Limit CHANGELOG.md to the sections that should be published for a release artifact.")
+    parser = argparse.ArgumentParser(
+        description="Limit CHANGELOG.md to the sections that should be published for a release artifact."
+    )
     parser.add_argument("tag", help="Release tag to extract from CHANGELOG.md.")
     parser.add_argument("--changelog", default="CHANGELOG.md", help="Path to the changelog file to rewrite.")
     args = parser.parse_args()
