@@ -55,6 +55,96 @@ CooldownPanels.CDM_AURA_ALWAYS_SHOW_MODE = CooldownPanels.CDM_AURA_ALWAYS_SHOW_M
 	DESATURATE = "DESATURATE",
 	DESATURATE_ACTIVE = "DESATURATE_ACTIVE",
 }
+
+CooldownPanels.BLIZZARD_ALERT_TEXTURES = CooldownPanels.BLIZZARD_ALERT_TEXTURES
+	or {
+		{ id = 424570, name = "Spell Activation Overlay 0" },
+		{ id = 449486, name = "Arcane Missiles" },
+		{ id = 449487, name = "Blood Surge" },
+		{ id = 449488, name = "Brain Freeze" },
+		{ id = 449489, name = "Frozen Fingers" },
+		{ id = 449490, name = "Hot Streak" },
+		{ id = 449491, name = "Imp Empowerment" },
+		{ id = 449492, name = "Nightfall" },
+		{ id = 449493, name = "Sudden Death" },
+		{ id = 449494, name = "Sword and Board" },
+		{ id = 450913, name = "Art of War" },
+		{ id = 450914, name = "Eclipse Moon" },
+		{ id = 450915, name = "Eclipse Sun" },
+		{ id = 450916, name = "Focus Fire" },
+		{ id = 450917, name = "Generic Arc 1" },
+		{ id = 450918, name = "Generic Arc 2" },
+		{ id = 450919, name = "Generic Arc 3" },
+		{ id = 450920, name = "Generic Arc 4" },
+		{ id = 450921, name = "Generic Arc 5" },
+		{ id = 450922, name = "Generic Arc 6" },
+		{ id = 450923, name = "Generic Top 1" },
+		{ id = 450924, name = "Generic Top 2" },
+		{ id = 450925, name = "Grand Crusader" },
+		{ id = 450926, name = "Lock and Load" },
+		{ id = 450927, name = "Maelstrom Weapon" },
+		{ id = 450928, name = "Master Marksman" },
+		{ id = 450929, name = "Nature's Grace" },
+		{ id = 450930, name = "Rime" },
+		{ id = 450931, name = "Slice and Dice" },
+		{ id = 450932, name = "Sudden Doom" },
+		{ id = 450933, name = "Surge of Light" },
+		{ id = 457658, name = "Impact" },
+		{ id = 458740, name = "Killing Machine" },
+		{ id = 458741, name = "Molten Core" },
+		{ id = 459313, name = "Daybreak" },
+		{ id = 459314, name = "Hand of Light" },
+		{ id = 460830, name = "Backslash" },
+		{ id = 460831, name = "Fury of Stormrage" },
+		{ id = 461878, name = "Dark Transformation" },
+		{ id = 463452, name = "Shooting Stars" },
+		{ id = 467696, name = "Fulmination" },
+		{ id = 469752, name = "Serendipity" },
+		{ id = 510822, name = "Berserk" },
+		{ id = 510823, name = "Omen of Clarity (Feral)" },
+		{ id = 511104, name = "Blood Boil" },
+		{ id = 511105, name = "Necropolis" },
+		{ id = 511469, name = "Denounce" },
+		{ id = 592058, name = "Surge of Darkness" },
+		{ id = 603338, name = "Dark Tiger" },
+		{ id = 603339, name = "White Tiger" },
+		{ id = 623950, name = "Monk Ox" },
+		{ id = 623951, name = "Monk Serpent" },
+		{ id = 623952, name = "Monk Tiger" },
+		{ id = 627609, name = "Shadow of Death" },
+		{ id = 627610, name = "Ultimatum" },
+		{ id = 656728, name = "Shadow Word Insanity" },
+		{ id = 774420, name = "Tooth and Claw" },
+		{ id = 801266, name = "Backlash Green" },
+		{ id = 801267, name = "Imp Empowerment Green" },
+		{ id = 801268, name = "Molten Core Green" },
+		{ id = 898423, name = "Predatory Swiftness" },
+		{ id = 962497, name = "Raging Blow" },
+		{ id = 1001511, name = "Monk Blackout Kick" },
+		{ id = 1001512, name = "Monk Tiger Palm" },
+		{ id = 1027131, name = "Arcane Missiles 1" },
+		{ id = 1027132, name = "Arcane Missiles 2" },
+		{ id = 1027133, name = "Arcane Missiles 3" },
+		{ id = 1028091, name = "Monk Ox 2" },
+		{ id = 1028092, name = "Monk Ox 3" },
+		{ id = 1028136, name = "Maelstrom Weapon 1" },
+		{ id = 1028137, name = "Maelstrom Weapon 2" },
+		{ id = 1028138, name = "Maelstrom Weapon 3" },
+		{ id = 1028139, name = "Maelstrom Weapon 4" },
+		{ id = 1029138, name = "Thrill of the Hunt 1" },
+		{ id = 1029139, name = "Thrill of the Hunt 2" },
+		{ id = 1029140, name = "Thrill of the Hunt 3" },
+		{ id = 1030393, name = "Bandits Guile" },
+		{ id = 1057288, name = "Echo of the Elements" },
+		{ id = 1518303, name = "Predatory Swiftness Green" },
+		{ id = 2851787, name = "Demonic Core" },
+		{ id = 2851788, name = "High Tide" },
+		{ id = 2888300, name = "Demonic Core Vertical" },
+		{ id = 4699056, name = "Essence Burst" },
+		{ id = 4699057, name = "Snapfire" },
+		{ id = 6160020, name = "Arcane Soul" },
+		{ id = 6160021, name = "Hyperthermia" },
+	}
 if CooldownPanels._eqolSpellCooldownIgnoreGCDSupported == nil then
 	-- TODO: Remove this pre-12.0.5 compatibility gate once 12.0.5+ is the minimum supported client.
 	CooldownPanels._eqolSpellCooldownIgnoreGCDSupported = (tonumber(GetBuildInfo and select(4, GetBuildInfo())) or 0) >= 120005
@@ -11331,9 +11421,11 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		if not ok then
 			showErrorMessage(err)
 			refreshEntryViews()
+			refreshStandaloneSettingValues()
 			return
 		end
 		refreshEntryPreview()
+		refreshStandaloneSettingValues()
 	end
 
 	local function setStateTextureField(field, value)
@@ -13251,6 +13343,30 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			maxChars = 128,
 		},
 		{
+			name = L["CooldownPanelBlizzardAlertTexture"] or "Blizzard alert texture",
+			kind = SettingType.Dropdown,
+			parentId = "cooldownPanelStandaloneStateTexture",
+			height = 120,
+			isShown = function() return isStateTextureSupported() end,
+			get = function()
+				local _, currentEntry = getEntry()
+				local alert = CooldownPanels:GetBlizzardAlertTextureByID(currentEntry and currentEntry.stateTextureInput)
+				return alert and CooldownPanels:FormatBlizzardAlertTextureLabel(alert) or (L["CooldownPanelBrowseBlizzardAlertTextures"] or "Browse Blizzard alerts")
+			end,
+			set = function() end,
+			generator = function(_, root)
+				root:CreateButton(L["CooldownPanelBrowseBlizzardAlertTextures"] or "Browse Blizzard alerts", function()
+					local _, currentEntry = getEntry()
+					CooldownPanels:ShowBlizzardAlertTexturePicker(currentEntry and currentEntry.stateTextureInput, function(fileDataID)
+						setStateTextureInput(nil, tostring(fileDataID or ""))
+					end)
+				end)
+				root:CreateButton(_G.CLEAR or "Clear", function()
+					setStateTextureInput(nil, "")
+				end)
+			end,
+		},
+		{
 			name = L["CooldownPanelStateTextureShowWithoutProc"] or "Show without proc",
 			kind = SettingType.Checkbox,
 			parentId = "cooldownPanelStandaloneStateTexture",
@@ -14604,6 +14720,192 @@ local function applySettingsIcon(texture)
 		end
 	end
 	texture:SetTexture("Interface\\Buttons\\UI-OptionsButton")
+end
+
+function CooldownPanels:FormatBlizzardAlertTextureLabel(entry)
+	if not entry then return _G.NONE or "None" end
+	return string.format("%s (%d)", tostring(entry.name or entry.id), tonumber(entry.id) or 0)
+end
+
+function CooldownPanels:GetBlizzardAlertTextureByID(fileDataID)
+	local id = tonumber(fileDataID)
+	if not id then return nil end
+	for _, entry in ipairs(self.BLIZZARD_ALERT_TEXTURES or {}) do
+		if tonumber(entry.id) == id then return entry end
+	end
+	return nil
+end
+
+function CooldownPanels:ShowBlizzardAlertTexturePicker(currentValue, onSelect)
+	local runtime = getRuntime("blizzardAlertTexturePicker")
+	local frame = runtime.frame
+	if not frame then
+		frame = CreateFrame("Frame", "EQOL_CooldownPanelsBlizzardAlertTexturePicker", UIParent, "BackdropTemplate")
+		runtime.frame = frame
+		frame:SetSize(700, 520)
+		frame:SetPoint("CENTER")
+		frame:SetFrameStrata("DIALOG")
+		frame:SetClampedToScreen(true)
+		frame:SetMovable(true)
+		frame:EnableMouse(true)
+		frame:RegisterForDrag("LeftButton")
+		frame:SetScript("OnDragStart", frame.StartMoving)
+		frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+		frame:Hide()
+
+		frame.bg = frame:CreateTexture(nil, "BACKGROUND")
+		frame.bg:SetPoint("TOPLEFT", frame, "TOPLEFT", 8, -8)
+		frame.bg:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 8)
+		frame.bg:SetTexture("Interface\\AddOns\\EnhanceQoL\\Assets\\background_dark.tga")
+		frame.bg:SetAlpha(0.95)
+		applyPanelBorder(frame)
+
+		frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+		frame.title:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -16)
+		frame.title:SetText(L["CooldownPanelBlizzardAlertTexturePicker"] or "Blizzard alert textures")
+		frame.title:SetFont((addon.variables and addon.variables.defaultFont) or frame.title:GetFont(), 16, "OUTLINE")
+
+		frame.close = CreateFrame("Button", nil, frame, "UIPanelCloseButtonNoScripts")
+		frame.close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 20, 12)
+		frame.close:SetScript("OnClick", function(self) self:GetParent():Hide() end)
+
+		frame.searchLabel = Helper.CreateLabel(frame, SEARCH or "Search", 11, "OUTLINE")
+		frame.searchLabel:SetPoint("TOPLEFT", frame.title, "BOTTOMLEFT", 0, -12)
+
+		frame.searchBox = Helper.CreateEditBox(frame, 240, 20)
+		frame.searchBox:SetPoint("LEFT", frame.searchLabel, "RIGHT", 8, 0)
+		frame.searchBox:SetScript("OnTextChanged", function(self)
+			local owner = self:GetParent()
+			if owner and owner.Refresh then owner:Refresh() end
+		end)
+
+		frame.clearButton = Helper.CreateButton(frame, _G.CLEAR or "Clear", 70, 20)
+		frame.clearButton:SetPoint("LEFT", frame.searchBox, "RIGHT", 8, 0)
+		frame.clearButton:SetScript("OnClick", function(self)
+			local owner = self:GetParent()
+			if owner and owner.searchBox then owner.searchBox:SetText("") end
+		end)
+
+		frame.okButton = Helper.CreateButton(frame, OKAY or "OK", 80, 22)
+		frame.okButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -32, 18)
+		frame.okButton:SetScript("OnClick", function(self)
+			self:GetParent():Hide()
+		end)
+
+		frame.scroll = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
+		frame.scroll:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, -76)
+		frame.scroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -34, 50)
+		frame.content = CreateFrame("Frame", nil, frame.scroll)
+		frame.content:SetSize(1, 1)
+		frame.scroll:SetScrollChild(frame.content)
+		frame.scroll:SetScript("OnSizeChanged", function(self)
+			if frame.content then frame.content:SetWidth(self:GetWidth() or 1) end
+			if frame.Refresh then frame:Refresh() end
+		end)
+
+		frame.noResults = frame.content:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+		frame.noResults:SetPoint("TOPLEFT", frame.content, "TOPLEFT", 8, -12)
+		frame.noResults:SetText(L["CooldownPanelBlizzardAlertTextureNoResults"] or "No matching alert textures.")
+		frame.noResults:Hide()
+		frame.tiles = {}
+
+		frame.Refresh = function(self)
+			local search = string.lower(tostring(self.searchBox and self.searchBox:GetText() or ""))
+			local selectedID = tonumber(self.currentValue)
+			local tileWidth, tileHeight = 146, 112
+			local paddingX, paddingY = 8, 10
+			local scrollWidth = self.scroll and self.scroll:GetWidth() or 560
+			local columns = math.max(1, math.floor((scrollWidth + paddingX) / (tileWidth + paddingX)))
+			tileWidth = math.max(tileWidth, math.floor((scrollWidth - ((columns - 1) * paddingX)) / columns))
+			local visibleIndex = 0
+
+			for _, entry in ipairs(CooldownPanels.BLIZZARD_ALERT_TEXTURES or {}) do
+				local name = string.lower(tostring(entry and entry.name or ""))
+				local id = tostring(entry and entry.id or "")
+				local show = search == "" or string.find(name, search, 1, true) ~= nil or string.find(id, search, 1, true) ~= nil
+				visibleIndex = show and (visibleIndex + 1) or visibleIndex
+				local tile = self.tiles[visibleIndex]
+				if show and not tile then
+					tile = CreateFrame("Button", nil, self.content, "BackdropTemplate")
+					self.tiles[visibleIndex] = tile
+					tile:SetSize(tileWidth, tileHeight)
+					tile:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 10, insets = { left = 1, right = 1, top = 1, bottom = 1 } })
+					tile:SetBackdropColor(0, 0, 0, 0.35)
+					tile:SetBackdropBorderColor(0.45, 0.45, 0.45, 0.85)
+					tile.icon = tile:CreateTexture(nil, "ARTWORK")
+					tile.icon:SetSize(62, 62)
+					tile.icon:SetPoint("TOP", tile, "TOP", 0, -8)
+					tile.icon:SetTexCoord(0, 1, 0, 1)
+					tile.name = tile:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+					tile.name:SetPoint("TOPLEFT", tile.icon, "BOTTOMLEFT", -22, -4)
+					tile.name:SetPoint("TOPRIGHT", tile.icon, "BOTTOMRIGHT", 22, -4)
+					tile.name:SetJustifyH("CENTER")
+					if tile.name.SetWordWrap then tile.name:SetWordWrap(false) end
+					if tile.name.SetMaxLines then tile.name:SetMaxLines(1) end
+					tile.id = tile:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+					tile.id:SetPoint("TOP", tile.name, "BOTTOM", 0, -2)
+					tile.selected = tile:CreateTexture(nil, "OVERLAY")
+					tile.selected:SetAllPoints(tile)
+					tile.selected:SetColorTexture(1, 0.82, 0, 0.18)
+					tile.selected:Hide()
+					tile:SetScript("OnClick", function(button)
+						local data = button.entry
+						if data and self.onSelect then
+							self.currentValue = tostring(data.id or "")
+							self.onSelect(data.id, data)
+							if self.Refresh then self:Refresh() end
+						end
+					end)
+					tile:SetScript("OnEnter", function(button)
+						button:SetBackdropBorderColor(1, 0.82, 0, 1)
+						GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+						GameTooltip:SetText(CooldownPanels:FormatBlizzardAlertTextureLabel(button.entry), 1, 1, 1)
+						GameTooltip:Show()
+					end)
+					tile:SetScript("OnLeave", function(button)
+						local data = button.entry
+						local activeID = tonumber(self.currentValue)
+						button:SetBackdropBorderColor(tonumber(data and data.id) == activeID and 1 or 0.45, tonumber(data and data.id) == activeID and 0.82 or 0.45, tonumber(data and data.id) == activeID and 0 or 0.45, tonumber(data and data.id) == activeID and 1 or 0.85)
+						GameTooltip:Hide()
+					end)
+				end
+				if show and tile then
+					local row = math.floor((visibleIndex - 1) / columns)
+					local column = (visibleIndex - 1) % columns
+					local selected = tonumber(entry.id) == selectedID
+					tile.entry = entry
+					tile:ClearAllPoints()
+					tile:SetPoint("TOPLEFT", self.content, "TOPLEFT", column * (tileWidth + paddingX), -(row * (tileHeight + paddingY)))
+					tile.icon:SetTexture(entry.id)
+					tile.name:SetText(entry.name or tostring(entry.id))
+					tile.id:SetText(tostring(entry.id))
+					tile.selected:SetShown(selected)
+					tile:SetBackdropBorderColor(selected and 1 or 0.45, selected and 0.82 or 0.45, selected and 0 or 0.45, selected and 1 or 0.85)
+					tile:Show()
+				end
+			end
+
+			for index = visibleIndex + 1, #self.tiles do
+				local tile = self.tiles[index]
+				if tile then
+					tile.entry = nil
+					tile:Hide()
+				end
+			end
+
+			self.noResults:SetShown(visibleIndex == 0)
+			local rows = visibleIndex > 0 and math.ceil(visibleIndex / columns) or 1
+			self.content:SetSize(scrollWidth, math.max(1, rows * (tileHeight + paddingY)))
+		end
+	end
+
+	frame.currentValue = currentValue
+	frame.onSelect = onSelect
+	if frame.searchBox then frame.searchBox:SetText("") end
+	if frame.Refresh then frame:Refresh() end
+	frame:Show()
+	frame:Raise()
+	return frame
 end
 
 local function ensureEditor()

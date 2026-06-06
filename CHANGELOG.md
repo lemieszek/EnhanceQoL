@@ -6,6 +6,7 @@
 ### ✨ Added
 
 - Bags: Added a configurable Profession Quality overlay for crafted gear and profession items.
+- Cooldown Panels: Added a Blizzard alert texture picker for State textures, with rendered previews, search, live preview selection and FileDataID display.
 - Sound: Added a mute toggle for Blizzard's Raid Warning sound under Interface / General.
 - Unit Frames: Added an optional separate target-of-target name text for the Target frame, with its own anchor, font size and X/Y offset controls.
 
