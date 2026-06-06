@@ -1,5 +1,13 @@
 # Changelog
 
+## [11.0.2] - 2026-06-06
+
+### 🐛 Fixed
+
+- Tooltips: Fixed numeric Off/On dropdowns in the modern Settings Center storing labels instead of numeric values, and migrated affected tooltip, group finder and mouse trail settings back to numeric values.
+
+---
+
 ## [11.0.1] - 2026-06-06
 
 ### 🐛 Fixed

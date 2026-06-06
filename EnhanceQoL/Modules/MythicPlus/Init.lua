@@ -16,6 +16,27 @@ local L = LibStub("AceLocale-3.0"):GetLocale("EnhanceQoL")
 
 _G["BINDING_NAME_CLICK EQOLRandomHearthstoneButton:LeftButton"] = L["teleportsRandomHearthstoneBinding"] or "Random Hearthstone"
 
+local function normalizeNumericDropdownValue(key, labels, fallback)
+	if not addon.db then return end
+	local value = addon.db[key]
+	if type(value) == "number" and labels[value] ~= nil then return end
+	if type(value) == "string" then
+		local numeric = tonumber(value)
+		if numeric and labels[numeric] ~= nil then
+			addon.db[key] = numeric
+			return
+		end
+		local trimmed = value:gsub("^%s+", ""):gsub("%s+$", "")
+		for index, label in pairs(labels) do
+			if trimmed == tostring(label) then
+				addon.db[key] = index
+				return
+			end
+		end
+	end
+	addon.db[key] = fallback
+end
+
 function addon.MythicPlus.functions.InitDB()
 	if addon.MythicPlus.variables.dbInitialized then return end
 	if not addon.db or not addon.functions or not addon.functions.InitDBValue then return end
@@ -38,6 +59,10 @@ function addon.MythicPlus.functions.InitDB()
 	init("groupfinderAppText", false)
 	init("groupfinderSkipRoleSelect", false)
 	init("groupfinderSkipRoleSelectOption", 1)
+	normalizeNumericDropdownValue("groupfinderSkipRoleSelectOption", {
+		[1] = L["groupfinderSkipRolecheckUseSpec"] or "Use your current spec's role (e.g. Blood Death Knight = Tank)",
+		[2] = L["groupfinderSkipRolecheckUseLFD"] or "Use Blizzard's selected role",
+	}, 1)
 	init("groupfinderShowDungeonScoreFrame", false)
 
 	-- Misc

@@ -1710,7 +1710,7 @@ local function getControlOptions(control)
 	if not order and #list > 0 then
 		for index, option in ipairs(list) do
 			options[#options + 1] = {
-				value = getOptionValue(option, index, true),
+				value = getOptionValue(option, index, false),
 				label = tostring(getOptionLabel(option, index) or index),
 			}
 		end
