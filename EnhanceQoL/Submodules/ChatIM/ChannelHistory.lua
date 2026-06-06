@@ -3385,7 +3385,9 @@ function ChannelHistory:CreateDebugFrame(showImmediately)
 			return
 		end
 
-		Settings.OpenToCategory(addon.SettingsLayout.chatframeCategory:GetID(), L["CH_TITLE_HISTORY"])
+		if addon.functions and addon.functions.OpenConfigCenter then
+			addon.functions.OpenConfigCenter("social.chathistory", "enableChatHistory")
+		end
 	end
 
 	local helpBtn = CreateFrame("Button", nil, f)
