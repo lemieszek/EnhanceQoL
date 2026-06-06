@@ -38,6 +38,7 @@ local DB = {
 	TRACK_WEAPON_BUFFS = "classBuffReminderTrackWeaponBuffs",
 	TRACK_WEAPON_BUFFS_CONTENT = "classBuffReminderTrackWeaponBuffsContent",
 	TRACK_WEAPON_BUFFS_INSTANCE_ONLY = "classBuffReminderTrackWeaponBuffsInstanceOnly",
+	EXPIRATION_WARNING_MINUTES = "classBuffReminderExpirationWarningMinutes",
 	TRACK_PETS = "classBuffReminderTrackPets",
 	TRACK_PETS_CONTENT = "classBuffReminderTrackPetsContent",
 	TRACK_PETS_INSTANCE_ONLY = "classBuffReminderTrackPetsInstanceOnly",
@@ -62,6 +63,9 @@ local DB = {
 	LEGACY_SHOW_ICON = "classBuffReminderShowIcon",
 	LEGACY_ONLY_WHEN_MISSING = "classBuffReminderOnlyWhenMissing",
 }
+
+local EXPIRATION_WARNING_MINUTES_MIN = 0
+local EXPIRATION_WARNING_MINUTES_MAX = 60
 
 local function createDefaultTrackingContentSelection()
 	if Reminder and Reminder.CreateDefaultTrackingContentSelection then return Reminder.CreateDefaultTrackingContentSelection() end
@@ -115,6 +119,7 @@ local defaults = (Reminder and Reminder.defaults)
 		trackWeaponBuffs = false,
 		trackWeaponBuffsContent = createDefaultTrackingContentSelection(),
 		trackWeaponBuffsInstanceOnly = false,
+		expirationWarningMinutes = 0,
 		trackPets = false,
 		trackPetsContent = createDefaultTrackingContentSelection(),
 		trackPetsInstanceOnly = false,
@@ -154,6 +159,7 @@ if defaults.trackFood == nil then defaults.trackFood = false end
 if type(defaults.trackFoodContent) ~= "table" then defaults.trackFoodContent = createDefaultTrackingContentSelection() end
 if defaults.trackWeaponBuffs == nil then defaults.trackWeaponBuffs = false end
 if type(defaults.trackWeaponBuffsContent) ~= "table" then defaults.trackWeaponBuffsContent = createDefaultTrackingContentSelection() end
+if defaults.expirationWarningMinutes == nil then defaults.expirationWarningMinutes = 0 end
 if defaults.trackPets == nil then defaults.trackPets = false end
 if type(defaults.trackPetsContent) ~= "table" then defaults.trackPetsContent = createDefaultTrackingContentSelection() end
 if defaults.ignorePetDefensive == nil then defaults.ignorePetDefensive = false end
@@ -166,6 +172,20 @@ if type(defaults.borderColor) ~= "table" then defaults.borderColor = { r = 1, g 
 
 local function refreshReminder()
 	if Reminder and Reminder.OnSettingChanged then Reminder:OnSettingChanged() end
+end
+
+local function normalizeExpirationWarningMinutes(value)
+	if Reminder and Reminder.NormalizeExpirationWarningMinutes then return Reminder:NormalizeExpirationWarningMinutes(value) end
+	local minutes = math.floor((tonumber(value) or defaults.expirationWarningMinutes or 0) + 0.5)
+	if minutes < EXPIRATION_WARNING_MINUTES_MIN then minutes = EXPIRATION_WARNING_MINUTES_MIN end
+	if minutes > EXPIRATION_WARNING_MINUTES_MAX then minutes = EXPIRATION_WARNING_MINUTES_MAX end
+	return minutes
+end
+
+local function formatExpirationWarningMinutes(value)
+	local minutes = normalizeExpirationWarningMinutes(value)
+	if minutes <= 0 then return L["ClassBuffReminderExpirationWarningOff"] or "Missing only" end
+	return string.format(L["ClassBuffReminderExpirationWarningMinutesFmt"] or "%d min", minutes)
 end
 
 local function normalizeRoleFilterContext(value)
@@ -260,6 +280,30 @@ addon.functions.SettingsCreateCheckbox(cat, {
 		addon.db[DB.HIDE_IN_RESTED_AREA] = value == true
 		refreshReminder()
 	end,
+	parentSection = expandable,
+})
+
+addon.functions.SettingsCreateSlider(cat, {
+	var = DB.EXPIRATION_WARNING_MINUTES,
+	text = L["ClassBuffReminderExpirationWarningMinutes"] or "Show before expiration",
+	desc = L["ClassBuffReminderExpirationWarningMinutesDesc"] or "0 keeps the current behavior. Higher values show the reminder when a tracked buff has this many minutes or less remaining.",
+	min = EXPIRATION_WARNING_MINUTES_MIN,
+	max = EXPIRATION_WARNING_MINUTES_MAX,
+	step = 1,
+	default = defaults.expirationWarningMinutes or 0,
+	get = function()
+		if Reminder and Reminder.GetExpirationWarningMinutes then return Reminder:GetExpirationWarningMinutes() end
+		return normalizeExpirationWarningMinutes(addon.db and addon.db[DB.EXPIRATION_WARNING_MINUTES])
+	end,
+	func = function(value)
+		if Reminder and Reminder.SetExpirationWarningMinutes then
+			Reminder:SetExpirationWarningMinutes(value)
+			return
+		end
+		if addon.db then addon.db[DB.EXPIRATION_WARNING_MINUTES] = normalizeExpirationWarningMinutes(value) end
+		refreshReminder()
+	end,
+	formatter = formatExpirationWarningMinutes,
 	parentSection = expandable,
 })
 
@@ -475,6 +519,7 @@ function addon.functions.initClassBuffReminder()
 	init(DB.TRACK_FLASKS, defaults.trackFlasks)
 	init(DB.TRACK_FOOD, defaults.trackFood)
 	init(DB.TRACK_WEAPON_BUFFS, defaults.trackWeaponBuffs)
+	init(DB.EXPIRATION_WARNING_MINUTES, defaults.expirationWarningMinutes)
 	init(DB.TRACK_PETS, defaults.trackPets)
 	init(DB.IGNORE_PET_PASSIVE, defaults.ignorePetPassive)
 	init(DB.IGNORE_PET_DEFENSIVE, defaults.ignorePetDefensive)

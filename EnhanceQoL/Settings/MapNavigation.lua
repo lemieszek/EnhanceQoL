@@ -1893,6 +1893,7 @@ data = {
 				parentSection = mapExpandable,
 			},
 			{
+				id = "instanceDifficultyColorsLFR",
 				var = "instanceDifficultyColors",
 				subvar = "LFR",
 				hasOpacity = true,
@@ -1914,6 +1915,7 @@ data = {
 				parentSection = mapExpandable,
 			},
 			{
+				id = "instanceDifficultyColorsNM",
 				var = "instanceDifficultyColors",
 				subvar = "NM",
 				hasOpacity = true,
@@ -1935,6 +1937,7 @@ data = {
 				parentSection = mapExpandable,
 			},
 			{
+				id = "instanceDifficultyColorsHC",
 				var = "instanceDifficultyColors",
 				subvar = "HC",
 				hasOpacity = true,
@@ -1956,6 +1959,7 @@ data = {
 				parentSection = mapExpandable,
 			},
 			{
+				id = "instanceDifficultyColorsM",
 				var = "instanceDifficultyColors",
 				subvar = "M",
 				hasOpacity = true,
@@ -1977,6 +1981,7 @@ data = {
 				parentSection = mapExpandable,
 			},
 			{
+				id = "instanceDifficultyColorsMPLUS",
 				var = "instanceDifficultyColors",
 				subvar = "MPLUS",
 				hasOpacity = true,
@@ -1998,6 +2003,7 @@ data = {
 				parentSection = mapExpandable,
 			},
 			{
+				id = "instanceDifficultyColorsTW",
 				var = "instanceDifficultyColors",
 				subvar = "TW",
 				hasOpacity = true,

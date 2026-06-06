@@ -1,9 +1,11 @@
 # Changelog
 
-## [11.0.1-beta1] - 2026-06-06
+## [11.0.1] - 2026-06-06
 
 ### 🐛 Fixed
 
+- Class Buff Reminder: Fixed missing expire timer.
+- Instance Difficulty: Restored the separate color picker rows for LFR, Normal, Heroic, Mythic, Mythic+ and Timewalking in the modern Settings Center.
 - Resource Bars / Shared Mode: Fixed non-Balance Druids being able to resolve Astral Power as the shared Main resource during shapeshift refreshes, and prevented driver-controlled bars from briefly flashing during rebuilds.
 
 ---

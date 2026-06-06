@@ -302,6 +302,7 @@ Reminder.defaults = Reminder.defaults
 		trackWeaponBuffs = false,
 		trackWeaponBuffsContent = Reminder.CreateDefaultTrackingContentSelection(),
 		trackWeaponBuffsInstanceOnly = false,
+		expirationWarningMinutes = 0,
 		trackPets = false,
 		trackPetsContent = Reminder.CreateDefaultPetTrackingContentSelection(),
 		trackPetsInstanceOnly = false,
@@ -348,6 +349,7 @@ if type(defaults.trackRunesContent) ~= "table" then defaults.trackRunesContent =
 if defaults.trackWeaponBuffs == nil then defaults.trackWeaponBuffs = false end
 if defaults.trackWeaponBuffsInstanceOnly == nil then defaults.trackWeaponBuffsInstanceOnly = false end
 if type(defaults.trackWeaponBuffsContent) ~= "table" then defaults.trackWeaponBuffsContent = Reminder.CreateDefaultTrackingContentSelection() end
+if defaults.expirationWarningMinutes == nil then defaults.expirationWarningMinutes = 0 end
 if defaults.trackPets == nil then defaults.trackPets = false end
 if defaults.trackPetsInstanceOnly == nil then defaults.trackPetsInstanceOnly = false end
 if type(defaults.trackPetsContent) ~= "table" then defaults.trackPetsContent = Reminder.CreateDefaultPetTrackingContentSelection() end
@@ -651,6 +653,28 @@ local function clamp(value, minValue, maxValue, fallback)
 	return n
 end
 
+local function nowSeconds()
+	if GetTimePreciseSec then return tonumber(GetTimePreciseSec()) or 0 end
+	if GetTime then return tonumber(GetTime()) or 0 end
+	return 0
+end
+
+function Reminder.GetAuraExpirationTime(aura)
+	if not aura or (issecretvalue and issecretvalue(aura)) then return nil end
+	local expirationTime = aura.expirationTime
+	if issecretvalue and issecretvalue(expirationTime) then expirationTime = nil end
+	expirationTime = tonumber(expirationTime)
+	if not expirationTime or expirationTime <= 0 then return math.huge end
+	return expirationTime
+end
+
+function Reminder.StoreBestExpiration(map, key, expirationTime)
+	if type(map) ~= "table" or key == nil then return end
+	expirationTime = expirationTime or math.huge
+	local current = map[key]
+	if current == nil or expirationTime > current then map[key] = expirationTime end
+end
+
 local function clamp01(value)
 	local n = tonumber(value) or 1
 	if n < 0 then return 0 end
@@ -671,6 +695,49 @@ local function getValue(key, fallback)
 	local value = addon.db[key]
 	if value == nil then return fallback end
 	return value
+end
+
+function Reminder:NormalizeExpirationWarningMinutes(value)
+	local minutes = clamp(value, 0, 60, defaults.expirationWarningMinutes or 0)
+	minutes = math.floor((tonumber(minutes) or 0) + 0.5)
+	if minutes < 0 then minutes = 0 end
+	if minutes > 60 then minutes = 60 end
+	return minutes
+end
+
+function Reminder:GetExpirationWarningMinutes()
+	return self:NormalizeExpirationWarningMinutes(getValue("classBuffReminderExpirationWarningMinutes", defaults.expirationWarningMinutes))
+end
+
+function Reminder:GetExpirationWarningSeconds()
+	return self:GetExpirationWarningMinutes() * 60
+end
+
+function Reminder:IsExpirationWarningEnabled()
+	return self:GetExpirationWarningSeconds() > 0
+end
+
+function Reminder:SetExpirationWarningMinutes(value)
+	if addon.db then addon.db.classBuffReminderExpirationWarningMinutes = self:NormalizeExpirationWarningMinutes(value) end
+	self:CancelExpirationWarningTimer()
+	self:MarkAuraStatesDirty()
+	self:RequestUpdate(true)
+	if EditMode and EditMode.RefreshFrame then EditMode:RefreshFrame(EDITMODE_ID) end
+end
+
+function Reminder:IsExpirationTimeUsable(expirationTime, thresholdSeconds, now)
+	thresholdSeconds = tonumber(thresholdSeconds) or self:GetExpirationWarningSeconds()
+	if thresholdSeconds <= 0 then return true end
+	if expirationTime == nil or expirationTime == math.huge then return true end
+	now = tonumber(now) or nowSeconds()
+	local remaining = expirationTime - now
+	if remaining <= thresholdSeconds then return false end
+	self:QueueExpirationWarningAt(expirationTime - thresholdSeconds)
+	return true
+end
+
+function Reminder:IsAuraUsableForReminder(aura, thresholdSeconds, now)
+	return self:IsExpirationTimeUsable(Reminder.GetAuraExpirationTime(aura), thresholdSeconds, now)
 end
 
 function Reminder.GetTrackingContentSelection(dbKey, legacyKey, defaultSelection)
@@ -1034,7 +1101,10 @@ local function unitHasAuraBySpellId(unit, spellId)
 	if type(unit) ~= "string" or unit == "" then return false end
 
 	if C_UnitAuras and C_UnitAuras.GetUnitAuraBySpellID then
-		if C_UnitAuras.GetUnitAuraBySpellID(unit, spellId) ~= nil then return true end
+		local aura = C_UnitAuras.GetUnitAuraBySpellID(unit, spellId)
+		if aura ~= nil and not (issecretvalue and issecretvalue(aura)) then
+			if type(aura) ~= "table" or Reminder:IsAuraUsableForReminder(aura) then return true end
+		end
 	end
 
 	if C_UnitAuras and C_UnitAuras.GetAuraSlots and C_UnitAuras.GetAuraDataBySlot then
@@ -1050,7 +1120,7 @@ local function unitHasAuraBySpellId(unit, spellId)
 						if issecretvalue and issecretvalue(isHelpful) then isHelpful = nil end
 						if isHelpful ~= false then
 							local auraSpellId = normalizeSpellId(aura.spellId)
-							if auraSpellId and auraSpellId == spellId then return true end
+							if auraSpellId and auraSpellId == spellId and Reminder:IsAuraUsableForReminder(aura) then return true end
 						end
 					end
 				end
@@ -1846,9 +1916,13 @@ function Reminder:GetPlayerAuraPresenceSnapshot()
 
 	snapshot = {
 		supported = false,
+		restricted = false,
 		spellIds = {},
 		names = {},
 		icons = {},
+		spellIdExpirations = {},
+		nameExpirations = {},
+		iconExpirations = {},
 		instanceSpellIds = {},
 		instanceNames = {},
 		instanceIcons = {},
@@ -1865,32 +1939,38 @@ function Reminder:GetPlayerAuraPresenceSnapshot()
 		local slots, slotCount, nextToken = getHelpfulAuraSlotBuffer("player", continuationToken)
 		for i = 2, slotCount do
 			local slot = slots[i]
-			if not (issecretvalue and issecretvalue(slot)) then
-				local aura = C_UnitAuras.GetAuraDataBySlot("player", slot)
-				if aura and not (issecretvalue and issecretvalue(aura)) then
-					if Reminder.IsRelevantHelpfulPlayerAura(aura) then
-						local auraId = normalizeAuraInstanceId(aura.auraInstanceID)
-						local auraSpellId = normalizeSpellId(aura.spellId)
-						if auraSpellId then
-							snapshot.spellIds[auraSpellId] = true
-							if auraId then snapshot.instanceSpellIds[auraId] = auraSpellId end
-						end
+			local aura = C_UnitAuras.GetAuraDataBySlot("player", slot)
+			if aura and Reminder.IsRelevantHelpfulPlayerAura(aura) then
+				local auraName = aura.name
+				if issecretvalue and issecretvalue(auraName) then
+					snapshot.supported = false
+					snapshot.restricted = true
+					self.playerAuraPresenceSnapshot = snapshot
+					return snapshot
+				end
 
-						local auraName = aura.name
-						if issecretvalue and issecretvalue(auraName) then auraName = nil end
-						if type(auraName) == "string" and auraName ~= "" then
-							snapshot.names[auraName] = true
-							if auraId then snapshot.instanceNames[auraId] = auraName end
-						end
+				local auraId = normalizeAuraInstanceId(aura.auraInstanceID)
+				local expirationTime = Reminder.GetAuraExpirationTime(aura)
+				local auraSpellId = normalizeSpellId(aura.spellId)
+				if auraSpellId then
+					snapshot.spellIds[auraSpellId] = true
+					Reminder.StoreBestExpiration(snapshot.spellIdExpirations, auraSpellId, expirationTime)
+					if auraId then snapshot.instanceSpellIds[auraId] = auraSpellId end
+				end
 
-						local auraIcon = aura.icon
-						if issecretvalue and issecretvalue(auraIcon) then auraIcon = nil end
-						auraIcon = tonumber(auraIcon)
-						if auraIcon and auraIcon > 0 then
-							snapshot.icons[auraIcon] = true
-							if auraId then snapshot.instanceIcons[auraId] = auraIcon end
-						end
-					end
+				if type(auraName) == "string" and auraName ~= "" then
+					snapshot.names[auraName] = true
+					Reminder.StoreBestExpiration(snapshot.nameExpirations, auraName, expirationTime)
+					if auraId then snapshot.instanceNames[auraId] = auraName end
+				end
+
+				local auraIcon = aura.icon
+				if issecretvalue and issecretvalue(auraIcon) then auraIcon = nil end
+				auraIcon = tonumber(auraIcon)
+				if auraIcon and auraIcon > 0 then
+					snapshot.icons[auraIcon] = true
+					Reminder.StoreBestExpiration(snapshot.iconExpirations, auraIcon, expirationTime)
+					if auraId then snapshot.instanceIcons[auraId] = auraIcon end
 				end
 			end
 		end
@@ -1903,13 +1983,23 @@ function Reminder:GetPlayerAuraPresenceSnapshot()
 	return snapshot
 end
 
+function Reminder:IsPlayerAuraSnapshotRestricted(snapshot)
+	return type(snapshot) == "table" and snapshot.restricted == true
+end
+
 function Reminder:AuraSnapshotHasAnySpellId(snapshot, spellIds)
 	if type(snapshot) ~= "table" or type(spellIds) ~= "table" then return false end
 	local present = snapshot.spellIds
 	if type(present) ~= "table" then return false end
+	local expirations = snapshot.spellIdExpirations
+	local thresholdSeconds = self:GetExpirationWarningSeconds()
+	local now = nowSeconds()
 	for i = 1, #spellIds do
 		local spellId = normalizeSpellId(spellIds[i])
-		if spellId and present[spellId] then return true end
+		if spellId and present[spellId] then
+			local expirationTime = type(expirations) == "table" and expirations[spellId] or math.huge
+			if self:IsExpirationTimeUsable(expirationTime, thresholdSeconds, now) then return true end
+		end
 	end
 	return false
 end
@@ -1918,9 +2008,15 @@ function Reminder:AuraSnapshotHasAnyName(snapshot, auraNames)
 	if type(snapshot) ~= "table" or type(auraNames) ~= "table" then return false end
 	local present = snapshot.names
 	if type(present) ~= "table" then return false end
+	local expirations = snapshot.nameExpirations
+	local thresholdSeconds = self:GetExpirationWarningSeconds()
+	local now = nowSeconds()
 	for i = 1, #auraNames do
 		local auraName = auraNames[i]
-		if type(auraName) == "string" and auraName ~= "" and present[auraName] then return true end
+		if type(auraName) == "string" and auraName ~= "" and present[auraName] then
+			local expirationTime = type(expirations) == "table" and expirations[auraName] or math.huge
+			if self:IsExpirationTimeUsable(expirationTime, thresholdSeconds, now) then return true end
+		end
 	end
 	return false
 end
@@ -1929,13 +2025,10 @@ function Reminder:AuraSnapshotHasIcon(snapshot, iconId)
 	iconId = tonumber(iconId)
 	if not iconId or iconId <= 0 or type(snapshot) ~= "table" then return false end
 	local present = snapshot.icons
-	return type(present) == "table" and present[iconId] == true or false
-end
-
-local function nowSeconds()
-	if GetTimePreciseSec then return tonumber(GetTimePreciseSec()) or 0 end
-	if GetTime then return tonumber(GetTime()) or 0 end
-	return 0
+	if type(present) ~= "table" or present[iconId] ~= true then return false end
+	local expirations = snapshot.iconExpirations
+	local expirationTime = type(expirations) == "table" and expirations[iconId] or math.huge
+	return self:IsExpirationTimeUsable(expirationTime)
 end
 
 function Reminder:GetFoodBagCacheVersion()
@@ -2148,6 +2241,7 @@ function Reminder:GetFlaskMissingEntry(evalContext)
 	if context and not context.flaskPreparedData then context.flaskPreparedData = prepared end
 	local snapshot = context and context.playerAuraSnapshot or self:GetPlayerAuraPresenceSnapshot()
 	if context and not context.playerAuraSnapshot then context.playerAuraSnapshot = snapshot end
+	if self:IsPlayerAuraSnapshotRestricted(snapshot) then return nil end
 
 	local hasFlaskAura
 	if snapshot and snapshot.supported == true then
@@ -2178,6 +2272,7 @@ function Reminder:GetFoodMissingEntry(evalContext)
 	if context and not context.foodPreparedData then context.foodPreparedData = prepared end
 	local snapshot = context and context.playerAuraSnapshot or self:GetPlayerAuraPresenceSnapshot()
 	if context and not context.playerAuraSnapshot then context.playerAuraSnapshot = snapshot end
+	if self:IsPlayerAuraSnapshotRestricted(snapshot) then return nil end
 
 	local hasFoodAura
 	if snapshot and snapshot.supported == true then
@@ -2207,6 +2302,7 @@ function Reminder:GetRuneMissingEntry(evalContext)
 	if context and not context.runePreparedData then context.runePreparedData = prepared end
 	local snapshot = context and context.playerAuraSnapshot or self:GetPlayerAuraPresenceSnapshot()
 	if context and not context.playerAuraSnapshot then context.playerAuraSnapshot = snapshot end
+	if self:IsPlayerAuraSnapshotRestricted(snapshot) then return nil end
 
 	local hasRuneAura
 	if snapshot and snapshot.supported == true then
@@ -2226,6 +2322,17 @@ function Reminder:GetRuneMissingEntry(evalContext)
 	return makeSelfMissingEntry(displaySpellId, displayLabel, nil, nil, "RUNES", prepared.displayIcon)
 end
 
+function Reminder:IsWeaponEnchantUsable(expirationMS)
+	local thresholdSeconds = self:GetExpirationWarningSeconds()
+	if thresholdSeconds <= 0 then return true end
+	expirationMS = tonumber(expirationMS)
+	if not expirationMS or expirationMS <= 0 then return true end
+	local remainingSeconds = expirationMS / 1000
+	if remainingSeconds <= thresholdSeconds then return false end
+	self:QueueExpirationWarningAt(nowSeconds() + remainingSeconds - thresholdSeconds)
+	return true
+end
+
 function Reminder:GetWeaponBuffMissingEntry(evalContext)
 	local candidates = self:GetWeaponBuffCandidates()
 	if type(candidates) ~= "table" or #candidates <= 0 then return nil end
@@ -2235,16 +2342,16 @@ function Reminder:GetWeaponBuffMissingEntry(evalContext)
 	local missingRequirements = 0
 	local hasMainWeapon = isPlayerMainhandEnchantableWeapon()
 	local hasOffhandWeapon = isPlayerOffhandEnchantableWeapon()
-	local hasMainEnchant, _, _, _, hasOffhandEnchant = GetWeaponEnchantInfo()
+	local hasMainEnchant, mainExpirationMS, _, _, hasOffhandEnchant, offhandExpirationMS = GetWeaponEnchantInfo()
 
 	if hasMainWeapon then
 		totalRequirements = totalRequirements + 1
-		if hasMainEnchant ~= true then missingRequirements = missingRequirements + 1 end
+		if hasMainEnchant ~= true or not self:IsWeaponEnchantUsable(mainExpirationMS) then missingRequirements = missingRequirements + 1 end
 	end
 
 	if hasOffhandWeapon then
 		totalRequirements = totalRequirements + 1
-		if hasOffhandEnchant ~= true then missingRequirements = missingRequirements + 1 end
+		if hasOffhandEnchant ~= true or not self:IsWeaponEnchantUsable(offhandExpirationMS) then missingRequirements = missingRequirements + 1 end
 	end
 
 	if totalRequirements <= 0 or missingRequirements <= 0 then return nil end
@@ -2497,7 +2604,7 @@ function Reminder:UnitHasAnyAuraName(unit, auraNames)
 					if issecretvalue and issecretvalue(isHelpful) then isHelpful = nil end
 					if isHelpful ~= false then
 						local activeName = aura.name
-						if not (issecretvalue and issecretvalue(activeName)) and type(activeName) == "string" and targetNames[activeName] then return true end
+						if not (issecretvalue and issecretvalue(activeName)) and type(activeName) == "string" and targetNames[activeName] and self:IsAuraUsableForReminder(aura) then return true end
 					end
 				end
 			end
@@ -2548,7 +2655,7 @@ function Reminder:UnitHasAuraIcon(unit, iconId)
 						local auraIcon = aura.icon
 						if issecretvalue and issecretvalue(auraIcon) then auraIcon = nil end
 						auraIcon = tonumber(auraIcon)
-						if auraIcon and auraIcon == iconId then return true end
+						if auraIcon and auraIcon == iconId and self:IsAuraUsableForReminder(aura) then return true end
 					end
 				end
 			end
@@ -3691,8 +3798,11 @@ function Reminder:GetUnitAuraState(unit)
 	if not state then
 		state = {
 			trackedByInstance = {},
+			expirationByInstance = {},
 			trackedCount = 0,
 			hasBuff = false,
+			hasUsableBuff = false,
+			nextExpirationWarningAt = nil,
 			initialized = false,
 			unitIdentity = nil,
 			providerRef = nil,
@@ -3701,6 +3811,7 @@ function Reminder:GetUnitAuraState(unit)
 		self.unitAuraStates[unit] = state
 	end
 	if type(state.trackedByInstance) ~= "table" then state.trackedByInstance = {} end
+	if type(state.expirationByInstance) ~= "table" then state.expirationByInstance = {} end
 	if type(state.trackedCount) ~= "number" then state.trackedCount = 0 end
 	return state
 end
@@ -3714,8 +3825,11 @@ end
 function Reminder:ClearTrackedAuraState(state)
 	if type(state) ~= "table" then return end
 	if type(state.trackedByInstance) == "table" then wipeTable(state.trackedByInstance) end
+	if type(state.expirationByInstance) == "table" then wipeTable(state.expirationByInstance) end
 	state.trackedCount = 0
 	state.hasBuff = false
+	state.hasUsableBuff = false
+	state.nextExpirationWarningAt = nil
 	state.initialized = false
 end
 
@@ -3986,6 +4100,38 @@ function Reminder:GetTrackableProviderAuraData(aura, provider)
 	return nil
 end
 
+function Reminder:RecomputeUsableAuraState(state)
+	if type(state) ~= "table" then return end
+	state.hasBuff = (tonumber(state.trackedCount) or 0) > 0
+	local thresholdSeconds = self:GetExpirationWarningSeconds()
+	if thresholdSeconds <= 0 then
+		state.hasUsableBuff = state.hasBuff
+		state.nextExpirationWarningAt = nil
+		return
+	end
+	local expirationByInstance = state.expirationByInstance
+	if type(expirationByInstance) ~= "table" then
+		state.hasUsableBuff = state.hasBuff
+		state.nextExpirationWarningAt = nil
+		return
+	end
+	local now = nowSeconds()
+	local usable = false
+	local nextAt
+	for _, expirationTime in pairs(expirationByInstance) do
+		if self:IsExpirationTimeUsable(expirationTime, thresholdSeconds, now) then
+			usable = true
+			if expirationTime and expirationTime ~= math.huge then
+				local warningAt = expirationTime - thresholdSeconds
+				if warningAt > now and (not nextAt or warningAt < nextAt) then nextAt = warningAt end
+			end
+		end
+	end
+	state.hasUsableBuff = usable
+	state.nextExpirationWarningAt = nextAt
+	if nextAt then self:QueueExpirationWarningAt(nextAt) end
+end
+
 function Reminder:AddProviderAuraToState(state, aura, provider)
 	if type(state) ~= "table" then return false end
 	local auraId, spellId = self:GetTrackableProviderAuraData(aura, provider)
@@ -3997,7 +4143,8 @@ function Reminder:AddProviderAuraToState(state, aura, provider)
 	else
 		state.trackedByInstance[auraId] = spellId
 	end
-	state.hasBuff = (state.trackedCount or 0) > 0
+	state.expirationByInstance[auraId] = Reminder.GetAuraExpirationTime(aura)
+	self:RecomputeUsableAuraState(state)
 	return true
 end
 
@@ -4007,9 +4154,10 @@ function Reminder:RemoveProviderAuraFromState(state, auraId)
 	if not auraId or state.trackedByInstance[auraId] == nil then return false end
 
 	state.trackedByInstance[auraId] = nil
+	if type(state.expirationByInstance) == "table" then state.expirationByInstance[auraId] = nil end
 	state.trackedCount = (state.trackedCount or 0) - 1
 	if state.trackedCount < 0 then state.trackedCount = 0 end
-	state.hasBuff = state.trackedCount > 0
+	self:RecomputeUsableAuraState(state)
 	return true
 end
 
@@ -4047,7 +4195,7 @@ function Reminder:FullRefreshUnitAuraState(unit, provider)
 		continuationToken = nextToken
 	end
 
-	state.hasBuff = (state.trackedCount or 0) > 0
+	self:RecomputeUsableAuraState(state)
 	state.initialized = true
 	return state
 end
@@ -4099,7 +4247,12 @@ function Reminder:ApplyDeltaToUnitAuraState(unit, updateInfo, provider)
 				local aura = C_UnitAuras.GetAuraDataByAuraInstanceID(unit, auraId)
 				if aura then
 					local trackedAuraId = self:GetTrackableProviderAuraData(aura, provider)
-					if trackedAuraId ~= auraId then self:RemoveProviderAuraFromState(state, auraId) end
+					if trackedAuraId == auraId then
+						state.expirationByInstance[auraId] = Reminder.GetAuraExpirationTime(aura)
+						self:RecomputeUsableAuraState(state)
+					else
+						self:RemoveProviderAuraFromState(state, auraId)
+					end
 				else
 					self:RemoveProviderAuraFromState(state, auraId)
 				end
@@ -4107,7 +4260,7 @@ function Reminder:ApplyDeltaToUnitAuraState(unit, updateInfo, provider)
 		end
 	end
 
-	state.hasBuff = (state.trackedCount or 0) > 0
+	self:RecomputeUsableAuraState(state)
 	state.initialized = true
 	return state
 end
@@ -4261,14 +4414,18 @@ function Reminder:GetGroupBuffUnitState(cache, unit)
 	if type(state) ~= "table" then
 		state = {
 			trackedByInstance = {},
+			expirationByInstance = {},
 			trackedCount = 0,
 			hasBuff = false,
+			hasUsableBuff = false,
+			nextExpirationWarningAt = nil,
 			initialized = false,
 			unitIdentity = nil,
 		}
 		cache.unitStates[unit] = state
 	end
 	if type(state.trackedByInstance) ~= "table" then state.trackedByInstance = {} end
+	if type(state.expirationByInstance) ~= "table" then state.expirationByInstance = {} end
 	if type(state.trackedCount) ~= "number" then state.trackedCount = 0 end
 	return state
 end
@@ -4276,8 +4433,11 @@ end
 function Reminder:ClearGroupBuffUnitState(state)
 	if type(state) ~= "table" then return end
 	if type(state.trackedByInstance) == "table" then wipeTable(state.trackedByInstance) end
+	if type(state.expirationByInstance) == "table" then wipeTable(state.expirationByInstance) end
 	state.trackedCount = 0
 	state.hasBuff = false
+	state.hasUsableBuff = false
+	state.nextExpirationWarningAt = nil
 	state.initialized = false
 end
 
@@ -4325,7 +4485,8 @@ function Reminder:AddGroupBuffAuraToState(state, aura, cache)
 	else
 		state.trackedByInstance[auraId] = spellId
 	end
-	state.hasBuff = (state.trackedCount or 0) > 0
+	state.expirationByInstance[auraId] = Reminder.GetAuraExpirationTime(aura)
+	self:RecomputeUsableAuraState(state)
 	return true
 end
 
@@ -4335,9 +4496,10 @@ function Reminder:RemoveGroupBuffAuraFromState(state, auraId)
 	if not auraId or state.trackedByInstance[auraId] == nil then return false end
 
 	state.trackedByInstance[auraId] = nil
+	if type(state.expirationByInstance) == "table" then state.expirationByInstance[auraId] = nil end
 	state.trackedCount = (state.trackedCount or 0) - 1
 	if state.trackedCount < 0 then state.trackedCount = 0 end
-	state.hasBuff = state.trackedCount > 0
+	self:RecomputeUsableAuraState(state)
 	return true
 end
 
@@ -4374,7 +4536,7 @@ function Reminder:FullRefreshGroupBuffUnitState(cache, unit)
 		continuationToken = nextToken
 	end
 
-	state.hasBuff = (state.trackedCount or 0) > 0
+	self:RecomputeUsableAuraState(state)
 	state.initialized = true
 	return state
 end
@@ -4423,7 +4585,13 @@ function Reminder:ApplyDeltaToGroupBuffUnitState(cache, unit, updateInfo)
 				local aura = C_UnitAuras.GetAuraDataByAuraInstanceID(unit, auraId)
 				if aura then
 					local trackedAuraId = self:GetTrackableGroupBuffAuraData(aura, cache)
-					if trackedAuraId ~= auraId and self:RemoveGroupBuffAuraFromState(state, auraId) then changed = true end
+					if trackedAuraId == auraId then
+						state.expirationByInstance[auraId] = Reminder.GetAuraExpirationTime(aura)
+						self:RecomputeUsableAuraState(state)
+						changed = true
+					elseif self:RemoveGroupBuffAuraFromState(state, auraId) then
+						changed = true
+					end
 				else
 					if self:RemoveGroupBuffAuraFromState(state, auraId) then changed = true end
 				end
@@ -4431,7 +4599,7 @@ function Reminder:ApplyDeltaToGroupBuffUnitState(cache, unit, updateInfo)
 		end
 	end
 
-	state.hasBuff = (state.trackedCount or 0) > 0
+	self:RecomputeUsableAuraState(state)
 	state.initialized = true
 	return state, changed
 end
@@ -4449,7 +4617,7 @@ function Reminder:GetGroupBuffUnitMissingStatus(cache, unit)
 	local state = self:PrepareGroupBuffUnitState(cache, unit)
 	if not state then return GROUP_UNIT_STATUS_INELIGIBLE end
 	if state.initialized ~= true then state = self:FullRefreshGroupBuffUnitState(cache, unit) end
-	if state and state.hasBuff == true then return GROUP_UNIT_STATUS_PRESENT end
+	if state and state.hasUsableBuff == true then return GROUP_UNIT_STATUS_PRESENT end
 	if not Reminder.CanActOnMissingGroupBuffUnit(unit) then return GROUP_UNIT_STATUS_INELIGIBLE end
 	return GROUP_UNIT_STATUS_MISSING
 end
@@ -5430,7 +5598,7 @@ function Reminder:UnitHasProviderBuff(unit, provider)
 	local state = self:PrepareUnitAuraState(unit, provider)
 	if not state then return false end
 	if not state.initialized then state = self:FullRefreshUnitAuraState(unit, provider) end
-	return state and state.hasBuff == true
+	return state and state.hasUsableBuff == true
 end
 
 function Reminder:ComputeMissing(provider)
@@ -5567,16 +5735,68 @@ function Reminder:RenderEditModePreview()
 	end
 end
 
+function Reminder:ResetExpirationWarningCandidate()
+	self.nextExpirationWarningAt = nil
+end
+
+function Reminder:QueueExpirationWarningAt(timestamp)
+	local thresholdSeconds = self:GetExpirationWarningSeconds()
+	if thresholdSeconds <= 0 then return end
+	timestamp = tonumber(timestamp)
+	if not timestamp or timestamp <= 0 then return end
+	local now = nowSeconds()
+	if timestamp <= now then return end
+	if not self.nextExpirationWarningAt or timestamp < self.nextExpirationWarningAt then self.nextExpirationWarningAt = timestamp end
+end
+
+function Reminder:CancelExpirationWarningTimer()
+	if self.expirationWarningTimer then
+		self.expirationWarningTimer:Cancel()
+		self.expirationWarningTimer = nil
+	end
+	self.expirationWarningTimerAt = nil
+end
+
+function Reminder.RunExpirationWarningTimer()
+	Reminder.expirationWarningTimer = nil
+	Reminder.expirationWarningTimerAt = nil
+	Reminder:MarkAuraStatesDirty()
+	Reminder:RequestUpdate(true)
+end
+
+function Reminder:ScheduleExpirationWarningTimer()
+	if self:GetExpirationWarningSeconds() <= 0 then
+		self:CancelExpirationWarningTimer()
+		return
+	end
+	local at = tonumber(self.nextExpirationWarningAt)
+	if not at then
+		self:CancelExpirationWarningTimer()
+		return
+	end
+	local delay = at - nowSeconds()
+	if delay < 0.05 then delay = 0.05 end
+	if self.expirationWarningTimer and self.expirationWarningTimerAt and math.abs(self.expirationWarningTimerAt - at) < 0.05 then return end
+	self:CancelExpirationWarningTimer()
+	if C_Timer and C_Timer.NewTimer then
+		self.expirationWarningTimerAt = at
+		self.expirationWarningTimer = C_Timer.NewTimer(delay, Reminder.RunExpirationWarningTimer)
+	end
+end
+
 function Reminder:UpdateDisplay()
 	self:FlushPendingAuraUpdates()
 	local frame = self:EnsureFrame()
 	if not frame then return end
 
 	if self.editModeActive == true then
+		self:CancelExpirationWarningTimer()
 		self.missingActive = false
 		self:RenderEditModePreview()
 		return
 	end
+
+	self:ResetExpirationWarningCandidate()
 
 	if frame.iconCountText then frame.iconCountText:SetText("") end
 	if frame.countText then frame.countText:SetText("") end
@@ -5584,6 +5804,7 @@ function Reminder:UpdateDisplay()
 	self:HideSelfMissingIcons()
 
 	if getValue(DB_ENABLED, defaults.enabled) ~= true then
+		self:CancelExpirationWarningTimer()
 		self:SetGlowShown(false)
 		self.missingActive = false
 		frame:Hide()
@@ -5593,6 +5814,7 @@ function Reminder:UpdateDisplay()
 	local groupModeAllowed = self:IsGroupModeAllowed()
 	local petSoloModeAllowed = groupModeAllowed ~= true and self:GetGroupContext() == GROUP_CONTEXT_SOLO and self:CanCheckPetReminder()
 	if groupModeAllowed ~= true and petSoloModeAllowed ~= true then
+		self:CancelExpirationWarningTimer()
 		self:SetGlowShown(false)
 		self.missingActive = false
 		frame:Hide()
@@ -5600,6 +5822,7 @@ function Reminder:UpdateDisplay()
 	end
 
 	if self:IsHideInRestedAreaEnabled() == true and self:IsPlayerInRestedArea() == true then
+		self:CancelExpirationWarningTimer()
 		self:SetGlowShown(false)
 		self.missingActive = false
 		frame:Hide()
@@ -5607,6 +5830,7 @@ function Reminder:UpdateDisplay()
 	end
 
 	if not canEvaluateUnit("player") then
+		self:CancelExpirationWarningTimer()
 		self:SetGlowShown(false)
 		self.missingActive = false
 		frame:Hide()
@@ -5614,6 +5838,7 @@ function Reminder:UpdateDisplay()
 	end
 
 	if self:IsRuntimeEvaluationBlockedByCombat() then
+		self:CancelExpirationWarningTimer()
 		self:SetGlowShown(false)
 		self.missingActive = false
 		frame:Hide()
@@ -5639,6 +5864,7 @@ function Reminder:UpdateDisplay()
 		elseif self:CanCheckPetReminder() then
 			provider = self:GetPetOnlyProvider()
 		else
+			self:CancelExpirationWarningTimer()
 			self:SetGlowShown(false)
 			self.missingActive = false
 			frame:Hide()
@@ -5678,6 +5904,7 @@ function Reminder:UpdateDisplay()
 		end
 	end
 	if total <= 0 and supplementalMissing <= 0 then
+		self:ScheduleExpirationWarningTimer()
 		self:SetGlowShown(false)
 		self.missingActive = false
 		frame:Hide()
@@ -5689,6 +5916,7 @@ function Reminder:UpdateDisplay()
 	if self.suppressNextMissingSound == true and effectiveMissing <= 0 then self.suppressNextMissingSound = false end
 
 	if effectiveMissing <= 0 then
+		self:ScheduleExpirationWarningTimer()
 		self:SetGlowShown(false)
 		self.missingActive = false
 		frame:Hide()
@@ -5698,6 +5926,7 @@ function Reminder:UpdateDisplay()
 	self:UpdateMissingStateAndSound(effectiveMissing)
 
 	self:Render(provider, missing, total, supplementalEntries, effectiveMissing)
+	self:ScheduleExpirationWarningTimer()
 end
 
 function Reminder:RequestUpdate(immediate, delay, reschedule)
@@ -5803,6 +6032,10 @@ function Reminder:HandleEvent(event, unit, updateInfo)
 		or event == "ENCOUNTER_START"
 		or event == "ENCOUNTER_END"
 	then
+		self:MarkAuraStatesDirty()
+		self:InvalidateFlaskCache()
+		self:InvalidateFoodCache()
+		self:InvalidateRuneCache()
 		self:RequestUpdate(false, Reminder.RUNTIME_UPDATE_DELAY, true)
 		return
 	end
@@ -6119,6 +6352,23 @@ function editModeSettingsBuilders.buildClassBuffs()
 			default = defaults.showSolo,
 			get = function() return getValue(DB_SHOW_SOLO, defaults.showSolo) == true end,
 			set = function(_, value) editModeSetBool(DB_SHOW_SOLO, value) end,
+		},
+		{
+			name = L["ClassBuffReminderExpirationWarningMinutes"] or "Show before expiration",
+			kind = SettingType.Slider,
+			parentId = "classBuffs",
+			default = defaults.expirationWarningMinutes or 0,
+			minValue = 0,
+			maxValue = 60,
+			valueStep = 1,
+			get = function() return Reminder:GetExpirationWarningMinutes() end,
+			set = function(_, value) Reminder:SetExpirationWarningMinutes(value) end,
+			formatter = function(value)
+				local minutes = Reminder:NormalizeExpirationWarningMinutes(value)
+				if minutes <= 0 then return L["ClassBuffReminderExpirationWarningOff"] or "Missing only" end
+				return string.format(L["ClassBuffReminderExpirationWarningMinutesFmt"] or "%d min", minutes)
+			end,
+			tooltip = L["ClassBuffReminderExpirationWarningMinutesDesc"] or "0 keeps the current behavior. Higher values show the reminder when a tracked buff has this many minutes or less remaining.",
 		},
 		{
 			name = L["ClassBuffReminderHideInRestedArea"] or "Don't show in rested areas",
