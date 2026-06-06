@@ -10,6 +10,7 @@
 ### ✨ Added
 
 - Damage Meter: Added optional segment linking across Damage Meter windows.
+- Damage Meter: Added a per-window option to keep manually selected meter types, allowing separate windows to stay on choices like Damage Done and Healing Done after reloads.
 - Economy: Added guild-bank repair context selection for automatic guild-bank repairs.
 - Unit Frames, Castbars and Resource Bars: Added configurable text anchors for cast names, cast durations and resource bar values.
 

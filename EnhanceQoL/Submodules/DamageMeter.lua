@@ -76,6 +76,7 @@ local SYNC_EXCLUDED_KEYS = {
 	anchorToWindow = true,
 	sessionType = true,
 	damageMeterType = true,
+	keepManualType = true,
 	roleSpecificType = true,
 	tankDamageMeterType = true,
 	healerDamageMeterType = true,
@@ -102,6 +103,7 @@ local DEFAULT_WINDOW = {
 	windowOffsetY = 0,
 	sessionType = "current",
 	damageMeterType = "DamageDone",
+	keepManualType = false,
 	roleSpecificType = false,
 	tankDamageMeterType = "DamageDone",
 	healerDamageMeterType = "HealingDone",
@@ -1685,6 +1687,9 @@ end
 function DamageMeter:GetEffectiveDamageMeterType(index)
 	local temporary = self:GetTemporarySelection(index)
 	local config = self:GetConfig(index)
+	if config.keepManualType == true then
+		return normalizeDamageMeterTypeKey(config.damageMeterType)
+	end
 	return normalizeDamageMeterTypeKey(self:GetRoleSpecificDamageMeterType(config) or temporary.damageMeterType or config.damageMeterType)
 end
 
@@ -1793,10 +1798,49 @@ function DamageMeter:ForEachLinkedSessionWindow(index, callback)
 end
 
 function DamageMeter:SetTemporaryDamageMeterType(index, damageMeterType)
+	local config = self:GetConfig(index)
+	local normalizedType = normalizeDamageMeterTypeKey(damageMeterType)
+	if config.keepManualType == true then
+		local temporary = self:GetTemporarySelection(index)
+		temporary.damageMeterType = nil
+		self:SetConfigValue(index, "damageMeterType", normalizedType)
+		return
+	end
+
 	local temporary = self:GetTemporarySelection(index)
-	temporary.damageMeterType = normalizeDamageMeterTypeKey(damageMeterType)
+	temporary.damageMeterType = normalizedType
 	self:InvalidateLiveEventWatch()
 	self:ScheduleRefresh()
+end
+
+function DamageMeter:SetKeepManualDamageMeterType(index, enabled)
+	local config = self:GetConfig(index)
+	enabled = enabled == true
+	local currentType = normalizeDamageMeterTypeKey(self:GetEffectiveDamageMeterType(index))
+	local changed = config.keepManualType ~= enabled
+	config.keepManualType = enabled
+
+	if enabled then
+		if config.damageMeterType ~= currentType then
+			config.damageMeterType = currentType
+			changed = true
+		end
+		if config.roleSpecificType ~= false then
+			config.roleSpecificType = false
+			changed = true
+		end
+		local temporary = self:GetTemporarySelection(index)
+		if temporary.damageMeterType ~= nil then
+			temporary.damageMeterType = nil
+			changed = true
+		end
+	end
+
+	if not changed then return end
+	self:InvalidateLiveEventWatch()
+	self:UpdateEventState()
+	self:MarkWindowStyleDirty(index)
+	self:RefreshWindow(index)
 end
 
 function DamageMeter:GetAvailableCombatSessions()
@@ -5668,7 +5712,7 @@ function DamageMeter:HasRoleSpecificTypeWindows()
 	if not self:IsEnabled() then return false end
 	local windows = self:GetWindowsDB()
 	for index = 1, getWindowCount() do
-		if windows[index] and windows[index].roleSpecificType == true then return true end
+		if windows[index] and windows[index].keepManualType ~= true and windows[index].roleSpecificType == true then return true end
 	end
 	return false
 end
@@ -6070,12 +6114,13 @@ local function sliderSetting(name, getter, setter, minValue, maxValue, step, par
 	}
 end
 
-local function checkboxSetting(name, getter, setter, parentId, isEnabled, tooltip)
+local function checkboxSetting(name, getter, setter, parentId, isEnabled, tooltip, isShown)
 	return {
 		name = name,
 		kind = SettingType.Checkbox,
 		parentId = parentId,
 		isEnabled = isEnabled,
+		isShown = isShown,
 		tooltip = tooltip,
 		get = getter,
 		set = function(_, value) setter(value == true) end,
@@ -6320,7 +6365,8 @@ function DamageMeter:BuildWindowSettings(index)
 	local function fixedIconBorderColorEnabled() return cfg().showIcons ~= false and cfg().iconBorderEnabled == true and cfg().iconBorderUseClassColor ~= true end
 	local function windowBorderEnabled() return cfg().borderEnabled == true end
 	local function fixedValueColorEnabled() return cfg().valueUseClassColors ~= true end
-	local function roleSpecificTypeEnabled() return cfg().roleSpecificType == true end
+	local function automaticTypeVisible() return cfg().keepManualType ~= true end
+	local function roleSpecificTypeEnabled() return automaticTypeVisible() and cfg().roleSpecificType == true end
 	local function rankingEnabled() return cfg().showRanks ~= false end
 	local function rankColumnEnabled() return cfg().showRanks ~= false and cfg().prefixRankInName ~= true end
 	local function fixedRankColorEnabled() return cfg().showRanks ~= false and cfg().rankUseClassColors ~= true end
@@ -6372,18 +6418,22 @@ function DamageMeter:BuildWindowSettings(index)
 			self:InvalidateLiveEventWatch()
 			self:Refresh()
 		end, behaviorId, nil, L["damageMeterLinkSegmentsDesc"] or "When enabled, changing the selected segment in one Damage Meter window switches all Damage Meter windows to that segment."),
+		checkboxSetting(L["damageMeterKeepManualType"] or "Keep manual type", function() return cfg().keepManualType == true end, function(value)
+			self:SetKeepManualDamageMeterType(index, value)
+			requestEditModeSettingsRefresh()
+		end, behaviorId, nil, L["damageMeterKeepManualTypeDesc"] or "When enabled, manual type changes are saved for this window and restored after reloads."),
 		dropdownSetting(L["damageMeterSession"] or "Session", function() return cfg().sessionType end, function(value) self:SetConfigValue(index, "sessionType", value == "overall" and "overall" or "current") end, {
 			{ value = "current", label = L["damageMeterCurrent"] or "Current" },
 			{ value = "overall", label = L["damageMeterOverall"] or "Overall" },
 		}, behaviorId, 110),
-		dropdownSetting(_G.TYPE or "Type", function() return normalizeDamageMeterTypeKey(cfg().damageMeterType) end, function(value) self:SetConfigValue(index, "damageMeterType", normalizeDamageMeterTypeKey(value)) end, buildDamageMeterTypeOptions, behaviorId, 180, function() return cfg().roleSpecificType ~= true end),
+		dropdownSetting(_G.TYPE or "Type", function() return normalizeDamageMeterTypeKey(cfg().damageMeterType) end, function(value) self:SetConfigValue(index, "damageMeterType", normalizeDamageMeterTypeKey(value)) end, buildDamageMeterTypeOptions, behaviorId, 180, function() return automaticTypeVisible() and cfg().roleSpecificType ~= true end, automaticTypeVisible),
 		checkboxSetting(L["damageMeterRoleSpecificType"] or "Role-specific type", function() return cfg().roleSpecificType == true end, function(value)
 			self:SetConfigValue(index, "roleSpecificType", value)
 			requestEditModeSettingsRefresh()
-		end, behaviorId),
-		dropdownSetting(L["damageMeterTankType"] or "Tank type", function() return normalizeDamageMeterTypeKey(cfg().tankDamageMeterType) end, function(value) self:SetConfigValue(index, "tankDamageMeterType", normalizeDamageMeterTypeKey(value)) end, buildDamageMeterTypeOptions, behaviorId, 180, roleSpecificTypeEnabled),
-		dropdownSetting(L["damageMeterHealerType"] or "Healer type", function() return normalizeDamageMeterTypeKey(cfg().healerDamageMeterType) end, function(value) self:SetConfigValue(index, "healerDamageMeterType", normalizeDamageMeterTypeKey(value)) end, buildDamageMeterTypeOptions, behaviorId, 180, roleSpecificTypeEnabled),
-		dropdownSetting(L["damageMeterDpsType"] or "DPS type", function() return normalizeDamageMeterTypeKey(cfg().damagerDamageMeterType) end, function(value) self:SetConfigValue(index, "damagerDamageMeterType", normalizeDamageMeterTypeKey(value)) end, buildDamageMeterTypeOptions, behaviorId, 180, roleSpecificTypeEnabled),
+		end, behaviorId, nil, nil, automaticTypeVisible),
+		dropdownSetting(L["damageMeterTankType"] or "Tank type", function() return normalizeDamageMeterTypeKey(cfg().tankDamageMeterType) end, function(value) self:SetConfigValue(index, "tankDamageMeterType", normalizeDamageMeterTypeKey(value)) end, buildDamageMeterTypeOptions, behaviorId, 180, roleSpecificTypeEnabled, automaticTypeVisible),
+		dropdownSetting(L["damageMeterHealerType"] or "Healer type", function() return normalizeDamageMeterTypeKey(cfg().healerDamageMeterType) end, function(value) self:SetConfigValue(index, "healerDamageMeterType", normalizeDamageMeterTypeKey(value)) end, buildDamageMeterTypeOptions, behaviorId, 180, roleSpecificTypeEnabled, automaticTypeVisible),
+		dropdownSetting(L["damageMeterDpsType"] or "DPS type", function() return normalizeDamageMeterTypeKey(cfg().damagerDamageMeterType) end, function(value) self:SetConfigValue(index, "damagerDamageMeterType", normalizeDamageMeterTypeKey(value)) end, buildDamageMeterTypeOptions, behaviorId, 180, roleSpecificTypeEnabled, automaticTypeVisible),
 		dividerSetting(behaviorId),
 		dropdownSetting(L["damageMeterAutomaticClear"] or "Automatic clear", function() return normalizeAutoClearMode(db().damageMeterAutomaticClear) end, function(value)
 			db().damageMeterAutomaticClear = normalizeAutoClearMode(value)

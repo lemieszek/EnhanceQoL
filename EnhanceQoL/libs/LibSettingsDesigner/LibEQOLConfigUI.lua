@@ -5232,29 +5232,36 @@ local function createFrame(app)
 	frame.Title:SetShadowOffset(1, -1)
 	setTextColor(frame.Title, TEXT.topbarGold)
 
-	frame.CustomCloseButton = CreateFrame("Button", nil, frame.TopBar, "BackdropTemplate")
+	frame.CustomCloseButton = CreateFrame("Button", nil, frame, "BackdropTemplate")
 	frame.CustomCloseButton:SetSize(30, 28)
-	frame.CustomCloseButton:SetPoint("RIGHT", frame.TopBar, "RIGHT", -12, 0)
-	applyBackdrop(frame.CustomCloseButton, { 0.060, 0.052, 0.040, 0.20 }, { 0, 0, 0, 0 })
+	frame.CustomCloseButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 16, 10)
+	frame.CustomCloseButton:SetBackdrop({
+		bgFile = "Interface\\Buttons\\WHITE8X8",
+		edgeFile = "Interface\\Buttons\\WHITE8X8",
+		tile = false,
+		edgeSize = 1,
+		insets = { left = 0, right = 0, top = 0, bottom = 0 },
+	})
+	setFrameBackdrop(frame.CustomCloseButton, { 0.060, 0.052, 0.040, 1.00 }, { 0.55, 0.42, 0.18, 1.00 })
 	frame.CustomCloseButton.Text = frame.CustomCloseButton:CreateFontString(nil, "OVERLAY", FONT_TITLE)
-	frame.CustomCloseButton.Text:SetPoint("CENTER", frame.CustomCloseButton, "CENTER", 1, 0)
+	frame.CustomCloseButton.Text:SetPoint("CENTER", frame.CustomCloseButton, "CENTER", 0, 0)
 	frame.CustomCloseButton.Text:SetSize(18, 18)
 	frame.CustomCloseButton.Text:SetJustifyH("CENTER")
 	frame.CustomCloseButton.Text:SetJustifyV("MIDDLE")
 	frame.CustomCloseButton.Text:SetText("X")
 	setTextColor(frame.CustomCloseButton.Text, TEXT.topbarGold)
 	frame.CustomCloseButton:SetScript("OnEnter", function(self)
-		setFrameBackdrop(self, { 0.165, 0.135, 0.080, 0.98 }, CARD_BORDER_HOVER)
+		setFrameBackdrop(self, { 0.165, 0.135, 0.080, 1.00 }, { 0.95, 0.72, 0.30, 1.00 })
 	end)
 	frame.CustomCloseButton:SetScript("OnLeave", function(self)
-		setFrameBackdrop(self, { 0.060, 0.052, 0.040, 0.20 }, { 0, 0, 0, 0 })
+		setFrameBackdrop(self, { 0.060, 0.052, 0.040, 1.00 }, { 0.55, 0.42, 0.18, 1.00 })
 	end)
 	frame.CustomCloseButton:SetScript("OnClick", function()
 		frame:Hide()
 	end)
 
 	frame.ResetButton = makeFlatButton(frame.TopBar, _G.DEFAULTS or _G.RESET or "Defaults", 104, 28)
-	frame.ResetButton:SetPoint("RIGHT", frame.CustomCloseButton, "LEFT", -10, 0)
+	frame.ResetButton:SetPoint("RIGHT", frame.TopBar, "RIGHT", -12, 0)
 	setFrameBackdrop(frame.ResetButton, { 0.120, 0.105, 0.075, 0.95 }, { 0.55, 0.42, 0.18, 0.82 })
 	setTextColor(frame.ResetButton.Text, TEXT.topbarGold)
 	frame.ResetButton:SetScript("OnEnter", function(self)
