@@ -3915,6 +3915,7 @@ end
 
 local function resolveDruidSharedMainAndSecondary(specIndex)
 	local spec = tonumber(specIndex or addon.variables.unitSpec)
+	local isBalance = spec == 1
 	local formID = GetShapeshiftFormID and GetShapeshiftFormID() or nil
 	local formKey = ResourceBars.GetCurrentDruidFormKey and ResourceBars.GetCurrentDruidFormKey() or nil
 	local currentPowerTypeId, currentPowerToken
@@ -3934,21 +3935,21 @@ local function resolveDruidSharedMainAndSecondary(specIndex)
 
 	if currentPowerToken == "RAGE" then return "RAGE", nil end
 	if currentPowerToken == "ENERGY" then return "ENERGY", "COMBO_POINTS" end
-	if currentPowerToken == "LUNAR_POWER" then return "LUNAR_POWER", "MANA" end
+	if currentPowerToken == "LUNAR_POWER" and isBalance then return "LUNAR_POWER", "MANA" end
 	if currentPowerToken == "MANA" then
-		if spec == 1 then return "LUNAR_POWER", "MANA" end
+		if isBalance then return "LUNAR_POWER", "MANA" end
 		return "MANA", nil
 	end
 
 	if formID == DRUID_BEAR_FORM then return "RAGE", nil end
 	if formID == DRUID_CAT_FORM then return "ENERGY", "COMBO_POINTS" end
-	if formID == DRUID_MOONKIN_FORM_1 or formID == DRUID_MOONKIN_FORM_2 then return "LUNAR_POWER", "MANA" end
+	if isBalance and (formID == DRUID_MOONKIN_FORM_1 or formID == DRUID_MOONKIN_FORM_2) then return "LUNAR_POWER", "MANA" end
 	if formID == DRUID_TREE_FORM or formID == 36 then return "MANA", nil end
 	if formID == DRUID_TRAVEL_FORM or formID == DRUID_ACQUATIC_FORM or formID == DRUID_FLIGHT_FORM or formID == DRUID_SWIFT_FLIGHT_FORM then return "MANA", nil end
 
 	if formKey == "STAG" or formKey == "TRAVEL" then return "MANA", nil end
 
-	if spec == 1 then return "LUNAR_POWER", "MANA" end
+	if isBalance then return "LUNAR_POWER", "MANA" end
 	return "MANA", nil
 end
 

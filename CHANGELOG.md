@@ -1,5 +1,13 @@
 # Changelog
 
+## [11.0.1] - 2026-06-06
+
+### 🐛 Fixed
+
+- Resource Bars / Shared Mode: Fixed non-Balance Druids being able to resolve Astral Power as the shared Main resource during shapeshift refreshes.
+
+---
+
 ## [11.0.0] - 2026-06-06
 
 ### ℹ️ Important
