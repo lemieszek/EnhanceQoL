@@ -26,6 +26,7 @@
 - Mythic Plus / Dungeon Finder: Fixed current-season dungeon score hover handling for missing Group Finder map IDs.
 - Tooltips: Fixed realm language flags falling back to locale text such as [frFR] inside instances.
 - Unit Frames: Fixed custom player, target, focus and pet portrait fields not being exposed on EQOL unit frames.
+- Unit Frames: Fixed the player absorb overlay sometimes staying at zero width after logging in with an active shield.
 - Unit Frames / Healer Buff Placement: Added an Anchor outside frame option so HBP indicators can be positioned slightly outside party and raid frames.
 - Bags: Fixed new characters without purchased character bank tabs being unable to switch to the integrated character bank purchase view.
 
