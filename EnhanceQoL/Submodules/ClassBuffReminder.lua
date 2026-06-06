@@ -731,6 +731,13 @@ local function canEvaluateUnit(unit)
 	return true
 end
 
+function Reminder.CanActOnMissingGroupBuffUnit(unit)
+	if isPlayerUnit(unit) then return true end
+	if UnitIsVisible and UnitIsVisible(unit) == false then return false end
+	if UnitPhaseReason and UnitPhaseReason(unit) ~= nil then return false end
+	return true
+end
+
 local function getUnitIdentity(unit)
 	if type(unit) ~= "string" or unit == "" or not UnitGUID then return nil end
 	local guid = UnitGUID(unit)
@@ -4116,6 +4123,7 @@ function Reminder:GetGroupUnitMissingStatus(provider, unit)
 	if isAIFollowerUnit(unit) then return GROUP_UNIT_STATUS_INELIGIBLE end
 	if not (UnitExists and UnitExists(unit) and UnitIsConnected and UnitIsConnected(unit) and not UnitIsDeadOrGhost(unit)) then return GROUP_UNIT_STATUS_INELIGIBLE end
 	if self:UnitHasProviderBuff(unit, provider) then return GROUP_UNIT_STATUS_PRESENT end
+	if not Reminder.CanActOnMissingGroupBuffUnit(unit) then return GROUP_UNIT_STATUS_INELIGIBLE end
 	return GROUP_UNIT_STATUS_MISSING
 end
 
@@ -4441,6 +4449,7 @@ function Reminder:GetGroupBuffUnitMissingStatus(cache, unit)
 	if not state then return GROUP_UNIT_STATUS_INELIGIBLE end
 	if state.initialized ~= true then state = self:FullRefreshGroupBuffUnitState(cache, unit) end
 	if state and state.hasBuff == true then return GROUP_UNIT_STATUS_PRESENT end
+	if not Reminder.CanActOnMissingGroupBuffUnit(unit) then return GROUP_UNIT_STATUS_INELIGIBLE end
 	return GROUP_UNIT_STATUS_MISSING
 end
 
@@ -5743,6 +5752,12 @@ function Reminder:HandleEvent(event, unit, updateInfo)
 		return
 	end
 
+	if event == "UNIT_PHASE" then
+		self:MarkAuraStatesDirty()
+		self:RequestUpdate(false, Reminder.RUNTIME_UPDATE_DELAY, true)
+		return
+	end
+
 	if event == "PLAYER_ROLES_ASSIGNED" or event == "ROLE_CHANGED_INFORM" then
 		self:InvalidateSelfProviderStatus()
 		self:InvalidateFlaskCache()
@@ -5922,6 +5937,7 @@ function Reminder:RegisterEvents()
 	self.eventFrame:RegisterEvent("PLAYER_LOGIN")
 	self.eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 	self.eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
+	self.eventFrame:RegisterEvent("UNIT_PHASE")
 	self.eventFrame:RegisterEvent("PLAYER_ROLES_ASSIGNED")
 	self.eventFrame:RegisterEvent("ROLE_CHANGED_INFORM")
 	self.eventFrame:RegisterEvent("READY_CHECK")
