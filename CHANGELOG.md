@@ -11,6 +11,7 @@
 ### 🐛 Fixed
 
 - Chat History: Fixed text selection and scrollbar interaction in the copy window.
+- Nameplates: Fixed EQOL threat colors depending on Blizzard's native threat health bar color option, allowing configured threat warning/lost colors to apply independently.
 - Unit Frames / Raid Frames: Fixed grouped raid header spans not being snapped to even pixels, which could cause player names to jitter during automatic raid resizing.
 
 ---

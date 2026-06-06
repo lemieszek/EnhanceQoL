@@ -1396,12 +1396,11 @@ local function getNameplateMobColor(dbKey, unit)
 	return color
 end
 
--- Mirror Blizzard threat health bar priority so EQoL can customize the color
--- without suppressing the default Health Bar Color state on nameplates.
+-- Keep Blizzard's threat priority, but calculate it for EQOL's own mob colors
+-- even when Blizzard's native threat health bar color option is disabled.
 local function getNameplateThreatStatus(unitFrame)
 	if not nameplateMobColorState.isActive then return nil end
 	if not unitFrame or issecretvalue(unitFrame) then return nil end
-	if not unitFrame.displayThreatHealthBarColor then return nil end
 
 	local threatUnit = unitFrame.displayedUnit
 	if issecretvalue(threatUnit) then threatUnit = nil end
