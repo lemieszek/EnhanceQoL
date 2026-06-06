@@ -7174,6 +7174,93 @@ local function buildUnitSettings(unit)
 	)
 	nameOffsetYSetting.isEnabled = isNameEnabled
 	list[#list + 1] = nameOffsetYSetting
+
+	if unit == "target" then
+		local targetTargetNameDef = statusDef.targetTargetName or {}
+		local function isTargetTargetNameEnabled()
+			local cfg = getValue(unit, { "status", "targetTargetName" }, nil)
+			if type(cfg) == "table" and cfg.enabled ~= nil then return cfg.enabled == true end
+			return getValue(unit, { "status", "showTargetTargetName" }, false) == true
+		end
+		local showTargetTargetNameSetting = checkbox(
+			L["UFShowTargetTargetName"] or "Show target-of-target name",
+			isTargetTargetNameEnabled,
+			function(val)
+				setValue(unit, { "status", "targetTargetName", "enabled" }, val and true or false)
+				setValue(unit, { "status", "showTargetTargetName" }, nil)
+				refresh()
+			end,
+			targetTargetNameDef.enabled == true,
+			"name"
+		)
+		list[#list + 1] = showTargetTargetNameSetting
+
+		local targetTargetAnchorSetting = radioDropdown(
+			L["UFTargetTargetNameAnchor"] or "Target-of-target anchor",
+			UF.ui.anchorOptions,
+			function() return getValue(unit, { "status", "targetTargetName", "anchor" }, targetTargetNameDef.anchor or "RIGHT") end,
+			function(val)
+				setValue(unit, { "status", "targetTargetName", "anchor" }, val or targetTargetNameDef.anchor or "RIGHT")
+				refresh()
+			end,
+			targetTargetNameDef.anchor or "RIGHT",
+			"name"
+		)
+		targetTargetAnchorSetting.isShown = isTargetTargetNameEnabled
+		list[#list + 1] = targetTargetAnchorSetting
+
+		local targetTargetFontSizeSetting = slider(
+			L["UFTargetTargetNameFontSize"] or "Target-of-target font size",
+			8,
+			30,
+			1,
+			function() return getValue(unit, { "status", "targetTargetName", "fontSize" }, targetTargetNameDef.fontSize or statusDef.nameFontSize or statusDef.fontSize or 14) end,
+			function(val)
+				setValue(unit, { "status", "targetTargetName", "fontSize" }, val or targetTargetNameDef.fontSize or statusDef.nameFontSize or statusDef.fontSize or 14)
+				refreshSelf()
+			end,
+			targetTargetNameDef.fontSize or statusDef.nameFontSize or statusDef.fontSize or 14,
+			"name",
+			true
+		)
+		targetTargetFontSizeSetting.isShown = isTargetTargetNameEnabled
+		list[#list + 1] = targetTargetFontSizeSetting
+
+		local targetTargetOffsetXSetting = slider(
+			L["UFTargetTargetNameX"] or "Target-of-target X offset",
+			-OFFSET_RANGE,
+			OFFSET_RANGE,
+			1,
+			function() return getValue(unit, { "status", "targetTargetName", "offset", "x" }, (targetTargetNameDef.offset and targetTargetNameDef.offset.x) or 0) end,
+			function(val)
+				setValue(unit, { "status", "targetTargetName", "offset", "x" }, val or 0)
+				refresh()
+			end,
+			(targetTargetNameDef.offset and targetTargetNameDef.offset.x) or 0,
+			"name",
+			true
+		)
+		targetTargetOffsetXSetting.isShown = isTargetTargetNameEnabled
+		list[#list + 1] = targetTargetOffsetXSetting
+
+		local targetTargetOffsetYSetting = slider(
+			L["UFTargetTargetNameY"] or "Target-of-target Y offset",
+			-OFFSET_RANGE,
+			OFFSET_RANGE,
+			1,
+			function() return getValue(unit, { "status", "targetTargetName", "offset", "y" }, (targetTargetNameDef.offset and targetTargetNameDef.offset.y) or 0) end,
+			function(val)
+				setValue(unit, { "status", "targetTargetName", "offset", "y" }, val or 0)
+				refresh()
+			end,
+			(targetTargetNameDef.offset and targetTargetNameDef.offset.y) or 0,
+			"name",
+			true
+		)
+		targetTargetOffsetYSetting.isShown = isTargetTargetNameEnabled
+		list[#list + 1] = targetTargetOffsetYSetting
+	end
+
 	list[#list + 1] = { name = "", kind = UF.ui.settingType.Divider, parentId = "name" }
 
 	list[#list + 1] = { name = LEVEL or "Level", kind = UF.ui.settingType.Collapsible, id = "level", defaultCollapsed = true }

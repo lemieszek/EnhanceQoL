@@ -6,6 +6,7 @@
 ### ✨ Added
 
 - Sound: Added a mute toggle for Blizzard's Raid Warning sound under Interface / General.
+- Unit Frames: Added an optional separate target-of-target name text for the Target frame, with its own anchor, font size and X/Y offset controls.
 
 ### 🐛 Fixed
 
