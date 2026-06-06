@@ -3474,46 +3474,94 @@ function ChannelHistory:CreateDebugFrame(showImmediately)
 		dragHandle:SetScript("OnDragStart", function() popup:StartMoving() end)
 		dragHandle:SetScript("OnDragStop", function() popup:StopMovingOrSizing() end)
 
-		local scroll = CreateFrame("ScrollFrame", nil, popup)
+		local scroll = CreateFrame("ScrollFrame", "EnhanceQoLChannelHistoryCopyScrollFrame", popup, "UIPanelScrollFrameTemplate")
 		scroll:SetPoint("TOPLEFT", popup, "TOPLEFT", 12, -36)
-		scroll:SetPoint("BOTTOMRIGHT", popup, "BOTTOMRIGHT", -18, 12)
+		scroll:SetPoint("BOTTOMRIGHT", popup, "BOTTOMRIGHT", -30, 12)
 		scroll:EnableMouseWheel(true)
+		scroll.scrollBarHideable = 1
 
-		local editBox = CreateFrame("EditBox", nil, scroll)
+		local editBox = CreateFrame("EditBox", "EnhanceQoLChannelHistoryCopyEditBox", scroll)
 		editBox:SetMultiLine(true)
-		editBox:SetAutoFocus(true)
+		editBox:EnableMouse(true)
+		editBox:SetAutoFocus(false)
 		editBox:SetFontObject(ChatFontNormal or GameFontNormal)
 		editBox:SetJustifyH("LEFT")
 		editBox:SetJustifyV("TOP")
 		editBox:SetTextColor(1, 1, 1, 1)
 		editBox:SetMaxLetters(0)
+		if editBox.SetIndentedWordWrap then editBox:SetIndentedWordWrap(false) end
 		editBox:ClearAllPoints()
-		editBox:SetPoint("TOPLEFT", scroll, "TOPLEFT", 0, -10)
-		editBox:SetPoint("TOPRIGHT", scroll, "TOPRIGHT", 0, -10)
-		editBox:SetWidth(580)
+		editBox:SetPoint("TOPLEFT", scroll, "TOPLEFT", 0, 0)
+		editBox:SetPoint("BOTTOMRIGHT", scroll, "BOTTOMRIGHT", 0, 0)
+		editBox:SetSize(100, 100)
 		editBox:SetScript("OnEscapePressed", function() popup:Hide() end)
+		editBox:SetScript("OnCursorChanged", function(self, x, y, w, h)
+			if ScrollingEdit_OnCursorChanged then ScrollingEdit_OnCursorChanged(self, x, y, w, h) end
+		end)
+		editBox:SetScript("OnUpdate", function(self, elapsed)
+			if ScrollingEdit_OnUpdate then ScrollingEdit_OnUpdate(self, elapsed, scroll) end
+		end)
 
 		scroll:SetScrollChild(editBox)
 
 		popup.editBox = editBox
 		popup.scroll = scroll
-		popup.scrollBar = self:CreateThinScrollFrameBar(scroll, 6)
 
-		function popup:RefreshScrollHeight()
+		local function getCopyScrollBar()
+			local scrollBar = scroll.ScrollBar or _G[scroll:GetName() .. "ScrollBar"]
+			return scrollBar
+		end
+
+		local function updateCopyScrollState(offset)
+			local scrollBar = getCopyScrollBar()
+			if not scrollBar then return end
+			if type(offset) ~= "number" then offset = nil end
+			offset = offset or scroll:GetVerticalScroll() or 0
+			scrollBar:SetValue(offset)
+
+			local _, maxValue = scrollBar:GetMinMaxValues()
+			local canScroll = false
+			if scrollBar.ScrollUpButton then
+				if offset == 0 then
+					scrollBar.ScrollUpButton:Disable()
+				else
+					scrollBar.ScrollUpButton:Enable()
+					canScroll = true
+				end
+			end
+			if scrollBar.ScrollDownButton then
+				if (scrollBar:GetValue() - maxValue) == 0 then
+					scrollBar.ScrollDownButton:Disable()
+				else
+					scrollBar.ScrollDownButton:Enable()
+					canScroll = true
+				end
+			end
+			scrollBar:SetShown(canScroll)
+		end
+
+		function popup:RefreshScrollLayout()
 			if not self.editBox or not self.scroll then return end
 			local width = (self.scroll:GetWidth() or 0)
 			if width < 50 then return end -- layout not ready yet
-			self.editBox:SetWidth(width - 4)
-			local textHeight = self.editBox.GetTextHeight and self.editBox:GetTextHeight() or 0
-			local minHeight = self.scroll:GetHeight() or 0
-			self.editBox:SetHeight(math.max(textHeight + 16, minHeight))
-			if self.scrollBar and ChannelHistory and ChannelHistory.UpdateThinScrollFrameBar then ChannelHistory:UpdateThinScrollFrameBar(self.scrollBar, self.scroll) end
+			self.editBox:SetWidth(width)
+			if self.scroll.UpdateScrollChildRect then self.scroll:UpdateScrollChildRect() end
+			updateCopyScrollState()
 		end
 
 		editBox:SetScript("OnTextChanged", function()
-			if popup.RefreshScrollHeight then popup:RefreshScrollHeight() end
+			if popup.RefreshScrollLayout then popup:RefreshScrollLayout() end
 		end)
-		scroll:SetScript("OnSizeChanged", function() popup:RefreshScrollHeight() end)
+		editBox:HookScript("OnCursorChanged", function()
+			local scrollBar = getCopyScrollBar()
+			if scrollBar then scrollBar:SetValue(scroll:GetVerticalScroll() or 0) end
+		end)
+		scroll:HookScript("OnSizeChanged", function() popup:RefreshScrollLayout() end)
+		scroll:SetScript("OnVerticalScroll", function(_, offset)
+			updateCopyScrollState(offset)
+		end)
+		scroll:HookScript("OnScrollRangeChanged", function() updateCopyScrollState() end)
+		scroll:HookScript("OnShow", function() updateCopyScrollState() end)
 
 		copyPopup = popup
 		ChannelHistory.ui = ChannelHistory.ui or {}
@@ -3557,13 +3605,12 @@ function ChannelHistory:CreateDebugFrame(showImmediately)
 		popup.editBox:SetText(text or "")
 		RunNextFrame(function()
 			if not popup or not popup:IsShown() then return end
-			if popup.RefreshScrollHeight then popup:RefreshScrollHeight() end
+			if popup.RefreshScrollLayout then popup:RefreshScrollLayout() end
 			if popup.scroll then popup.scroll:SetVerticalScroll(0) end
-			if popup.scrollBar and ChannelHistory and ChannelHistory.UpdateThinScrollFrameBar then ChannelHistory:UpdateThinScrollFrameBar(popup.scrollBar, popup.scroll) end
 			if popup.editBox then
 				popup.editBox:SetCursorPosition(0)
+				popup.editBox:HighlightText(0, 0)
 				popup.editBox:SetFocus()
-				popup.editBox:HighlightText()
 			end
 		end)
 	end

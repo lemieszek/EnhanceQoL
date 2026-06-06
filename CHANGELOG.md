@@ -1,6 +1,14 @@
 # Changelog
 
 <!--@eqol-beta@-->
+## [11.0.0-beta2] - 2026-06-06
+
+### 🐛 Fixed
+
+- Chat History: Fixed text selection and scrollbar interaction in the copy window.
+
+---
+
 ## [11.0.0-beta1] - 2026-06-06
 
 ### ℹ️ Important
