@@ -5,11 +5,13 @@
 
 ### ✨ Added
 
+- Bags: Added a configurable Profession Quality overlay for crafted gear and profession items.
 - Sound: Added a mute toggle for Blizzard's Raid Warning sound under Interface / General.
 - Unit Frames: Added an optional separate target-of-target name text for the Target frame, with its own anchor, font size and X/Y offset controls.
 
 ### 🐛 Fixed
 
+- Bags: Restored missing icons for the Bags settings side navigation.
 - Chat History: Fixed text selection and scrollbar interaction in the copy window.
 - Nameplates: Fixed EQOL threat colors depending on Blizzard's native threat health bar color option, allowing configured threat warning/lost colors to apply independently.
 - Unit Frames / Raid Frames: Fixed grouped raid header spans not being snapped to even pixels, which could cause player names to jitter during automatic raid resizing.

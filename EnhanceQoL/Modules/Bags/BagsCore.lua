@@ -1,4 +1,4 @@
--- luacheck: globals BagsItemButton_OnLoad ItemButtonUtil ContainerFrameItemButtonMixin ScrollFrameTemplate_OnMouseWheel IsAnyStandardHeldBagOpen BackpackTokenFrame BagItemAutoSortButton ITEM_SEARCHBAR_LIST BagSearch_OnHide BagSearch_OnTextChanged BagSearch_OnChar UIPanelScrollFrame_OnLoad ClearItemButtonOverlay SetItemButtonQuality SetItemButtonCount SetItemButtonDesaturated SetItemButtonTextureVertexColor ContainerFrame_AllowedToOpenBags C_Cursor COPPER_PER_GOLD COPPER_PER_SILVER NUM_BAG_SLOTS NUM_REAGENTBAG_SLOTS GetInventoryItemTexture GetInventoryItemID GetInventoryItemQuality GetInventorySlotInfo PickupBagFromSlot PutItemInBackpack PutItemInBag CloseAllBags BAGS EQUIP_CONTAINER EQUIP_CONTAINER_REAGENT PVP_ITEM_LEVEL_TOOLTIP
+-- luacheck: globals BagsItemButton_OnLoad ItemButtonUtil ContainerFrameItemButtonMixin ScrollFrameTemplate_OnMouseWheel IsAnyStandardHeldBagOpen BackpackTokenFrame BagItemAutoSortButton ITEM_SEARCHBAR_LIST BagSearch_OnHide BagSearch_OnTextChanged BagSearch_OnChar UIPanelScrollFrame_OnLoad ClearItemButtonOverlay SetItemButtonQuality SetItemButtonCount SetItemButtonDesaturated SetItemButtonTextureVertexColor ContainerFrame_AllowedToOpenBags C_Cursor C_TradeSkillUI COPPER_PER_GOLD COPPER_PER_SILVER NUM_BAG_SLOTS NUM_REAGENTBAG_SLOTS GetInventoryItemTexture GetInventoryItemID GetInventoryItemQuality GetInventorySlotInfo PickupBagFromSlot PutItemInBackpack PutItemInBag CloseAllBags BAGS EQUIP_CONTAINER EQUIP_CONTAINER_REAGENT PVP_ITEM_LEVEL_TOOLTIP
 local addonName, addon = ...
 addon = addon or {}
 _G[addonName] = addon
@@ -300,6 +300,9 @@ function BagsItemButton_OnLoad(self)
 	end
 	if self.BindStatusText then
 		self.BindStatusText:Hide()
+	end
+	if self.EQOLProfessionQualityOverlay then
+		self.EQOLProfessionQualityOverlay:Hide()
 	end
 	if self.ReagentTint then
 		self.ReagentTint:Hide()
@@ -1373,30 +1376,91 @@ applyConfiguredOverlayAnchors = function(button, overlayRuntime)
 
 	button._bagsOverlayVersion = version
 	for _, entry in ipairs((overlayRuntime and overlayRuntime.entries) or {}) do
-		local region = entry.frameKey and button[entry.frameKey]
-		local anchorInfo = entry.anchorInfo
-		if region and anchorInfo then
-			region:ClearAllPoints()
-			region:SetPoint(anchorInfo.point, button, anchorInfo.relativePoint, anchorInfo.x, anchorInfo.y)
-			if region.SetJustifyH and anchorInfo.justifyH then
-				region:SetJustifyH(anchorInfo.justifyH)
+		if entry.id == "professionQuality" then
+			Core.UpdateProfessionQualityOverlay(button, overlayRuntime)
+		else
+			local region = entry.frameKey and button[entry.frameKey]
+			local anchorInfo = entry.anchorInfo
+			if region and anchorInfo then
+				region:ClearAllPoints()
+				region:SetPoint(anchorInfo.point, button, anchorInfo.relativePoint, anchorInfo.x, anchorInfo.y)
+				if region.SetJustifyH and anchorInfo.justifyH then
+					region:SetJustifyH(anchorInfo.justifyH)
+				end
+				if region.SetJustifyV and anchorInfo.justifyV then
+					region:SetJustifyV(anchorInfo.justifyV)
+				end
 			end
-			if region.SetJustifyV and anchorInfo.justifyV then
-				region:SetJustifyV(anchorInfo.justifyV)
-			end
-		end
-		region = entry.textFrameKey and button[entry.textFrameKey]
-		if region and anchorInfo then
-			region:ClearAllPoints()
-			region:SetPoint(anchorInfo.point, button, anchorInfo.relativePoint, anchorInfo.x, anchorInfo.y)
-			if region.SetJustifyH and anchorInfo.justifyH then
-				region:SetJustifyH(anchorInfo.justifyH)
-			end
-			if region.SetJustifyV and anchorInfo.justifyV then
-				region:SetJustifyV(anchorInfo.justifyV)
+			region = entry.textFrameKey and button[entry.textFrameKey]
+			if region and anchorInfo then
+				region:ClearAllPoints()
+				region:SetPoint(anchorInfo.point, button, anchorInfo.relativePoint, anchorInfo.x, anchorInfo.y)
+				if region.SetJustifyH and anchorInfo.justifyH then
+					region:SetJustifyH(anchorInfo.justifyH)
+				end
+				if region.SetJustifyV and anchorInfo.justifyV then
+					region:SetJustifyV(anchorInfo.justifyV)
+				end
 			end
 		end
 	end
+end
+
+Core.UpdateProfessionQualityOverlay = function(button, overlayRuntime, itemRef)
+	if not button then
+		return
+	end
+
+	overlayRuntime = overlayRuntime or getOverlayRuntimeConfig()
+	local overlayEntry = overlayRuntime and overlayRuntime.byID and overlayRuntime.byID.professionQuality or nil
+	local enabled = overlayEntry and overlayEntry.enabled == true
+	button.alwaysShowProfessionsQuality = false
+	if button.ProfessionQualityOverlay then
+		button.ProfessionQualityOverlay:Hide()
+	end
+
+	if not enabled then
+		if button.EQOLProfessionQualityOverlay then
+			button.EQOLProfessionQualityOverlay:Hide()
+		end
+		return
+	end
+
+	itemRef = itemRef or button._bagsRenderItemLink or button._bagsWarbandRenderItemLink or button._bagsRenderItemID or button._bagsWarbandRenderItemID
+	local qualityInfo
+	if itemRef and C_TradeSkillUI then
+		qualityInfo = C_TradeSkillUI.GetItemReagentQualityInfo and C_TradeSkillUI.GetItemReagentQualityInfo(itemRef) or nil
+		if not qualityInfo and C_TradeSkillUI.GetItemCraftedQualityInfo then
+			qualityInfo = C_TradeSkillUI.GetItemCraftedQualityInfo(itemRef)
+		end
+	end
+	if not qualityInfo then
+		if button.EQOLProfessionQualityOverlay then
+			button.EQOLProfessionQualityOverlay:Hide()
+		end
+		return
+	end
+
+	if not button.EQOLProfessionQualityOverlay then
+		button.EQOLProfessionQualityOverlay = button:CreateTexture(nil, "OVERLAY", nil, 7)
+	end
+
+	local overlay = button.EQOLProfessionQualityOverlay
+	local atlas = qualityInfo.iconSmall or qualityInfo.icon or qualityInfo.iconInventory
+	if atlas and overlay.SetAtlas then
+		overlay:SetAtlas(atlas, false)
+	end
+	if overlayEntry and overlayEntry.anchorInfo then
+		local anchorInfo = overlayEntry.anchorInfo
+		local boundary = button.Icon or button
+		local buttonSize = button.GetWidth and button:GetWidth() or 37
+		local overlaySize = math.max(10, math.min(16, buttonSize * 0.38))
+		overlay:SetScale(1)
+		overlay:SetSize(overlaySize, overlaySize)
+		overlay:ClearAllPoints()
+		overlay:SetPoint(anchorInfo.point, boundary, anchorInfo.relativePoint, anchorInfo.x, anchorInfo.y)
+	end
+	overlay:Show()
 end
 
 local function getFrameDB()
@@ -3693,6 +3757,7 @@ local function updateButtonData(button, mapping, overlayRuntime, textAppearance,
 		state.applyStackCountLayoutIfNeeded(button, stackCountLayoutSignature)
 		updateReagentBagVisuals(button)
 		applyConfiguredOverlayAnchors(button, overlayRuntime)
+		Core.UpdateProfessionQualityOverlay(button, overlayRuntime, itemLink or itemID)
 		Core.UpdateEquipmentSetOverlay(button, bagID, slotID, info, overlayRuntime)
 		Core.UpdateBindStatusOverlay(button, bagID, slotID, info, overlayRuntime)
 		if button._bagsRenderFiltered ~= isFiltered then
@@ -3731,6 +3796,7 @@ local function updateButtonData(button, mapping, overlayRuntime, textAppearance,
 	button:UpdateCooldown(texture)
 	button:SetReadable(readable)
 	updateButtonSearchState(button, isFiltered)
+	Core.UpdateProfessionQualityOverlay(button, overlayRuntime, itemLink or itemID)
 	button._bagsFreeSlotGroup = freeSlotGroup
 	button._bagsFreeSlotDisplayMode = freeSlotGroup and addon.GetFreeSlotDisplayMode and addon.GetFreeSlotDisplayMode() or nil
 	button._bagsFreeSlotColor = button._bagsFreeSlotDisplayMode == "colors" and addon.GetFreeSlotColor and addon.GetFreeSlotColor(freeSlotGroup) or nil
@@ -5404,6 +5470,9 @@ local function ensureButtonCapacity(requiredCount)
 		if button.BindStatusText then
 			button.BindStatusText:SetText("")
 			button.BindStatusText:Hide()
+		end
+		if button.EQOLProfessionQualityOverlay then
+			button.EQOLProfessionQualityOverlay:Hide()
 		end
 		state.buttons[index] = button
 	end

@@ -1748,13 +1748,23 @@ local function refreshOverlayCard(card)
 	end
 
 	if card.PreviewOverlay then
-		local appearance = addon.GetResolvedTextAppearance and addon.GetResolvedTextAppearance() or nil
-		local overlaySize = tonumber(appearance and appearance.overlaySize) or tonumber(appearance and appearance.size) or 12
-		if addon.ApplyConfiguredFont then
-			addon.ApplyConfiguredFont(card.PreviewOverlay, overlaySize)
+		if card.Definition.previewAtlas then
+			local previewSize = tonumber(card.Definition.previewSize) or 22
+			card.PreviewOverlay:SetSize(previewSize, previewSize)
+			if card.PreviewOverlay.SetAtlas then
+				card.PreviewOverlay:SetAtlas(card.Definition.previewAtlas, false)
+			end
+		else
+			local appearance = addon.GetResolvedTextAppearance and addon.GetResolvedTextAppearance() or nil
+			local overlaySize = tonumber(appearance and appearance.overlaySize) or tonumber(appearance and appearance.size) or 12
+			if addon.ApplyConfiguredFont then
+				addon.ApplyConfiguredFont(card.PreviewOverlay, overlaySize)
+			end
 		end
 
-		if card.Definition.id == "upgradeTrack" and addon.GetUpgradeTrackOptions then
+		if card.Definition.previewAtlas then
+			card.PreviewOverlay:SetVertexColor(1, 1, 1, 1)
+		elseif card.Definition.id == "upgradeTrack" and addon.GetUpgradeTrackOptions then
 			local previewKey
 			for _, option in ipairs(addon.GetUpgradeTrackOptions() or {}) do
 				if addon.IsUpgradeTrackOverlayTrackEnabled and addon.IsUpgradeTrackOverlayTrackEnabled(option.value) then
@@ -1790,7 +1800,7 @@ local function refreshOverlayCard(card)
 			end
 		end
 
-		applyAnchorToRegion(card.PreviewOverlay, card.PreviewSlot, anchorID, 2)
+		applyAnchorToRegion(card.PreviewOverlay, card.Definition.previewAtlas and card.PreviewSlotIcon or card.PreviewSlot, anchorID, 2)
 		card.PreviewOverlay:SetShown(isEnabled)
 	end
 	if card.EnabledCheck then
@@ -2037,15 +2047,24 @@ local function createOverlayAnchorCard(parent, definition)
 	slotIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 	card.PreviewSlotIcon = slotIcon
 
-	local previewOverlay = previewSlot:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
-	if addon.ApplyConfiguredFont then
-		addon.ApplyConfiguredFont(previewOverlay, 12)
+	local previewOverlay
+	if definition.previewAtlas then
+		previewOverlay = previewSlot:CreateTexture(nil, "OVERLAY", nil, 7)
+		previewOverlay:SetSize(tonumber(definition.previewSize) or 22, tonumber(definition.previewSize) or 22)
+		if previewOverlay.SetAtlas then
+			previewOverlay:SetAtlas(definition.previewAtlas, false)
+		end
 	else
-		previewOverlay:SetFont(STANDARD_TEXT_FONT, 12, "OUTLINE")
-	end
-	previewOverlay:SetText(definition.previewText or "278")
-	if definition.previewColor then
-		previewOverlay:SetTextColor(definition.previewColor[1], definition.previewColor[2], definition.previewColor[3])
+		previewOverlay = previewSlot:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
+		if addon.ApplyConfiguredFont then
+			addon.ApplyConfiguredFont(previewOverlay, 12)
+		else
+			previewOverlay:SetFont(STANDARD_TEXT_FONT, 12, "OUTLINE")
+		end
+		previewOverlay:SetText(definition.previewText or "278")
+		if definition.previewColor then
+			previewOverlay:SetTextColor(definition.previewColor[1], definition.previewColor[2], definition.previewColor[3])
+		end
 	end
 	card.PreviewOverlay = previewOverlay
 
