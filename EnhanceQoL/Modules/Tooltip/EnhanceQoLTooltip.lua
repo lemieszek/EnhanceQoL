@@ -575,7 +575,7 @@ local function AddRealmInfo(tooltip, realm)
 	if IsRealmInfoFieldEnabled("language", "TooltipRealmShowLanguage") then
 		local language = GetRealmLanguageLabel(info.locale)
 		if language then
-			local flag = GetRealmFlagPlaceholder(info, not isTooltipRestricted())
+			local flag = GetRealmFlagPlaceholder(info, true)
 			if flag then language = flag .. " " .. language end
 			ensureHeader()
 			tooltip:AddDoubleLine(L["TooltipRealmLanguage"], ColorText(language))
