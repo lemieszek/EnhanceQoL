@@ -866,7 +866,7 @@ local function registerLegacyControl(category, cbData, controlType, setting)
 	local app = ensureConfigApp()
 	if not app or type(cbData) ~= "table" then return end
 	local key = cbData.var or cbData.key
-	local id = cbData.id or key or cbData.text or cbData.label or cbData.name
+	local id = cbData.id or (key and cbData.subvar and (tostring(key) .. "." .. tostring(cbData.subvar))) or key or cbData.text or cbData.label or cbData.name
 	if not id then return end
 	addon.ConfigControlOrder = (addon.ConfigControlOrder or 0) + 1
 	local groupID, groupTitle, pageID = getLegacyControlGroup(app, category, cbData)
