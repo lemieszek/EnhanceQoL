@@ -3496,10 +3496,10 @@ function ChannelHistory:CreateDebugFrame(showImmediately)
 		editBox:SetSize(100, 100)
 		editBox:SetScript("OnEscapePressed", function() popup:Hide() end)
 		editBox:SetScript("OnCursorChanged", function(self, x, y, w, h)
-			if ScrollingEdit_OnCursorChanged then ScrollingEdit_OnCursorChanged(self, x, y, w, h) end
+			if _G.ScrollingEdit_OnCursorChanged then _G.ScrollingEdit_OnCursorChanged(self, x, y, w, h) end
 		end)
 		editBox:SetScript("OnUpdate", function(self, elapsed)
-			if ScrollingEdit_OnUpdate then ScrollingEdit_OnUpdate(self, elapsed, scroll) end
+			if _G.ScrollingEdit_OnUpdate then _G.ScrollingEdit_OnUpdate(self, elapsed, scroll) end
 		end)
 
 		scroll:SetScrollChild(editBox)
