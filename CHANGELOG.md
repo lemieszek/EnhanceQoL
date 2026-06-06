@@ -20,6 +20,7 @@
 
 ### 🐛 Fixed
 
+- Cooldown Panels: Fixed bar value text for normal cooldown entries not updating reliably in combat when the bar used a native cooldown duration object.
 - Cooldown Panels: Fixed Paste Entry Style copying tracked aura identity fields instead of only applying the visual style.
 - Damage Meter: Fixed restricted combat-data tooltip refresh errors and several tooltip row rendering issues.
 - Mythic Plus / Dungeon Finder: Fixed current-season dungeon score hover handling for missing Group Finder map IDs.
