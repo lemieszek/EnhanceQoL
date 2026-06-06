@@ -31,6 +31,9 @@ jobs:
       - name: Prepare packager gates
         run: bash scripts/prepare_packager_gates.sh "${GITHUB_REF_NAME}"
 
+      - name: Generate ingame changelog
+        run: python3 scripts/generate_changelog_lua.py "${GITHUB_REF_NAME}"
+
       - name: Validate gated package Lua
         uses: nebularg/actions-luacheck@v1
         with:

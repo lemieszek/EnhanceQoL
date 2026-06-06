@@ -1598,14 +1598,6 @@ data = {
 			if addon.functions.applyMinimapButtonMouseover then addon.functions.applyMinimapButtonMouseover() end
 		end,
 		default = false,
-		parentCheck = function()
-			return not (
-				addon.SettingsLayout.elements["enableMinimapButtonBin"]
-				and addon.SettingsLayout.elements["enableMinimapButtonBin"].setting
-				and addon.SettingsLayout.elements["enableMinimapButtonBin"].setting:GetValue() == true
-			)
-		end,
-		notify = "enableMinimapButtonBin",
 		parentSection = mapExpandable,
 	},
 	{

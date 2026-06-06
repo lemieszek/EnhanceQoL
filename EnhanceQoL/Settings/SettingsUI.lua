@@ -298,6 +298,43 @@ local function getConfigCenterSlashCommandContent()
 	}
 end
 
+local function getConfigCenterChangelogContent()
+	local data = addon.GeneratedChangelog
+	local releases = data and data.releases
+	if type(releases) ~= "table" or #releases == 0 then
+		return {
+			{
+				title = L["configCenterChangelog"] or "Changelog",
+				entries = {
+					{ type = "text", text = L["configCenterChangelogEmpty"] or "No changelog information is available for this build." },
+				},
+			},
+		}
+	end
+
+	local content = {}
+	for _, release in ipairs(releases) do
+		local title = tostring(release.tag or "")
+		if release.date and release.date ~= "" then title = title .. " - " .. tostring(release.date) end
+		local entries = {}
+		for _, section in ipairs(release.sections or {}) do
+			local sectionTitle = tostring(section.title or "")
+			if sectionTitle ~= "" then
+				entries[#entries + 1] = { type = "text", text = "|cffffd700" .. sectionTitle .. "|r" }
+			end
+			for _, item in ipairs(section.items or {}) do
+				entries[#entries + 1] = { type = "text", text = "|cffffd700- |r" .. tostring(item or "") }
+			end
+			entries[#entries + 1] = { type = "spacer", height = 6 }
+		end
+		content[#content + 1] = {
+			title = title ~= "" and title or (L["configCenterChangelog"] or "Changelog"),
+			entries = entries,
+		}
+	end
+	return content
+end
+
 local function ensureConfigApp()
 	if addon.ConfigApp or not ConfigLib then return addon.ConfigApp end
 
@@ -470,6 +507,9 @@ local function ensureConfigApp()
 								title = _G.GAME_VERSION_LABEL or L["configCenterVersion"] or "Version",
 								value = versionValue,
 								badge = versionBadge,
+								onClick = function(state)
+									if state and state.SetPage then state:SetPage("help.changelog") end
+								end,
 							}
 						end
 						local newCount = tonumber(stats and stats.newControls) or 0
@@ -575,6 +615,14 @@ local function ensureConfigApp()
 				},
 			},
 		},
+	})
+	app:RegisterPage({
+		id = "help.changelog",
+		title = L["configCenterChangelog"] or "Changelog",
+		description = L["configCenterChangelogDesc"] or "Review the release notes included with this build.",
+		iconKey = "settingspage",
+		layout = "info",
+		content = getConfigCenterChangelogContent(),
 	})
 	app:SetDefaultPage("dashboard")
 

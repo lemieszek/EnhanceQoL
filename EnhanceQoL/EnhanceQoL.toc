@@ -52,6 +52,7 @@ Core\SharedAnchors.lua
 Modules\ActionBarLabels.lua
 Core\Cleanup.lua
 EnhanceQoL.lua
+GeneratedChangelog.lua
 Core\DataHub.lua
 Core\DataPanel.lua
 Core\ChallengeMapLabels.lua
