@@ -20,6 +20,7 @@
 
 ### 🐛 Fixed
 
+- Action Bars / Button Text: Fixed keybind anchor positions using the HotKey text box width instead of the actual text anchor point.
 - Cooldown Panels: Fixed bar value text for normal cooldown entries not updating reliably in combat when the bar used a native cooldown duration object.
 - Cooldown Panels: Fixed Paste Entry Style copying tracked aura identity fields instead of only applying the visual style.
 - Damage Meter: Fixed restricted combat-data tooltip refresh errors and several tooltip row rendering issues.

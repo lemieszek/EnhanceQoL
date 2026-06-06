@@ -720,23 +720,30 @@ local function RestoreRegionAnchorPoints(region, key)
 	region[key] = nil
 end
 
-local function GetActionButtonAnchorTarget(button)
-	if not button then return nil end
-	return button.icon or button.Icon or button
+local function GetActionButtonAnchorTarget(region, button)
+	if region and region.GetParent then
+		local parent = region:GetParent()
+		if parent and parent ~= button and parent.GetParent and parent:GetParent() == button then return parent end
+	end
+	return button
 end
 
-local function ApplyRegionPositionOverride(region, button, enabled, anchor, offsetX, offsetY, stateKey, originalKey)
+local function ApplyRegionPositionOverride(region, button, enabled, anchor, offsetX, offsetY, stateKey, originalKey, collapseWidth, originalWidthKey)
 	if not (region and button) then return end
 	if enabled then
 		if not region[stateKey] then StoreRegionAnchorPoints(region, originalKey) end
-		local target = GetActionButtonAnchorTarget(button)
+		if collapseWidth and originalWidthKey and not region[originalWidthKey] and region.GetWidth then region[originalWidthKey] = region:GetWidth() end
+		local target = GetActionButtonAnchorTarget(region, button)
 		local point = NormalizeTextAnchor(anchor, "CENTER")
 		region:ClearAllPoints()
+		if collapseWidth and region.SetWidth then region:SetWidth(0) end
 		region:SetPoint(point, target, point, NormalizeTextOffset(offsetX, 0), NormalizeTextOffset(offsetY, 0))
 		region[stateKey] = true
 	else
 		if region[stateKey] then
 			RestoreRegionAnchorPoints(region, originalKey)
+			if originalWidthKey and region[originalWidthKey] and region.SetWidth then region:SetWidth(region[originalWidthKey]) end
+			if originalWidthKey then region[originalWidthKey] = nil end
 			region[stateKey] = nil
 		else
 			StoreRegionAnchorPoints(region, originalKey)
@@ -1008,7 +1015,9 @@ local function ApplyHotkeyStyling(button, barNameOverride)
 		addon.db.actionBarHotkeyOffsetX,
 		addon.db.actionBarHotkeyOffsetY,
 		"EQOL_UsingHotkeyPositionOverride",
-		"EQOL_OriginalHotkeyPoints"
+		"EQOL_OriginalHotkeyPoints",
+		true,
+		"EQOL_OriginalHotkeyWidth"
 	)
 	local originalText = hotkey:GetText()
 	if hotkey.EQOL_ShortApplied and originalText ~= hotkey.EQOL_ShortValue then
