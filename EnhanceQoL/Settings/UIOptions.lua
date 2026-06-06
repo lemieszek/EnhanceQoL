@@ -2609,9 +2609,9 @@ local function ensureBarsResourcesCategory()
 	local expandable = addon.SettingsLayout.uiBarsResourcesExpandable
 	if not expandable then
 		expandable = addon.functions.SettingsCreateExpandableSection(category, {
-			name = L["BarsAndResources"] or "Bars & Resources",
+			name = L["BarsAndResources"] or "XP & Absorb Bars",
 			description = L["configCenterPageDescBarsResources"]
-				or "Adjust class resources, resource and status bars, XP, absorb and player resource displays.",
+				or "Configure the XP and reputation bar plus the standalone absorb tracker.",
 			expanded = false,
 			colorizeTitle = false,
 			iconKey = "resource",
