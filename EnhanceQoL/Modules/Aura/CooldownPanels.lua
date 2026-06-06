@@ -17285,6 +17285,7 @@ function CooldownPanels:OpenEditor()
 	local editor = ensureEditor()
 	if not editor then return end
 	editor.frame:Show()
+	return editor.frame
 end
 
 function CooldownPanels:CloseEditor()

@@ -928,12 +928,49 @@ function AppMixin:GetStats()
 	}
 end
 
+local function registerBlizzardSettingsBridge(app)
+	if not (app and app.opts and app.opts.blizzardSettingsRoot == true) then
+		return
+	end
+	if app.blizzardSettingsCategory then
+		return
+	end
+	if not (Settings and Settings.RegisterVerticalLayoutCategory and Settings.RegisterAddOnCategory) then
+		return
+	end
+	if not (_G.CreateSettingsButtonInitializer and _G.SettingsPanel and _G.SettingsPanel.GetLayout) then
+		return
+	end
+	local title = app.opts.blizzardSettingsTitle or app.opts.title or app.id
+	local ok, category = pcall(Settings.RegisterVerticalLayoutCategory, title)
+	if not ok or not category then
+		return
+	end
+	pcall(Settings.RegisterAddOnCategory, category)
+	if category.SetShouldSortAlphabetically then
+		pcall(category.SetShouldSortAlphabetically, category, false)
+	end
+	local layout = _G.SettingsPanel:GetLayout(category)
+	if not layout or not layout.AddInitializer then
+		return
+	end
+	local function openSettings()
+		if type(app.opts.openSettings) == "function" then
+			app.opts.openSettings(app)
+		end
+	end
+	local button = _G.CreateSettingsButtonInitializer(title, _G.SETTINGS or "Settings", openSettings, nil, false)
+	layout:AddInitializer(button)
+	app.blizzardSettingsCategory = category
+end
+
 function lib:RegisterAddOn(id, opts)
 	local _ = self
 	assert(id, "addon id required")
 	local app = apps[id]
 	if app then
 		app.opts = opts or app.opts or {}
+		registerBlizzardSettingsBridge(app)
 		return app
 	end
 	app = {
@@ -955,6 +992,7 @@ function lib:RegisterAddOn(id, opts)
 		app[key] = value
 	end
 	apps[id] = app
+	registerBlizzardSettingsBridge(app)
 	return app
 end
 

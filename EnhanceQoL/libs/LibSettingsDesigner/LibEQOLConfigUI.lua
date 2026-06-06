@@ -1297,10 +1297,31 @@ function lib.GetDensityLabel(app, density)
 	return L["configCenterDensityComfortable"] or "Comfortable"
 end
 
+function lib.GetConfiguredDensity(app)
+	local opts = app and app.opts
+	local density = opts and opts.density
+	if type(density) == "function" then
+		local ok, value = pcall(density, app)
+		if ok then
+			density = value
+		end
+	end
+	if density == "compact" or density == "comfortable" then
+		return density
+	end
+	return nil
+end
+
+function lib.ShouldShowDensityButton(app)
+	local opts = app and app.opts
+	return not (opts and opts.showDensityButton == false)
+end
+
 function lib.UpdateDensityButton(frame, state)
 	if not frame or not frame.DensityButton then
 		return
 	end
+	frame.DensityButton:SetShown(lib.ShouldShowDensityButton(state and state.app))
 	local label = lib.GetDensityLabel(state and state.app, state and state.density)
 	frame.DensityButton.Text:SetText(label)
 end
@@ -5056,13 +5077,17 @@ function StateMixin:SetPage(pageID, focusControlID)
 end
 
 function StateMixin:SetDensity(density)
+	local configuredDensity = lib.GetConfiguredDensity(self.app)
+	if configuredDensity then
+		density = configuredDensity
+	end
 	density = density == "compact" and "compact" or "comfortable"
 	if self.density == density then
 		return
 	end
 	self:SaveCurrentContentScroll()
 	self.density = density
-	if self.app and self.app.opts and type(self.app.opts.setDensity) == "function" then
+	if not configuredDensity and self.app and self.app.opts and type(self.app.opts.setDensity) == "function" then
 		pcall(self.app.opts.setDensity, density)
 	end
 	lib._densityByApp = lib._densityByApp or {}
@@ -5099,10 +5124,10 @@ function lib.SaveFrameSize(app, width, height)
 end
 
 local function initializeState(frame, app)
-	local density
+	local density = lib.GetConfiguredDensity(app)
 	if app and app.opts and type(app.opts.getDensity) == "function" then
 		local ok, value = pcall(app.opts.getDensity)
-		if ok and (value == "compact" or value == "comfortable") then
+		if not density and ok and (value == "compact" or value == "comfortable") then
 			density = value
 		end
 	end
@@ -5249,10 +5274,17 @@ local function createFrame(app)
 	frame.DensityButton:SetScript("OnLeave", function(self)
 		setFrameBackdrop(self, { 0.100, 0.090, 0.070, 0.88 }, { 0.46, 0.36, 0.18, 0.70 })
 	end)
+	frame.DensityButton:SetShown(lib.ShouldShowDensityButton(app))
 
 	frame.SearchShell = CreateFrame("Frame", nil, frame.TopBar, "BackdropTemplate")
 	frame.SearchShell:SetSize(286, 28)
-	frame.SearchShell:SetPoint("RIGHT", frame.DensityButton, "LEFT", -12, 0)
+	frame.SearchShell:SetPoint(
+		"RIGHT",
+		lib.ShouldShowDensityButton(app) and frame.DensityButton or frame.ResetButton,
+		"LEFT",
+		-12,
+		0
+	)
 	applyBackdrop(frame.SearchShell, { 0.035, 0.034, 0.032, 0.95 }, { 0.30, 0.28, 0.22, 0.90 })
 
 	frame.SearchIcon = frame.SearchShell:CreateTexture(nil, "OVERLAY")
@@ -5452,7 +5484,9 @@ local function createFrame(app)
 		confirmResetCurrentPage(state)
 	end)
 	frame.DensityButton:SetScript("OnClick", function()
-		state:SetDensity(lib.IsCompactDensity(state) and "comfortable" or "compact")
+		if lib.ShouldShowDensityButton(app) then
+			state:SetDensity(lib.IsCompactDensity(state) and "comfortable" or "compact")
+		end
 	end)
 	lib.UpdateDensityButton(frame, state)
 	frame:SetScript("OnSizeChanged", function()
@@ -5512,6 +5546,14 @@ function lib:Open(appOrID, pageID, focusControlID)
 	end
 	frame:Show()
 	return frame
+end
+
+function lib:GetFrame(appOrID)
+	local app = type(appOrID) == "table" and appOrID or LibStub("LibEQOLConfig-1.0"):GetAddOn(appOrID)
+	if not app then
+		return nil
+	end
+	return frames[app.id]
 end
 
 function lib:Toggle(appOrID, pageID, focusControlID)

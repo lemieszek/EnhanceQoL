@@ -29,11 +29,19 @@ local function withCooldownPanels(action)
 	action(panels)
 end
 
+local function openEditorExclusively(panels)
+	if not (panels and panels.OpenEditor) then return end
+	local editorFrame = panels:OpenEditor()
+	if addon.functions.HideConfigCenterUntilFrameHidden then
+		addon.functions.HideConfigCenterUntilFrameHidden(editorFrame)
+	end
+end
+
 addon.functions.SettingsCreateButton(cat, {
 	text = L["CooldownPanelOpenEditor"] or "Open Cooldown Panel Editor",
 	func = function()
 		withCooldownPanels(function(panels)
-			if panels.OpenEditor then panels:OpenEditor() end
+			openEditorExclusively(panels)
 		end)
 	end,
 	parentSection = expandable,
@@ -45,7 +53,7 @@ addon.functions.SettingsCreateButton(cat, {
 		withCooldownPanels(function(panels)
 			local panelId = panels:CreatePanel(L["CooldownPanelNewPanel"] or "New Panel")
 			if panelId then panels:SelectPanel(panelId) end
-			if panels.OpenEditor then panels:OpenEditor() end
+			openEditorExclusively(panels)
 		end)
 	end,
 	parentSection = expandable,

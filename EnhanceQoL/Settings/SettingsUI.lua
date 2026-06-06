@@ -306,16 +306,15 @@ local function ensureConfigApp()
 		settingsTitle = L["configCenterTitle"] or "EnhanceQoL Settings",
 		dashboardTitle = L["configCenterDashboard"] or "Dashboard",
 		icon = "Interface\\AddOns\\EnhanceQoL\\Icons\\Icon.tga",
+		blizzardSettingsRoot = true,
+		openSettings = function()
+			addon.functions.OpenConfigCenter()
+		end,
 		pageDescriptionKeys = pageDescriptionKeysByStableID,
 		addonFolder = addonName,
 		assetRoot = "Interface\\AddOns\\EnhanceQoL\\libs\\LibSettingsDesigner\\Assets\\",
-		getDensity = function()
-			return addon.db and addon.db.configCenterDensity or "comfortable"
-		end,
-		setDensity = function(value)
-			if not addon.db then return end
-			addon.db.configCenterDensity = value == "compact" and "compact" or "comfortable"
-		end,
+		density = "compact",
+		showDensityButton = false,
 		getSize = function()
 			local size = addon.db and addon.db.configCenterSize
 			if type(size) == "table" then
@@ -775,9 +774,33 @@ end
 function addon.functions.OpenConfigCenter(pageID, focusControlID)
 	local app = ensureConfigApp()
 	if ConfigUILib and app then
-		ConfigUILib:Open(app, pageID, focusControlID)
+		addon.ConfigCenterFrame = ConfigUILib:Open(app, pageID, focusControlID)
 		return
 	end
+end
+
+function addon.functions.HideConfigCenterUntilFrameHidden(externalFrame)
+	if not (ConfigUILib and externalFrame and externalFrame.HookScript) then return end
+	local app = ensureConfigApp()
+	if not app then return end
+	local frame = ConfigUILib.GetFrame and ConfigUILib:GetFrame(app) or addon.ConfigCenterFrame
+	if not (frame and frame.IsShown and frame:IsShown()) then return end
+	local state = frame._LibEQOLConfigState
+	local restorePageID = state and state.view == "page" and state.selectedPageID or nil
+	frame:Hide()
+	externalFrame._eqolConfigCenterRestore = {
+		app = app,
+		pageID = restorePageID,
+	}
+	if externalFrame._eqolConfigCenterRestoreHooked then return end
+	externalFrame._eqolConfigCenterRestoreHooked = true
+	externalFrame:HookScript("OnHide", function(self)
+		local restore = self._eqolConfigCenterRestore
+		self._eqolConfigCenterRestore = nil
+		if restore and ConfigUILib and restore.app then
+			addon.ConfigCenterFrame = ConfigUILib:Open(restore.app, restore.pageID)
+		end
+	end)
 end
 
 local function registerLegacyCategory(category, title, newTagID)

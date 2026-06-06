@@ -1,246 +1,32 @@
 # Changelog
 
-## [11.0.0-alpha7] - 2026-06-05
-
-### 🔄 Changed
-
-- Settings Center / EQoL Suites: Moved the standalone EQoL Castbar toggle into its own Castbar page with overview and detail descriptions.
-- Settings Center / Data Panels: Added clearer descriptions for tooltip hints, context-menu modifiers and panel creation.
-- Settings Center: Switched the remaining Interface settings to modern-only registration and removed the old Blizzard Settings tree content.
-- Settings Center: Removed the global Legacy Blizzard Settings button from the modern settings shell while keeping keybind rows linked to Blizzard Key Bindings.
-- Settings Center: Removed the old shared settings library stack and release-time LibEQOL download; Edit Mode now uses a private vendored EnhanceQoL EditMode bridge.
-
-### 🐛 Fixed
-
-- Settings Center / Interface: Fixed dynamically visible Unit Frames and Castbars controls resolving to the generic Settings page instead of their owning Interface subpages.
-- Settings Center / Interface: Fixed unheaded Interface settings groups, including Nameplates and Tooltip IDs, appearing below later sections instead of first.
-- Settings Center / Interface: Fixed Combat Text dependent controls staying editable while Combat Text is disabled.
-- Settings Center / Interface: Fixed the Health Text explanation showing as a page note instead of on the Player, Target and Boss health text rows.
-- Settings Center / Data Panels: Fixed the Add Panel action missing its modern button text and description.
-- Settings Center / Mover: Fixed standalone hint text disappearing from modern pages when no previous control existed to attach it to.
-- Settings Center: Fixed recycled dropdown menu rows keeping sound preview icons in non-sound dropdowns and LSM sound previews using unstable option indexes instead of the selected sound key.
-
-## [11.0.0-alpha6] - 2026-06-05
-
-### ✨ Added
-
-- Settings Center: Added deep links to individual settings and sections so internal buttons and search results can open a page, expand the matching section, and scroll directly to the relevant control.
-- Settings Center: Added sound preview buttons to sound dropdown menus so available sounds can be tested directly from the modern dropdown list.
-- Settings Center / Interface, General and Gameplay: Added missing descriptions for many controls and page areas so modern setting rows explain what the option affects before deeper migration work continues.
-- Settings Center / Action Bars: Added descriptions for macro text, keybind text, charge/stack text, font, anchor, offset and color controls.
-- Settings Center / Bags & Inventory: Added descriptions for bag indicators, item level positions, upgrade tracks, upgrade icons, item level targets, sort direction and loot direction.
-- Settings Center / Gear & Upgrades: Added descriptions for character-frame and inspect-frame indicators, item level styling, missing enchant overlays, upgrade tracks and equipment flyout item levels.
-- Settings Center / Gameplay: Added clearer descriptions for quest automation, ignored quest types, Wowhead links, pull timers, Group Finder helpers, delve automation, random mounts, teleport options, Talent Reminder and macro helpers.
-- Settings Center / Mouse & Accessibility: Added descriptions for mouse ring, combat overlays, cast/GCD progress, screen crosshair, mouse trail and trail density options.
-- Settings Center / Social and Group Tools: Added descriptions for Focus Marker controls and related macro/update actions.
-
-### 🔄 Changed
-
-- Settings Center / General: Migrated General pages to modern-only rendering and removed the old General root category from the Blizzard Settings tree.
-- Settings Center / Gameplay: Migrated Gameplay pages to modern-only rendering and removed the old Gameplay root category from the Blizzard Settings tree.
-- Settings Center / Class Buff Reminder: Migrated Class Buff Reminder to modern-only rendering and routed Flask/Buff Food shortcut buttons into the modern Macros & Consumables page.
-- Settings Center / Drink and Health Macros: Migrated macro helper settings to modern-only rendering and attached the `EnhanceQoLHealthMacro` placement note to the Health Macro toggle.
-- Settings Center / Gear & Upgrades: Reworked Character Frame, Inspect Frame and shared item-level formatting controls so dependent rows are hidden until the relevant indicator is selected.
-- Settings Center / Bags & Inventory: Reworked native bag indicator controls so item level, upgrade and target options are hidden until their matching bag indicator is selected.
-- Settings Center / Loot & Rewards: Reworked loot toast filters into clearer modern sections, including per-rarity sections and a proper Include add action.
-- Settings Center / Dialogs & Confirmations: Sorted auto-confirm dialog options alphabetically in the modern multi-select menu.
-- Settings Center / Group Finder: Made party-member Mythic+ keystone info independent from the Keystone Helper toggle.
-- Settings Center / Talent Reminder: Moved the main Settings section above the specialization/profile detail blocks.
-- Settings Center / Teleports: Moved World Map Teleport usage help into the setting note so the normal description stays readable first.
-- Settings Center / Private Auras: Removed the redundant Edit Mode row from the modern Standalone Private Auras page.
-- Settings Center: Raised the modern settings frame back to `DIALOG` strata with a high frame level so it stays above addon editor windows.
-
-### ❌ Removed
-
-- Settings Center / General: Removed the base-game auto-dismount CVar option from the modern Movement & Input page.
-
-### 🐛 Fixed
-
-- Settings Center: Fixed setting notes showing before the normal description in hover help; descriptions now appear first unless a note explicitly overrides ordering.
-- Settings Center: Fixed modern-only keybinding rows trying to create legacy Blizzard Settings initializers.
-- Settings Center: Fixed modern deep links from legacy helper buttons only opening the page instead of jumping to the exact target setting.
-- Settings Center: Fixed deep-linked collapsed sections staying collapsed after navigation.
-- Settings Center: Fixed multi-dropdown summary text for selected Hearthstones continuing to show the default "All owned Hearthstones" label after custom selections.
-- Settings Center: Fixed controls with `refreshOnChange` not rebuilding the visible page when dependent controls need to be hidden or shown.
-- Settings Center: Fixed another main-file local variable warning by keeping new navigation helpers off the LibSettingsDesigner main chunk local list.
-- Settings Center / Gear & Upgrades: Fixed the missing `gearInspectDisplayDesc` locale key across supported locales.
-- Settings Center / Questing: Fixed the NPC ignore tip being attached to the wrong setting in the modern tooltip.
-
-## [11.0.0-alpha5] - 2026-06-05
-
-### ✨ Added
-
-- Damage Meter: Added optional segment linking so changing the selected segment in one Damage Meter window can switch all Damage Meter windows to the same segment.
-- Settings Center: Added direct numeric editing for slider values by clicking the highlighted current value.
-
-### 🔄 Changed
-
-- Economy / Auto-Sell Rules: Reworked the modern page into a behavior section followed by separate rarity sections instead of one large Settings block.
-- Economy / Auto-Sell Rules: Moved "Only auto sell when Shift is held" and the 12-item buyback safety option from Vendor Quick Actions into Auto-Sell Rules.
-- Economy / Include / Exclude: Reworked add/remove rows with clearer labels, descriptions, popup prompts, and disabled empty-state remove dropdowns.
-- Economy / Destroy Queue: Reworked add/remove rows with clearer labels, descriptions, and a disabled empty-state remove dropdown.
-- Settings Center / Economy: Added clearer overview-card descriptions for Auction House, Merchant UI, Repair Options, Destroy Queue and Include / Exclude.
-- Settings Center / Sound: Added clearer overview-card descriptions for Audio Device, Additional Sounds, Shared Media, Deep Voice Sounds and Sounds to Mute.
-- Settings Center / Combat Alerts: Moved Combat Alerts to a modern-only Gameplay page and added clearer descriptions for death alerts, no-target reminders, sounds, TTS and role rules.
-- Settings Center / Combat Alerts: Added row-level descriptions for Death Alert and No Target Indicator so the purpose of each feature is visible directly in the modern page.
-- Settings Center / Private Auras: Moved Standalone Private Auras to a modern-only Gameplay page with clearer descriptions for the movable private aura anchor and Edit Mode placement.
-- Settings Center / Profiles: Migrated profile pages to modern-only rendering, including AddOn, Bags Categories, Damage Meter, Healer Buff Placement, Resource Bars and Unit Frames profiles.
-- Settings Center / Profiles: Removed the old Blizzard Settings root category for Profiles; profile pages now register directly into the modern Profiles category.
-- Settings Center / Profiles: Split global Font settings and Import Protection into their own Profile subpages so they can be found directly.
-- Settings Center / Profiles: Added a Profile Management section to the AddOn profile page so active/default profile controls appear before copy, delete, create and export/import actions.
-- Settings Center / Sound: Migrated Audio Device, Sounds to Mute, Additional Sounds and Shared Media pages to modern-only rendering and removed the old Blizzard Settings root category for Sound.
-- Settings Center / Economy: Migrated Economy pages to modern-only rendering and removed the old Blizzard Settings root category for Economy.
-- Settings Center / Interface: Moved the Quick Join button visibility setting from Instant Messenger to Popups & UI Tweaks and renamed it to describe the actual Blizzard button.
-- Settings Center / Social: Migrated Social, Chat, Mailbox, Privacy and Friends pages to modern-only rendering and removed the old Blizzard Settings root category for Social.
-- Settings Center / Social: Added clearer descriptions for invite blocking, automatic group invites, advanced ignore list options, Communities privacy and friends-list styling controls.
-
-### 🐛 Fixed
-
-- Economy / Warband Gold: Improved the default target gold description and kept ignored-character multi-select entries in their provided name-sorted order.
-- Settings Center: Replaced the generic "Configure this advanced setting" fallback text with a neutral editor/action description.
-- Settings Center: Fixed long slider scale labels being clipped by widening the min/max label area when needed.
-- Settings Center: Lowered the modern settings window to MEDIUM frame strata so it layers more naturally with other addon editor windows.
-- Settings Center: Fixed long dropdown and multi-select context menus overflowing the screen by enabling Blizzard scroll mode for large option lists.
-- Settings Center / Shared Media: Fixed Enable all and Disable all leaving visible sound toggles in their old state until the page was reopened.
-
-## [11.0.0-alpha4] - 2026-06-04
-
-### ✨ Added
-
-- Economy / Vendors: Added a Guild Bank repair context selector so automatic guild-bank repairs can be limited to World, Party, Dungeons, Mythic+, Raid, or PvP.
-- Settings Center: Added generic info pages for rich help content so add-ons can register text, command lists, action buttons, and images without creating fake settings rows.
-- Settings Center: Added a Quick Reference & Help page linked from the dashboard with EnhanceQoL slash commands and macro examples.
-- Settings Center: Added a Support & Feedback page linked from the dashboard with a copyable Discord invite.
-- Settings Center: Added a persistent Comfortable/Compact density toggle for modern detail pages so dense settings pages can show more options at once while keeping descriptions available on hover.
-- Settings Center: Added a resize grip to the modern settings frame with persistent size memory.
-
-### 🔄 Changed
-
-- Settings Center: Dashboard help cards now open modern in-center pages instead of routing back to Blizzard Settings.
-- Settings Center / Resource Bars: Moved Resource Bars into its own modern-only `EQoL Suites` page and removed those controls from the combined Bars & Resources page.
-- Settings Center / Resource Bars: Added clearer modern descriptions for Resource Bars mode, Shared mode, Classic mode, auto-enable behavior, and per-specialization bar selection.
-- Settings Center / Resource Bars: Mode switching now hides inactive Shared or Classic options instead of leaving disabled rows visible.
-- Settings Center / Markers: Migrated World Marker keybinding guidance to a single modern-only row that explains cycle and clear bindings and opens Blizzard Key Bindings directly.
-- Settings Center / Markers: Renamed the modern subpage to World Markers and added a concise page-card description.
-
-### 🐛 Fixed
-
-- Settings Center: Lowered the main window strata so addon editors and dialog-style tools can layer above it consistently.
-- Settings Center: Fixed modern-only sliders and dropdowns not persisting changes when their setter used the modern single-value callback shape.
-- Settings Center: Replaced the resize grip placeholder with a native diagonal corner grabber and avoided expensive full content rebuilds while resizing.
-- Settings Center: Fixed resize edge cases by using manual cursor-based resizing with a lower minimum height and stable top-left anchoring.
-
-## [11.0.0-alpha3] - 2026-06-04
-
-### ✨ Added
-
-- Settings Center / Action Bars: Added a clearer explanation for action bar visibility rules so the multi-select describes show, hide, mouseover, and fade behavior instead of showing a generic fallback.
-- Settings Center / Skinner: Added a Character Frame section header and renamed the main toggle to make it clear that it enables Character Frame skinning.
-- Settings Center / Skinner: Added a Character Frame preview note using the new example image asset.
-
-### 🔄 Changed
-
-- Settings Center: Added an `EQoL Suites` root category for major built-in replacement systems, including Bags, EQoL Unit Frames, Resource Bars, Cooldown Panels, and Damage Meter.
-- Settings Center: Added generic page and setting visibility predicates so migrated pages can hide obsolete Blizzard/native options when an EQoL replacement system is active.
-- Settings Center / Bags: Split the Bags suite entry from Bags & Inventory. Bags & Inventory now stays with native inventory helpers and is hidden when the Bags module is active.
-- Settings Center / Gear & Upgrades: Moved the low durability warning setting out of Bags & Inventory because it belongs to equipment status, not bag replacement settings.
-- Settings Center / Unit Frames: Hide legacy Blizzard unit-frame and class-resource controls from the modern menu when the matching EQoL Unit Frames replacement is active.
-- Settings Center / Unit Frames: Moved EQoL Unit Frames fully to the modern Settings Center, removed it from the old Blizzard Settings tree, and split the page into Solo Frames, Group Frames, and Class Colors sections.
-- Settings Center / Unit Frames: Renamed the player and target frame toggles to remove "custom", added concise Edit Mode descriptions, and made Class Colors depend on at least one supported EQoL unit or group frame being enabled.
-- Settings Center: Migrated Action Bars & Buttons and Skinner away from the legacy Blizzard Settings renderer. They now register only for the modern Settings Center while keeping their SavedVariables and runtime behavior unchanged.
-- Settings Center: Migrated Visibility & Fading (Frames) to the modern Settings Center so frame visibility multi-select controls are registered directly on the modern page.
-- Settings Center / Visibility & Fading: Added contextual notes for frame visibility controls that are disabled because EQoL Unit Frames already manage that frame.
-
-### 🐛 Fixed
-
-- Settings Center / Skinner: Fixed the Character Frame setting order so the main Character Frame toggle appears first and disables the dependent alpha and border options when turned off.
-- Settings Center: Fixed disabled dropdowns, buttons, and color controls keeping an active-looking border until hovered by refreshing optional row widgets reliably even when earlier widget slots are empty.
-- Cooldown Panels: Fixed Paste Entry Style copying tracked aura identity fields, which could leave a copied aura's label and icon on the target entry instead of only applying the visual style.
-
----
-
-## [11.0.0-alpha2] - 2026-06-04
-
-### ✨ Added
-
-- Settings Center: Added a richer dashboard for the experimental settings center, including quick-access cards, AddOn status tiles, customized feature overview, and a "New in this Version" overview.
-- Settings Center: Added modern category overview cards with feature icons, concise descriptions, setting counts, and clearer hover/selected states.
-- Settings Center: Added modern detail pages with fixed breadcrumb/back navigation, two-column detail layout, section cards, compact setting rows, and a persistent About panel.
-- Settings Center: Added native renderers for more setting control types, including compact toggles, stacked sliders, dropdowns, multi-dropdowns, inputs, color pickers, and polished configure/legacy fallbacks for complex controls.
-- Settings Center: Added setting notes/tooltips for richer contextual help on individual settings.
-- Settings Center: Added search-result cards that can show and edit matching controls directly, then open and scroll to the owning setting location.
-- Settings Center: Added `tag:new` search support and a dashboard shortcut for finding settings marked as new in the current version.
-- Settings Center: Added NEW badges to relevant sidebar categories and individual setting rows.
-- Settings Center: Added local LibSettingsDesigner assets for the modern frame shell, dropdown/collapse indicators, textures, and settings-center UI material.
-- Settings Center: Added EnhanceQoL-specific category/page icons for the modern settings overview.
-- Settings Center: Added internal library locale coverage for generic LibSettingsDesigner UI strings.
-
-### 🔄 Changed
-
-- Settings Center: Moved the experimental config stack out of `LibEQOL` into the standalone `LibSettingsDesigner` folder so it can evolve independently from the legacy settings wrapper.
-- Settings Center: Reworked the visual style toward a darker WoW-native charcoal material with clearer surface hierarchy, calmer normal borders, and stronger gold hover/selected borders.
-- Settings Center: Reworked the window frame, top bar, close button, search box, scrollbars, and spacing to better match the target mockup.
-- Settings Center: Reworked sliders into compact stacked field rows with aligned current value, muted min/max labels, and full-width tracks.
-- Settings Center: Reworked dropdown and multi-dropdown menus with clearer selected-state display, disabled-state handling, and radio/checkbox-style entries.
-- Settings Center: Reworked search so repeated searches reset to the top and clearing the query returns to the previous view.
-- Settings Center: Reworked the dashboard and category overview so non-clickable informational tiles no longer show misleading clickable hover borders.
-- Settings Center: Reworked "Customized settings" wording to the shorter "Customized".
-- Settings Center: Reworked `About` as the page overview panel and removed `Related` from the EnhanceQoL layout for now.
-- Settings Center: Reworked page descriptions, icons, and search metadata to be driven by EnhanceQoL page IDs instead of English display text, improving non-English locales.
-- Settings Center: Reworked new-setting counts so root/category/page placeholders are not counted as new settings.
-
-### ❌ Removed
-
-- System / CVar: Removed the deprecated "Persist CVar values" option and its storage logic.
-- System / UI: Removed Blizzard CVar toggles that are base-game only and no longer needed in this addon: "Show LUA-Error on UI", "Auto-push new spells to your action bars", and "Enable Advanced Tooltips".
-- Settings / UI: Removed the empty `System & Debug` section from the General settings page.
-- Settings / Blizzard UI: Removed the temporary "Open EnhanceQoL Settings" button from the Blizzard Settings page to avoid confusing the release path while `/eqol2` remains experimental.
-
-### 🐛 Fixed
-
-- Settings Center: Fixed random first checkboxes being promoted into fake page master toggles.
-- Settings Center: Fixed grouped detail pages by bridging existing settings headlines into modern section cards.
-- Settings Center: Fixed many controls rendering as static grey values instead of real widgets.
-- Settings Center: Fixed disabled dropdowns, color pickers, and related controls remaining clickable.
-- Settings Center: Fixed multi-dropdown selected values not visually reflecting the saved selection.
-- Settings Center: Fixed dependent controls not updating enabled/disabled state live after toggling their parent setting.
-- Settings Center: Fixed dropdown and multi-dropdown text vertical alignment.
-- Settings Center: Fixed repeated search/open navigation preserving an old scroll position.
-- Settings Center: Fixed scrollbar alignment, track height, and overlap issues across dashboard, category, search, and detail views.
-- Settings Center: Fixed detail-page bottom borders and last-row separators overlapping or showing unnecessary divider lines.
-- Settings Center: Fixed detail-page About panels starting lower than the main settings column.
-- Settings Center: Fixed top-bar title/search visibility issues caused by color/layering.
-- Settings Center: Fixed missing or incorrect localized text for dashboard, generic controls, About panels, and library-owned UI labels.
-- Settings Center: Fixed page/category icons resolving from translated text instead of stable IDs.
-- Settings Center: Fixed false "Customized" counts on fresh profiles by comparing only stored values against real `addon.dbDefaults`, supporting sub-settings, and normalizing color tables with alpha/default float tolerance.
-- Settings Center: Fixed `instanceDifficultyColors` defaults being written only to the active profile instead of also being available to the modern registry.
-- Settings Center: Fixed missing `subvar` metadata in the legacy-to-modern registry bridge.
-- Settings Center: Fixed color picker rows using disabled-looking swatches/buttons even when the setting was active.
-- Settings Center: Fixed NEW search results initially returning category/page placeholders instead of concrete new settings.
-- Settings Center: Fixed `tag:new` showing no results when old Blizzard Settings still marked settings as new.
-- Settings Center: Fixed the LibSettingsDesigner main file hitting WoW's "more than 200 local variables" warning by moving constant data out of the main function path.
-- Damage Meter: Fixed a secret-value error when tooltip bar, icon, or row borders were refreshed while showing source breakdown tooltips in restricted combat-data environments.
-
----
-
-## [11.0.0-alpha1] - 2026-06-03
+<!--@eqol-beta@-->
+## [11.0.0-beta1] - 2026-06-06
 
 ### ℹ️ Important
 
-- Settings: EnhanceQoL is beginning the migration from the full Blizzard Settings tree to a dedicated EnhanceQoL Settings Center with dashboard, feature pages, grouped controls, direct search, and `/eqol2` access during the alpha phase.
+- EnhanceQoL now uses a new modern Settings Center instead of the old Blizzard Settings tree, with dashboard, search, deep links, category pages, richer descriptions and modern controls for addon settings.
 
 ### ✨ Added
 
-- Settings: Added the experimental modern EnhanceQoL Settings Center, available with `/eqol2` while the legacy settings remain available through `/eqol` and the minimap button.
-- Unit Frames / Castbar and Resource Bars: Added configurable text anchors for cast names, cast durations, and resource bar values so text can stay pinned to the desired position while bars resize.
+- Damage Meter: Added optional segment linking across Damage Meter windows.
+- Economy: Added guild-bank repair context selection for automatic guild-bank repairs.
+- Unit Frames, Castbars and Resource Bars: Added configurable text anchors for cast names, cast durations and resource bar values.
+
+### ❌ Removed
+
+- System / CVar: Removed the deprecated Persist CVar values option and its storage logic.
 
 ### 🐛 Fixed
 
-- Mythic Plus / Dungeon Finder: Fixed the Mythic+ score frame hover highlight for current-season dungeons whose Group Finder map IDs were not present in the teleport compendium data.
-- Unit Frames: Exposed custom player, target, focus, and pet portrait fields on the EQOL unit frames.
-- Bags: Fixed new characters without purchased character bank tabs being unable to switch to the character bank purchase view when the integrated bank is enabled.
+- Cooldown Panels: Fixed Paste Entry Style copying tracked aura identity fields instead of only applying the visual style.
+- Damage Meter: Fixed restricted combat-data tooltip refresh errors and several tooltip row rendering issues.
+- Mythic Plus / Dungeon Finder: Fixed current-season dungeon score hover handling for missing Group Finder map IDs.
+- Unit Frames: Fixed custom player, target, focus and pet portrait fields not being exposed on EQOL unit frames.
+- Unit Frames / Healer Buff Placement: Added an Anchor outside frame option so HBP indicators can be positioned slightly outside party and raid frames.
+- Bags: Fixed new characters without purchased character bank tabs being unable to switch to the integrated character bank purchase view.
 
----
+<!--@end-eqol-beta@-->
 
 ## [10.24.0] - 2026-06-02
 
