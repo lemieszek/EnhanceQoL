@@ -1,5 +1,13 @@
 # Changelog
 
+## [11.0.4] - 2026-06-07
+
+### 🐛 Fixed
+
+- Craft Shopper: Removed the obsolete Missing only filter because the shopping list already contains only missing tracked-recipe reagents.
+
+---
+
 ## [11.0.3] - 2026-06-06
 
 ### 🐛 Fixed
