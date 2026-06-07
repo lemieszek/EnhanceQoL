@@ -451,9 +451,6 @@ local function SyncCraftShopperQualityControls()
 	local mode = GetCraftShopperReagentQualityMode()
 	local frameDropdown = addon.Vendor.CraftShopper.frame and addon.Vendor.CraftShopper.frame.qualityPreference
 	if frameDropdown and frameDropdown.GetValue and frameDropdown:GetValue() ~= mode then frameDropdown:SetValue(mode) end
-
-	local settingsDropdown = addon.Vendor.CraftShopper.settingsQualityDropdown
-	if settingsDropdown and settingsDropdown.GetValue and settingsDropdown:GetValue() ~= mode then settingsDropdown:SetValue(mode) end
 end
 
 function addon.Vendor.CraftShopper.GetReagentQualityMode()
