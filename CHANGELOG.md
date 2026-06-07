@@ -4,6 +4,7 @@
 
 ### ✨ Added
 
+- Cooldown Panels: Added per-entry options to hide icon borders while a cooldown is active or while it is ready.
 - Group Tools / Focus Marker: Added a keybinding entry for the focus marker macro.
 
 ### 🐛 Fixed

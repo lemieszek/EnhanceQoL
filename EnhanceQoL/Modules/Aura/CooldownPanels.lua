@@ -9848,6 +9848,7 @@ end
 
 function cdp.ENTRY.ClearBlizzardIconSkin(icon)
 	if not icon then return end
+	icon._eqolBlizzardIconBorderEnabled = nil
 	if icon.blizzardIconOverlay then icon.blizzardIconOverlay:Hide() end
 	if icon._eqolBlizzardMaskApplied and icon.texture and icon.blizzardIconMask and icon.texture.RemoveMaskTexture then
 		pcall(icon.texture.RemoveMaskTexture, icon.texture, icon.blizzardIconMask)
@@ -9875,6 +9876,7 @@ end
 function cdp.ENTRY.ApplyBlizzardIconSkin(icon)
 	if not icon then return end
 	local overlay = cdp.ENTRY.EnsureBlizzardIconOverlay(icon)
+	icon._eqolBlizzardIconBorderEnabled = true
 	local width = tonumber(icon:GetWidth()) or 0
 	local height = tonumber(icon:GetHeight()) or 0
 	if width <= 0 then width = tonumber(icon._eqolBaseSlotSize) or Helper.PANEL_LAYOUT_DEFAULTS.iconSize or 36 end
@@ -9946,6 +9948,7 @@ local function applyIconBorder(icon, layout)
 	local border = icon.border
 	local defaults = Helper.PANEL_LAYOUT_DEFAULTS
 	local enabled = layout and layout.iconBorderEnabled == true
+	border._eqolIconBorderEnabled = nil
 	if not enabled then
 		cdp.ENTRY.ClearBlizzardIconSkin(icon)
 		border:Hide()
@@ -9960,6 +9963,7 @@ local function applyIconBorder(icon, layout)
 	end
 
 	cdp.ENTRY.ClearBlizzardIconSkin(icon)
+	border._eqolIconBorderEnabled = true
 	local edgeSize = Helper.ClampInt(layout.iconBorderSize, 1, 64, defaults.iconBorderSize or 1)
 	local offset = Helper.ClampInt(layout.iconBorderOffset, -64, 64, defaults.iconBorderOffset or 0)
 	local edgeFile = resolveIconBorderTexture(textureKey)
@@ -9985,6 +9989,13 @@ local function applyIconBorder(icon, layout)
 
 	border:SetBackdropBorderColor(color[1] or 0, color[2] or 0, color[3] or 0, color[4] or 1)
 	border:Show()
+end
+
+function cdp.ENTRY.ApplyIconBorderCooldownVisibility(icon, entry, cooldownRunning)
+	if not icon or not entry then return end
+	local hideBorder = (entry.hideBorderOnCooldown == true and cooldownRunning == true) or (entry.hideBorderOffCooldown == true and cooldownRunning ~= true)
+	if icon.border and icon.border._eqolIconBorderEnabled == true then icon.border:SetShown(not hideBorder) end
+	if icon.blizzardIconOverlay and icon._eqolBlizzardIconBorderEnabled == true then icon.blizzardIconOverlay:SetShown(not hideBorder) end
 end
 
 local function applyIconLayout(frame, count, layout)
@@ -11567,6 +11578,26 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		refreshEntryViews()
 	end
 
+	local function setBorderCooldownVisibility(field, value)
+		local _, currentEntry = getEntry()
+		if not currentEntry then return end
+		local hideOnCooldown = currentEntry.hideBorderOnCooldown == true
+		local hideOffCooldown = currentEntry.hideBorderOffCooldown == true
+		if field == "hideBorderOnCooldown" then
+			hideOnCooldown = value == true
+			if hideOnCooldown then hideOffCooldown = false end
+		elseif field == "hideBorderOffCooldown" then
+			hideOffCooldown = value == true
+			if hideOffCooldown then hideOnCooldown = false end
+		else
+			return
+		end
+		if currentEntry.hideBorderOnCooldown == hideOnCooldown and currentEntry.hideBorderOffCooldown == hideOffCooldown then return end
+		currentEntry.hideBorderOnCooldown = hideOnCooldown
+		currentEntry.hideBorderOffCooldown = hideOffCooldown
+		refreshEntryViews()
+	end
+
 	local function setIconSizeOverrideEnabled(value)
 		local _, currentEntry = getEntry()
 		if not currentEntry then return end
@@ -12003,6 +12034,26 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			end,
 			get = function() return getResolvedShowOnCooldown() end,
 			set = function(_, value) setCooldownVisibility("showOnCooldown", value) end,
+		},
+		{
+			name = L["CooldownPanelHideBorderOnCooldown"] or "Hide border on cooldown",
+			kind = SettingType.Checkbox,
+			parentId = "cooldownPanelStandaloneDisplay",
+			get = function()
+				local _, currentEntry = getEntry()
+				return currentEntry and currentEntry.hideBorderOnCooldown == true or false
+			end,
+			set = function(_, value) setBorderCooldownVisibility("hideBorderOnCooldown", value) end,
+		},
+		{
+			name = L["CooldownPanelHideBorderOffCooldown"] or "Hide border off cooldown",
+			kind = SettingType.Checkbox,
+			parentId = "cooldownPanelStandaloneDisplay",
+			get = function()
+				local _, currentEntry = getEntry()
+				return currentEntry and currentEntry.hideBorderOffCooldown == true or false
+			end,
+			set = function(_, value) setBorderCooldownVisibility("hideBorderOffCooldown", value) end,
 		},
 		{
 			name = L["CooldownPanelTrackPassiveSpell"] or "Track passive spell",
@@ -19688,6 +19739,8 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 					data.readyAt = nil
 				end
 			end
+			if readyGlowCooldownRunning == nil then readyGlowCooldownRunning = durationActive or usingCooldown or (cooldownEnabledOk and isCooldownActive(cooldownStart, cooldownDuration)) end
+			cdp.ENTRY.ApplyIconBorderCooldownVisibility(icon, data.entry, readyGlowCooldownRunning == true)
 			if not useSecretReadyGlow and data.glowReady and data.showCooldown and data.canTriggerReadyGlow then
 				if data.readyAt then
 					if readyGlowPrimed then readyGlowPrimed[data.entryId] = true end
@@ -23003,6 +23056,8 @@ function cdp.ENTRY.ApplyVisibleSpellRuntime(panelId, runtime, icon, data, resolv
 			data.readyAt = nil
 		end
 	end
+	if readyGlowCooldownRunning == nil then readyGlowCooldownRunning = durationActive or usingCooldown or (cooldownEnabledOk and isCooldownActive(cooldownStart, cooldownDuration)) end
+	cdp.ENTRY.ApplyIconBorderCooldownVisibility(icon, data.entry, readyGlowCooldownRunning == true)
 	if not useSecretReadyGlow and data.glowReady and data.showCooldown and data.canTriggerReadyGlow then
 		if data.readyAt then
 			if readyGlowPrimed then readyGlowPrimed[data.entryId] = true end
@@ -23156,6 +23211,7 @@ function cdp.ENTRY.ApplyVisibleItemRuntime(panelId, runtime, icon, data, resolve
 			data.readyAt = nil
 		end
 	end
+	cdp.ENTRY.ApplyIconBorderCooldownVisibility(icon, data.entry, readyGlowCooldownRunning == true)
 	if data.glowReady and data.showCooldown and data.canTriggerReadyGlow then
 		if data.readyAt then
 			if readyGlowPrimed then readyGlowPrimed[data.entryId] = true end
