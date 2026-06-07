@@ -29,6 +29,11 @@
              >
     </Binding>
 
+    <Binding name="CLICK EQOLFocusMarkerButton:LeftButton"
+             category="Enhance QoL"
+             >
+    </Binding>
+
     <Binding name="EQOL_TOGGLE_CHATHISTORY"
              category="Enhance QoL"
              >
