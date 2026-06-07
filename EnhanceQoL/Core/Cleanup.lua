@@ -137,11 +137,14 @@ local MIGRATED_DATAPANEL_STREAM_OPTION_POSITION_KEYS = {
 	latency = true,
 	location = true,
 	lootspec = true,
+	microbar = true,
 	mythickey = true,
 	pettracker = true,
 	realm = true,
 	stats = true,
+	talent = true,
 	time = true,
+	volume = true,
 }
 
 local function cleanupListedProfileKeys(profile, keys)

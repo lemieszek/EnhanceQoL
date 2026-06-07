@@ -3,12 +3,8 @@ local addonName, addon = ...
 
 local L = addon.L
 
-local AceGUI = addon.AceGUI
 local db
 local stream
--- Forward declarations used across functions
-local listWindow -- AceGUI window
-local populateListWindow -- function to (re)build the list window
 local function getOptionsHint()
 	if addon.DataPanel and addon.DataPanel.GetOptionsHintText then
 		local text = addon.DataPanel.GetOptionsHintText()
@@ -391,7 +387,6 @@ local function getFriends(stream)
 	stream.snapshot.skipPanelClassColor = db and (db.useClassColor == true or db.useTextColor == true) or nil
 	if isFriendsDataRestricted() then
 		stream.snapshot.text = colorizeStreamText(FRIENDS)
-		if listWindow and listWindow.frame and listWindow.frame:IsShown() then populateListWindow() end
 		return
 	end
 
@@ -507,26 +502,6 @@ local function getFriends(stream)
 	else
 		stream.snapshot.text = colorizeStreamText(totalUnique .. " " .. FRIENDS)
 	end
-
-	-- If our extended window is open, refresh its content
-	if listWindow and listWindow.frame and listWindow.frame:IsShown() then populateListWindow() end
-end
-
-local function ensureListWindow()
-	if listWindow and listWindow.frame and listWindow.frame:IsShown() then return listWindow end
-	local frame = AceGUI:Create("Window")
-	listWindow = frame
-	frame:SetTitle(FRIENDS)
-	frame:SetWidth(720)
-	frame:SetHeight(520)
-	frame:SetLayout("Fill")
-
-	local scroll = AceGUI:Create("ScrollFrame")
-	scroll:SetLayout("Flow")
-	frame:AddChild(scroll)
-
-	frame._scroll = scroll
-	return frame
 end
 
 local function colorizeText(text, r, g, b)
@@ -589,90 +564,6 @@ local function getTooltipRightColor(entry, sameZone)
 	return 0.62, 0.62, 0.62
 end
 
-local function addHeader(scroll, title)
-	local header = AceGUI:Create("Label")
-	header:SetFullWidth(true)
-	header:SetText("|cffffd100" .. title .. "|r")
-	header:SetFont(addon.variables and addon.variables.defaultFont or GameFontNormal:GetFont(), 14, "OUTLINE")
-	scroll:AddChild(header)
-end
-
-local function addTwoColumnRow(scroll, leftText, rightText, leftWidth, rightWidth)
-	local row = AceGUI:Create("SimpleGroup")
-	row:SetFullWidth(true)
-	row:SetLayout("Flow")
-	local left = AceGUI:Create("Label")
-	left:SetRelativeWidth(leftWidth or 0.58)
-	left:SetText(leftText or "")
-	row:AddChild(left)
-
-	local right = AceGUI:Create("Label")
-	right:SetRelativeWidth(rightWidth or 0.42)
-	right:SetText(rightText or "")
-	row:AddChild(right)
-
-	scroll:AddChild(row)
-end
-
-local function addColumnHeader(scroll)
-	local rightHeader = _G.ZONE or _G.PRESENCE or L["Presence"] or "Presence"
-	addTwoColumnRow(scroll, "|cffcccccc" .. NAME .. "|r", "|cffcccccc" .. rightHeader .. "|r")
-end
-
-local function addSectionRows(scroll, title, items)
-	if #items == 0 then return end
-	addHeader(scroll, string.format("%s (%d)", title, #items))
-	addColumnHeader(scroll)
-	for _, entry in ipairs(items) do
-		addTwoColumnRow(scroll, formatEntryName(entry), getEntryRightText(entry))
-	end
-end
-
-local function addSpacer(scroll)
-	local spacer = AceGUI:Create("Label")
-	spacer:SetFullWidth(true)
-	spacer:SetText(" ")
-	scroll:AddChild(spacer)
-end
-
-function populateListWindow()
-	if not (listWindow and listWindow._scroll) then return end
-	local scroll = listWindow._scroll
-	scroll:ReleaseChildren()
-
-	if tooltipMeta.guildName or tooltipMeta.guildTotalCount > 0 or tooltipMeta.guildMotd or #tooltipData.guild > 0 then
-		addHeader(scroll, tooltipMeta.guildName or GUILD)
-		if tooltipMeta.guildTotalCount and tooltipMeta.guildTotalCount > 0 then
-			addTwoColumnRow(scroll, "|cffcccccc" .. GUILD .. "|r", string.format("%d/%d", tooltipMeta.guildOnlineCount, tooltipMeta.guildTotalCount), 0.24, 0.76)
-		elseif tooltipMeta.guildOnlineCount and tooltipMeta.guildOnlineCount > 0 then
-			addTwoColumnRow(scroll, "|cffcccccc" .. GUILD .. "|r", tostring(tooltipMeta.guildOnlineCount), 0.24, 0.76)
-		end
-		if tooltipMeta.guildMotd and tooltipMeta.guildMotd ~= "" then addTwoColumnRow(scroll, "|cffccccccMOTD|r", tooltipMeta.guildMotd, 0.24, 0.76) end
-		if #tooltipData.guild > 0 then
-			addSpacer(scroll)
-			addColumnHeader(scroll)
-			for _, entry in ipairs(tooltipData.guild) do
-				addTwoColumnRow(scroll, formatEntryName(entry), getEntryRightText(entry))
-			end
-		end
-	end
-
-	if (tooltipMeta.guildName or tooltipMeta.guildTotalCount > 0 or tooltipMeta.guildMotd or #tooltipData.guild > 0) and (#tooltipData.friends > 0 or #tooltipData.bnet > 0) then addSpacer(scroll) end
-
-	addSectionRows(scroll, FRIENDS, tooltipData.friends)
-	if #tooltipData.friends > 0 and #tooltipData.bnet > 0 then addSpacer(scroll) end
-	addSectionRows(scroll, BATTLENET_OPTIONS_LABEL or "Battle.net", tooltipData.bnet)
-end
-
-local function toggleListWindow()
-	local frame = ensureListWindow()
-	if frame.frame:IsShown() then
-		frame:Hide()
-	else
-		frame:Show()
-		populateListWindow()
-	end
-end
 
 local provider = {
 	id = "friends",
@@ -707,8 +598,6 @@ local provider = {
 	OnClick = function(_, btn)
 		if btn == "RightButton" then
 			openSettings()
-		else
-			toggleListWindow()
 		end
 	end,
 	OnMouseEnter = function(btn)
@@ -774,10 +663,5 @@ local provider = {
 }
 
 stream = EnhanceQoL.DataHub.RegisterStream(provider)
-
--- If the list window is open during updates, refresh its contents
-hooksecurefunc(addon.DataHub, "RequestUpdate", function(_)
-	if listWindow and listWindow.frame and listWindow.frame:IsShown() then populateListWindow() end
-end)
 
 return provider
