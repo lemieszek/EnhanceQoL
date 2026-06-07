@@ -1526,9 +1526,37 @@ function Editor:EnsureFrame()
 	ruleSettingsTitle:SetPoint("TOPLEFT", 572, -10)
 	settingsPanel.RuleSettingsTitle = ruleSettingsTitle
 
+	local ruleControlCard = CreateFrame("Frame", nil, settingsPanel, "BackdropTemplate")
+	ruleControlCard:SetPoint("TOPLEFT", ruleSettingsTitle, "BOTTOMLEFT", -4, -6)
+	ruleControlCard:SetPoint("BOTTOMRIGHT", settingsPanel, "BOTTOMRIGHT", -10, 10)
+	applyCardBackground(ruleControlCard, true)
+
+	local ruleControlViewport = CreateFrame("ScrollFrame", nil, ruleControlCard)
+	ruleControlViewport:SetPoint("TOPLEFT", ruleControlCard, "TOPLEFT", 12, -10)
+	ruleControlViewport:SetPoint("BOTTOMRIGHT", ruleControlCard, "BOTTOMRIGHT", -20, 10)
+	settingsPanel.RuleControlViewport = ruleControlViewport
+
+	local ruleControlContent = CreateFrame("Frame", nil, ruleControlViewport)
+	ruleControlContent:SetPoint("TOPLEFT", ruleControlViewport, "TOPLEFT", 0, 0)
+	ruleControlContent:SetHeight(260)
+	ruleControlContent:SetWidth(480)
+	ruleControlViewport:SetScrollChild(ruleControlContent)
+	settingsPanel.RuleControlContent = ruleControlContent
+
+	local ruleControlScroll = createThinScrollFrameBar(ruleControlViewport, 4)
+	settingsPanel.RuleControlScroll = ruleControlScroll
+
+	local function updateRuleControlScroll()
+		local viewportWidth = max(1, (ruleControlViewport:GetWidth() or 1) - 6)
+		ruleControlContent:SetWidth(viewportWidth)
+		if ruleControlScroll and ruleControlScroll.Sync then ruleControlScroll:Sync() end
+	end
+	frame._updateRuleControlScroll = updateRuleControlScroll
+
 	local controls = {}
 	frame.Controls = controls
 	local groupControlParent = groupControlContent
+	local ruleControlParent = ruleControlContent
 	controls.PreviewLoop = previewPanel.LoopCheck
 
 	controls.GroupNameLabel = groupControlParent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -1801,49 +1829,67 @@ function Editor:EnsureFrame()
 	end
 	frame._layoutGroupControlRows = layoutGroupControlRows
 
-	controls.RuleEnabled = createCheck(settingsPanel, tr("UFGroupHealerBuffEditorRuleEnabled", "Rule enabled"))
-	controls.RuleEnabled:SetPoint("TOPLEFT", ruleSettingsTitle, "BOTTOMLEFT", 0, -10)
+	controls.RuleEnabled = createCheck(ruleControlParent, tr("UFGroupHealerBuffEditorRuleEnabled", "Rule enabled"))
+	controls.RuleEnabled:SetPoint("TOPLEFT", ruleControlParent, "TOPLEFT", 0, -2)
 
-	controls.RuleNot = createCheck(settingsPanel, tr("UFGroupHealerBuffEditorRuleNot", "NOT (active when missing)"))
+	controls.RuleNot = createCheck(ruleControlParent, tr("UFGroupHealerBuffEditorRuleNot", "NOT (active when missing)"))
 	controls.RuleNot:SetPoint("TOPLEFT", controls.RuleEnabled, "BOTTOMLEFT", 0, -6)
 
-	controls.RuleMissingDesaturate = createCheck(settingsPanel, tr("UFGroupHealerBuffEditorRuleMissingDesaturate", "Desaturate missing icon"))
+	controls.RuleMissingDesaturate = createCheck(ruleControlParent, tr("UFGroupHealerBuffEditorRuleMissingDesaturate", "Desaturate missing icon"))
 	controls.RuleMissingDesaturate:SetPoint("TOPLEFT", controls.RuleNot, "BOTTOMLEFT", 16, -6)
 	controls.RuleMissingDesaturate:Hide()
 
-	controls.RuleAppliesParty = createCheck(settingsPanel, tr("Party", "Party"))
+	controls.RuleExpirationPulse = createCheck(ruleControlParent, tr("UFGroupHealerBuffEditorRuleExpirationPulse", "Pulse when expiring"))
+	controls.RuleExpirationPulse:SetPoint("TOPLEFT", controls.RuleNot, "BOTTOMLEFT", 0, -6)
+	controls.RuleExpirationPulse:Hide()
+	controls.RuleExpirationPulseThresholdLabel = ruleControlParent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	controls.RuleExpirationPulseThresholdLabel:SetPoint("TOPLEFT", controls.RuleExpirationPulse, "BOTTOMLEFT", 4, -18)
+	controls.RuleExpirationPulseThresholdLabel:SetText(tr("UFGroupHealerBuffEditorRuleExpirationPulseThreshold", "Pulse window"))
+	controls.RuleExpirationPulseThreshold = createSlider(ruleControlParent, 130, 1, 10, 1)
+	controls.RuleExpirationPulseThreshold:SetPoint("TOPLEFT", controls.RuleExpirationPulseThresholdLabel, "TOPRIGHT", 10, 8)
+	controls.RuleExpirationPulseThresholdValue = createNumberInput(ruleControlParent, 48, 8)
+	controls.RuleExpirationPulseThresholdValue:SetPoint("LEFT", controls.RuleExpirationPulseThreshold, "RIGHT", 12, 0)
+	controls.RuleExpirationPulseThresholdValue:SetText("3")
+	controls.RuleExpirationPulseThresholdLabel:Hide()
+	controls.RuleExpirationPulseThreshold:Hide()
+	controls.RuleExpirationPulseThresholdValue:Hide()
+	controls.RuleExpirationPulseCountdownOnly = createCheck(ruleControlParent, tr("UFGroupHealerBuffEditorRuleExpirationPulseCountdownOnly", "Countdown only during pulse"))
+	controls.RuleExpirationPulseCountdownOnly:SetPoint("TOPLEFT", controls.RuleExpirationPulseThresholdLabel, "BOTTOMLEFT", -4, -14)
+	controls.RuleExpirationPulseCountdownOnly:Hide()
+
+	controls.RuleAppliesParty = createCheck(ruleControlParent, tr("Party", "Party"))
 	controls.RuleAppliesParty:SetPoint("TOPLEFT", controls.RuleMissingDesaturate, "BOTTOMLEFT", -16, -6)
 
-	controls.RuleAppliesRaid = createCheck(settingsPanel, tr("Raid", "Raid"))
+	controls.RuleAppliesRaid = createCheck(ruleControlParent, tr("Raid", "Raid"))
 	controls.RuleAppliesRaid:SetPoint("TOPLEFT", controls.RuleAppliesParty, "BOTTOMLEFT", 0, -6)
 
-	controls.RuleIconModeLabel = settingsPanel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	controls.RuleIconModeLabel = ruleControlParent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	controls.RuleIconModeLabel:SetPoint("TOPLEFT", controls.RuleAppliesRaid, "BOTTOMLEFT", 0, -14)
 	controls.RuleIconModeLabel:SetText(tr("UFGroupHealerBuffEditorIconRuleMode", "Icon Rule Mode"))
-	controls.RuleIconMode = createDropdown(settingsPanel, 260)
+	controls.RuleIconMode = createDropdown(ruleControlParent, 260)
 	controls.RuleIconMode:SetPoint("TOPLEFT", controls.RuleIconModeLabel, "TOPRIGHT", 0, 12)
 	controls.RuleIconModeLabel:Hide()
 	controls.RuleIconMode:Hide()
 
-	controls.RuleMatchLabel = settingsPanel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	controls.RuleMatchLabel = ruleControlParent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	controls.RuleMatchLabel:SetPoint("TOPLEFT", controls.RuleAppliesRaid, "BOTTOMLEFT", 0, -14)
 	controls.RuleMatchLabel:SetText(tr("UFGroupHealerBuffEditorTintTrigger", "Tint Trigger"))
-	controls.RuleMatch = createDropdown(settingsPanel, 260)
+	controls.RuleMatch = createDropdown(ruleControlParent, 260)
 	controls.RuleMatch:SetPoint("TOPLEFT", controls.RuleMatchLabel, "TOPRIGHT", 0, 12)
 	controls.RuleMatchLabel:Hide()
 	controls.RuleMatch:Hide()
 
-	controls.RuleColorLabel = settingsPanel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	controls.RuleColorLabel = ruleControlParent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	controls.RuleColorLabel:SetPoint("TOPLEFT", controls.RuleAppliesRaid, "BOTTOMLEFT", 0, -14)
 	controls.RuleColorLabel:SetText(tr("UFGroupHealerBuffEditorSpellColor", "Spell Color"))
-	controls.RuleColorButton = createColorSwatchButton(settingsPanel, 24)
+	controls.RuleColorButton = createColorSwatchButton(ruleControlParent, 24)
 	controls.RuleColorButton:SetPoint("LEFT", controls.RuleColorLabel, "RIGHT", 10, 0)
 	controls.RuleColorLabel:Hide()
 	controls.RuleColorButton:Hide()
 
-	controls.RuleInfo = settingsPanel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	controls.RuleInfo = ruleControlParent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	controls.RuleInfo:SetPoint("TOPLEFT", controls.RuleAppliesRaid, "BOTTOMLEFT", 0, -10)
-	controls.RuleInfo:SetPoint("RIGHT", settingsPanel, "RIGHT", -14, 0)
+	controls.RuleInfo:SetPoint("RIGHT", ruleControlParent, "RIGHT", -4, 0)
 	controls.RuleInfo:SetJustifyH("LEFT")
 	controls.RuleInfo:SetTextColor(0.75, 0.75, 0.75, 1)
 	controls.RuleInfo:SetText(tr("UFGroupHealerBuffEditorRuleInfoDefaultHint", "Add rules via + and remove them via x in the list."))
@@ -2741,6 +2787,51 @@ function Editor:EnsureFrame()
 		Editor:RefreshRuntimeNow()
 	end)
 
+	controls.RuleExpirationPulse:SetScript("OnClick", function(self)
+		local rule = ruleFromSelection()
+		if not rule then return end
+		rule.expirationPulseEnabled = self:GetChecked() == true
+		if rule.expirationPulseThreshold == nil then rule.expirationPulseThreshold = 3 end
+		Editor:RefreshRuleControls()
+		Editor:RefreshPreview()
+		Editor:RefreshRuntimeNow()
+	end)
+
+	local function applyRuleExpirationPulseThreshold(value)
+		local rule = ruleFromSelection()
+		if not rule then return end
+		value = roundInt(tonumber(value) or rule.expirationPulseThreshold or 3)
+		if value < 1 then value = 1 end
+		if value > 10 then value = 10 end
+		rule.expirationPulseThreshold = value
+		syncSliderValue(controls.RuleExpirationPulseThreshold, controls.RuleExpirationPulseThresholdValue, value, 1)
+		Editor:RefreshPreview()
+		Editor:RefreshRuntimeNow()
+	end
+
+	controls.RuleExpirationPulseThreshold:SetScript("OnValueChanged", function(self, value)
+		if self._eqolSliderSync then return end
+		applyRuleExpirationPulseThreshold(value)
+	end)
+	controls.RuleExpirationPulseThresholdValue:SetScript("OnEnterPressed", function(self)
+		applyRuleExpirationPulseThreshold(self:GetText())
+		self:ClearFocus()
+	end)
+	controls.RuleExpirationPulseThresholdValue:SetScript("OnEditFocusLost", function(self) applyRuleExpirationPulseThreshold(self:GetText()) end)
+	controls.RuleExpirationPulseThresholdValue:SetScript("OnEscapePressed", function(self)
+		local rule = ruleFromSelection()
+		self:SetText(tostring((rule and rule.expirationPulseThreshold) or 3))
+		self:ClearFocus()
+	end)
+
+	controls.RuleExpirationPulseCountdownOnly:SetScript("OnClick", function(self)
+		local rule = ruleFromSelection()
+		if not rule then return end
+		rule.expirationPulseCountdownOnly = self:GetChecked() == true
+		Editor:RefreshPreview()
+		Editor:RefreshRuntimeNow()
+	end)
+
 	controls.RuleAppliesParty:SetScript("OnClick", function(self)
 		local rule = ruleFromSelection()
 		if not rule then return end
@@ -2800,13 +2891,16 @@ function Editor:EnsureFrame()
 
 	frame:SetScript("OnShow", function()
 		if frame._updateGroupControlScroll then frame._updateGroupControlScroll() end
+		if frame._updateRuleControlScroll then frame._updateRuleControlScroll() end
 		Editor:UpdatePreviewLoopTicker()
 	end)
 	frame:SetScript("OnHide", function() Editor:UpdatePreviewLoopTicker() end)
 	frame:SetScript("OnSizeChanged", function()
 		if frame._updateGroupControlScroll then frame._updateGroupControlScroll() end
+		if frame._updateRuleControlScroll then frame._updateRuleControlScroll() end
 	end)
 	if frame._updateGroupControlScroll then frame._updateGroupControlScroll() end
+	if frame._updateRuleControlScroll then frame._updateRuleControlScroll() end
 
 	return frame
 end
@@ -2942,6 +3036,7 @@ function Editor:RefreshRuleControls()
 	local selectedGroupStyle = tostring(selectedGroup and selectedGroup.style or "")
 	local showIconRuleMode = selectedGroupStyle == "ICON" or selectedGroupStyle == "SQUARE"
 	local showMissingDesaturate = selectedGroupStyle == "ICON" and rule ~= nil and rule["not"] == true
+	local showExpirationPulse = showIconRuleMode and rule ~= nil and rule["not"] ~= true
 	local showTintRuleMatch = selectedGroupStyle == "TINT"
 	local showRuleColor = styleSupportsRuleColor(selectedGroupStyle)
 	local showBarDrainInfo = selectedGroupStyle == "BAR" and selectedGroup and selectedGroup.barDrainAnimation == true
@@ -2968,8 +3063,26 @@ function Editor:RefreshRuleControls()
 
 	controls.RuleMissingDesaturate:ClearAllPoints()
 	if showMissingDesaturate then controls.RuleMissingDesaturate:SetPoint("TOPLEFT", controls.RuleNot, "BOTTOMLEFT", 16, -6) end
-	controls.RuleAppliesParty:ClearAllPoints()
+	controls.RuleExpirationPulse:ClearAllPoints()
 	if showMissingDesaturate then
+		controls.RuleExpirationPulse:SetPoint("TOPLEFT", controls.RuleMissingDesaturate, "BOTTOMLEFT", -16, -6)
+	else
+		controls.RuleExpirationPulse:SetPoint("TOPLEFT", controls.RuleNot, "BOTTOMLEFT", 0, -6)
+	end
+	controls.RuleExpirationPulseThresholdLabel:ClearAllPoints()
+	controls.RuleExpirationPulseThresholdLabel:SetPoint("TOPLEFT", controls.RuleExpirationPulse, "BOTTOMLEFT", 4, -18)
+	controls.RuleExpirationPulseThreshold:ClearAllPoints()
+	controls.RuleExpirationPulseThreshold:SetPoint("TOPLEFT", controls.RuleExpirationPulseThresholdLabel, "TOPRIGHT", 10, 8)
+	controls.RuleExpirationPulseThresholdValue:ClearAllPoints()
+	controls.RuleExpirationPulseThresholdValue:SetPoint("LEFT", controls.RuleExpirationPulseThreshold, "RIGHT", 12, 0)
+	controls.RuleExpirationPulseCountdownOnly:ClearAllPoints()
+	controls.RuleExpirationPulseCountdownOnly:SetPoint("TOPLEFT", controls.RuleExpirationPulseThresholdLabel, "BOTTOMLEFT", -4, -14)
+	controls.RuleAppliesParty:ClearAllPoints()
+	if showExpirationPulse and rule and rule.expirationPulseEnabled == true then
+		controls.RuleAppliesParty:SetPoint("TOPLEFT", controls.RuleExpirationPulseCountdownOnly, "BOTTOMLEFT", 0, -6)
+	elseif showExpirationPulse then
+		controls.RuleAppliesParty:SetPoint("TOPLEFT", controls.RuleExpirationPulse, "BOTTOMLEFT", 0, -6)
+	elseif showMissingDesaturate then
 		controls.RuleAppliesParty:SetPoint("TOPLEFT", controls.RuleMissingDesaturate, "BOTTOMLEFT", -16, -6)
 	else
 		controls.RuleAppliesParty:SetPoint("TOPLEFT", controls.RuleNot, "BOTTOMLEFT", 0, -6)
@@ -3010,17 +3123,33 @@ function Editor:RefreshRuleControls()
 	else
 		controls.RuleInfo:SetPoint("TOPLEFT", controls.RuleAppliesRaid, "BOTTOMLEFT", 0, -12)
 	end
-	controls.RuleInfo:SetPoint("RIGHT", frame.SettingsPanel, "RIGHT", -14, 0)
+	controls.RuleInfo:SetPoint("RIGHT", frame.SettingsPanel.RuleControlContent, "RIGHT", -4, 0)
 
 	controls.RuleEnabled:SetChecked(rule and rule.enabled ~= false)
 	controls.RuleNot:SetChecked(rule and rule["not"] == true)
 	controls.RuleMissingDesaturate:SetChecked(rule and rule.desaturateMissing == true)
+	controls.RuleExpirationPulse:SetChecked(rule and rule.expirationPulseEnabled == true)
+	local pulseThreshold = roundInt(tonumber(rule and rule.expirationPulseThreshold) or 3)
+	if pulseThreshold < 1 then pulseThreshold = 1 end
+	if pulseThreshold > 10 then pulseThreshold = 10 end
+	controls.RuleExpirationPulseThreshold:SetValue(pulseThreshold)
+	controls.RuleExpirationPulseThresholdValue:SetText(tostring(pulseThreshold))
+	controls.RuleExpirationPulseCountdownOnly:SetChecked(rule and rule.expirationPulseCountdownOnly == true)
 	controls.RuleAppliesParty:SetChecked(rule and rule.appliesParty ~= false)
 	controls.RuleAppliesRaid:SetChecked(rule and rule.appliesRaid ~= false)
 	setControlEnabled(controls.RuleEnabled, rule ~= nil)
 	setControlEnabled(controls.RuleNot, rule ~= nil)
 	setControlVisible(controls.RuleMissingDesaturate, showMissingDesaturate)
 	setControlEnabled(controls.RuleMissingDesaturate, showMissingDesaturate and rule ~= nil)
+	setControlVisible(controls.RuleExpirationPulse, showExpirationPulse)
+	setControlEnabled(controls.RuleExpirationPulse, showExpirationPulse and rule ~= nil)
+	setControlVisible(controls.RuleExpirationPulseThresholdLabel, showExpirationPulse and rule and rule.expirationPulseEnabled == true)
+	setControlVisible(controls.RuleExpirationPulseThreshold, showExpirationPulse and rule and rule.expirationPulseEnabled == true)
+	setControlVisible(controls.RuleExpirationPulseThresholdValue, showExpirationPulse and rule and rule.expirationPulseEnabled == true)
+	setControlEnabled(controls.RuleExpirationPulseThreshold, showExpirationPulse and rule and rule.expirationPulseEnabled == true)
+	setControlEnabled(controls.RuleExpirationPulseThresholdValue, showExpirationPulse and rule and rule.expirationPulseEnabled == true)
+	setControlVisible(controls.RuleExpirationPulseCountdownOnly, showExpirationPulse and rule and rule.expirationPulseEnabled == true)
+	setControlEnabled(controls.RuleExpirationPulseCountdownOnly, showExpirationPulse and rule and rule.expirationPulseEnabled == true)
 	setControlEnabled(controls.RuleAppliesParty, rule ~= nil)
 	setControlEnabled(controls.RuleAppliesRaid, rule ~= nil)
 	setControlEnabled(frame.RulePanel and frame.RulePanel.AddButton, self.selectedGroupId ~= nil)
@@ -3075,6 +3204,16 @@ function Editor:RefreshRuleControls()
 			controls.RuleInfo:SetText(string.format(tr("UFGroupHealerBuffEditorRuleInfoDefault", "Showing rules for %s. Scope is set per rule (Party/Raid). Add via +, remove via x."), groupLabel))
 		end
 	end
+	if frame.SettingsPanel and frame.SettingsPanel.RuleControlContent then
+		local content = frame.SettingsPanel.RuleControlContent
+		local top = controls.RuleEnabled and controls.RuleEnabled.GetTop and controls.RuleEnabled:GetTop()
+		local bottom = controls.RuleInfo and controls.RuleInfo.GetBottom and controls.RuleInfo:GetBottom()
+		local height = 260
+		if top and bottom then height = (top - bottom) + 28 end
+		if height < 260 then height = 260 end
+		content:SetHeight(height)
+	end
+	if frame._updateRuleControlScroll then frame._updateRuleControlScroll() end
 end
 
 function Editor:RefreshGroupControls()
@@ -3615,6 +3754,25 @@ local function ensurePreviewIndicatorBorder(icon)
 	return border
 end
 
+local function ensurePreviewExpirationPulseBorder(icon)
+	if not icon then return nil end
+	local border = icon.ExpirationPulseBorder
+	if not border then
+		border = CreateFrame("Frame", nil, icon, "BackdropTemplate")
+		border:EnableMouse(false)
+		icon.ExpirationPulseBorder = border
+	end
+	border:SetParent(icon)
+	if border.SetFrameStrata and icon.GetFrameStrata then border:SetFrameStrata(icon:GetFrameStrata()) end
+	if border.SetFrameLevel and icon.GetFrameLevel then border:SetFrameLevel((icon:GetFrameLevel() or 0) + 8) end
+	return border
+end
+
+local function hidePreviewExpirationPulseBorder(icon)
+	local border = icon and icon.ExpirationPulseBorder
+	if border then border:Hide() end
+end
+
 local function applyPreviewIndicatorBorder(icon, group)
 	if not icon then return end
 	local style = tostring(group and group.style or ""):upper()
@@ -3653,6 +3811,67 @@ local function applyPreviewIndicatorBorder(icon, group)
 	local br, bg, bb, ba = resolveColor(group.indicatorBorderColor)
 	border:SetBackdropColor(0, 0, 0, 0)
 	border:SetBackdropBorderColor(br, bg, bb, ba)
+	border:Show()
+end
+
+local function applyPreviewExpirationPulse(icon, group, rule, sampleIndex, now, loopEnabled, loopOrigin)
+	if not (icon and group and rule and rule.expirationPulseEnabled == true) then
+		hidePreviewExpirationPulseBorder(icon)
+		return
+	end
+	local style = tostring(group.style or ""):upper()
+	if style ~= "ICON" and style ~= "SQUARE" then
+		hidePreviewExpirationPulseBorder(icon)
+		return
+	end
+	local threshold = roundInt(tonumber(rule.expirationPulseThreshold) or 3)
+	if threshold < 1 then threshold = 1 end
+	if threshold > 10 then threshold = 10 end
+	local _, remaining = getPreviewCooldownTiming(sampleIndex, now, loopEnabled, loopOrigin)
+	local inPulse = remaining and remaining <= threshold
+	if icon.PreviewCooldown and icon.PreviewCooldown.SetHideCountdownNumbers then
+		icon.PreviewCooldown:SetHideCountdownNumbers((group.hideCooldownText == true) or (rule.expirationPulseCountdownOnly == true and not inPulse))
+	end
+	if not inPulse then
+		hidePreviewExpirationPulseBorder(icon)
+		return
+	end
+	local useIndicatorBorder = group.indicatorBorderEnabled == true
+	local border = useIndicatorBorder and ensurePreviewIndicatorBorder(icon) or ensurePreviewExpirationPulseBorder(icon)
+	if not border then return end
+	if useIndicatorBorder then hidePreviewExpirationPulseBorder(icon) end
+	local pulse = (math.sin(((threshold - remaining) * 2) * math.pi) + 1) * 0.5
+	local size = roundInt(tonumber(group.indicatorBorderSize) or 2)
+	if useIndicatorBorder then
+		if size < 1 then size = 1 end
+	else
+		if size < 2 then size = 2 end
+	end
+	if size > 24 then size = 24 end
+	local offset = roundInt(tonumber(group.indicatorBorderOffset) or 0)
+	if offset < -12 then offset = -12 end
+	if offset > 12 then offset = 12 end
+	local texture = resolveBorderTexture(group.indicatorBorderTexture or "DEFAULT")
+	local key = tostring(texture) .. "|" .. tostring(size)
+	if border._eqolBackdropKey ~= key then
+		border._eqolBackdropKey = key
+		border:SetBackdrop({
+			bgFile = "Interface\\Buttons\\WHITE8x8",
+			edgeFile = texture,
+			tile = false,
+			edgeSize = size,
+			insets = { left = size, right = size, top = size, bottom = size },
+		})
+	end
+	if border._eqolOffset ~= offset then
+		border._eqolOffset = offset
+		border:ClearAllPoints()
+		border:SetPoint("TOPLEFT", icon, "TOPLEFT", -offset, offset)
+		border:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", offset, -offset)
+	end
+	local br, bg, bb, ba = resolveColor(useIndicatorBorder and group.indicatorBorderColor or rule.color or group.indicatorBorderColor or group.color)
+	border:SetBackdropColor(0, 0, 0, 0)
+	border:SetBackdropBorderColor(br, bg, bb, max(ba or 1, 0.85) * (0.08 + (0.92 * pulse)))
 	border:Show()
 end
 
@@ -3844,6 +4063,7 @@ function Editor:RefreshPreview()
 						applyPreviewCharges(icon, group, ac, i)
 						icon:SetBackdropBorderColor(0, 0, 0, 0)
 						applyPreviewIndicatorBorder(icon, group)
+						applyPreviewExpirationPulse(icon, group, rule, i, now, loopEnabled, loopOrigin)
 						icon:Show()
 					end
 				end

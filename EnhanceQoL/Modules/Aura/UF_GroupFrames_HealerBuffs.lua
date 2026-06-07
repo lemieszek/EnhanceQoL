@@ -25,6 +25,8 @@ local floor = math.floor
 local max = math.max
 local min = math.min
 local abs = math.abs
+local sin = math.sin
+local pi = math.pi
 local tostring = tostring
 local tonumber = tonumber
 local pairs = pairs
@@ -745,6 +747,9 @@ function HB.CreateDefaultRule(id, familyId, groupId)
 		groupId = tostring(groupId or "1"),
 		["not"] = false,
 		desaturateMissing = false,
+		expirationPulseEnabled = false,
+		expirationPulseThreshold = 3,
+		expirationPulseCountdownOnly = false,
 		enabled = true,
 		appliesParty = true,
 		appliesRaid = true,
@@ -852,6 +857,9 @@ local function normalizeRule(rule, id)
 	if desaturateMissing == nil then desaturateMissing = rule.missingDesaturate end
 	rule.desaturateMissing = desaturateMissing == true
 	rule.missingDesaturate = nil
+	rule.expirationPulseEnabled = rule.expirationPulseEnabled == true
+	rule.expirationPulseThreshold = roundInt(clamp(rule.expirationPulseThreshold, 1, 10, 3))
+	rule.expirationPulseCountdownOnly = rule.expirationPulseCountdownOnly == true
 	if rule.enabled == nil then rule.enabled = true end
 	rule.enabled = rule.enabled ~= false
 	local appliesParty = rule.appliesParty
@@ -2095,6 +2103,138 @@ local function applyIndicatorBorder(btn, group)
 	border:Show()
 end
 
+local function ensureExpirationPulseBorderFrame(btn)
+	if not btn then return nil end
+	local border = btn._hbExpirationPulseBorder
+	if not border then
+		border = CreateFrame("Frame", nil, btn.overlay or btn, "BackdropTemplate")
+		border:EnableMouse(false)
+		btn._hbExpirationPulseBorder = border
+	end
+	local parent = btn.overlay or btn
+	setFrameParentCached(border, parent)
+	setFrameStrataCached(border, parent:GetFrameStrata() or btn:GetFrameStrata())
+	local baseLevel = parent:GetFrameLevel() or btn:GetFrameLevel() or 0
+	setFrameLevelCached(border, baseLevel + 4)
+	return border
+end
+
+local function hideExpirationPulseBorder(btn)
+	local border = btn and btn._hbExpirationPulseBorder
+	if border then border:Hide() end
+end
+
+local EXPIRATION_PULSE_INTERVAL = 0.05
+
+local function getAuraRemaining(aura, now)
+	local expirationTime = aura and tonumber(aura.expirationTime) or nil
+	if not (expirationTime and expirationTime > 0) then return nil end
+	now = tonumber(now) or ((GetTime and GetTime()) or 0)
+	return expirationTime - now
+end
+
+local function clearExpirationPulse(btn, group)
+	if not btn then return end
+	btn._hbExpirationPulseRule = nil
+	btn._hbExpirationPulseAura = nil
+	btn._hbExpirationPulseGroup = nil
+	btn._hbExpirationPulseThreshold = nil
+	btn._hbExpirationPulseCountdownOnly = nil
+	btn._hbExpirationPulseElapsed = nil
+	if btn.SetScript and (not btn.GetScript or btn:GetScript("OnUpdate") == btn._hbExpirationPulseOnUpdate) then btn:SetScript("OnUpdate", nil) end
+	hideExpirationPulseBorder(btn)
+	if btn.cd and btn.cd.SetHideCountdownNumbers then btn.cd:SetHideCountdownNumbers(group and group.hideCooldownText == true or false) end
+	applyIndicatorBorder(btn, group)
+end
+
+local function applyExpirationPulseBorder(btn, group, rule, pulseAlpha)
+	local useIndicatorBorder = group and group.indicatorBorderEnabled == true
+	local border = useIndicatorBorder and ensureIndicatorBorderFrame(btn) or ensureExpirationPulseBorderFrame(btn)
+	if not border then return end
+	if useIndicatorBorder then hideExpirationPulseBorder(btn) end
+	local pulse = clamp(pulseAlpha, 0, 1, 1) or 1
+	local size = roundInt(tonumber(group and group.indicatorBorderSize) or 1)
+	if useIndicatorBorder then
+		size = max(1, size)
+	else
+		size = max(2, size)
+	end
+	local offset = roundInt(tonumber(group and group.indicatorBorderOffset) or 0)
+	if offset > 12 then offset = 12 end
+	if offset < -12 then offset = -12 end
+	local texture = resolveBorderTexture((group and group.indicatorBorderTexture) or "DEFAULT")
+	local key = tostring(texture) .. "|" .. tostring(size)
+	if border._hbBackdropKey ~= key then
+		border._hbBackdropKey = key
+		border:SetBackdrop({
+			bgFile = "Interface\\Buttons\\WHITE8x8",
+			edgeFile = texture,
+			tile = false,
+			edgeSize = size,
+			insets = { left = size, right = size, top = size, bottom = size },
+		})
+	end
+	if border._hbOffset ~= offset then
+		border._hbOffset = offset
+		setTwoPointsCached(border, "TOPLEFT", btn, "TOPLEFT", -offset, offset, "BOTTOMRIGHT", btn, "BOTTOMRIGHT", offset, -offset)
+	end
+	local br, bg, bb, ba = resolveColor(useIndicatorBorder and group.indicatorBorderColor or (rule and rule.color) or (group and group.indicatorBorderColor) or (group and group.color))
+	border:SetBackdropColor(0, 0, 0, 0)
+	border:SetBackdropBorderColor(br, bg, bb, clamp(max(ba or 1, 0.85) * (0.08 + (0.92 * pulse)), 0, 1, 1) or 1)
+	border:Show()
+end
+
+local function updateExpirationPulseButton(btn)
+	local aura = btn and btn._hbExpirationPulseAura
+	local group = btn and btn._hbExpirationPulseGroup
+	local rule = btn and btn._hbExpirationPulseRule
+	if not (btn and aura and group and rule) then return end
+	local remaining = getAuraRemaining(aura)
+	local threshold = tonumber(btn._hbExpirationPulseThreshold) or 3
+	if not remaining or remaining <= 0 then
+		clearExpirationPulse(btn, group)
+		return
+	end
+	local inPulse = remaining <= threshold
+	if btn.cd and btn.cd.SetHideCountdownNumbers then
+		btn.cd:SetHideCountdownNumbers((group.hideCooldownText == true) or (btn._hbExpirationPulseCountdownOnly == true and not inPulse))
+	end
+	if not inPulse then
+		hideExpirationPulseBorder(btn)
+		applyIndicatorBorder(btn, group)
+		return
+	end
+	local pulse = (sin(((threshold - remaining) * 2) * pi) + 1) * 0.5
+	applyExpirationPulseBorder(btn, group, rule, pulse)
+end
+
+local function applyExpirationPulse(btn, group, rule, aura)
+	local style = tostring(group and group.style or ""):upper()
+	local enabled = (style == STYLE_ICON or style == STYLE_SQUARE) and rule and rule.expirationPulseEnabled == true
+	local duration = aura and tonumber(aura.duration) or nil
+	local expirationTime = aura and tonumber(aura.expirationTime) or nil
+	if not (enabled and duration and duration > 0 and expirationTime and expirationTime > 0) then
+		clearExpirationPulse(btn, group)
+		return
+	end
+	btn._hbExpirationPulseRule = rule
+	btn._hbExpirationPulseAura = aura
+	btn._hbExpirationPulseGroup = group
+	btn._hbExpirationPulseThreshold = clamp(rule.expirationPulseThreshold, 1, 10, 3) or 3
+	btn._hbExpirationPulseCountdownOnly = rule.expirationPulseCountdownOnly == true
+	btn._hbExpirationPulseElapsed = 0
+	updateExpirationPulseButton(btn)
+	if not btn._hbExpirationPulseOnUpdate then
+		btn._hbExpirationPulseOnUpdate = function(self, elapsed)
+			self._hbExpirationPulseElapsed = (self._hbExpirationPulseElapsed or 0) + (elapsed or 0)
+			if self._hbExpirationPulseElapsed < EXPIRATION_PULSE_INTERVAL then return end
+			self._hbExpirationPulseElapsed = 0
+			updateExpirationPulseButton(self)
+		end
+	end
+	if btn.SetScript then btn:SetScript("OnUpdate", btn._hbExpirationPulseOnUpdate) end
+end
+
 local function getPlaceholderAura(state, ruleId, familyId)
 	state.tempPlaceholderByRule = state.tempPlaceholderByRule or {}
 	local aura = state.tempPlaceholderByRule[ruleId]
@@ -2381,6 +2521,9 @@ local function renderIconStyleForGroup(btn, st, state, compiled, cfg, group, cha
 
 	if #activeRules == 0 then
 		container:Hide()
+		for i = 1, #buttons do
+			clearExpirationPulse(buttons[i], group)
+		end
 		hideButtons(buttons, 1)
 		return
 	end
@@ -2455,17 +2598,21 @@ local function renderIconStyleForGroup(btn, st, state, compiled, cfg, group, cha
 			button._hbIndicatorGroupId = group.id
 			button._hbIndicatorStyle = group.style
 		end
-			if button.SetSize and button._hbButtonSize ~= group.size then
-				if AuraUtil and AuraUtil.setAuraButtonSize then
-					AuraUtil.setAuraButtonSize(button, group.size)
-				else
-					setSizeCached(button, group.size, group.size)
-					button._eqolAuraButtonSize = group.size
-				end
-				button._hbButtonSize = group.size
+		applyExpirationPulse(button, group, rule, aura)
+		if button.SetSize and button._hbButtonSize ~= group.size then
+			if AuraUtil and AuraUtil.setAuraButtonSize then
+				AuraUtil.setAuraButtonSize(button, group.size)
+			else
+				setSizeCached(button, group.size, group.size)
+				button._eqolAuraButtonSize = group.size
 			end
+			button._hbButtonSize = group.size
+		end
 		positionAuraButton(button, container, primary, secondary, index, group.perRow, group.size, group.spacing)
 		button:Show()
+	end
+	for index = #activeRules + 1, #buttons do
+		clearExpirationPulse(buttons[index], group)
 	end
 	hideButtons(buttons, #activeRules + 1)
 end
