@@ -451,6 +451,57 @@ local function refreshSettingsUI()
 	if lib and lib.internal and lib.internal.RefreshSettingValues then lib.internal:RefreshSettingValues() end
 end
 
+local DEFAULT_SETTINGS_MAX_HEIGHT = 720
+local DEFAULT_SETTINGS_SCREEN_MARGIN = 200
+local settingsMaxHeightWatcher
+
+local function getSettingsMaxHeight()
+	local screenHeight = addon.variables and tonumber(addon.variables.screenHeight)
+	if (not screenHeight or screenHeight <= 0) and GetScreenHeight then
+		screenHeight = tonumber(GetScreenHeight())
+		if screenHeight and screenHeight > 0 then
+			addon.variables = addon.variables or {}
+			addon.variables.screenHeight = screenHeight
+		end
+	end
+	if not screenHeight or screenHeight <= 0 then return DEFAULT_SETTINGS_MAX_HEIGHT end
+	if screenHeight < DEFAULT_SETTINGS_MAX_HEIGHT then return screenHeight end
+	return math.max(DEFAULT_SETTINGS_MAX_HEIGHT, screenHeight - DEFAULT_SETTINGS_SCREEN_MARGIN)
+end
+
+local function applyFrameSettingsMaxHeight(frame, maxHeight)
+	local lib = addon.EditModeLib or (EditMode and EditMode.lib)
+	if not (lib and lib.SetFrameSettingsMaxHeight and frame) then return end
+	lib:SetFrameSettingsMaxHeight(frame, maxHeight or getSettingsMaxHeight())
+end
+
+local function applyRegisteredSettingsMaxHeight()
+	local maxHeight = getSettingsMaxHeight()
+	local registeredSettingsFrames = ResourceBars and ResourceBars._editModeRegisteredSettingsFrames
+	if not registeredSettingsFrames then return end
+	for _, frame in pairs(registeredSettingsFrames) do
+		applyFrameSettingsMaxHeight(frame, maxHeight)
+	end
+end
+
+local function ensureSettingsMaxHeightWatcher()
+	if settingsMaxHeightWatcher or not CreateFrame then return end
+	settingsMaxHeightWatcher = CreateFrame("Frame")
+	settingsMaxHeightWatcher:RegisterEvent("PLAYER_LOGIN")
+	settingsMaxHeightWatcher:RegisterEvent("DISPLAY_SIZE_CHANGED")
+	settingsMaxHeightWatcher:RegisterEvent("UI_SCALE_CHANGED")
+	settingsMaxHeightWatcher:SetScript("OnEvent", function()
+		if GetScreenHeight then
+			local screenHeight = tonumber(GetScreenHeight())
+			if screenHeight and screenHeight > 0 then
+				addon.variables = addon.variables or {}
+				addon.variables.screenHeight = screenHeight
+			end
+		end
+		applyRegisteredSettingsMaxHeight()
+	end)
+end
+
 local registerEditModeBars
 local unregisterEditModeBars
 
@@ -471,6 +522,7 @@ unregisterEditModeBars = function()
 	local registeredFrames = ResourceBars and ResourceBars._editModeRegisteredFrames or {}
 	local registeredByBar = ResourceBars and ResourceBars._editModeRegisteredFrameByBar or {}
 	local registeredFrameNameByBar = ResourceBars and ResourceBars._editModeRegisteredFrameNameByBar or {}
+	local registeredSettingsFrames = ResourceBars and ResourceBars._editModeRegisteredSettingsFrames or {}
 
 	if EditMode and EditMode.UnregisterFrame then
 		local seen = {}
@@ -490,6 +542,9 @@ unregisterEditModeBars = function()
 	end
 	for key in pairs(registeredFrameNameByBar) do
 		registeredFrameNameByBar[key] = nil
+	end
+	for key in pairs(registeredSettingsFrames) do
+		registeredSettingsFrames[key] = nil
 	end
 
 	if ResourceBars then ResourceBars._editModeRegistered = false end
@@ -579,9 +634,12 @@ registerEditModeBars = function()
 	local registeredFrames = ResourceBars._editModeRegisteredFrames or {}
 	local registeredByBar = ResourceBars._editModeRegisteredFrameByBar or {}
 	local registeredFrameNameByBar = ResourceBars._editModeRegisteredFrameNameByBar or {}
+	local registeredSettingsFrames = ResourceBars._editModeRegisteredSettingsFrames or {}
 	ResourceBars._editModeRegisteredFrames = registeredFrames
 	ResourceBars._editModeRegisteredFrameByBar = registeredByBar
 	ResourceBars._editModeRegisteredFrameNameByBar = registeredFrameNameByBar
+	ResourceBars._editModeRegisteredSettingsFrames = registeredSettingsFrames
+	ensureSettingsMaxHeightWatcher()
 
 	local function registerBar(idSuffix, frameName, barType, widthDefault, heightDefault, opts)
 		opts = opts or {}
@@ -609,10 +667,12 @@ registerEditModeBars = function()
 		if prevId and prevId ~= frameId and EditMode and EditMode.UnregisterFrame then
 			EditMode:UnregisterFrame(prevId, false)
 			registeredFrames[prevId] = nil
+			registeredSettingsFrames[prevId] = nil
 		end
 		if prevId == frameId and EditMode and EditMode.UnregisterFrame and ((prevFrameName and prevFrameName ~= actualFrameName) or (existingFrame and existingFrame ~= frame)) then
 			EditMode:UnregisterFrame(frameId, false)
 			registeredFrames[frameId] = nil
+			registeredSettingsFrames[frameId] = nil
 		end
 		if registeredFrames[frameId] and existingFrame == frame then return end
 		registeredByBar[idSuffix] = frameId
@@ -4966,6 +5026,7 @@ registerEditModeBars = function()
 			allowDrag = function() return anchorUsesUIParent() end,
 			managePosition = false,
 			persistPosition = false,
+			settingsMaxHeight = DEFAULT_SETTINGS_MAX_HEIGHT,
 			layoutDefaults = {
 				point = anchor and anchor.point or "CENTER",
 				relativePoint = anchor and anchor.relativePoint or "CENTER",
@@ -5050,6 +5111,8 @@ registerEditModeBars = function()
 			showOutsideEditMode = true,
 			collapseExclusive = true,
 		})
+		registeredSettingsFrames[frameId] = frame
+		applyFrameSettingsMaxHeight(frame, getSettingsMaxHeight())
 		if addon.EditModeLib and addon.EditModeLib.SetFrameResetVisible then addon.EditModeLib:SetFrameResetVisible(frame, false) end
 		registeredFrames[frameId] = true
 		registered = registered + 1
@@ -5062,6 +5125,7 @@ registerEditModeBars = function()
 			if not allowed[key] then
 				if oldId and EditMode and EditMode.UnregisterFrame then EditMode:UnregisterFrame(oldId, false) end
 				if oldId then registeredFrames[oldId] = nil end
+				if oldId then registeredSettingsFrames[oldId] = nil end
 				registeredByBar[key] = nil
 				registeredFrameNameByBar[key] = nil
 			end

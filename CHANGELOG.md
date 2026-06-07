@@ -1,5 +1,17 @@
 # Changelog
 
+## [11.1.0] - 2026-06-07
+
+### ✨ Added
+
+- Group Tools / Focus Marker: Added a keybinding entry for the focus marker macro.
+
+### 🐛 Fixed
+
+- Resource Bars / Druid Forms: Fixed form-filtered bars such as Energy and Combo Points staying hidden in combat after entering combat from Travel Form or after a combat resurrection.
+
+---
+
 ## [11.0.4] - 2026-06-07
 
 ### 🐛 Fixed

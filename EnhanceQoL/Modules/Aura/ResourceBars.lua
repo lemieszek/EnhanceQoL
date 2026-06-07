@@ -3767,6 +3767,16 @@ local function shouldUseDruidFormDriver(cfg)
 	return false
 end
 ResourceBars.ShouldUseDruidFormDriver = shouldUseDruidFormDriver
+
+function ResourceBars.ShouldKeepDruidFormDriverManaged(cfg)
+	if not shouldUseDruidFormDriver(cfg) then return false end
+	local showForms = cfg.showForms
+	if type(showForms) ~= "table" then return false end
+	for _, key in ipairs(DRUID_FORM_SEQUENCE) do
+		if showForms[key] == true then return true end
+	end
+	return false
+end
 local function mapFormNameToKey(name)
 	if not name then return nil end
 	name = tostring(name):lower()
@@ -7144,13 +7154,15 @@ local function setPowerbars(opts)
 
 			if shouldShow then
 				local formAllowed = true
+				local keepForDruidFormDriver = false
 				local barCfg = specCfg and specCfg[pType]
 				if isDruid and barCfg and barCfg.showForms then
 					local allowed = barCfg.showForms
+					keepForDruidFormDriver = ResourceBars.ShouldKeepDruidFormDriverManaged(barCfg)
 					if druidForm and allowed[druidForm] == false then formAllowed = false end
 				end
 				if forceAllDruidBars then formAllowed = true end
-				if formAllowed and addon.variables.unitClass == "DRUID" then
+				if (formAllowed or keepForDruidFormDriver) and addon.variables.unitClass == "DRUID" then
 					if RB.FREQUENT_POWER_TYPES[pType] then powerfrequent[pType] = true end
 					if forceAllDruidBars then
 						if mainPowerBar ~= pType then
@@ -7893,6 +7905,7 @@ function ResourceBars.ApplyVisibilityPreference(context)
 		local barEnabled = cfg and cfg.enabled == true
 		if barEnabled then
 			local runtimeVisible = not frame or frame._rbDesiredVisible ~= false
+			if not runtimeVisible and ResourceBars.ShouldKeepDruidFormDriverManaged(cfg) then runtimeVisible = true end
 			if not runtimeVisible then
 				if canApplyDriver then applyVisibilityDriverToFrame(frame, nil) end
 				if frame and frame._rbManualVisibilityHidden then
