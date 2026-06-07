@@ -3,7 +3,6 @@ local addonName, addon = ...
 local L = addon.L
 
 local db
-local stream
 
 local format = string.format
 local floor = math.floor
@@ -179,6 +178,6 @@ local provider = {
 	end,
 }
 
-stream = EnhanceQoL.DataHub.RegisterStream(provider)
+EnhanceQoL.DataHub.RegisterStream(provider)
 
 return provider

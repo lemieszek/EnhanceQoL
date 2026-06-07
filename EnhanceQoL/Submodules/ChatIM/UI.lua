@@ -1,4 +1,4 @@
--- luacheck: globals CENSORED_MESSAGE_HIDDEN CENSORED_MESSAGE_REPORT
+-- luacheck: globals CENSORED_MESSAGE_HIDDEN CENSORED_MESSAGE_REPORT PanelTemplates_TabResize FCFTab_UpdateColors
 local parentAddonName = "EnhanceQoL"
 local addonName, addon = ...
 if _G[parentAddonName] then

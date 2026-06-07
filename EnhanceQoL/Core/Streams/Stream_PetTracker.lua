@@ -3,7 +3,6 @@ local addonName, addon = ...
 local L = addon.L
 
 local db
-local stream
 local blinkStartAt
 local blinkTicker
 local blinkTickInterval
@@ -418,6 +417,6 @@ local provider = {
 	},
 }
 
-stream = EnhanceQoL.DataHub.RegisterStream(provider)
+EnhanceQoL.DataHub.RegisterStream(provider)
 
 return provider

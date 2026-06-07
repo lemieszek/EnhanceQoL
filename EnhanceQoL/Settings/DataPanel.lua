@@ -1,3 +1,4 @@
+-- luacheck: globals LOOT_SPECIALIZATION
 local addonName, addon = ...
 
 local L = LibStub("AceLocale-3.0"):GetLocale(addonName)

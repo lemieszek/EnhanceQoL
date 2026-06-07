@@ -6,7 +6,6 @@ local format = string.format
 
 local sets = {}
 local db
-local stream
 
 local function getOptionsHint()
 	if addon.DataPanel and addon.DataPanel.GetOptionsHintText then
@@ -214,6 +213,6 @@ local provider = {
 	OnMouseEnter = function(btn) showTooltip(btn) end,
 }
 
-stream = EnhanceQoL.DataHub.RegisterStream(provider)
+EnhanceQoL.DataHub.RegisterStream(provider)
 
 return provider

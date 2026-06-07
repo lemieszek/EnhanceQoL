@@ -24,7 +24,6 @@ local DEFAULT_TEXTURE_TEX_COORD = { 0.07, 0.93, 0.07, 0.93 }
 local DEFAULT_ATLAS_TEX_COORD = { 0.04, 0.96, 0.04, 0.96 }
 
 local db
-local stream
 
 local function clampInt(value, minValue, maxValue, fallback)
 	value = tonumber(value)
@@ -853,6 +852,6 @@ local provider = {
 	end,
 }
 
-stream = EnhanceQoL.DataHub.RegisterStream(provider)
+EnhanceQoL.DataHub.RegisterStream(provider)
 
 return provider

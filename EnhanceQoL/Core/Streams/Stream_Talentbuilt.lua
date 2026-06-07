@@ -3,7 +3,6 @@ local addonName, addon = ...
 local L = addon.L
 
 local db
-local stream
 local provider
 local TALENTS_PREFIX_DEFAULT = (TALENTS or "Talents") .. ":"
 local floor = math.floor
@@ -195,6 +194,6 @@ provider = {
 	end,
 }
 
-stream = EnhanceQoL.DataHub.RegisterStream(provider)
+EnhanceQoL.DataHub.RegisterStream(provider)
 
 return provider

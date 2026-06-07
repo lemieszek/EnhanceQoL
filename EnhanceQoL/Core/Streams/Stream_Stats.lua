@@ -3,7 +3,6 @@ local addonName, addon = ...
 local L = addon.L
 
 local db
-local stream
 
 local idx
 local primaryResolveToken = 0
@@ -415,6 +414,6 @@ local provider = {
 	end,
 }
 
-stream = EnhanceQoL.DataHub.RegisterStream(provider)
+EnhanceQoL.DataHub.RegisterStream(provider)
 
 return provider

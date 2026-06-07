@@ -3,7 +3,6 @@ local addonName, addon = ...
 local L = addon.L
 
 local db
-local stream
 local last = {}
 local LOOTSPEC_TITLE = SELECT_LOOT_SPECIALIZATION or LOOT_SPECIALIZATION or "Loot Specialization"
 
@@ -193,6 +192,6 @@ local provider = {
 	end,
 }
 
-stream = EnhanceQoL.DataHub.RegisterStream(provider)
+EnhanceQoL.DataHub.RegisterStream(provider)
 
 return provider
