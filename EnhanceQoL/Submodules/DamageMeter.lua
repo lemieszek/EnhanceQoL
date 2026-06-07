@@ -131,6 +131,7 @@ local DEFAULT_WINDOW = {
 	barBackgroundCustomTexture = "",
 	barBackgroundTexture = "",
 	barBackgroundColor = { r = 0, g = 0, b = 0, a = 0.45 },
+	barBackgroundUseClassColor = false,
 	rowBorderEnabled = false,
 	rowBorderTexture = "",
 	rowBorderColor = { r = 0, g = 0, b = 0, a = 0.9 },
@@ -302,7 +303,11 @@ local DEFAULT_WINDOW = {
 	tooltipBarTexture = "Blizzard Raid Bar",
 	tooltipBarColor = { r = 0.7686275243759155, g = 0.168627455830574, b = 0.2823529541492462, a = 1 },
 	tooltipBarUseClassColor = false,
+	tooltipBarBackgroundTexture = "",
+	tooltipBarBackgroundColor = { r = 0, g = 0, b = 0, a = 0.45 },
+	tooltipBarBackgroundUseClassColor = false,
 	tooltipBarSpacing = 0,
+	tooltipBackdropUseClassColor = false,
 	tooltipRowBorderEnabled = false,
 	tooltipRowBorderTexture = "",
 	tooltipRowBorderColor = { r = 0, g = 0, b = 0, a = 0.9 },
@@ -2662,6 +2667,10 @@ function DamageMeter:GetBarColor(config, classFilename)
 	return 0.55, 0.55, 0.55, a
 end
 
+function DamageMeter:GetBarBackgroundColor(config, classFilename)
+	return getClassOrCustomColor(classFilename, config.barBackgroundColor, DEFAULT_WINDOW.barBackgroundColor, config.barBackgroundUseClassColor)
+end
+
 function DamageMeter:GetNameColor(config, classFilename)
 	return getClassOrCustomColor(classFilename, config.nameColor, DEFAULT_WINDOW.nameColor, config.nameUseClassColors)
 end
@@ -2689,6 +2698,7 @@ function DamageMeter:GetRowColorState(frame, config, classFilename)
 	local entry = cache.byClass[classKey]
 	if entry then return entry end
 	local r, g, b, a = self:GetBarColor(config, classKey)
+	local br, bg, bb, ba = self:GetBarBackgroundColor(config, classKey)
 	local nr, ng, nb, na = self:GetNameColor(config, classKey)
 	local vr, vg, vb, va = self:GetValueColor(config, classKey)
 	local prr, prg, prb, pra = self:GetPrefixRankColor(config, classKey)
@@ -2698,6 +2708,7 @@ function DamageMeter:GetRowColorState(frame, config, classFilename)
 	local ibr, ibg, ibb, iba = getClassOrCustomColor(classKey, config.iconBorderColor, DEFAULT_WINDOW.iconBorderColor, config.iconBorderUseClassColor)
 	entry = {
 		r = r, g = g, b = b, a = a,
+		br = br, bg = bg, bb = bb, ba = ba,
 		nr = nr, ng = ng, nb = nb, na = na,
 		vr = vr, vg = vg, vb = vb, va = va,
 		prr = prr, prg = prg, prb = prb, pra = pra,
@@ -2882,13 +2893,18 @@ local function applyTextureColor(textureObject, r, g, b, a)
 	textureObject:SetVertexColor(r, g, b, a)
 end
 
-function DamageMeter:ApplyBarBackground(row, config)
+function DamageMeter:ApplyBarBackground(row, config, classFilename, colors)
 	local textureKind, texture = getCustomTextureInfo(config.barBackgroundUseCustomTexture == true and config.barBackgroundCustomTexture or nil)
 	if not textureKind then
 		textureKind = "texture"
 		texture = resolveMedia("statusbar", config.barBackgroundTexture, "Interface\\Buttons\\WHITE8x8")
 	end
-	local r, g, b, a = colorComponents(config.barBackgroundColor, DEFAULT_WINDOW.barBackgroundColor)
+	local r, g, b, a
+	if colors then
+		r, g, b, a = colors.br, colors.bg, colors.bb, colors.ba
+	else
+		r, g, b, a = self:GetBarBackgroundColor(config, classFilename)
+	end
 	applyTextureOverride(row.background, textureKind, texture)
 	applyTextureColor(row.background, r, g, b, a)
 end
@@ -4347,6 +4363,7 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 	local nameRight = amountRight - amountWidth - 8
 	local showBars = config.tooltipShowBars == true
 	local barTexture = resolveMedia("statusbar", config.tooltipBarTexture, DEFAULT_TEXTURE)
+	local barBackgroundTexture = resolveMedia("statusbar", config.tooltipBarBackgroundTexture, "Interface\\Buttons\\WHITE8x8")
 	local shown = #rows
 	local tooltipBarSpacing = clampNumber(config.tooltipBarSpacing, -16, 16, DEFAULT_WINDOW.tooltipBarSpacing)
 	local tooltipHeight = 10
@@ -4361,9 +4378,9 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 	local borderSize = clampNumber(config.tooltipBorderSize, 1, 32, DEFAULT_WINDOW.tooltipBorderSize)
 	local borderOffset = clampNumber(config.tooltipBorderInset, 0, 32, DEFAULT_WINDOW.tooltipBorderInset)
 	frame:SetBackdrop({ bgFile = backdropTexture })
-	local bg = normalizeColor(config.tooltipBackdropColor, DEFAULT_WINDOW.tooltipBackdropColor)
+	local bgr, bgg, bgb, bga = getClassOrCustomColor(source and source.classFilename, config.tooltipBackdropColor, DEFAULT_WINDOW.tooltipBackdropColor, config.tooltipBackdropUseClassColor)
 	local border = normalizeColor(config.tooltipBorderColor, DEFAULT_WINDOW.tooltipBorderColor)
-	frame:SetBackdropColor(bg.r, bg.g, bg.b, bg.a)
+	frame:SetBackdropColor(bgr, bgg, bgb, bga)
 	frame:SetSize(width, tooltipHeight)
 	frame.border:ClearAllPoints()
 	frame.border:SetPoint("TOPLEFT", frame, "TOPLEFT", -borderOffset, borderOffset)
@@ -4422,11 +4439,12 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 			end
 			local classFilename = data.classFilename or (source and source.classFilename)
 			local barR, barG, barB, barA = getClassOrCustomColor(classFilename, config.tooltipBarColor, DEFAULT_WINDOW.tooltipBarColor, config.tooltipBarUseClassColor)
+			local barBgR, barBgG, barBgB, barBgA = getClassOrCustomColor(classFilename, config.tooltipBarBackgroundColor, DEFAULT_WINDOW.tooltipBarBackgroundColor, config.tooltipBarBackgroundUseClassColor)
 			local availableBarWidth = math.max(1, width - rightPadding - barStartX)
 			local barHeight = math.max(1, currentLineHeight - 3)
 			if showBars and not data.header and not data.spacer and data.barValue ~= nil then
-				line.barBG:SetTexture(barTexture)
-				line.barBG:SetVertexColor(0, 0, 0, math.min(0.45, (barA or 1) * 0.6))
+				line.barBG:SetTexture(barBackgroundTexture)
+				line.barBG:SetVertexColor(barBgR, barBgG, barBgB, barBgA)
 				line.barBG:SetPoint("LEFT", line.icon, "RIGHT", tooltipIconGap, 0)
 				line.barBG:SetSize(availableBarWidth, barHeight)
 				line.barBG:Show()
@@ -5563,6 +5581,7 @@ function DamageMeter:RefreshWindow(index, shared, sessionCache)
 
 				self:ApplyRankText(row, sourceIndex, config)
 				row.sourceData = source
+			self:ApplyBarBackground(row, config, source.classFilename, colors)
 			self:ApplyRowBorder(row, config, source.classFilename, colors)
 			self:ApplyIconBorder(row, config, source.classFilename, colors)
 			self:ApplyBarBorder(row, config, source.classFilename, colors)
@@ -6652,7 +6671,8 @@ function DamageMeter:BuildWindowSettings(index)
 		end, barId),
 		inputSetting(L["damageMeterBarBackgroundCustomTexture"] or "Atlas name or texture ID", function() return cfg().barBackgroundCustomTexture or "" end, function(value) self:SetConfigValue(index, "barBackgroundCustomTexture", trimTextureInput(value)) end, barId, function() return cfg().barBackgroundUseCustomTexture == true end, L["damageMeterHeaderBackgroundCustomTextureDesc"] or "Enter an atlas name, texture file ID, or texture path.", 160),
 		dropdownSetting(L["damageMeterBarBackgroundTexture"] or "Background texture", function() return cfg().barBackgroundTexture end, function(value) self:SetConfigValue(index, "barBackgroundTexture", value) end, buildMediaOptions("statusbar", false), barId, 260, function() return cfg().barBackgroundUseCustomTexture ~= true end),
-		colorSetting(L["damageMeterBarBackgroundColor"] or "Background color", function() return normalizeColor(cfg().barBackgroundColor, DEFAULT_WINDOW.barBackgroundColor) end, function(value) self:SetConfigValue(index, "barBackgroundColor", normalizeColor(value, DEFAULT_WINDOW.barBackgroundColor)) end, DEFAULT_WINDOW.barBackgroundColor, barId),
+		checkboxSetting(L["damageMeterBarBackgroundUseClassColor"] or "Use class color for background", function() return cfg().barBackgroundUseClassColor == true end, function(value) self:SetConfigValue(index, "barBackgroundUseClassColor", value) end, barId),
+		colorSetting(L["damageMeterBarBackgroundColor"] or "Background color", function() return normalizeColor(cfg().barBackgroundColor, DEFAULT_WINDOW.barBackgroundColor) end, function(value) self:SetConfigValue(index, "barBackgroundColor", normalizeColor(value, DEFAULT_WINDOW.barBackgroundColor)) end, DEFAULT_WINDOW.barBackgroundColor, barId, function() return cfg().barBackgroundUseClassColor ~= true end),
 		dividerSetting(barId),
 		checkboxSetting(L["damageMeterRowBorder"] or "Row border", function() return cfg().rowBorderEnabled == true end, function(value)
 			self:SetConfigValue(index, "rowBorderEnabled", value)
@@ -6800,6 +6820,9 @@ function DamageMeter:BuildWindowSettings(index)
 			requestEditModeSettingsRefresh()
 		end, tooltipId, tooltipEnabled),
 		colorSetting(L["damageMeterTooltipBarColor"] or "Tooltip bar color", function() return normalizeColor(cfg().tooltipBarColor, DEFAULT_WINDOW.tooltipBarColor) end, function(value) self:SetConfigValue(index, "tooltipBarColor", normalizeColor(value, DEFAULT_WINDOW.tooltipBarColor)) end, DEFAULT_WINDOW.tooltipBarColor, tooltipId, fixedTooltipBarColorEnabled),
+		dropdownSetting(L["damageMeterTooltipBarBackgroundTexture"] or "Tooltip bar background texture", function() return cfg().tooltipBarBackgroundTexture end, function(value) self:SetConfigValue(index, "tooltipBarBackgroundTexture", value) end, buildMediaOptions("statusbar", false), tooltipId, 260, tooltipEnabled),
+		checkboxSetting(L["damageMeterTooltipBarBackgroundUseClassColor"] or "Use class color for tooltip bar background", function() return cfg().tooltipBarBackgroundUseClassColor == true end, function(value) self:SetConfigValue(index, "tooltipBarBackgroundUseClassColor", value) end, tooltipId, tooltipEnabled),
+		colorSetting(L["damageMeterTooltipBarBackgroundColor"] or "Tooltip bar background color", function() return normalizeColor(cfg().tooltipBarBackgroundColor, DEFAULT_WINDOW.tooltipBarBackgroundColor) end, function(value) self:SetConfigValue(index, "tooltipBarBackgroundColor", normalizeColor(value, DEFAULT_WINDOW.tooltipBarBackgroundColor)) end, DEFAULT_WINDOW.tooltipBarBackgroundColor, tooltipId, function() return tooltipEnabled() and cfg().tooltipBarBackgroundUseClassColor ~= true end),
 		sliderSetting(L["damageMeterBarSpacing"] or "Bar spacing", function() return cfg().tooltipBarSpacing end, function(value) self:SetConfigValue(index, "tooltipBarSpacing", clampNumber(value, -16, 16, DEFAULT_WINDOW.tooltipBarSpacing)) end, -16, 16, 1, tooltipId, tooltipEnabled),
 		dividerSetting(tooltipId),
 		checkboxSetting(L["damageMeterRowBorder"] or "Row border", function() return cfg().tooltipRowBorderEnabled == true end, function(value)
@@ -6843,7 +6866,8 @@ function DamageMeter:BuildWindowSettings(index)
 		sliderSetting(L["damageMeterIconGap"] or "Icon gap", function() return cfg().tooltipIconGap end, function(value) self:SetConfigValue(index, "tooltipIconGap", clampNumber(value, 0, 24, DEFAULT_WINDOW.tooltipIconGap)) end, 0, 24, 1, tooltipId, tooltipEnabled),
 		dividerSetting(tooltipId),
 		dropdownSetting(L["damageMeterTooltipBackgroundTexture"] or "Tooltip background texture", function() return cfg().tooltipBackdropTexture end, function(value) self:SetConfigValue(index, "tooltipBackdropTexture", value) end, buildMediaOptions("statusbar", false), tooltipId, 260, tooltipEnabled),
-		colorSetting(L["damageMeterTooltipBackgroundColor"] or "Tooltip background color", function() return normalizeColor(cfg().tooltipBackdropColor, DEFAULT_WINDOW.tooltipBackdropColor) end, function(value) self:SetConfigValue(index, "tooltipBackdropColor", normalizeColor(value, DEFAULT_WINDOW.tooltipBackdropColor)) end, DEFAULT_WINDOW.tooltipBackdropColor, tooltipId, tooltipEnabled),
+		checkboxSetting(L["damageMeterTooltipBackgroundUseClassColor"] or "Use class color for tooltip background", function() return cfg().tooltipBackdropUseClassColor == true end, function(value) self:SetConfigValue(index, "tooltipBackdropUseClassColor", value) end, tooltipId, tooltipEnabled),
+		colorSetting(L["damageMeterTooltipBackgroundColor"] or "Tooltip background color", function() return normalizeColor(cfg().tooltipBackdropColor, DEFAULT_WINDOW.tooltipBackdropColor) end, function(value) self:SetConfigValue(index, "tooltipBackdropColor", normalizeColor(value, DEFAULT_WINDOW.tooltipBackdropColor)) end, DEFAULT_WINDOW.tooltipBackdropColor, tooltipId, function() return tooltipEnabled() and cfg().tooltipBackdropUseClassColor ~= true end),
 		dropdownSetting(L["damageMeterTooltipBorderTexture"] or "Tooltip border texture", function() return cfg().tooltipBorderTexture end, function(value) self:SetConfigValue(index, "tooltipBorderTexture", value) end, buildMediaOptions("border", false), tooltipId, 260, tooltipEnabled),
 		colorSetting(L["damageMeterTooltipBorderColor"] or "Tooltip border color", function() return normalizeColor(cfg().tooltipBorderColor, DEFAULT_WINDOW.tooltipBorderColor) end, function(value) self:SetConfigValue(index, "tooltipBorderColor", normalizeColor(value, DEFAULT_WINDOW.tooltipBorderColor)) end, DEFAULT_WINDOW.tooltipBorderColor, tooltipId, tooltipEnabled),
 		sliderSetting(L["damageMeterTooltipBorderSize"] or "Tooltip border size", function() return cfg().tooltipBorderSize end, function(value) self:SetConfigValue(index, "tooltipBorderSize", clampNumber(value, 1, 32, DEFAULT_WINDOW.tooltipBorderSize)) end, 1, 32, 1, tooltipId, tooltipEnabled),
