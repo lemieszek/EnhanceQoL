@@ -4,6 +4,8 @@
 
 ### ✨ Added
 
+- Chat: Added an optional setting to turn web links in chat messages into clickable copy links.
+- Chat History: Added Raid Warning messages to the logged Raid channel history.
 - Cooldown Panels: Added per-entry options to hide icon borders while a cooldown is active or while it is ready.
 - Group Tools / Focus Marker: Added a keybinding entry for the focus marker macro.
 

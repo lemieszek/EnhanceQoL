@@ -68,6 +68,16 @@ addon.functions.SettingsCreateHeadline(cChatFrame, COMMUNITIES_ADD_TO_CHAT_DROP_
 
 local data = {
 	{
+		var = "chatLinkCopy",
+		text = L["chatLinkCopy"],
+		desc = L["chatLinkCopyDesc"],
+		func = function(key)
+			addon.db["chatLinkCopy"] = key
+			if addon.ChatIcons and addon.ChatIcons.SetURLCopyEnabled then addon.ChatIcons:SetURLCopyEnabled(key) end
+		end,
+		default = false,
+	},
+	{
 		var = "chatShowLootCurrencyIcons",
 		text = L["chatLootCurrencyIcons"],
 		desc = L["chatLootCurrencyIconsDesc"],

@@ -11,6 +11,7 @@ addon.ChatIcons = addon.ChatIcons or {}
 local ChatIcons = addon.ChatIcons
 
 local ICON_SIZE = 12
+local URL_LINK_TYPE = "url"
 local CURRENCY_LINK_PATTERN = "(|Hcurrency:(%d+)[^|]*|h%[[^%]]+%]|h%|r)"
 local ITEM_LINK_PATTERN = "|Hitem:.-|h%[.-%]|h|r"
 
@@ -44,10 +45,101 @@ local ITEMLINK_EVENTS_FALLBACK = {
 	"CHAT_MSG_GUILD_ITEM_LOOTED",
 }
 
+local URL_CHAT_EVENTS_FALLBACK = {
+	"CHAT_MSG_CHANNEL",
+	"CHAT_MSG_COMMUNITIES_CHANNEL",
+	"CHAT_MSG_SAY",
+	"CHAT_MSG_YELL",
+	"CHAT_MSG_WHISPER",
+	"CHAT_MSG_WHISPER_INFORM",
+	"CHAT_MSG_BN_WHISPER",
+	"CHAT_MSG_BN_WHISPER_INFORM",
+	"CHAT_MSG_GUILD",
+	"CHAT_MSG_OFFICER",
+	"CHAT_MSG_PARTY",
+	"CHAT_MSG_PARTY_LEADER",
+	"CHAT_MSG_RAID",
+	"CHAT_MSG_RAID_LEADER",
+	"CHAT_MSG_RAID_WARNING",
+	"CHAT_MSG_INSTANCE_CHAT",
+	"CHAT_MSG_INSTANCE_CHAT_LEADER",
+	"CHAT_MSG_BATTLEGROUND",
+	"CHAT_MSG_BATTLEGROUND_LEADER",
+}
+
 local tonumber = tonumber
 local format = string.format
 local GetDetailedItemLevelInfoFn = C_Item and C_Item.GetDetailedItemLevelInfo
 local GetItemInfoFn = C_Item and C_Item.GetItemInfo
+local LinkUtil = _G.LinkUtil
+
+local function EnsureCopyPopup()
+	if not StaticPopupDialogs then return end
+	if StaticPopupDialogs["EQOL_URL_COPY"] then return end
+	StaticPopupDialogs["EQOL_URL_COPY"] = {
+		text = CALENDAR_COPY_EVENT,
+		button1 = CLOSE,
+		hasEditBox = true,
+		editBoxWidth = 320,
+		timeout = 0,
+		whileDead = true,
+		hideOnEscape = true,
+		preferredIndex = 3,
+		OnShow = function(self, data)
+			local editBox = self.editBox or self.GetEditBox and self:GetEditBox()
+			if editBox then
+				editBox:SetText(data or "")
+				editBox:SetFocus()
+				editBox:HighlightText()
+			end
+		end,
+	}
+end
+
+local function ShowCopyDialog(text)
+	EnsureCopyPopup()
+	if StaticPopup_Show then StaticPopup_Show("EQOL_URL_COPY", nil, nil, text or "") end
+end
+
+local function BuildURLLinkEvents()
+	local events = {}
+	if type(ChatTypeGroup) == "table" then
+		for _, group in pairs(ChatTypeGroup) do
+			if type(group) == "table" then
+				for _, event in pairs(group) do
+					events[event] = true
+				end
+			end
+		end
+	end
+	for _, event in ipairs(URL_CHAT_EVENTS_FALLBACK) do
+		events[event] = true
+	end
+	return events
+end
+
+local function IsURLToken(token)
+	return token:match("^https?://") or token:match("^www%.") or token:match("^[%w%-]+%.[%w%.%-]+/.+")
+end
+
+local function FormatURLToken(token)
+	if token:find("|H", 1, true) or token:find("|h", 1, true) then return token end
+	if not IsURLToken(token) then return token end
+
+	local originalToken = token
+	local suffix = ""
+	while token:match("[%.,%;:%!%?%)%]%}]$") do
+		suffix = token:sub(-1) .. suffix
+		token = token:sub(1, -2)
+	end
+	if token == "" or not IsURLToken(token) then return originalToken end
+
+	return format("|H%s:%s|h[|cffffffff%s|r]|h%s", URL_LINK_TYPE, token, token, suffix)
+end
+
+local function FormatURLs(text)
+	return text:gsub("%S+", FormatURLToken)
+end
 
 local function GetItemTexture(link)
 	if not link then return nil end
@@ -168,6 +260,8 @@ local function FilterChatMessage(_, event, message, ...)
 	if issecretvalue and issecretvalue(message) then return end
 	if type(message) ~= "string" or message == "" then return false end
 
+	if ChatIcons.urlCopyEnabled then message = FormatURLs(message) end
+
 	local formatItemIcons = ChatIcons.enabled == true
 	local formatItemLevel = ChatIcons.itemLevelEnabled
 	if formatItemIcons or formatItemLevel then
@@ -189,10 +283,29 @@ ChatIcons.enabled = ChatIcons.enabled or false
 ChatIcons.itemLevelEnabled = ChatIcons.itemLevelEnabled or false
 ChatIcons.itemLevelShowLocation = ChatIcons.itemLevelShowLocation or false
 ChatIcons.itemTooltipOnHoverEnabled = ChatIcons.itemTooltipOnHoverEnabled or false
+ChatIcons.urlCopyEnabled = ChatIcons.urlCopyEnabled or false
 ChatIcons.registeredEvents = ChatIcons.registeredEvents or {}
+
+function ChatIcons:RegisterURLCopyHandler()
+	if self.urlCopyHandlerRegistered then return end
+	self.urlCopyHandlerRegistered = true
+
+	if LinkUtil and LinkUtil.RegisterLinkHandler and (not LinkUtil.IsLinkHandlerRegistered or not LinkUtil.IsLinkHandlerRegistered(URL_LINK_TYPE)) then
+		LinkUtil.RegisterLinkHandler(URL_LINK_TYPE, function(link, text, linkData)
+			local payload = linkData and linkData.options or link and link:match("^url:(.+)$") or text
+			ShowCopyDialog(payload)
+		end)
+	end
+end
 
 function ChatIcons:UpdateFilters()
 	local needed = {}
+	if self.urlCopyEnabled then
+		self.urlLinkEvents = self.urlLinkEvents or BuildURLLinkEvents()
+		for event in pairs(self.urlLinkEvents) do
+			needed[event] = true
+		end
+	end
 	if self.itemLevelEnabled or self.enabled then
 		self.itemLinkEvents = self.itemLinkEvents or BuildItemLinkEvents()
 		for event in pairs(self.itemLinkEvents) do
@@ -237,4 +350,10 @@ function ChatIcons:SetItemTooltipOnHoverEnabled(enabled)
 	self.itemTooltipOnHoverEnabled = enabled and true or false
 	RegisterChatItemTooltipHooks()
 	if not self.itemTooltipOnHoverEnabled then HideChatItemTooltip() end
+end
+
+function ChatIcons:SetURLCopyEnabled(enabled)
+	self.urlCopyEnabled = enabled and true or false
+	if self.urlCopyEnabled then self:RegisterURLCopyHandler() end
+	self:UpdateFilters()
 end

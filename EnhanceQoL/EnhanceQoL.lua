@@ -4325,6 +4325,7 @@ local function initChatFrame()
 	addon.functions.InitDBValue("chatShowItemTooltipsOnHover", false)
 	addon.functions.InitDBValue("chatShowItemLevelInLinks", false)
 	addon.functions.InitDBValue("chatShowItemLevelLocation", false)
+	addon.functions.InitDBValue("chatLinkCopy", false)
 	addon.functions.InitDBValue("chatHideLearnUnlearn", false)
 	addon.functions.InitDBValue("chatUseArrowKeys", false)
 	addon.functions.InitDBValue("chatEditBoxOnTop", false)
@@ -4338,6 +4339,7 @@ local function initChatFrame()
 	if addon.ChatIcons and addon.ChatIcons.SetEnabled then addon.ChatIcons:SetEnabled(addon.db["chatShowLootCurrencyIcons"]) end
 	if addon.ChatIcons and addon.ChatIcons.SetItemTooltipOnHoverEnabled then addon.ChatIcons:SetItemTooltipOnHoverEnabled(addon.db["chatShowItemTooltipsOnHover"]) end
 	if addon.ChatIcons and addon.ChatIcons.SetItemLevelEnabled then addon.ChatIcons:SetItemLevelEnabled(addon.db["chatShowItemLevelInLinks"]) end
+	if addon.ChatIcons and addon.ChatIcons.SetURLCopyEnabled then addon.ChatIcons:SetURLCopyEnabled(addon.db["chatLinkCopy"]) end
 
 	if addon.ChatIM and addon.ChatIM.SetEnabled then addon.ChatIM:SetEnabled(addon.db["enableChatIM"]) end
 	if addon.functions.ApplyChatFrameMaxLines then addon.functions.ApplyChatFrameMaxLines() end
