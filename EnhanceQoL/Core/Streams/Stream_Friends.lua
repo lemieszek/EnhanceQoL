@@ -517,13 +517,6 @@ local function colorizedName(name, color)
 	return colorizeText(name, color.r or 1, color.g or 1, color.b or 1)
 end
 
-local function colorizedLocation(location, sameZone)
-	location = sanitizeString(location)
-	if not location then return nil end
-	if sameZone then return colorizeText(location, 0.25, 1.0, 0.4) end
-	return colorizeText(location, 0.62, 0.62, 0.62)
-end
-
 local function formatEntryName(entry)
 	local nameText = colorizedName(entry.name, entry.color) or (sanitizeString(entry.name) or "")
 	local bnName = sanitizeString(entry.bnName)
@@ -544,12 +537,6 @@ local function buildClassLevelText(entry)
 	local note = sanitizeString(entry.note)
 	if note then return note end
 	return ""
-end
-
-local function getEntryRightText(entry)
-	local rightText = sanitizeString(entry.location) or ""
-	if rightText == "" then rightText = buildClassLevelText(entry) end
-	return colorizedLocation(rightText, rightText ~= "" and entry.locationSameZone == true)
 end
 
 local function getTooltipEntryRight(entry)

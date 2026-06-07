@@ -19,5 +19,6 @@
 ## X-Compatible-With: retail
 ## Globe-Main: EnhanceQoL
 
+libs\AceGUI-3.0\AceGUI-3.0.xml
 EnhanceQoLQuery.lua
 EditModeExamples.lua
