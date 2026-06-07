@@ -675,6 +675,27 @@ end
 
 local function getOptionsEntryLabel(entry) return getEntryLabel(entry) end
 
+addon.MicroBarOptions = addon.MicroBarOptions or {}
+addon.MicroBarOptions.GetVisibleEntryOptions = function()
+	local options = {}
+	for _, entry in ipairs(menuEntries) do
+		if isEntryAvailable(entry) then
+			options[#options + 1] = {
+				value = entry.id,
+				label = getOptionsEntryLabel(entry),
+			}
+		end
+	end
+	return options
+end
+addon.MicroBarOptions.IsEntryVisible = function(entryID)
+	return not isEntryHidden(entryID)
+end
+addon.MicroBarOptions.SetEntryVisible = function(entryID, visible)
+	setEntryHidden(entryID, not (visible and true or false))
+end
+addon.MicroBarOptions.RequestUpdate = requestUpdate
+
 local function isEntryEnabled(entry)
 	if entry.enabled == nil then return true end
 	if type(entry.enabled) == "function" then return entry.enabled() end

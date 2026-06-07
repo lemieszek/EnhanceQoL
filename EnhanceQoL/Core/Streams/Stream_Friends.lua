@@ -58,94 +58,10 @@ local function colorizeStreamText(text)
 	return text
 end
 
-local function RestorePosition(frame)
-	if db.point and db.x and db.y then
-		frame:ClearAllPoints()
-		frame:SetPoint(db.point, UIParent, db.point, db.x, db.y)
+local function openSettings()
+	if addon.functions and addon.functions.OpenConfigCenter then
+		addon.functions.OpenConfigCenter("interface.datapanel", "DataPanel_friends_fontSize")
 	end
-end
-
-local aceWindow
-local function createAceWindow()
-	if aceWindow then
-		aceWindow:Show()
-		return
-	end
-	ensureDB()
-	local frame = AceGUI:Create("Window")
-	aceWindow = frame.frame
-	frame:SetTitle((addon.DataPanel and addon.DataPanel.GetStreamOptionsTitle and addon.DataPanel.GetStreamOptionsTitle(stream and stream.meta and stream.meta.title)) or GAMEMENU_OPTIONS)
-	frame:SetWidth(300)
-	frame:SetHeight(300)
-	frame:SetLayout("List")
-
-	frame.frame:SetScript("OnShow", function(self) RestorePosition(self) end)
-	frame.frame:SetScript("OnHide", function(self)
-		local point, _, _, xOfs, yOfs = self:GetPoint()
-		db.point = point
-		db.x = xOfs
-		db.y = yOfs
-	end)
-
-	local fontSize = AceGUI:Create("Slider")
-	fontSize:SetLabel(FONT_SIZE)
-	fontSize:SetSliderValues(8, 32, 1)
-	fontSize:SetValue(db.fontSize)
-	fontSize:SetCallback("OnValueChanged", function(_, _, val)
-		db.fontSize = val
-		addon.DataHub:RequestUpdate(stream)
-	end)
-	frame:AddChild(fontSize)
-
-	local useClassColor = AceGUI:Create("CheckBox")
-	useClassColor:SetLabel(L["DataPanelUseClassTextColor"] or "Use class text color")
-	useClassColor:SetValue(db.useClassColor == true)
-	useClassColor:SetCallback("OnValueChanged", function(_, _, val)
-		db.useClassColor = val and true or false
-		addon.DataHub:RequestUpdate(stream)
-	end)
-	frame:AddChild(useClassColor)
-
-	local useColor = AceGUI:Create("CheckBox")
-	useColor:SetLabel(L["Use custom text color"] or "Use custom text color")
-	useColor:SetValue(db.useTextColor == true)
-	useColor:SetCallback("OnValueChanged", function(_, _, val)
-		db.useTextColor = val and true or false
-		addon.DataHub:RequestUpdate(stream)
-	end)
-	frame:AddChild(useColor)
-
-	local textColor = AceGUI:Create("ColorPicker")
-	textColor:SetLabel(L["Text color"] or "Text color")
-	textColor:SetColor(db.textColor.r, db.textColor.g, db.textColor.b)
-	textColor:SetCallback("OnValueChanged", function(_, _, r, g, b)
-		db.textColor = { r = r, g = g, b = b }
-		if db.useTextColor and not db.useClassColor then addon.DataHub:RequestUpdate(stream) end
-	end)
-	frame:AddChild(textColor)
-
-	local splitDisplayInline
-	local splitDisplay = AceGUI:Create("CheckBox")
-	splitDisplay:SetLabel(L["Friends/Guild display"] or "Show friends + guild")
-	splitDisplay:SetValue(db.splitDisplay == true)
-	splitDisplay:SetCallback("OnValueChanged", function(_, _, val)
-		db.splitDisplay = val and true or false
-		if splitDisplayInline and splitDisplayInline.SetDisabled then splitDisplayInline:SetDisabled(not db.splitDisplay) end
-		addon.DataHub:RequestUpdate(stream)
-	end)
-	frame:AddChild(splitDisplay)
-
-	splitDisplayInline = AceGUI:Create("CheckBox")
-	splitDisplayInline:SetLabel(L["Friends/Guild display single line"] or "Single-line layout")
-	splitDisplayInline:SetValue(db.splitDisplayInline == true)
-	splitDisplayInline:SetDisabled(not db.splitDisplay)
-	splitDisplayInline:SetCallback("OnValueChanged", function(_, _, val)
-		db.splitDisplayInline = val and true or false
-		addon.DataHub:RequestUpdate(stream)
-	end)
-	frame:AddChild(splitDisplayInline)
-
-	frame.frame:Show()
 end
 
 local GetNumFriends = C_FriendList.GetNumFriends
@@ -790,7 +706,7 @@ local provider = {
 	},
 	OnClick = function(_, btn)
 		if btn == "RightButton" then
-			createAceWindow()
+			openSettings()
 		else
 			toggleListWindow()
 		end
