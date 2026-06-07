@@ -4182,8 +4182,14 @@ local function resetCurrentPage(state)
 		return
 	end
 	for _, control in ipairs(getVisiblePageControls(state.app, page)) do
-		if control.default ~= nil then
-			state.app:SetControlValue(control, control.default)
+		local default, hasDefault
+		if type(state.app.GetControlDefault) == "function" then
+			default, hasDefault = state.app:GetControlDefault(control)
+		else
+			default, hasDefault = control.default, control.default ~= nil
+		end
+		if hasDefault then
+			state.app:SetControlValue(control, default)
 		end
 	end
 	state:RenderContent()

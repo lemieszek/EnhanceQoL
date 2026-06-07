@@ -5,6 +5,7 @@
 ### 🐛 Fixed
 
 - Craft Shopper: Removed the obsolete Missing only filter because the shopping list already contains only missing tracked-recipe reagents.
+- Settings Center: Fixed disabled dependency controls still counting as changed, and fixed page Defaults restoring some multi-select settings to UI fallback labels instead of their real default selection.
 
 ---
 
