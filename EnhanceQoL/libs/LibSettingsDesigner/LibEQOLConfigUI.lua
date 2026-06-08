@@ -5394,6 +5394,39 @@ function lib.SaveFrameSize(app, width, height)
 	end
 end
 
+function lib.IsFrameLocked(app)
+	if app and app.opts and type(app.opts.getLocked) == "function" then
+		local ok, locked = pcall(app.opts.getLocked)
+		if ok then
+			return locked == true
+		end
+	end
+	local saved = lib._lockedByApp and lib._lockedByApp[app.id or app.title or "default"]
+	return saved == true
+end
+
+function lib.SaveFrameLocked(app, locked)
+	locked = locked == true
+	lib._lockedByApp = lib._lockedByApp or {}
+	lib._lockedByApp[app.id or app.title or "default"] = locked
+	if app and app.opts and type(app.opts.setLocked) == "function" then
+		pcall(app.opts.setLocked, locked)
+	end
+end
+
+function lib.ApplyFrameLocked(frame, app)
+	if not frame then return end
+	local L = getLocale(app)
+	local locked = lib.IsFrameLocked(app)
+	frame._eqolLocked = locked
+	if frame.SetMovable then
+		frame:SetMovable(not locked)
+	end
+	if frame.LockButton and frame.LockButton.Text then
+		frame.LockButton.Text:SetText(locked and (L["configCenterUnlockWindow"] or "Unlock Window") or (L["configCenterLockWindow"] or "Lock Window"))
+	end
+end
+
 local function initializeState(frame, app)
 	local density = lib.GetConfiguredDensity(app)
 	if app and app.opts and type(app.opts.getDensity) == "function" then
@@ -5457,7 +5490,10 @@ local function createFrame(app)
 	end
 	frame:EnableMouse(true)
 	frame:RegisterForDrag("LeftButton")
-	frame:SetScript("OnDragStart", frame.StartMoving)
+	frame:SetScript("OnDragStart", function(self)
+		if self._eqolLocked then return end
+		self:StartMoving()
+	end)
 	frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
 	frame.bg = frame:CreateTexture(nil, "BACKGROUND", nil, -2)
 	frame.bg:SetPoint("TOPLEFT", frame, "TOPLEFT", 8, -8)
@@ -5534,6 +5570,29 @@ local function createFrame(app)
 		setFrameBackdrop(self, { 0.120, 0.105, 0.075, 0.95 }, { 0.55, 0.42, 0.18, 0.82 })
 	end)
 
+	frame.LockButton = makeFlatButton(frame.TopBar, L["configCenterLockWindow"] or "Lock Window", 138, 28)
+	frame.LockButton:SetPoint("RIGHT", frame.ResetButton, "LEFT", -12, 0)
+	setFrameBackdrop(frame.LockButton, { 0.100, 0.090, 0.070, 0.88 }, { 0.46, 0.36, 0.18, 0.70 })
+	setTextColor(frame.LockButton.Text, TEXT.topbarGold)
+	frame.LockButton:SetScript("OnEnter", function(self)
+		setFrameBackdrop(self, { 0.165, 0.135, 0.080, 0.98 }, CARD_BORDER_HOVER)
+		if _G.GameTooltip then
+			_G.GameTooltip:SetOwner(self, "ANCHOR_TOP")
+			_G.GameTooltip:SetText(L["configCenterLockWindowDesc"] or "Prevents the settings window from being moved by touch or mouse drags.")
+			_G.GameTooltip:Show()
+		end
+	end)
+	frame.LockButton:SetScript("OnLeave", function(self)
+		setFrameBackdrop(self, { 0.100, 0.090, 0.070, 0.88 }, { 0.46, 0.36, 0.18, 0.70 })
+		if _G.GameTooltip then
+			_G.GameTooltip:Hide()
+		end
+	end)
+	frame.LockButton:SetScript("OnClick", function()
+		lib.SaveFrameLocked(app, not lib.IsFrameLocked(app))
+		lib.ApplyFrameLocked(frame, app)
+	end)
+
 	frame.DensityButton = makeFlatButton(frame.TopBar, L["configCenterDensityComfortable"] or "Comfortable", 118, 28)
 	frame.DensityButton:SetPoint("RIGHT", frame.ResetButton, "LEFT", -12, 0)
 	setFrameBackdrop(frame.DensityButton, { 0.100, 0.090, 0.070, 0.88 }, { 0.46, 0.36, 0.18, 0.70 })
@@ -5545,12 +5604,18 @@ local function createFrame(app)
 		setFrameBackdrop(self, { 0.100, 0.090, 0.070, 0.88 }, { 0.46, 0.36, 0.18, 0.70 })
 	end)
 	frame.DensityButton:SetShown(lib.ShouldShowDensityButton(app))
+	frame.LockButton:ClearAllPoints()
+	if lib.ShouldShowDensityButton(app) then
+		frame.LockButton:SetPoint("RIGHT", frame.DensityButton, "LEFT", -12, 0)
+	else
+		frame.LockButton:SetPoint("RIGHT", frame.ResetButton, "LEFT", -12, 0)
+	end
 
 	frame.SearchShell = CreateFrame("Frame", nil, frame.TopBar, "BackdropTemplate")
 	frame.SearchShell:SetSize(286, 28)
 	frame.SearchShell:SetPoint(
 		"RIGHT",
-		lib.ShouldShowDensityButton(app) and frame.DensityButton or frame.ResetButton,
+		frame.LockButton,
 		"LEFT",
 		-12,
 		0
@@ -5759,6 +5824,7 @@ local function createFrame(app)
 		end
 	end)
 	lib.UpdateDensityButton(frame, state)
+	lib.ApplyFrameLocked(frame, app)
 	frame:SetScript("OnSizeChanged", function()
 		lib.SaveFrameSize(app, frame:GetWidth(), frame:GetHeight())
 		if frame:IsShown() and not (frame.ResizeGrip and frame.ResizeGrip._eqolResizing) then
@@ -5814,6 +5880,7 @@ function lib:Open(appOrID, pageID, focusControlID)
 	else
 		state:SetDashboard()
 	end
+	lib.ApplyFrameLocked(frame, app)
 	frame:Show()
 	return frame
 end

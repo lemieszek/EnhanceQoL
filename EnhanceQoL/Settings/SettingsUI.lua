@@ -365,6 +365,13 @@ local function ensureConfigApp()
 				height = height,
 			}
 		end,
+		getLocked = function()
+			return addon.db and addon.db.configCenterLocked == true
+		end,
+		setLocked = function(locked)
+			if not addon.db then return end
+			addon.db.configCenterLocked = locked == true
+		end,
 		categoryIconTextures = {
 			dashboard = newSettingsAsset("Cogwheel.tga"),
 			economy = newSettingsAsset("Economy.tga"),

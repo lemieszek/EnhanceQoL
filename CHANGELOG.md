@@ -1,5 +1,19 @@
 # Changelog
 
+## [11.1.0-beta2] - 2026-06-07
+
+### ✨ Added
+
+- Damage Meter: Added options for class-colored bar and tooltip backgrounds, plus separate tooltip bar background texture and color controls.
+- Unit Frames / Healer Buff Placement: Added per-spell expiration pulse rules with an optional countdown-only display during the pulse window.
+
+### 🐛 Fixed
+
+- Damage Meter: Fixed Current windows switching away from the completed Mythic+ overall view when post-run healing or damage starts a new combat session before leaving the dungeon.
+- Tooltips: Fixed modifier-gated player tooltip details not refreshing reliably when the modifier was pressed or released after already hovering a player.
+
+---
+
 ## [11.1.0-beta1] - 2026-06-07
 
 ### ✨ Added
@@ -7,9 +21,7 @@
 - Chat: Added an optional setting to turn web links in chat messages into clickable copy links.
 - Chat History: Added Raid Warning messages to the logged Raid channel history.
 - Cooldown Panels: Added per-entry options to hide icon borders while a cooldown is active or while it is ready.
-- Damage Meter: Added options for class-colored bar and tooltip backgrounds, plus separate tooltip bar background texture and color controls.
 - Group Tools / Focus Marker: Added a keybinding entry for the focus marker macro.
-- Unit Frames / Healer Buff Placement: Added per-spell expiration pulse rules with an optional countdown-only display during the pulse window.
 
 ### 🐛 Fixed
 

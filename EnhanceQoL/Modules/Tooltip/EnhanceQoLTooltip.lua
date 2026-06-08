@@ -910,6 +910,7 @@ local function RefreshVisibleTooltipForModifier()
 	local unit, hadTooltipUnit = GetUnitTokenFromTooltip(GameTooltip)
 	local kind = GetTooltipDataKind(GameTooltip)
 	if kind == "unit" or hadTooltipUnit then
+		if not SafeUnitExists(unit) and ResolveTooltipUnit then unit = ResolveTooltipUnit(GameTooltip) end
 		if not SafeUnitExists(unit) then return end
 		if GameTooltip.SetUnit and safeSecureCall(GameTooltip.SetUnit, GameTooltip, unit) then GameTooltip:Show() end
 		return

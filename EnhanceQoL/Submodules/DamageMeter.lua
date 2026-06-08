@@ -1862,6 +1862,7 @@ function DamageMeter:SetTemporarySessionType(index, sessionType)
 		temporary.sessionName = nil
 		temporary.sessionDurationSeconds = nil
 		temporary.sessionType = sessionType
+		temporary.mythicPlusOverallLock = nil
 	end)
 	self:InvalidateLiveEventWatch()
 	self:ScheduleRefresh()
@@ -1877,9 +1878,55 @@ function DamageMeter:SetTemporarySessionID(index, sessionID, sessionName, durati
 		temporary.sessionID = sessionID
 		temporary.sessionName = sessionName
 		temporary.sessionDurationSeconds = durationSeconds
+		temporary.mythicPlusOverallLock = nil
 	end)
 	self:InvalidateLiveEventWatch()
 	self:ScheduleRefresh()
+end
+
+function DamageMeter:LockCurrentWindowsToMythicPlusOverall()
+	local changed = false
+	self.temporarySelections = self.temporarySelections or {}
+	for index = 1, getWindowCount() do
+		if self:GetEffectiveSessionID(index) == nil and self:GetEffectiveSessionType(index) == "current" then
+			local temporary = self:GetTemporarySelection(index)
+			temporary.sessionID = nil
+			temporary.sessionName = nil
+			temporary.sessionDurationSeconds = nil
+			temporary.sessionType = "overall"
+			temporary.mythicPlusOverallLock = true
+			changed = true
+		end
+	end
+	if not changed then return end
+	self:InvalidateLiveEventWatch()
+	self:ScheduleRefresh()
+end
+
+function DamageMeter:ClearMythicPlusOverallLocks()
+	local changed = false
+	if not self.temporarySelections then return end
+	for index, temporary in pairs(self.temporarySelections) do
+		if temporary and temporary.mythicPlusOverallLock == true then
+			temporary.mythicPlusOverallLock = nil
+			temporary.sessionType = nil
+			changed = true
+			if next(temporary) == nil then self.temporarySelections[index] = nil end
+		end
+	end
+	if not changed then return end
+	self:InvalidateLiveEventWatch()
+	self:ScheduleRefresh()
+end
+
+function DamageMeter:ClearMythicPlusOverallLocksOutsideDungeon()
+	local inInstance, instanceType = IsInInstance and IsInInstance() or false, nil
+	if inInstance then
+		local _, currentInstanceType = GetInstanceInfo()
+		instanceType = currentInstanceType
+	end
+	if inInstance and instanceType == "party" then return end
+	self:ClearMythicPlusOverallLocks()
 end
 
 function DamageMeter:ClearTemporarySelection(index)
@@ -6974,7 +7021,10 @@ function DamageMeter:Init()
 		if event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" then
 			self:InvalidatePartyClassFallback()
 			self:InvalidateDerivedTargetCache(true)
-			if event == "PLAYER_ENTERING_WORLD" then self:CheckAutomaticClear() end
+			if event == "PLAYER_ENTERING_WORLD" then
+				self:CheckAutomaticClear()
+				self:ClearMythicPlusOverallLocksOutsideDungeon()
+			end
 		elseif event == "PLAYER_ROLES_ASSIGNED" or event == "PLAYER_SPECIALIZATION_CHANGED" or event == "ACTIVE_PLAYER_SPECIALIZATION_CHANGED" then
 			self:InvalidateLiveEventWatch()
 		elseif event == "PLAYER_REGEN_DISABLED" then
@@ -6986,6 +7036,10 @@ function DamageMeter:Init()
 			self:InvalidateDerivedTargetCache()
 		elseif event == "ADDON_RESTRICTION_STATE_CHANGED" then
 			self:RefreshReportRestrictionState(damageMeterType, sessionID)
+		elseif event == "CHALLENGE_MODE_COMPLETED" then
+			self:LockCurrentWindowsToMythicPlusOverall()
+		elseif event == "CHALLENGE_MODE_START" or event == "CHALLENGE_MODE_RESET" then
+			self:ClearMythicPlusOverallLocks()
 		end
 		if event == "DAMAGE_METER_COMBAT_SESSION_UPDATED" then
 			self:InvalidateDerivedTargetCache(true)
@@ -7002,6 +7056,7 @@ function DamageMeter:Init()
 			self:ScheduleContextRefresh()
 		elseif event == "ZONE_CHANGED_NEW_AREA" then
 			self:CheckAutomaticClear()
+			self:ClearMythicPlusOverallLocksOutsideDungeon()
 			self:ScheduleContextRefresh()
 		else
 			self:ScheduleContextRefresh()

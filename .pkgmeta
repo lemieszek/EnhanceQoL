@@ -11,6 +11,7 @@ ignore:
   - .DS_Store
   - .env
   - .git
+  - .codex
   - .github
   - .gitignore
   - .luacheckrc
@@ -29,6 +30,8 @@ ignore:
   - README.md
   - CONTRIBUTING.md
   - stylua.toml
+  - .tools
+  - tools
   - wow-ui-retail.skill
 
 manual-changelog:
