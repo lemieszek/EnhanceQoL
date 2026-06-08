@@ -1574,11 +1574,11 @@ cdp.ICON_BORDER = cdp.ICON_BORDER or {
 	BLIZZARD_ALIAS = "ORIGINAL_BLIZZARD",
 	OVERLAY_ATLAS = "UI-HUD-CoolDownManager-IconOverlay",
 	MASK_ATLAS = "UI-HUD-CoolDownManager-Mask",
+	DEFAULT_SWIPE_TEXTURE = "Interface\\Buttons\\WHITE8X8",
 	SWIPE_TEXTURE = "Interface\\HUD\\UI-HUD-CoolDownManager-Icon-Swipe",
 	OVERLAY_OFFSET_X_RATIO = 0.175,
 	OVERLAY_OFFSET_Y_RATIO = 0.175,
 	OVERLAY_OFFSET_X_NUDGE = 0,
-	COOLDOWN_INSET_RATIO = 0.055,
 	ICON_BOTTOM_INSET = 2,
 }
 
@@ -9834,6 +9834,17 @@ function cdp.ENTRY.ApplyCooldownSwipeVisual(icon, data)
 	end
 end
 
+function cdp.ENTRY.ResetCooldownSwipeVisual(icon)
+	if not (icon and icon.cooldown) then return end
+	if icon.cooldown.SetSwipeTexture then
+		pcall(icon.cooldown.SetSwipeTexture, icon.cooldown, cdp.ICON_BORDER.DEFAULT_SWIPE_TEXTURE, 0, 0, 0, 0.8)
+	end
+	if icon.cooldown.SetSwipeColor then icon.cooldown:SetSwipeColor(0, 0, 0, 0.8) end
+	icon._eqolBlizzardSwipeTextureApplied = nil
+	icon._eqolSwipeTextureR, icon._eqolSwipeTextureG, icon._eqolSwipeTextureB, icon._eqolSwipeTextureA = nil, nil, nil, nil
+	icon._eqolSwipeColorR, icon._eqolSwipeColorG, icon._eqolSwipeColorB, icon._eqolSwipeColorA = nil, nil, nil, nil
+end
+
 function cdp.ENTRY.EnsureBlizzardIconOverlay(icon)
 	if not icon then return nil end
 	local overlay = icon.blizzardIconOverlay
@@ -9844,6 +9855,28 @@ function cdp.ENTRY.EnsureBlizzardIconOverlay(icon)
 		icon.blizzardIconOverlay = overlay
 	end
 	return overlay
+end
+
+function cdp.ENTRY.ApplyBlizzardCooldownMask(icon, maskTexture)
+	local cooldown = icon and icon.cooldown
+	if not (cooldown and cooldown.GetRegions and cooldown.GetNumRegions) then return end
+	for index = 1, cooldown:GetNumRegions() do
+		local region = select(index, cooldown:GetRegions())
+		if region then
+			if maskTexture then
+				if region.AddMaskTexture and region._eqolBlizzardCooldownMask ~= maskTexture then
+					if region._eqolBlizzardCooldownMask and region.RemoveMaskTexture then
+						pcall(region.RemoveMaskTexture, region, region._eqolBlizzardCooldownMask)
+					end
+					local ok = pcall(region.AddMaskTexture, region, maskTexture)
+					region._eqolBlizzardCooldownMask = ok and maskTexture or nil
+				end
+			elseif region._eqolBlizzardCooldownMask and region.RemoveMaskTexture then
+				pcall(region.RemoveMaskTexture, region, region._eqolBlizzardCooldownMask)
+				region._eqolBlizzardCooldownMask = nil
+			end
+		end
+	end
 end
 
 function cdp.ENTRY.ClearBlizzardIconSkin(icon)
@@ -9861,6 +9894,7 @@ function cdp.ENTRY.ClearBlizzardIconSkin(icon)
 	icon._eqolBlizzardIconTextureInsetApplied = nil
 	icon._eqolBlizzardIconTextureAnchored = nil
 	icon._eqolBlizzardIconBottomInset = nil
+	cdp.ENTRY.ApplyBlizzardCooldownMask(icon, nil)
 	if (icon._eqolBlizzardCooldownInsetApplied or icon._eqolBlizzardCooldownAnchored) and icon.cooldown then
 		icon.cooldown:ClearAllPoints()
 		icon.cooldown:SetAllPoints(icon)
@@ -9870,7 +9904,7 @@ function cdp.ENTRY.ClearBlizzardIconSkin(icon)
 	icon._eqolBlizzardCooldownInset = nil
 	icon._eqolBlizzardCooldownWidth = nil
 	icon._eqolBlizzardCooldownHeight = nil
-	icon._eqolBlizzardSwipeTextureApplied = nil
+	cdp.ENTRY.ResetCooldownSwipeVisual(icon)
 end
 
 function cdp.ENTRY.ApplyBlizzardIconSkin(icon)
@@ -9915,18 +9949,16 @@ function cdp.ENTRY.ApplyBlizzardIconSkin(icon)
 			local ok = pcall(icon.texture.AddMaskTexture, icon.texture, icon.blizzardIconMask)
 			icon._eqolBlizzardMaskApplied = ok == true
 		end
+		cdp.ENTRY.ApplyBlizzardCooldownMask(icon, icon.blizzardIconMask)
 	end
 
 	if icon.cooldown then
-		local size = math.min(width, height)
-		local inset = math.max(1, math.floor((size * cdp.ICON_BORDER.COOLDOWN_INSET_RATIO) + 0.5))
-		if icon._eqolBlizzardCooldownInset ~= inset then
+		if icon._eqolBlizzardCooldownAnchored ~= true or icon._eqolBlizzardCooldownInsetApplied then
 			icon.cooldown:ClearAllPoints()
-			icon.cooldown:SetPoint("TOPLEFT", icon, "TOPLEFT", inset, -inset)
-			icon.cooldown:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -inset, inset)
-			icon._eqolBlizzardCooldownInset = inset
-			icon._eqolBlizzardCooldownInsetApplied = true
-			icon._eqolBlizzardCooldownAnchored = nil
+			icon.cooldown:SetAllPoints(icon)
+			icon._eqolBlizzardCooldownInset = nil
+			icon._eqolBlizzardCooldownInsetApplied = nil
+			icon._eqolBlizzardCooldownAnchored = true
 			icon._eqolBlizzardCooldownWidth = nil
 			icon._eqolBlizzardCooldownHeight = nil
 		end

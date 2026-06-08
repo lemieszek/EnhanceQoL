@@ -1,5 +1,13 @@
 # Changelog
 
+## [11.1.0-beta4] - 2026-06-08
+
+### 🐛 Fixed
+
+- Cooldown Panels: Fixed cooldown swipe alignment and stale mask state when switching away from the Original Blizzard icon border.
+
+---
+
 ## [11.1.0-beta3] - 2026-06-08
 
 ### 🐛 Fixed
