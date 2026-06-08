@@ -6,6 +6,9 @@
 
 - Unit Frames / Group Frames: Added an optional Data Bar for party, raid, main tank, and main assist frames with position, color, texture, font, and health text slot settings.
 - Resource Bars: Added Vengeance Demon Hunter Soul Fragments tracking for the Secondary resource bar.
+
+### 🔁 Changed
+
 - Resource Bars: Moved Augmentation Evoker Ebon Might to the Shared Secondary resource slot and Mana to the Shared Tertiary slot.
 
 ### 🐛 Fixed

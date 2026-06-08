@@ -62,7 +62,19 @@
 - If the user asks to make or update a beta changelog, keep the beta section in `CHANGELOG.md` wrapped in `<!--@eqol-beta@-->` and `<!--@end-eqol-beta@-->`.
 - If the user asks to prepare a release changelog while a beta changelog should remain available, keep the beta-gated section separate and place the release section below it, outside the beta gate.
 - Do not merge beta-only changelog entries into a release section unless the user explicitly says those beta items are shipping in that release.
+- Alpha changelog entries may be technical and specific because they document early prerelease iteration.
+- Beta changelog entries should be less technical than alpha entries because beta builds are installed by users. Keep beta notes user-facing while still specific enough for testers.
+- When preparing the final release changelog for the same version, consolidate all alpha and beta entries into a small number of user-facing summary bullets. Do not copy verbose prerelease details directly into the release section.
+- In a final release changelog, omit fixes for bugs that only existed in alpha or beta builds of that same version. Those fixes are implementation churn for a newly shipped feature, not user-facing release notes.
+- For final release changelogs, prefer concise feature/result wording over implementation details, internal issue context, stack traces, or intermediate prerelease regressions.
+- Use changelog sections consistently: `Added` for new user-facing functionality, `Changed` for behavior/default/slot/order changes, and `Fixed` for bugs in already-shipped behavior.
+- Before creating or pushing any release, beta, or alpha tag at the user's request, run project Luacheck when Lua code changed and only tag after it passes or after explicitly reporting remaining failures to the user.
 - After changing packaging gates, verify `scripts/prepare_packager_gates.sh` with at least `bash -n`, and make sure the release workflow still runs Luacheck after the gate step.
+
+## Secret Values
+
+- When handling Blizzard secret values, do not do Lua arithmetic, comparisons, `tonumber`, `min`, `max`, sorting, modulo, or similar numeric operations on the secret value.
+- Pass secret values through to Blizzard APIs that can consume them directly, such as status bar setters, instead of converting or deriving values in Lua.
 
 ## EditMode MultiDropdowns
 
