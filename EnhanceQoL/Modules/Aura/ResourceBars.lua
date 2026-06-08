@@ -142,6 +142,10 @@ local ResourcebarVars = {
 	MAELSTROM_WEAPON_MID_STACK_DEFAULT = 5,
 	MAELSTROM_WEAPON_SPELL_ID = 344179,
 	ICICLES_SPELL_ID = 205473,
+	VENGEANCE_SOUL_FRAGMENTS_SPELL_ID = 203981,
+	VENGEANCE_SOUL_CLEAVE_SPELL_ID = 228477,
+	VENGEANCE_SOUL_CLEAVE_BASE_SPELL_ID = 344862,
+	VENGEANCE_SOUL_FRAGMENTS_MAX = 6,
 	VOID_METAMORPHOSIS_SPELL_ID = 1225789,
 	VOID_META_TALENT_SOUL_GLUTTON_SPELL_ID = 1247534,
 	COLLAPSING_STAR_SPELL_ID = 1227702,
@@ -641,6 +645,7 @@ end
 ResourceBars.PowerLabels = {
 	MAELSTROM_WEAPON = (C_Spell.GetSpellName(RB.MAELSTROM_WEAPON_SPELL_ID)) or "Maelstrom Weapon",
 	ICICLES = (C_Spell.GetSpellName(RB.ICICLES_SPELL_ID)) or (L and L["Icicles"]) or "Icicles",
+	SOUL_FRAGMENTS_VENGEANCE = (C_Spell.GetSpellName(RB.VENGEANCE_SOUL_FRAGMENTS_SPELL_ID)) or "Soul Fragments",
 	VOID_METAMORPHOSIS = (C_Spell.GetSpellName(RB.VOID_METAMORPHOSIS_SPELL_ID)) or "Void Metamorphosis",
 	EBON_MIGHT = (C_Spell.GetSpellName(RB.EBON_MIGHT_SPELL_ID)) or "Ebon Might",
 	TIP_OF_THE_SPEAR = (C_Spell.GetSpellName(RB.TIP_OF_THE_SPEAR_SPELL_ID)) or "Tip of the Spear",
@@ -671,6 +676,14 @@ RB.AURA_POWER_CONFIG = {
 		maxStacks = 3,
 		visualSegments = 3,
 		defaultColor = { 1.00, 0.60, 0.20, 1 },
+		useMaxColorDefault = true,
+		defaultShowSeparator = true,
+	},
+	SOUL_FRAGMENTS_VENGEANCE = {
+		spellCastCountId = RB.VENGEANCE_SOUL_CLEAVE_SPELL_ID,
+		maxStacks = RB.VENGEANCE_SOUL_FRAGMENTS_MAX,
+		visualSegments = RB.VENGEANCE_SOUL_FRAGMENTS_MAX,
+		defaultColor = { 0.35, 0.25, 0.73, 1 },
 		useMaxColorDefault = true,
 		defaultShowSeparator = true,
 	},
@@ -788,6 +801,11 @@ end
 local function getAuraPowerCounts(pType)
 	local cfg = RB.AURA_POWER_CONFIG[pType]
 	if not cfg then return 0, 0, 0 end
+	if cfg.spellCastCountId and C_Spell and C_Spell.GetSpellCastCount then
+		local current = C_Spell.GetSpellCastCount(cfg.spellCastCountId) or 0
+		local maxStacks = tonumber(cfg.maxStacks) or tonumber(cfg.visualSegments) or 0
+		return current or 0, maxStacks, tonumber(cfg.visualSegments) or maxStacks
+	end
 	local state = ensureAuraPowerState(pType)
 	local auraData
 	if state.currentInstance and C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID then
@@ -1385,6 +1403,7 @@ ResourceBars.SHARED_POWER_TYPE_DEFAULT_OVERRIDES = {
 	ICICLES = { textStyle = "CURRENT" },
 	MAELSTROM_WEAPON = { textStyle = "CURRENT" },
 	EBON_MIGHT = { textStyle = "CURRENT" },
+	SOUL_FRAGMENTS_VENGEANCE = { textStyle = "CURRENT" },
 	SOUL_SHARDS = { textStyle = "CURRENT" },
 	TIP_OF_THE_SPEAR = { textStyle = "CURRENT" },
 }
@@ -1421,7 +1440,7 @@ ResourceBars.SHARED_SLOT_ASSIGNMENTS = {
 	},
 	DEMONHUNTER = {
 		[1] = { MAIN = "FURY" },
-		[2] = { MAIN = "FURY" },
+		[2] = { MAIN = "FURY", SECONDARY = "SOUL_FRAGMENTS_VENGEANCE" },
 		[3] = { MAIN = "FURY", SECONDARY = "VOID_METAMORPHOSIS" },
 	},
 }
@@ -1925,6 +1944,41 @@ local function shouldAutoEnableBar(pType, specInfo, selection)
 	return false
 end
 
+function ResourceBars.EnsureVengeanceSoulFragmentsBackfill(class, spec, specCfg)
+	local specNumber = tonumber(spec)
+	if class ~= "DEMONHUNTER" or specNumber ~= 2 or type(specCfg) ~= "table" then return end
+	local soulType = "SOUL_FRAGMENTS_VENGEANCE"
+	local voidType = "VOID_METAMORPHOSIS"
+	local soulCfg = specCfg[soulType]
+	if type(soulCfg) == "table" then return end
+
+	local voidCfg = specCfg[voidType]
+	local voidWasEnabled = type(voidCfg) == "table" and voidCfg.enabled == true
+	local selection = autoEnableSelection()
+	local wantsSecondary = selection and selection.SECONDARY == true
+	if not voidWasEnabled and not wantsSecondary then return end
+
+	local globalCfg = resolveGlobalTemplate(soulType, specNumber)
+	if globalCfg then
+		specCfg[soulType] = CopyTable(globalCfg)
+	elseif type(voidCfg) == "table" then
+		specCfg[soulType] = CopyTable(voidCfg)
+	else
+		specCfg[soulType] = {}
+	end
+
+	ResourceBars.SetRuntimeCfgField(specCfg[soulType], "rbType", soulType)
+	specCfg[soulType].enabled = true
+	if ResourceBars.separatorEligible and ResourceBars.separatorEligible[soulType] then
+		specCfg[soulType].showSeparator = true
+		specCfg[soulType].separatorThickness = specCfg[soulType].separatorThickness or RB.SEPARATOR_THICKNESS
+		specCfg[soulType].separatorColor = specCfg[soulType].separatorColor or RB.SEP_DEFAULT
+	end
+	if ResourceBars.PrepareBarConfigForRuntime then ResourceBars.PrepareBarConfigForRuntime(specCfg[soulType], soulType, powertypeClasses[class] and powertypeClasses[class][specNumber]) end
+
+	if voidWasEnabled and type(voidCfg) == "table" then voidCfg.enabled = false end
+end
+
 ensureSpecCfg = function(specIndex)
 	local class = addon.variables.unitClass
 	local spec = specIndex or addon.variables.unitSpec
@@ -2062,6 +2116,7 @@ ensureSpecCfg = function(specIndex)
 			ResourceBars.EnsureSharedSlotStore(slot)
 		end
 	end
+	ResourceBars.EnsureVengeanceSoulFragmentsBackfill(class, spec, specCfg)
 	maybeAutoEnableRuntime()
 	return specCfg
 end
@@ -4837,7 +4892,10 @@ powertypeClasses = {
 	},
 	DEMONHUNTER = {
 		[1] = { MAIN = "FURY" },
-		[2] = { MAIN = "FURY" },
+		[2] = {
+			MAIN = "FURY",
+			SOUL_FRAGMENTS_VENGEANCE = true,
+		},
 		[3] = {
 			MAIN = "VOID_METAMORPHOSIS",
 			FURY = true,
@@ -4914,6 +4972,7 @@ classPowerTypes = {
 	"HOLY_POWER",
 	"MAELSTROM",
 	"MAELSTROM_WEAPON",
+	"SOUL_FRAGMENTS_VENGEANCE",
 	"VOID_METAMORPHOSIS",
 	"EBON_MIGHT",
 	"CHI",
@@ -4937,6 +4996,7 @@ ResourceBars.separatorEligible = {
 	COMBO_POINTS = true,
 	ICICLES = true,
 	TIP_OF_THE_SPEAR = true,
+	SOUL_FRAGMENTS_VENGEANCE = true,
 	VOID_METAMORPHOSIS = true,
 	MAELSTROM_WEAPON = true,
 	EBON_MIGHT = true,
@@ -5605,17 +5665,83 @@ function updatePowerBar(type, runeSlot)
 			end
 			if desiredSegments and desiredSegments > 0 then visualMax = desiredSegments end
 		end
-		if bar._lastMax ~= visualMax then
-			bar:SetMinMaxValues(0, visualMax)
-			bar._lastMax = visualMax
-		end
+			if bar._lastMax ~= visualMax then
+				bar:SetMinMaxValues(0, visualMax)
+				bar._lastMax = visualMax
+			end
 
-		local style = bar._style or "CURMAX"
-		local smooth = cfg.smoothFill == true
-		local shownStacks = stacks
-		if visualMax and visualMax > 0 then
-			if stacks <= 0 then
-				shownStacks = 0
+			local style = bar._style or "CURMAX"
+			local smooth = cfg.smoothFill == true
+			if cfgDef.spellCastCountId then
+				setBarValue(bar, stacks, smooth)
+				bar._lastVal = stacks
+				if bar.text then
+					if style == "NONE" then
+						if bar._textShown then
+							bar.text:SetText("")
+							bar._lastText = ""
+							bar.text:Hide()
+							bar._textShown = false
+						elseif bar._lastText ~= "" then
+							bar.text:SetText("")
+							bar._lastText = ""
+						end
+					else
+						bar.text:SetText(stacks)
+						bar._lastText = nil
+						if not bar._textShown then
+							bar.text:Show()
+							bar._textShown = true
+						end
+					end
+				end
+
+				bar._baseColor = bar._baseColor or {}
+				if bar._baseColor[1] == nil then
+					local br, bg, bb, ba = bar:GetStatusBarColor()
+					bar._baseColor[1], bar._baseColor[2], bar._baseColor[3], bar._baseColor[4] = br, bg, bb, ba or 1
+				end
+				if cfg.useBarColor then
+					local custom = cfg.barColor or RB.WHITE
+					bar._baseColor[1], bar._baseColor[2], bar._baseColor[3], bar._baseColor[4] = custom[1] or 1, custom[2] or 1, custom[3] or 1, custom[4] or 1
+				elseif cfg.useClassColor == true then
+					local cr, cg, cb, ca = getPlayerClassColor()
+					bar._baseColor[1], bar._baseColor[2], bar._baseColor[3], bar._baseColor[4] = cr, cg, cb, ca or (cfg.barColor and cfg.barColor[4]) or 1
+				elseif ResourceBars.GetRuntimeCfgField(cfg, "resolvedDefaultPowerColor") then
+					local c = ResourceBars.GetRuntimeCfgField(cfg, "resolvedDefaultPowerColor")
+					bar._baseColor[1], bar._baseColor[2], bar._baseColor[3], bar._baseColor[4] = c[1] or 1, c[2] or 1, c[3] or 1, c[4] or 1
+				elseif cfgDef.defaultColor then
+					local c = cfgDef.defaultColor
+					bar._baseColor[1], bar._baseColor[2], bar._baseColor[3], bar._baseColor[4] = c[1] or 1, c[2] or 1, c[3] or 1, c[4] or 1
+				end
+
+				local targetR, targetG, targetB, targetA = bar._baseColor[1] or 1, bar._baseColor[2] or 1, bar._baseColor[3] or 1, bar._baseColor[4] or 1
+				local lc = bar._lastColor or {}
+				if lc[1] ~= targetR or lc[2] ~= targetG or lc[3] ~= targetB or lc[4] ~= targetA then
+					lc[1], lc[2], lc[3], lc[4] = targetR, targetG, targetB, targetA
+					bar._lastColor = lc
+					if ResourceBars.SetStatusBarColorWithGradient then
+						ResourceBars.SetStatusBarColorWithGradient(bar, cfg, lc[1], lc[2], lc[3], lc[4])
+					else
+						bar:SetStatusBarColor(lc[1], lc[2], lc[3], lc[4])
+					end
+				end
+				bar._usingMaxColor = false
+				bar._usingAbsoluteThresholdColor = false
+				bar._usingMaelstromFiveColor = false
+				local usingDiscreteSegments = refreshDiscreteSegmentsForBar(type, bar, cfg, stacks, visualMax, stacks)
+				configureSpecialTexture(bar, type, cfg)
+				if usingDiscreteSegments then
+					setParentBarTextureVisible(bar, false)
+				elseif ResourceBars.RefreshStatusBarGradient then
+					ResourceBars.RefreshStatusBarGradient(bar, cfg)
+				end
+				return
+			end
+			local shownStacks = stacks
+			if visualMax and visualMax > 0 then
+				if stacks <= 0 then
+					shownStacks = 0
 			elseif cfgDef.clampOverflowToMax or cfg.clampOverflowToMax then
 				shownStacks = min(stacks, visualMax)
 			else
@@ -6089,10 +6215,18 @@ refreshDiscreteSegmentsForBar = function(pType, bar, cfg, value, maxValue, rawVa
 		return false
 	end
 
-	local scaledValue = tonumber(value) or 0
-	local sourceMax = tonumber(maxValue) or segments
-	if sourceMax > 0 and sourceMax ~= segments then scaledValue = (scaledValue / sourceMax) * segments end
-	bar._rbDiscreteRawValue = tonumber(rawValue) or tonumber(value) or 0
+	local valueIsSecret = issecretvalue and issecretvalue(value)
+	local scaledValue = value
+	if not valueIsSecret then
+		scaledValue = tonumber(value) or 0
+		local sourceMax = tonumber(maxValue) or segments
+		if sourceMax > 0 and sourceMax ~= segments then scaledValue = (scaledValue / sourceMax) * segments end
+	end
+	if valueIsSecret then
+		bar._rbDiscreteRawValue = nil
+	else
+		bar._rbDiscreteRawValue = tonumber(rawValue) or tonumber(value) or 0
+	end
 
 	if ResourceBars.UpdateDiscreteSegments then
 		local separatorThickness = (cfg and cfg.showSeparator == true and ((cfg and cfg.separatorThickness) or RB.SEPARATOR_THICKNESS)) or 0
@@ -8055,7 +8189,8 @@ function ResourceBars.RefreshBarsAfterPlayerStateChange(reason)
 	end
 end
 
-local function eventHandler(self, event, unit, arg1)
+local function eventHandler(self, event, eventArg1, eventArg2)
+	local unit = eventArg1
 	if event == "ADDON_LOADED" then
 		local anchorHelper = ResourceBars.GetAnchorHelper and ResourceBars.GetAnchorHelper()
 		if anchorHelper and anchorHelper.HandleAddonLoaded then anchorHelper:HandleAddonLoaded(unit) end
@@ -8151,7 +8286,7 @@ local function eventHandler(self, event, unit, arg1)
 			finalizeShapeshiftLayout()
 		end
 	elseif event == "UNIT_AURA" and unit == "player" then
-		local info = arg1
+		local info = eventArg2
 
 		if not info or info.isFullUpdate then
 			resetAuraTracking()
@@ -8170,6 +8305,13 @@ local function eventHandler(self, event, unit, arg1)
 		end
 		updateStaggerBarIfShown()
 		return
+	elseif event == "SPELL_UPDATE_USES" then
+		if addon.variables.unitClass ~= "DEMONHUNTER" or tonumber(addon.variables.unitSpec) ~= 2 then return end
+		local spellId = tonumber(eventArg1)
+		local baseSpellId = tonumber(eventArg2)
+		if spellId ~= RB.VENGEANCE_SOUL_CLEAVE_SPELL_ID and baseSpellId ~= RB.VENGEANCE_SOUL_CLEAVE_BASE_SPELL_ID then return end
+		if powerbar["SOUL_FRAGMENTS_VENGEANCE"] and powerbar["SOUL_FRAGMENTS_VENGEANCE"]:IsShown() then updatePowerBar("SOUL_FRAGMENTS_VENGEANCE") end
+		return
 	elseif event == "UNIT_MAXHEALTH" or event == "UNIT_HEALTH" or event == "UNIT_MAX_HEALTH_MODIFIERS_CHANGED" or event == "UNIT_ABSORB_AMOUNT_CHANGED" or event == "UNIT_HEAL_ABSORB_AMOUNT_CHANGED" then
 		if healthBar and healthBar:IsShown() then
 			if event == "UNIT_MAXHEALTH" then
@@ -8180,10 +8322,10 @@ local function eventHandler(self, event, unit, arg1)
 			updateHealthBar(event)
 		end
 		updateStaggerBarIfShown()
-	elseif event == "UNIT_POWER_UPDATE" and powerbar[arg1] and powerbar[arg1]:IsShown() and not powerfrequent[arg1] then
-		updatePowerBar(arg1)
-	elseif event == "UNIT_POWER_FREQUENT" and powerbar[arg1] and powerbar[arg1]:IsShown() and powerfrequent[arg1] then
-		updatePowerBar(arg1)
+	elseif event == "UNIT_POWER_UPDATE" and powerbar[eventArg2] and powerbar[eventArg2]:IsShown() and not powerfrequent[eventArg2] then
+		updatePowerBar(eventArg2)
+	elseif event == "UNIT_POWER_FREQUENT" and powerbar[eventArg2] and powerbar[eventArg2]:IsShown() and powerfrequent[eventArg2] then
+		updatePowerBar(eventArg2)
 	elseif event == "UNIT_POWER_POINT_CHARGE" then
 		local comboBar = powerbar["COMBO_POINTS"]
 		if comboBar and comboBar:IsShown() then
@@ -8194,18 +8336,18 @@ local function eventHandler(self, event, unit, arg1)
 			updateBarSeparators("COMBO_POINTS", comboCfg)
 			updateBarThresholds("COMBO_POINTS", comboCfg)
 		end
-	elseif event == "UNIT_MAXPOWER" and powerbar[arg1] and powerbar[arg1]:IsShown() then
-		local enum = POWER_ENUM[arg1]
-		local bar = powerbar[arg1]
+	elseif event == "UNIT_MAXPOWER" and powerbar[eventArg2] and powerbar[eventArg2]:IsShown() then
+		local enum = POWER_ENUM[eventArg2]
+		local bar = powerbar[eventArg2]
 		if enum and bar then
-			local useRaw = ResourceBars.ShouldUseRawPowerValues(arg1)
+			local useRaw = ResourceBars.ShouldUseRawPowerValues(eventArg2)
 			local max = UnitPowerMax("player", enum, useRaw)
 			bar._lastMax = max
 			bar._lastMaxRaw = useRaw
 			bar:SetMinMaxValues(0, max)
 		end
-		updatePowerBar(arg1)
-		if ResourceBars.separatorEligible[arg1] then updateBarSeparators(arg1) end
+		updatePowerBar(eventArg2)
+		if ResourceBars.separatorEligible[eventArg2] then updateBarSeparators(eventArg2) end
 	elseif event == "RUNE_POWER_UPDATE" then
 		-- payload: runeIndex, isEnergize -> first vararg is held in 'unit' here
 		if powerbar["RUNES"] and powerbar["RUNES"]:IsShown() then updatePowerBar("RUNES", unit) end
@@ -8248,6 +8390,7 @@ function ResourceBars.EnableResourceBars()
 	frameAnchor:RegisterEvent("PET_BATTLE_OPENING_START")
 	frameAnchor:RegisterEvent("PET_BATTLE_CLOSE")
 	frameAnchor:RegisterEvent("ADDON_LOADED")
+	if addon.variables.unitClass == "DEMONHUNTER" then frameAnchor:RegisterEvent("SPELL_UPDATE_USES") end
 	if frameAnchor.RegisterUnitEvent then
 		frameAnchor:RegisterUnitEvent("UNIT_SPELLCAST_START", "player")
 		frameAnchor:RegisterUnitEvent("UNIT_SPELLCAST_STOP", "player")

@@ -997,14 +997,21 @@ function ResourceBars.UpdateDiscreteSegments(bar, cfg, count, value, color, text
 	local texPath = texturePath or "Interface\\Buttons\\WHITE8x8"
 	local segmentBgPath, segmentBgR, segmentBgG, segmentBgB, segmentBgA, segmentBgVisible = resolveDiscreteSegmentBackground(cfg, texPath, dimR, dimG, dimB, dimA)
 	local bgColorKey = segmentBgR .. ":" .. segmentBgG .. ":" .. segmentBgB .. ":" .. segmentBgA
-	local clamped = tonumber(value) or 0
-	if clamped < 0 then
-		clamped = 0
-	elseif clamped > count then
-		clamped = count
+	local valueIsSecret = issecretvalue and issecretvalue(value)
+	local clamped = 0
+	if not valueIsSecret then
+		clamped = tonumber(value) or 0
+		if clamped < 0 then
+			clamped = 0
+		elseif clamped > count then
+			clamped = count
+		end
 	end
-	local useMaelstromCarryFill, carryOverflow, carryR, carryG, carryB, carryA = resolveMaelstromCarryMode(bar, cfg, count, clamped)
-	if useMaelstromCarryFill then clamped = count end
+	local useMaelstromCarryFill, carryOverflow, carryR, carryG, carryB, carryA
+	if not valueIsSecret then
+		useMaelstromCarryFill, carryOverflow, carryR, carryG, carryB, carryA = resolveMaelstromCarryMode(bar, cfg, count, clamped)
+		if useMaelstromCarryFill then clamped = count end
+	end
 	local chargedStyleActive = bar and bar._rbType == "COMBO_POINTS" and addon and addon.variables and addon.variables.unitClass == "ROGUE" and (cfg and cfg.useChargedComboStyling ~= false)
 	local chargedFillActive = chargedStyleActive and (cfg.chargedComboAffectFill ~= false)
 	local chargedBgActive = chargedStyleActive and (cfg.chargedComboAffectBackground ~= false)
@@ -1038,11 +1045,14 @@ function ResourceBars.UpdateDiscreteSegments(bar, cfg, count, value, color, text
 		if sb then
 			local logicalIndex = reverse and (count - physicalIndex + 1) or physicalIndex
 			local isChargedPoint = type(chargedPoints) == "table" and chargedPoints[logicalIndex] == true
-			local segmentValue = clamped - (logicalIndex - 1)
-			if segmentValue < 0 then
-				segmentValue = 0
-			elseif segmentValue > 1 then
-				segmentValue = 1
+			local segmentValue
+			if not valueIsSecret then
+				segmentValue = clamped - (logicalIndex - 1)
+				if segmentValue < 0 then
+					segmentValue = 0
+				elseif segmentValue > 1 then
+					segmentValue = 1
+				end
 			end
 
 			local textureReset = ensureStatusBarTexturePath(sb, texPath)
@@ -1106,12 +1116,17 @@ function ResourceBars.UpdateDiscreteSegments(bar, cfg, count, value, color, text
 				ResourceBars.RefreshStatusBarGradient(sb, cfg, segmentR, segmentG, segmentB, segmentA)
 			end
 
-			sb:SetMinMaxValues(0, 1)
-			local pixel = getPixelHelper()
-			if pixel and pixel.SetStatusBarValue then
-				pixel.SetStatusBarValue(sb, segmentValue, false, true)
+			if valueIsSecret then
+				sb:SetMinMaxValues(logicalIndex - 1, logicalIndex)
+				sb:SetValue(value)
 			else
-				sb:SetValue(segmentValue)
+				sb:SetMinMaxValues(0, 1)
+				local pixel = getPixelHelper()
+				if pixel and pixel.SetStatusBarValue then
+					pixel.SetStatusBarValue(sb, segmentValue, false, true)
+				else
+					sb:SetValue(segmentValue)
+				end
 			end
 			if not sb:IsShown() then sb:Show() end
 		end

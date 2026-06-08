@@ -1,6 +1,7 @@
 # Changelog
 
 ## [11.1.0-beta4] - 2026-06-08
+- Resource Bars: Added Vengeance Demon Hunter Soul Fragments tracking for the Secondary resource bar.
 
 ### 🐛 Fixed
 
