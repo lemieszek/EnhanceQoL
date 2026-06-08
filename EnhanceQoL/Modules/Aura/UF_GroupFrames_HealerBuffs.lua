@@ -2124,6 +2124,11 @@ local function hideExpirationPulseBorder(btn)
 	if border then border:Hide() end
 end
 
+local function shouldHideCooldownText(btn, group)
+	if btn and btn._hbHideCooldownTextEffective ~= nil then return btn._hbHideCooldownTextEffective == true end
+	return group and group.hideCooldownText == true or false
+end
+
 local EXPIRATION_PULSE_INTERVAL = 0.05
 
 local function getAuraRemaining(aura, now)
@@ -2143,7 +2148,7 @@ local function clearExpirationPulse(btn, group)
 	btn._hbExpirationPulseElapsed = nil
 	if btn.SetScript and (not btn.GetScript or btn:GetScript("OnUpdate") == btn._hbExpirationPulseOnUpdate) then btn:SetScript("OnUpdate", nil) end
 	hideExpirationPulseBorder(btn)
-	if btn.cd and btn.cd.SetHideCountdownNumbers then btn.cd:SetHideCountdownNumbers(group and group.hideCooldownText == true or false) end
+	if btn.cd and btn.cd.SetHideCountdownNumbers then btn.cd:SetHideCountdownNumbers(shouldHideCooldownText(btn, group)) end
 	applyIndicatorBorder(btn, group)
 end
 
@@ -2197,7 +2202,7 @@ local function updateExpirationPulseButton(btn)
 	end
 	local inPulse = remaining <= threshold
 	if btn.cd and btn.cd.SetHideCountdownNumbers then
-		btn.cd:SetHideCountdownNumbers((group.hideCooldownText == true) or (btn._hbExpirationPulseCountdownOnly == true and not inPulse))
+		btn.cd:SetHideCountdownNumbers(shouldHideCooldownText(btn, group) or (btn._hbExpirationPulseCountdownOnly == true and not inPulse))
 	end
 	if not inPulse then
 		hideExpirationPulseBorder(btn)
@@ -2541,6 +2546,7 @@ local function renderIconStyleForGroup(btn, st, state, compiled, cfg, group, cha
 		local button = buttons[index]
 		if not button then button = AuraUtil.ensureAuraButton(container, buttons, index, style) end
 		if not button then break end
+		button._hbHideCooldownTextEffective = style.showCooldownText == false or group.hideCooldownText == true
 		button._tooltipUseEditMode = style.tooltipUseEditMode == true
 		button._tooltipAnchor = style.tooltipAnchor or "ANCHOR_BOTTOMRIGHT"
 		local drawCooldownSwipe = style.showCooldownSwipe ~= false
