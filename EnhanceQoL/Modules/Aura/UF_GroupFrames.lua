@@ -287,11 +287,12 @@ function GF.GetDynamicContentScale(self, cfg)
 	local kind = self._eqolGroupKind or "party"
 	cfg = cfg or self._eqolCfg or getCfg(kind)
 	local amount = GF.GetDynamicContentScaleAmount(cfg)
-	if kind ~= "raid" or amount <= 0 then return 1 end
+	if kind ~= "raid" then return 1 end
 	local parent = self.GetParent and self:GetParent() or nil
 	local fitScale = tonumber(self._eqolFitScale)
 	if not (fitScale and fitScale > 0 and fitScale < 1) then fitScale = tonumber(parent and parent._eqolFitScale) end
 	if fitScale and fitScale > 0 and fitScale < 1 then return fitScale + ((1 - fitScale) * amount) end
+	if amount <= 0 then return 1 end
 	local inverseScale = 1
 	local ownScale = self.GetScale and self:GetScale() or 1
 	ownScale = tonumber(ownScale) or 1
