@@ -1,6 +1,10 @@
 # Changelog
 
 ## [11.1.0-beta4] - 2026-06-08
+
+### ✨ Added
+
+- Unit Frames / Group Frames: Added an optional Data Bar for party, raid, main tank, and main assist frames with position, color, texture, font, and health text slot settings.
 - Resource Bars: Added Vengeance Demon Hunter Soul Fragments tracking for the Secondary resource bar.
 
 ### 🐛 Fixed

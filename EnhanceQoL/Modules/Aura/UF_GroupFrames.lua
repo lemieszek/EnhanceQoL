@@ -2314,6 +2314,14 @@ local function setTextSlot(st, fs, cacheKey, mode, cur, maxv, useShort, percentV
 	end
 end
 
+function GF.ClearDataBarText(st)
+	if not st then return end
+	if st.dataBarTextLeft then st.dataBarTextLeft:SetText("") end
+	if st.dataBarTextCenter then st.dataBarTextCenter:SetText("") end
+	if st.dataBarTextRight then st.dataBarTextRight:SetText("") end
+	st._lastDataBarTextLeft, st._lastDataBarTextCenter, st._lastDataBarTextRight = nil, nil, nil
+end
+
 local function normalizeTextMode(value)
 	if value == "CURPERCENTDASH" then return "CURPERCENT" end
 	return value
@@ -2475,6 +2483,33 @@ function GF._createHealerBuffPlacementDefaults()
 		groupOrder = {},
 		rulesById = {},
 		ruleOrder = {},
+	}
+end
+
+function GF.CreateDataBarDefaults()
+	return {
+		enabled = false,
+		position = "BELOW",
+		height = 16,
+		gap = 0,
+		color = { 0.18, 0.18, 0.22, 1 },
+		useClassColor = false,
+		textLeft = "NAME",
+		textCenter = "CURMAX",
+		textRight = "PERCENT",
+		textDelimiter = " ",
+		textDelimiterSecondary = " ",
+		textDelimiterTertiary = " ",
+		fontSize = 12,
+		font = "__EQOL_GLOBAL_FONT__",
+		fontOutline = "OUTLINE",
+		textColor = { 1, 1, 1, 1 },
+		offsetLeft = { x = 6, y = 0 },
+		offsetCenter = { x = 0, y = 0 },
+		offsetRight = { x = -6, y = 0 },
+		useShortNumbers = true,
+		hidePercentSymbol = false,
+		texture = "SOLID",
 	}
 end
 
@@ -2921,6 +2956,7 @@ local DEFAULTS = {
 			useCustomColor = false,
 			useShortNumbers = true,
 		},
+		dataBar = GF.CreateDataBarDefaults(),
 		height = 100,
 		hideInClientScene = true,
 		highlight = {
@@ -3732,6 +3768,7 @@ local DEFAULTS = {
 			useCustomColor = false,
 			useShortNumbers = true,
 		},
+		dataBar = GF.CreateDataBarDefaults(),
 		height = 100,
 		hideInClientScene = true,
 		highlight = {
@@ -6492,6 +6529,15 @@ function GF:BuildButton(self)
 	applyBarBackdrop(st.power, pcfg, { textureKey = powerTexKey })
 	if st.power.SetStatusBarDesaturated then st.power:SetStatusBarDesaturated(true) end
 
+	if not st.dataBar then
+		st.dataBar = CreateFrame("StatusBar", nil, st.barGroup, "BackdropTemplate")
+		st.dataBar:SetMinMaxValues(0, 1)
+		GF.SetStatusBarValue(st.dataBar, 1, false, true)
+		if st.dataBar.SetStatusBarDesaturated then st.dataBar:SetStatusBarDesaturated(false) end
+		st.dataBar:Hide()
+	end
+	if st.dataBar.GetParent and st.dataBar:GetParent() ~= st.barGroup then st.dataBar:SetParent(st.barGroup) end
+
 	if not st.healthTextLayer then
 		st.healthTextLayer = CreateFrame("Frame", nil, st.health)
 		st.healthTextLayer:SetAllPoints(st.health)
@@ -6500,6 +6546,13 @@ function GF:BuildButton(self)
 		st.powerTextLayer = CreateFrame("Frame", nil, st.power)
 		st.powerTextLayer:SetAllPoints(st.power)
 	end
+	if not st.dataBarTextLayer then
+		st.dataBarTextLayer = CreateFrame("Frame", nil, st.dataBar)
+		st.dataBarTextLayer:SetAllPoints(st.dataBar)
+	end
+	if st.dataBarTextLayer.GetParent and st.dataBarTextLayer:GetParent() ~= st.dataBar then st.dataBarTextLayer:SetParent(st.dataBar) end
+	st.dataBarTextLayer:ClearAllPoints()
+	st.dataBarTextLayer:SetAllPoints(st.dataBar)
 	local textOverlayParent = st.layoutAnchor or st.barGroup or st.health or self
 	local nameTextLayer = GF.EnsureTextOverlayLayer(st, "nameTextLayer", textOverlayParent)
 	local levelTextLayer = GF.EnsureTextOverlayLayer(st, "levelTextLayer", textOverlayParent)
@@ -6517,6 +6570,9 @@ function GF:BuildButton(self)
 	if not st.powerTextLeft then st.powerTextLeft = st.powerTextLayer:CreateFontString(nil, "OVERLAY", "GameFontHighlight") end
 	if not st.powerTextCenter then st.powerTextCenter = st.powerTextLayer:CreateFontString(nil, "OVERLAY", "GameFontHighlight") end
 	if not st.powerTextRight then st.powerTextRight = st.powerTextLayer:CreateFontString(nil, "OVERLAY", "GameFontHighlight") end
+	if not st.dataBarTextLeft then st.dataBarTextLeft = st.dataBarTextLayer:CreateFontString(nil, "OVERLAY", "GameFontHighlight") end
+	if not st.dataBarTextCenter then st.dataBarTextCenter = st.dataBarTextLayer:CreateFontString(nil, "OVERLAY", "GameFontHighlight") end
+	if not st.dataBarTextRight then st.dataBarTextRight = st.dataBarTextLayer:CreateFontString(nil, "OVERLAY", "GameFontHighlight") end
 
 	if not st.nameText then st.nameText = nameTextLayer:CreateFontString(nil, "OVERLAY", "GameFontHighlight") end
 	if st.nameText.GetParent and st.nameText:GetParent() ~= nameTextLayer then st.nameText:SetParent(nameTextLayer) end
@@ -6631,6 +6687,10 @@ function GF:BuildButton(self)
 		UFHelper.applyFont(st.powerTextLeft, pcfg.font, pcfg.fontSize or 10, pcfg.fontOutline)
 		UFHelper.applyFont(st.powerTextCenter, pcfg.font, pcfg.fontSize or 10, pcfg.fontOutline)
 		UFHelper.applyFont(st.powerTextRight, pcfg.font, pcfg.fontSize or 10, pcfg.fontOutline)
+		local dbc = cfg.dataBar or {}
+		UFHelper.applyFont(st.dataBarTextLeft, dbc.font, dbc.fontSize or 12, dbc.fontOutline)
+		UFHelper.applyFont(st.dataBarTextCenter, dbc.font, dbc.fontSize or 12, dbc.fontOutline)
+		UFHelper.applyFont(st.dataBarTextRight, dbc.font, dbc.fontSize or 12, dbc.fontOutline)
 		UFHelper.applyFont(st.nameText, tc.font or hc.font, tc.fontSize or hc.fontSize or 12, tc.fontOutline or hc.fontOutline)
 	end
 
@@ -6664,12 +6724,15 @@ function GF:LayoutButton(self)
 	local def = DEFAULTS[kind] or {}
 	local hc = cfg.health or {}
 	local pcfg = cfg.power or {}
+	local dbc = cfg.dataBar or {}
 	local defH = def.health or {}
+	local defDB = def.dataBar or {}
 	local healthBackdropClampToFill = (hc.backdrop and hc.backdrop.clampToFill)
 	if healthBackdropClampToFill == nil then healthBackdropClampToFill = defH.backdrop and defH.backdrop.clampToFill end
 	if healthBackdropClampToFill == nil then healthBackdropClampToFill = false end
 	local healthTexKey = getEffectiveBarTexture(cfg, hc)
 	local powerTexKey = getEffectiveBarTexture(cfg, pcfg)
+	local dataBarTexKey = dbc.texture or defDB.texture or "SOLID"
 	local contentScale = GF.GetDynamicContentScale(self, cfg)
 
 	local scale = GFH.GetEffectiveScale(self)
@@ -6688,6 +6751,15 @@ function GF:LayoutButton(self)
 	powerH = roundToEvenPixel(max(0, powerH), scale)
 	if not powerDetachedRequested and powerH > availH then powerH = availH end
 	local powerDetached = powerDetachedRequested and powerH > 0
+	local dataBarEnabled = dbc.enabled == true
+	local dataBarH = dataBarEnabled and clampNumber(dbc.height, 1, availH, defDB.height or 16) or 0
+	local dataBarGap = dataBarEnabled and clampNumber(dbc.gap, -20, 40, defDB.gap or 0) or 0
+	dataBarH = roundToEvenPixel(dataBarH, scale)
+	dataBarGap = roundToPixel(dataBarGap, scale)
+	local dataBarSpace = dataBarEnabled and max(0, dataBarH + dataBarGap) or 0
+	if dataBarSpace > availH - 1 then dataBarSpace = max(0, availH - 1) end
+	local dataBarPosition = tostring(dbc.position or defDB.position or "BELOW"):upper()
+	if dataBarPosition ~= "ABOVE" then dataBarPosition = "BELOW" end
 
 	local portraitEnabled, portraitSide, portraitSquareBackground, portraitBorderWithFrame = GF.ResolveGroupPortraitConfig(cfg, kind)
 	local portraitDetached, portraitDetachedX, portraitDetachedY, portraitDetachedSize = GF.ResolveGroupPortraitDetachedConfig(cfg, kind)
@@ -6728,7 +6800,9 @@ function GF:LayoutButton(self)
 		contentOffsetRight = (portraitEnabled and portraitSide == "RIGHT") and portraitSpace or 0
 	end
 
-	local healthBottomOffset = powerDetached and 0 or roundToPixel(powerH, scale)
+	local bottomDataBarSpace = dataBarEnabled and dataBarPosition == "BELOW" and dataBarSpace or 0
+	local topDataBarSpace = dataBarEnabled and dataBarPosition == "ABOVE" and dataBarSpace or 0
+	local healthBottomOffset = (powerDetached and 0 or roundToPixel(powerH, scale)) + bottomDataBarSpace
 
 	st.barGroup:ClearAllPoints()
 	if portraitInsideFrame and portraitSpace > 0 then
@@ -6765,8 +6839,33 @@ function GF:LayoutButton(self)
 		st.power:SetHeight(powerH)
 	end
 
+	if st.dataBar then
+		st.dataBar:ClearAllPoints()
+		if dataBarEnabled and dataBarH > 0 then
+			if Pixel and Pixel.SetHeight then
+				Pixel.SetHeight(st.dataBar, dataBarH)
+			else
+				st.dataBar:SetHeight(dataBarH)
+			end
+			if dataBarPosition == "ABOVE" then
+				st.dataBar:SetPoint("TOPLEFT", st.barGroup, "TOPLEFT", contentOffsetLeft, 0)
+				st.dataBar:SetPoint("TOPRIGHT", st.barGroup, "TOPRIGHT", -contentOffsetRight, 0)
+			else
+				st.dataBar:SetPoint("BOTTOMLEFT", st.barGroup, "BOTTOMLEFT", contentOffsetLeft, 0)
+				st.dataBar:SetPoint("BOTTOMRIGHT", st.barGroup, "BOTTOMRIGHT", -contentOffsetRight, 0)
+			end
+			st.dataBar:Show()
+		else
+			st.dataBar:Hide()
+			if st.dataBarTextLeft then st.dataBarTextLeft:SetText("") end
+			if st.dataBarTextCenter then st.dataBarTextCenter:SetText("") end
+			if st.dataBarTextRight then st.dataBarTextRight:SetText("") end
+			st._lastDataBarTextLeft, st._lastDataBarTextCenter, st._lastDataBarTextRight = nil, nil, nil
+		end
+	end
+
 	st.health:ClearAllPoints()
-	st.health:SetPoint("TOPLEFT", st.barGroup, "TOPLEFT", contentOffsetLeft, 0)
+	st.health:SetPoint("TOPLEFT", st.barGroup, "TOPLEFT", contentOffsetLeft, -topDataBarSpace)
 	st.health:SetPoint("BOTTOMRIGHT", st.barGroup, "BOTTOMRIGHT", -contentOffsetRight, healthBottomOffset)
 	if st.tempMaxHealthLoss then
 		if st.tempMaxHealthLoss.GetParent and st.tempMaxHealthLoss:GetParent() ~= st.health then st.tempMaxHealthLoss:SetParent(st.health) end
@@ -6777,6 +6876,18 @@ function GF:LayoutButton(self)
 	if tempMaxHealthLossEnabled == nil then tempMaxHealthLossEnabled = defH.tempMaxHealthLossEnabled ~= false end
 	applyBarBackdrop(st.health, hc, { clampToFill = healthBackdropClampToFill == true, textureKey = healthTexKey })
 	applyBarBackdrop(st.power, pcfg, { textureKey = powerTexKey })
+	if st.dataBar and st.dataBar.SetStatusBarTexture and UFHelper and UFHelper.resolveTexture then
+		if st._lastDataBarTexture ~= dataBarTexKey then
+			if Pixel and Pixel.SetStatusBarTexture then
+				Pixel.SetStatusBarTexture(st.dataBar, UFHelper.resolveTexture(dataBarTexKey))
+			else
+				st.dataBar:SetStatusBarTexture(UFHelper.resolveTexture(dataBarTexKey))
+			end
+			st._lastDataBarTexture = dataBarTexKey
+			stabilizeStatusBarTexture(st.dataBar)
+		end
+	end
+	if st.dataBar then applyBarBackdrop(st.dataBar, { backdrop = { enabled = false }, texture = dataBarTexKey }, { textureKey = dataBarTexKey }) end
 
 	if powerDetached then
 		local powerOffset = pcfg.offset or EMPTY
@@ -6811,8 +6922,8 @@ function GF:LayoutButton(self)
 			st.power:SetFrameLevel(powerLevel)
 		end
 	else
-		st.power:SetPoint("BOTTOMLEFT", st.barGroup, "BOTTOMLEFT", contentOffsetLeft, 0)
-		st.power:SetPoint("BOTTOMRIGHT", st.barGroup, "BOTTOMRIGHT", -contentOffsetRight, 0)
+		st.power:SetPoint("BOTTOMLEFT", st.barGroup, "BOTTOMLEFT", contentOffsetLeft, bottomDataBarSpace)
+		st.power:SetPoint("BOTTOMRIGHT", st.barGroup, "BOTTOMRIGHT", -contentOffsetRight, bottomDataBarSpace)
 		if st.power.SetFrameStrata and st.barGroup.GetFrameStrata then st.power:SetFrameStrata(st.barGroup:GetFrameStrata()) end
 		if st.power.SetFrameLevel and st.health.GetFrameLevel then st.power:SetFrameLevel(GF.ClampFrameLevel((st.health:GetFrameLevel() or 0) + 1)) end
 	end
@@ -6942,6 +7053,10 @@ function GF:LayoutButton(self)
 		GF.ApplyScaledFont(self, st.powerTextLeft, pcfgLocal.font, pcfgLocal.fontSize or 10, pcfgLocal.fontOutline, cfg)
 		GF.ApplyScaledFont(self, st.powerTextCenter, pcfgLocal.font, pcfgLocal.fontSize or 10, pcfgLocal.fontOutline, cfg)
 		GF.ApplyScaledFont(self, st.powerTextRight, pcfgLocal.font, pcfgLocal.fontSize or 10, pcfgLocal.fontOutline, cfg)
+		local dbcLocal = cfg.dataBar or {}
+		GF.ApplyScaledFont(self, st.dataBarTextLeft, dbcLocal.font, dbcLocal.fontSize or 12, dbcLocal.fontOutline, cfg)
+		GF.ApplyScaledFont(self, st.dataBarTextCenter, dbcLocal.font, dbcLocal.fontSize or 12, dbcLocal.fontOutline, cfg)
+		GF.ApplyScaledFont(self, st.dataBarTextRight, dbcLocal.font, dbcLocal.fontSize or 12, dbcLocal.fontOutline, cfg)
 		if st.statusText then
 			local scfg = cfg.status or {}
 			local us = scfg.unitStatus or {}
@@ -6954,6 +7069,7 @@ function GF:LayoutButton(self)
 	end
 	layoutTexts(st.health, st.healthTextLeft, st.healthTextCenter, st.healthTextRight, GF.GetScaledBarTextConfig(cfg.health, contentScale), scale, layoutAnchor or st.health)
 	layoutTexts(st.power, st.powerTextLeft, st.powerTextCenter, st.powerTextRight, GF.GetScaledBarTextConfig(cfg.power, contentScale), scale)
+	layoutTexts(st.dataBar, st.dataBarTextLeft, st.dataBarTextCenter, st.dataBarTextRight, GF.GetScaledBarTextConfig(cfg.dataBar, contentScale), scale)
 	if st.statusText then
 		local scfg = cfg.status or {}
 		local us = scfg.unitStatus or {}
@@ -7338,6 +7454,26 @@ function GF:LayoutButton(self)
 			if st.healthTextLeft then st.healthTextLeft:SetTextColor(r, g, b, a) end
 			if st.healthTextCenter then st.healthTextCenter:SetTextColor(r, g, b, a) end
 			if st.healthTextRight then st.healthTextRight:SetTextColor(r, g, b, a) end
+		end
+	end
+
+	if st.dataBar then
+		local dbR, dbG, dbB, dbA
+		if dbc.useClassColor == true and GF:EnsureUnitClassColor(self, st, getUnit(self)) then
+			dbR, dbG, dbB, dbA = st._classR, st._classG, st._classB, st._classA or 1
+		else
+			dbR, dbG, dbB, dbA = unpackColor(dbc.color, defDB.color or { 0.18, 0.18, 0.22, 1 })
+		end
+		if st._lastDataBarR ~= dbR or st._lastDataBarG ~= dbG or st._lastDataBarB ~= dbB or st._lastDataBarA ~= dbA then
+			st._lastDataBarR, st._lastDataBarG, st._lastDataBarB, st._lastDataBarA = dbR, dbG, dbB, dbA
+			st.dataBar:SetStatusBarColor(dbR, dbG, dbB, dbA or 1)
+		end
+		local tr, tg, tb, ta = unpackColor(dbc.textColor, defDB.textColor or GFH.COLOR_WHITE)
+		if st._lastDataBarTextR ~= tr or st._lastDataBarTextG ~= tg or st._lastDataBarTextB ~= tb or st._lastDataBarTextA ~= ta then
+			st._lastDataBarTextR, st._lastDataBarTextG, st._lastDataBarTextB, st._lastDataBarTextA = tr, tg, tb, ta
+			if st.dataBarTextLeft then st.dataBarTextLeft:SetTextColor(tr, tg, tb, ta) end
+			if st.dataBarTextCenter then st.dataBarTextCenter:SetTextColor(tr, tg, tb, ta) end
+			if st.dataBarTextRight then st.dataBarTextRight:SetTextColor(tr, tg, tb, ta) end
 		end
 	end
 
@@ -10711,6 +10847,7 @@ function GF:UpdateHealthValue(self, unit, st)
 			GF.SetStatusBarValue(st.tempMaxHealthLoss, 0, false, true)
 			st.tempMaxHealthLoss:Hide()
 		end
+		GF.ClearDataBarText(st)
 		return
 	end
 
@@ -11010,6 +11147,12 @@ function GF:UpdateHealthValue(self, unit, st)
 	local centerMode = (hc.textCenter ~= nil) and hc.textCenter or defH.textCenter or "NONE"
 	local rightMode = (hc.textRight ~= nil) and hc.textRight or defH.textRight or "NONE"
 	local hasText = (leftMode ~= "NONE") or (centerMode ~= "NONE") or (rightMode ~= "NONE")
+	local dbc = cfg and cfg.dataBar or {}
+	local defDB = (DEFAULTS[kind] and DEFAULTS[kind].dataBar) or {}
+	local dbLeft = dbc.textLeft or defDB.textLeft or "NONE"
+	local dbCenter = dbc.textCenter or defDB.textCenter or "NONE"
+	local dbRight = dbc.textRight or defDB.textRight or "NONE"
+	local dataBarHasText = dbc.enabled == true and ((dbLeft ~= "NONE") or (dbCenter ~= "NONE") or (dbRight ~= "NONE"))
 	local scfg = cfg and cfg.status or {}
 	local us = scfg.unitStatus or {}
 	local hideTextOffline = us.hideHealthTextWhenOffline == true
@@ -11021,6 +11164,7 @@ function GF:UpdateHealthValue(self, unit, st)
 		if st.healthTextRight then st.healthTextRight:SetText("") end
 		st._lastHealthTextLeft, st._lastHealthTextCenter, st._lastHealthTextRight = nil, nil, nil
 		st._nextHealthTextUpdateAt = nil
+		GF.ClearDataBarText(st)
 		return
 	end
 	if isDead == true then
@@ -11029,9 +11173,10 @@ function GF:UpdateHealthValue(self, unit, st)
 		if st.healthTextRight then st.healthTextRight:SetText("") end
 		st._lastHealthTextLeft, st._lastHealthTextCenter, st._lastHealthTextRight = nil, nil, nil
 		st._nextHealthTextUpdateAt = nil
+		GF.ClearDataBarText(st)
 		return
 	end
-	if hasText and (st.healthTextLeft or st.healthTextCenter or st.healthTextRight) then
+	if (hasText or dataBarHasText) and (st.healthTextLeft or st.healthTextCenter or st.healthTextRight or st.dataBarTextLeft or st.dataBarTextCenter or st.dataBarTextRight) then
 		local allowSecretText = secretHealth and addon.variables and addon.variables.isMidnight
 		if secretHealth and not allowSecretText then
 			if st.healthTextLeft then st.healthTextLeft:SetText("") end
@@ -11039,6 +11184,7 @@ function GF:UpdateHealthValue(self, unit, st)
 			if st.healthTextRight then st.healthTextRight:SetText("") end
 			st._lastHealthTextLeft, st._lastHealthTextCenter, st._lastHealthTextRight = nil, nil, nil
 			st._nextHealthTextUpdateAt = nil
+			GF.ClearDataBarText(st)
 		else
 			local allowTextRefresh = true
 			if secretHealth then
@@ -11095,6 +11241,33 @@ function GF:UpdateHealthValue(self, unit, st)
 					missingValue
 				)
 				setTextSlot(st, st.healthTextRight, "_lastHealthTextRight", rightMode, cur, maxv, useShort, percentVal, delimiter, delimiter2, delimiter3, hidePercentSymbol, levelText, missingValue)
+				if dbc.enabled == true and st.dataBar and st.dataBar:IsShown() then
+					local dbDelimiter = (UFHelper and UFHelper.getTextDelimiter and UFHelper.getTextDelimiter(dbc, defDB)) or (dbc.textDelimiter or defDB.textDelimiter or " ")
+					local dbDelimiter2 = (UFHelper and UFHelper.getTextDelimiterSecondary and UFHelper.getTextDelimiterSecondary(dbc, defDB, dbDelimiter))
+						or (dbc.textDelimiterSecondary or defDB.textDelimiterSecondary or dbDelimiter)
+					local dbDelimiter3 = (UFHelper and UFHelper.getTextDelimiterTertiary and UFHelper.getTextDelimiterTertiary(dbc, defDB, dbDelimiter, dbDelimiter2))
+						or (dbc.textDelimiterTertiary or defDB.textDelimiterTertiary or dbDelimiter2)
+					local dbUseShort = dbc.useShortNumbers ~= false
+					local dbHidePercentSymbol = dbc.hidePercentSymbol == true
+					local dbPercentVal = percentVal
+					if UFHelper and dbPercentVal == nil and (UFHelper.textModeUsesPercent(dbLeft) or UFHelper.textModeUsesPercent(dbCenter) or UFHelper.textModeUsesPercent(dbRight)) then
+						dbPercentVal = getHealthPercent(unit, cur, maxv, calc)
+					end
+					local dbLevelText = levelText
+					if UFHelper and UFHelper.textModeUsesLevel and dbLevelText == nil then
+						if UFHelper.textModeUsesLevel(dbLeft) or UFHelper.textModeUsesLevel(dbCenter) or UFHelper.textModeUsesLevel(dbRight) then dbLevelText = getSafeLevelText(unit, false) end
+					end
+					local dbMissingValue = missingValue
+					if dbMissingValue == nil and (GFH.TextModeUsesDeficit(dbLeft) or GFH.TextModeUsesDeficit(dbCenter) or GFH.TextModeUsesDeficit(dbRight)) then
+						if UnitHealthMissing then dbMissingValue = UnitHealthMissing(unit) end
+						if dbMissingValue == nil and not secretHealth and type(cur) == "number" and type(maxv) == "number" then dbMissingValue = maxv - cur end
+					end
+					setTextSlot(st, st.dataBarTextLeft, "_lastDataBarTextLeft", dbLeft, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue)
+					setTextSlot(st, st.dataBarTextCenter, "_lastDataBarTextCenter", dbCenter, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue)
+					setTextSlot(st, st.dataBarTextRight, "_lastDataBarTextRight", dbRight, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue)
+				else
+					GF.ClearDataBarText(st)
+				end
 			end
 		end
 	elseif st.healthTextLeft or st.healthTextCenter or st.healthTextRight then
@@ -11103,6 +11276,7 @@ function GF:UpdateHealthValue(self, unit, st)
 		if st.healthTextRight then st.healthTextRight:SetText("") end
 		st._lastHealthTextLeft, st._lastHealthTextCenter, st._lastHealthTextRight = nil, nil, nil
 		st._nextHealthTextUpdateAt = nil
+		GF.ClearDataBarText(st)
 	end
 end
 
@@ -14561,6 +14735,7 @@ GF._groupCopySectionOrder = {
 	"targetHighlight",
 	"portrait",
 	"text",
+	"dataBar",
 	"health",
 	"incomingheal",
 	"absorb",
@@ -14592,6 +14767,7 @@ GF._groupCopySectionLabels = {
 	targetHighlight = L["Target highlight"] or "Target highlight",
 	portrait = "Portrait",
 	text = L["Name"] or "Name",
+	dataBar = L["UFDataBar"] or "Data bar",
 	health = L["Health"] or "Health",
 	incomingheal = L["Incoming heals"] or "Incoming heals",
 	absorb = L["Absorb"] or "Absorb",
@@ -14657,6 +14833,9 @@ GF._groupCopySectionRules = {
 		{ "status", "nameColor" },
 		{ "status", "nameStrata" },
 		{ "status", "nameFrameLevelOffset" },
+	},
+	dataBar = {
+		{ "dataBar" },
 	},
 	health = {
 		{ "health" },
@@ -16139,6 +16318,7 @@ function GF.ReorderGroupEditModeSettings(settings)
 		"targetHighlight",
 		"portrait",
 		"text",
+		"dataBar",
 		"health",
 		"incomingheal",
 		"absorb",
@@ -19248,6 +19428,518 @@ local function buildEditModeSettings(kind, editModeId)
 				local cfg = getCfg(kind)
 				local tc = cfg and cfg.text or {}
 				return tc.showName ~= false
+			end,
+		},
+		{
+			name = L["UFDataBar"] or "Data bar",
+			kind = SettingType.Collapsible,
+			id = "dataBar",
+			defaultCollapsed = true,
+		},
+		{
+			name = L["UFDataBarEnable"] or "Enable data bar",
+			kind = SettingType.Checkbox,
+			field = "dataBarEnabled",
+			parentId = "dataBar",
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				return dbc.enabled == true
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.dataBar = cfg.dataBar or copyDefaultsTable((DEFAULTS[kind] and DEFAULTS[kind].dataBar) or GF.CreateDataBarDefaults())
+				cfg.dataBar.enabled = value and true or false
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarEnabled", cfg.dataBar.enabled, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+		},
+		{
+			name = L["UFDataBarPosition"] or "Data bar position",
+			kind = SettingType.Dropdown,
+			field = "dataBarPosition",
+			parentId = "dataBar",
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				return dbc.position or (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.position) or "BELOW"
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.dataBar = cfg.dataBar or {}
+				cfg.dataBar.position = (value == "ABOVE") and "ABOVE" or "BELOW"
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarPosition", cfg.dataBar.position, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			generator = function(_, root)
+				local options = {
+					{ value = "ABOVE", label = L["UFDataBarAbove"] or "Above" },
+					{ value = "BELOW", label = L["UFDataBarBelow"] or "Below" },
+				}
+				for _, option in ipairs(options) do
+					root:CreateRadio(option.label, function()
+						local cfg = getCfg(kind)
+						local dbc = cfg and cfg.dataBar or {}
+						return (dbc.position or (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.position) or "BELOW") == option.value
+					end, function()
+						local cfg = getCfg(kind)
+						if not cfg then return end
+						cfg.dataBar = cfg.dataBar or {}
+						cfg.dataBar.position = option.value
+						if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarPosition", option.value, nil, true) end
+						GF:ApplyHeaderAttributes(kind)
+					end)
+				end
+			end,
+			isEnabled = function()
+				local cfg = getCfg(kind)
+				return cfg and cfg.dataBar and cfg.dataBar.enabled == true
+			end,
+		},
+		{
+			name = L["UFDataBarHeight"] or "Data bar height",
+			kind = SettingType.Slider,
+			allowInput = true,
+			field = "dataBarHeight",
+			parentId = "dataBar",
+			minValue = 1,
+			maxValue = 40,
+			valueStep = 1,
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				return dbc.height or (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.height) or 16
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.dataBar = cfg.dataBar or {}
+				cfg.dataBar.height = clampNumber(value, 1, 40, cfg.dataBar.height or 16)
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarHeight", cfg.dataBar.height, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			isEnabled = function()
+				local cfg = getCfg(kind)
+				return cfg and cfg.dataBar and cfg.dataBar.enabled == true
+			end,
+		},
+		{
+			name = L["UFDataBarGap"] or "Data bar gap",
+			kind = SettingType.Slider,
+			allowInput = true,
+			field = "dataBarGap",
+			parentId = "dataBar",
+			minValue = -20,
+			maxValue = 40,
+			valueStep = 1,
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				return dbc.gap or (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.gap) or 0
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.dataBar = cfg.dataBar or {}
+				cfg.dataBar.gap = clampNumber(value, -20, 40, cfg.dataBar.gap or 0)
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarGap", cfg.dataBar.gap, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			isEnabled = function()
+				local cfg = getCfg(kind)
+				return cfg and cfg.dataBar and cfg.dataBar.enabled == true
+			end,
+		},
+		{
+			name = L["Use class color (players)"] or "Use class color (players)",
+			kind = SettingType.Checkbox,
+			field = "dataBarClassColor",
+			parentId = "dataBar",
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				return dbc.useClassColor == true
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.dataBar = cfg.dataBar or {}
+				cfg.dataBar.useClassColor = value and true or false
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarClassColor", cfg.dataBar.useClassColor, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			isEnabled = function()
+				local cfg = getCfg(kind)
+				return cfg and cfg.dataBar and cfg.dataBar.enabled == true
+			end,
+		},
+		{
+			name = L["UFDataBarColor"] or "Data bar color",
+			kind = SettingType.Color,
+			field = "dataBarColor",
+			parentId = "dataBar",
+			hasOpacity = true,
+			default = (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.color) or { 0.18, 0.18, 0.22, 1 },
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				local def = (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.color) or { 0.18, 0.18, 0.22, 1 }
+				local r, g, b, a = unpackColor(dbc.color, def)
+				return { r = r, g = g, b = b, a = a }
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not (cfg and value) then return end
+				cfg.dataBar = cfg.dataBar or {}
+				cfg.dataBar.color = { value.r or 0.18, value.g or 0.18, value.b or 0.22, value.a or 1 }
+				cfg.dataBar.useClassColor = false
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarColor", cfg.dataBar.color, nil, true) end
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarClassColor", false, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			isEnabled = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				return dbc.enabled == true and dbc.useClassColor ~= true
+			end,
+		},
+		{
+			name = L["Bar texture"] or "Bar texture",
+			kind = SettingType.Dropdown,
+			field = "dataBarTexture",
+			parentId = "dataBar",
+			height = 200,
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				return dbc.texture or (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.texture) or "SOLID"
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.dataBar = cfg.dataBar or {}
+				cfg.dataBar.texture = value
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarTexture", value, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			generator = function(_, root)
+				for _, option in ipairs(textureOptions()) do
+					root:CreateRadio(option.label, function()
+						local cfg = getCfg(kind)
+						local dbc = cfg and cfg.dataBar or {}
+						return (dbc.texture or (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.texture) or "SOLID") == option.value
+					end, function()
+						local cfg = getCfg(kind)
+						if not cfg then return end
+						cfg.dataBar = cfg.dataBar or {}
+						cfg.dataBar.texture = option.value
+						if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarTexture", option.value, nil, true) end
+						GF:ApplyHeaderAttributes(kind)
+					end)
+				end
+			end,
+			isEnabled = function()
+				local cfg = getCfg(kind)
+				return cfg and cfg.dataBar and cfg.dataBar.enabled == true
+			end,
+		},
+		{
+			name = L["Left text"] or "Left text",
+			kind = SettingType.Dropdown,
+			field = "dataBarTextLeft",
+			parentId = "dataBar",
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				return dbc.textLeft or (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.textLeft) or "NONE"
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.dataBar = cfg.dataBar or {}
+				cfg.dataBar.textLeft = value
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarTextLeft", value, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			generator = function(_, root)
+				for _, option in ipairs(GF._sharedEdit.healthTextModeOpts) do
+					root:CreateRadio(option.label, function()
+						local cfg = getCfg(kind)
+						local dbc = cfg and cfg.dataBar or {}
+						return (dbc.textLeft or (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.textLeft) or "NONE") == option.value
+					end, function()
+						local cfg = getCfg(kind)
+						if not cfg then return end
+						cfg.dataBar = cfg.dataBar or {}
+						cfg.dataBar.textLeft = option.value
+						if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarTextLeft", option.value, nil, true) end
+						GF:ApplyHeaderAttributes(kind)
+					end)
+				end
+			end,
+			isEnabled = function()
+				local cfg = getCfg(kind)
+				return cfg and cfg.dataBar and cfg.dataBar.enabled == true
+			end,
+		},
+		{
+			name = L["Center text"] or "Center text",
+			kind = SettingType.Dropdown,
+			field = "dataBarTextCenter",
+			parentId = "dataBar",
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				return dbc.textCenter or (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.textCenter) or "NONE"
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.dataBar = cfg.dataBar or {}
+				cfg.dataBar.textCenter = value
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarTextCenter", value, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			generator = function(_, root)
+				for _, option in ipairs(GF._sharedEdit.healthTextModeOpts) do
+					root:CreateRadio(option.label, function()
+						local cfg = getCfg(kind)
+						local dbc = cfg and cfg.dataBar or {}
+						return (dbc.textCenter or (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.textCenter) or "NONE") == option.value
+					end, function()
+						local cfg = getCfg(kind)
+						if not cfg then return end
+						cfg.dataBar = cfg.dataBar or {}
+						cfg.dataBar.textCenter = option.value
+						if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarTextCenter", option.value, nil, true) end
+						GF:ApplyHeaderAttributes(kind)
+					end)
+				end
+			end,
+			isEnabled = function()
+				local cfg = getCfg(kind)
+				return cfg and cfg.dataBar and cfg.dataBar.enabled == true
+			end,
+		},
+		{
+			name = L["Right text"] or "Right text",
+			kind = SettingType.Dropdown,
+			field = "dataBarTextRight",
+			parentId = "dataBar",
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				return dbc.textRight or (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.textRight) or "NONE"
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.dataBar = cfg.dataBar or {}
+				cfg.dataBar.textRight = value
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarTextRight", value, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			generator = function(_, root)
+				for _, option in ipairs(GF._sharedEdit.healthTextModeOpts) do
+					root:CreateRadio(option.label, function()
+						local cfg = getCfg(kind)
+						local dbc = cfg and cfg.dataBar or {}
+						return (dbc.textRight or (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.textRight) or "NONE") == option.value
+					end, function()
+						local cfg = getCfg(kind)
+						if not cfg then return end
+						cfg.dataBar = cfg.dataBar or {}
+						cfg.dataBar.textRight = option.value
+						if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarTextRight", option.value, nil, true) end
+						GF:ApplyHeaderAttributes(kind)
+					end)
+				end
+			end,
+			isEnabled = function()
+				local cfg = getCfg(kind)
+				return cfg and cfg.dataBar and cfg.dataBar.enabled == true
+			end,
+		},
+		{
+			name = L["UFDataBarTextColor"] or "Data bar text color",
+			kind = SettingType.Color,
+			field = "dataBarTextColor",
+			parentId = "dataBar",
+			hasOpacity = true,
+			default = (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.textColor) or { 1, 1, 1, 1 },
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				local def = (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.textColor) or { 1, 1, 1, 1 }
+				local r, g, b, a = unpackColor(dbc.textColor, def)
+				return { r = r, g = g, b = b, a = a }
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not (cfg and value) then return end
+				cfg.dataBar = cfg.dataBar or {}
+				cfg.dataBar.textColor = { value.r or 1, value.g or 1, value.b or 1, value.a or 1 }
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarTextColor", cfg.dataBar.textColor, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			isEnabled = function()
+				local cfg = getCfg(kind)
+				return cfg and cfg.dataBar and cfg.dataBar.enabled == true
+			end,
+		},
+		{
+			name = FONT_SIZE,
+			kind = SettingType.Slider,
+			allowInput = true,
+			field = "dataBarFontSize",
+			parentId = "dataBar",
+			minValue = 8,
+			maxValue = 30,
+			valueStep = 1,
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				return dbc.fontSize or (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.fontSize) or 12
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.dataBar = cfg.dataBar or {}
+				cfg.dataBar.fontSize = clampNumber(value, 8, 30, cfg.dataBar.fontSize or 12)
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarFontSize", cfg.dataBar.fontSize, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			isEnabled = function()
+				local cfg = getCfg(kind)
+				return cfg and cfg.dataBar and cfg.dataBar.enabled == true
+			end,
+		},
+		{
+			name = L["Font"] or "Font",
+			kind = SettingType.Dropdown,
+			field = "dataBarFont",
+			height = FONT_DROPDOWN_SCROLL_HEIGHT,
+			parentId = "dataBar",
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				return dbc.font or (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.font) or GF.GlobalFontConfigKey()
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.dataBar = cfg.dataBar or {}
+				cfg.dataBar.font = value
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarFont", value, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			generator = function(_, root)
+				for _, option in ipairs(fontOptions()) do
+					root:CreateRadio(option.label, function()
+						local cfg = getCfg(kind)
+						local dbc = cfg and cfg.dataBar or {}
+						return (dbc.font or (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.font) or GF.GlobalFontConfigKey()) == option.value
+					end, function()
+						local cfg = getCfg(kind)
+						if not cfg then return end
+						cfg.dataBar = cfg.dataBar or {}
+						cfg.dataBar.font = option.value
+						if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarFont", option.value, nil, true) end
+						GF:ApplyHeaderAttributes(kind)
+					end)
+				end
+			end,
+			isEnabled = function()
+				local cfg = getCfg(kind)
+				return cfg and cfg.dataBar and cfg.dataBar.enabled == true
+			end,
+		},
+		{
+			name = L["Font outline"] or "Font outline",
+			kind = SettingType.Dropdown,
+			field = "dataBarFontOutline",
+			parentId = "dataBar",
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				return normalizeFontStyleChoice(dbc.fontOutline, (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.fontOutline) or "OUTLINE")
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.dataBar = cfg.dataBar or {}
+				cfg.dataBar.fontOutline = normalizeFontStyleChoice(value, (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.fontOutline) or "OUTLINE")
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarFontOutline", cfg.dataBar.fontOutline, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			generator = function(_, root)
+				for _, option in ipairs(GF._sharedEdit.outlineOpts) do
+					root:CreateRadio(option.label, function()
+						local cfg = getCfg(kind)
+						local dbc = cfg and cfg.dataBar or {}
+						return normalizeFontStyleChoice(dbc.fontOutline, (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.fontOutline) or "OUTLINE") == option.value
+					end, function()
+						local cfg = getCfg(kind)
+						if not cfg then return end
+						cfg.dataBar = cfg.dataBar or {}
+						cfg.dataBar.fontOutline = normalizeFontStyleChoice(option.value, (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.fontOutline) or "OUTLINE")
+						if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarFontOutline", cfg.dataBar.fontOutline, nil, true) end
+						GF:ApplyHeaderAttributes(kind)
+					end)
+				end
+			end,
+			isEnabled = function()
+				local cfg = getCfg(kind)
+				return cfg and cfg.dataBar and cfg.dataBar.enabled == true
+			end,
+		},
+		{
+			name = L["Use short numbers"] or "Use short numbers",
+			kind = SettingType.Checkbox,
+			field = "dataBarShortNumbers",
+			parentId = "dataBar",
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				if dbc.useShortNumbers == nil then return (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.useShortNumbers) ~= false end
+				return dbc.useShortNumbers ~= false
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.dataBar = cfg.dataBar or {}
+				cfg.dataBar.useShortNumbers = value and true or false
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarShortNumbers", cfg.dataBar.useShortNumbers, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			isEnabled = function()
+				local cfg = getCfg(kind)
+				return cfg and cfg.dataBar and cfg.dataBar.enabled == true
+			end,
+		},
+		{
+			name = L["Hide % symbol"] or "Hide % symbol",
+			kind = SettingType.Checkbox,
+			field = "dataBarHidePercent",
+			parentId = "dataBar",
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				return dbc.hidePercentSymbol == true
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.dataBar = cfg.dataBar or {}
+				cfg.dataBar.hidePercentSymbol = value and true or false
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarHidePercent", cfg.dataBar.hidePercentSymbol, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			isEnabled = function()
+				local cfg = getCfg(kind)
+				return cfg and cfg.dataBar and cfg.dataBar.enabled == true
 			end,
 		},
 		{
