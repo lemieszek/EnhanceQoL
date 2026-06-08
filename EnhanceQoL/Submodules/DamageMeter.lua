@@ -2821,48 +2821,100 @@ function DamageMeter:ApplyTooltipFontString(fontString, config)
 	applyCachedFontString(fontString, config.tooltipFontFace, clampNumber(config.tooltipFontSize, 8, 24, DEFAULT_WINDOW.tooltipFontSize), config.tooltipFontOutline, "tooltip")
 end
 
-local function applyTooltipBorder(border, enabled, textureKey, size, r, g, b, a)
+function DamageMeter:ApplyBorderFrame(border, enabled, textureKey, size, r, g, b, a)
 	if not border then return end
 	if enabled then
-		if not border._damageMeterBorderTop then
-			border._damageMeterBorderTop = border:CreateTexture(nil, "BORDER")
-			border._damageMeterBorderBottom = border:CreateTexture(nil, "BORDER")
-			border._damageMeterBorderLeft = border:CreateTexture(nil, "BORDER")
-			border._damageMeterBorderRight = border:CreateTexture(nil, "BORDER")
-		end
-		local top = border._damageMeterBorderTop
-		local bottom = border._damageMeterBorderBottom
-		local left = border._damageMeterBorderLeft
-		local right = border._damageMeterBorderRight
+		local texture = resolveMedia("border", textureKey, DEFAULT_BORDER)
+		local useSlices = texture ~= DEFAULT_BORDER
+		local backdropChanged = false
 		if border._damageMeterBackdropEnabled ~= true
 			or border._damageMeterBackdropTexture ~= textureKey
-			or border._damageMeterBackdropSize ~= size then
+			or border._damageMeterBackdropResolvedTexture ~= texture
+			or border._damageMeterBackdropSize ~= size
+			or border._damageMeterBackdropUseSlices ~= useSlices then
 			border._damageMeterBackdropEnabled = true
 			border._damageMeterBackdropTexture = textureKey
+			border._damageMeterBackdropResolvedTexture = texture
 			border._damageMeterBackdropSize = size
-			local texture = resolveMedia("border", textureKey, DEFAULT_BORDER)
+			border._damageMeterBackdropUseSlices = useSlices
+			backdropChanged = true
+			if border.SetBackdrop then border:SetBackdrop(nil) end
+			if not border._damageMeterBorderTop then
+				border._damageMeterBorderTop = border:CreateTexture(nil, "BORDER")
+				border._damageMeterBorderBottom = border:CreateTexture(nil, "BORDER")
+				border._damageMeterBorderLeft = border:CreateTexture(nil, "BORDER")
+				border._damageMeterBorderRight = border:CreateTexture(nil, "BORDER")
+				border._damageMeterBorderTopLeft = border:CreateTexture(nil, "BORDER")
+				border._damageMeterBorderTopRight = border:CreateTexture(nil, "BORDER")
+				border._damageMeterBorderBottomLeft = border:CreateTexture(nil, "BORDER")
+				border._damageMeterBorderBottomRight = border:CreateTexture(nil, "BORDER")
+			end
+			local top = border._damageMeterBorderTop
+			local bottom = border._damageMeterBorderBottom
+			local left = border._damageMeterBorderLeft
+			local right = border._damageMeterBorderRight
+			local topLeft = border._damageMeterBorderTopLeft
+			local topRight = border._damageMeterBorderTopRight
+			local bottomLeft = border._damageMeterBorderBottomLeft
+			local bottomRight = border._damageMeterBorderBottomRight
 			top:SetTexture(texture)
 			bottom:SetTexture(texture)
 			left:SetTexture(texture)
 			right:SetTexture(texture)
+			topLeft:SetTexture(texture)
+			topRight:SetTexture(texture)
+			bottomLeft:SetTexture(texture)
+			bottomRight:SetTexture(texture)
+			if useSlices then
+				topLeft:SetTexCoord(0.5078125, 0.0625, 0.5078125, 0.9375, 0.6171875, 0.0625, 0.6171875, 0.9375)
+				topRight:SetTexCoord(0.6328125, 0.0625, 0.6328125, 0.9375, 0.7421875, 0.0625, 0.7421875, 0.9375)
+				bottomLeft:SetTexCoord(0.7578125, 0.0625, 0.7578125, 0.9375, 0.8671875, 0.0625, 0.8671875, 0.9375)
+				bottomRight:SetTexCoord(0.8828125, 0.0625, 0.8828125, 0.9375, 0.9921875, 0.0625, 0.9921875, 0.9375)
+				top:SetTexCoord(0.2578125, 0.9375, 0.3671875, 0.9375, 0.2578125, 0.0625, 0.3671875, 0.0625)
+				bottom:SetTexCoord(0.3828125, 0.9375, 0.4921875, 0.9375, 0.3828125, 0.0625, 0.4921875, 0.0625)
+				left:SetTexCoord(0.0078125, 0.0625, 0.0078125, 0.9375, 0.1171875, 0.0625, 0.1171875, 0.9375)
+				right:SetTexCoord(0.1328125, 0.0625, 0.1328125, 0.9375, 0.2421875, 0.0625, 0.2421875, 0.9375)
+			else
+				top:SetTexCoord(0, 1, 0, 1)
+				bottom:SetTexCoord(0, 1, 0, 1)
+				left:SetTexCoord(0, 1, 0, 1)
+				right:SetTexCoord(0, 1, 0, 1)
+				topLeft:SetTexCoord(0, 1, 0, 1)
+				topRight:SetTexCoord(0, 1, 0, 1)
+				bottomLeft:SetTexCoord(0, 1, 0, 1)
+				bottomRight:SetTexCoord(0, 1, 0, 1)
+			end
+			topLeft:ClearAllPoints()
+			topLeft:SetPoint("TOPLEFT", border, "TOPLEFT")
+			topLeft:SetSize(size, size)
+			topRight:ClearAllPoints()
+			topRight:SetPoint("TOPRIGHT", border, "TOPRIGHT")
+			topRight:SetSize(size, size)
+			bottomLeft:ClearAllPoints()
+			bottomLeft:SetPoint("BOTTOMLEFT", border, "BOTTOMLEFT")
+			bottomLeft:SetSize(size, size)
+			bottomRight:ClearAllPoints()
+			bottomRight:SetPoint("BOTTOMRIGHT", border, "BOTTOMRIGHT")
+			bottomRight:SetSize(size, size)
 			top:ClearAllPoints()
-			top:SetPoint("TOPLEFT", border, "TOPLEFT")
-			top:SetPoint("TOPRIGHT", border, "TOPRIGHT")
+			top:SetPoint("TOPLEFT", topLeft, "TOPRIGHT")
+			top:SetPoint("TOPRIGHT", topRight, "TOPLEFT")
 			top:SetHeight(size)
 			bottom:ClearAllPoints()
-			bottom:SetPoint("BOTTOMLEFT", border, "BOTTOMLEFT")
-			bottom:SetPoint("BOTTOMRIGHT", border, "BOTTOMRIGHT")
+			bottom:SetPoint("BOTTOMLEFT", bottomLeft, "BOTTOMRIGHT")
+			bottom:SetPoint("BOTTOMRIGHT", bottomRight, "BOTTOMLEFT")
 			bottom:SetHeight(size)
 			left:ClearAllPoints()
-			left:SetPoint("TOPLEFT", border, "TOPLEFT")
-			left:SetPoint("BOTTOMLEFT", border, "BOTTOMLEFT")
+			left:SetPoint("TOPLEFT", topLeft, "BOTTOMLEFT")
+			left:SetPoint("BOTTOMLEFT", bottomLeft, "TOPLEFT")
 			left:SetWidth(size)
 			right:ClearAllPoints()
-			right:SetPoint("TOPRIGHT", border, "TOPRIGHT")
-			right:SetPoint("BOTTOMRIGHT", border, "BOTTOMRIGHT")
+			right:SetPoint("TOPRIGHT", topRight, "BOTTOMRIGHT")
+			right:SetPoint("BOTTOMRIGHT", bottomRight, "TOPRIGHT")
 			right:SetWidth(size)
 		end
-		if border._damageMeterBorderColorR ~= r
+		if backdropChanged
+			or border._damageMeterBorderColorR ~= r
 			or border._damageMeterBorderColorG ~= g
 			or border._damageMeterBorderColorB ~= b
 			or border._damageMeterBorderColorA ~= a then
@@ -2870,21 +2922,31 @@ local function applyTooltipBorder(border, enabled, textureKey, size, r, g, b, a)
 			border._damageMeterBorderColorG = g
 			border._damageMeterBorderColorB = b
 			border._damageMeterBorderColorA = a
-			top:SetVertexColor(r, g, b, a)
-			bottom:SetVertexColor(r, g, b, a)
-			left:SetVertexColor(r, g, b, a)
-			right:SetVertexColor(r, g, b, a)
+			if border._damageMeterBorderTop then border._damageMeterBorderTop:SetVertexColor(r, g, b, a) end
+			if border._damageMeterBorderBottom then border._damageMeterBorderBottom:SetVertexColor(r, g, b, a) end
+			if border._damageMeterBorderLeft then border._damageMeterBorderLeft:SetVertexColor(r, g, b, a) end
+			if border._damageMeterBorderRight then border._damageMeterBorderRight:SetVertexColor(r, g, b, a) end
+			if border._damageMeterBorderTopLeft then border._damageMeterBorderTopLeft:SetVertexColor(r, g, b, a) end
+			if border._damageMeterBorderTopRight then border._damageMeterBorderTopRight:SetVertexColor(r, g, b, a) end
+			if border._damageMeterBorderBottomLeft then border._damageMeterBorderBottomLeft:SetVertexColor(r, g, b, a) end
+			if border._damageMeterBorderBottomRight then border._damageMeterBorderBottomRight:SetVertexColor(r, g, b, a) end
 		end
-		top:Show()
-		bottom:Show()
-		left:Show()
-		right:Show()
+		if border._damageMeterBorderTop then border._damageMeterBorderTop:Show() end
+		if border._damageMeterBorderBottom then border._damageMeterBorderBottom:Show() end
+		if border._damageMeterBorderLeft then border._damageMeterBorderLeft:Show() end
+		if border._damageMeterBorderRight then border._damageMeterBorderRight:Show() end
+		if border._damageMeterBorderTopLeft then border._damageMeterBorderTopLeft:Show() end
+		if border._damageMeterBorderTopRight then border._damageMeterBorderTopRight:Show() end
+		if border._damageMeterBorderBottomLeft then border._damageMeterBorderBottomLeft:Show() end
+		if border._damageMeterBorderBottomRight then border._damageMeterBorderBottomRight:Show() end
 		setShownIfChanged(border, true)
 	else
 		if border._damageMeterBackdropEnabled ~= false then
 			border._damageMeterBackdropEnabled = false
 			border._damageMeterBackdropTexture = nil
+			border._damageMeterBackdropResolvedTexture = nil
 			border._damageMeterBackdropSize = nil
+			border._damageMeterBackdropUseSlices = nil
 			border._damageMeterBorderColorR = nil
 			border._damageMeterBorderColorG = nil
 			border._damageMeterBorderColorB = nil
@@ -2893,6 +2955,11 @@ local function applyTooltipBorder(border, enabled, textureKey, size, r, g, b, a)
 			if border._damageMeterBorderBottom then border._damageMeterBorderBottom:Hide() end
 			if border._damageMeterBorderLeft then border._damageMeterBorderLeft:Hide() end
 			if border._damageMeterBorderRight then border._damageMeterBorderRight:Hide() end
+			if border._damageMeterBorderTopLeft then border._damageMeterBorderTopLeft:Hide() end
+			if border._damageMeterBorderTopRight then border._damageMeterBorderTopRight:Hide() end
+			if border._damageMeterBorderBottomLeft then border._damageMeterBorderBottomLeft:Hide() end
+			if border._damageMeterBorderBottomRight then border._damageMeterBorderBottomRight:Hide() end
+			if border.SetBackdrop then border:SetBackdrop(nil) end
 		end
 		setShownIfChanged(border, false)
 	end
@@ -3042,7 +3109,7 @@ end
 
 function DamageMeter:ApplyRowBorder(row, config, classFilename, colors)
 	local border = row.rowBorder
-	if not border or not border.SetBackdrop then return end
+	if not border then return end
 	local enabled = config.rowBorderEnabled == true
 	local styleVersion = self:GetWindowStyleVersion(row.windowIndex or 0)
 	local classKey = enabled and config.rowBorderUseClassColor == true and type(classFilename) == "string" and classFilename ~= "" and classFilename or false
@@ -3063,50 +3130,15 @@ function DamageMeter:ApplyRowBorder(row, config, classFilename, colors)
 		else
 			br, bg, bb, ba = getClassOrCustomColor(classKey, config.rowBorderColor, DEFAULT_WINDOW.rowBorderColor, config.rowBorderUseClassColor)
 		end
-		local backdropChanged = false
-		if border._damageMeterBackdropEnabled ~= true
-			or border._damageMeterBackdropTexture ~= config.rowBorderTexture
-			or border._damageMeterBackdropSize ~= size then
-			border._damageMeterBackdropEnabled = true
-			border._damageMeterBackdropTexture = config.rowBorderTexture
-			border._damageMeterBackdropSize = size
-			backdropChanged = true
-			local borderTexture = resolveMedia("border", config.rowBorderTexture, DEFAULT_BORDER)
-			border:SetBackdrop({
-				edgeFile = borderTexture,
-				edgeSize = size,
-			})
-		end
-		if backdropChanged
-			or border._damageMeterBorderColorR ~= br
-			or border._damageMeterBorderColorG ~= bg
-			or border._damageMeterBorderColorB ~= bb
-			or border._damageMeterBorderColorA ~= ba then
-			border._damageMeterBorderColorR = br
-			border._damageMeterBorderColorG = bg
-			border._damageMeterBorderColorB = bb
-			border._damageMeterBorderColorA = ba
-			border:SetBackdropBorderColor(br, bg, bb, ba)
-		end
-		setShownIfChanged(border, true)
+		self:ApplyBorderFrame(border, true, config.rowBorderTexture, size, br, bg, bb, ba)
 	else
-		if border._damageMeterBackdropEnabled ~= false then
-			border._damageMeterBackdropEnabled = false
-			border._damageMeterBackdropTexture = nil
-			border._damageMeterBackdropSize = nil
-			border._damageMeterBorderColorR = nil
-			border._damageMeterBorderColorG = nil
-			border._damageMeterBorderColorB = nil
-			border._damageMeterBorderColorA = nil
-			border:SetBackdrop(nil)
-		end
-		setShownIfChanged(border, false)
+		self:ApplyBorderFrame(border, false)
 	end
 end
 
 function DamageMeter:ApplyBarBorder(row, config, classFilename, colors)
 	local border = row.barBorder
-	if not border or not border.SetBackdrop then return end
+	if not border then return end
 	local enabled = config.barBorderEnabled == true
 	local classKey = enabled and config.barBorderUseClassColor == true and type(classFilename) == "string" and classFilename ~= "" and classFilename or false
 	local styleVersion = self:GetWindowStyleVersion(row.windowIndex or 0)
@@ -3127,50 +3159,15 @@ function DamageMeter:ApplyBarBorder(row, config, classFilename, colors)
 		else
 			br, bg, bb, ba = getClassOrCustomColor(classKey, config.barBorderColor, DEFAULT_WINDOW.barBorderColor, config.barBorderUseClassColor)
 		end
-		local backdropChanged = false
-		if border._damageMeterBackdropEnabled ~= true
-			or border._damageMeterBackdropTexture ~= config.barBorderTexture
-			or border._damageMeterBackdropSize ~= size then
-			border._damageMeterBackdropEnabled = true
-			border._damageMeterBackdropTexture = config.barBorderTexture
-			border._damageMeterBackdropSize = size
-			backdropChanged = true
-			local borderTexture = resolveMedia("border", config.barBorderTexture, DEFAULT_BORDER)
-			border:SetBackdrop({
-				edgeFile = borderTexture,
-				edgeSize = size,
-			})
-		end
-		if backdropChanged
-			or border._damageMeterBorderColorR ~= br
-			or border._damageMeterBorderColorG ~= bg
-			or border._damageMeterBorderColorB ~= bb
-			or border._damageMeterBorderColorA ~= ba then
-			border._damageMeterBorderColorR = br
-			border._damageMeterBorderColorG = bg
-			border._damageMeterBorderColorB = bb
-			border._damageMeterBorderColorA = ba
-			border:SetBackdropBorderColor(br, bg, bb, ba)
-		end
-		setShownIfChanged(border, true)
+		self:ApplyBorderFrame(border, true, config.barBorderTexture, size, br, bg, bb, ba)
 	else
-		if border._damageMeterBackdropEnabled ~= false then
-			border._damageMeterBackdropEnabled = false
-			border._damageMeterBackdropTexture = nil
-			border._damageMeterBackdropSize = nil
-			border._damageMeterBorderColorR = nil
-			border._damageMeterBorderColorG = nil
-			border._damageMeterBorderColorB = nil
-			border._damageMeterBorderColorA = nil
-			border:SetBackdrop(nil)
-		end
-		setShownIfChanged(border, false)
+		self:ApplyBorderFrame(border, false)
 	end
 end
 
 function DamageMeter:ApplyIconBorder(row, config, classFilename, colors)
 	local border = row.iconBorder
-	if not border or not border.SetBackdrop then return end
+	if not border then return end
 	local enabled = config.showIcons ~= false and config.iconBorderEnabled == true
 	local classKey = enabled and config.iconBorderUseClassColor == true and type(classFilename) == "string" and classFilename ~= "" and classFilename or false
 	local styleVersion = self:GetWindowStyleVersion(row.windowIndex or 0)
@@ -3191,44 +3188,9 @@ function DamageMeter:ApplyIconBorder(row, config, classFilename, colors)
 		else
 			br, bg, bb, ba = getClassOrCustomColor(classKey, config.iconBorderColor, DEFAULT_WINDOW.iconBorderColor, config.iconBorderUseClassColor)
 		end
-		local backdropChanged = false
-		if border._damageMeterBackdropEnabled ~= true
-			or border._damageMeterBackdropTexture ~= config.iconBorderTexture
-			or border._damageMeterBackdropSize ~= size then
-			border._damageMeterBackdropEnabled = true
-			border._damageMeterBackdropTexture = config.iconBorderTexture
-			border._damageMeterBackdropSize = size
-			backdropChanged = true
-			local borderTexture = resolveMedia("border", config.iconBorderTexture, DEFAULT_BORDER)
-			border:SetBackdrop({
-				edgeFile = borderTexture,
-				edgeSize = size,
-			})
-		end
-		if backdropChanged
-			or border._damageMeterBorderColorR ~= br
-			or border._damageMeterBorderColorG ~= bg
-			or border._damageMeterBorderColorB ~= bb
-			or border._damageMeterBorderColorA ~= ba then
-			border._damageMeterBorderColorR = br
-			border._damageMeterBorderColorG = bg
-			border._damageMeterBorderColorB = bb
-			border._damageMeterBorderColorA = ba
-			border:SetBackdropBorderColor(br, bg, bb, ba)
-		end
-		setShownIfChanged(border, true)
+		self:ApplyBorderFrame(border, true, config.iconBorderTexture, size, br, bg, bb, ba)
 	else
-		if border._damageMeterBackdropEnabled ~= false then
-			border._damageMeterBackdropEnabled = false
-			border._damageMeterBackdropTexture = nil
-			border._damageMeterBackdropSize = nil
-			border._damageMeterBorderColorR = nil
-			border._damageMeterBorderColorG = nil
-			border._damageMeterBorderColorB = nil
-			border._damageMeterBorderColorA = nil
-			border:SetBackdrop(nil)
-		end
-		setShownIfChanged(border, false)
+		self:ApplyBorderFrame(border, false)
 	end
 end
 
@@ -4421,7 +4383,6 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 	end
 
 	local backdropTexture = resolveMedia("statusbar", config.tooltipBackdropTexture, "Interface\\Buttons\\WHITE8x8")
-	local borderTexture = resolveMedia("border", config.tooltipBorderTexture, DEFAULT_BORDER)
 	local borderSize = clampNumber(config.tooltipBorderSize, 1, 32, DEFAULT_WINDOW.tooltipBorderSize)
 	local borderOffset = clampNumber(config.tooltipBorderInset, 0, 32, DEFAULT_WINDOW.tooltipBorderInset)
 	frame:SetBackdrop({ bgFile = backdropTexture })
@@ -4432,9 +4393,7 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 	frame.border:ClearAllPoints()
 	frame.border:SetPoint("TOPLEFT", frame, "TOPLEFT", -borderOffset, borderOffset)
 	frame.border:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", borderOffset, -borderOffset)
-	frame.border:SetBackdrop({ edgeFile = borderTexture, edgeSize = borderSize })
-	frame.border:SetBackdropBorderColor(border.r, border.g, border.b, border.a)
-	frame.border:Show()
+	self:ApplyBorderFrame(frame.border, true, config.tooltipBorderTexture, borderSize, border.r, border.g, border.b, border.a)
 	self:AnchorSourceTooltip(frame, owner, config)
 
 	local growUp = normalizeTooltipGrow(config.tooltipGrow) == "UP"
@@ -4514,7 +4473,7 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 			line.rowBorder:SetPoint("TOPLEFT", line.icon, "TOPLEFT", -rowBorderOffset, rowBorderOffset)
 			line.rowBorder:SetSize(rowBorderWidth, rowBorderHeight)
 			local rbr, rbg, rbb, rba = getClassOrCustomColor(classFilename, config.tooltipRowBorderColor, DEFAULT_WINDOW.tooltipRowBorderColor, config.tooltipRowBorderUseClassColor)
-			applyTooltipBorder(line.rowBorder, showLineBorders and config.tooltipRowBorderEnabled == true, config.tooltipRowBorderTexture, clampNumber(config.tooltipRowBorderSize, 1, 32, DEFAULT_WINDOW.tooltipRowBorderSize), rbr, rbg, rbb, rba)
+			self:ApplyBorderFrame(line.rowBorder, showLineBorders and config.tooltipRowBorderEnabled == true, config.tooltipRowBorderTexture, clampNumber(config.tooltipRowBorderSize, 1, 32, DEFAULT_WINDOW.tooltipRowBorderSize), rbr, rbg, rbb, rba)
 
 			local barBorderOffset = clampNumber(config.tooltipBarBorderInset, 0, 24, DEFAULT_WINDOW.tooltipBarBorderInset)
 			local barBorderWidth = math.max(1, availableBarWidth + (barBorderOffset * 2))
@@ -4523,7 +4482,7 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 			line.barBorder:SetPoint("TOPLEFT", line.bar, "TOPLEFT", -barBorderOffset, barBorderOffset)
 			line.barBorder:SetSize(barBorderWidth, barBorderHeight)
 			local bbr, bbg, bbb, bba = getClassOrCustomColor(classFilename, config.tooltipBarBorderColor, DEFAULT_WINDOW.tooltipBarBorderColor, config.tooltipBarBorderUseClassColor)
-			applyTooltipBorder(line.barBorder, line.bar:IsShown() and config.tooltipBarBorderEnabled == true, config.tooltipBarBorderTexture, clampNumber(config.tooltipBarBorderSize, 1, 32, DEFAULT_WINDOW.tooltipBarBorderSize), bbr, bbg, bbb, bba)
+			self:ApplyBorderFrame(line.barBorder, line.bar:IsShown() and config.tooltipBarBorderEnabled == true, config.tooltipBarBorderTexture, clampNumber(config.tooltipBarBorderSize, 1, 32, DEFAULT_WINDOW.tooltipBarBorderSize), bbr, bbg, bbb, bba)
 
 			local iconBorderOffset = clampNumber(config.tooltipIconBorderInset, 0, 24, DEFAULT_WINDOW.tooltipIconBorderInset)
 			local iconBorderSize = math.max(1, tooltipIconSize + (iconBorderOffset * 2))
@@ -4531,7 +4490,7 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 			line.iconBorder:SetPoint("TOPLEFT", line.icon, "TOPLEFT", -iconBorderOffset, iconBorderOffset)
 			line.iconBorder:SetSize(iconBorderSize, iconBorderSize)
 			local ibr, ibg, ibb, iba = getClassOrCustomColor(classFilename, config.tooltipIconBorderColor, DEFAULT_WINDOW.tooltipIconBorderColor, config.tooltipIconBorderUseClassColor)
-			applyTooltipBorder(line.iconBorder, line.icon:IsShown() and showLineBorders and config.tooltipIconBorderEnabled == true, config.tooltipIconBorderTexture, clampNumber(config.tooltipIconBorderSize, 1, 32, DEFAULT_WINDOW.tooltipIconBorderSize), ibr, ibg, ibb, iba)
+			self:ApplyBorderFrame(line.iconBorder, line.icon:IsShown() and showLineBorders and config.tooltipIconBorderEnabled == true, config.tooltipIconBorderTexture, clampNumber(config.tooltipIconBorderSize, 1, 32, DEFAULT_WINDOW.tooltipIconBorderSize), ibr, ibg, ibb, iba)
 
 			local lineName = data.name
 			if data.spacer or lineName == nil then lineName = "" end
@@ -5067,7 +5026,6 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 	frame.footerBackground:SetPoint("BOTTOMRIGHT", frame.status, "BOTTOMRIGHT", footerBackgroundOffsetX + footerBackgroundSizeOffsetX, footerBackgroundOffsetY - footerBackgroundSizeOffsetY)
 	self:ApplyFooterBackground(frame, config, showStatus)
 
-	local borderTexture = resolveMedia("border", config.borderTexture, DEFAULT_BORDER)
 	if config.borderEnabled == true then
 		local size = clampNumber(config.borderSize, 1, 32, DEFAULT_WINDOW.borderSize)
 		local offset = clampNumber(config.borderInset, 0, 24, DEFAULT_WINDOW.borderInset)
@@ -5084,17 +5042,9 @@ function DamageMeter:ApplyWindowStyle(index, contentRows, forceRankColumn)
 		frame.windowBorder:ClearAllPoints()
 		frame.windowBorder:SetPoint("TOPLEFT", frame, "TOPLEFT", -offset + borderOffsetX - borderSizeOffsetX, offset + borderOffsetY + borderSizeOffsetY)
 		frame.windowBorder:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", offset + borderOffsetX + borderSizeOffsetX, -offset + borderOffsetY - borderSizeOffsetY)
-		frame.windowBorder:SetBackdrop({
-			bgFile = nil,
-			edgeFile = borderTexture,
-			edgeSize = size,
-			insets = { left = 0, right = 0, top = 0, bottom = 0 },
-		})
-		frame.windowBorder:SetBackdropBorderColor(borderR, borderG, borderB, borderA)
-		frame.windowBorder:Show()
+		self:ApplyBorderFrame(frame.windowBorder, true, config.borderTexture, size, borderR, borderG, borderB, borderA)
 	else
-		frame.windowBorder:Hide()
-		frame.windowBorder:SetBackdrop(nil)
+		self:ApplyBorderFrame(frame.windowBorder, false)
 	end
 	frame:SetBackdrop(nil)
 

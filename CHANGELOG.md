@@ -4,6 +4,7 @@
 
 ### 🐛 Fixed
 
+- Damage Meter: Fixed SharedMedia border rendering and secret-number backdrop errors by rendering Damage Meter borders without Blizzard Backdrop edge calculations.
 - Unit Frames / Healer Buff Placement: Fixed healer buff indicators showing cooldown text again after updating when regular buff cooldown text had already been disabled.
 - Unit Frames / Healer Buff Placement: Fixed icon indicators growing back toward the unit frame when anchored outside on the right side with a rightward growth direction.
 
