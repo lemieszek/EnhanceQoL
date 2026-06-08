@@ -1,5 +1,14 @@
 # Changelog
 
+## [11.1.0-beta3] - 2026-06-08
+
+### 🐛 Fixed
+
+- Unit Frames / Healer Buff Placement: Fixed healer buff indicators showing cooldown text again after updating when regular buff cooldown text had already been disabled.
+- Unit Frames / Healer Buff Placement: Fixed icon indicators growing back toward the unit frame when anchored outside on the right side with a rightward growth direction.
+
+---
+
 ## [11.1.0-beta2] - 2026-06-07
 
 ### ✨ Added

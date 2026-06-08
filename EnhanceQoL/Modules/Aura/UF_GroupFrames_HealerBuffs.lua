@@ -1302,7 +1302,7 @@ local function calcGridSize(shown, perRow, size, spacing, primary)
 	return w, h
 end
 
-local function positionAuraButton(btn, container, primary, secondary, index, perRow, size, spacing)
+local function positionAuraButton(btn, container, primary, secondary, index, perRow, size, spacing, anchorPoint)
 	if not (btn and container) then return end
 	perRow = max(1, perRow or 1)
 	local primaryHorizontal = primary == "LEFT" or primary == "RIGHT"
@@ -1318,12 +1318,12 @@ local function positionAuraButton(btn, container, primary, secondary, index, per
 	local verticalDir = primaryHorizontal and secondary or primary
 	local xSign = horizontalDir == "RIGHT" and 1 or -1
 	local ySign = verticalDir == "UP" and 1 or -1
-	local basePoint = (ySign == 1 and "BOTTOM" or "TOP") .. (xSign == 1 and "LEFT" or "RIGHT")
 	local step = size + spacing
 	local scale = getEffectiveScale(container)
 	local x = roundToPixel(col * step * xSign, scale)
 	local y = roundToPixel(row * step * ySign, scale)
-	setSinglePointCached(btn, basePoint, container, basePoint, x, y)
+	anchorPoint = normalizeAnchor(anchorPoint)
+	setSinglePointCached(btn, anchorPoint, container, anchorPoint, x, y)
 end
 
 local function getState(btn)
@@ -2614,7 +2614,7 @@ local function renderIconStyleForGroup(btn, st, state, compiled, cfg, group, cha
 			end
 			button._hbButtonSize = group.size
 		end
-		positionAuraButton(button, container, primary, secondary, index, group.perRow, group.size, group.spacing)
+		positionAuraButton(button, container, primary, secondary, index, group.perRow, group.size, group.spacing, group.anchorPoint)
 		button:Show()
 	end
 	for index = #activeRules + 1, #buttons do
