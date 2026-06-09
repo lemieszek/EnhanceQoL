@@ -3498,6 +3498,8 @@ cdp.ENTRY.STYLE_CLIPBOARD = {
 	},
 	CDM_AURA_ONLY_KEYS = {
 		pandemicGlow = true,
+		glowOtherAura = true,
+		glowOtherAuraColor = true,
 		pandemicGlowColor = true,
 		pandemicGlowStyle = true,
 		pandemicGlowInset = true,
@@ -11433,6 +11435,24 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		refreshEntryViews()
 	end
 
+	local function setGlowOtherAura(_, value)
+		local _, currentEntry = getEntry()
+		if not currentEntry then return end
+		if value == nil or value == "" then
+			if currentEntry.glowOtherAura == nil then return end
+			currentEntry.glowOtherAura = nil
+			refreshEntryViews()
+			return
+		end
+		for _, option in ipairs(CooldownPanels:GetCDMAuraGlowOtherAuraOptions(panelId, currentEntry)) do
+			if option.value == tostring(value) then
+				currentEntry.glowOtherAura = option.info
+				refreshEntryViews()
+				return
+			end
+		end
+	end
+
 	local function setStaticText(_, value)
 		local _, currentEntry = getEntry()
 		if not currentEntry then return end
@@ -11839,6 +11859,12 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		return CooldownPanels:ResolveEntryPandemicGlowColor(layout, currentEntry)
 	end
 
+	local function getResolvedOtherAuraGlowColor()
+		local _, currentEntry = getEntry()
+		local fallbackColor = getResolvedGlowColor()
+		return Helper.NormalizeColor(currentEntry and currentEntry.glowOtherAuraColor, fallbackColor)
+	end
+
 	local function getResolvedPandemicGlowStyle()
 		local layout = getLayout()
 		local _, currentEntry = getEntry()
@@ -11882,7 +11908,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 	local function entryUsesConfiguredGlow(currentEntry)
 		if not currentEntry or currentEntry.type == "MACRO" then return false end
 		if currentEntry.type == "SPELL" then return true end
-		if currentEntry.type == "CDM_AURA" then return currentEntry.glowReady == true or currentEntry.pandemicGlow == true end
+		if currentEntry.type == "CDM_AURA" then return currentEntry.glowReady == true or currentEntry.pandemicGlow == true or currentEntry.glowOtherAura ~= nil end
 		return currentEntry.glowReady == true
 	end
 
@@ -13653,6 +13679,32 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			set = function(_, value) setEntryBoolean("pandemicGlow", value) end,
 		},
 		{
+			name = L["CooldownPanelGlowOtherAura"] or "Glow when other aura is active",
+			kind = SettingType.Dropdown,
+			parentId = "cooldownPanelStandaloneGlow",
+			height = 260,
+			isShown = function() return getEffectiveType() == "CDM_AURA" end,
+			get = function()
+				local _, currentEntry = getEntry()
+				local config = CooldownPanels:NormalizeCDMAuraGlowOtherAura(currentEntry and currentEntry.glowOtherAura)
+				return config and tostring(config.cooldownID) or ""
+			end,
+			set = setGlowOtherAura,
+			generator = function(_, root)
+				root:CreateRadio(_G.NONE or "None", function()
+					local _, currentEntry = getEntry()
+					return CooldownPanels:NormalizeCDMAuraGlowOtherAura(currentEntry and currentEntry.glowOtherAura) == nil
+				end, function() setGlowOtherAura(nil, "") end)
+				for _, option in ipairs(CooldownPanels:GetCDMAuraGlowOtherAuraOptions(panelId, select(2, getEntry()))) do
+					root:CreateRadio(option.label, function()
+						local _, currentEntry = getEntry()
+						local config = CooldownPanels:NormalizeCDMAuraGlowOtherAura(currentEntry and currentEntry.glowOtherAura)
+						return config and tostring(config.cooldownID) == option.value or false
+					end, function() setGlowOtherAura(nil, option.value) end)
+				end
+			end,
+		},
+		{
 			name = L["CooldownPanelOverwriteGlobalDefault"] or "Overwrite global default",
 			kind = SettingType.Checkbox,
 			parentId = "cooldownPanelStandaloneGlow",
@@ -13821,6 +13873,33 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 				return { r = color[1], g = color[2], b = color[3], a = color[4] }
 			end,
 			set = setGlowColor,
+		},
+		{
+			name = L["CooldownPanelGlowColorOtherAura"] or "Other aura glow color",
+			kind = SettingType.Color,
+			parentId = "cooldownPanelStandaloneGlow",
+			hasOpacity = true,
+			isShown = function() return getEffectiveType() == "CDM_AURA" end,
+			disabled = function()
+				local _, currentEntry = getEntry()
+				return not (currentEntry and currentEntry.glowOtherAura ~= nil)
+			end,
+			get = function()
+				local color = getResolvedOtherAuraGlowColor()
+				return { r = color[1], g = color[2], b = color[3], a = color[4] }
+			end,
+			set = function(_, value)
+				local _, currentEntry = getEntry()
+				if not currentEntry then return end
+				local fallbackColor = getResolvedGlowColor()
+				local normalized = Helper.NormalizeColor(value, fallbackColor)
+				if normalized[1] == fallbackColor[1] and normalized[2] == fallbackColor[2] and normalized[3] == fallbackColor[3] and normalized[4] == fallbackColor[4] then
+					currentEntry.glowOtherAuraColor = nil
+				else
+					currentEntry.glowOtherAuraColor = normalized
+				end
+				refreshEntryViews()
+			end,
 		},
 		{
 			name = L["CooldownPanelGlowColorPandemic"] or "Pandemic glow color",
@@ -18200,6 +18279,74 @@ local function isSpellFlagged(map, baseId, effectiveId)
 	return false
 end
 
+function cdp.RUNTIME.NormalizeCDMAuraCooldownID(value)
+	local valueType = type(value)
+	if valueType == "number" then return value > 0 and value or nil end
+	if valueType == "string" then return value ~= "" and value or nil end
+	return nil
+end
+
+function cdp.RUNTIME.CDMAuraCooldownIDsEqual(a, b)
+	local left = cdp.RUNTIME.NormalizeCDMAuraCooldownID(a)
+	local right = cdp.RUNTIME.NormalizeCDMAuraCooldownID(b)
+	if left == nil or right == nil then return false end
+	return tostring(left) == tostring(right)
+end
+
+function CooldownPanels:NormalizeCDMAuraGlowOtherAura(value)
+	if type(value) ~= "table" then value = { cooldownID = value } end
+	local cooldownID = cdp.RUNTIME.NormalizeCDMAuraCooldownID(value.cooldownID)
+	if not cooldownID then return nil end
+	return {
+		cooldownID = cooldownID,
+		spellID = tonumber(value.spellID),
+		buffName = type(value.buffName) == "string" and value.buffName or nil,
+		iconTextureID = value.iconTextureID,
+		sourceType = value.sourceType,
+		sourceViewer = value.sourceViewer,
+	}
+end
+
+function CooldownPanels:GetCDMAuraGlowOtherAuraOptions(panelId, currentEntry)
+	local cdmAuras = self.CDMAuras
+	local options = {}
+	if not (cdmAuras and cdmAuras.ScanTrackedBuffs) then return options end
+	local buffs = cdmAuras:ScanTrackedBuffs(true)
+	if type(buffs) ~= "table" then return options end
+	for i = 1, #buffs do
+		local info = buffs[i]
+		local cooldownID = cdp.RUNTIME.NormalizeCDMAuraCooldownID(info and info.cooldownID)
+		if cooldownID and not cdp.RUNTIME.CDMAuraCooldownIDsEqual(cooldownID, currentEntry and currentEntry.cooldownID) then
+			local icon = tostring(info.iconTextureID or Helper.PREVIEW_ICON)
+			local nameText = tostring(info.buffName or cooldownID)
+			options[#options + 1] = {
+				value = tostring(cooldownID),
+				label = string.format("|T%s:14:14:0:0:64:64:4:60:4:60|t %s", icon, nameText),
+				info = self:NormalizeCDMAuraGlowOtherAura(info),
+			}
+		end
+	end
+	return options
+end
+
+function CooldownPanels:IsCDMAuraGlowOtherAuraActive(panelId, entryId, entry, entryLayout)
+	local cdmAuras = self.CDMAuras
+	local config = self:NormalizeCDMAuraGlowOtherAura(entry and entry.glowOtherAura)
+	if not (cdmAuras and cdmAuras.BuildRuntimeData and config) then return false end
+	if cdp.RUNTIME.CDMAuraCooldownIDsEqual(config.cooldownID, entry and entry.cooldownID) then return false end
+	local otherEntry = {
+		type = "CDM_AURA",
+		cooldownID = config.cooldownID,
+		spellID = config.spellID,
+		buffName = config.buffName,
+		iconTextureID = config.iconTextureID,
+		sourceType = config.sourceType or entry.sourceType,
+		sourceViewer = config.sourceViewer,
+	}
+	local otherData = cdmAuras:BuildRuntimeData(panelId, tostring(entryId or "") .. ":glowOtherAura", otherEntry, entryLayout, "HIDE")
+	return otherData and otherData.active == true or false
+end
+
 CooldownPanels.SetIconDesaturatedRuntime = function(texture, enabled, skipDesaturation)
 	if skipDesaturation then
 		texture:SetDesaturated(false)
@@ -18309,6 +18456,8 @@ function CooldownPanels:DisableEntryGlowForQuickSetup(panelId, entryId, entry)
 	entry.glowUseGlobal = false
 	entry.glowReady = false
 	entry.pandemicGlow = false
+	entry.glowOtherAura = nil
+	entry.glowOtherAuraColor = nil
 	entry.procGlowUseGlobal = false
 	entry.procGlowEnabled = false
 	entry.activationOverlayGlow = false
@@ -18885,6 +19034,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 					self:ResolveEntryCooldownVisuals(entryLayout, entry)
 				local cdmAuraActiveGlow = entry.type == "CDM_AURA" and entry.glowReady == true
 				local cdmAuraPandemicGlow = entry.type == "CDM_AURA" and entry.pandemicGlow == true
+				local cdmAuraOtherAuraGlow = entry.type == "CDM_AURA" and entry.glowOtherAura ~= nil
 				local glowDuration, glowColor, glowStyle, glowInset = CooldownPanels:ResolveEntryGlowStyle(entryLayout, entry)
 				local procGlowStyle, procGlowInset = CooldownPanels:ResolveEntryProcGlowVisual(entryLayout, entry)
 				local stateTextureType, stateTextureValue, stateTextureWidth, stateTextureHeight, stateTextureScale, stateTextureAngle, stateTextureDouble, stateTextureMirror, stateTextureMirrorSecond, stateTextureMirrorVertical, stateTextureMirrorVerticalSecond, stateTextureSpacingX, stateTextureSpacingY =
@@ -18893,6 +19043,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				if resolvedType == "CDM_AURA" then
 					pandemicGlowColor, pandemicGlowStyle, pandemicGlowInset = CooldownPanels:ResolveEntryPandemicGlowVisual(entryLayout, entry)
 				end
+				local otherAuraGlowColor = resolvedType == "CDM_AURA" and Helper.NormalizeColor(entry.glowOtherAuraColor, glowColor) or glowColor
 				local soundReady = false
 				local soundName = normalizeSoundName(nil)
 				local previewSound = false
@@ -18909,6 +19060,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				local procGlowEnabled = resolvedType == "SPELL" and CooldownPanels:ResolveEntryProcGlowEnabled(entryLayout, entry)
 				local procActive = resolvedType == "SPELL" and isSpellFlagged(overlayGlowSpells, baseSpellId, effectiveSpellId)
 				local overlayGlow = procActive and procGlowEnabled
+				local otherAuraGlowActive = cdmAuraOtherAuraGlow and CooldownPanels:IsCDMAuraGlowOtherAuraActive(panelId, entryId, entry, entryLayout)
 				local resourceInsufficient = resolvedType == "SPELL" and isSpellFlagged(powerInsufficientSpells, baseSpellId, effectiveSpellId)
 				local unusableForReadyGlow = resolvedType == "SPELL" and isSpellFlagged(spellUnusableSpells, baseSpellId, effectiveSpellId)
 				local readyGlowResourceBlocked = resolvedType == "SPELL" and readyGlowCheckPower and (resourceInsufficient or unusableForReadyGlow)
@@ -19098,6 +19250,11 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 					data.overlayGlowColor = pandemicGlowColor
 					data.overlayGlowStyle = pandemicGlowStyle
 					data.overlayGlowInset = pandemicGlowInset
+				elseif resolvedType == "CDM_AURA" and otherAuraGlowActive then
+					data.overlayGlow = true
+					data.overlayGlowColor = otherAuraGlowColor
+					data.overlayGlowStyle = glowStyle
+					data.overlayGlowInset = glowInset
 				elseif resolvedType == "CDM_AURA" and cdmAuraActiveGlow and cdmAuraData and cdmAuraData.active == true then
 					data.overlayGlow = true
 					data.overlayGlowColor = glowColor
@@ -19804,7 +19961,12 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				simpleGlowStyle = data.readyGlowStyle or simpleGlowStyle
 				simpleGlowInset = data.readyGlowInset or simpleGlowInset
 			end
-			if layoutEditActive and data.entry and data.entry.type ~= "MACRO" and (data.entry.glowReady == true or data.entry.pandemicGlow == true or data.entry.activationOverlayGlow == true) then
+			if
+				layoutEditActive
+				and data.entry
+				and data.entry.type ~= "MACRO"
+				and (data.entry.glowReady == true or data.entry.pandemicGlow == true or data.entry.glowOtherAura ~= nil or data.entry.activationOverlayGlow == true)
+			then
 				simpleGlowEnabled = true
 				simpleGlowColor = (
 					data.entry.type == "CDM_AURA"

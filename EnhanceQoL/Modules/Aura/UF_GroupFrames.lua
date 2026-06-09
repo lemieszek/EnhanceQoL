@@ -2272,7 +2272,7 @@ local function resolveDispelIndicatorEnabled(cfg, kind)
 	return overlay == true or glow == true
 end
 
-local function setTextSlot(st, fs, cacheKey, mode, cur, maxv, useShort, percentVal, delimiter, delimiter2, delimiter3, hidePercentSymbol, levelText, missingValue)
+local function setTextSlot(st, fs, cacheKey, mode, cur, maxv, useShort, percentVal, delimiter, delimiter2, delimiter3, hidePercentSymbol, levelText, missingValue, roundPercent)
 	if not (st and fs) then return end
 	if fs.SetAlpha then
 		if mode == "DEFICIT" then
@@ -2299,7 +2299,7 @@ local function setTextSlot(st, fs, cacheKey, mode, cur, maxv, useShort, percentV
 	end
 	local text
 	if UFHelper and UFHelper.formatText then
-		text = UFHelper.formatText(mode, cur, maxv, useShort, percentVal, delimiter, delimiter2, delimiter3, hidePercentSymbol, levelText, missingValue)
+		text = UFHelper.formatText(mode, cur, maxv, useShort, percentVal, delimiter, delimiter2, delimiter3, hidePercentSymbol, levelText, missingValue, roundPercent)
 	else
 		text = tostring(cur or 0)
 	end
@@ -2508,6 +2508,7 @@ function GF.CreateDataBarDefaults()
 		offsetCenter = { x = 0, y = 0 },
 		offsetRight = { x = -6, y = 0 },
 		useShortNumbers = true,
+		roundPercent = false,
 		hidePercentSymbol = false,
 		texture = "SOLID",
 	}
@@ -2955,6 +2956,7 @@ local DEFAULTS = {
 			useClassColor = true,
 			useCustomColor = false,
 			useShortNumbers = true,
+			roundPercent = false,
 		},
 		dataBar = GF.CreateDataBarDefaults(),
 		height = 100,
@@ -3099,6 +3101,7 @@ local DEFAULTS = {
 			texture = "DEFAULT",
 			smoothFill = false,
 			useShortNumbers = true,
+			roundPercent = false,
 		},
 		powerHeight = 6,
 		privateAuras = {
@@ -3767,6 +3770,7 @@ local DEFAULTS = {
 			useClassColor = true,
 			useCustomColor = false,
 			useShortNumbers = true,
+			roundPercent = false,
 		},
 		dataBar = GF.CreateDataBarDefaults(),
 		height = 100,
@@ -3878,6 +3882,7 @@ local DEFAULTS = {
 			texture = "DEFAULT",
 			smoothFill = false,
 			useShortNumbers = true,
+			roundPercent = false,
 		},
 		powerHeight = 4,
 		privateAuras = {
@@ -4408,6 +4413,7 @@ local DEFAULTS = {
 			useClassColor = true,
 			useCustomColor = false,
 			useShortNumbers = true,
+			roundPercent = false,
 		},
 		height = 100,
 		hideInClientScene = true,
@@ -4518,6 +4524,7 @@ local DEFAULTS = {
 			texture = "DEFAULT",
 			smoothFill = false,
 			useShortNumbers = true,
+			roundPercent = false,
 		},
 		powerHeight = 6,
 		privateAuras = {
@@ -5046,6 +5053,7 @@ local DEFAULTS = {
 			useClassColor = true,
 			useCustomColor = false,
 			useShortNumbers = true,
+			roundPercent = false,
 		},
 		height = 100,
 		hideInClientScene = true,
@@ -5156,6 +5164,7 @@ local DEFAULTS = {
 			texture = "DEFAULT",
 			smoothFill = false,
 			useShortNumbers = true,
+			roundPercent = false,
 		},
 		powerHeight = 6,
 		privateAuras = {
@@ -11205,6 +11214,7 @@ function GF:UpdateHealthValue(self, unit, st)
 				local delimiter3 = (UFHelper and UFHelper.getTextDelimiterTertiary and UFHelper.getTextDelimiterTertiary(hc, defH, delimiter, delimiter2))
 					or (hc.textDelimiterTertiary or defH.textDelimiterTertiary or delimiter2)
 				local useShort = hc.useShortNumbers ~= false
+				local roundPercent = hc.roundPercent == true
 				local hidePercentSymbol = hc.hidePercentSymbol == true
 				local percentVal
 				if UFHelper and (UFHelper.textModeUsesPercent(leftMode) or UFHelper.textModeUsesPercent(centerMode) or UFHelper.textModeUsesPercent(rightMode)) then
@@ -11223,7 +11233,7 @@ function GF:UpdateHealthValue(self, unit, st)
 						end
 					end
 				end
-				setTextSlot(st, st.healthTextLeft, "_lastHealthTextLeft", leftMode, cur, maxv, useShort, percentVal, delimiter, delimiter2, delimiter3, hidePercentSymbol, levelText, missingValue)
+				setTextSlot(st, st.healthTextLeft, "_lastHealthTextLeft", leftMode, cur, maxv, useShort, percentVal, delimiter, delimiter2, delimiter3, hidePercentSymbol, levelText, missingValue, roundPercent)
 				setTextSlot(
 					st,
 					st.healthTextCenter,
@@ -11238,9 +11248,10 @@ function GF:UpdateHealthValue(self, unit, st)
 					delimiter3,
 					hidePercentSymbol,
 					levelText,
-					missingValue
+					missingValue,
+					roundPercent
 				)
-				setTextSlot(st, st.healthTextRight, "_lastHealthTextRight", rightMode, cur, maxv, useShort, percentVal, delimiter, delimiter2, delimiter3, hidePercentSymbol, levelText, missingValue)
+				setTextSlot(st, st.healthTextRight, "_lastHealthTextRight", rightMode, cur, maxv, useShort, percentVal, delimiter, delimiter2, delimiter3, hidePercentSymbol, levelText, missingValue, roundPercent)
 				if dbc.enabled == true and st.dataBar and st.dataBar:IsShown() then
 					local dbDelimiter = (UFHelper and UFHelper.getTextDelimiter and UFHelper.getTextDelimiter(dbc, defDB)) or (dbc.textDelimiter or defDB.textDelimiter or " ")
 					local dbDelimiter2 = (UFHelper and UFHelper.getTextDelimiterSecondary and UFHelper.getTextDelimiterSecondary(dbc, defDB, dbDelimiter))
@@ -11262,9 +11273,10 @@ function GF:UpdateHealthValue(self, unit, st)
 						if UnitHealthMissing then dbMissingValue = UnitHealthMissing(unit) end
 						if dbMissingValue == nil and not secretHealth and type(cur) == "number" and type(maxv) == "number" then dbMissingValue = maxv - cur end
 					end
-					setTextSlot(st, st.dataBarTextLeft, "_lastDataBarTextLeft", dbLeft, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue)
-					setTextSlot(st, st.dataBarTextCenter, "_lastDataBarTextCenter", dbCenter, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue)
-					setTextSlot(st, st.dataBarTextRight, "_lastDataBarTextRight", dbRight, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue)
+					local dbRoundPercent = dbc.roundPercent == true
+					setTextSlot(st, st.dataBarTextLeft, "_lastDataBarTextLeft", dbLeft, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue, dbRoundPercent)
+					setTextSlot(st, st.dataBarTextCenter, "_lastDataBarTextCenter", dbCenter, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue, dbRoundPercent)
+					setTextSlot(st, st.dataBarTextRight, "_lastDataBarTextRight", dbRight, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue, dbRoundPercent)
 				else
 					GF.ClearDataBarText(st)
 				end
@@ -11457,6 +11469,7 @@ function GF:UpdatePowerValue(self, unit, st)
 				local delimiter3 = (UFHelper and UFHelper.getTextDelimiterTertiary and UFHelper.getTextDelimiterTertiary(pcfg, defP, delimiter, delimiter2))
 					or (pcfg.textDelimiterTertiary or defP.textDelimiterTertiary or delimiter2)
 				local useShort = pcfg.useShortNumbers ~= false
+				local roundPercent = pcfg.roundPercent == true
 				local hidePercentSymbol = pcfg.hidePercentSymbol == true
 				local percentVal
 				if UFHelper and (UFHelper.textModeUsesPercent(leftMode) or UFHelper.textModeUsesPercent(centerMode) or UFHelper.textModeUsesPercent(rightMode)) then
@@ -11470,9 +11483,9 @@ function GF:UpdatePowerValue(self, unit, st)
 				if UFHelper and UFHelper.textModeUsesLevel then
 					if UFHelper.textModeUsesLevel(leftMode) or UFHelper.textModeUsesLevel(centerMode) or UFHelper.textModeUsesLevel(rightMode) then levelText = getSafeLevelText(unit, false) end
 				end
-				setTextSlot(st, st.powerTextLeft, "_lastPowerTextLeft", leftMode, cur, maxv, useShort, percentVal, delimiter, delimiter2, delimiter3, hidePercentSymbol, levelText)
-				setTextSlot(st, st.powerTextCenter, "_lastPowerTextCenter", centerMode, cur, maxv, useShort, percentVal, delimiter, delimiter2, delimiter3, hidePercentSymbol, levelText)
-				setTextSlot(st, st.powerTextRight, "_lastPowerTextRight", rightMode, cur, maxv, useShort, percentVal, delimiter, delimiter2, delimiter3, hidePercentSymbol, levelText)
+				setTextSlot(st, st.powerTextLeft, "_lastPowerTextLeft", leftMode, cur, maxv, useShort, percentVal, delimiter, delimiter2, delimiter3, hidePercentSymbol, levelText, nil, roundPercent)
+				setTextSlot(st, st.powerTextCenter, "_lastPowerTextCenter", centerMode, cur, maxv, useShort, percentVal, delimiter, delimiter2, delimiter3, hidePercentSymbol, levelText, nil, roundPercent)
+				setTextSlot(st, st.powerTextRight, "_lastPowerTextRight", rightMode, cur, maxv, useShort, percentVal, delimiter, delimiter2, delimiter3, hidePercentSymbol, levelText, nil, roundPercent)
 			end
 		end
 	elseif st.powerTextLeft or st.powerTextCenter or st.powerTextRight then
@@ -19920,6 +19933,29 @@ local function buildEditModeSettings(kind, editModeId)
 			end,
 		},
 		{
+			name = L["Round percent values"] or "Round percent values",
+			kind = SettingType.Checkbox,
+			field = "dataBarRoundPercent",
+			parentId = "dataBar",
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				return dbc.roundPercent == true
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.dataBar = cfg.dataBar or {}
+				cfg.dataBar.roundPercent = value and true or false
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarRoundPercent", cfg.dataBar.roundPercent, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			isEnabled = function()
+				local cfg = getCfg(kind)
+				return cfg and cfg.dataBar and cfg.dataBar.enabled == true
+			end,
+		},
+		{
 			name = L["Hide % symbol"] or "Hide % symbol",
 			kind = SettingType.Checkbox,
 			field = "dataBarHidePercent",
@@ -20310,6 +20346,25 @@ local function buildEditModeSettings(kind, editModeId)
 				cfg.health = cfg.health or {}
 				cfg.health.useShortNumbers = value and true or false
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "healthShortNumbers", cfg.health.useShortNumbers, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+		},
+		{
+			name = L["Round percent values"] or "Round percent values",
+			kind = SettingType.Checkbox,
+			field = "healthRoundPercent",
+			parentId = "health",
+			get = function()
+				local cfg = getCfg(kind)
+				local hc = cfg and cfg.health or {}
+				return hc.roundPercent == true
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.health = cfg.health or {}
+				cfg.health.roundPercent = value and true or false
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "healthRoundPercent", cfg.health.roundPercent, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
 		},
@@ -24883,6 +24938,25 @@ local function buildEditModeSettings(kind, editModeId)
 				cfg.power = cfg.power or {}
 				cfg.power.useShortNumbers = value and true or false
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "powerShortNumbers", cfg.power.useShortNumbers, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+		},
+		{
+			name = L["Round percent values"] or "Round percent values",
+			kind = SettingType.Checkbox,
+			field = "powerRoundPercent",
+			parentId = "power",
+			get = function()
+				local cfg = getCfg(kind)
+				local pcfg = cfg and cfg.power or {}
+				return pcfg.roundPercent == true
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.power = cfg.power or {}
+				cfg.power.roundPercent = value and true or false
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "powerRoundPercent", cfg.power.roundPercent, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
 		},
@@ -29521,6 +29595,10 @@ local function applyEditModeData(kind, data)
 		cfg.health = cfg.health or {}
 		cfg.health.useShortNumbers = data.healthShortNumbers and true or false
 	end
+	if data.healthRoundPercent ~= nil then
+		cfg.health = cfg.health or {}
+		cfg.health.roundPercent = data.healthRoundPercent and true or false
+	end
 	if data.healthHidePercent ~= nil then
 		cfg.health = cfg.health or {}
 		cfg.health.hidePercentSymbol = data.healthHidePercent and true or false
@@ -30095,6 +30173,10 @@ local function applyEditModeData(kind, data)
 	if data.powerShortNumbers ~= nil then
 		cfg.power = cfg.power or {}
 		cfg.power.useShortNumbers = data.powerShortNumbers and true or false
+	end
+	if data.powerRoundPercent ~= nil then
+		cfg.power = cfg.power or {}
+		cfg.power.roundPercent = data.powerRoundPercent and true or false
 	end
 	if data.powerHidePercent ~= nil then
 		cfg.power = cfg.power or {}
@@ -30705,6 +30787,7 @@ function GF:EnsureEditMode()
 						or ((cfg.health and cfg.health.textDelimiterSecondary) or (cfg.health and cfg.health.textDelimiter) or " ")
 					),
 				healthShortNumbers = (cfg.health and cfg.health.useShortNumbers) ~= false,
+				healthRoundPercent = (cfg.health and cfg.health.roundPercent) == true,
 				healthHidePercent = (cfg.health and cfg.health.hidePercentSymbol) == true,
 				healthFontSize = hc.fontSize or defH.fontSize or 12,
 				healthFont = hc.font or defH.font or nil,
@@ -30974,6 +31057,7 @@ function GF:EnsureEditMode()
 				powerDelimiterTertiary = pcfg.textDelimiterTertiary
 					or ((DEFAULTS[kind] and DEFAULTS[kind].power and DEFAULTS[kind].power.textDelimiterTertiary) or (pcfg.textDelimiterSecondary or pcfg.textDelimiter or " ")),
 				powerShortNumbers = pcfg.useShortNumbers ~= false,
+				powerRoundPercent = pcfg.roundPercent == true,
 				powerHidePercent = pcfg.hidePercentSymbol == true,
 				powerFontSize = pcfg.fontSize or defP.fontSize or 10,
 				powerFont = pcfg.font or defP.font or nil,

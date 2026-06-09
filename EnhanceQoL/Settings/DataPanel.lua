@@ -331,6 +331,10 @@ function datapanel.isFriendsCustomColorEnabled()
 	return datapanel.getValue("friends", { useTextColor = false }, "useTextColor") == true
 end
 
+function datapanel.isLatencyCustomColorEnabled()
+	return datapanel.getValue("latency", { useTextColor = false }, "useTextColor") == true
+end
+
 function datapanel.isFriendsSplitDisplayEnabled()
 	return datapanel.getValue("friends", { splitDisplay = false }, "splitDisplay") == true
 end
@@ -984,10 +988,11 @@ datapanel.streams = {
 		id = "latency",
 		dbKey = "latency",
 		title = L["Latency"] or "Latency",
-		defaults = { fontSize = 14, displayMode = "both", textColor = datapanel.normalColor, fpsInterval = 0.25, pingInterval = 1, fpsSmoothWindow = 0.75, pingMode = "max", pingThresholdLow = 50, pingThresholdMid = 150, pingColorLow = { r = 0, g = 1, b = 0, a = 1 }, pingColorMid = { r = 1, g = 0.65, b = 0, a = 1 }, pingColorHigh = { r = 1, g = 0, b = 0, a = 1 } },
+		defaults = { fontSize = 14, displayMode = "both", useTextColor = false, textColor = datapanel.normalColor, fpsInterval = 0.25, pingInterval = 1, fpsSmoothWindow = 0.75, pingMode = "max", pingThresholdLow = 50, pingThresholdMid = 150, pingColorLow = { r = 0, g = 1, b = 0, a = 1 }, pingColorMid = { r = 1, g = 0.65, b = 0, a = 1 }, pingColorHigh = { r = 1, g = 0, b = 0, a = 1 } },
 		controls = {
 			datapanel.fontSlider,
-			datapanel.textColor,
+			{ key = "useTextColor", text = L["Use custom text color"] or "Use custom text color", default = false, refreshOnChange = true },
+			{ type = "color", key = "textColor", text = L["Text color"] or "Text color", default = datapanel.normalColor, isEnabled = datapanel.isLatencyCustomColorEnabled },
 			{ type = "dropdown", key = "displayMode", text = L["latencyPanelDisplay"] or "Panel display", list = { both = L["latencyPanelDisplayBoth"] or "FPS + Latency", ping = L["latencyPanelDisplayPing"] or "Latency only", fps = L["latencyPanelDisplayFPS"] or "FPS only" }, default = "both" },
 			{ type = "slider", key = "fpsInterval", text = L["FPS update interval (s)"] or "FPS update interval (s)", min = 0.1, max = 1, step = 0.05, default = 0.25 },
 			{ type = "slider", key = "fpsSmoothWindow", text = L["FPS smoothing window (s)"] or "FPS smoothing window (s)", min = 0, max = 1.5, step = 0.05, default = 0.75 },

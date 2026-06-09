@@ -76,6 +76,15 @@
 - When handling Blizzard secret values, do not do Lua arithmetic, comparisons, `tonumber`, `min`, `max`, sorting, modulo, or similar numeric operations on the secret value.
 - Pass secret values through to Blizzard APIs that can consume them directly, such as status bar setters, instead of converting or deriving values in Lua.
 
+## Large Lua Files and Local Limits
+
+- Lua chunks have a hard limit of 200 local variables. In large addon files, avoid adding new top-level locals casually.
+- Prefer a single module table such as `local UF = {}`, `local RB = {}`, or `local M = {}` for grouped functions, constants, and runtime state when a file is large or already near the local limit.
+- Store related values as table fields, such as `UF.constants`, `UF.state`, or `UF.helpers`, instead of many independent top-level locals.
+- Use local upvalues only for genuinely hot paths, imported APIs, or small scoped helpers where the benefit is clear.
+- Before adding several new locals to a large file, check whether the file already has local-limit warnings or history, and prefer table fields if in doubt.
+- Do not refactor an existing large file only to reduce locals unless required for the task. Keep changes scoped.
+
 ## EditMode MultiDropdowns
 
 - `SettingType.MultiDropdown` callbacks must not rebuild or refresh the open EditMode settings dialog while the dropdown menu is open.

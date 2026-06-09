@@ -1,15 +1,28 @@
 # Changelog
 
+<!--@eqol-beta@-->
+## [11.1.0-beta5] - 2026-06-09
+
+### ✨ Added
+
+- Cooldown Panels: Added an optional tracked-aura glow trigger that can glow a CDM aura entry when another Cooldown Manager aura is active, including a separate optional glow color.
+- Unit Frames / Group Frames: Added a Round percent values option for group health, power, and Data Bar text.
+
+### 🐛 Fixed
+
+- Data Panels: Fixed the Latency stream overriding panel-wide class text colors unless its own custom text color option is enabled.
+- Resource Bars / Druid Forms: Fixed Classic resource bars showing resources from inactive forms when manual visibility rules such as Player is casting were active.
+
+<!--@end-eqol-beta@-->
+
+---
+
 ## [11.1.0-beta4] - 2026-06-08
 
 ### ✨ Added
 
 - Unit Frames / Group Frames: Added an optional Data Bar for party, raid, main tank, and main assist frames with position, color, texture, font, and health text slot settings.
 - Resource Bars: Added Vengeance Demon Hunter Soul Fragments tracking for the Secondary resource bar.
-
-### 🔁 Changed
-
-- Resource Bars: Moved Augmentation Evoker Ebon Might to the Shared Secondary resource slot and Mana to the Shared Tertiary slot.
 
 ### 🐛 Fixed
 

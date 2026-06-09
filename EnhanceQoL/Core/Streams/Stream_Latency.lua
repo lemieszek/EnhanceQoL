@@ -27,7 +27,7 @@ local lastPingUpdate = 0
 local pingHome, pingWorld = nil, nil
 local emaFPS -- exponential moving average for FPS
 -- Change detection cache (declare early so callbacks see locals, not globals)
-local lastFps, lastHome, lastWorld, lastPingMode, lastDisplay
+local lastFps, lastHome, lastWorld, lastPingMode, lastDisplay, lastBaseHex
 
 -- Color helpers (hex without leading #)
 local function fpsColorHex(v)
@@ -65,6 +65,7 @@ local function ensureDB()
 
 	db.fontSize = db.fontSize or 14
 	db.displayMode = db.displayMode or "both"
+	if db.useTextColor == nil then db.useTextColor = false end
 	if not db.textColor then
 		local r, g, b = 1, 0.82, 0
 		if NORMAL_FONT_COLOR and NORMAL_FONT_COLOR.GetRGB then
@@ -109,8 +110,12 @@ end
 local function updateLatency(s)
 	s = s or stream
 	ensureDB()
-	local baseHex = colorToHex(db and db.textColor)
-	local function base(text) return format("|cff%s%s|r", baseHex, text or "") end
+	local baseHex = db and db.useTextColor and colorToHex(db.textColor) or nil
+	local function base(text)
+		text = text or ""
+		if baseHex then return format("|cff%s%s|r", baseHex, text) end
+		return text
+	end
 
 	local displayMode = db.displayMode or "both"
 	local showFps = displayMode ~= "ping"
@@ -143,7 +148,7 @@ local function updateLatency(s)
 		end
 	end
 
-	local needsUpdate = displayMode ~= lastDisplay
+	local needsUpdate = displayMode ~= lastDisplay or baseHex ~= lastBaseHex
 	if showFps and fpsValue ~= lastFps then needsUpdate = true end
 	if showPing and ((pingHome or 0) ~= (lastHome or -1) or (pingWorld or 0) ~= (lastWorld or -1) or db.pingMode ~= lastPingMode) then needsUpdate = true end
 
@@ -198,6 +203,7 @@ local function updateLatency(s)
 		lastHome = showPing and (pingHome or 0) or nil
 		lastWorld = showPing and (pingWorld or 0) or nil
 		lastPingMode = showPing and db.pingMode or nil
+		lastBaseHex = baseHex
 	end
 
 	-- Only touch fontSize if actually changed
@@ -205,6 +211,7 @@ local function updateLatency(s)
 		s.snapshot.fontSize = size
 		s.snapshot._fs = size
 	end
+	s.snapshot.skipPanelClassColor = db and db.useTextColor == true or nil
 end
 
 local provider = {

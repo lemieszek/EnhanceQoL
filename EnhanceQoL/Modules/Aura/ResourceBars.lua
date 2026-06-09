@@ -1431,7 +1431,7 @@ ResourceBars.SHARED_SLOT_ASSIGNMENTS = {
 	EVOKER = {
 		[1] = { MAIN = "MANA", SECONDARY = "ESSENCE" },
 		[2] = { MAIN = "MANA", SECONDARY = "ESSENCE" },
-		[3] = { MAIN = "ESSENCE", SECONDARY = "EBON_MIGHT", TERTIARY = "MANA" },
+		[3] = { MAIN = "ESSENCE", SECONDARY = "MANA", TERTIARY = "EBON_MIGHT" },
 	},
 	SHAMAN = {
 		[1] = { MAIN = "MAELSTROM", SECONDARY = "MANA" },
@@ -7867,6 +7867,10 @@ end
 
 function visibilityLogic:ShouldShowManual(cfg, visibilityCfg)
 	if not cfg then return false end
+	if addon.variables.unitClass == "DRUID" and type(cfg.showForms) == "table" then
+		local currentForm = ResourceBars.GetCurrentDruidFormKey and ResourceBars.GetCurrentDruidFormKey()
+		if currentForm and cfg.showForms[currentForm] == false then return false end
+	end
 	if ResourceBars.ShouldHideInVehicle and ResourceBars.ShouldHideInVehicle(cfg) then
 		if UnitInVehicle and UnitInVehicle("player") then return false end
 	end
