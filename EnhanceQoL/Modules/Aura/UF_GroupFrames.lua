@@ -46,6 +46,23 @@ GF._sharedEdit = {
 }
 local ensureAuraConfig = GFH.EnsureAuraConfig
 local L = LibStub("AceLocale-3.0"):GetLocale("EnhanceQoL")
+GF._sharedEdit.dataBarTextModeOpts = {
+	{ value = "NAME", label = NAME or L["Name"] or "Name", text = NAME or L["Name"] or "Name" },
+	{ value = "LEVEL", label = LEVEL or L["Level"] or "Level", text = LEVEL or L["Level"] or "Level" },
+}
+do
+	local seen = { NAME = true, LEVEL = true }
+	local function addTextOptions(options)
+		for _, option in ipairs(options or EMPTY) do
+			if option.value and not seen[option.value] then
+				seen[option.value] = true
+				GF._sharedEdit.dataBarTextModeOpts[#GF._sharedEdit.dataBarTextModeOpts + 1] = option
+			end
+		end
+	end
+	addTextOptions(GF._sharedEdit.textModeOpts)
+	addTextOptions(GF._sharedEdit.healthTextModeOpts)
+end
 local GROUP_DEBUFF_FILTER_ALL = "ALL"
 local GROUP_DEBUFF_FILTER_CROWD_CONTROL = "CROWD_CONTROL"
 local GROUP_DEBUFF_FILTER_IMPORTANT = "IMPORTANT"
@@ -2272,7 +2289,7 @@ local function resolveDispelIndicatorEnabled(cfg, kind)
 	return overlay == true or glow == true
 end
 
-local function setTextSlot(st, fs, cacheKey, mode, cur, maxv, useShort, percentVal, delimiter, delimiter2, delimiter3, hidePercentSymbol, levelText, missingValue, roundPercent)
+local function setTextSlot(st, fs, cacheKey, mode, cur, maxv, useShort, percentVal, delimiter, delimiter2, delimiter3, hidePercentSymbol, levelText, missingValue, roundPercent, nameText)
 	if not (st and fs) then return end
 	if fs.SetAlpha then
 		if mode == "DEFICIT" then
@@ -2298,7 +2315,9 @@ local function setTextSlot(st, fs, cacheKey, mode, cur, maxv, useShort, percentV
 		return
 	end
 	local text
-	if UFHelper and UFHelper.formatText then
+	if mode == "NAME" then
+		text = nameText or ""
+	elseif UFHelper and UFHelper.formatText then
 		text = UFHelper.formatText(mode, cur, maxv, useShort, percentVal, delimiter, delimiter2, delimiter3, hidePercentSymbol, levelText, missingValue, roundPercent)
 	else
 		text = tostring(cur or 0)
@@ -11320,15 +11339,20 @@ function GF:UpdateHealthValue(self, unit, st)
 					if UFHelper and UFHelper.textModeUsesLevel and dbLevelText == nil then
 						if UFHelper.textModeUsesLevel(dbLeft) or UFHelper.textModeUsesLevel(dbCenter) or UFHelper.textModeUsesLevel(dbRight) then dbLevelText = getSafeLevelText(unit, false) end
 					end
+					local dbNameText
+					if dbLeft == "NAME" or dbCenter == "NAME" or dbRight == "NAME" then
+						dbNameText = (UnitName and UnitName(unit)) or ""
+						if isEditModeActive() and self._eqolPreview and st._previewName then dbNameText = st._previewName end
+					end
 					local dbMissingValue = missingValue
 					if dbMissingValue == nil and (GFH.TextModeUsesDeficit(dbLeft) or GFH.TextModeUsesDeficit(dbCenter) or GFH.TextModeUsesDeficit(dbRight)) then
 						if UnitHealthMissing then dbMissingValue = UnitHealthMissing(unit) end
 						if dbMissingValue == nil and not secretHealth and type(cur) == "number" and type(maxv) == "number" then dbMissingValue = maxv - cur end
 					end
 					local dbRoundPercent = dbc.roundPercent == true
-					setTextSlot(st, st.dataBarTextLeft, "_lastDataBarTextLeft", dbLeft, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue, dbRoundPercent)
-					setTextSlot(st, st.dataBarTextCenter, "_lastDataBarTextCenter", dbCenter, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue, dbRoundPercent)
-					setTextSlot(st, st.dataBarTextRight, "_lastDataBarTextRight", dbRight, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue, dbRoundPercent)
+					setTextSlot(st, st.dataBarTextLeft, "_lastDataBarTextLeft", dbLeft, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue, dbRoundPercent, dbNameText)
+					setTextSlot(st, st.dataBarTextCenter, "_lastDataBarTextCenter", dbCenter, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue, dbRoundPercent, dbNameText)
+					setTextSlot(st, st.dataBarTextRight, "_lastDataBarTextRight", dbRight, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue, dbRoundPercent, dbNameText)
 				else
 					GF.ClearDataBarText(st)
 				end
@@ -11877,9 +11901,12 @@ function GF:UnitButton_RegisterUnitEvents(self, unit)
 	if not wantsLevel and UFHelper and UFHelper.textModeUsesLevel then
 		local hc = cfg and cfg.health or {}
 		local pcfg = cfg and cfg.power or {}
+		local dbc = cfg and cfg.dataBar or {}
 		if UFHelper.textModeUsesLevel(hc.textLeft) or UFHelper.textModeUsesLevel(hc.textCenter) or UFHelper.textModeUsesLevel(hc.textRight) then
 			wantsLevel = true
 		elseif UFHelper.textModeUsesLevel(pcfg.textLeft) or UFHelper.textModeUsesLevel(pcfg.textCenter) or UFHelper.textModeUsesLevel(pcfg.textRight) then
+			wantsLevel = true
+		elseif dbc.enabled == true and (UFHelper.textModeUsesLevel(dbc.textLeft) or UFHelper.textModeUsesLevel(dbc.textCenter) or UFHelper.textModeUsesLevel(dbc.textRight)) then
 			wantsLevel = true
 		end
 	end
@@ -19955,7 +19982,7 @@ local function buildEditModeSettings(kind, editModeId)
 				GF:ApplyHeaderAttributes(kind)
 			end,
 			generator = function(_, root)
-				for _, option in ipairs(GF._sharedEdit.healthTextModeOpts) do
+				for _, option in ipairs(GF._sharedEdit.dataBarTextModeOpts) do
 					root:CreateRadio(option.label, function()
 						local cfg = getCfg(kind)
 						local dbc = cfg and cfg.dataBar or {}
@@ -19994,7 +20021,7 @@ local function buildEditModeSettings(kind, editModeId)
 				GF:ApplyHeaderAttributes(kind)
 			end,
 			generator = function(_, root)
-				for _, option in ipairs(GF._sharedEdit.healthTextModeOpts) do
+				for _, option in ipairs(GF._sharedEdit.dataBarTextModeOpts) do
 					root:CreateRadio(option.label, function()
 						local cfg = getCfg(kind)
 						local dbc = cfg and cfg.dataBar or {}
@@ -20033,7 +20060,7 @@ local function buildEditModeSettings(kind, editModeId)
 				GF:ApplyHeaderAttributes(kind)
 			end,
 			generator = function(_, root)
-				for _, option in ipairs(GF._sharedEdit.healthTextModeOpts) do
+				for _, option in ipairs(GF._sharedEdit.dataBarTextModeOpts) do
 					root:CreateRadio(option.label, function()
 						local cfg = getCfg(kind)
 						local dbc = cfg and cfg.dataBar or {}

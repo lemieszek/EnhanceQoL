@@ -30,195 +30,6 @@ local TICK_INTERVAL = 0.2
 local CHALLENGERS_PERIL_AFFIX_ID = 152
 local DEATH_ICON_ATLAS = "poi-graveyard-neutral"
 
-local DB = {
-	enabled = "mythicPlusTimerEnabled",
-	showDungeon = "mythicPlusTimerShowDungeon",
-	dungeonDisplay = "mythicPlusTimerDungeonDisplay",
-	showAffixes = "mythicPlusTimerShowAffixes",
-	showAffixIcons = "mythicPlusTimerShowAffixIcons",
-	affixDisplay = "mythicPlusTimerAffixDisplay",
-	showTimer = "mythicPlusTimerShowTimer",
-	showChestTimers = "mythicPlusTimerShowChestTimers",
-	showDeaths = "mythicPlusTimerShowDeaths",
-	deathDisplay = "mythicPlusTimerDeathDisplay",
-	showObjectives = "mythicPlusTimerShowObjectives",
-	showEnemyForces = "mythicPlusTimerShowEnemyForces",
-	showObjectiveBars = "mythicPlusTimerShowObjectiveBars",
-	showObjectiveTimes = "mythicPlusTimerShowObjectiveTimes",
-	showObjectiveBestTimes = "mythicPlusTimerShowObjectiveBestTimes",
-	showOnlyInMythicPlus = "mythicPlusTimerShowOnlyInMythicPlus",
-	visibility = "mythicPlusTimerVisibility",
-	updateRate = "mythicPlusTimerUpdateRate",
-	tooltip = "mythicPlusTimerTooltip",
-	layoutMode = "mythicPlusTimerLayoutMode",
-	panelHeight = "mythicPlusTimerPanelHeight",
-	showKeyLevel = "mythicPlusTimerShowKeyLevel",
-	showBestTime = "mythicPlusTimerShowBestTime",
-	showBestDelta = "mythicPlusTimerShowBestDelta",
-	showEnemyPercent = "mythicPlusTimerShowEnemyPercent",
-	showPanelTimerBar = "mythicPlusTimerShowPanelTimerBar",
-	showPanelEnemyBar = "mythicPlusTimerShowPanelEnemyBar",
-	dungeonAnchor = "mythicPlusTimerDungeonAnchor",
-	dungeonOffsetX = "mythicPlusTimerDungeonOffsetX",
-	dungeonOffsetY = "mythicPlusTimerDungeonOffsetY",
-	keyLevelAnchor = "mythicPlusTimerKeyLevelAnchor",
-	keyLevelOffsetX = "mythicPlusTimerKeyLevelOffsetX",
-	keyLevelOffsetY = "mythicPlusTimerKeyLevelOffsetY",
-	timerAnchor = "mythicPlusTimerTimerAnchor",
-	timerOffsetX = "mythicPlusTimerTimerOffsetX",
-	timerOffsetY = "mythicPlusTimerTimerOffsetY",
-	chest2Anchor = "mythicPlusTimerChest2Anchor",
-	chest2OffsetX = "mythicPlusTimerChest2OffsetX",
-	chest2OffsetY = "mythicPlusTimerChest2OffsetY",
-	chest3Anchor = "mythicPlusTimerChest3Anchor",
-	chest3OffsetX = "mythicPlusTimerChest3OffsetX",
-	chest3OffsetY = "mythicPlusTimerChest3OffsetY",
-	deathsAnchor = "mythicPlusTimerDeathsAnchor",
-	deathsOffsetX = "mythicPlusTimerDeathsOffsetX",
-	deathsOffsetY = "mythicPlusTimerDeathsOffsetY",
-	enemyPercentAnchor = "mythicPlusTimerEnemyPercentAnchor",
-	enemyPercentOffsetX = "mythicPlusTimerEnemyPercentOffsetX",
-	enemyPercentOffsetY = "mythicPlusTimerEnemyPercentOffsetY",
-	bestTimeAnchor = "mythicPlusTimerBestTimeAnchor",
-	bestTimeOffsetX = "mythicPlusTimerBestTimeOffsetX",
-	bestTimeOffsetY = "mythicPlusTimerBestTimeOffsetY",
-	panelAffixesAnchor = "mythicPlusTimerPanelAffixesAnchor",
-	panelAffixesOffsetX = "mythicPlusTimerPanelAffixesOffsetX",
-	panelAffixesOffsetY = "mythicPlusTimerPanelAffixesOffsetY",
-	panelAffixesFontSize = "mythicPlusTimerPanelAffixesFontSize",
-	panelAffixIconSize = "mythicPlusTimerPanelAffixIconSize",
-	panelDungeonFontSize = "mythicPlusTimerPanelDungeonFontSize",
-	panelKeyLevelFontSize = "mythicPlusTimerPanelKeyLevelFontSize",
-	panelTimerFontSize = "mythicPlusTimerPanelTimerFontSize",
-	panelChestFontSize = "mythicPlusTimerPanelChestFontSize",
-	panelChestHideLabels = "mythicPlusTimerPanelChestHideLabels",
-	panelDeathsFontSize = "mythicPlusTimerPanelDeathsFontSize",
-	panelDeathIconSize = "mythicPlusTimerPanelDeathIconSize",
-	panelEnemyPercentFontSize = "mythicPlusTimerPanelEnemyPercentFontSize",
-	panelBestTimeFontSize = "mythicPlusTimerPanelBestTimeFontSize",
-	panelObjectivesAnchor = "mythicPlusTimerPanelObjectivesAnchor",
-	panelObjectivesOffsetX = "mythicPlusTimerPanelObjectivesOffsetX",
-	panelObjectivesOffsetY = "mythicPlusTimerPanelObjectivesOffsetY",
-	panelObjectivesWidth = "mythicPlusTimerPanelObjectivesWidth",
-	panelObjectivesFontSize = "mythicPlusTimerPanelObjectivesFontSize",
-	panelObjectivesSpacing = "mythicPlusTimerPanelObjectivesSpacing",
-	panelBarWidth = "mythicPlusTimerPanelBarWidth",
-	panelBarHeight = "mythicPlusTimerPanelBarHeight",
-	panelTimerBarWidth = "mythicPlusTimerPanelTimerBarWidth",
-	panelTimerBarHeight = "mythicPlusTimerPanelTimerBarHeight",
-	panelTimerBarColor = "mythicPlusTimerPanelTimerBarColor",
-	panelTimerBarExpiredColor = "mythicPlusTimerPanelTimerBarExpiredColor",
-	panelTimerBarTexture = "mythicPlusTimerPanelTimerBarTexture",
-	panelTimerBarBackgroundTexture = "mythicPlusTimerPanelTimerBarBackgroundTexture",
-	panelTimerBarBackgroundColor = "mythicPlusTimerPanelTimerBarBackgroundColor",
-	panelTimerBarBorderEnabled = "mythicPlusTimerPanelTimerBarBorderEnabled",
-	panelTimerBarBorderTexture = "mythicPlusTimerPanelTimerBarBorderTexture",
-	panelTimerBarBorderColor = "mythicPlusTimerPanelTimerBarBorderColor",
-	panelTimerBarBorderSize = "mythicPlusTimerPanelTimerBarBorderSize",
-	panelTimerBarBorderOffset = "mythicPlusTimerPanelTimerBarBorderOffset",
-	panelTimerBarChestMarkers = "mythicPlusTimerPanelTimerBarChestMarkers",
-	panelTimerBarChestMarkerColor = "mythicPlusTimerPanelTimerBarChestMarkerColor",
-	panelTimerBarChestMarkerWidth = "mythicPlusTimerPanelTimerBarChestMarkerWidth",
-	panelTimerBarChestTimeText = "mythicPlusTimerPanelTimerBarChestTimeText",
-	panelTimerBarChestTimeTextOffsetY = "mythicPlusTimerPanelTimerBarChestTimeTextOffsetY",
-	panelTimerBarChestTimeTextFontSize = "mythicPlusTimerPanelTimerBarChestTimeTextFontSize",
-	panelTimerBarChestTimeTextColor = "mythicPlusTimerPanelTimerBarChestTimeTextColor",
-	panelTimerBarAnchor = "mythicPlusTimerPanelTimerBarAnchor",
-	panelTimerBarOffsetX = "mythicPlusTimerPanelTimerBarOffsetX",
-	panelTimerBarOffsetY = "mythicPlusTimerPanelTimerBarOffsetY",
-	panelEnemyBarWidth = "mythicPlusTimerPanelEnemyBarWidth",
-	panelEnemyBarHeight = "mythicPlusTimerPanelEnemyBarHeight",
-	panelEnemyBarColor = "mythicPlusTimerPanelEnemyBarColor",
-	panelEnemyBarTexture = "mythicPlusTimerPanelEnemyBarTexture",
-	panelEnemyBarBackgroundTexture = "mythicPlusTimerPanelEnemyBarBackgroundTexture",
-	panelEnemyBarBackgroundColor = "mythicPlusTimerPanelEnemyBarBackgroundColor",
-	panelEnemyBarBorderEnabled = "mythicPlusTimerPanelEnemyBarBorderEnabled",
-	panelEnemyBarBorderTexture = "mythicPlusTimerPanelEnemyBarBorderTexture",
-	panelEnemyBarBorderColor = "mythicPlusTimerPanelEnemyBarBorderColor",
-	panelEnemyBarBorderSize = "mythicPlusTimerPanelEnemyBarBorderSize",
-	panelEnemyBarBorderOffset = "mythicPlusTimerPanelEnemyBarBorderOffset",
-	panelEnemyBarAnchor = "mythicPlusTimerPanelEnemyBarAnchor",
-	panelEnemyBarOffsetX = "mythicPlusTimerPanelEnemyBarOffsetX",
-	panelEnemyBarOffsetY = "mythicPlusTimerPanelEnemyBarOffsetY",
-	panelEnemyBarTextEnabled = "mythicPlusTimerPanelEnemyBarTextEnabled",
-	panelEnemyBarTextAlign = "mythicPlusTimerPanelEnemyBarTextAlign",
-	panelEnemyBarTextOffsetY = "mythicPlusTimerPanelEnemyBarTextOffsetY",
-	panelEnemyBarTextFontSize = "mythicPlusTimerPanelEnemyBarTextFontSize",
-	panelEnemyBarTextColor = "mythicPlusTimerPanelEnemyBarTextColor",
-	width = "mythicPlusTimerWidth",
-	rowHeight = "mythicPlusTimerRowHeight",
-	rowSpacing = "mythicPlusTimerRowSpacing",
-	growth = "mythicPlusTimerGrowth",
-	align = "mythicPlusTimerAlign",
-	iconOffsetX = "mythicPlusTimerIconOffsetX",
-	iconOffsetY = "mythicPlusTimerIconOffsetY",
-	iconGap = "mythicPlusTimerIconGap",
-	textOffsetX = "mythicPlusTimerTextOffsetX",
-	textOffsetY = "mythicPlusTimerTextOffsetY",
-	valueOffsetX = "mythicPlusTimerValueOffsetX",
-	valueOffsetY = "mythicPlusTimerValueOffsetY",
-	barPosition = "mythicPlusTimerBarPosition",
-	barHeight = "mythicPlusTimerBarHeight",
-	barOffsetX = "mythicPlusTimerBarOffsetX",
-	barOffsetY = "mythicPlusTimerBarOffsetY",
-	barWidthOffset = "mythicPlusTimerBarWidthOffset",
-	texture = "mythicPlusTimerTexture",
-	barBackgroundTexture = "mythicPlusTimerBarBackgroundTexture",
-	barBackgroundColor = "mythicPlusTimerBarBackgroundColor",
-	barBorderEnabled = "mythicPlusTimerBarBorderEnabled",
-	barBorderTexture = "mythicPlusTimerBarBorderTexture",
-	barBorderColor = "mythicPlusTimerBarBorderColor",
-	barBorderSize = "mythicPlusTimerBarBorderSize",
-	barBorderOffset = "mythicPlusTimerBarBorderOffset",
-	fontFace = "mythicPlusTimerFontFace",
-	fontOutline = "mythicPlusTimerFontOutline",
-	fontSize = "mythicPlusTimerFontSize",
-	titleFontSize = "mythicPlusTimerTitleFontSize",
-	timerFontSize = "mythicPlusTimerTimerFontSize",
-	dungeonColor = "mythicPlusTimerDungeonColor",
-	affixColor = "mythicPlusTimerAffixColor",
-	timerColor = "mythicPlusTimerTimerColor",
-	timerExpiredColor = "mythicPlusTimerTimerExpiredColor",
-	chestColor = "mythicPlusTimerChestColor",
-	deathColor = "mythicPlusTimerDeathColor",
-	objectiveColor = "mythicPlusTimerObjectiveColor",
-	objectiveCompleteColor = "mythicPlusTimerObjectiveCompleteColor",
-	enemyForcesColor = "mythicPlusTimerEnemyForcesColor",
-	backdropEnabled = "mythicPlusTimerBackdropEnabled",
-	backdropTexture = "mythicPlusTimerBackdropTexture",
-	backdropColor = "mythicPlusTimerBackdropColor",
-	backdropAnchor = "mythicPlusTimerBackdropAnchor",
-	backdropOffsetX = "mythicPlusTimerBackdropOffsetX",
-	backdropOffsetY = "mythicPlusTimerBackdropOffsetY",
-	backdropSizeOffsetX = "mythicPlusTimerBackdropSizeOffsetX",
-	backdropSizeOffsetY = "mythicPlusTimerBackdropSizeOffsetY",
-	headerBarEnabled = "mythicPlusTimerHeaderBarEnabled",
-	headerBarUseCustomTexture = "mythicPlusTimerHeaderBarUseCustomTexture",
-	headerBarCustomTexture = "mythicPlusTimerHeaderBarCustomTexture",
-	headerBarTexture = "mythicPlusTimerHeaderBarTexture",
-	headerBarColor = "mythicPlusTimerHeaderBarColor",
-	headerBarAnchor = "mythicPlusTimerHeaderBarAnchor",
-	headerBarOffsetX = "mythicPlusTimerHeaderBarOffsetX",
-	headerBarOffsetY = "mythicPlusTimerHeaderBarOffsetY",
-	headerBarSizeOffsetX = "mythicPlusTimerHeaderBarSizeOffsetX",
-	headerBarSizeOffsetY = "mythicPlusTimerHeaderBarSizeOffsetY",
-	footerBarEnabled = "mythicPlusTimerFooterBarEnabled",
-	footerBarUseCustomTexture = "mythicPlusTimerFooterBarUseCustomTexture",
-	footerBarCustomTexture = "mythicPlusTimerFooterBarCustomTexture",
-	footerBarTexture = "mythicPlusTimerFooterBarTexture",
-	footerBarColor = "mythicPlusTimerFooterBarColor",
-	footerBarAnchor = "mythicPlusTimerFooterBarAnchor",
-	footerBarOffsetX = "mythicPlusTimerFooterBarOffsetX",
-	footerBarOffsetY = "mythicPlusTimerFooterBarOffsetY",
-	footerBarSizeOffsetX = "mythicPlusTimerFooterBarSizeOffsetX",
-	footerBarSizeOffsetY = "mythicPlusTimerFooterBarSizeOffsetY",
-	borderEnabled = "mythicPlusTimerBorderEnabled",
-	borderTexture = "mythicPlusTimerBorderTexture",
-	borderColor = "mythicPlusTimerBorderColor",
-	borderSize = "mythicPlusTimerBorderSize",
-	borderInset = "mythicPlusTimerBorderInset",
-}
-
 Timer.defaults = Timer.defaults
 	or {
 		enabled = false,
@@ -287,9 +98,12 @@ Timer.defaults = Timer.defaults
 		panelEnemyPercentFontSize = 12,
 		panelBestTimeFontSize = 12,
 		panelObjectivesAnchor = "TOPLEFT",
+		panelObjectivesGrowth = "DOWN",
 		panelObjectivesOffsetX = 12,
 		panelObjectivesOffsetY = -78,
 		panelObjectivesWidth = 240,
+		panelObjectivesFontFace = GLOBAL_FONT_KEY,
+		panelObjectivesFontOutline = GLOBAL_STYLE_KEY,
 		panelObjectivesFontSize = 12,
 		panelObjectivesSpacing = 2,
 		panelBarWidth = 220,
@@ -306,6 +120,9 @@ Timer.defaults = Timer.defaults
 		panelTimerBarBorderColor = { r = 0, g = 0, b = 0, a = 0.85 },
 		panelTimerBarBorderSize = 1,
 		panelTimerBarBorderOffset = 0,
+		panelTimerBarBorderSeparateOffset = false,
+		panelTimerBarBorderOffsetX = 0,
+		panelTimerBarBorderOffsetY = 0,
 		panelTimerBarChestMarkers = false,
 		panelTimerBarChestMarkerColor = { r = 1, g = 1, b = 1, a = 0.85 },
 		panelTimerBarChestMarkerWidth = 2,
@@ -327,6 +144,9 @@ Timer.defaults = Timer.defaults
 		panelEnemyBarBorderColor = { r = 0, g = 0, b = 0, a = 0.85 },
 		panelEnemyBarBorderSize = 1,
 		panelEnemyBarBorderOffset = 0,
+		panelEnemyBarBorderSeparateOffset = false,
+		panelEnemyBarBorderOffsetX = 0,
+		panelEnemyBarBorderOffsetY = 0,
 		panelEnemyBarAnchor = "TOPLEFT",
 		panelEnemyBarOffsetX = 20,
 		panelEnemyBarOffsetY = -64,
@@ -360,6 +180,9 @@ Timer.defaults = Timer.defaults
 		barBorderColor = { r = 0, g = 0, b = 0, a = 0.85 },
 		barBorderSize = 1,
 		barBorderOffset = 0,
+		barBorderSeparateOffset = false,
+		barBorderOffsetX = 0,
+		barBorderOffsetY = 0,
 		fontFace = GLOBAL_FONT_KEY,
 		fontOutline = GLOBAL_STYLE_KEY,
 		fontSize = 12,
@@ -375,6 +198,8 @@ Timer.defaults = Timer.defaults
 		objectiveCompleteColor = { r = 0.55, g = 0.55, b = 0.55, a = 1 },
 		enemyForcesColor = { r = 0.95, g = 0.55, b = 0.15, a = 1 },
 		backdropEnabled = true,
+		backdropUseCustomTexture = false,
+		backdropCustomTexture = "",
 		backdropTexture = "",
 		backdropColor = { r = 0.02, g = 0.025, b = 0.03, a = 0.55 },
 		backdropAnchor = "CENTER",
@@ -407,6 +232,11 @@ Timer.defaults = Timer.defaults
 		borderColor = { r = 1, g = 0.82, b = 0, a = 0.8 },
 		borderSize = 8,
 		borderInset = 0,
+		borderSeparateOffset = false,
+		borderOffsetX = 0,
+		borderOffsetY = 0,
+		borderPositionOffsetX = 0,
+		borderPositionOffsetY = 0,
 	}
 
 local defaults = Timer.defaults
@@ -444,19 +274,58 @@ local function snapSize(value, minimum)
 	return math.max(minimum or getPixelSize(), snapToPixel(value))
 end
 
-local function applyBorderOffset(borderFrame, target, offset)
+local function applyBorderOffset(borderFrame, target, offsetX, offsetY, positionOffsetX, positionOffsetY)
 	if not (borderFrame and target) then return end
-	local borderOffset = snapToPixel(clampNumber(offset, -64, 64, 0))
+	local borderOffsetX = snapToPixel(clampNumber(offsetX, -300, 300, 0))
+	local borderOffsetY = snapToPixel(clampNumber(offsetY, -300, 300, borderOffsetX))
+	local shiftX = snapToPixel(clampNumber(positionOffsetX, -1000, 1000, 0))
+	local shiftY = snapToPixel(clampNumber(positionOffsetY, -1000, 1000, 0))
 	borderFrame:ClearAllPoints()
-	borderFrame:SetPoint("TOPLEFT", target, "TOPLEFT", -borderOffset, borderOffset)
-	borderFrame:SetPoint("BOTTOMRIGHT", target, "BOTTOMRIGHT", borderOffset, -borderOffset)
+	borderFrame:SetPoint("TOPLEFT", target, "TOPLEFT", -borderOffsetX + shiftX, borderOffsetY + shiftY)
+	borderFrame:SetPoint("BOTTOMRIGHT", target, "BOTTOMRIGHT", borderOffsetX + shiftX, -borderOffsetY + shiftY)
 end
 
-local function getDBValue(key, fallback)
-	if not addon.db then return fallback end
-	local value = addon.db[key]
-	if value == nil then return fallback end
-	return value
+local function getBorderOffsets(getter, prefix, legacyKey)
+	local fallbackDefaults = Timer.defaults or {}
+	if getter(prefix .. "SeparateOffset") == true then
+		local defaultX = fallbackDefaults[prefix .. "OffsetX"] or 0
+		local defaultY = fallbackDefaults[prefix .. "OffsetY"] or 0
+		return clampNumber(getter(prefix .. "OffsetX"), -300, 300, defaultX), clampNumber(getter(prefix .. "OffsetY"), -300, 300, defaultY)
+	end
+	local defaultOffset = fallbackDefaults[legacyKey] or fallbackDefaults[prefix .. "Offset"] or 0
+	local offset = clampNumber(getter(legacyKey), -300, 300, defaultOffset)
+	return offset, offset
+end
+
+local function getTimerConfig(create)
+	if not addon.db then return nil end
+	local config = addon.db.mythicPlusTimer
+	if type(config) ~= "table" then
+		if not create then return nil end
+		config = {}
+		addon.db.mythicPlusTimer = config
+	end
+	return config
+end
+
+local function getTimerConfigValue(key, fallback)
+	local config = getTimerConfig(false)
+	if config and config[key] ~= nil then return config[key] end
+	return fallback
+end
+
+local function getTimerStoredTable(key, create)
+	local config = getTimerConfig(create)
+	if config then
+		local value = config[key]
+		if type(value) == "table" then return value end
+		if create then
+			value = {}
+			config[key] = value
+			return value
+		end
+	end
+	return nil
 end
 
 local function normalizeColor(value, fallback)
@@ -670,6 +539,28 @@ local function getScenarioInfo()
 	return nil
 end
 
+local function parseCriteriaQuantityString(value)
+	if type(value) ~= "string" or value == "" then return nil end
+	local normalized = value:gsub(",", ".")
+	local raw = normalized:match("[-+]?%d+%.?%d*") or normalized:match("[-+]?%.%d+")
+	return raw and tonumber(raw) or nil
+end
+
+local function getWeightedCriteriaProgress(info)
+	if not (info and info.isWeightedProgress) then return nil, nil end
+	local quantityFromString = parseCriteriaQuantityString(info.quantityString)
+	local quantity = quantityFromString or tonumber(info.quantity) or 0
+	local total = tonumber(info.totalQuantity) or 0
+	local percent
+	if quantityFromString and total > 0 then
+		percent = quantityFromString / total * 100
+	else
+		percent = tonumber(info.quantity)
+	end
+	if percent then percent = math.floor(percent * 100 + 0.5) / 100 end
+	return quantity, percent
+end
+
 local function getObjectiveData()
 	local stepInfo = getScenarioInfo()
 	local objectives, enemyForces = {}, nil
@@ -681,9 +572,8 @@ local function getObjectiveData()
 			local quantity = tonumber(info.quantity) or 0
 			local total = tonumber(info.totalQuantity) or 0
 			local percent
-			if info.isWeightedProgress and info.quantityString then
-				local raw = tonumber(tostring(info.quantityString):match("([%d%.]+)"))
-				if raw then percent = raw end
+			if info.isWeightedProgress then
+				quantity, percent = getWeightedCriteriaProgress(info)
 			elseif total > 0 then
 				percent = quantity / total * 100
 			end
@@ -705,16 +595,17 @@ local function getObjectiveData()
 end
 
 function Timer:IsEnabled()
-	return addon.db and addon.db[DB.enabled] == true
+	return self:Get("enabled") == true
 end
 
 function Timer:Get(key, fallback)
-	return getDBValue(DB[key], fallback == nil and defaults[key] or fallback)
+	return getTimerConfigValue(key, fallback == nil and defaults[key] or fallback)
 end
 
 function Timer:Set(key, value)
-	if not addon.db or not DB[key] then return end
-	addon.db[DB[key]] = value
+	if not addon.db or defaults[key] == nil then return end
+	local config = getTimerConfig(true)
+	config[key] = value
 	self:Refresh()
 end
 
@@ -1112,7 +1003,11 @@ function Timer:ApplyWindowBackground()
 	texture:SetShown(enabled)
 	frame:SetBackdrop(nil)
 	if not enabled then return end
-	local textureValue = resolveMedia("statusbar", self:Get("backdropTexture"), DEFAULT_BORDER)
+	local textureKind, textureValue = getCustomTextureInfo(self:Get("backdropUseCustomTexture") == true and self:Get("backdropCustomTexture") or nil)
+	if not textureKind then
+		textureKind = "texture"
+		textureValue = resolveMedia("statusbar", self:Get("backdropTexture"), DEFAULT_BORDER)
+	end
 	local color = normalizeColor(self:Get("backdropColor"), defaults.backdropColor)
 	local anchor = normalizePoint(self:Get("backdropAnchor"))
 	local baseWidth = frame:GetWidth() or clampNumber(self:Get("width"), 120, 800, defaults.width)
@@ -1120,7 +1015,7 @@ function Timer:ApplyWindowBackground()
 	texture:ClearAllPoints()
 	texture:SetPoint(anchor, frame, anchor, snapToPixel(clampNumber(self:Get("backdropOffsetX"), -1000, 1000, defaults.backdropOffsetX)), snapToPixel(clampNumber(self:Get("backdropOffsetY"), -1000, 1000, defaults.backdropOffsetY)))
 	texture:SetSize(snapSize(baseWidth + clampNumber(self:Get("backdropSizeOffsetX"), -1000, 1000, defaults.backdropSizeOffsetX)), snapSize(baseHeight + clampNumber(self:Get("backdropSizeOffsetY"), -1000, 1000, defaults.backdropSizeOffsetY)))
-	applyTexture(texture, "texture", textureValue)
+	applyTexture(texture, textureKind, textureValue)
 	texture:SetVertexColor(color.r, color.g, color.b, color.a)
 end
 
@@ -1145,7 +1040,15 @@ function Timer:ApplyFrameStyle()
 	self:ApplyDecorBar("footer")
 	if frame.borderFrame then
 		frame.borderFrame:SetFrameLevel(frame:GetFrameLevel() + 30)
-		applyBorderOffset(frame.borderFrame, frame, clampNumber(self:Get("borderInset"), -64, 64, defaults.borderInset))
+		local borderOffsetX, borderOffsetY = getBorderOffsets(function(key) return self:Get(key) end, "border", "borderInset")
+		applyBorderOffset(
+			frame.borderFrame,
+			frame,
+			borderOffsetX,
+			borderOffsetY,
+			clampNumber(self:Get("borderPositionOffsetX"), -1000, 1000, defaults.borderPositionOffsetX),
+			clampNumber(self:Get("borderPositionOffsetY"), -1000, 1000, defaults.borderPositionOffsetY)
+		)
 		if self:Get("borderEnabled") then
 			frame.borderFrame:SetBackdrop({
 				edgeFile = borderTexture,
@@ -1170,7 +1073,8 @@ function Timer:ApplyFrameStyle()
 		row.bar.bg:SetVertexColor(barBgColor.r, barBgColor.g, barBgColor.b, barBgColor.a)
 		if row.bar.borderFrame then
 			row.bar.borderFrame:SetFrameLevel(row.bar:GetFrameLevel() + 10)
-			applyBorderOffset(row.bar.borderFrame, row.bar, clampNumber(self:Get("barBorderOffset"), -64, 64, defaults.barBorderOffset))
+			local barBorderOffsetX, barBorderOffsetY = getBorderOffsets(function(key) return self:Get(key) end, "barBorder", "barBorderOffset")
+			applyBorderOffset(row.bar.borderFrame, row.bar, barBorderOffsetX, barBorderOffsetY)
 		end
 		if self:Get("barBorderEnabled") then
 			if row.bar.borderFrame then
@@ -1205,7 +1109,8 @@ function Timer:ApplyFrameStyle()
 		bar.bg:SetVertexColor(panelBgColor.r, panelBgColor.g, panelBgColor.b, panelBgColor.a)
 		if bar.borderFrame then
 			bar.borderFrame:SetFrameLevel(bar:GetFrameLevel() + 10)
-			applyBorderOffset(bar.borderFrame, bar, clampNumber(self:Get(prefix .. "BorderOffset"), -64, 64, defaults[prefix .. "BorderOffset"] or defaults.barBorderOffset))
+			local panelBorderOffsetX, panelBorderOffsetY = getBorderOffsets(function(key) return self:Get(key) end, prefix .. "Border", prefix .. "BorderOffset")
+			applyBorderOffset(bar.borderFrame, bar, panelBorderOffsetX, panelBorderOffsetY)
 		end
 		if self:Get(prefix .. "BorderEnabled") then
 			if bar.borderFrame then
@@ -1237,7 +1142,7 @@ function Timer:GetBestTime(state)
 	if not addon.db then return nil end
 	local mapKey, levelKey = self:GetRunKey(state)
 	if not mapKey then return nil end
-	local bestTimes = addon.db.mythicPlusTimerBestTimes
+	local bestTimes = getTimerStoredTable("bestTimes", false)
 	return type(bestTimes) == "table" and bestTimes[mapKey] and tonumber(bestTimes[mapKey][levelKey]) or nil
 end
 
@@ -1253,7 +1158,7 @@ function Timer:GetBestObjectiveTime(state, objectiveText)
 	if not addon.db then return nil end
 	local mapKey, levelKey = self:GetRunKey(state)
 	if not mapKey then return nil end
-	local best = addon.db.mythicPlusTimerBestObjectiveTimes
+	local best = getTimerStoredTable("bestObjectiveTimes", false)
 	best = type(best) == "table" and best[mapKey] and best[mapKey][levelKey]
 	return type(best) == "table" and tonumber(best[splitKey(objectiveText)]) or nil
 end
@@ -1262,12 +1167,12 @@ function Timer:SetBestObjectiveTime(state, objectiveText, elapsed)
 	if not addon.db then return end
 	local mapKey, levelKey = self:GetRunKey(state)
 	if not mapKey or not elapsed or elapsed <= 0 then return end
-	addon.db.mythicPlusTimerBestObjectiveTimes = addon.db.mythicPlusTimerBestObjectiveTimes or {}
-	addon.db.mythicPlusTimerBestObjectiveTimes[mapKey] = addon.db.mythicPlusTimerBestObjectiveTimes[mapKey] or {}
-	addon.db.mythicPlusTimerBestObjectiveTimes[mapKey][levelKey] = addon.db.mythicPlusTimerBestObjectiveTimes[mapKey][levelKey] or {}
+	local bestObjectiveTimes = getTimerStoredTable("bestObjectiveTimes", true)
+	bestObjectiveTimes[mapKey] = bestObjectiveTimes[mapKey] or {}
+	bestObjectiveTimes[mapKey][levelKey] = bestObjectiveTimes[mapKey][levelKey] or {}
 	local key = splitKey(objectiveText)
-	local current = tonumber(addon.db.mythicPlusTimerBestObjectiveTimes[mapKey][levelKey][key])
-	if not current or elapsed < current then addon.db.mythicPlusTimerBestObjectiveTimes[mapKey][levelKey][key] = elapsed end
+	local current = tonumber(bestObjectiveTimes[mapKey][levelKey][key])
+	if not current or elapsed < current then bestObjectiveTimes[mapKey][levelKey][key] = elapsed end
 end
 
 function Timer:UpdateObjectiveSplits(state)
@@ -1314,10 +1219,10 @@ function Timer:RecordBestTime()
 	if not state or state.preview or not state.elapsed or state.elapsed <= 0 then return end
 	local mapKey, levelKey = self:GetRunKey(state)
 	if not mapKey then return end
-	addon.db.mythicPlusTimerBestTimes = addon.db.mythicPlusTimerBestTimes or {}
-	addon.db.mythicPlusTimerBestTimes[mapKey] = addon.db.mythicPlusTimerBestTimes[mapKey] or {}
-	local current = tonumber(addon.db.mythicPlusTimerBestTimes[mapKey][levelKey])
-	if not current or state.elapsed < current then addon.db.mythicPlusTimerBestTimes[mapKey][levelKey] = state.elapsed end
+	local bestTimes = getTimerStoredTable("bestTimes", true)
+	bestTimes[mapKey] = bestTimes[mapKey] or {}
+	local current = tonumber(bestTimes[mapKey][levelKey])
+	if not current or state.elapsed < current then bestTimes[mapKey][levelKey] = state.elapsed end
 end
 
 function Timer:SetPanelText(key, textValue, anchorKey, xKey, yKey, color, fontSize, justify)
@@ -1391,16 +1296,19 @@ function Timer:RenderPanelAffixes(state)
 end
 
 function Timer:RenderPanelObjectives(state)
-	if not (state and state.objectives and #state.objectives > 0) then return end
+	if not (state and state.objectives and #state.objectives > 0) then return 0 end
 	local frame = self:EnsureFrame()
-	local font = resolveFont(self:Get("fontFace"))
-	local style = resolveFontStyle(self:Get("fontOutline"))
+	local font = resolveFont(self:Get("panelObjectivesFontFace"))
+	local style = resolveFontStyle(self:Get("panelObjectivesFontOutline"))
 	local fontSize = clampNumber(self:Get("panelObjectivesFontSize"), 8, 56, defaults.panelObjectivesFontSize)
 	local spacing = snapToPixel(clampNumber(self:Get("panelObjectivesSpacing"), 0, 24, defaults.panelObjectivesSpacing))
-	local width = snapSize(clampNumber(self:Get("panelObjectivesWidth"), 80, 800, defaults.panelObjectivesWidth))
-	local anchor = normalizePoint(self:Get("panelObjectivesAnchor"))
 	local x = snapToPixel(clampNumber(self:Get("panelObjectivesOffsetX"), -800, 800, defaults.panelObjectivesOffsetX))
 	local y = snapToPixel(clampNumber(self:Get("panelObjectivesOffsetY"), -800, 800, defaults.panelObjectivesOffsetY))
+	local rowHeight = snapSize(fontSize + 2)
+	local frameWidth = clampNumber(self:Get("width"), 120, 800, defaults.width)
+	local width = snapSize(math.max(80, frameWidth - math.abs(x) * 2 - 12))
+	local rowsHeight = (#state.objectives * rowHeight) + math.max(0, #state.objectives - 1) * spacing
+	local growUp = self:Get("panelObjectivesGrowth") == "UP"
 	local previous
 	for index, objective in ipairs(state.objectives) do
 		local item = self:EnsurePanelObjective(index)
@@ -1408,12 +1316,20 @@ function Timer:RenderPanelObjectives(state)
 		local valueText = self:FormatObjectiveValue(state, objective)
 		item.tooltipType = "objective"
 		item.tooltipData = objective
-		item:SetSize(width, snapSize(fontSize + 2))
+		item:SetSize(width, rowHeight)
 		item:ClearAllPoints()
 		if previous then
-			item:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, -spacing)
+			if growUp then
+				item:SetPoint("BOTTOMLEFT", previous, "TOPLEFT", 0, spacing)
+			else
+				item:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, -spacing)
+			end
 		else
-			item:SetPoint(anchor, frame, anchor, x, y)
+			if growUp then
+				item:SetPoint("BOTTOM", frame, "TOP", x, y)
+			else
+				item:SetPoint("TOP", frame, "TOP", x, y)
+			end
 		end
 		item.text:SetFont(font, fontSize, style)
 		item.text:SetText(objective.text or "")
@@ -1429,6 +1345,10 @@ function Timer:RenderPanelObjectives(state)
 		item:Show()
 		previous = item
 	end
+	if growUp then
+		return math.max(0, -y) + 6
+	end
+	return math.max(0, -y) + rowsHeight + 6
 end
 
 function Timer:ShouldShowDeathDisplay(state)
@@ -1471,7 +1391,7 @@ function Timer:SetPanelEnemyBarText(percent)
 	local offsetY = snapToPixel(clampNumber(self:Get("panelEnemyBarTextOffsetY"), -100, 100, defaults.panelEnemyBarTextOffsetY))
 	bar.text:ClearAllPoints()
 	bar.text:SetFont(font, fontSize, style)
-	bar.text:SetText(string.format("%.1f%%", tonumber(percent) or 0))
+	bar.text:SetText(string.format("%.2f%%", tonumber(percent) or 0))
 	bar.text:SetTextColor(color.r, color.g, color.b, color.a)
 	bar.text:SetJustifyH(align)
 	if align == "LEFT" then
@@ -1573,14 +1493,14 @@ function Timer:RenderPanel(state, timeLeft, twoChest, threeChest)
 		local deathText = self:SetPanelText("deaths", self:GetDeathDisplayText(state.deaths, self:Get("panelDeathIconSize")), "deathsAnchor", "deathsOffsetX", "deathsOffsetY", self:Get("deathColor"), self:Get("panelDeathsFontSize"))
 		self:SetPanelHoverForText("deaths", deathText, "deaths", state)
 	end
-	if self:Get("showEnemyPercent") then self:SetPanelText("enemyPercent", string.format("%.1f%%", enemyPercent), "enemyPercentAnchor", "enemyPercentOffsetX", "enemyPercentOffsetY", self:Get("enemyForcesColor"), self:Get("panelEnemyPercentFontSize")) end
+	if self:Get("showEnemyPercent") then self:SetPanelText("enemyPercent", string.format("%.2f%%", enemyPercent), "enemyPercentAnchor", "enemyPercentOffsetX", "enemyPercentOffsetY", self:Get("enemyForcesColor"), self:Get("panelEnemyPercentFontSize")) end
 	if self:Get("showBestTime") and best then
 		local bestText = secondsToText(best)
 		if self:Get("showBestDelta") and delta then bestText = bestText .. string.format(" (%+.0fs)", delta) end
 		self:SetPanelText("best", bestText, "bestTimeAnchor", "bestTimeOffsetX", "bestTimeOffsetY", self:Get("objectiveCompleteColor"), self:Get("panelBestTimeFontSize"))
 	end
 	if self:Get("showAffixes") then self:RenderPanelAffixes(state) end
-	if self:Get("showObjectives") then self:RenderPanelObjectives(state) end
+	local objectiveHeight = self:Get("showObjectives") and self:RenderPanelObjectives(state) or 0
 	if self:Get("showPanelTimerBar") then
 		self:SetPanelBar("timer", math.max(0, timeLeft), state.timeLimit or 1, "panelTimerBarAnchor", "panelTimerBarOffsetX", "panelTimerBarOffsetY", timeLeft <= 0 and self:Get("panelTimerBarExpiredColor") or self:Get("panelTimerBarColor"))
 		self:UpdatePanelTimerBarChestMarkers(state.timeLimit or 0, twoChest, threeChest)
@@ -1589,7 +1509,7 @@ function Timer:RenderPanel(state, timeLeft, twoChest, threeChest)
 		self:SetPanelBar("enemy", enemyPercent, 100, "panelEnemyBarAnchor", "panelEnemyBarOffsetX", "panelEnemyBarOffsetY", self:Get("panelEnemyBarColor"))
 		self:SetPanelEnemyBarText(enemyPercent)
 	end
-	return clampNumber(self:Get("panelHeight"), 24, 300, defaults.panelHeight)
+	return math.max(clampNumber(self:Get("panelHeight"), 24, 300, defaults.panelHeight), objectiveHeight)
 end
 
 function Timer:SetRow(index, data)
@@ -1747,11 +1667,11 @@ function Timer:LayoutRows(count, panelOffset)
 	local width = snapSize(clampNumber(self:Get("width"), 120, 800, defaults.width))
 	local rowHeight = snapSize(clampNumber(self:Get("rowHeight"), 12, 48, defaults.rowHeight))
 	panelOffset = snapToPixel(tonumber(panelOffset) or 0)
-	local height = panelOffset + (count > 0 and (count * rowHeight + (count - 1) * spacing) or rowHeight)
+	local rowsHeight = count > 0 and (count * rowHeight + (count - 1) * spacing) or 0
+	local height = panelOffset + rowsHeight
+	if height <= 0 then height = rowHeight end
 	frame:SetSize(width, snapSize(height))
-	self:ApplyWindowBackground()
-	self:ApplyDecorBar("header")
-	self:ApplyDecorBar("footer")
+	self:ApplyFrameStyle()
 	for index = 1, #frame.rows do
 		local row = frame.rows[index]
 		row:ClearAllPoints()
@@ -1874,7 +1794,7 @@ function Timer:Refresh()
 		local objectiveValue = self:FormatObjectiveValue(state, state.enemyForces)
 		self:SetRow(rows, {
 			text = state.enemyForces.text ~= "" and state.enemyForces.text or (L["mythicPlusTimerEnemyForces"] or "Enemy Forces"),
-			valueText = objectiveValue ~= "" and string.format("%.1f%% - %s", percent, objectiveValue) or string.format("%.1f%%", percent),
+			valueText = objectiveValue ~= "" and string.format("%.2f%% - %s", percent, objectiveValue) or string.format("%.2f%%", percent),
 			color = self:Get("enemyForcesColor"),
 			max = 100,
 			value = percent,
@@ -2141,9 +2061,23 @@ function Timer:BuildEditModeSettings()
 	local function enabledWhen(key)
 		return function() return Timer:Get(key) == true end
 	end
+	local function shownWhen(key)
+		return function() return Timer:Get(key) == true end
+	end
 	local function allEnabled(...)
 		local keys = { ... }
 		return function()
+			for _, key in ipairs(keys) do
+				if Timer:Get(key) ~= true then return false end
+			end
+			return true
+		end
+	end
+	local allShown = allEnabled
+	local function allEnabledAndNot(disabledKey, ...)
+		local keys = { ... }
+		return function()
+			if Timer:Get(disabledKey) == true then return false end
 			for _, key in ipairs(keys) do
 				if Timer:Get(key) ~= true then return false end
 			end
@@ -2273,15 +2207,15 @@ function Timer:BuildEditModeSettings()
 		anchorSetting("timerAnchor", "mpt-panel-time", nil, L["Anchor"] or "Anchor"),
 		sliderSetting(L["mythicPlusTimerTimerOffsetX"] or L["Offset X"] or "Offset X", get("timerOffsetX"), set("timerOffsetX", function(value) return clampNumber(value, -800, 800, defaults.timerOffsetX) end), -800, 800, 1, "mpt-panel-time"),
 		sliderSetting(L["mythicPlusTimerTimerOffsetY"] or L["Offset Y"] or "Offset Y", get("timerOffsetY"), set("timerOffsetY", function(value) return clampNumber(value, -800, 800, defaults.timerOffsetY) end), -800, 800, 1, "mpt-panel-time"),
-		checkboxSetting(L["mythicPlusTimerShowChestTimers"] or "Show +2/+3 timers", get("showChestTimers"), set("showChestTimers"), "mpt-panel-time"),
-		sliderSetting(L["mythicPlusTimerPanelChestFontSize"] or "+2/+3 font size", get("panelChestFontSize"), set("panelChestFontSize", function(value) return clampNumber(value, 8, 56, defaults.panelChestFontSize) end), 8, 56, 1, "mpt-panel-time", nil, enabledWhen("showChestTimers")),
-		checkboxSetting(L["mythicPlusTimerPanelChestHideLabels"] or "Hide +2/+3 labels", get("panelChestHideLabels"), set("panelChestHideLabels"), "mpt-panel-time", enabledWhen("showChestTimers")),
-		anchorSetting("chest2Anchor", "mpt-panel-time", nil, L["mythicPlusTimerChest2Anchor"] or "+2 anchor"),
-		sliderSetting(L["mythicPlusTimerChest2OffsetX"] or "+2 X offset", get("chest2OffsetX"), set("chest2OffsetX", function(value) return clampNumber(value, -800, 800, defaults.chest2OffsetX) end), -800, 800, 1, "mpt-panel-time"),
-		sliderSetting(L["mythicPlusTimerChest2OffsetY"] or "+2 Y offset", get("chest2OffsetY"), set("chest2OffsetY", function(value) return clampNumber(value, -800, 800, defaults.chest2OffsetY) end), -800, 800, 1, "mpt-panel-time"),
-		anchorSetting("chest3Anchor", "mpt-panel-time", nil, L["mythicPlusTimerChest3Anchor"] or "+3 anchor"),
-		sliderSetting(L["mythicPlusTimerChest3OffsetX"] or "+3 X offset", get("chest3OffsetX"), set("chest3OffsetX", function(value) return clampNumber(value, -800, 800, defaults.chest3OffsetX) end), -800, 800, 1, "mpt-panel-time"),
-		sliderSetting(L["mythicPlusTimerChest3OffsetY"] or "+3 Y offset", get("chest3OffsetY"), set("chest3OffsetY", function(value) return clampNumber(value, -800, 800, defaults.chest3OffsetY) end), -800, 800, 1, "mpt-panel-time"),
+		checkboxSetting(L["mythicPlusTimerShowChestTimers"] or "Show +2/+3 timers", get("showChestTimers"), set("showChestTimers", nil, true), "mpt-panel-time"),
+		sliderSetting(L["mythicPlusTimerPanelChestFontSize"] or "+2/+3 font size", get("panelChestFontSize"), set("panelChestFontSize", function(value) return clampNumber(value, 8, 56, defaults.panelChestFontSize) end), 8, 56, 1, "mpt-panel-time", nil, enabledWhen("showChestTimers"), shownWhen("showChestTimers")),
+		checkboxSetting(L["mythicPlusTimerPanelChestHideLabels"] or "Hide +2/+3 labels", get("panelChestHideLabels"), set("panelChestHideLabels"), "mpt-panel-time", enabledWhen("showChestTimers"), shownWhen("showChestTimers")),
+		anchorSetting("chest2Anchor", "mpt-panel-time", shownWhen("showChestTimers"), L["mythicPlusTimerChest2Anchor"] or "+2 anchor"),
+		sliderSetting(L["mythicPlusTimerChest2OffsetX"] or "+2 X offset", get("chest2OffsetX"), set("chest2OffsetX", function(value) return clampNumber(value, -800, 800, defaults.chest2OffsetX) end), -800, 800, 1, "mpt-panel-time", nil, nil, shownWhen("showChestTimers")),
+		sliderSetting(L["mythicPlusTimerChest2OffsetY"] or "+2 Y offset", get("chest2OffsetY"), set("chest2OffsetY", function(value) return clampNumber(value, -800, 800, defaults.chest2OffsetY) end), -800, 800, 1, "mpt-panel-time", nil, nil, shownWhen("showChestTimers")),
+		anchorSetting("chest3Anchor", "mpt-panel-time", shownWhen("showChestTimers"), L["mythicPlusTimerChest3Anchor"] or "+3 anchor"),
+		sliderSetting(L["mythicPlusTimerChest3OffsetX"] or "+3 X offset", get("chest3OffsetX"), set("chest3OffsetX", function(value) return clampNumber(value, -800, 800, defaults.chest3OffsetX) end), -800, 800, 1, "mpt-panel-time", nil, nil, shownWhen("showChestTimers")),
+		sliderSetting(L["mythicPlusTimerChest3OffsetY"] or "+3 Y offset", get("chest3OffsetY"), set("chest3OffsetY", function(value) return clampNumber(value, -800, 800, defaults.chest3OffsetY) end), -800, 800, 1, "mpt-panel-time", nil, nil, shownWhen("showChestTimers")),
 		checkboxSetting(L["mythicPlusTimerShowPanelTimerBar"] or "Show panel timer bar", get("showPanelTimerBar"), set("showPanelTimerBar", nil, true), "mpt-panel-time"),
 		sliderSetting(L["mythicPlusTimerPanelTimerBarWidth"] or L["Bar width"] or "Bar width", get("panelTimerBarWidth"), set("panelTimerBarWidth", function(value) return clampNumber(value, 20, 800, defaults.panelTimerBarWidth) end), 20, 800, 1, "mpt-panel-time", nil, enabledWhen("showPanelTimerBar")),
 		sliderSetting(L["mythicPlusTimerPanelTimerBarHeight"] or L["Bar height"] or "Bar height", get("panelTimerBarHeight"), set("panelTimerBarHeight", function(value) return clampNumber(value, 1, 64, defaults.panelTimerBarHeight) end), 1, 64, 1, "mpt-panel-time", nil, enabledWhen("showPanelTimerBar")),
@@ -2294,7 +2228,10 @@ function Timer:BuildEditModeSettings()
 		dropdownSetting(L["mythicPlusTimerPanelTimerBarBorderTexture"] or L["Border texture"] or "Border texture", get("panelTimerBarBorderTexture"), set("panelTimerBarBorderTexture"), function() return buildMediaOptions("border", false) end, "mpt-panel-time", 260, allEnabled("showPanelTimerBar", "panelTimerBarBorderEnabled")),
 		colorSetting(L["mythicPlusTimerPanelTimerBarBorderColor"] or L["Border color"] or "Border color", get("panelTimerBarBorderColor"), set("panelTimerBarBorderColor"), defaults.panelTimerBarBorderColor, "mpt-panel-time", allEnabled("showPanelTimerBar", "panelTimerBarBorderEnabled")),
 		sliderSetting(L["mythicPlusTimerPanelTimerBarBorderSize"] or L["Border size"] or "Border size", get("panelTimerBarBorderSize"), set("panelTimerBarBorderSize", function(value) return clampNumber(value, 1, 32, defaults.panelTimerBarBorderSize) end), 1, 32, 1, "mpt-panel-time", nil, allEnabled("showPanelTimerBar", "panelTimerBarBorderEnabled")),
-		sliderSetting(L["mythicPlusTimerPanelTimerBarBorderOffset"] or L["Border offset"] or "Border offset", get("panelTimerBarBorderOffset"), set("panelTimerBarBorderOffset", function(value) return clampNumber(value, -64, 64, defaults.panelTimerBarBorderOffset) end), -64, 64, 1, "mpt-panel-time", nil, allEnabled("showPanelTimerBar", "panelTimerBarBorderEnabled")),
+		checkboxSetting(L["damageMeterBorderAdvancedOffsets"] or "Separate border offsets", get("panelTimerBarBorderSeparateOffset"), set("panelTimerBarBorderSeparateOffset", nil, true), "mpt-panel-time", allEnabled("showPanelTimerBar", "panelTimerBarBorderEnabled")),
+		sliderSetting(L["mythicPlusTimerPanelTimerBarBorderOffset"] or L["Border offset"] or "Border offset", get("panelTimerBarBorderOffset"), set("panelTimerBarBorderOffset", function(value) return clampNumber(value, -300, 300, defaults.panelTimerBarBorderOffset) end), -300, 300, 1, "mpt-panel-time", nil, allEnabledAndNot("panelTimerBarBorderSeparateOffset", "showPanelTimerBar", "panelTimerBarBorderEnabled")),
+		sliderSetting(L["damageMeterBackdropSizeOffsetX"] or "Width offset", get("panelTimerBarBorderOffsetX"), set("panelTimerBarBorderOffsetX", function(value) return clampNumber(value, -300, 300, defaults.panelTimerBarBorderOffsetX) end), -300, 300, 1, "mpt-panel-time", nil, allEnabled("showPanelTimerBar", "panelTimerBarBorderEnabled", "panelTimerBarBorderSeparateOffset")),
+		sliderSetting(L["damageMeterBackdropSizeOffsetY"] or "Height offset", get("panelTimerBarBorderOffsetY"), set("panelTimerBarBorderOffsetY", function(value) return clampNumber(value, -300, 300, defaults.panelTimerBarBorderOffsetY) end), -300, 300, 1, "mpt-panel-time", nil, allEnabled("showPanelTimerBar", "panelTimerBarBorderEnabled", "panelTimerBarBorderSeparateOffset")),
 		checkboxSetting(L["mythicPlusTimerPanelTimerBarChestMarkers"] or "Show +2/+3 markers", get("panelTimerBarChestMarkers"), set("panelTimerBarChestMarkers", nil, true), "mpt-panel-time", enabledWhen("showPanelTimerBar")),
 		colorSetting(L["mythicPlusTimerPanelTimerBarChestMarkerColor"] or "+2/+3 marker color", get("panelTimerBarChestMarkerColor"), set("panelTimerBarChestMarkerColor"), defaults.panelTimerBarChestMarkerColor, "mpt-panel-time", allEnabled("showPanelTimerBar", "panelTimerBarChestMarkers")),
 		sliderSetting(L["mythicPlusTimerPanelTimerBarChestMarkerWidth"] or "+2/+3 marker width", get("panelTimerBarChestMarkerWidth"), set("panelTimerBarChestMarkerWidth", function(value) return clampNumber(value, 1, 12, defaults.panelTimerBarChestMarkerWidth) end), 1, 12, 1, "mpt-panel-time", nil, allEnabled("showPanelTimerBar", "panelTimerBarChestMarkers")),
@@ -2334,7 +2271,10 @@ function Timer:BuildEditModeSettings()
 		dropdownSetting(L["mythicPlusTimerPanelEnemyBarBorderTexture"] or L["Border texture"] or "Border texture", get("panelEnemyBarBorderTexture"), set("panelEnemyBarBorderTexture"), function() return buildMediaOptions("border", false) end, "mpt-panel-enemy", 260, allEnabled("showPanelEnemyBar", "panelEnemyBarBorderEnabled")),
 		colorSetting(L["mythicPlusTimerPanelEnemyBarBorderColor"] or L["Border color"] or "Border color", get("panelEnemyBarBorderColor"), set("panelEnemyBarBorderColor"), defaults.panelEnemyBarBorderColor, "mpt-panel-enemy", allEnabled("showPanelEnemyBar", "panelEnemyBarBorderEnabled")),
 		sliderSetting(L["mythicPlusTimerPanelEnemyBarBorderSize"] or L["Border size"] or "Border size", get("panelEnemyBarBorderSize"), set("panelEnemyBarBorderSize", function(value) return clampNumber(value, 1, 32, defaults.panelEnemyBarBorderSize) end), 1, 32, 1, "mpt-panel-enemy", nil, allEnabled("showPanelEnemyBar", "panelEnemyBarBorderEnabled")),
-		sliderSetting(L["mythicPlusTimerPanelEnemyBarBorderOffset"] or L["Border offset"] or "Border offset", get("panelEnemyBarBorderOffset"), set("panelEnemyBarBorderOffset", function(value) return clampNumber(value, -64, 64, defaults.panelEnemyBarBorderOffset) end), -64, 64, 1, "mpt-panel-enemy", nil, allEnabled("showPanelEnemyBar", "panelEnemyBarBorderEnabled")),
+		checkboxSetting(L["damageMeterBorderAdvancedOffsets"] or "Separate border offsets", get("panelEnemyBarBorderSeparateOffset"), set("panelEnemyBarBorderSeparateOffset", nil, true), "mpt-panel-enemy", allEnabled("showPanelEnemyBar", "panelEnemyBarBorderEnabled")),
+		sliderSetting(L["mythicPlusTimerPanelEnemyBarBorderOffset"] or L["Border offset"] or "Border offset", get("panelEnemyBarBorderOffset"), set("panelEnemyBarBorderOffset", function(value) return clampNumber(value, -300, 300, defaults.panelEnemyBarBorderOffset) end), -300, 300, 1, "mpt-panel-enemy", nil, allEnabledAndNot("panelEnemyBarBorderSeparateOffset", "showPanelEnemyBar", "panelEnemyBarBorderEnabled")),
+		sliderSetting(L["damageMeterBackdropSizeOffsetX"] or "Width offset", get("panelEnemyBarBorderOffsetX"), set("panelEnemyBarBorderOffsetX", function(value) return clampNumber(value, -300, 300, defaults.panelEnemyBarBorderOffsetX) end), -300, 300, 1, "mpt-panel-enemy", nil, allEnabled("showPanelEnemyBar", "panelEnemyBarBorderEnabled", "panelEnemyBarBorderSeparateOffset")),
+		sliderSetting(L["damageMeterBackdropSizeOffsetY"] or "Height offset", get("panelEnemyBarBorderOffsetY"), set("panelEnemyBarBorderOffsetY", function(value) return clampNumber(value, -300, 300, defaults.panelEnemyBarBorderOffsetY) end), -300, 300, 1, "mpt-panel-enemy", nil, allEnabled("showPanelEnemyBar", "panelEnemyBarBorderEnabled", "panelEnemyBarBorderSeparateOffset")),
 		anchorSetting("panelEnemyBarAnchor", "mpt-panel-enemy", nil, L["Anchor"] or "Anchor"),
 		sliderSetting(L["mythicPlusTimerPanelEnemyBarOffsetX"] or L["Offset X"] or "Offset X", get("panelEnemyBarOffsetX"), set("panelEnemyBarOffsetX", function(value) return clampNumber(value, -800, 800, defaults.panelEnemyBarOffsetX) end), -800, 800, 1, "mpt-panel-enemy", nil, enabledWhen("showPanelEnemyBar")),
 		sliderSetting(L["mythicPlusTimerPanelEnemyBarOffsetY"] or L["Offset Y"] or "Offset Y", get("panelEnemyBarOffsetY"), set("panelEnemyBarOffsetY", function(value) return clampNumber(value, -800, 800, defaults.panelEnemyBarOffsetY) end), -800, 800, 1, "mpt-panel-enemy", nil, enabledWhen("showPanelEnemyBar")),
@@ -2354,14 +2294,20 @@ function Timer:BuildEditModeSettings()
 		sliderSetting(L["mythicPlusTimerBestTimeOffsetY"] or L["Offset Y"] or "Offset Y", get("bestTimeOffsetY"), set("bestTimeOffsetY", function(value) return clampNumber(value, -800, 800, defaults.bestTimeOffsetY) end), -800, 800, 1, "mpt-panel-best"),
 		{ name = L["mythicPlusTimerPanelObjectives"] or "Objectives", kind = SettingType.Collapsible, id = "mpt-panel-objectives", defaultCollapsed = true },
 		checkboxSetting(L["mythicPlusTimerShowObjectives"] or "Show objectives", get("showObjectives"), set("showObjectives", nil, true), "mpt-panel-objectives"),
-		checkboxSetting(L["mythicPlusTimerShowObjectiveTimes"] or "Show objective times", get("showObjectiveTimes"), set("showObjectiveTimes", nil, true), "mpt-panel-objectives", enabledWhen("showObjectives")),
-		checkboxSetting(L["mythicPlusTimerShowObjectiveBestTimes"] or "Show objective best deltas", get("showObjectiveBestTimes"), set("showObjectiveBestTimes"), "mpt-panel-objectives", objectiveTimesEnabled),
-		sliderSetting(L["mythicPlusTimerPanelObjectivesWidth"] or L["Width"] or "Width", get("panelObjectivesWidth"), set("panelObjectivesWidth", function(value) return clampNumber(value, 80, 800, defaults.panelObjectivesWidth) end), 80, 800, 1, "mpt-panel-objectives", nil, enabledWhen("showObjectives")),
-		sliderSetting(L["mythicPlusTimerPanelObjectivesFontSize"] or L["Text size"] or "Text size", get("panelObjectivesFontSize"), set("panelObjectivesFontSize", function(value) return clampNumber(value, 8, 56, defaults.panelObjectivesFontSize) end), 8, 56, 1, "mpt-panel-objectives", nil, enabledWhen("showObjectives")),
-		sliderSetting(L["mythicPlusTimerPanelObjectivesSpacing"] or "Spacing", get("panelObjectivesSpacing"), set("panelObjectivesSpacing", function(value) return clampNumber(value, 0, 24, defaults.panelObjectivesSpacing) end), 0, 24, 1, "mpt-panel-objectives", nil, enabledWhen("showObjectives")),
-		anchorSetting("panelObjectivesAnchor", "mpt-panel-objectives", nil, L["Anchor"] or "Anchor"),
-		sliderSetting(L["mythicPlusTimerPanelObjectivesOffsetX"] or L["Offset X"] or "Offset X", get("panelObjectivesOffsetX"), set("panelObjectivesOffsetX", function(value) return clampNumber(value, -800, 800, defaults.panelObjectivesOffsetX) end), -800, 800, 1, "mpt-panel-objectives", nil, enabledWhen("showObjectives")),
-		sliderSetting(L["mythicPlusTimerPanelObjectivesOffsetY"] or L["Offset Y"] or "Offset Y", get("panelObjectivesOffsetY"), set("panelObjectivesOffsetY", function(value) return clampNumber(value, -800, 800, defaults.panelObjectivesOffsetY) end), -800, 800, 1, "mpt-panel-objectives", nil, enabledWhen("showObjectives")),
+		checkboxSetting(L["mythicPlusTimerShowObjectiveTimes"] or "Show objective times", get("showObjectiveTimes"), set("showObjectiveTimes", nil, true), "mpt-panel-objectives", enabledWhen("showObjectives"), shownWhen("showObjectives")),
+		checkboxSetting(L["mythicPlusTimerShowObjectiveBestTimes"] or "Show objective best deltas", get("showObjectiveBestTimes"), set("showObjectiveBestTimes"), "mpt-panel-objectives", objectiveTimesEnabled, objectiveTimesEnabled),
+		dropdownSetting(L["mythicPlusTimerFont"] or "Font", get("panelObjectivesFontFace"), set("panelObjectivesFontFace"), function() return buildMediaOptions("font", true) end, "mpt-panel-objectives", 260, enabledWhen("showObjectives"), shownWhen("showObjectives")),
+		dropdownSetting(L["mythicPlusTimerFontOutline"] or "Font outline", get("panelObjectivesFontOutline"), set("panelObjectivesFontOutline", normalizeFontStyle), buildStyleOptions, "mpt-panel-objectives", 180, enabledWhen("showObjectives"), shownWhen("showObjectives")),
+		sliderSetting(L["mythicPlusTimerPanelObjectivesFontSize"] or L["Text size"] or "Text size", get("panelObjectivesFontSize"), set("panelObjectivesFontSize", function(value) return clampNumber(value, 8, 56, defaults.panelObjectivesFontSize) end), 8, 56, 1, "mpt-panel-objectives", nil, enabledWhen("showObjectives"), shownWhen("showObjectives")),
+		sliderSetting(L["mythicPlusTimerPanelObjectivesSpacing"] or "Spacing", get("panelObjectivesSpacing"), set("panelObjectivesSpacing", function(value) return clampNumber(value, 0, 24, defaults.panelObjectivesSpacing) end), 0, 24, 1, "mpt-panel-objectives", nil, enabledWhen("showObjectives"), shownWhen("showObjectives")),
+		colorSetting(L["mythicPlusTimerObjectiveColor"] or "Objective color", get("objectiveColor"), set("objectiveColor"), defaults.objectiveColor, "mpt-panel-objectives", enabledWhen("showObjectives"), shownWhen("showObjectives")),
+		colorSetting(L["mythicPlusTimerObjectiveCompleteColor"] or "Completed objective color", get("objectiveCompleteColor"), set("objectiveCompleteColor"), defaults.objectiveCompleteColor, "mpt-panel-objectives", enabledWhen("showObjectives"), shownWhen("showObjectives")),
+		dropdownSetting(L["mythicPlusTimerGrowth"] or "Growth direction", get("panelObjectivesGrowth"), set("panelObjectivesGrowth", function(value) return value == "UP" and "UP" or "DOWN" end), {
+			{ value = "DOWN", label = L["damageMeterRowsGrowDown"] or "Down" },
+			{ value = "UP", label = L["damageMeterRowsGrowUp"] or "Up" },
+		}, "mpt-panel-objectives", 120, enabledWhen("showObjectives"), shownWhen("showObjectives")),
+		sliderSetting(L["mythicPlusTimerPanelObjectivesOffsetX"] or L["Offset X"] or "Offset X", get("panelObjectivesOffsetX"), set("panelObjectivesOffsetX", function(value) return clampNumber(value, -800, 800, defaults.panelObjectivesOffsetX) end), -800, 800, 1, "mpt-panel-objectives", nil, enabledWhen("showObjectives"), shownWhen("showObjectives")),
+		sliderSetting(L["mythicPlusTimerPanelObjectivesOffsetY"] or L["Offset Y"] or "Offset Y", get("panelObjectivesOffsetY"), set("panelObjectivesOffsetY", function(value) return clampNumber(value, -800, 800, defaults.panelObjectivesOffsetY) end), -800, 800, 1, "mpt-panel-objectives", nil, enabledWhen("showObjectives"), shownWhen("showObjectives")),
 		{ name = L["mythicPlusTimerPanelAffixes"] or "Affixes", kind = SettingType.Collapsible, id = "mpt-panel-affixes", defaultCollapsed = true },
 		checkboxSetting(L["mythicPlusTimerShowAffixes"] or "Show affixes", get("showAffixes"), set("showAffixes", nil, true), "mpt-panel-affixes"),
 		dropdownSetting(L["mythicPlusTimerAffixDisplay"] or "Affix display", get("affixDisplay"), set("affixDisplay"), {
@@ -2391,7 +2337,10 @@ function Timer:BuildEditModeSettings()
 		dropdownSetting(L["mythicPlusTimerBarBorderTexture"] or "Bar border texture", get("barBorderTexture"), set("barBorderTexture"), function() return buildMediaOptions("border", false) end, barId, 260, enabledWhen("barBorderEnabled")),
 		colorSetting(L["mythicPlusTimerBarBorderColor"] or "Bar border color", get("barBorderColor"), set("barBorderColor"), defaults.barBorderColor, barId, enabledWhen("barBorderEnabled")),
 		sliderSetting(L["mythicPlusTimerBarBorderSize"] or "Bar border size", get("barBorderSize"), set("barBorderSize", function(value) return clampNumber(value, 1, 32, defaults.barBorderSize) end), 1, 32, 1, barId, nil, enabledWhen("barBorderEnabled")),
-		sliderSetting(L["mythicPlusTimerBarBorderOffset"] or "Bar border offset", get("barBorderOffset"), set("barBorderOffset", function(value) return clampNumber(value, -64, 64, defaults.barBorderOffset) end), -64, 64, 1, barId, nil, enabledWhen("barBorderEnabled")),
+		checkboxSetting(L["damageMeterBorderAdvancedOffsets"] or "Separate border offsets", get("barBorderSeparateOffset"), set("barBorderSeparateOffset", nil, true), barId, enabledWhen("barBorderEnabled")),
+		sliderSetting(L["mythicPlusTimerBarBorderOffset"] or "Bar border offset", get("barBorderOffset"), set("barBorderOffset", function(value) return clampNumber(value, -300, 300, defaults.barBorderOffset) end), -300, 300, 1, barId, nil, allEnabledAndNot("barBorderSeparateOffset", "barBorderEnabled")),
+		sliderSetting(L["damageMeterBackdropSizeOffsetX"] or "Width offset", get("barBorderOffsetX"), set("barBorderOffsetX", function(value) return clampNumber(value, -300, 300, defaults.barBorderOffsetX) end), -300, 300, 1, barId, nil, allEnabled("barBorderEnabled", "barBorderSeparateOffset")),
+		sliderSetting(L["damageMeterBackdropSizeOffsetY"] or "Height offset", get("barBorderOffsetY"), set("barBorderOffsetY", function(value) return clampNumber(value, -300, 300, defaults.barBorderOffsetY) end), -300, 300, 1, barId, nil, allEnabled("barBorderEnabled", "barBorderSeparateOffset")),
 		{ name = L["mythicPlusTimerSectionFont"] or "Font", kind = SettingType.Collapsible, id = fontId, defaultCollapsed = true },
 		dropdownSetting(L["mythicPlusTimerFont"] or "Font", get("fontFace"), set("fontFace"), function() return buildMediaOptions("font", true) end, fontId, 260),
 		dropdownSetting(L["mythicPlusTimerFontOutline"] or "Font outline", get("fontOutline"), set("fontOutline", normalizeFontStyle), buildStyleOptions, fontId, 180),
@@ -2410,13 +2359,15 @@ function Timer:BuildEditModeSettings()
 		colorSetting(L["mythicPlusTimerEnemyForcesColor"] or "Enemy forces color", get("enemyForcesColor"), set("enemyForcesColor"), defaults.enemyForcesColor, colorId),
 		{ name = L["Background"] or "Background", kind = SettingType.Collapsible, id = backgroundId, defaultCollapsed = true },
 		checkboxSetting(L["mythicPlusTimerBackdropEnabled"] or "Use background", get("backdropEnabled"), set("backdropEnabled", nil, true), backgroundId),
-		dropdownSetting(L["mythicPlusTimerBackdropTexture"] or "Background texture", get("backdropTexture"), set("backdropTexture"), function() return buildMediaOptions("statusbar", false) end, backgroundId, 260, enabledWhen("backdropEnabled")),
-		colorSetting(L["mythicPlusTimerBackdropColor"] or "Background color", get("backdropColor"), set("backdropColor"), defaults.backdropColor, backgroundId, enabledWhen("backdropEnabled")),
-		dropdownSetting(L["Anchor"] or "Anchor", get("backdropAnchor"), set("backdropAnchor", normalizePoint), anchorOptions, backgroundId, 220, enabledWhen("backdropEnabled")),
-		sliderSetting(L["damageMeterBackdropSizeOffsetX"] or "Width offset", get("backdropSizeOffsetX"), set("backdropSizeOffsetX", function(value) return clampNumber(value, -1000, 1000, defaults.backdropSizeOffsetX) end), -1000, 1000, 1, backgroundId, nil, enabledWhen("backdropEnabled")),
-		sliderSetting(L["damageMeterBackdropSizeOffsetY"] or "Height offset", get("backdropSizeOffsetY"), set("backdropSizeOffsetY", function(value) return clampNumber(value, -1000, 1000, defaults.backdropSizeOffsetY) end), -1000, 1000, 1, backgroundId, nil, enabledWhen("backdropEnabled")),
-		sliderSetting(L["Offset X"] or "Offset X", get("backdropOffsetX"), set("backdropOffsetX", function(value) return clampNumber(value, -1000, 1000, defaults.backdropOffsetX) end), -1000, 1000, 1, backgroundId, nil, enabledWhen("backdropEnabled")),
-		sliderSetting(L["Offset Y"] or "Offset Y", get("backdropOffsetY"), set("backdropOffsetY", function(value) return clampNumber(value, -1000, 1000, defaults.backdropOffsetY) end), -1000, 1000, 1, backgroundId, nil, enabledWhen("backdropEnabled")),
+		checkboxSetting(L["damageMeterHeaderBackgroundUseCustomTexture"] or "Custom texture", get("backdropUseCustomTexture"), set("backdropUseCustomTexture", nil, true), backgroundId, enabledWhen("backdropEnabled"), shownWhen("backdropEnabled")),
+		inputSetting(L["damageMeterHeaderBackgroundCustomTexture"] or "Atlas name or texture ID", get("backdropCustomTexture"), set("backdropCustomTexture", trimTextureInput), backgroundId, allEnabled("backdropEnabled", "backdropUseCustomTexture"), L["damageMeterHeaderBackgroundCustomTextureDesc"] or "Enter an atlas name, texture file ID, or texture path.", 160, allShown("backdropEnabled", "backdropUseCustomTexture")),
+		dropdownSetting(L["mythicPlusTimerBackdropTexture"] or "Background texture", get("backdropTexture"), set("backdropTexture"), function() return buildMediaOptions("statusbar", false) end, backgroundId, 260, allEnabledAndNot("backdropUseCustomTexture", "backdropEnabled"), allEnabledAndNot("backdropUseCustomTexture", "backdropEnabled")),
+		colorSetting(L["mythicPlusTimerBackdropColor"] or "Background color", get("backdropColor"), set("backdropColor"), defaults.backdropColor, backgroundId, enabledWhen("backdropEnabled"), shownWhen("backdropEnabled")),
+		dropdownSetting(L["Anchor"] or "Anchor", get("backdropAnchor"), set("backdropAnchor", normalizePoint), anchorOptions, backgroundId, 220, enabledWhen("backdropEnabled"), shownWhen("backdropEnabled")),
+		sliderSetting(L["damageMeterBackdropSizeOffsetX"] or "Width offset", get("backdropSizeOffsetX"), set("backdropSizeOffsetX", function(value) return clampNumber(value, -1000, 1000, defaults.backdropSizeOffsetX) end), -1000, 1000, 1, backgroundId, nil, enabledWhen("backdropEnabled"), shownWhen("backdropEnabled")),
+		sliderSetting(L["damageMeterBackdropSizeOffsetY"] or "Height offset", get("backdropSizeOffsetY"), set("backdropSizeOffsetY", function(value) return clampNumber(value, -1000, 1000, defaults.backdropSizeOffsetY) end), -1000, 1000, 1, backgroundId, nil, enabledWhen("backdropEnabled"), shownWhen("backdropEnabled")),
+		sliderSetting(L["Offset X"] or "Offset X", get("backdropOffsetX"), set("backdropOffsetX", function(value) return clampNumber(value, -1000, 1000, defaults.backdropOffsetX) end), -1000, 1000, 1, backgroundId, nil, enabledWhen("backdropEnabled"), shownWhen("backdropEnabled")),
+		sliderSetting(L["Offset Y"] or "Offset Y", get("backdropOffsetY"), set("backdropOffsetY", function(value) return clampNumber(value, -1000, 1000, defaults.backdropOffsetY) end), -1000, 1000, 1, backgroundId, nil, enabledWhen("backdropEnabled"), shownWhen("backdropEnabled")),
 		{ name = L["Header"] or "Header", kind = SettingType.Collapsible, id = headerId, defaultCollapsed = true },
 		{ name = L["settingsCategoryFooter"] or L["damageMeterFooter"] or "Footer", kind = SettingType.Collapsible, id = footerId, defaultCollapsed = true },
 		{ name = L["Border"] or "Border", kind = SettingType.Collapsible, id = borderId, defaultCollapsed = true },
@@ -2424,7 +2375,12 @@ function Timer:BuildEditModeSettings()
 		dropdownSetting(L["mythicPlusTimerBorderTexture"] or "Border texture", get("borderTexture"), set("borderTexture"), function() return buildMediaOptions("border", false) end, borderId, 260, enabledWhen("borderEnabled")),
 		colorSetting(L["mythicPlusTimerBorderColor"] or "Border color", get("borderColor"), set("borderColor"), defaults.borderColor, borderId, enabledWhen("borderEnabled")),
 		sliderSetting(L["mythicPlusTimerBorderSize"] or "Border size", get("borderSize"), set("borderSize", function(value) return clampNumber(value, 1, 32, defaults.borderSize) end), 1, 32, 1, borderId, nil, enabledWhen("borderEnabled")),
-		sliderSetting(L["mythicPlusTimerBorderInset"] or "Border offset", get("borderInset"), set("borderInset", function(value) return clampNumber(value, -64, 64, defaults.borderInset) end), -64, 64, 1, borderId, nil, enabledWhen("borderEnabled")),
+		checkboxSetting(L["damageMeterBorderAdvancedOffsets"] or "Separate border offsets", get("borderSeparateOffset"), set("borderSeparateOffset", nil, true), borderId, enabledWhen("borderEnabled")),
+		sliderSetting(L["mythicPlusTimerBorderInset"] or "Border offset", get("borderInset"), set("borderInset", function(value) return clampNumber(value, -300, 300, defaults.borderInset) end), -300, 300, 1, borderId, nil, allEnabledAndNot("borderSeparateOffset", "borderEnabled")),
+		sliderSetting(L["damageMeterBackdropSizeOffsetX"] or "Width offset", get("borderOffsetX"), set("borderOffsetX", function(value) return clampNumber(value, -300, 300, defaults.borderOffsetX) end), -300, 300, 1, borderId, nil, allEnabled("borderEnabled", "borderSeparateOffset")),
+		sliderSetting(L["damageMeterBackdropSizeOffsetY"] or "Height offset", get("borderOffsetY"), set("borderOffsetY", function(value) return clampNumber(value, -300, 300, defaults.borderOffsetY) end), -300, 300, 1, borderId, nil, allEnabled("borderEnabled", "borderSeparateOffset")),
+		sliderSetting(L["Offset X"] or "Offset X", get("borderPositionOffsetX"), set("borderPositionOffsetX", function(value) return clampNumber(value, -1000, 1000, defaults.borderPositionOffsetX) end), -1000, 1000, 1, borderId, nil, enabledWhen("borderEnabled")),
+		sliderSetting(L["Offset Y"] or "Offset Y", get("borderPositionOffsetY"), set("borderPositionOffsetY", function(value) return clampNumber(value, -1000, 1000, defaults.borderPositionOffsetY) end), -1000, 1000, 1, borderId, nil, enabledWhen("borderEnabled")),
 		divider(borderId),
 	}
 	for _, setting in ipairs(decorBarSettings("header", headerId)) do

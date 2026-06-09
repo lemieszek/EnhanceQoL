@@ -6,6 +6,7 @@
 ### ✨ Added
 
 - Cooldown Panels: Added an optional interrupt-spell glow that highlights tracked interrupts when the target is casting an interruptible spell.
+- Mythic Plus: Added a beta-only Mythic+ Timer.
 
 ## [11.1.0-beta5] - 2026-06-09
 

@@ -3326,6 +3326,7 @@ function H.formatText(mode, cur, maxv, useShort, percentValue, delimiter, delimi
 		local infix = useShort == false and tostring(missNum) or (AbbreviateNumbers and AbbreviateNumbers(missNum) or H.shortValue(missNum))
 		return "-" .. infix
 	end
+	if mode == "LEVEL" then return levelText end
 	if addon.variables and addon.variables.isMidnight and issecretvalue then
 		if (cur and issecretvalue(cur)) or (maxv and issecretvalue(maxv)) then
 			local scur = useShort and H.shortValue(cur) or BreakUpLargeNumbers(cur)

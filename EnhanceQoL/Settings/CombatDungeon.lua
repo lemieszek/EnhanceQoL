@@ -2677,8 +2677,13 @@ if cChar and sectionDungeon then
 		var = "mythicPlusTimerEnabled",
 		text = L["mythicPlusTimerEnabled"],
 		desc = L["mythicPlusTimerEditModeHint"],
+		get = function()
+			local config = type(addon.db.mythicPlusTimer) == "table" and addon.db.mythicPlusTimer or nil
+			return config and config.enabled == true
+		end,
 		func = function(value)
-			addon.db["mythicPlusTimerEnabled"] = value == true
+			addon.db.mythicPlusTimer = type(addon.db.mythicPlusTimer) == "table" and addon.db.mythicPlusTimer or {}
+			addon.db.mythicPlusTimer.enabled = value == true
 			if addon.MythicPlus and addon.MythicPlus.MythicPlusTimer and addon.MythicPlus.MythicPlusTimer.UpdateEventState then addon.MythicPlus.MythicPlusTimer:UpdateEventState() end
 		end,
 		parentSection = mythicPlusTimerSection,
