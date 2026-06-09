@@ -2877,6 +2877,50 @@ local POWER_ENUM = {
 	ESSENCE = (EnumPowerType and EnumPowerType.Essence) or 19,
 }
 
+function ResourceBars.HideSegmentChildren(segments, clearCooldownText)
+	if not segments then return end
+	for i = 1, #segments do
+		local sb = segments[i]
+		if sb then
+			sb:Hide()
+			if sb._rbSegmentBg then sb._rbSegmentBg:Hide() end
+			if sb._rbSegmentBorder then sb._rbSegmentBorder:Hide() end
+			if clearCooldownText and sb.fs then
+				sb.fs:SetText("")
+				sb.fs:Hide()
+				sb._lastRemain = nil
+			end
+		end
+	end
+end
+
+function ResourceBars.HideInactiveEssenceChildren(frame)
+	if not frame then return end
+	ResourceBars.HideSegmentChildren(frame.essences, false)
+	if frame.essenceGapMarks then
+		for i = 1, #frame.essenceGapMarks do
+			local mark = frame.essenceGapMarks[i]
+			if mark then mark:Hide() end
+		end
+	end
+	frame._essenceSegments = 0
+	frame._essenceVertical = nil
+	frame._essenceGap = nil
+	frame._essenceGapRequested = nil
+	frame._essenceSegmentStyled = nil
+end
+
+function ResourceBars.HideInactiveRuneChildren(frame)
+	if not frame then return end
+	ResourceBars.HideSegmentChildren(frame.runes, true)
+	if frame.runeGapMarks then
+		for i = 1, #frame.runeGapMarks do
+			local mark = frame.runeGapMarks[i]
+			if mark then mark:Hide() end
+		end
+	end
+end
+
 local function applyStatusBarInsets(frame, inset, force)
 	if not frame then return end
 	inset = inset or RB.ZERO_INSETS
@@ -2933,11 +2977,21 @@ local function applyStatusBarInsets(frame, inset, force)
 		updateBarSeparators(frame._rbType)
 		updateBarThresholds(frame._rbType)
 	end
-	if frame.runes then layoutRunes(frame) end
+	if frame.runes then
+		if frame._rbType == "RUNES" then
+			layoutRunes(frame)
+		else
+			ResourceBars.HideInactiveRuneChildren(frame)
+		end
+	end
 	if frame.essences then
-		local cfg = frame._cfg or (frame._rbType and getBarSettings(frame._rbType)) or getBarSettings("ESSENCE") or {}
-		local count = POWER_ENUM and UnitPowerMax("player", POWER_ENUM.ESSENCE) or 0
-		ResourceBars.LayoutEssences(frame, cfg, count, resolveTexture(cfg))
+		if frame._rbType == "ESSENCE" then
+			local cfg = frame._cfg or getBarSettings("ESSENCE") or {}
+			local count = POWER_ENUM and UnitPowerMax("player", POWER_ENUM.ESSENCE) or 0
+			ResourceBars.LayoutEssences(frame, cfg, count, resolveTexture(cfg))
+		else
+			ResourceBars.HideInactiveEssenceChildren(frame)
+		end
 	end
 end
 
@@ -6809,23 +6863,6 @@ end
 function ResourceBars.ResetReusedPowerBarVisualState(bar, previousType, nextType)
 	if not bar or previousType == nextType then return end
 
-	local function hideBarChildSegments(segments, clearCooldownText)
-		if not segments then return end
-		for i = 1, #segments do
-			local sb = segments[i]
-			if sb then
-				sb:Hide()
-				if sb._rbSegmentBg then sb._rbSegmentBg:Hide() end
-				if sb._rbSegmentBorder then sb._rbSegmentBorder:Hide() end
-				if clearCooldownText and sb.fs then
-					sb.fs:SetText("")
-					sb.fs:Hide()
-					sb._lastRemain = nil
-				end
-			end
-		end
-	end
-
 	-- Shared frames are reused across specs, so clear visuals from the old type
 	-- before the new type config is applied.
 	deactivateRuneTicker(bar)
@@ -6841,8 +6878,8 @@ function ResourceBars.ResetReusedPowerBarVisualState(bar, previousType, nextType
 	bar._usingHolyThreeColor = nil
 	bar._usingMaelstromFiveColor = nil
 
-	hideBarChildSegments(bar.runes, true)
-	hideBarChildSegments(bar.essences, false)
+	ResourceBars.HideSegmentChildren(bar.runes, true)
+	ResourceBars.HideSegmentChildren(bar.essences, false)
 
 	if bar.runeGapMarks then
 		for i = 1, #bar.runeGapMarks do
@@ -6911,6 +6948,8 @@ function ResourceBars.ReuseExistingPowerBar(type, sharedSlot)
 	else
 		powerbar[type] = bar
 	end
+	applyBarFrameLayers(bar, settings)
+	applyBackdrop(bar, settings)
 	if not ResourceBars.ShouldDeferShowToVisibilityDriver or not ResourceBars.ShouldDeferShowToVisibilityDriver(bar, settings) then
 		if not bar:IsShown() then bar:Show() end
 	end

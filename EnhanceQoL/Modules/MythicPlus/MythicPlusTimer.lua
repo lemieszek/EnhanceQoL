@@ -34,14 +34,16 @@ Timer.defaults = Timer.defaults
 	or {
 		enabled = false,
 		showDungeon = true,
-		dungeonDisplay = "NAME_LEVEL",
-		showAffixes = true,
+		dungeonDisplay = "SHORT_LEVEL",
+		showAffixes = false,
 		showAffixIcons = false,
 		affixDisplay = "TEXT",
 		showTimer = true,
-		showChestTimers = true,
+		timerDisplay = "TIME_LEFT",
+		showChestTimers = false,
 		showDeaths = true,
-		deathDisplay = "TEXT",
+		deathDisplay = "ICON",
+		deathShowTimeLost = true,
 		showObjectives = true,
 		showEnemyForces = true,
 		showObjectiveBars = true,
@@ -51,56 +53,56 @@ Timer.defaults = Timer.defaults
 		visibility = "runOrEditMode",
 		updateRate = 0.2,
 		tooltip = true,
-		layoutMode = "LIST",
-		panelHeight = 70,
-		showKeyLevel = true,
+		layoutMode = "PANEL",
+		panelHeight = 142,
+		showKeyLevel = false,
 		showBestTime = true,
 		showBestDelta = true,
-		showEnemyPercent = true,
+		showEnemyPercent = false,
 		showPanelTimerBar = true,
 		showPanelEnemyBar = true,
 		dungeonAnchor = "TOPLEFT",
-		dungeonOffsetX = 44,
-		dungeonOffsetY = -12,
+		dungeonOffsetX = 5,
+		dungeonOffsetY = -3,
 		keyLevelAnchor = "TOPLEFT",
 		keyLevelOffsetX = 12,
 		keyLevelOffsetY = -12,
-		timerAnchor = "TOPLEFT",
-		timerOffsetX = 130,
-		timerOffsetY = -8,
+		timerAnchor = "TOPRIGHT",
+		timerOffsetX = -5,
+		timerOffsetY = 0,
 		chest2Anchor = "TOPLEFT",
 		chest2OffsetX = 115,
 		chest2OffsetY = -38,
 		chest3Anchor = "TOPLEFT",
 		chest3OffsetX = 175,
 		chest3OffsetY = -38,
-		deathsAnchor = "TOPLEFT",
-		deathsOffsetX = 56,
-		deathsOffsetY = -12,
+		deathsAnchor = "BOTTOMRIGHT",
+		deathsOffsetX = -5,
+		deathsOffsetY = 5,
 		enemyPercentAnchor = "TOPLEFT",
 		enemyPercentOffsetX = 218,
 		enemyPercentOffsetY = -42,
-		bestTimeAnchor = "TOPLEFT",
-		bestTimeOffsetX = 218,
-		bestTimeOffsetY = -18,
+		bestTimeAnchor = "BOTTOMLEFT",
+		bestTimeOffsetX = 5,
+		bestTimeOffsetY = 5,
 		panelAffixesAnchor = "TOPLEFT",
 		panelAffixesOffsetX = 12,
-		panelAffixesOffsetY = -34,
+		panelAffixesOffsetY = -24,
 		panelAffixesFontSize = 12,
 		panelAffixIconSize = 16,
-		panelDungeonFontSize = 15,
+		panelDungeonFontSize = 28,
 		panelKeyLevelFontSize = 26,
 		panelTimerFontSize = 28,
 		panelChestFontSize = 12,
-		panelChestHideLabels = false,
+		panelChestHideLabels = true,
 		panelDeathsFontSize = 12,
 		panelDeathIconSize = 16,
 		panelEnemyPercentFontSize = 12,
 		panelBestTimeFontSize = 12,
 		panelObjectivesAnchor = "TOPLEFT",
 		panelObjectivesGrowth = "DOWN",
-		panelObjectivesOffsetX = 12,
-		panelObjectivesOffsetY = -78,
+		panelObjectivesOffsetX = 0,
+		panelObjectivesOffsetY = -85,
 		panelObjectivesWidth = 240,
 		panelObjectivesFontFace = GLOBAL_FONT_KEY,
 		panelObjectivesFontOutline = GLOBAL_STYLE_KEY,
@@ -108,54 +110,54 @@ Timer.defaults = Timer.defaults
 		panelObjectivesSpacing = 2,
 		panelBarWidth = 220,
 		panelBarHeight = 8,
-		panelTimerBarWidth = 220,
-		panelTimerBarHeight = 8,
+		panelTimerBarWidth = 290,
+		panelTimerBarHeight = 12,
 		panelTimerBarColor = { r = 0.15, g = 1, b = 0.25, a = 1 },
 		panelTimerBarExpiredColor = { r = 1, g = 0.12, b = 0.12, a = 1 },
-		panelTimerBarTexture = "Blizzard Raid Bar",
+		panelTimerBarTexture = "EQOL: Astral",
 		panelTimerBarBackgroundTexture = "",
 		panelTimerBarBackgroundColor = { r = 0, g = 0, b = 0, a = 0.45 },
-		panelTimerBarBorderEnabled = false,
-		panelTimerBarBorderTexture = "",
-		panelTimerBarBorderColor = { r = 0, g = 0, b = 0, a = 0.85 },
-		panelTimerBarBorderSize = 1,
-		panelTimerBarBorderOffset = 0,
+		panelTimerBarBorderEnabled = true,
+		panelTimerBarBorderTexture = "EQOL: Midnight 12px",
+		panelTimerBarBorderColor = { r = 0.0470588281750679, g = 0.95686280727386475, b = 1, a = 1 },
+		panelTimerBarBorderSize = 5,
+		panelTimerBarBorderOffset = 1,
 		panelTimerBarBorderSeparateOffset = false,
 		panelTimerBarBorderOffsetX = 0,
 		panelTimerBarBorderOffsetY = 0,
-		panelTimerBarChestMarkers = false,
+		panelTimerBarChestMarkers = true,
 		panelTimerBarChestMarkerColor = { r = 1, g = 1, b = 1, a = 0.85 },
-		panelTimerBarChestMarkerWidth = 2,
-		panelTimerBarChestTimeText = false,
-		panelTimerBarChestTimeTextOffsetY = 12,
-		panelTimerBarChestTimeTextFontSize = 11,
+		panelTimerBarChestMarkerWidth = 1,
+		panelTimerBarChestTimeText = true,
+		panelTimerBarChestTimeTextOffsetY = 14,
+		panelTimerBarChestTimeTextFontSize = 14,
 		panelTimerBarChestTimeTextColor = { r = 0.55, g = 0.85, b = 1, a = 1 },
-		panelTimerBarAnchor = "TOPLEFT",
-		panelTimerBarOffsetX = 20,
+		panelTimerBarAnchor = "TOP",
+		panelTimerBarOffsetX = 0,
 		panelTimerBarOffsetY = -52,
-		panelEnemyBarWidth = 220,
-		panelEnemyBarHeight = 8,
+		panelEnemyBarWidth = 290,
+		panelEnemyBarHeight = 12,
 		panelEnemyBarColor = { r = 0.95, g = 0.55, b = 0.15, a = 1 },
 		panelEnemyBarTexture = "Blizzard Raid Bar",
 		panelEnemyBarBackgroundTexture = "",
 		panelEnemyBarBackgroundColor = { r = 0, g = 0, b = 0, a = 0.45 },
-		panelEnemyBarBorderEnabled = false,
-		panelEnemyBarBorderTexture = "",
-		panelEnemyBarBorderColor = { r = 0, g = 0, b = 0, a = 0.85 },
-		panelEnemyBarBorderSize = 1,
-		panelEnemyBarBorderOffset = 0,
+		panelEnemyBarBorderEnabled = true,
+		panelEnemyBarBorderTexture = "EQOL: Midnight 12px",
+		panelEnemyBarBorderColor = { r = 0.3254902064800263, g = 0.94117653369903564, b = 1, a = 1 },
+		panelEnemyBarBorderSize = 5,
+		panelEnemyBarBorderOffset = 2,
 		panelEnemyBarBorderSeparateOffset = false,
 		panelEnemyBarBorderOffsetX = 0,
 		panelEnemyBarBorderOffsetY = 0,
-		panelEnemyBarAnchor = "TOPLEFT",
-		panelEnemyBarOffsetX = 20,
-		panelEnemyBarOffsetY = -64,
-		panelEnemyBarTextEnabled = false,
-		panelEnemyBarTextAlign = "CENTER",
+		panelEnemyBarAnchor = "TOP",
+		panelEnemyBarOffsetX = 0,
+		panelEnemyBarOffsetY = -70,
+		panelEnemyBarTextEnabled = true,
+		panelEnemyBarTextAlign = "RIGHT",
 		panelEnemyBarTextOffsetY = 0,
 		panelEnemyBarTextFontSize = 11,
 		panelEnemyBarTextColor = { r = 1, g = 1, b = 1, a = 1 },
-		width = 260,
+		width = 308,
 		rowHeight = 18,
 		rowSpacing = 3,
 		growth = "DOWN",
@@ -200,8 +202,8 @@ Timer.defaults = Timer.defaults
 		backdropEnabled = true,
 		backdropUseCustomTexture = false,
 		backdropCustomTexture = "",
-		backdropTexture = "",
-		backdropColor = { r = 0.02, g = 0.025, b = 0.03, a = 0.55 },
+		backdropTexture = "EQOL: Astral",
+		backdropColor = { r = 0.62352943420410156, g = 0.74901962280273438, b = 1, a = 0.550000011920929 },
 		backdropAnchor = "CENTER",
 		backdropOffsetX = 0,
 		backdropOffsetY = 0,
@@ -274,12 +276,16 @@ local function snapSize(value, minimum)
 	return math.max(minimum or getPixelSize(), snapToPixel(value))
 end
 
+local function pointOffset(value, minimum, maximum, fallback)
+	return clampNumber(value, minimum, maximum, fallback)
+end
+
 local function applyBorderOffset(borderFrame, target, offsetX, offsetY, positionOffsetX, positionOffsetY)
 	if not (borderFrame and target) then return end
 	local borderOffsetX = snapToPixel(clampNumber(offsetX, -300, 300, 0))
 	local borderOffsetY = snapToPixel(clampNumber(offsetY, -300, 300, borderOffsetX))
-	local shiftX = snapToPixel(clampNumber(positionOffsetX, -1000, 1000, 0))
-	local shiftY = snapToPixel(clampNumber(positionOffsetY, -1000, 1000, 0))
+	local shiftX = pointOffset(positionOffsetX, -1000, 1000, 0)
+	local shiftY = pointOffset(positionOffsetY, -1000, 1000, 0)
 	borderFrame:ClearAllPoints()
 	borderFrame:SetPoint("TOPLEFT", target, "TOPLEFT", -borderOffsetX + shiftX, borderOffsetY + shiftY)
 	borderFrame:SetPoint("BOTTOMRIGHT", target, "BOTTOMRIGHT", borderOffsetX + shiftX, -borderOffsetY + shiftY)
@@ -458,6 +464,15 @@ local function timeRemainingToText(seconds)
 	seconds = tonumber(seconds) or 0
 	if seconds >= 0 then return secondsToText(seconds) end
 	return "+" .. secondsToText(-seconds)
+end
+
+local function secondsToShortText(seconds)
+	seconds = math.max(0, math.floor(tonumber(seconds) or 0))
+	if seconds < 60 then return string.format("%ds", seconds) end
+	local minutes = math.floor(seconds / 60)
+	local remaining = seconds % 60
+	if remaining == 0 then return string.format("%dm", minutes) end
+	return string.format("%dm%02ds", minutes, remaining)
 end
 
 local function isInMythicPlus()
@@ -727,13 +742,25 @@ function Timer:GetSingleAffixDisplayText(state, index, iconSize)
 	return string.format("|T%s:%d:%d:0:0|t %s", tostring(icon), iconSize, iconSize, name)
 end
 
-function Timer:GetDeathDisplayText(deaths, iconSize)
+function Timer:GetDeathDisplayText(deaths, iconSize, timeLost)
 	deaths = tonumber(deaths) or 0
 	local mode = self:Get("deathDisplay")
 	iconSize = clampNumber(iconSize, 8, 64, 16)
-	if mode == "ICON" then return string.format("|A:%s:%d:%d|a %d", DEATH_ICON_ATLAS, iconSize, iconSize, deaths) end
-	if mode == "ICON_TEXT" then return string.format("|A:%s:%d:%d|a %d %s", DEATH_ICON_ATLAS, iconSize, iconSize, deaths, L["mythicPlusTimerDeaths"] or "Deaths") end
-	return string.format("%d %s", deaths, L["mythicPlusTimerDeaths"] or "Deaths")
+	local suffix = ""
+	if self:Get("deathShowTimeLost") == true and tonumber(timeLost) and tonumber(timeLost) > 0 then suffix = string.format(" (+%s)", secondsToShortText(timeLost)) end
+	if mode == "ICON" then return string.format("|A:%s:%d:%d|a %d%s", DEATH_ICON_ATLAS, iconSize, iconSize, deaths, suffix) end
+	if mode == "ICON_TEXT" then return string.format("|A:%s:%d:%d|a %d %s%s", DEATH_ICON_ATLAS, iconSize, iconSize, deaths, L["mythicPlusTimerDeaths"] or "Deaths", suffix) end
+	return string.format("%d %s%s", deaths, L["mythicPlusTimerDeaths"] or "Deaths", suffix)
+end
+
+function Timer:GetTimerDisplayText(state, timeLeft)
+	state = state or {}
+	local mode = self:Get("timerDisplay")
+	local elapsed = tonumber(state.elapsed) or 0
+	local total = tonumber(state.timeLimit) or 0
+	if mode == "TIME_LEFT_TOTAL" then return string.format("%s / %s", timeRemainingToText(timeLeft), secondsToText(total)) end
+	if mode == "ELAPSED_TOTAL" then return string.format("%s / %s", secondsToText(elapsed), secondsToText(total)) end
+	return timeRemainingToText(timeLeft)
 end
 
 local function buildDungeonAbbreviation(name)
@@ -821,7 +848,7 @@ function Timer:EnsureRow(index)
 	row.bar.bg = row.bar:CreateTexture(nil, "BACKGROUND")
 	row.bar.bg:SetDrawLayer("BACKGROUND", -7)
 	row.bar.bg:SetAllPoints()
-	row.bar.borderFrame = CreateFrame("Frame", nil, row.bar, BackdropTemplateMixin and "BackdropTemplate")
+	row.bar.borderFrame = CreateFrame("Frame", nil, row, BackdropTemplateMixin and "BackdropTemplate")
 	row.bar.borderFrame:EnableMouse(false)
 	row.bar.borderFrame:Hide()
 	row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -907,21 +934,25 @@ function Timer:EnsurePanelBar(key)
 	bar.bg = bar:CreateTexture(nil, "BACKGROUND")
 	bar.bg:SetDrawLayer("BACKGROUND", -7)
 	bar.bg:SetAllPoints()
-	bar.text = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-	bar.text:SetDrawLayer("OVERLAY", 7)
+	bar.textFrame = CreateFrame("Frame", nil, frame)
+	bar.textFrame:SetFrameLevel(frame:GetFrameLevel() + 40)
+	bar.text = bar.textFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	bar.text:SetDrawLayer("OVERLAY", 9)
 	bar.text:Hide()
-	bar.borderFrame = CreateFrame("Frame", nil, bar, BackdropTemplateMixin and "BackdropTemplate")
+	bar.borderFrame = CreateFrame("Frame", nil, frame, BackdropTemplateMixin and "BackdropTemplate")
 	bar.borderFrame:EnableMouse(false)
 	bar.borderFrame:Hide()
 	bar.chestMarkers = {}
 	bar.chestMarkerTexts = {}
+	bar.chestMarkerTextFrame = CreateFrame("Frame", nil, frame)
+	bar.chestMarkerTextFrame:SetFrameLevel(frame:GetFrameLevel() + 40)
 	for index = 1, 2 do
 		local marker = bar:CreateTexture(nil, "OVERLAY")
 		marker:SetColorTexture(1, 1, 1, 1)
 		marker:Hide()
 		bar.chestMarkers[index] = marker
-		local markerText = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-		markerText:SetDrawLayer("OVERLAY", 8)
+		local markerText = bar.chestMarkerTextFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+		markerText:SetDrawLayer("OVERLAY", 9)
 		markerText:SetJustifyH("CENTER")
 		markerText:Hide()
 		bar.chestMarkerTexts[index] = markerText
@@ -938,6 +969,13 @@ function Timer:HidePanelElements()
 	end
 	for _, bar in pairs(frame.panelBars or {}) do
 		bar:Hide()
+		if bar.text then bar.text:Hide() end
+		for _, marker in ipairs(bar.chestMarkers or {}) do
+			marker:Hide()
+		end
+		for _, markerText in ipairs(bar.chestMarkerTexts or {}) do
+			markerText:Hide()
+		end
 	end
 	for _, hover in pairs(frame.panelHovers or {}) do
 		hover:Hide()
@@ -989,7 +1027,7 @@ function Timer:ApplyDecorBar(kind)
 		end
 	end
 	texture:ClearAllPoints()
-	texture:SetPoint(texturePoint, frame, framePoint, snapToPixel(clampNumber(self:Get(prefix .. "OffsetX"), -1000, 1000, defaults[prefix .. "OffsetX"])), snapToPixel(clampNumber(self:Get(prefix .. "OffsetY"), -1000, 1000, defaults[prefix .. "OffsetY"])))
+	texture:SetPoint(texturePoint, frame, framePoint, pointOffset(self:Get(prefix .. "OffsetX"), -1000, 1000, defaults[prefix .. "OffsetX"]), pointOffset(self:Get(prefix .. "OffsetY"), -1000, 1000, defaults[prefix .. "OffsetY"]))
 	texture:SetSize(width, height)
 	applyTexture(texture, textureKind, textureValue)
 	texture:SetVertexColor(color.r, color.g, color.b, color.a)
@@ -1013,7 +1051,7 @@ function Timer:ApplyWindowBackground()
 	local baseWidth = frame:GetWidth() or clampNumber(self:Get("width"), 120, 800, defaults.width)
 	local baseHeight = frame:GetHeight() or 120
 	texture:ClearAllPoints()
-	texture:SetPoint(anchor, frame, anchor, snapToPixel(clampNumber(self:Get("backdropOffsetX"), -1000, 1000, defaults.backdropOffsetX)), snapToPixel(clampNumber(self:Get("backdropOffsetY"), -1000, 1000, defaults.backdropOffsetY)))
+	texture:SetPoint(anchor, frame, anchor, pointOffset(self:Get("backdropOffsetX"), -1000, 1000, defaults.backdropOffsetX), pointOffset(self:Get("backdropOffsetY"), -1000, 1000, defaults.backdropOffsetY))
 	texture:SetSize(snapSize(baseWidth + clampNumber(self:Get("backdropSizeOffsetX"), -1000, 1000, defaults.backdropSizeOffsetX)), snapSize(baseHeight + clampNumber(self:Get("backdropSizeOffsetY"), -1000, 1000, defaults.backdropSizeOffsetY)))
 	applyTexture(texture, textureKind, textureValue)
 	texture:SetVertexColor(color.r, color.g, color.b, color.a)
@@ -1232,7 +1270,7 @@ function Timer:SetPanelText(key, textValue, anchorKey, xKey, yKey, color, fontSi
 	local anchor = normalizePoint(self:Get(anchorKey))
 	text:ClearAllPoints()
 	text:SetDrawLayer("OVERLAY", 7)
-	text:SetPoint(anchor, self:EnsureFrame(), anchor, snapToPixel(clampNumber(self:Get(xKey), -800, 800, defaults[xKey] or 0)), snapToPixel(clampNumber(self:Get(yKey), -800, 800, defaults[yKey] or 0)))
+	text:SetPoint(anchor, self:EnsureFrame(), anchor, pointOffset(self:Get(xKey), -800, 800, defaults[xKey] or 0), pointOffset(self:Get(yKey), -800, 800, defaults[yKey] or 0))
 	text:SetFont(font, clampNumber(fontSize, 8, 56, defaults.fontSize), style)
 	text:SetJustifyH(justify or "LEFT")
 	text:SetText(textValue or "")
@@ -1261,8 +1299,8 @@ function Timer:RenderPanelAffixes(state)
 	local iconSize = clampNumber(self:Get("panelAffixIconSize"), 8, 64, defaults.panelAffixIconSize)
 	local anchor = normalizePoint(self:Get("panelAffixesAnchor"))
 	local color = normalizeColor(self:Get("affixColor"), defaults.affixColor)
-	local x = snapToPixel(clampNumber(self:Get("panelAffixesOffsetX"), -800, 800, defaults.panelAffixesOffsetX))
-	local y = snapToPixel(clampNumber(self:Get("panelAffixesOffsetY"), -800, 800, defaults.panelAffixesOffsetY))
+	local x = pointOffset(self:Get("panelAffixesOffsetX"), -800, 800, defaults.panelAffixesOffsetX)
+	local y = pointOffset(self:Get("panelAffixesOffsetY"), -800, 800, defaults.panelAffixesOffsetY)
 	local mode = self:Get("affixDisplay")
 	local gap = mode == "ICON" and 4 or 10
 	local growLeft = anchor == "TOPRIGHT" or anchor == "RIGHT" or anchor == "BOTTOMRIGHT"
@@ -1275,7 +1313,9 @@ function Timer:RenderPanelAffixes(state)
 		item.tooltipType = "affix"
 		item.tooltipData = { state = state, index = index }
 		item.text:SetFont(font, fontSize, style)
-		item.text:SetText(self:GetSingleAffixDisplayText(state, index, iconSize))
+		local affixText = self:GetSingleAffixDisplayText(state, index, iconSize)
+		if mode == "TEXT" and index < #state.affixNames then affixText = affixText .. " -" end
+		item.text:SetText(affixText)
 		item.text:SetTextColor(color.r, color.g, color.b, color.a)
 		item.text:ClearAllPoints()
 		item.text:SetPoint("TOPLEFT", item, "TOPLEFT", 0, 0)
@@ -1302,8 +1342,8 @@ function Timer:RenderPanelObjectives(state)
 	local style = resolveFontStyle(self:Get("panelObjectivesFontOutline"))
 	local fontSize = clampNumber(self:Get("panelObjectivesFontSize"), 8, 56, defaults.panelObjectivesFontSize)
 	local spacing = snapToPixel(clampNumber(self:Get("panelObjectivesSpacing"), 0, 24, defaults.panelObjectivesSpacing))
-	local x = snapToPixel(clampNumber(self:Get("panelObjectivesOffsetX"), -800, 800, defaults.panelObjectivesOffsetX))
-	local y = snapToPixel(clampNumber(self:Get("panelObjectivesOffsetY"), -800, 800, defaults.panelObjectivesOffsetY))
+	local x = pointOffset(self:Get("panelObjectivesOffsetX"), -800, 800, defaults.panelObjectivesOffsetX)
+	local y = pointOffset(self:Get("panelObjectivesOffsetY"), -800, 800, defaults.panelObjectivesOffsetY)
 	local rowHeight = snapSize(fontSize + 2)
 	local frameWidth = clampNumber(self:Get("width"), 120, 800, defaults.width)
 	local width = snapSize(math.max(80, frameWidth - math.abs(x) * 2 - 12))
@@ -1366,7 +1406,9 @@ function Timer:SetPanelBar(key, value, maxValue, anchorKey, xKey, yKey, color)
 	local anchor = normalizePoint(self:Get(anchorKey))
 	bar:ClearAllPoints()
 	bar:SetFrameLevel(math.max(0, self:EnsureFrame():GetFrameLevel() + 1))
-	bar:SetPoint(anchor, self:EnsureFrame(), anchor, snapToPixel(clampNumber(self:Get(xKey), -800, 800, defaults[xKey] or 0)), snapToPixel(clampNumber(self:Get(yKey), -800, 800, defaults[yKey] or 0)))
+	if bar.textFrame then bar.textFrame:SetFrameLevel(self:EnsureFrame():GetFrameLevel() + 40) end
+	if bar.chestMarkerTextFrame then bar.chestMarkerTextFrame:SetFrameLevel(self:EnsureFrame():GetFrameLevel() + 40) end
+	bar:SetPoint(anchor, self:EnsureFrame(), anchor, pointOffset(self:Get(xKey), -800, 800, defaults[xKey] or 0), pointOffset(self:Get(yKey), -800, 800, defaults[yKey] or 0))
 	bar:SetSize(width, height)
 	bar:SetMinMaxValues(0, maxValue or 100)
 	bar:SetValue(value or 0)
@@ -1388,7 +1430,7 @@ function Timer:SetPanelEnemyBarText(percent)
 	local style = resolveFontStyle(self:Get("fontOutline"))
 	local fontSize = clampNumber(self:Get("panelEnemyBarTextFontSize"), 8, 56, defaults.panelEnemyBarTextFontSize)
 	local color = normalizeColor(self:Get("panelEnemyBarTextColor"), defaults.panelEnemyBarTextColor)
-	local offsetY = snapToPixel(clampNumber(self:Get("panelEnemyBarTextOffsetY"), -100, 100, defaults.panelEnemyBarTextOffsetY))
+	local offsetY = pointOffset(self:Get("panelEnemyBarTextOffsetY"), -100, 100, defaults.panelEnemyBarTextOffsetY)
 	bar.text:ClearAllPoints()
 	bar.text:SetFont(font, fontSize, style)
 	bar.text:SetText(string.format("%.2f%%", tonumber(percent) or 0))
@@ -1446,7 +1488,7 @@ function Timer:UpdatePanelTimerBarChestMarkers(timeLimit, twoChest, threeChest)
 	local style = resolveFontStyle(self:Get("fontOutline"))
 	local fontSize = clampNumber(self:Get("panelTimerBarChestTimeTextFontSize"), 8, 56, defaults.panelTimerBarChestTimeTextFontSize)
 	local textColor = normalizeColor(self:Get("panelTimerBarChestTimeTextColor"), defaults.panelTimerBarChestTimeTextColor)
-	local textOffsetY = snapToPixel(clampNumber(self:Get("panelTimerBarChestTimeTextOffsetY"), -100, 100, defaults.panelTimerBarChestTimeTextOffsetY))
+	local textOffsetY = pointOffset(self:Get("panelTimerBarChestTimeTextOffsetY"), -100, 100, defaults.panelTimerBarChestTimeTextOffsetY)
 	for index, marker in ipairs(bar.chestMarkers) do
 		if showMarkers then
 			marker:ClearAllPoints()
@@ -1461,7 +1503,7 @@ function Timer:UpdatePanelTimerBarChestMarkers(timeLimit, twoChest, threeChest)
 		if markerText then
 			if showTexts and remainingTimes[index] and remainingTimes[index] >= 0 then
 				markerText:ClearAllPoints()
-				markerText:SetPoint("CENTER", bar, "LEFT", snapToPixel(positions[index]), snapToPixel(textOffsetY))
+				markerText:SetPoint("CENTER", bar, "LEFT", snapToPixel(positions[index]), textOffsetY)
 				markerText:SetFont(font, fontSize, style)
 				markerText:SetText(secondsToText(remainingTimes[index]))
 				markerText:SetTextColor(textColor.r, textColor.g, textColor.b, textColor.a)
@@ -1483,14 +1525,14 @@ function Timer:RenderPanel(state, timeLeft, twoChest, threeChest)
 	local elapsed = tonumber(state.elapsed) or 0
 	if self:Get("showDungeon") then self:SetPanelText("dungeon", self:GetDungeonDisplayText(state), "dungeonAnchor", "dungeonOffsetX", "dungeonOffsetY", self:Get("dungeonColor"), self:Get("panelDungeonFontSize")) end
 	if self:Get("showKeyLevel") then self:SetPanelText("key", tostring(state.level or 0), "keyLevelAnchor", "keyLevelOffsetX", "keyLevelOffsetY", self:Get("dungeonColor"), self:Get("panelKeyLevelFontSize")) end
-	if self:Get("showTimer") then self:SetPanelText("timer", timeRemainingToText(timeLeft), "timerAnchor", "timerOffsetX", "timerOffsetY", timeLeft <= 0 and self:Get("timerExpiredColor") or self:Get("timerColor"), self:Get("panelTimerFontSize"), "CENTER") end
+	if self:Get("showTimer") then self:SetPanelText("timer", self:GetTimerDisplayText(state, timeLeft), "timerAnchor", "timerOffsetX", "timerOffsetY", timeLeft <= 0 and self:Get("timerExpiredColor") or self:Get("timerColor"), self:Get("panelTimerFontSize"), "CENTER") end
 	if self:Get("showChestTimers") then
 		local hideChestLabels = self:Get("panelChestHideLabels") == true
 		if elapsed <= twoChest then self:SetPanelText("chest2", hideChestLabels and secondsToText(twoChest - elapsed) or ("+2\n" .. secondsToText(twoChest - elapsed)), "chest2Anchor", "chest2OffsetX", "chest2OffsetY", self:Get("chestColor"), self:Get("panelChestFontSize")) end
 		if elapsed <= threeChest then self:SetPanelText("chest3", hideChestLabels and secondsToText(threeChest - elapsed) or ("+3\n" .. secondsToText(threeChest - elapsed)), "chest3Anchor", "chest3OffsetX", "chest3OffsetY", self:Get("chestColor"), self:Get("panelChestFontSize")) end
 	end
 	if self:ShouldShowDeathDisplay(state) then
-		local deathText = self:SetPanelText("deaths", self:GetDeathDisplayText(state.deaths, self:Get("panelDeathIconSize")), "deathsAnchor", "deathsOffsetX", "deathsOffsetY", self:Get("deathColor"), self:Get("panelDeathsFontSize"))
+		local deathText = self:SetPanelText("deaths", self:GetDeathDisplayText(state.deaths, self:Get("panelDeathIconSize"), state.timeLost), "deathsAnchor", "deathsOffsetX", "deathsOffsetY", self:Get("deathColor"), self:Get("panelDeathsFontSize"))
 		self:SetPanelHoverForText("deaths", deathText, "deaths", state)
 	end
 	if self:Get("showEnemyPercent") then self:SetPanelText("enemyPercent", string.format("%.2f%%", enemyPercent), "enemyPercentAnchor", "enemyPercentOffsetX", "enemyPercentOffsetY", self:Get("enemyForcesColor"), self:Get("panelEnemyPercentFontSize")) end
@@ -1516,16 +1558,16 @@ function Timer:SetRow(index, data)
 	local row = self:EnsureRow(index)
 	local rowHeight = snapSize(clampNumber(self:Get("rowHeight"), 12, 48, defaults.rowHeight))
 	local barHeight = snapSize(clampNumber(self:Get("barHeight"), 1, 96, defaults.barHeight))
-	local iconGap = snapToPixel(clampNumber(self:Get("iconGap"), -50, 100, defaults.iconGap))
-	local iconOffsetX = snapToPixel(clampNumber(self:Get("iconOffsetX"), -200, 200, defaults.iconOffsetX))
-	local iconOffsetY = snapToPixel(clampNumber(self:Get("iconOffsetY"), -200, 200, defaults.iconOffsetY))
-	local barOffsetX = snapToPixel(clampNumber(self:Get("barOffsetX"), -200, 200, defaults.barOffsetX))
-	local barOffsetY = snapToPixel(clampNumber(self:Get("barOffsetY"), -200, 200, defaults.barOffsetY))
+	local iconGap = pointOffset(self:Get("iconGap"), -50, 100, defaults.iconGap)
+	local iconOffsetX = pointOffset(self:Get("iconOffsetX"), -200, 200, defaults.iconOffsetX)
+	local iconOffsetY = pointOffset(self:Get("iconOffsetY"), -200, 200, defaults.iconOffsetY)
+	local barOffsetX = pointOffset(self:Get("barOffsetX"), -200, 200, defaults.barOffsetX)
+	local barOffsetY = pointOffset(self:Get("barOffsetY"), -200, 200, defaults.barOffsetY)
 	local barWidthOffset = snapToPixel(clampNumber(self:Get("barWidthOffset"), -400, 400, defaults.barWidthOffset))
-	local textOffsetX = snapToPixel(clampNumber(self:Get("textOffsetX"), -400, 400, defaults.textOffsetX))
-	local textOffsetY = snapToPixel(clampNumber(self:Get("textOffsetY"), -200, 200, defaults.textOffsetY))
-	local valueOffsetX = snapToPixel(clampNumber(self:Get("valueOffsetX"), -400, 400, defaults.valueOffsetX))
-	local valueOffsetY = snapToPixel(clampNumber(self:Get("valueOffsetY"), -200, 200, defaults.valueOffsetY))
+	local textOffsetX = pointOffset(self:Get("textOffsetX"), -400, 400, defaults.textOffsetX)
+	local textOffsetY = pointOffset(self:Get("textOffsetY"), -200, 200, defaults.textOffsetY)
+	local valueOffsetX = pointOffset(self:Get("valueOffsetX"), -400, 400, defaults.valueOffsetX)
+	local valueOffsetY = pointOffset(self:Get("valueOffsetY"), -200, 200, defaults.valueOffsetY)
 	local barPosition = self:Get("barPosition")
 	if barPosition ~= "TOP" and barPosition ~= "BOTTOM" then barPosition = "BACKGROUND" end
 	local align = self:Get("align")
@@ -1747,7 +1789,7 @@ function Timer:Refresh()
 		local color = timeLeft <= 0 and self:Get("timerExpiredColor") or self:Get("timerColor")
 		self:SetRow(rows, {
 			text = L["mythicPlusTimerTimeLeft"] or "Time left",
-			valueText = timeRemainingToText(timeLeft),
+			valueText = self:GetTimerDisplayText(state, timeLeft),
 			color = color,
 			fontSize = self:Get("timerFontSize"),
 			max = state.timeLimit or 1,
@@ -1778,9 +1820,10 @@ function Timer:Refresh()
 	end
 	if self:ShouldShowDeathDisplay(state) then
 		rows = rows + 1
+		local showDeathInline = self:Get("deathShowTimeLost") == true
 		self:SetRow(rows, {
-			text = self:GetDeathDisplayText(state.deaths),
-			valueText = string.format("-%s", secondsToText(state.timeLost or 0)),
+			text = self:GetDeathDisplayText(state.deaths, nil, state.timeLost),
+			valueText = showDeathInline and "" or string.format("-%s", secondsToText(state.timeLost or 0)),
 			color = self:Get("deathColor"),
 			max = 10,
 			value = math.min(10, state.deaths or 0),
@@ -2146,6 +2189,11 @@ function Timer:BuildEditModeSettings()
 			{ value = "TEXT", label = L["mythicPlusTimerAffixDisplayText"] or "Text" },
 		}, displayId, 160, enabledWhen("showAffixes"), isListMode),
 		checkboxSetting(L["mythicPlusTimerShowTimer"] or "Show timer", get("showTimer"), set("showTimer"), displayId, nil, isListMode),
+		dropdownSetting(L["mythicPlusTimerTimerDisplay"] or "Timer display", get("timerDisplay"), set("timerDisplay"), {
+			{ value = "TIME_LEFT", label = L["mythicPlusTimerTimerDisplayTimeLeft"] or "Time left" },
+			{ value = "TIME_LEFT_TOTAL", label = L["mythicPlusTimerTimerDisplayTimeLeftTotal"] or "Time left / total time" },
+			{ value = "ELAPSED_TOTAL", label = L["mythicPlusTimerTimerDisplayElapsedTotal"] or "Time elapsed / total time" },
+		}, displayId, 220, enabledWhen("showTimer"), isListMode),
 		checkboxSetting(L["mythicPlusTimerShowChestTimers"] or "Show +2/+3 timers", get("showChestTimers"), set("showChestTimers"), displayId, nil, isListMode),
 		checkboxSetting(L["mythicPlusTimerShowDeaths"] or "Show deaths", get("showDeaths"), set("showDeaths"), displayId, nil, isListMode),
 		dropdownSetting(L["mythicPlusTimerDeathDisplay"] or "Death display", get("deathDisplay"), set("deathDisplay"), {
@@ -2153,6 +2201,7 @@ function Timer:BuildEditModeSettings()
 			{ value = "ICON", label = L["mythicPlusTimerAffixDisplayIcon"] or "Icon" },
 			{ value = "TEXT", label = L["mythicPlusTimerAffixDisplayText"] or "Text" },
 		}, displayId, 160, enabledWhen("showDeaths"), isListMode),
+		checkboxSetting(L["mythicPlusTimerDeathShowTimeLost"] or "Show time lost with deaths", get("deathShowTimeLost"), set("deathShowTimeLost"), displayId, enabledWhen("showDeaths"), isListMode),
 		checkboxSetting(L["mythicPlusTimerShowEnemyForces"] or "Show enemy forces", get("showEnemyForces"), set("showEnemyForces"), displayId, nil, isListMode),
 		checkboxSetting(L["mythicPlusTimerShowObjectives"] or "Show objectives", get("showObjectives"), set("showObjectives", nil, true), displayId, nil, isListMode),
 		checkboxSetting(L["mythicPlusTimerShowObjectiveBars"] or "Show objective bars", get("showObjectiveBars"), set("showObjectiveBars"), displayId, enabledWhen("showObjectives"), isListMode),
@@ -2203,6 +2252,11 @@ function Timer:BuildEditModeSettings()
 		sliderSetting(L["mythicPlusTimerKeyLevelOffsetY"] or L["Offset Y"] or "Offset Y", get("keyLevelOffsetY"), set("keyLevelOffsetY", function(value) return clampNumber(value, -800, 800, defaults.keyLevelOffsetY) end), -800, 800, 1, "mpt-panel-dungeon-key"),
 		{ name = L["mythicPlusTimerPanelTimerAndTiers"] or "Timer and tiers", kind = SettingType.Collapsible, id = "mpt-panel-time", defaultCollapsed = true },
 		checkboxSetting(L["mythicPlusTimerShowTimer"] or "Show timer", get("showTimer"), set("showTimer"), "mpt-panel-time"),
+		dropdownSetting(L["mythicPlusTimerTimerDisplay"] or "Timer display", get("timerDisplay"), set("timerDisplay"), {
+			{ value = "TIME_LEFT", label = L["mythicPlusTimerTimerDisplayTimeLeft"] or "Time left" },
+			{ value = "TIME_LEFT_TOTAL", label = L["mythicPlusTimerTimerDisplayTimeLeftTotal"] or "Time left / total time" },
+			{ value = "ELAPSED_TOTAL", label = L["mythicPlusTimerTimerDisplayElapsedTotal"] or "Time elapsed / total time" },
+		}, "mpt-panel-time", 220, enabledWhen("showTimer")),
 		sliderSetting(L["mythicPlusTimerPanelTimerFontSize"] or L["Text size"] or "Text size", get("panelTimerFontSize"), set("panelTimerFontSize", function(value) return clampNumber(value, 8, 72, defaults.panelTimerFontSize) end), 8, 72, 1, "mpt-panel-time", nil, enabledWhen("showTimer")),
 		anchorSetting("timerAnchor", "mpt-panel-time", nil, L["Anchor"] or "Anchor"),
 		sliderSetting(L["mythicPlusTimerTimerOffsetX"] or L["Offset X"] or "Offset X", get("timerOffsetX"), set("timerOffsetX", function(value) return clampNumber(value, -800, 800, defaults.timerOffsetX) end), -800, 800, 1, "mpt-panel-time"),
@@ -2249,6 +2303,7 @@ function Timer:BuildEditModeSettings()
 			{ value = "ICON", label = L["mythicPlusTimerAffixDisplayIcon"] or "Icon" },
 			{ value = "TEXT", label = L["mythicPlusTimerAffixDisplayText"] or "Text" },
 		}, "mpt-panel-deaths", 160, enabledWhen("showDeaths")),
+		checkboxSetting(L["mythicPlusTimerDeathShowTimeLost"] or "Show time lost with deaths", get("deathShowTimeLost"), set("deathShowTimeLost"), "mpt-panel-deaths", enabledWhen("showDeaths")),
 		sliderSetting(L["mythicPlusTimerPanelDeathsFontSize"] or L["Text size"] or "Text size", get("panelDeathsFontSize"), set("panelDeathsFontSize", function(value) return clampNumber(value, 8, 56, defaults.panelDeathsFontSize) end), 8, 56, 1, "mpt-panel-deaths", nil, enabledWhen("showDeaths")),
 		sliderSetting(L["mythicPlusTimerPanelDeathIconSize"] or L["Icon size"] or "Icon size", get("panelDeathIconSize"), set("panelDeathIconSize", function(value) return clampNumber(value, 8, 64, defaults.panelDeathIconSize) end), 8, 64, 1, "mpt-panel-deaths", nil, enabledWhen("showDeaths")),
 		anchorSetting("deathsAnchor", "mpt-panel-deaths", nil, L["Anchor"] or "Anchor"),

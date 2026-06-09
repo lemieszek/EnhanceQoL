@@ -2520,6 +2520,7 @@ function GF.CreateDataBarDefaults()
 		detachedOffset = { x = 0, y = 0 },
 		detachedStrata = nil,
 		detachedFrameLevelOffset = 2,
+		nameMaxChars = 0,
 		color = { 0.18, 0.18, 0.22, 1 },
 		useClassColor = false,
 		textLeft = "NAME",
@@ -11259,8 +11260,8 @@ function GF:UpdateHealthValue(self, unit, st)
 		if st.healthTextRight then st.healthTextRight:SetText("") end
 		st._lastHealthTextLeft, st._lastHealthTextCenter, st._lastHealthTextRight = nil, nil, nil
 		st._nextHealthTextUpdateAt = nil
-		GF.ClearDataBarText(st)
-		return
+		leftMode, centerMode, rightMode = "NONE", "NONE", "NONE"
+		hasText = false
 	end
 	if (hasText or dataBarHasText) and (st.healthTextLeft or st.healthTextCenter or st.healthTextRight or st.dataBarTextLeft or st.dataBarTextCenter or st.dataBarTextRight) then
 		local allowSecretText = secretHealth and addon.variables and addon.variables.isMidnight
@@ -11349,6 +11350,13 @@ function GF:UpdateHealthValue(self, unit, st)
 					if dbLeft == "NAME" or dbCenter == "NAME" or dbRight == "NAME" then
 						dbNameText = (UnitName and UnitName(unit)) or ""
 						if isEditModeActive() and self._eqolPreview and st._previewName then dbNameText = st._previewName end
+						local dbNameMaxChars = tonumber(dbc.nameMaxChars)
+						if dbNameMaxChars == nil then dbNameMaxChars = tonumber(defDB.nameMaxChars) end
+						if dbNameMaxChars and dbNameMaxChars > 0 and UFHelper and UFHelper.getNameLimitWidth and UFHelper.truncateTextToWidth then
+							local dbFontSize = GF.ScaleContentValue(self, dbc.fontSize or defDB.fontSize or 12, cfg, 1)
+							local dbMaxWidth = UFHelper.getNameLimitWidth(dbc.font or defDB.font, dbFontSize, dbc.fontOutline or defDB.fontOutline or "OUTLINE", dbNameMaxChars)
+							if dbMaxWidth and dbMaxWidth > 0 then dbNameText = UFHelper.truncateTextToWidth(dbc.font or defDB.font, dbFontSize, dbc.fontOutline or defDB.fontOutline or "OUTLINE", dbNameText, dbMaxWidth) end
+						end
 					end
 					local dbMissingValue = missingValue
 					if dbMissingValue == nil and (GFH.TextModeUsesDeficit(dbLeft) or GFH.TextModeUsesDeficit(dbCenter) or GFH.TextModeUsesDeficit(dbRight)) then
@@ -16831,6 +16839,13 @@ local function buildEditModeSettings(kind, editModeId)
 		if value == nil then value = true end
 		return value ~= true
 	end
+	local function isDataBarNameTextEnabled()
+		if not isDataBarEnabled() then return false end
+		local cfg = getCfg(kind)
+		local dbc = cfg and cfg.dataBar or {}
+		local def = DEFAULTS[kind] and DEFAULTS[kind].dataBar or {}
+		return (dbc.textLeft or def.textLeft) == "NAME" or (dbc.textCenter or def.textCenter) == "NAME" or (dbc.textRight or def.textRight) == "NAME"
+	end
 	local function isPortraitDetached()
 		local cfg = getCfg(kind)
 		return select(1, GF.ResolveGroupPortraitDetachedConfig(cfg, kind))
@@ -20022,6 +20037,7 @@ local function buildEditModeSettings(kind, editModeId)
 				cfg.dataBar.textLeft = value
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarTextLeft", value, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
+				requestEditModeSettingsRefresh()
 			end,
 			generator = function(_, root)
 				for _, option in ipairs(GF._sharedEdit.dataBarTextModeOpts) do
@@ -20036,6 +20052,7 @@ local function buildEditModeSettings(kind, editModeId)
 						cfg.dataBar.textLeft = option.value
 						if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarTextLeft", option.value, nil, true) end
 						GF:ApplyHeaderAttributes(kind)
+						requestEditModeSettingsRefresh()
 					end)
 				end
 			end,
@@ -20061,6 +20078,7 @@ local function buildEditModeSettings(kind, editModeId)
 				cfg.dataBar.textCenter = value
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarTextCenter", value, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
+				requestEditModeSettingsRefresh()
 			end,
 			generator = function(_, root)
 				for _, option in ipairs(GF._sharedEdit.dataBarTextModeOpts) do
@@ -20075,6 +20093,7 @@ local function buildEditModeSettings(kind, editModeId)
 						cfg.dataBar.textCenter = option.value
 						if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarTextCenter", option.value, nil, true) end
 						GF:ApplyHeaderAttributes(kind)
+						requestEditModeSettingsRefresh()
 					end)
 				end
 			end,
@@ -20100,6 +20119,7 @@ local function buildEditModeSettings(kind, editModeId)
 				cfg.dataBar.textRight = value
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarTextRight", value, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
+				requestEditModeSettingsRefresh()
 			end,
 			generator = function(_, root)
 				for _, option in ipairs(GF._sharedEdit.dataBarTextModeOpts) do
@@ -20114,6 +20134,7 @@ local function buildEditModeSettings(kind, editModeId)
 						cfg.dataBar.textRight = option.value
 						if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarTextRight", option.value, nil, true) end
 						GF:ApplyHeaderAttributes(kind)
+						requestEditModeSettingsRefresh()
 					end)
 				end
 			end,
@@ -20121,6 +20142,32 @@ local function buildEditModeSettings(kind, editModeId)
 				local cfg = getCfg(kind)
 				return cfg and cfg.dataBar and cfg.dataBar.enabled == true
 			end,
+		},
+		{
+			name = L["Name max width"] or "Name max width",
+			kind = SettingType.Slider,
+			allowInput = true,
+			field = "dataBarNameMaxChars",
+			parentId = "dataBar",
+			minValue = 0,
+			maxValue = 40,
+			valueStep = 1,
+			default = (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.nameMaxChars) or 0,
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				return dbc.nameMaxChars or (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.nameMaxChars) or 0
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.dataBar = cfg.dataBar or {}
+				cfg.dataBar.nameMaxChars = clampNumber(value, 0, 40, cfg.dataBar.nameMaxChars or 0)
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarNameMaxChars", cfg.dataBar.nameMaxChars, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			isEnabled = isDataBarNameTextEnabled,
+			isShown = isDataBarNameTextEnabled,
 		},
 		{
 			name = L["UFDataBarTextColor"] or "Data bar text color",

@@ -3,9 +3,23 @@
 <!--@eqol-beta@-->
 ## [11.1.0-beta7] - 2026-06-09
 
+### ✨ Added
+
+- Mythic Plus / Timer: Added timer display formats for time left, time left with total time, and elapsed time with total time.
+- Mythic Plus / Timer: Added an option to show time lost directly next to the death count.
+- Unit Frames / Group Frames: Added options to detach the Data Bar from horizontal frame layouts, including width, offset, strata, and frame-level controls.
+- Unit Frames / Group Frames: Added more Data Bar text choices, including name, level, and level-based health text formats.
+
 ### 🐛 Fixed
 
+- Mythic Plus / Timer: Fixed several X/Y offset controls moving elements inconsistently compared to their configured values.
+- Mythic Plus / Timer: Fixed timer and enemy forces bar borders rendering incorrectly at some bar heights or offsets.
+- Mythic Plus / Timer: Fixed timer bar chest time labels and enemy percentage text rendering below bar borders.
+- Mythic Plus / Timer: Added clearer hyphen separation between text-only affixes in panel mode.
 - Resource Bars / Evoker: Fixed Augmentation's Ebon Might bar only updating its remaining duration while resource text was enabled.
+- Resource Bars / Evoker: Fixed stale shared resource bar backdrop and segment visuals after switching between Preservation and Augmentation.
+- Unit Frames / Group Frames: Fixed Data Bar names overlapping other Data Bar text by adding a separate name width limit.
+- Unit Frames / Group Frames: Fixed Data Bar name and level text disappearing when a unit dies.
 
 ## [11.1.0-beta6] - 2026-06-09
 
