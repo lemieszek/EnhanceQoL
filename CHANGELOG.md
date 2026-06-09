@@ -1,6 +1,19 @@
 # Changelog
 
 <!--@eqol-beta@-->
+## [11.1.0-beta8] - 2026-06-09
+
+### ✨ Added
+
+- Mythic Plus / Timer: Added an option to fill the timer bar upward with elapsed time instead of emptying it.
+
+### 🐛 Fixed
+
+- Mythic Plus / Timer: Fixed an Edit Mode font error when global font styling resolved to an invalid WoW font flag.
+- Mythic Plus / Timer: Fixed Edit Mode preview text using a direct font path that could break with global font styling or LSM font fallback settings.
+- Mythic Plus / Timer: Fixed multi-line objectives losing spacing and long panel affix text being clipped.
+- Unit Frames: Fixed the Blizzard Raid Frame bar texture making default health and power bar backdrops appear transparent.
+
 ## [11.1.0-beta7] - 2026-06-09
 
 ### ✨ Added

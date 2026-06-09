@@ -921,7 +921,11 @@ local function applyBarBackdrop(bar, cfg, options)
 	local a = col[4] or 0.6
 	local currentStatusTex = (clampToFill and bar.GetStatusBarTexture and bar:GetStatusBarTexture()) or nil
 	local backdropTextureKey = bd.texture
-	if backdropTextureKey == nil or backdropTextureKey == "" or backdropTextureKey == "DEFAULT" then backdropTextureKey = options.textureKey or cfg.texture end
+	local inheritedBackdropTexture = backdropTextureKey == nil or backdropTextureKey == "" or backdropTextureKey == "DEFAULT"
+	if inheritedBackdropTexture then
+		backdropTextureKey = options.textureKey or cfg.texture
+		if UFHelper and UFHelper.shouldUseSolidBackdropForTexture and UFHelper.shouldUseSolidBackdropForTexture(backdropTextureKey) then backdropTextureKey = "SOLID" end
+	end
 	local backdropTexture = (UFHelper and UFHelper.resolveTexture and UFHelper.resolveTexture(backdropTextureKey)) or backdropTextureKey
 	if not backdropTexture or backdropTexture == "" then backdropTexture = "Interface\\Buttons\\WHITE8x8" end
 

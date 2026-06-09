@@ -132,6 +132,7 @@ Timer.defaults = Timer.defaults
 		panelTimerBarChestTimeTextOffsetY = 14,
 		panelTimerBarChestTimeTextFontSize = 14,
 		panelTimerBarChestTimeTextColor = { r = 0.55, g = 0.85, b = 1, a = 1 },
+		panelTimerBarFillUp = false,
 		panelTimerBarAnchor = "TOP",
 		panelTimerBarOffsetX = 0,
 		panelTimerBarOffsetY = -52,
@@ -373,11 +374,25 @@ local function normalizeHorizontal(value)
 end
 
 local function resolveFontStyle(value)
-	if addon.functions.ResolveFontStyleChoice then return addon.functions.ResolveFontStyleChoice(value, "OUTLINE") end
+	if addon.functions.GetFontFlagsForStyle then
+		local flags = addon.functions.GetFontFlagsForStyle(value, "OUTLINE")
+		if flags == nil or flags == "" or flags == "OUTLINE" or flags == "THICKOUTLINE" or flags == "MONOCHROME" or flags == "MONOCHROMEOUTLINE" then return flags end
+		return "OUTLINE"
+	end
 	value = normalizeFontStyle(value)
 	if value == GLOBAL_STYLE_KEY then return addon.db and addon.db.globalFontStyle or "OUTLINE" end
 	if value == "NONE" then return "" end
-	return value
+	if value == "" or value == "OUTLINE" or value == "THICKOUTLINE" or value == "MONOCHROME" or value == "MONOCHROMEOUTLINE" then return value end
+	return "OUTLINE"
+end
+
+local function applyFontString(fontString, fontFace, fontSize, fontStyle)
+	if not (fontString and fontString.SetFont) then return false end
+	if addon.functions.ApplyFontString then return addon.functions.ApplyFontString(fontString, fontFace, fontSize, fontStyle, DEFAULT_FONT, "OUTLINE") end
+	local flags = resolveFontStyle(fontStyle)
+	local ok = pcall(fontString.SetFont, fontString, fontFace or DEFAULT_FONT, tonumber(fontSize) or 12, flags)
+	if addon.functions.ApplyFontStyleShadow then addon.functions.ApplyFontStyleShadow(fontString, fontStyle, "OUTLINE") end
+	return ok
 end
 
 local function resolveMedia(mediaType, key, fallback)
@@ -1062,7 +1077,7 @@ function Timer:ApplyFrameStyle()
 	local width = snapSize(clampNumber(self:Get("width"), 120, 800, defaults.width))
 	local rowHeight = snapSize(clampNumber(self:Get("rowHeight"), 12, 48, defaults.rowHeight))
 	local font = resolveFont(self:Get("fontFace"))
-	local style = resolveFontStyle(self:Get("fontOutline"))
+	local style = normalizeFontStyle(self:Get("fontOutline"))
 	local fontSize = clampNumber(self:Get("fontSize"), 8, 32, defaults.fontSize)
 	local texture = resolveMedia("statusbar", self:Get("texture"), DEFAULT_STATUSBAR)
 	local bgTexture = resolveMedia("statusbar", self:Get("barBackgroundTexture"), DEFAULT_STATUSBAR)
@@ -1131,8 +1146,8 @@ function Timer:ApplyFrameStyle()
 				row.bar.borderFrame:Hide()
 			end
 		end
-		row.text:SetFont(font, fontSize, style)
-		row.value:SetFont(font, fontSize, style)
+		applyFontString(row.text, font, fontSize, style)
+		applyFontString(row.value, font, fontSize, style)
 	end
 	for _, bar in pairs(frame.panelBars or {}) do
 		bar:SetFrameLevel(math.max(0, frame:GetFrameLevel() + 1))
@@ -1266,12 +1281,12 @@ end
 function Timer:SetPanelText(key, textValue, anchorKey, xKey, yKey, color, fontSize, justify)
 	local text = self:EnsurePanelText(key)
 	local font = resolveFont(self:Get("fontFace"))
-	local style = resolveFontStyle(self:Get("fontOutline"))
+	local style = normalizeFontStyle(self:Get("fontOutline"))
 	local anchor = normalizePoint(self:Get(anchorKey))
 	text:ClearAllPoints()
 	text:SetDrawLayer("OVERLAY", 7)
 	text:SetPoint(anchor, self:EnsureFrame(), anchor, pointOffset(self:Get(xKey), -800, 800, defaults[xKey] or 0), pointOffset(self:Get(yKey), -800, 800, defaults[yKey] or 0))
-	text:SetFont(font, clampNumber(fontSize, 8, 56, defaults.fontSize), style)
+	applyFontString(text, font, clampNumber(fontSize, 8, 56, defaults.fontSize), style)
 	text:SetJustifyH(justify or "LEFT")
 	text:SetText(textValue or "")
 	setTextColor(text, color or defaults.objectiveColor)
@@ -1294,7 +1309,7 @@ function Timer:RenderPanelAffixes(state)
 	if not (state and state.affixNames and #state.affixNames > 0) then return end
 	local frame = self:EnsureFrame()
 	local font = resolveFont(self:Get("fontFace"))
-	local style = resolveFontStyle(self:Get("fontOutline"))
+	local style = normalizeFontStyle(self:Get("fontOutline"))
 	local fontSize = clampNumber(self:Get("panelAffixesFontSize"), 8, 56, defaults.panelAffixesFontSize)
 	local iconSize = clampNumber(self:Get("panelAffixIconSize"), 8, 64, defaults.panelAffixIconSize)
 	local anchor = normalizePoint(self:Get("panelAffixesAnchor"))
@@ -1305,6 +1320,9 @@ function Timer:RenderPanelAffixes(state)
 	local gap = mode == "ICON" and 4 or 10
 	local growLeft = anchor == "TOPRIGHT" or anchor == "RIGHT" or anchor == "BOTTOMRIGHT"
 	local previous
+	local lineStart
+	local lineWidth = 0
+	local maxLineWidth = math.max(80, clampNumber(self:Get("width"), 120, 800, defaults.width) - math.abs(x) * 2 - 12)
 	local startIndex = growLeft and #state.affixNames or 1
 	local endIndex = growLeft and 1 or #state.affixNames
 	local step = growLeft and -1 or 1
@@ -1312,24 +1330,41 @@ function Timer:RenderPanelAffixes(state)
 		local item = self:EnsurePanelAffix(index)
 		item.tooltipType = "affix"
 		item.tooltipData = { state = state, index = index }
-		item.text:SetFont(font, fontSize, style)
+		applyFontString(item.text, font, fontSize, style)
 		local affixText = self:GetSingleAffixDisplayText(state, index, iconSize)
 		if mode == "TEXT" and index < #state.affixNames then affixText = affixText .. " -" end
 		item.text:SetText(affixText)
 		item.text:SetTextColor(color.r, color.g, color.b, color.a)
 		item.text:ClearAllPoints()
+		item.text:SetWordWrap(mode ~= "ICON")
+		item.text:SetNonSpaceWrap(false)
+		if mode ~= "ICON" then item.text:SetWidth(maxLineWidth) end
 		item.text:SetPoint("TOPLEFT", item, "TOPLEFT", 0, 0)
 		item:ClearAllPoints()
-		if previous then
+		local itemWidth = snapSize(math.max(12, math.min(item.text:GetStringWidth() or 12, maxLineWidth)))
+		local itemHeight = snapSize(math.max(12, item.text:GetStringHeight() or fontSize))
+		local shouldWrap = previous and mode ~= "ICON" and (lineWidth + gap + itemWidth > maxLineWidth)
+		if shouldWrap then
+			if growLeft then
+				item:SetPoint("TOPRIGHT", lineStart, "BOTTOMRIGHT", 0, -gap)
+			else
+				item:SetPoint("TOPLEFT", lineStart, "BOTTOMLEFT", 0, -gap)
+			end
+			lineStart = item
+			lineWidth = itemWidth
+		elseif previous then
 			if growLeft then
 				item:SetPoint("RIGHT", previous, "LEFT", -gap, 0)
 			else
 				item:SetPoint("LEFT", previous, "RIGHT", gap, 0)
 			end
+			lineWidth = lineWidth + gap + itemWidth
 		else
 			item:SetPoint(anchor, frame, anchor, x, y)
+			lineStart = item
+			lineWidth = itemWidth
 		end
-		item:SetSize(snapSize(math.max(12, item.text:GetStringWidth() or 12)), snapSize(math.max(12, item.text:GetStringHeight() or fontSize)))
+		item:SetSize(itemWidth, itemHeight)
 		item:Show()
 		previous = item
 	end
@@ -1339,15 +1374,15 @@ function Timer:RenderPanelObjectives(state)
 	if not (state and state.objectives and #state.objectives > 0) then return 0 end
 	local frame = self:EnsureFrame()
 	local font = resolveFont(self:Get("panelObjectivesFontFace"))
-	local style = resolveFontStyle(self:Get("panelObjectivesFontOutline"))
+	local style = normalizeFontStyle(self:Get("panelObjectivesFontOutline"))
 	local fontSize = clampNumber(self:Get("panelObjectivesFontSize"), 8, 56, defaults.panelObjectivesFontSize)
 	local spacing = snapToPixel(clampNumber(self:Get("panelObjectivesSpacing"), 0, 24, defaults.panelObjectivesSpacing))
 	local x = pointOffset(self:Get("panelObjectivesOffsetX"), -800, 800, defaults.panelObjectivesOffsetX)
 	local y = pointOffset(self:Get("panelObjectivesOffsetY"), -800, 800, defaults.panelObjectivesOffsetY)
-	local rowHeight = snapSize(fontSize + 2)
+	local baseRowHeight = snapSize(fontSize + 2)
 	local frameWidth = clampNumber(self:Get("width"), 120, 800, defaults.width)
 	local width = snapSize(math.max(80, frameWidth - math.abs(x) * 2 - 12))
-	local rowsHeight = (#state.objectives * rowHeight) + math.max(0, #state.objectives - 1) * spacing
+	local rowsHeight = 0
 	local growUp = self:Get("panelObjectivesGrowth") == "UP"
 	local previous
 	for index, objective in ipairs(state.objectives) do
@@ -1356,7 +1391,24 @@ function Timer:RenderPanelObjectives(state)
 		local valueText = self:FormatObjectiveValue(state, objective)
 		item.tooltipType = "objective"
 		item.tooltipData = objective
-		item:SetSize(width, rowHeight)
+		item:SetWidth(width)
+		applyFontString(item.text, font, fontSize, style)
+		item.text:SetText(objective.text or "")
+		item.text:SetWordWrap(true)
+		item.text:SetNonSpaceWrap(false)
+		item.text:SetTextColor(color.r, color.g, color.b, color.a)
+		item.text:ClearAllPoints()
+		item.text:SetPoint("TOPLEFT", item, "TOPLEFT", 0, 0)
+		item.text:SetPoint("RIGHT", item, "RIGHT", -70, 0)
+		applyFontString(item.value, font, fontSize, style)
+		item.value:SetText(valueText)
+		item.value:SetTextColor(color.r, color.g, color.b, color.a)
+		item.value:ClearAllPoints()
+		item.value:SetPoint("TOPRIGHT", item, "TOPRIGHT", 0, 0)
+		local textHeight = item.text:GetStringHeight() or baseRowHeight
+		local valueHeight = item.value:GetStringHeight() or baseRowHeight
+		local itemHeight = snapSize(math.max(baseRowHeight, textHeight, valueHeight))
+		item:SetSize(width, itemHeight)
 		item:ClearAllPoints()
 		if previous then
 			if growUp then
@@ -1371,17 +1423,8 @@ function Timer:RenderPanelObjectives(state)
 				item:SetPoint("TOP", frame, "TOP", x, y)
 			end
 		end
-		item.text:SetFont(font, fontSize, style)
-		item.text:SetText(objective.text or "")
-		item.text:SetTextColor(color.r, color.g, color.b, color.a)
-		item.text:ClearAllPoints()
-		item.text:SetPoint("LEFT", item, "LEFT", 0, 0)
-		item.text:SetPoint("RIGHT", item, "RIGHT", -70, 0)
-		item.value:SetFont(font, fontSize, style)
-		item.value:SetText(valueText)
-		item.value:SetTextColor(color.r, color.g, color.b, color.a)
-		item.value:ClearAllPoints()
-		item.value:SetPoint("RIGHT", item, "RIGHT", 0, 0)
+		rowsHeight = rowsHeight + itemHeight
+		if index > 1 then rowsHeight = rowsHeight + spacing end
 		item:Show()
 		previous = item
 	end
@@ -1427,12 +1470,12 @@ function Timer:SetPanelEnemyBarText(percent)
 	end
 	local align = normalizeHorizontal(self:Get("panelEnemyBarTextAlign"))
 	local font = resolveFont(self:Get("fontFace"))
-	local style = resolveFontStyle(self:Get("fontOutline"))
+	local style = normalizeFontStyle(self:Get("fontOutline"))
 	local fontSize = clampNumber(self:Get("panelEnemyBarTextFontSize"), 8, 56, defaults.panelEnemyBarTextFontSize)
 	local color = normalizeColor(self:Get("panelEnemyBarTextColor"), defaults.panelEnemyBarTextColor)
 	local offsetY = pointOffset(self:Get("panelEnemyBarTextOffsetY"), -100, 100, defaults.panelEnemyBarTextOffsetY)
 	bar.text:ClearAllPoints()
-	bar.text:SetFont(font, fontSize, style)
+	applyFontString(bar.text, font, fontSize, style)
 	bar.text:SetText(string.format("%.2f%%", tonumber(percent) or 0))
 	bar.text:SetTextColor(color.r, color.g, color.b, color.a)
 	bar.text:SetJustifyH(align)
@@ -1485,7 +1528,7 @@ function Timer:UpdatePanelTimerBarChestMarkers(timeLimit, twoChest, threeChest)
 		(tonumber(twoChest) or 0) - elapsed,
 	}
 	local font = resolveFont(self:Get("fontFace"))
-	local style = resolveFontStyle(self:Get("fontOutline"))
+	local style = normalizeFontStyle(self:Get("fontOutline"))
 	local fontSize = clampNumber(self:Get("panelTimerBarChestTimeTextFontSize"), 8, 56, defaults.panelTimerBarChestTimeTextFontSize)
 	local textColor = normalizeColor(self:Get("panelTimerBarChestTimeTextColor"), defaults.panelTimerBarChestTimeTextColor)
 	local textOffsetY = pointOffset(self:Get("panelTimerBarChestTimeTextOffsetY"), -100, 100, defaults.panelTimerBarChestTimeTextOffsetY)
@@ -1504,7 +1547,7 @@ function Timer:UpdatePanelTimerBarChestMarkers(timeLimit, twoChest, threeChest)
 			if showTexts and remainingTimes[index] and remainingTimes[index] >= 0 then
 				markerText:ClearAllPoints()
 				markerText:SetPoint("CENTER", bar, "LEFT", snapToPixel(positions[index]), textOffsetY)
-				markerText:SetFont(font, fontSize, style)
+				applyFontString(markerText, font, fontSize, style)
 				markerText:SetText(secondsToText(remainingTimes[index]))
 				markerText:SetTextColor(textColor.r, textColor.g, textColor.b, textColor.a)
 				markerText:Show()
@@ -1544,7 +1587,8 @@ function Timer:RenderPanel(state, timeLeft, twoChest, threeChest)
 	if self:Get("showAffixes") then self:RenderPanelAffixes(state) end
 	local objectiveHeight = self:Get("showObjectives") and self:RenderPanelObjectives(state) or 0
 	if self:Get("showPanelTimerBar") then
-		self:SetPanelBar("timer", math.max(0, timeLeft), state.timeLimit or 1, "panelTimerBarAnchor", "panelTimerBarOffsetX", "panelTimerBarOffsetY", timeLeft <= 0 and self:Get("panelTimerBarExpiredColor") or self:Get("panelTimerBarColor"))
+		local timerBarValue = self:Get("panelTimerBarFillUp") == true and math.min(state.timeLimit or 1, math.max(0, elapsed)) or math.max(0, timeLeft)
+		self:SetPanelBar("timer", timerBarValue, state.timeLimit or 1, "panelTimerBarAnchor", "panelTimerBarOffsetX", "panelTimerBarOffsetY", timeLeft <= 0 and self:Get("panelTimerBarExpiredColor") or self:Get("panelTimerBarColor"))
 		self:UpdatePanelTimerBarChestMarkers(state.timeLimit or 0, twoChest, threeChest)
 	end
 	if self:Get("showPanelEnemyBar") then
@@ -1573,7 +1617,7 @@ function Timer:SetRow(index, data)
 	local align = self:Get("align")
 	if align ~= "CENTER" and align ~= "RIGHT" then align = "LEFT" end
 	local font = resolveFont(self:Get("fontFace"))
-	local style = resolveFontStyle(self:Get("fontOutline"))
+	local style = normalizeFontStyle(self:Get("fontOutline"))
 	local fontSize = clampNumber(data.fontSize or self:Get("fontSize"), 8, 44, defaults.fontSize)
 	local width = snapSize(clampNumber(self:Get("width"), 120, 800, defaults.width))
 	row.tooltipType = data.tooltipType
@@ -1586,8 +1630,8 @@ function Timer:SetRow(index, data)
 	row.value:SetDrawLayer("OVERLAY", 7)
 	row.text:SetJustifyH(align)
 	row.value:SetJustifyH("RIGHT")
-	row.text:SetFont(font, fontSize, style)
-	row.value:SetFont(font, fontSize, style)
+	applyFontString(row.text, font, fontSize, style)
+	applyFontString(row.value, font, fontSize, style)
 	row.bar:SetMinMaxValues(0, data.max or 100)
 	row.bar:SetValue(data.value or 0)
 	row.bar:SetShown(data.hideBar ~= true)
@@ -2293,6 +2337,7 @@ function Timer:BuildEditModeSettings()
 		sliderSetting(L["mythicPlusTimerPanelTimerBarChestTimeTextOffsetY"] or "+2/+3 time text Y offset", get("panelTimerBarChestTimeTextOffsetY"), set("panelTimerBarChestTimeTextOffsetY", function(value) return clampNumber(value, -100, 100, defaults.panelTimerBarChestTimeTextOffsetY) end), -100, 100, 1, "mpt-panel-time", nil, allEnabled("showPanelTimerBar", "panelTimerBarChestTimeText")),
 		sliderSetting(L["mythicPlusTimerPanelTimerBarChestTimeTextFontSize"] or "+2/+3 time text font size", get("panelTimerBarChestTimeTextFontSize"), set("panelTimerBarChestTimeTextFontSize", function(value) return clampNumber(value, 8, 56, defaults.panelTimerBarChestTimeTextFontSize) end), 8, 56, 1, "mpt-panel-time", nil, allEnabled("showPanelTimerBar", "panelTimerBarChestTimeText")),
 		colorSetting(L["mythicPlusTimerPanelTimerBarChestTimeTextColor"] or "+2/+3 time text color", get("panelTimerBarChestTimeTextColor"), set("panelTimerBarChestTimeTextColor"), defaults.panelTimerBarChestTimeTextColor, "mpt-panel-time", allEnabled("showPanelTimerBar", "panelTimerBarChestTimeText")),
+		checkboxSetting(L["mythicPlusTimerPanelTimerBarFillUp"] or "Fill timer bar up", get("panelTimerBarFillUp"), set("panelTimerBarFillUp"), "mpt-panel-time", enabledWhen("showPanelTimerBar")),
 		anchorSetting("panelTimerBarAnchor", "mpt-panel-time", nil, L["Anchor"] or "Anchor"),
 		sliderSetting(L["mythicPlusTimerPanelTimerBarOffsetX"] or L["Offset X"] or "Offset X", get("panelTimerBarOffsetX"), set("panelTimerBarOffsetX", function(value) return clampNumber(value, -800, 800, defaults.panelTimerBarOffsetX) end), -800, 800, 1, "mpt-panel-time", nil, enabledWhen("showPanelTimerBar")),
 		sliderSetting(L["mythicPlusTimerPanelTimerBarOffsetY"] or L["Offset Y"] or "Offset Y", get("panelTimerBarOffsetY"), set("panelTimerBarOffsetY", function(value) return clampNumber(value, -800, 800, defaults.panelTimerBarOffsetY) end), -800, 800, 1, "mpt-panel-time", nil, enabledWhen("showPanelTimerBar")),

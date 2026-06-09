@@ -1779,6 +1779,10 @@ function H.resolveTexture(key)
 	return key
 end
 
+function H.shouldUseSolidBackdropForTexture(key)
+	return key == H.BLIZZARD_RAID_FRAME_TEX_KEY or key == H.BLIZZARD_RAID_FRAME_TEX
+end
+
 function H.resolveSeparatorTexture(key)
 	if not key or key == "" or key == "SOLID" then return "Interface\\Buttons\\WHITE8x8" end
 	if key == "DEFAULT" then return BLIZZARD_TEX end
