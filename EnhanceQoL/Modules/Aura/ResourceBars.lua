@@ -5756,7 +5756,7 @@ function updatePowerBar(type, runeSlot)
 		end
 		bar._lastVal = shownStacks
 		if cfgDef.durationAsValue then
-			if stacks > 0 and logicalMax > 0 and style ~= "NONE" then
+			if stacks > 0 and logicalMax > 0 then
 				bar._auraDurationObject = durationObject or bar._auraDurationObject
 				bar._auraDurationTotal = logicalMax
 				if not bar._auraDurationUpdater then

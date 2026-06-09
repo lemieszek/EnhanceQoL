@@ -1,6 +1,12 @@
 # Changelog
 
 <!--@eqol-beta@-->
+## [11.1.0-beta7] - 2026-06-09
+
+### 🐛 Fixed
+
+- Resource Bars / Evoker: Fixed Augmentation's Ebon Might bar only updating its remaining duration while resource text was enabled.
+
 ## [11.1.0-beta6] - 2026-06-09
 
 ### ✨ Added
