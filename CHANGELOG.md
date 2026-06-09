@@ -1,6 +1,12 @@
 # Changelog
 
 <!--@eqol-beta@-->
+## [11.1.0-beta6] - 2026-06-09
+
+### ✨ Added
+
+- Cooldown Panels: Added an optional interrupt-spell glow that highlights tracked interrupts when the target is casting an interruptible spell.
+
 ## [11.1.0-beta5] - 2026-06-09
 
 ### ✨ Added

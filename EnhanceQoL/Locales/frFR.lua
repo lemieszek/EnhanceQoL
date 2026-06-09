@@ -1060,6 +1060,7 @@ L["CooldownPanelImportConfirm"] = "Importer un panneau ou groupe de temps de rec
 L["CooldownPanelImportFailed"] = "Échec de l'importation du panneau de temps de recharge."
 L["CooldownPanelImportPanel"] = "Importer le panneau"
 L["CooldownPanelImportSuccess"] = "Panneau de temps de recharge importé."
+L["CooldownPanelInterruptGlow"] = "Lueur quand la cible lance un sort interruptible"
 L["CooldownPanelKeybindsAnchor"] = "Ancrage des raccourcis clavier"
 L["CooldownPanelKeybindsHeader"] = "Raccourcis clavier"
 L["CooldownPanelKeybindsIgnoreItems"] = "Ignorer les objets"

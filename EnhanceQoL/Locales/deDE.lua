@@ -1060,6 +1060,7 @@ L["CooldownPanelImportConfirm"] = "Ein Abklingzeit-Panel oder eine Gruppe import
 L["CooldownPanelImportFailed"] = "Abklingzeit-Panel konnte nicht importiert werden."
 L["CooldownPanelImportPanel"] = "Panel importieren"
 L["CooldownPanelImportSuccess"] = "Abklingzeit-Panel importiert."
+L["CooldownPanelInterruptGlow"] = "Leuchten, wenn das Ziel einen unterbrechbaren Zauber wirkt"
 L["CooldownPanelKeybindsAnchor"] = "Tastenbelegung-Anker"
 L["CooldownPanelKeybindsHeader"] = "Tastenbelegungen"
 L["CooldownPanelKeybindsIgnoreItems"] = "Gegenstände ignorieren"

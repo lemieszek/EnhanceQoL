@@ -1568,6 +1568,22 @@ end
 
 function CooldownPanels:GetGlowStyleOptions(panelId) return Helper.GLOW_STYLE_OPTIONS or {} end
 
+function CooldownPanels:IsInterruptGlowSupported(entry)
+	if not (entry and entry.type == "SPELL") then return false end
+	local tracker = addon.Aura and addon.Aura.FocusInterruptTracker
+	if not (tracker and tracker.IsInterruptSpell) then return false end
+	return tracker:IsInterruptSpell(entry.spellID) == true
+end
+
+function CooldownPanels:GetInterruptGlowTargetCondition(spellId)
+	local tracker = addon.Aura and addon.Aura.FocusInterruptTracker
+	if not (tracker and tracker.IsInterruptSpellReady and tracker.GetTargetInterruptibleCast) then return false, nil end
+	if not tracker:IsInterruptSpellReady(spellId) then return false, nil end
+	local cast = tracker:GetTargetInterruptibleCast()
+	if not cast then return false, nil end
+	return true, cast.rawNotInterruptible
+end
+
 cdp.ICON_BORDER = cdp.ICON_BORDER or {
 	DEFAULT = "DEFAULT",
 	BLIZZARD = "BLIZZARD",
@@ -3482,6 +3498,7 @@ cdp.ENTRY.STYLE_CLIPBOARD = {
 		checkPowerUseGlobal = true,
 		hideWhenNoResource = true,
 		hideWhenNoResourceUseGlobal = true,
+		interruptGlow = true,
 		procGlowEnabled = true,
 		procGlowUseGlobal = true,
 		procGlowStyle = true,
@@ -5291,6 +5308,8 @@ function CooldownPanels:RebuildSpellIndex()
 	local itemTrackedIds = {}
 	local itemUsesTrackedIds = {}
 	local rangeCheckSpells = {}
+	runtime.interruptGlowActive = false
+	runtime.interruptGlowPanels = {}
 	self:EnsureFoodRankGroupsLoaded()
 	local activeSpecId = queryPlayerSpecId()
 	local classSpecs = getPlayerClassSpecMap()
@@ -5423,6 +5442,10 @@ function CooldownPanels:RebuildSpellIndex()
 								index[aliasId] = index[aliasId] or {}
 								index[aliasId][panelId] = true
 								cdp.ENTRY.RegisterSpellAlias(spellEntryIndex, aliasId, panelId, entryId, spellEntryMetaData)
+							end
+							if entry.interruptGlow == true and self:IsInterruptGlowSupported(entry) then
+								runtime.interruptGlowActive = true
+								runtime.interruptGlowPanels[panelId] = true
 							end
 							if wantsRangeCheck and effectiveId then rangeCheckSpells[effectiveId] = true end
 						end
@@ -11912,6 +11935,11 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		return currentEntry.glowReady == true
 	end
 
+	local function isInterruptGlowSupported()
+		local _, currentEntry = getEntry()
+		return CooldownPanels:IsInterruptGlowSupported(currentEntry)
+	end
+
 	local function getResolvedNoDesaturation()
 		local layout = getLayout()
 		local _, currentEntry = getEntry()
@@ -13666,6 +13694,17 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 				return currentEntry and currentEntry.glowReady == true or false
 			end,
 			set = function(_, value) setEntryBoolean("glowReady", value) end,
+		},
+		{
+			name = L["CooldownPanelInterruptGlow"] or "Glow when target casts interruptible spell",
+			kind = SettingType.Checkbox,
+			parentId = "cooldownPanelStandaloneGlow",
+			isShown = isInterruptGlowSupported,
+			get = function()
+				local _, currentEntry = getEntry()
+				return currentEntry and currentEntry.interruptGlow == true or false
+			end,
+			set = function(_, value) setEntryBoolean("interruptGlow", value) end,
 		},
 		{
 			name = L["CooldownPanelGlowPandemic"] or "Pandemic glow",
@@ -18420,6 +18459,7 @@ function CooldownPanels:HandleEntryBooleanMutation(panelId, entryId, entry, fiel
 	if not (panelId and entry and field) then return end
 	if field == "glowReady" then CooldownPanels.ClearReadyGlowEntryState(panelId, entryId, true) end
 	if field == "trackPassiveSpell" then self:RebuildSpellIndex() end
+	if field == "interruptGlow" then self:RebuildSpellIndex() end
 	if field == "glowReady" or field == "checkPower" or field == "hideWhenNoResource" or field == "readyGlowCheckPower" then self:RebuildPowerIndex() end
 	if field == "showCharges" then self:RebuildChargesIndex() end
 	if field == "showItemUses" or field == "useHighestRank" then
@@ -18455,6 +18495,7 @@ function CooldownPanels:DisableEntryGlowForQuickSetup(panelId, entryId, entry)
 	if not entry then return end
 	entry.glowUseGlobal = false
 	entry.glowReady = false
+	entry.interruptGlow = false
 	entry.pandemicGlow = false
 	entry.glowOtherAura = nil
 	entry.glowOtherAuraColor = nil
@@ -19288,6 +19329,11 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				data.readyGlowInset = glowInset
 				data.readyGlowCheckPower = readyGlowCheckPower == true
 				data.readyGlowResourceBlocked = readyGlowResourceBlocked == true
+				data.interruptGlow = false
+				data.interruptGlowCondition = nil
+				if resolvedType == "SPELL" and entry.interruptGlow == true and CooldownPanels:IsInterruptGlowSupported(entry) then
+					data.interruptGlow, data.interruptGlowCondition = CooldownPanels:GetInterruptGlowTargetCondition(effectiveSpellId or baseSpellId)
+				end
 				data.spellReadyCondition = spellReadyCondition
 				data.canTriggerReadyGlow = canTriggerReadyGlow
 				data.soundReady = soundReady
@@ -19965,7 +20011,13 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				layoutEditActive
 				and data.entry
 				and data.entry.type ~= "MACRO"
-				and (data.entry.glowReady == true or data.entry.pandemicGlow == true or data.entry.glowOtherAura ~= nil or data.entry.activationOverlayGlow == true)
+				and (
+					data.entry.glowReady == true
+					or data.entry.interruptGlow == true
+					or data.entry.pandemicGlow == true
+					or data.entry.glowOtherAura ~= nil
+					or data.entry.activationOverlayGlow == true
+				)
 			then
 				simpleGlowEnabled = true
 				simpleGlowColor = (
@@ -19990,7 +20042,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				) or data.readyGlowInset
 			end
 			if layoutEditActive then
-				stopGlowKeys(icon, "EQOL_SIMPLE", "EQOL_OVERLAY", "EQOL_READY")
+				stopGlowKeys(icon, "EQOL_SIMPLE", "EQOL_OVERLAY", "EQOL_READY", "EQOL_INTERRUPT")
 				setPreviewGlow(icon, simpleGlowEnabled, simpleGlowColor, simpleGlowStyle, simpleGlowInset)
 			else
 				setPreviewGlow(icon, false)
@@ -19998,6 +20050,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 					setGlow(icon, false, nil, "EQOL_SIMPLE")
 					setGlow(icon, false, nil, "EQOL_OVERLAY")
 					setGlow(icon, false, nil, "EQOL_READY")
+					setGlow(icon, false, nil, "EQOL_INTERRUPT")
 				elseif useSecretReadyGlow then
 					setGlow(icon, false, nil, "EQOL_SIMPLE")
 					if secretReadyGlowAllowed then
@@ -20017,10 +20070,12 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 						setGlow(icon, overlayGlow, overlayGlowColor, "EQOL_OVERLAY", nil, nil, nil, data.overlayGlowStyle or data.readyGlowStyle, data.overlayGlowInset or data.readyGlowInset)
 						setGlow(icon, false, nil, "EQOL_READY")
 					end
+					setGlow(icon, data.interruptGlow == true, data.readyGlowColor, "EQOL_INTERRUPT", data.interruptGlowCondition, 0, 1, data.readyGlowStyle, data.readyGlowInset)
 				else
 					setGlow(icon, false, nil, "EQOL_OVERLAY")
 					setGlow(icon, false, nil, "EQOL_READY")
 					setGlow(icon, simpleGlowEnabled, simpleGlowColor, "EQOL_SIMPLE", nil, nil, nil, simpleGlowStyle, simpleGlowInset)
+					setGlow(icon, data.interruptGlow == true, data.readyGlowColor, "EQOL_INTERRUPT", data.interruptGlowCondition, 0, 1, data.readyGlowStyle, data.readyGlowInset)
 				end
 			end
 			if showGhostIcon then
@@ -23281,6 +23336,7 @@ function cdp.ENTRY.ApplyVisibleSpellRuntime(panelId, runtime, icon, data, resolv
 		setGlow(icon, false, nil, "EQOL_SIMPLE")
 		setGlow(icon, false, nil, "EQOL_OVERLAY")
 		setGlow(icon, false, nil, "EQOL_READY")
+		setGlow(icon, false, nil, "EQOL_INTERRUPT")
 	elseif useSecretReadyGlow then
 		setGlow(icon, false, nil, "EQOL_SIMPLE")
 		if secretReadyGlowAllowed then
@@ -23290,10 +23346,12 @@ function cdp.ENTRY.ApplyVisibleSpellRuntime(panelId, runtime, icon, data, resolv
 			setGlow(icon, overlayGlow, overlayGlowColor, "EQOL_OVERLAY", nil, nil, nil, data.overlayGlowStyle or data.readyGlowStyle, data.overlayGlowInset or data.readyGlowInset)
 			setGlow(icon, false, nil, "EQOL_READY")
 		end
+		setGlow(icon, data.interruptGlow == true, data.readyGlowColor, "EQOL_INTERRUPT", data.interruptGlowCondition, 0, 1, data.readyGlowStyle, data.readyGlowInset)
 	else
 		setGlow(icon, false, nil, "EQOL_OVERLAY")
 		setGlow(icon, false, nil, "EQOL_READY")
 		setGlow(icon, simpleGlowEnabled, simpleGlowColor, "EQOL_SIMPLE", nil, nil, nil, simpleGlowStyle, simpleGlowInset)
+		setGlow(icon, data.interruptGlow == true, data.readyGlowColor, "EQOL_INTERRUPT", data.interruptGlowCondition, 0, 1, data.readyGlowStyle, data.readyGlowInset)
 	end
 
 	return true
@@ -23441,9 +23499,11 @@ function cdp.ENTRY.ApplyVisibleItemRuntime(panelId, runtime, icon, data, resolve
 		setGlow(icon, false, nil, "EQOL_SIMPLE")
 		setGlow(icon, false, nil, "EQOL_OVERLAY")
 		setGlow(icon, false, nil, "EQOL_READY")
+		setGlow(icon, false, nil, "EQOL_INTERRUPT")
 	else
 		setGlow(icon, false, nil, "EQOL_OVERLAY")
 		setGlow(icon, false, nil, "EQOL_READY")
+		setGlow(icon, false, nil, "EQOL_INTERRUPT")
 		setGlow(icon, simpleGlowEnabled, simpleGlowColor, "EQOL_SIMPLE", nil, nil, nil, simpleGlowStyle, simpleGlowInset)
 	end
 
@@ -23557,6 +23617,11 @@ function cdp.ENTRY.TryRefreshVisibleSpellEntry(panelId, entryId, mode)
 		end
 	else
 		data.spellReadyCondition = nil
+	end
+	data.interruptGlow = false
+	data.interruptGlowCondition = nil
+	if entry.interruptGlow == true and CooldownPanels:IsInterruptGlowSupported(entry) then
+		data.interruptGlow, data.interruptGlowCondition = CooldownPanels:GetInterruptGlowTargetCondition(effectiveSpellId or baseSpellId)
 	end
 
 	local resolvedLayout = CooldownPanels.ResolveRuntimeLayout(runtime, runtime.frame, panel.layout)
@@ -25029,6 +25094,23 @@ ensureAssistedHighlightHook = function()
 	return true
 end
 
+function CooldownPanels:RequestInterruptGlowPanelRefreshes()
+	local runtime = self.runtime
+	local panels = runtime and runtime.interruptGlowPanels
+	if not (panels and next(panels)) then return false end
+	local queued = false
+	for panelId in pairs(panels) do
+		if self.RequestPanelRefresh then
+			self:RequestPanelRefresh(panelId)
+			queued = true
+		elseif self.RefreshPanel then
+			self:RefreshPanel(panelId)
+			queued = true
+		end
+	end
+	return queued
+end
+
 function CooldownPanels.SetUpdateFrameEnabled(frame, enabled)
 	if not frame then return end
 	local mode = enabled
@@ -25038,13 +25120,15 @@ function CooldownPanels.SetUpdateFrameEnabled(frame, enabled)
 		mode = nil
 	end
 	if mode ~= "active" and mode ~= "passive" then mode = nil end
-	if frame._eqolEventMode == mode then return end
+	local runtime = CooldownPanels.runtime
+	local interruptGlowEvents = mode == "active" and runtime and runtime.interruptGlowActive == true
+	if frame._eqolEventMode == mode and frame._eqolInterruptGlowEvents == interruptGlowEvents then return end
 
 	if frame._eqolEventsRegistered then
 		frame:UnregisterAllEvents()
 		frame._eqolEventsRegistered = false
-		local runtime = CooldownPanels.runtime
 		if runtime then runtime.powerEventRegistered = nil end
+		frame._eqolInterruptGlowEvents = nil
 	end
 
 	if mode then
@@ -25063,12 +25147,26 @@ function CooldownPanels.SetUpdateFrameEnabled(frame, enabled)
 			-- frame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_STOP", "player")
 			frame:RegisterUnitEvent("UNIT_ENTERED_VEHICLE", "player")
 			frame:RegisterUnitEvent("UNIT_EXITED_VEHICLE", "player")
+			if interruptGlowEvents then
+				frame:RegisterUnitEvent("UNIT_SPELLCAST_START", "target")
+				frame:RegisterUnitEvent("UNIT_SPELLCAST_STOP", "target")
+				frame:RegisterUnitEvent("UNIT_SPELLCAST_INTERRUPTED", "target")
+				frame:RegisterUnitEvent("UNIT_SPELLCAST_INTERRUPTIBLE", "target")
+				frame:RegisterUnitEvent("UNIT_SPELLCAST_NOT_INTERRUPTIBLE", "target")
+				frame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_START", "target")
+				frame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_STOP", "target")
+				frame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_UPDATE", "target")
+				frame:RegisterUnitEvent("UNIT_SPELLCAST_EMPOWER_START", "target")
+				frame:RegisterUnitEvent("UNIT_SPELLCAST_EMPOWER_STOP", "target")
+				frame:RegisterUnitEvent("UNIT_SPELLCAST_EMPOWER_UPDATE", "target")
+			end
 		end
 		frame._eqolEventsRegistered = true
 		frame._eqolEventMode = mode
 		if mode == "active" and updatePowerEventRegistration then updatePowerEventRegistration() end
 	end
 	frame._eqolEventMode = mode
+	frame._eqolInterruptGlowEvents = interruptGlowEvents
 end
 
 function CooldownPanels.IsAssistedCombatActionSlot(slot)
@@ -25092,6 +25190,24 @@ function CooldownPanels.EnsureUpdateFrame()
 	frame:SetScript("OnEvent", function(_, event, ...)
 		if not CooldownPanels.assistedHighlightHooked and ensureAssistedHighlightHook then ensureAssistedHighlightHook() end
 		if CooldownPanels.ensureAssistedHighlightCVarListener then CooldownPanels.ensureAssistedHighlightCVarListener() end
+		if event == "UNIT_SPELLCAST_START"
+			or event == "UNIT_SPELLCAST_STOP"
+			or event == "UNIT_SPELLCAST_INTERRUPTED"
+			or event == "UNIT_SPELLCAST_INTERRUPTIBLE"
+			or event == "UNIT_SPELLCAST_NOT_INTERRUPTIBLE"
+			or event == "UNIT_SPELLCAST_CHANNEL_START"
+			or event == "UNIT_SPELLCAST_CHANNEL_STOP"
+			or event == "UNIT_SPELLCAST_CHANNEL_UPDATE"
+			or event == "UNIT_SPELLCAST_EMPOWER_START"
+			or event == "UNIT_SPELLCAST_EMPOWER_STOP"
+			or event == "UNIT_SPELLCAST_EMPOWER_UPDATE"
+		then
+			local unit = ...
+			if unit == "target" and CooldownPanels.runtime and CooldownPanels.runtime.interruptGlowActive == true then
+				if not CooldownPanels:RequestInterruptGlowPanelRefreshes() then CooldownPanels:RequestUpdate("Event:" .. event) end
+			end
+			return
+		end
 		if event == "ADDON_LOADED" then
 			local name = ...
 			local anchorHelper = CooldownPanels.AnchorHelper

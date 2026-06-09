@@ -1060,6 +1060,7 @@ L["CooldownPanelImportConfirm"] = "¿Importar un panel o grupo de enfriamientos?
 L["CooldownPanelImportFailed"] = "Error al importar el panel de enfriamientos."
 L["CooldownPanelImportPanel"] = "Importar panel"
 L["CooldownPanelImportSuccess"] = "Panel de enfriamientos importado."
+L["CooldownPanelInterruptGlow"] = "Resplandor cuando el objetivo lance un hechizo interrumpible"
 L["CooldownPanelKeybindsAnchor"] = "Anclaje de atajos de tecla"
 L["CooldownPanelKeybindsHeader"] = "Atajos de tecla"
 L["CooldownPanelKeybindsIgnoreItems"] = "Ignorar objetos"

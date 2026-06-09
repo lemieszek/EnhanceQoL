@@ -1060,6 +1060,7 @@ L["CooldownPanelImportConfirm"] = "쿨다운 패널 또는 그룹을 가져오�
 L["CooldownPanelImportFailed"] = "쿨다운 패널 가져오기에 실패했습니다."
 L["CooldownPanelImportPanel"] = "패널 가져오기"
 L["CooldownPanelImportSuccess"] = "쿨다운 패널을 가져왔습니다."
+L["CooldownPanelInterruptGlow"] = "대상이 차단 가능한 주문 시전 시 반짝임"
 L["CooldownPanelKeybindsAnchor"] = "단축키 앵커"
 L["CooldownPanelKeybindsHeader"] = "단축키"
 L["CooldownPanelKeybindsIgnoreItems"] = "아이템 무시"

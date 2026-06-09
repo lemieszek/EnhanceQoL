@@ -319,6 +319,7 @@ Helper.ENTRY_DEFAULTS = {
 	hideWhenNoResource = false,
 	glowReady = false,
 	readyGlowCheckPower = false,
+	interruptGlow = false,
 	pandemicGlow = false,
 	pandemicGlowColor = nil,
 	procGlowEnabled = true,
@@ -2444,6 +2445,7 @@ function Helper.NormalizeEntry(entry, defaults)
 	if type(entry.hideWhenNoResourceUseGlobal) ~= "boolean" then entry.hideWhenNoResourceUseGlobal = Helper.ENTRY_DEFAULTS.hideWhenNoResourceUseGlobal end
 	if type(entry.hideWhenNoResource) ~= "boolean" then entry.hideWhenNoResource = Helper.ENTRY_DEFAULTS.hideWhenNoResource end
 	if type(entry.readyGlowCheckPower) ~= "boolean" then entry.readyGlowCheckPower = Helper.ENTRY_DEFAULTS.readyGlowCheckPower end
+	if type(entry.interruptGlow) ~= "boolean" then entry.interruptGlow = Helper.ENTRY_DEFAULTS.interruptGlow end
 	if type(entry.procGlowEnabled) ~= "boolean" then entry.procGlowEnabled = Helper.ENTRY_DEFAULTS.procGlowEnabled end
 	if type(entry.procGlowUseGlobal) ~= "boolean" then
 		entry.procGlowUseGlobal = (hasLegacySharedProcGlowVisual or entry.procGlowStyle ~= nil or entry.procGlowInset ~= nil or entry.procGlowEnabled ~= Helper.ENTRY_DEFAULTS.procGlowEnabled)

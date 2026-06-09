@@ -1060,6 +1060,7 @@ L["CooldownPanelImportConfirm"] = "Импортировать панель ил�
 L["CooldownPanelImportFailed"] = "Не удалось импортировать панель кулдаунов."
 L["CooldownPanelImportPanel"] = "Импорт панели"
 L["CooldownPanelImportSuccess"] = "Панель кулдаунов импортирована."
+L["CooldownPanelInterruptGlow"] = "Свечение, когда цель произносит прерываемое заклинание"
 L["CooldownPanelKeybindsAnchor"] = "Якорь назначенных клавиш"
 L["CooldownPanelKeybindsHeader"] = "Назначенные клавиши"
 L["CooldownPanelKeybindsIgnoreItems"] = "Игнорировать предметы"

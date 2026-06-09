@@ -100,6 +100,14 @@ local CLASS_INTERRUPT_SPELLS = {
 	WARRIOR = { 6552 },
 }
 
+local ALL_INTERRUPT_SPELLS = {}
+for _, spellList in pairs(CLASS_INTERRUPT_SPELLS) do
+	for i = 1, #spellList do
+		local spellId = tonumber(spellList[i])
+		if spellId then ALL_INTERRUPT_SPELLS[spellId] = true end
+	end
+end
+
 local AUTO_ANCHOR_OPTIONS = {
 	{
 		value = "AUTO",
@@ -607,9 +615,22 @@ function Tracker:ResolveInterruptSpell()
 	return nil
 end
 
+function Tracker:IsInterruptSpell(spellId)
+	spellId = tonumber(spellId)
+	return spellId and ALL_INTERRUPT_SPELLS[spellId] == true or false
+end
+
 function Tracker:GetTrackedSpellCooldown()
 	local spellId = self:ResolveInterruptSpell()
 	if not spellId then return nil end
+	local cooldown = querySpellCooldown(spellId)
+	cooldown.spellId = spellId
+	return cooldown
+end
+
+function Tracker:GetInterruptSpellCooldown(spellId)
+	spellId = tonumber(spellId)
+	if not self:IsInterruptSpell(spellId) then return nil end
 	local cooldown = querySpellCooldown(spellId)
 	cooldown.spellId = spellId
 	return cooldown
@@ -622,6 +643,10 @@ function Tracker:IsTrackedSpellReady(cooldown)
 	return true
 end
 
+function Tracker:IsInterruptSpellReady(spellId)
+	return self:IsTrackedSpellReady(self:GetInterruptSpellCooldown(spellId))
+end
+
 function Tracker:HasHostileFocus()
 	if not UnitExists or UnitExists("focus") ~= true then return false end
 	if UnitCanAttack then return UnitCanAttack("player", "focus") == true end
@@ -629,10 +654,19 @@ function Tracker:HasHostileFocus()
 	return true
 end
 
-function Tracker:GetFocusInterruptibleCast()
-	if not self:HasHostileFocus() then return nil end
+function Tracker:HasHostileUnit(unit)
+	unit = unit or "focus"
+	if not UnitExists or UnitExists(unit) ~= true then return false end
+	if UnitCanAttack then return UnitCanAttack("player", unit) == true end
+	if UnitIsFriend then return UnitIsFriend("player", unit) ~= true end
+	return true
+end
 
-	local name, _, _, _, _, _, castId, notInterruptible, spellId = UnitCastingInfo("focus")
+function Tracker:GetUnitInterruptibleCast(unit)
+	unit = unit or "focus"
+	if not self:HasHostileUnit(unit) then return nil end
+
+	local name, _, _, _, _, _, castId, notInterruptible, spellId = UnitCastingInfo(unit)
 	if name then
 		return {
 			hasCast = true,
@@ -642,7 +676,7 @@ function Tracker:GetFocusInterruptibleCast()
 		}
 	end
 
-	name, _, _, _, _, _, notInterruptible, spellId = UnitChannelInfo("focus")
+	name, _, _, _, _, _, notInterruptible, spellId = UnitChannelInfo(unit)
 	if name then
 		return {
 			hasCast = true,
@@ -652,6 +686,14 @@ function Tracker:GetFocusInterruptibleCast()
 	end
 
 	return nil
+end
+
+function Tracker:GetFocusInterruptibleCast()
+	return self:GetUnitInterruptibleCast("focus")
+end
+
+function Tracker:GetTargetInterruptibleCast()
+	return self:GetUnitInterruptibleCast("target")
 end
 
 function Tracker:ResolveDisplayIcon(spellId)
