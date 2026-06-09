@@ -5,6 +5,9 @@
 	<Script file="DungeonFilter.lua" />
 	<Script file="ObjectiveTracker.lua" />
 	<Script file="WorldMapDungeonPortals.lua" />
+	<!--@eqol-beta@-->
+	<Script file="MythicPlusTimer.lua" />
+	<!--@end-eqol-beta@-->
 	<Script file="EnhanceQoLMythicPlus.lua" />
 	<Script file="Settings_MythicPlus.lua" />
 </Ui>

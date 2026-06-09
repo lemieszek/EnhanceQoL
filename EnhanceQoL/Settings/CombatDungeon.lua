@@ -2656,6 +2656,35 @@ if cChar and sectionDungeon then
 		parentSection = damageMeterSection,
 	})
 
+	--@eqol-beta@
+	local mythicPlusTimerSection = addon.SettingsLayout.suitesMythicPlusTimerSection
+	if not mythicPlusTimerSection then
+		mythicPlusTimerSection = addon.functions.SettingsCreateExpandableSection(cChar, {
+			name = L["mythicPlusTimerTitle"] or "Mythic+ Timer",
+			configPageKey = "MythicPlusTimer",
+			description = L["mythicPlusTimerEditModeHint"],
+			iconKey = "dungeons",
+			modernCategory = "suites",
+			modernOnly = true,
+			expanded = false,
+			colorizeTitle = false,
+			newTagID = "mythicPlusTimerEnabled",
+		})
+		addon.SettingsLayout.suitesMythicPlusTimerSection = mythicPlusTimerSection
+	end
+
+	addon.functions.SettingsCreateCheckbox(cChar, {
+		var = "mythicPlusTimerEnabled",
+		text = L["mythicPlusTimerEnabled"],
+		desc = L["mythicPlusTimerEditModeHint"],
+		func = function(value)
+			addon.db["mythicPlusTimerEnabled"] = value == true
+			if addon.MythicPlus and addon.MythicPlus.MythicPlusTimer and addon.MythicPlus.MythicPlusTimer.UpdateEventState then addon.MythicPlus.MythicPlusTimer:UpdateEventState() end
+		end,
+		parentSection = mythicPlusTimerSection,
+	})
+	--@end-eqol-beta@
+
 	-- Objective Tracker
 	local objEnable = addon.functions.SettingsCreateCheckbox(cChar, {
 		var = "mythicPlusEnableObjectiveTracker",

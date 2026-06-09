@@ -2492,6 +2492,13 @@ function GF.CreateDataBarDefaults()
 		position = "BELOW",
 		height = 16,
 		gap = 0,
+		detached = false,
+		detachedMatchHealthWidth = true,
+		detachedWidth = nil,
+		detachedGrowFromCenter = false,
+		detachedOffset = { x = 0, y = 0 },
+		detachedStrata = nil,
+		detachedFrameLevelOffset = 2,
 		color = { 0.18, 0.18, 0.22, 1 },
 		useClassColor = false,
 		textLeft = "NAME",
@@ -6761,11 +6768,12 @@ function GF:LayoutButton(self)
 	if not powerDetachedRequested and powerH > availH then powerH = availH end
 	local powerDetached = powerDetachedRequested and powerH > 0
 	local dataBarEnabled = dbc.enabled == true
-	local dataBarH = dataBarEnabled and clampNumber(dbc.height, 1, availH, defDB.height or 16) or 0
+	local dataBarDetached = dataBarEnabled and dbc.detached == true
+	local dataBarH = dataBarEnabled and clampNumber(dbc.height, 1, dataBarDetached and 1000 or availH, defDB.height or 16) or 0
 	local dataBarGap = dataBarEnabled and clampNumber(dbc.gap, -20, 40, defDB.gap or 0) or 0
 	dataBarH = roundToEvenPixel(dataBarH, scale)
 	dataBarGap = roundToPixel(dataBarGap, scale)
-	local dataBarSpace = dataBarEnabled and max(0, dataBarH + dataBarGap) or 0
+	local dataBarSpace = (dataBarEnabled and not dataBarDetached) and max(0, dataBarH + dataBarGap) or 0
 	if dataBarSpace > availH - 1 then dataBarSpace = max(0, availH - 1) end
 	local dataBarPosition = tostring(dbc.position or defDB.position or "BELOW"):upper()
 	if dataBarPosition ~= "ABOVE" then dataBarPosition = "BELOW" end
@@ -6856,12 +6864,56 @@ function GF:LayoutButton(self)
 			else
 				st.dataBar:SetHeight(dataBarH)
 			end
-			if dataBarPosition == "ABOVE" then
+			if dataBarDetached then
+				local dataBarOffset = dbc.detachedOffset or EMPTY
+				local dataBarX = tonumber(dataBarOffset.x) or 0
+				local dataBarY = tonumber(dataBarOffset.y) or 0
+				local dataBarGrowFromCenter = dbc.detachedGrowFromCenter == true
+				local dataBarMatchHealthWidth = dbc.detachedMatchHealthWidth ~= false
+				local dataBarWidth = max(1, w - contentOffsetLeft - contentOffsetRight)
+				if not dataBarMatchHealthWidth then dataBarWidth = max(1, tonumber(dbc.detachedWidth) or dataBarWidth) end
+				if Pixel and Pixel.SetWidth then
+					Pixel.SetWidth(st.dataBar, dataBarWidth, 1)
+				else
+					st.dataBar:SetWidth(dataBarWidth)
+				end
+				if dataBarPosition == "ABOVE" then
+					if dataBarGrowFromCenter then
+						st.dataBar:SetPoint("BOTTOM", st.health, "TOP", dataBarX, dataBarGap + dataBarY)
+					else
+						st.dataBar:SetPoint("BOTTOMLEFT", st.health, "TOPLEFT", dataBarX, dataBarGap + dataBarY)
+					end
+				else
+					local dataBarAnchor = (powerDetached and not st._powerHidden) and st.power or st.health
+					if dataBarGrowFromCenter then
+						st.dataBar:SetPoint("TOP", dataBarAnchor, "BOTTOM", dataBarX, -dataBarGap + dataBarY)
+					else
+						st.dataBar:SetPoint("TOPLEFT", dataBarAnchor, "BOTTOMLEFT", dataBarX, -dataBarGap + dataBarY)
+					end
+				end
+				local detachedDataBarStrata = GF.NormalizeFrameStrataToken(dbc.detachedStrata)
+				if st.dataBar.SetFrameStrata then
+					if detachedDataBarStrata then
+						st.dataBar:SetFrameStrata(detachedDataBarStrata)
+					elseif st.health.GetFrameStrata then
+						st.dataBar:SetFrameStrata(st.health:GetFrameStrata())
+					end
+				end
+				if st.dataBar.SetFrameLevel and st.health.GetFrameLevel then
+					local levelOffset = clampNumber(dbc.detachedFrameLevelOffset, -20, 1000, 2)
+					levelOffset = floor(levelOffset + (levelOffset >= 0 and 0.5 or -0.5))
+					st.dataBar:SetFrameLevel(GF.ClampFrameLevel((st.health:GetFrameLevel() or 0) + levelOffset))
+				end
+			elseif dataBarPosition == "ABOVE" then
 				st.dataBar:SetPoint("TOPLEFT", st.barGroup, "TOPLEFT", contentOffsetLeft, 0)
 				st.dataBar:SetPoint("TOPRIGHT", st.barGroup, "TOPRIGHT", -contentOffsetRight, 0)
 			else
 				st.dataBar:SetPoint("BOTTOMLEFT", st.barGroup, "BOTTOMLEFT", contentOffsetLeft, 0)
 				st.dataBar:SetPoint("BOTTOMRIGHT", st.barGroup, "BOTTOMRIGHT", -contentOffsetRight, 0)
+			end
+			if not dataBarDetached then
+				if st.dataBar.SetFrameStrata and st.barGroup.GetFrameStrata then st.dataBar:SetFrameStrata(st.barGroup:GetFrameStrata()) end
+				if st.dataBar.SetFrameLevel and st.health.GetFrameLevel then st.dataBar:SetFrameLevel(GF.ClampFrameLevel((st.health:GetFrameLevel() or 0) + 1)) end
 			end
 			st.dataBar:Show()
 		else
@@ -16720,6 +16772,27 @@ local function buildEditModeSettings(kind, editModeId)
 		local pcfg = cfg and cfg.power or {}
 		return pcfg.detachedBorder == true
 	end
+	local function isDataBarEnabled()
+		local cfg = getCfg(kind)
+		local dbc = cfg and cfg.dataBar or {}
+		return dbc.enabled == true
+	end
+	local function isDataBarDetached()
+		if not isDataBarEnabled() then return false end
+		local cfg = getCfg(kind)
+		local dbc = cfg and cfg.dataBar or {}
+		return dbc.detached == true
+	end
+	local function isDetachedDataBarWidthUnlocked()
+		if not isDataBarDetached() then return false end
+		local cfg = getCfg(kind)
+		local dbc = cfg and cfg.dataBar or {}
+		local def = DEFAULTS[kind] and DEFAULTS[kind].dataBar or {}
+		local value = dbc.detachedMatchHealthWidth
+		if value == nil then value = def.detachedMatchHealthWidth end
+		if value == nil then value = true end
+		return value ~= true
+	end
 	local function isPortraitDetached()
 		local cfg = getCfg(kind)
 		return select(1, GF.ResolveGroupPortraitDetachedConfig(cfg, kind))
@@ -19564,6 +19637,211 @@ local function buildEditModeSettings(kind, editModeId)
 				local cfg = getCfg(kind)
 				return cfg and cfg.dataBar and cfg.dataBar.enabled == true
 			end,
+		},
+		{
+			name = L["UFDataBarDetached"] or "Detach data bar",
+			kind = SettingType.Checkbox,
+			field = "dataBarDetached",
+			parentId = "dataBar",
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				return dbc.detached == true
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.dataBar = cfg.dataBar or {}
+				cfg.dataBar.detached = value and true or false
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarDetached", cfg.dataBar.detached, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+				requestEditModeSettingsRefresh()
+			end,
+			isEnabled = isDataBarEnabled,
+			isShown = isDataBarEnabled,
+		},
+		{
+			name = L["UFDataBarDetachedMatchHealthWidth"] or "Match health width",
+			kind = SettingType.Checkbox,
+			field = "dataBarDetachedMatchHealthWidth",
+			parentId = "dataBar",
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				local def = DEFAULTS[kind] and DEFAULTS[kind].dataBar or {}
+				local value = dbc.detachedMatchHealthWidth
+				if value == nil then value = def.detachedMatchHealthWidth end
+				if value == nil then value = true end
+				return value == true
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.dataBar = cfg.dataBar or {}
+				cfg.dataBar.detachedMatchHealthWidth = value and true or false
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarDetachedMatchHealthWidth", cfg.dataBar.detachedMatchHealthWidth, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			isEnabled = isDataBarDetached,
+			isShown = isDataBarDetached,
+		},
+		{
+			name = L["UFDataBarWidth"] or "Data bar width",
+			kind = SettingType.Slider,
+			allowInput = true,
+			field = "dataBarDetachedWidth",
+			parentId = "dataBar",
+			minValue = 10,
+			maxValue = 600,
+			valueStep = 1,
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				return dbc.detachedWidth or cfg.width or (DEFAULTS[kind] and DEFAULTS[kind].width) or 100
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.dataBar = cfg.dataBar or {}
+				cfg.dataBar.detachedWidth = clampNumber(value, 10, 600, cfg.dataBar.detachedWidth or cfg.width or 100)
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarDetachedWidth", cfg.dataBar.detachedWidth, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			isEnabled = isDetachedDataBarWidthUnlocked,
+			isShown = isDataBarDetached,
+		},
+		{
+			name = L["Grow from center"] or "Grow from center",
+			kind = SettingType.Checkbox,
+			field = "dataBarDetachedGrowFromCenter",
+			parentId = "dataBar",
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				local def = DEFAULTS[kind] and DEFAULTS[kind].dataBar or {}
+				local value = dbc.detachedGrowFromCenter
+				if value == nil then value = def.detachedGrowFromCenter end
+				return value == true
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.dataBar = cfg.dataBar or {}
+				cfg.dataBar.detachedGrowFromCenter = value and true or false
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarDetachedGrowFromCenter", cfg.dataBar.detachedGrowFromCenter, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			isEnabled = isDataBarDetached,
+			isShown = isDataBarDetached,
+		},
+		{
+			name = L["Offset X"] or "Offset X",
+			kind = SettingType.Slider,
+			allowInput = true,
+			field = "dataBarDetachedOffsetX",
+			parentId = "dataBar",
+			minValue = -400,
+			maxValue = 400,
+			valueStep = 1,
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				return (dbc.detachedOffset and dbc.detachedOffset.x) or 0
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.dataBar = cfg.dataBar or {}
+				cfg.dataBar.detachedOffset = cfg.dataBar.detachedOffset or {}
+				cfg.dataBar.detachedOffset.x = clampNumber(value, -400, 400, cfg.dataBar.detachedOffset.x or 0)
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarDetachedOffsetX", cfg.dataBar.detachedOffset.x, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			isEnabled = isDataBarDetached,
+			isShown = isDataBarDetached,
+		},
+		{
+			name = L["Offset Y"] or "Offset Y",
+			kind = SettingType.Slider,
+			allowInput = true,
+			field = "dataBarDetachedOffsetY",
+			parentId = "dataBar",
+			minValue = -400,
+			maxValue = 400,
+			valueStep = 1,
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				return (dbc.detachedOffset and dbc.detachedOffset.y) or 0
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.dataBar = cfg.dataBar or {}
+				cfg.dataBar.detachedOffset = cfg.dataBar.detachedOffset or {}
+				cfg.dataBar.detachedOffset.y = clampNumber(value, -400, 400, cfg.dataBar.detachedOffset.y or 0)
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarDetachedOffsetY", cfg.dataBar.detachedOffset.y, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			isEnabled = isDataBarDetached,
+			isShown = isDataBarDetached,
+		},
+		{
+			name = L["UFDetachedPowerStrata"] or "Strata",
+			kind = SettingType.Dropdown,
+			field = "dataBarDetachedStrata",
+			parentId = "dataBar",
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				return GF.NormalizeFrameStrataToken(dbc.detachedStrata) or ""
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.dataBar = cfg.dataBar or {}
+				cfg.dataBar.detachedStrata = GF.NormalizeFrameStrataToken(value)
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarDetachedStrata", cfg.dataBar.detachedStrata or "", nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			getValueText = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				return GF.DropdownOptionLabel(GF._FRAME_STRATA_OPTIONS_WITH_DEFAULT, GF.NormalizeFrameStrataToken(dbc.detachedStrata) or "", DEFAULT or "Default")
+			end,
+			generator = GF.DropdownRadioGenerator(GF._FRAME_STRATA_OPTIONS_WITH_DEFAULT),
+			isEnabled = isDataBarDetached,
+			isShown = isDataBarDetached,
+		},
+		{
+			name = L["UFDetachedPowerLevelOffset"] or "Frame level offset",
+			kind = SettingType.Slider,
+			allowInput = true,
+			field = "dataBarDetachedFrameLevelOffset",
+			parentId = "dataBar",
+			minValue = -20,
+			maxValue = 1000,
+			valueStep = 1,
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				local value = dbc.detachedFrameLevelOffset
+				if value == nil then value = (DEFAULTS[kind] and DEFAULTS[kind].dataBar and DEFAULTS[kind].dataBar.detachedFrameLevelOffset) end
+				value = clampNumber(value, -20, 1000, 2)
+				return floor(value + (value >= 0 and 0.5 or -0.5))
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.dataBar = cfg.dataBar or {}
+				local levelOffset = clampNumber(value, -20, 1000, cfg.dataBar.detachedFrameLevelOffset or 2)
+				levelOffset = floor(levelOffset + (levelOffset >= 0 and 0.5 or -0.5))
+				cfg.dataBar.detachedFrameLevelOffset = levelOffset
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarDetachedFrameLevelOffset", cfg.dataBar.detachedFrameLevelOffset, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			isEnabled = isDataBarDetached,
+			isShown = isDataBarDetached,
 		},
 		{
 			name = L["Use class color (players)"] or "Use class color (players)",
