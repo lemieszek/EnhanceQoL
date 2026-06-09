@@ -7,6 +7,7 @@
 
 - Cooldown Panels: Added an optional interrupt-spell glow that highlights tracked interrupts when the target is casting an interruptible spell.
 - Mythic Plus: Added a beta-only Mythic+ Timer.
+- Unit Frames / Group Frames: Added a Portrait mode option that can show player class icons instead of unit portraits.
 
 ## [11.1.0-beta5] - 2026-06-09
 

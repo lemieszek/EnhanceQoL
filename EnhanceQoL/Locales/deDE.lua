@@ -3942,6 +3942,9 @@ L["UFPlusHint"] = "Konfiguriere die eigenen Spieler-/Ziel-/Ziel-des-Ziels-Frames
 Aktiviere jede Einheit und passe Größe, Position, Texte, Farben, Auren sowie Zauberleisten an.\
 \"Default\" behält die Blizzard-Textur; eigene Texturen kommen aus SharedMedia."
 L["UFPlusRoot"] = "UF Plus"
+L["UFPortraitMode"] = "Portraitmodus"
+L["UFPortraitModeClassIcon"] = "Klassenicon"
+L["UFPortraitModePortrait"] = "Portrait"
 L["UFPortraitSeparatorEnable"] = "Trennlinie am Porträt anzeigen"
 L["UFPortraitSeparatorTexture"] = "Trennlinientextur"
 L["UFPowerColor"] = "Ressourcenfarbe"

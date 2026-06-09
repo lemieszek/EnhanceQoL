@@ -3941,6 +3941,9 @@ L["UFPlusHint"] = "設定 EnhanceQoL 的自訂玩家/目標/目標的目標框�
 啟用各單位框架並調整大小、位置、文字、顏色、光環與施法條選項。\
 \"Default\" 會保留暴雪材質；自訂材質來自 SharedMedia。"
 L["UFPlusRoot"] = "UF Plus"
+L["UFPortraitMode"] = "頭像模式"
+L["UFPortraitModeClassIcon"] = "職業圖示"
+L["UFPortraitModePortrait"] = "頭像"
 L["UFPortraitSeparatorEnable"] = "顯示頭像分隔線"
 L["UFPortraitSeparatorTexture"] = "分隔線材質"
 L["UFPowerColor"] = "資源顏色"

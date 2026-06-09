@@ -3942,6 +3942,9 @@ L["UFPlusHint"] = "Configure os quadros personalizados de Jogador/Alvo/Alvo do A
 Ative cada quadro de unidade e ajuste tamanho, posição, textos, cores, auras e opções da barra de lançamento.\
 A textura \"Default\" mantém o atlas da Blizzard; texturas personalizadas vêm do SharedMedia."
 L["UFPlusRoot"] = "UF Plus"
+L["UFPortraitMode"] = "Modo de retrato"
+L["UFPortraitModeClassIcon"] = "Icone de classe"
+L["UFPortraitModePortrait"] = "Retrato"
 L["UFPortraitSeparatorEnable"] = "Mostrar separador do retrato"
 L["UFPortraitSeparatorTexture"] = "Textura do separador"
 L["UFPowerColor"] = "Cor do recurso"

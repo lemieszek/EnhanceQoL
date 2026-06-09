@@ -3942,6 +3942,9 @@ L["UFPlusHint"] = "Configurez les cadres Joueur/Cible/Cible de la cible personna
 Activez chaque cadre d'unité et ajustez taille, position, textes, couleurs, auras et options de barre d'incantation.\
 La texture \"Default\" conserve l'atlas Blizzard ; les textures personnalisées viennent de SharedMedia."
 L["UFPlusRoot"] = "UF Plus"
+L["UFPortraitMode"] = "Mode portrait"
+L["UFPortraitModeClassIcon"] = "Icone de classe"
+L["UFPortraitModePortrait"] = "Portrait"
 L["UFPortraitSeparatorEnable"] = "Afficher le séparateur du portrait"
 L["UFPortraitSeparatorTexture"] = "Texture du séparateur"
 L["UFPowerColor"] = "Couleur de ressource"

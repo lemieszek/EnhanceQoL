@@ -3942,6 +3942,9 @@ L["UFPlusHint"] = "Configura los marcos personalizados de jugador/objetivo/ToT d
 Activa cada marco de unidad y ajusta tamaño, posición, textos, colores, auras y opciones de barra de lanzamiento.\
 La textura \"Default\" mantiene el atlas de Blizzard; las personalizadas vienen de SharedMedia."
 L["UFPlusRoot"] = "UF Plus"
+L["UFPortraitMode"] = "Modo de retrato"
+L["UFPortraitModeClassIcon"] = "Icono de clase"
+L["UFPortraitModePortrait"] = "Retrato"
 L["UFPortraitSeparatorEnable"] = "Mostrar separador del retrato"
 L["UFPortraitSeparatorTexture"] = "Textura del separador"
 L["UFPowerColor"] = "Color de recurso"

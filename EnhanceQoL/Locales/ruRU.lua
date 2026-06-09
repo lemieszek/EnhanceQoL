@@ -3942,6 +3942,9 @@ L["UFPlusHint"] = "Настройте пользовательские фрей�
 Включайте каждый фрейм и регулируйте размер, позицию, тексты, цвета, ауры и параметры полосы произнесения.\
 Текстура \"Default\" оставляет атлас Blizzard; пользовательские текстуры берутся из SharedMedia."
 L["UFPlusRoot"] = "UF Plus"
+L["UFPortraitMode"] = "Режим портрета"
+L["UFPortraitModeClassIcon"] = "Значок класса"
+L["UFPortraitModePortrait"] = "Портрет"
 L["UFPortraitSeparatorEnable"] = "Показывать разделитель портрета"
 L["UFPortraitSeparatorTexture"] = "Текстура разделителя"
 L["UFPowerColor"] = "Цвет ресурса"

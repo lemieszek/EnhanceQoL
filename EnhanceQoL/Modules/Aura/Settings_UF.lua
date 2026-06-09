@@ -4219,6 +4219,30 @@ local function buildUnitSettings(unit)
 		refreshSettingsUI()
 	end, portraitDef.enabled == true, "portrait")
 
+	local portraitModeOptions = {
+		{ value = "PORTRAIT", label = L["UFPortraitModePortrait"] or "Portrait" },
+		{ value = "CLASS_ICON", label = L["UFPortraitModeClassIcon"] or "Class icon" },
+	}
+	local portraitMode = radioDropdown(
+		L["UFPortraitMode"] or "Portrait mode",
+		portraitModeOptions,
+		function()
+			local mode = tostring(getValue(unit, { "portrait", "mode" }, portraitDef.mode or "PORTRAIT") or "PORTRAIT"):upper()
+			if mode ~= "CLASS_ICON" then mode = "PORTRAIT" end
+			return mode
+		end,
+		function(val)
+			local mode = tostring(val or "PORTRAIT"):upper()
+			if mode ~= "CLASS_ICON" then mode = "PORTRAIT" end
+			setValue(unit, { "portrait", "mode" }, mode)
+			refreshSelf()
+		end,
+		portraitDef.mode or "PORTRAIT",
+		"portrait"
+	)
+	portraitMode.isEnabled = isPortraitEnabled
+	list[#list + 1] = portraitMode
+
 	local portraitSideOptions = {
 		{ value = "LEFT", label = HUD_EDIT_MODE_SETTING_AURA_FRAME_ICON_DIRECTION_LEFT or "Left" },
 		{ value = "RIGHT", label = HUD_EDIT_MODE_SETTING_AURA_FRAME_ICON_DIRECTION_RIGHT or "Right" },

@@ -1087,7 +1087,7 @@ local function usesPerBarTextureSelection(cfg)
 end
 
 function GF.ResolveGroupPortraitConfig(cfg, kind)
-	if kind == "raid" then return false, "LEFT", false, false end
+	if kind == "raid" then return false, "LEFT", false, false, "PORTRAIT" end
 	local def = (kind and DEFAULTS[kind]) or DEFAULTS.party or {}
 	local pdef = def and def.portrait or {}
 	local pcfg = (cfg and cfg.portrait) or {}
@@ -1099,7 +1099,9 @@ function GF.ResolveGroupPortraitConfig(cfg, kind)
 	if squareBackground == nil then squareBackground = pdef.squareBackground end
 	local borderWithFrame = pcfg.borderWithFrame
 	if borderWithFrame == nil then borderWithFrame = pdef.borderWithFrame end
-	return enabled == true, side, squareBackground == true, borderWithFrame == true
+	local mode = tostring(pcfg.mode or pdef.mode or "PORTRAIT"):upper()
+	if mode ~= "CLASS_ICON" then mode = "PORTRAIT" end
+	return enabled == true, side, squareBackground == true, borderWithFrame == true, mode
 end
 
 function GF.IsGroupPowerDetached(cfg, kind)
@@ -3048,6 +3050,7 @@ local DEFAULTS = {
 			detached = false,
 			detachedSize = nil,
 			enabled = false,
+			mode = "PORTRAIT",
 			separator = {
 				color = {
 					1,
@@ -3860,6 +3863,7 @@ local DEFAULTS = {
 		portrait = {
 			borderWithFrame = false,
 			enabled = false,
+			mode = "PORTRAIT",
 			separator = {
 				enabled = true,
 				texture = "SOLID",
@@ -4502,6 +4506,7 @@ local DEFAULTS = {
 		portrait = {
 			borderWithFrame = false,
 			enabled = false,
+			mode = "PORTRAIT",
 			separator = {
 				enabled = true,
 				texture = "SOLID",
@@ -5142,6 +5147,7 @@ local DEFAULTS = {
 		portrait = {
 			borderWithFrame = false,
 			enabled = false,
+			mode = "PORTRAIT",
 			separator = {
 				enabled = true,
 				texture = "SOLID",
@@ -11650,7 +11656,7 @@ function GF:UpdatePortrait(self, unit, st)
 
 	local kind = self._eqolGroupKind or "party"
 	local cfg = self._eqolCfg or getCfg(kind)
-	local portraitEnabled, _, portraitSquareBackground = GF.ResolveGroupPortraitConfig(cfg, kind)
+	local portraitEnabled, _, portraitSquareBackground, _, portraitMode = GF.ResolveGroupPortraitConfig(cfg, kind)
 	if st._portraitEnabled ~= nil then portraitEnabled = st._portraitEnabled == true end
 	if st._portraitSquareBackground ~= nil then portraitSquareBackground = st._portraitSquareBackground == true end
 
@@ -11672,7 +11678,12 @@ function GF:UpdatePortrait(self, unit, st)
 		return
 	end
 
-	SetPortraitTexture(st.portrait, unit)
+	if UF.ApplyPortraitTexture then
+		UF.ApplyPortraitTexture(st.portrait, unit, portraitMode)
+	else
+		st.portrait:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		SetPortraitTexture(st.portrait, unit)
+	end
 	st.portrait:Show()
 	if st.portraitHolder then st.portraitHolder:Show() end
 	if st.portraitBg then
@@ -16921,6 +16932,10 @@ local function buildEditModeSettings(kind, editModeId)
 		{ value = "LEFT", label = "Left", text = "Left" },
 		{ value = "RIGHT", label = "Right", text = "Right" },
 	}
+	local portraitModeOptions = {
+		{ value = "PORTRAIT", label = L["UFPortraitModePortrait"] or "Portrait", text = L["UFPortraitModePortrait"] or "Portrait" },
+		{ value = "CLASS_ICON", label = L["UFPortraitModeClassIcon"] or "Class icon", text = L["UFPortraitModeClassIcon"] or "Class icon" },
+	}
 	local function isPortraitEnabled()
 		local cfg = getCfg(kind)
 		local pcfg = cfg and cfg.portrait or {}
@@ -16936,6 +16951,14 @@ local function buildEditModeSettings(kind, editModeId)
 		local side = tostring(pcfg.side or defPortrait.side or "LEFT"):upper()
 		if side ~= "RIGHT" then side = "LEFT" end
 		return side
+	end
+	local function getPortraitModeValue()
+		local cfg = getCfg(kind)
+		local pcfg = cfg and cfg.portrait or {}
+		local defPortrait = (DEFAULTS[kind] and DEFAULTS[kind].portrait) or {}
+		local mode = tostring(pcfg.mode or defPortrait.mode or "PORTRAIT"):upper()
+		if mode ~= "CLASS_ICON" then mode = "PORTRAIT" end
+		return mode
 	end
 	local settings = {
 		{
@@ -18743,6 +18766,25 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "portraitEnabled", cfg.portrait.enabled, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+		},
+		{
+			name = L["UFPortraitMode"] or "Portrait mode",
+			kind = SettingType.Dropdown,
+			field = "portraitMode",
+			parentId = "portrait",
+			values = portraitModeOptions,
+			isShown = function() return kind ~= "raid" end,
+			get = function() return getPortraitModeValue() end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.portrait = cfg.portrait or {}
+				cfg.portrait.mode = tostring(value or "PORTRAIT"):upper()
+				if cfg.portrait.mode ~= "CLASS_ICON" then cfg.portrait.mode = "PORTRAIT" end
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "portraitMode", cfg.portrait.mode, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			isEnabled = function() return isPortraitEnabled() end,
 		},
 		{
 			name = L["Portrait side"] or "Portrait side",

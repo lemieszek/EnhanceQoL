@@ -3949,6 +3949,9 @@ L["UFPlusHint"] = 'Configure EnhanceQoL\'s custom Player/Target/ToT frames.\
 Enable each unit frame and tweak size, position, texts, colors, auras, and castbar options.\
 "Default" texture keeps the Blizzard atlas; custom textures come from SharedMedia.'
 L["UFPlusRoot"] = "UF Plus"
+L["UFPortraitMode"] = "Portrait mode"
+L["UFPortraitModeClassIcon"] = "Class icon"
+L["UFPortraitModePortrait"] = "Portrait"
 L["UFPortraitSeparatorEnable"] = "Show portrait separator"
 L["UFPortraitSeparatorTexture"] = "Separator texture"
 L["UFPowerColor"] = "Custom power color"

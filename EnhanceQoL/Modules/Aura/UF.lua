@@ -231,6 +231,7 @@ end
 
 local L = LibStub("AceLocale-3.0"):GetLocale("EnhanceQoL")
 local LSM = LibStub("LibSharedMedia-3.0")
+local CLASS_ICON_TEXTURE = "Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES"
 local DEFAULT_NOT_INTERRUPTIBLE_COLOR = { 204 / 255, 204 / 255, 204 / 255, 1 }
 local UnitGetTotalAbsorbs = UnitGetTotalAbsorbs or function() return 0 end
 local UnitGetTotalHealAbsorbs = UnitGetTotalHealAbsorbs or function() return 0 end
@@ -1969,6 +1970,7 @@ local defaults = {
 		},
 		portrait = {
 			enabled = false,
+			mode = "PORTRAIT",
 			side = "LEFT",
 			squareBackground = true,
 			separator = {
@@ -2123,6 +2125,7 @@ local defaults = {
 		},
 		portrait = {
 			enabled = false,
+			mode = "PORTRAIT",
 			side = "LEFT",
 			squareBackground = false,
 			separator = {
@@ -2141,6 +2144,7 @@ local defaults = {
 		anchor = { point = "CENTER", relativeTo = "UIParent", relativePoint = "CENTER", x = 520, y = -200 },
 		portrait = {
 			enabled = false,
+			mode = "PORTRAIT",
 			side = "LEFT",
 			squareBackground = false,
 			separator = {
@@ -8538,7 +8542,25 @@ local function getPortraitConfig(cfg, unit)
 	if side ~= "RIGHT" then side = "LEFT" end
 	local squareBackground = pcfg.squareBackground
 	if squareBackground == nil then squareBackground = pdef.squareBackground end
-	return enabled == true, side, squareBackground == true
+	local mode = tostring(pcfg.mode or pdef.mode or "PORTRAIT"):upper()
+	if mode ~= "CLASS_ICON" then mode = "PORTRAIT" end
+	return enabled == true, side, squareBackground == true, mode
+end
+
+function UF.ApplyPortraitTexture(texture, unit, mode)
+	if not texture then return false end
+	if mode == "CLASS_ICON" and UnitIsPlayer and UnitIsPlayer(unit) then
+		local classFile = select(2, UnitClass(unit))
+		local coords = classFile and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[classFile]
+		if coords then
+			texture:SetTexture(CLASS_ICON_TEXTURE)
+			texture:SetTexCoord(coords[1], coords[2], coords[3], coords[4])
+			return true
+		end
+	end
+	texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	SetPortraitTexture(texture, unit)
+	return true
 end
 
 local function getPortraitSeparatorConfig(cfg, unit, portraitEnabled)
@@ -8606,7 +8628,7 @@ local function updatePortrait(cfg, unit)
 	cfg = cfg or (states[unit] and states[unit].cfg) or ensureDB(unit)
 	local st = states[unit]
 	if not st or not st.portrait then return end
-	local enabled, _, squareBackground = getPortraitConfig(cfg, unit)
+	local enabled, _, squareBackground, mode = getPortraitConfig(cfg, unit)
 	if not enabled or cfg.enabled == false then
 		st.portrait:Hide()
 		st.portrait:SetTexture(nil)
@@ -8623,7 +8645,7 @@ local function updatePortrait(cfg, unit)
 		applyPortraitSeparator(cfg, unit, st, false)
 		return
 	end
-	SetPortraitTexture(st.portrait, unit)
+	UF.ApplyPortraitTexture(st.portrait, unit, mode)
 	st.portrait:Show()
 	if st.portraitHolder then st.portraitHolder:Show() end
 	if st.portraitBg then

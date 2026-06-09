@@ -3942,6 +3942,9 @@ L["UFPlusHint"] = "EnhanceQoL의 사용자 지정 플레이어/대상/대상의 
 각 유닛 프레임을 활성화하고 크기, 위치, 텍스트, 색상, 오라, 시전바 옵션을 조정하세요.\
 \"Default\"는 블리자드 아틀라스를 유지하고, 사용자 지정 질감은 SharedMedia에서 가져옵니다."
 L["UFPlusRoot"] = "UF Plus"
+L["UFPortraitMode"] = "초상화 모드"
+L["UFPortraitModeClassIcon"] = "직업 아이콘"
+L["UFPortraitModePortrait"] = "초상화"
 L["UFPortraitSeparatorEnable"] = "초상화 구분선 표시"
 L["UFPortraitSeparatorTexture"] = "구분선 텍스처"
 L["UFPowerColor"] = "자원 색상"

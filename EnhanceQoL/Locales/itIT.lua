@@ -3942,6 +3942,9 @@ L["UFPlusHint"] = "Configura i frame personalizzati Giocatore/Bersaglio/ToT di E
 Abilita ogni frame di unità e regola dimensioni, posizione, testi, colori, aure e opzioni della barra di lancio.\
 La trama \"Default\" mantiene l'atlante Blizzard; le trame personalizzate provengono da SharedMedia."
 L["UFPlusRoot"] = "UF Plus"
+L["UFPortraitMode"] = "Modalita ritratto"
+L["UFPortraitModeClassIcon"] = "Icona classe"
+L["UFPortraitModePortrait"] = "Ritratto"
 L["UFPortraitSeparatorEnable"] = "Mostra separatore del ritratto"
 L["UFPortraitSeparatorTexture"] = "Texture separatore"
 L["UFPowerColor"] = "Colore risorse"
