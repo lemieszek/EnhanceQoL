@@ -9,11 +9,22 @@
 - Data Panels: Added an Auto Width option so panels can size their background to the visible stream contents.
 - Data Panels: Added a Player Name stream with optional realm display, class color, and custom text color settings.
 - Data Panels: Made the Hearthstone stream clickable, using the configured random/favorite Hearthstone behavior.
+- Mythic Plus / Timer: Added an option to hide objective count values such as 0/1 and 1/1 for a more compact objective list.
+- Mythic Plus / Timer: Added per-player death counts to the death tooltip.
+- Mythic Plus / Timer: Added panel Best Time controls for visibility, delta visibility, and color.
 - Unit Frames: Added a class-color option for Data Bar text, separate from the existing Data Bar texture color option.
 
 ### 🐛 Fixed
 
 - Data Panels: Stabilized the FPS and latency stream width so changing numbers no longer shift neighboring streams.
+- Mythic Plus / Timer: Fixed +2/+3 bar time labels not matching the selected timer bar fill direction.
+- Mythic Plus / Timer: Fixed disabled panel timer/enemy bars leaving their border or overlay text visible.
+- Mythic Plus / Timer: Fixed panel element anchor controls staying clickable while their related element was disabled.
+- Mythic Plus / Timer: Removed the combat-log death tracking path and now tracks player death details through the unit death event to avoid protected event registration errors.
+- Mythic Plus / Timer: Kept the timer visible inside a Mythic+ instance after the run is completed.
+- Mythic Plus / Timer: Reduced timer drift by resyncing against the active challenge timer when it diverges.
+- Mythic Plus / Timer: Improved panel objective spacing for wrapped objective names.
+- Mythic Plus / Timer: Centered text-only affix hyphens between affix names instead of attaching them to the previous affix.
 - Unit Frames / Boss Frames: Fixed the Data Bar not showing correctly in Edit Mode and not refreshing its text on boss frame updates.
 
 ## [11.1.0-beta8] - 2026-06-09

@@ -1,4 +1,4 @@
--- luacheck: globals UIParent BackdropTemplateMixin CreateFrame C_ChallengeMode C_ScenarioInfo C_Spell C_Timer Enum GameTooltip GameTooltip_Hide GetInstanceInfo GetNumGroupMembers GetTime GetWorldElapsedTime GetWorldElapsedTimers InCombatLockdown IsInInstance SecondsToClock UnitIsDeadOrGhost IsInGroup GetNumSubgroupMembers LE_PARTY_CATEGORY_INSTANCE
+-- luacheck: globals UIParent BackdropTemplateMixin CreateFrame C_ChallengeMode C_ScenarioInfo C_Spell C_Timer CUSTOM_CLASS_COLORS Enum GameTooltip GameTooltip_Hide GetInstanceInfo GetNumGroupMembers GetTime GetWorldElapsedTime GetWorldElapsedTimers InCombatLockdown IsInInstance IsInRaid RAID_CLASS_COLORS SecondsToClock UnitClassFromGUID UnitGUID UnitIsDeadOrGhost UnitNameFromGUID issecretvalue IsInGroup GetNumSubgroupMembers LE_PARTY_CATEGORY_INSTANCE
 local parentAddonName = "EnhanceQoL"
 local addonName, addon = ...
 
@@ -45,6 +45,7 @@ Timer.defaults = Timer.defaults
 		deathDisplay = "ICON",
 		deathShowTimeLost = true,
 		showObjectives = true,
+		showObjectiveValues = true,
 		showEnemyForces = true,
 		showObjectiveBars = true,
 		showObjectiveTimes = true,
@@ -85,6 +86,7 @@ Timer.defaults = Timer.defaults
 		bestTimeAnchor = "BOTTOMLEFT",
 		bestTimeOffsetX = 5,
 		bestTimeOffsetY = 5,
+		bestTimeColor = { r = 0.55, g = 0.55, b = 0.55, a = 1 },
 		panelAffixesAnchor = "TOPLEFT",
 		panelAffixesOffsetX = 12,
 		panelAffixesOffsetY = -24,
@@ -553,6 +555,26 @@ local function getDeathInfo()
 	return 0, 0
 end
 
+local function isSecretValue(value)
+	return issecretvalue and issecretvalue(value)
+end
+
+local function getNameFromGUID(guid)
+	if not UnitNameFromGUID then return nil end
+	local ok, name, server = pcall(UnitNameFromGUID, guid)
+	if not ok or isSecretValue(name) or isSecretValue(server) then return nil end
+	if not name or name == "" then return nil end
+	if server and server ~= "" then return name .. "-" .. server end
+	return name
+end
+
+local function getClassFromGUID(guid)
+	if not UnitClassFromGUID then return nil end
+	local ok, _, classFile = pcall(UnitClassFromGUID, guid)
+	if ok and not isSecretValue(classFile) then return classFile end
+	return nil
+end
+
 local function getCriteriaInfo(index)
 	if C_ScenarioInfo and C_ScenarioInfo.GetCriteriaInfo then
 		local ok, info = pcall(C_ScenarioInfo.GetCriteriaInfo, index)
@@ -636,6 +658,10 @@ function Timer:Set(key, value)
 	if not addon.db or defaults[key] == nil then return end
 	local config = getTimerConfig(true)
 	config[key] = value
+	if key == "enabled" then
+		self:UpdateEventState()
+		return
+	end
 	self:Refresh()
 end
 
@@ -659,7 +685,15 @@ function Timer:ResolveRunState()
 	local timerID = self:SyncActiveTimerBase(false)
 	local active = timerID ~= nil
 	local elapsed = 0
-	if active then elapsed = (self.timerBaseElapsed or 0) + math.max(0, (GetTime and GetTime() or 0) - (self.timerBaseTime or 0)) end
+	if active then
+		elapsed = (self.timerBaseElapsed or 0) + math.max(0, (GetTime and GetTime() or 0) - (self.timerBaseTime or 0))
+		local _, authoritativeElapsed = getActiveChallengeTimer()
+		if authoritativeElapsed and math.abs(authoritativeElapsed - elapsed) > 0.75 then
+			self.timerBaseElapsed = authoritativeElapsed
+			self.timerBaseTime = GetTime and GetTime() or 0
+			elapsed = authoritativeElapsed
+		end
+	end
 	local level, affixes, mapID = getActiveKeystoneInfo()
 	local mapName, timeLimit = getMapInfo(mapID)
 	return {
@@ -690,6 +724,10 @@ function Timer:GetPreviewState()
 		affixIcons = { 136265, 132308, 136214 },
 		deaths = 3,
 		timeLost = 45,
+		deathMembers = {
+			{ name = "GroupMember2", class = "MAGE", count = 2 },
+			{ name = "GroupMember5", class = "SHAMAN", count = 1 },
+		},
 		objectives = {
 			{ text = L["mythicPlusTimerPreviewObjectiveBosses"] or "Defeat bosses", quantity = 2, total = 4, percent = 50, completed = false, splitTime = 612, bestTime = 580 },
 			{ text = L["mythicPlusTimerPreviewObjectiveRescue"] or "Rescue captives", quantity = 6, total = 6, percent = 100, completed = true, splitTime = 494, bestTime = 510 },
@@ -707,6 +745,7 @@ function Timer:BuildState()
 	state.enemyForces = enemyForces
 	state.deaths = deaths
 	state.timeLost = timeLost
+	state.deathMembers = self:GetDeathMembers()
 	state.affixNames = {}
 	state.affixIcons = {}
 	for _, affixID in ipairs(state.affixes or {}) do
@@ -723,6 +762,82 @@ function Timer:BuildState()
 		state.affixIcons[#state.affixIcons + 1] = icon
 	end
 	return state
+end
+
+function Timer:ResetDeathTracking()
+	self.groupMembersByGUID = {}
+	self.deathDetails = {}
+end
+
+function Timer:RefreshGroupRoster()
+	self.groupMembersByGUID = self.groupMembersByGUID or {}
+	for guid in pairs(self.groupMembersByGUID) do
+		self.groupMembersByGUID[guid] = nil
+	end
+	local function addUnit(unit)
+		local guid = UnitGUID and UnitGUID(unit)
+		if not guid or isSecretValue(guid) then return end
+		self.groupMembersByGUID[guid] = true
+	end
+	addUnit("player")
+	if IsInRaid and IsInRaid() then
+		local count = GetNumGroupMembers and GetNumGroupMembers() or 0
+		for index = 1, count do
+			addUnit("raid" .. index)
+		end
+	elseif IsInGroup and IsInGroup() then
+		for index = 1, 4 do
+			addUnit("party" .. index)
+		end
+	end
+end
+
+function Timer:AddDeathDetail(guid)
+	if not guid or isSecretValue(guid) then return end
+	self.deathDetails = self.deathDetails or {}
+	self.deathDetails[#self.deathDetails + 1] = {
+		time = tonumber(self.lastState and self.lastState.elapsed) or 0,
+		name = getNameFromGUID(guid) or tostring(guid),
+		class = getClassFromGUID(guid),
+	}
+	return true
+end
+
+function Timer:TrackUnitDied(guid)
+	if not guid or isSecretValue(guid) or not isInMythicPlus() then return end
+	if not self:SyncActiveTimerBase(false) then return end
+	if not self.groupMembersByGUID or not self.groupMembersByGUID[guid] then self:RefreshGroupRoster() end
+	if not (self.groupMembersByGUID and self.groupMembersByGUID[guid]) then return end
+	return self:AddDeathDetail(guid)
+end
+
+function Timer:GetDeathMembers()
+	local countTable = {}
+	for _, entry in ipairs(self.deathDetails or {}) do
+		local name = entry.name or ""
+		if name ~= "" then
+			local count = countTable[name]
+			if not count then
+				count = {
+					name = name,
+					class = entry.class,
+					count = 0,
+				}
+				countTable[name] = count
+			end
+			count.count = count.count + 1
+			count.class = count.class or entry.class
+		end
+	end
+	local result = {}
+	for _, entry in pairs(countTable) do
+		result[#result + 1] = entry
+	end
+	table.sort(result, function(left, right)
+		if left.count ~= right.count then return left.count > right.count end
+		return tostring(left.name or "") < tostring(right.name or "")
+	end)
+	return result
 end
 
 function Timer:GetAffixDisplayText(state)
@@ -918,6 +1033,21 @@ function Timer:EnsurePanelAffix(index)
 	return item
 end
 
+function Timer:EnsurePanelAffixSeparator(index)
+	local frame = self:EnsureFrame()
+	frame.panelAffixSeparators = frame.panelAffixSeparators or {}
+	if frame.panelAffixSeparators[index] then return frame.panelAffixSeparators[index] end
+	local item = CreateFrame("Frame", nil, frame)
+	item:EnableMouse(false)
+	item:SetFrameLevel(frame:GetFrameLevel() + 24)
+	item.text = item:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	item.text:SetDrawLayer("OVERLAY", 7)
+	item.text:SetJustifyH("CENTER")
+	item.text:SetJustifyV("TOP")
+	frame.panelAffixSeparators[index] = item
+	return item
+end
+
 function Timer:EnsurePanelObjective(index)
 	local frame = self:EnsureFrame()
 	frame.panelObjectives = frame.panelObjectives or {}
@@ -930,9 +1060,11 @@ function Timer:EnsurePanelObjective(index)
 	item.text = item:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	item.text:SetDrawLayer("OVERLAY", 7)
 	item.text:SetJustifyH("LEFT")
+	item.text:SetJustifyV("TOP")
 	item.value = item:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	item.value:SetDrawLayer("OVERLAY", 7)
 	item.value:SetJustifyH("RIGHT")
+	item.value:SetJustifyV("TOP")
 	frame.panelObjectives[index] = item
 	return item
 end
@@ -984,6 +1116,9 @@ function Timer:HidePanelElements()
 	end
 	for _, bar in pairs(frame.panelBars or {}) do
 		bar:Hide()
+		if bar.borderFrame then bar.borderFrame:Hide() end
+		if bar.textFrame then bar.textFrame:Hide() end
+		if bar.chestMarkerTextFrame then bar.chestMarkerTextFrame:Hide() end
 		if bar.text then bar.text:Hide() end
 		for _, marker in ipairs(bar.chestMarkers or {}) do
 			marker:Hide()
@@ -996,6 +1131,9 @@ function Timer:HidePanelElements()
 		hover:Hide()
 	end
 	for _, item in pairs(frame.panelAffixes or {}) do
+		item:Hide()
+	end
+	for _, item in pairs(frame.panelAffixSeparators or {}) do
 		item:Hide()
 	end
 	for _, item in pairs(frame.panelObjectives or {}) do
@@ -1255,7 +1393,7 @@ function Timer:UpdateObjectiveSplits(state)
 end
 
 function Timer:FormatObjectiveValue(state, objective)
-	local valueText = objective.total and objective.total > 0 and string.format("%d/%d", objective.quantity or 0, objective.total) or ""
+	local valueText = self:Get("showObjectiveValues") ~= false and objective.total and objective.total > 0 and string.format("%d/%d", objective.quantity or 0, objective.total) or ""
 	if self:Get("showObjectiveTimes") and objective.splitTime then
 		valueText = valueText ~= "" and (valueText .. " - " .. secondsToText(objective.splitTime)) or secondsToText(objective.splitTime)
 		if self:Get("showObjectiveBestTimes") then
@@ -1317,11 +1455,12 @@ function Timer:RenderPanelAffixes(state)
 	local x = pointOffset(self:Get("panelAffixesOffsetX"), -800, 800, defaults.panelAffixesOffsetX)
 	local y = pointOffset(self:Get("panelAffixesOffsetY"), -800, 800, defaults.panelAffixesOffsetY)
 	local mode = self:Get("affixDisplay")
-	local gap = mode == "ICON" and 4 or 10
+	local gap = mode == "ICON" and 4 or 5
 	local growLeft = anchor == "TOPRIGHT" or anchor == "RIGHT" or anchor == "BOTTOMRIGHT"
 	local previous
 	local lineStart
 	local lineWidth = 0
+	local separatorIndex = 0
 	local maxLineWidth = math.max(80, clampNumber(self:Get("width"), 120, 800, defaults.width) - math.abs(x) * 2 - 12)
 	local startIndex = growLeft and #state.affixNames or 1
 	local endIndex = growLeft and 1 or #state.affixNames
@@ -1331,9 +1470,7 @@ function Timer:RenderPanelAffixes(state)
 		item.tooltipType = "affix"
 		item.tooltipData = { state = state, index = index }
 		applyFontString(item.text, font, fontSize, style)
-		local affixText = self:GetSingleAffixDisplayText(state, index, iconSize)
-		if mode == "TEXT" and index < #state.affixNames then affixText = affixText .. " -" end
-		item.text:SetText(affixText)
+		item.text:SetText(self:GetSingleAffixDisplayText(state, index, iconSize))
 		item.text:SetTextColor(color.r, color.g, color.b, color.a)
 		item.text:ClearAllPoints()
 		item.text:SetWordWrap(mode ~= "ICON")
@@ -1343,8 +1480,23 @@ function Timer:RenderPanelAffixes(state)
 		item:ClearAllPoints()
 		local itemWidth = snapSize(math.max(12, math.min(item.text:GetStringWidth() or 12, maxLineWidth)))
 		local itemHeight = snapSize(math.max(12, item.text:GetStringHeight() or fontSize))
-		local shouldWrap = previous and mode ~= "ICON" and (lineWidth + gap + itemWidth > maxLineWidth)
+		local separator
+		local separatorWidth = 0
+		if previous and mode == "TEXT" then
+			separatorIndex = separatorIndex + 1
+			separator = self:EnsurePanelAffixSeparator(separatorIndex)
+			applyFontString(separator.text, font, fontSize, style)
+			separator.text:SetText("-")
+			separator.text:SetTextColor(color.r, color.g, color.b, color.a)
+			separator.text:ClearAllPoints()
+			separator.text:SetPoint("TOPLEFT", separator, "TOPLEFT", 0, 0)
+			separatorWidth = snapSize(math.max(6, separator.text:GetStringWidth() or 6))
+			separator:SetSize(separatorWidth, itemHeight)
+		end
+		local inlineWidth = itemWidth + (separator and (separatorWidth + gap * 2) or gap)
+		local shouldWrap = previous and mode ~= "ICON" and (lineWidth + inlineWidth > maxLineWidth)
 		if shouldWrap then
+			if separator then separator:Hide() end
 			if growLeft then
 				item:SetPoint("TOPRIGHT", lineStart, "BOTTOMRIGHT", 0, -gap)
 			else
@@ -1353,12 +1505,25 @@ function Timer:RenderPanelAffixes(state)
 			lineStart = item
 			lineWidth = itemWidth
 		elseif previous then
-			if growLeft then
-				item:SetPoint("RIGHT", previous, "LEFT", -gap, 0)
+			if separator then
+				separator:ClearAllPoints()
+				if growLeft then
+					separator:SetPoint("RIGHT", previous, "LEFT", -gap, 0)
+					item:SetPoint("RIGHT", separator, "LEFT", -gap, 0)
+				else
+					separator:SetPoint("LEFT", previous, "RIGHT", gap, 0)
+					item:SetPoint("LEFT", separator, "RIGHT", gap, 0)
+				end
+				separator:Show()
+				lineWidth = lineWidth + gap + separatorWidth + gap + itemWidth
 			else
-				item:SetPoint("LEFT", previous, "RIGHT", gap, 0)
+				if growLeft then
+					item:SetPoint("RIGHT", previous, "LEFT", -gap, 0)
+				else
+					item:SetPoint("LEFT", previous, "RIGHT", gap, 0)
+				end
+				lineWidth = lineWidth + gap + itemWidth
 			end
-			lineWidth = lineWidth + gap + itemWidth
 		else
 			item:SetPoint(anchor, frame, anchor, x, y)
 			lineStart = item
@@ -1389,6 +1554,7 @@ function Timer:RenderPanelObjectives(state)
 		local item = self:EnsurePanelObjective(index)
 		local color = normalizeColor(objective.completed and self:Get("objectiveCompleteColor") or self:Get("objectiveColor"), defaults.objectiveColor)
 		local valueText = self:FormatObjectiveValue(state, objective)
+		local valueWidth = valueText ~= "" and 70 or 0
 		item.tooltipType = "objective"
 		item.tooltipData = objective
 		item:SetWidth(width)
@@ -1399,7 +1565,7 @@ function Timer:RenderPanelObjectives(state)
 		item.text:SetTextColor(color.r, color.g, color.b, color.a)
 		item.text:ClearAllPoints()
 		item.text:SetPoint("TOPLEFT", item, "TOPLEFT", 0, 0)
-		item.text:SetPoint("RIGHT", item, "RIGHT", -70, 0)
+		item.text:SetPoint("RIGHT", item, "RIGHT", -valueWidth, 0)
 		applyFontString(item.value, font, fontSize, style)
 		item.value:SetText(valueText)
 		item.value:SetTextColor(color.r, color.g, color.b, color.a)
@@ -1407,7 +1573,7 @@ function Timer:RenderPanelObjectives(state)
 		item.value:SetPoint("TOPRIGHT", item, "TOPRIGHT", 0, 0)
 		local textHeight = item.text:GetStringHeight() or baseRowHeight
 		local valueHeight = item.value:GetStringHeight() or baseRowHeight
-		local itemHeight = snapSize(math.max(baseRowHeight, textHeight, valueHeight))
+		local itemHeight = snapSize(math.max(baseRowHeight, textHeight, valueHeight) + 2)
 		item:SetSize(width, itemHeight)
 		item:ClearAllPoints()
 		if previous then
@@ -1519,13 +1685,20 @@ function Timer:UpdatePanelTimerBarChestMarkers(timeLimit, twoChest, threeChest)
 	local width = bar:GetWidth() or clampNumber(self:Get("panelTimerBarWidth"), 20, 800, defaults.panelTimerBarWidth)
 	local height = bar:GetHeight() or clampNumber(self:Get("panelTimerBarHeight"), 1, 64, defaults.panelTimerBarHeight)
 	local elapsed = tonumber(self.lastState and self.lastState.elapsed) or 0
+	local fillUp = self:Get("panelTimerBarFillUp") == true
+	local threeChestTime = tonumber(threeChest) or 0
+	local twoChestTime = tonumber(twoChest) or 0
+	local function markerPosition(chestTime)
+		local ratio = fillUp and ((timeLimit - chestTime) / timeLimit) or (chestTime / timeLimit)
+		return width * math.max(0, math.min(1, ratio))
+	end
 	local positions = {
-		width * math.max(0, math.min(1, (timeLimit - (tonumber(threeChest) or 0)) / timeLimit)),
-		width * math.max(0, math.min(1, (timeLimit - (tonumber(twoChest) or 0)) / timeLimit)),
+		markerPosition(threeChestTime),
+		markerPosition(twoChestTime),
 	}
 	local remainingTimes = {
-		(tonumber(threeChest) or 0) - elapsed,
-		(tonumber(twoChest) or 0) - elapsed,
+		threeChestTime - elapsed,
+		twoChestTime - elapsed,
 	}
 	local font = resolveFont(self:Get("fontFace"))
 	local style = normalizeFontStyle(self:Get("fontOutline"))
@@ -1582,16 +1755,21 @@ function Timer:RenderPanel(state, timeLeft, twoChest, threeChest)
 	if self:Get("showBestTime") and best then
 		local bestText = secondsToText(best)
 		if self:Get("showBestDelta") and delta then bestText = bestText .. string.format(" (%+.0fs)", delta) end
-		self:SetPanelText("best", bestText, "bestTimeAnchor", "bestTimeOffsetX", "bestTimeOffsetY", self:Get("objectiveCompleteColor"), self:Get("panelBestTimeFontSize"))
+		self:SetPanelText("best", bestText, "bestTimeAnchor", "bestTimeOffsetX", "bestTimeOffsetY", self:Get("bestTimeColor"), self:Get("panelBestTimeFontSize"))
 	end
 	if self:Get("showAffixes") then self:RenderPanelAffixes(state) end
 	local objectiveHeight = self:Get("showObjectives") and self:RenderPanelObjectives(state) or 0
 	if self:Get("showPanelTimerBar") then
+		local bar = self:EnsurePanelBar("timer")
+		if bar.textFrame then bar.textFrame:Show() end
+		if bar.chestMarkerTextFrame then bar.chestMarkerTextFrame:Show() end
 		local timerBarValue = self:Get("panelTimerBarFillUp") == true and math.min(state.timeLimit or 1, math.max(0, elapsed)) or math.max(0, timeLeft)
 		self:SetPanelBar("timer", timerBarValue, state.timeLimit or 1, "panelTimerBarAnchor", "panelTimerBarOffsetX", "panelTimerBarOffsetY", timeLeft <= 0 and self:Get("panelTimerBarExpiredColor") or self:Get("panelTimerBarColor"))
 		self:UpdatePanelTimerBarChestMarkers(state.timeLimit or 0, twoChest, threeChest)
 	end
 	if self:Get("showPanelEnemyBar") then
+		local bar = self:EnsurePanelBar("enemy")
+		if bar.textFrame then bar.textFrame:Show() end
 		self:SetPanelBar("enemy", enemyPercent, 100, "panelEnemyBarAnchor", "panelEnemyBarOffsetX", "panelEnemyBarOffsetY", self:Get("panelEnemyBarColor"))
 		self:SetPanelEnemyBarText(enemyPercent)
 	end
@@ -1705,6 +1883,21 @@ function Timer:AddDeathTooltipLines(state)
 	if not state then return end
 	GameTooltip:AddLine(self:GetDeathDisplayText(state.deaths), 1, 1, 1)
 	GameTooltip:AddDoubleLine(L["mythicPlusTimerTimeLost"] or "Time lost", secondsToText(state.timeLost or 0), 1, 0.82, 0, 1, 1, 1)
+	if type(state.deathMembers) == "table" and #state.deathMembers > 0 then
+		GameTooltip:AddLine(" ")
+		GameTooltip:AddLine(L["mythicPlusTimerDeathsByPlayer"] or "Player deaths", 1, 0.82, 0)
+		local classColors = CUSTOM_CLASS_COLORS or RAID_CLASS_COLORS or {}
+		for _, entry in ipairs(state.deathMembers) do
+			local color = entry.class and classColors[entry.class]
+			local r, g, b = 1, 1, 1
+			if color then
+				r = color.r or r
+				g = color.g or g
+				b = color.b or b
+			end
+			GameTooltip:AddDoubleLine(entry.name or "", tostring(entry.count or 0), r, g, b, 1, 1, 1)
+		end
+	end
 end
 
 function Timer:ShowRowTooltip(row)
@@ -1790,7 +1983,8 @@ function Timer:Refresh()
 	self:UpdateObjectiveSplits(state)
 	self.lastState = state
 	local inEditMode = self:IsInEditMode()
-	local shouldShow = enabled and (state.active or not self:Get("showOnlyInMythicPlus") or inEditMode)
+	local inMythicPlus = isInMythicPlus()
+	local shouldShow = enabled and (state.active or inMythicPlus or not self:Get("showOnlyInMythicPlus") or inEditMode)
 	if not shouldShow then
 		frame:Hide()
 		return
@@ -1961,23 +2155,20 @@ function Timer:RegisterEvents()
 	frame:RegisterEvent("PLAYER_DEAD")
 	frame:RegisterEvent("PLAYER_ALIVE")
 	frame:RegisterEvent("GROUP_ROSTER_UPDATE")
+	frame:RegisterEvent("UNIT_DIED")
 	self.eventsRegistered = true
 end
 
 function Timer:UnregisterEvents()
-	local frame = self.eventFrame
-	if not frame or not self.eventsRegistered then return end
-	frame:UnregisterAllEvents()
-	self.eventsRegistered = false
+	if self.frame then self.frame:Hide() end
 end
 
 function Timer:UpdateEventState()
+	self:RegisterEvents()
 	if self:IsEnabled() then
-		self:RegisterEvents()
 		self:Refresh()
 		self:ScheduleTick()
 	else
-		self:UnregisterEvents()
 		if self.frame then self.frame:Hide() end
 	end
 end
@@ -2194,8 +2385,8 @@ function Timer:BuildEditModeSettings()
 		{ value = "BOTTOM", label = _G.BOTTOM or "Bottom" },
 		{ value = "BOTTOMRIGHT", label = "Bottom right" },
 	}
-	local function anchorSetting(key, parentId, isShown, name)
-		return dropdownSetting(name or L["mythicPlusTimerAnchor"] or "Anchor", get(key), set(key, normalizePoint), anchorOptions, parentId, 220, nil, isShown)
+	local function anchorSetting(key, parentId, isShown, name, isEnabled)
+		return dropdownSetting(name or L["mythicPlusTimerAnchor"] or "Anchor", get(key), set(key, normalizePoint), anchorOptions, parentId, 220, isEnabled, isShown)
 	end
 	local function decorBarSettings(kind, sectionId)
 		local prefix = kind == "footer" and "footerBar" or "headerBar"
@@ -2208,7 +2399,7 @@ function Timer:BuildEditModeSettings()
 			inputSetting(L["damageMeterHeaderBackgroundCustomTexture"] or "Atlas name or texture ID", get(prefix .. "CustomTexture"), set(prefix .. "CustomTexture", trimTextureInput), sectionId, customEnabled, L["damageMeterHeaderBackgroundCustomTextureDesc"] or "Enter an atlas name, texture file ID, or texture path.", 160),
 			dropdownSetting(L["Texture"] or "Texture", get(prefix .. "Texture"), set(prefix .. "Texture"), function() return buildMediaOptions("statusbar", false) end, sectionId, 260, lsmEnabled),
 			colorSetting(L["damageMeterHeaderBackgroundColor"] or "Color", get(prefix .. "Color"), set(prefix .. "Color"), defaults[prefix .. "Color"], sectionId, enabled),
-			anchorSetting(prefix .. "Anchor", sectionId, nil, L["Anchor"] or "Anchor"),
+			anchorSetting(prefix .. "Anchor", sectionId, nil, L["Anchor"] or "Anchor", enabled),
 			sliderSetting(L["damageMeterHeaderBackgroundSizeOffsetX"] or "Width offset", get(prefix .. "SizeOffsetX"), set(prefix .. "SizeOffsetX", function(value) return clampNumber(value, -1000, 1000, defaults[prefix .. "SizeOffsetX"]) end), -1000, 1000, 1, sectionId, nil, enabled),
 			sliderSetting(L["damageMeterHeaderBackgroundSizeOffsetY"] or "Height offset", get(prefix .. "SizeOffsetY"), set(prefix .. "SizeOffsetY", function(value) return clampNumber(value, -300, 300, defaults[prefix .. "SizeOffsetY"]) end), -300, 300, 1, sectionId, nil, enabled),
 			sliderSetting(L["Offset X"] or "Offset X", get(prefix .. "OffsetX"), set(prefix .. "OffsetX", function(value) return clampNumber(value, -1000, 1000, defaults[prefix .. "OffsetX"]) end), -1000, 1000, 1, sectionId, nil, enabled),
@@ -2248,6 +2439,7 @@ function Timer:BuildEditModeSettings()
 		checkboxSetting(L["mythicPlusTimerDeathShowTimeLost"] or "Show time lost with deaths", get("deathShowTimeLost"), set("deathShowTimeLost"), displayId, enabledWhen("showDeaths"), isListMode),
 		checkboxSetting(L["mythicPlusTimerShowEnemyForces"] or "Show enemy forces", get("showEnemyForces"), set("showEnemyForces"), displayId, nil, isListMode),
 		checkboxSetting(L["mythicPlusTimerShowObjectives"] or "Show objectives", get("showObjectives"), set("showObjectives", nil, true), displayId, nil, isListMode),
+		checkboxSetting(L["mythicPlusTimerShowObjectiveValues"] or "Show objective values", get("showObjectiveValues"), set("showObjectiveValues", nil, true), displayId, enabledWhen("showObjectives"), isListMode),
 		checkboxSetting(L["mythicPlusTimerShowObjectiveBars"] or "Show objective bars", get("showObjectiveBars"), set("showObjectiveBars"), displayId, enabledWhen("showObjectives"), isListMode),
 		checkboxSetting(L["mythicPlusTimerShowObjectiveTimes"] or "Show objective times", get("showObjectiveTimes"), set("showObjectiveTimes", nil, true), displayId, enabledWhen("showObjectives"), isListMode),
 		checkboxSetting(L["mythicPlusTimerShowObjectiveBestTimes"] or "Show objective best deltas", get("showObjectiveBestTimes"), set("showObjectiveBestTimes"), displayId, objectiveTimesEnabled, isListMode),
@@ -2286,12 +2478,12 @@ function Timer:BuildEditModeSettings()
 			{ value = "LEVEL", label = L["mythicPlusTimerDungeonDisplayLevel"] or "Level" },
 		}, "mpt-panel-dungeon-key", 180, enabledWhen("showDungeon")),
 		sliderSetting(L["mythicPlusTimerPanelDungeonFontSize"] or L["Text size"] or "Text size", get("panelDungeonFontSize"), set("panelDungeonFontSize", function(value) return clampNumber(value, 8, 56, defaults.panelDungeonFontSize) end), 8, 56, 1, "mpt-panel-dungeon-key", nil, enabledWhen("showDungeon")),
-		anchorSetting("dungeonAnchor", "mpt-panel-dungeon-key", nil, L["Anchor"] or "Anchor"),
+		anchorSetting("dungeonAnchor", "mpt-panel-dungeon-key", nil, L["Anchor"] or "Anchor", enabledWhen("showDungeon")),
 		sliderSetting(L["mythicPlusTimerDungeonOffsetX"] or L["Offset X"] or "Offset X", get("dungeonOffsetX"), set("dungeonOffsetX", function(value) return clampNumber(value, -800, 800, defaults.dungeonOffsetX) end), -800, 800, 1, "mpt-panel-dungeon-key"),
 		sliderSetting(L["mythicPlusTimerDungeonOffsetY"] or L["Offset Y"] or "Offset Y", get("dungeonOffsetY"), set("dungeonOffsetY", function(value) return clampNumber(value, -800, 800, defaults.dungeonOffsetY) end), -800, 800, 1, "mpt-panel-dungeon-key"),
 		checkboxSetting(L["mythicPlusTimerShowStandaloneKeyLevel"] or "Show standalone key level", get("showKeyLevel"), set("showKeyLevel"), "mpt-panel-dungeon-key"),
 		sliderSetting(L["mythicPlusTimerPanelKeyLevelFontSize"] or L["Text size"] or "Text size", get("panelKeyLevelFontSize"), set("panelKeyLevelFontSize", function(value) return clampNumber(value, 8, 64, defaults.panelKeyLevelFontSize) end), 8, 64, 1, "mpt-panel-dungeon-key", nil, enabledWhen("showKeyLevel")),
-		anchorSetting("keyLevelAnchor", "mpt-panel-dungeon-key", nil, L["Anchor"] or "Anchor"),
+		anchorSetting("keyLevelAnchor", "mpt-panel-dungeon-key", nil, L["Anchor"] or "Anchor", enabledWhen("showKeyLevel")),
 		sliderSetting(L["mythicPlusTimerKeyLevelOffsetX"] or L["Offset X"] or "Offset X", get("keyLevelOffsetX"), set("keyLevelOffsetX", function(value) return clampNumber(value, -800, 800, defaults.keyLevelOffsetX) end), -800, 800, 1, "mpt-panel-dungeon-key"),
 		sliderSetting(L["mythicPlusTimerKeyLevelOffsetY"] or L["Offset Y"] or "Offset Y", get("keyLevelOffsetY"), set("keyLevelOffsetY", function(value) return clampNumber(value, -800, 800, defaults.keyLevelOffsetY) end), -800, 800, 1, "mpt-panel-dungeon-key"),
 		{ name = L["mythicPlusTimerPanelTimerAndTiers"] or "Timer and tiers", kind = SettingType.Collapsible, id = "mpt-panel-time", defaultCollapsed = true },
@@ -2302,16 +2494,16 @@ function Timer:BuildEditModeSettings()
 			{ value = "ELAPSED_TOTAL", label = L["mythicPlusTimerTimerDisplayElapsedTotal"] or "Time elapsed / total time" },
 		}, "mpt-panel-time", 220, enabledWhen("showTimer")),
 		sliderSetting(L["mythicPlusTimerPanelTimerFontSize"] or L["Text size"] or "Text size", get("panelTimerFontSize"), set("panelTimerFontSize", function(value) return clampNumber(value, 8, 72, defaults.panelTimerFontSize) end), 8, 72, 1, "mpt-panel-time", nil, enabledWhen("showTimer")),
-		anchorSetting("timerAnchor", "mpt-panel-time", nil, L["Anchor"] or "Anchor"),
+		anchorSetting("timerAnchor", "mpt-panel-time", nil, L["Anchor"] or "Anchor", enabledWhen("showTimer")),
 		sliderSetting(L["mythicPlusTimerTimerOffsetX"] or L["Offset X"] or "Offset X", get("timerOffsetX"), set("timerOffsetX", function(value) return clampNumber(value, -800, 800, defaults.timerOffsetX) end), -800, 800, 1, "mpt-panel-time"),
 		sliderSetting(L["mythicPlusTimerTimerOffsetY"] or L["Offset Y"] or "Offset Y", get("timerOffsetY"), set("timerOffsetY", function(value) return clampNumber(value, -800, 800, defaults.timerOffsetY) end), -800, 800, 1, "mpt-panel-time"),
 		checkboxSetting(L["mythicPlusTimerShowChestTimers"] or "Show +2/+3 timers", get("showChestTimers"), set("showChestTimers", nil, true), "mpt-panel-time"),
 		sliderSetting(L["mythicPlusTimerPanelChestFontSize"] or "+2/+3 font size", get("panelChestFontSize"), set("panelChestFontSize", function(value) return clampNumber(value, 8, 56, defaults.panelChestFontSize) end), 8, 56, 1, "mpt-panel-time", nil, enabledWhen("showChestTimers"), shownWhen("showChestTimers")),
 		checkboxSetting(L["mythicPlusTimerPanelChestHideLabels"] or "Hide +2/+3 labels", get("panelChestHideLabels"), set("panelChestHideLabels"), "mpt-panel-time", enabledWhen("showChestTimers"), shownWhen("showChestTimers")),
-		anchorSetting("chest2Anchor", "mpt-panel-time", shownWhen("showChestTimers"), L["mythicPlusTimerChest2Anchor"] or "+2 anchor"),
+		anchorSetting("chest2Anchor", "mpt-panel-time", shownWhen("showChestTimers"), L["mythicPlusTimerChest2Anchor"] or "+2 anchor", enabledWhen("showChestTimers")),
 		sliderSetting(L["mythicPlusTimerChest2OffsetX"] or "+2 X offset", get("chest2OffsetX"), set("chest2OffsetX", function(value) return clampNumber(value, -800, 800, defaults.chest2OffsetX) end), -800, 800, 1, "mpt-panel-time", nil, nil, shownWhen("showChestTimers")),
 		sliderSetting(L["mythicPlusTimerChest2OffsetY"] or "+2 Y offset", get("chest2OffsetY"), set("chest2OffsetY", function(value) return clampNumber(value, -800, 800, defaults.chest2OffsetY) end), -800, 800, 1, "mpt-panel-time", nil, nil, shownWhen("showChestTimers")),
-		anchorSetting("chest3Anchor", "mpt-panel-time", shownWhen("showChestTimers"), L["mythicPlusTimerChest3Anchor"] or "+3 anchor"),
+		anchorSetting("chest3Anchor", "mpt-panel-time", shownWhen("showChestTimers"), L["mythicPlusTimerChest3Anchor"] or "+3 anchor", enabledWhen("showChestTimers")),
 		sliderSetting(L["mythicPlusTimerChest3OffsetX"] or "+3 X offset", get("chest3OffsetX"), set("chest3OffsetX", function(value) return clampNumber(value, -800, 800, defaults.chest3OffsetX) end), -800, 800, 1, "mpt-panel-time", nil, nil, shownWhen("showChestTimers")),
 		sliderSetting(L["mythicPlusTimerChest3OffsetY"] or "+3 Y offset", get("chest3OffsetY"), set("chest3OffsetY", function(value) return clampNumber(value, -800, 800, defaults.chest3OffsetY) end), -800, 800, 1, "mpt-panel-time", nil, nil, shownWhen("showChestTimers")),
 		checkboxSetting(L["mythicPlusTimerShowPanelTimerBar"] or "Show panel timer bar", get("showPanelTimerBar"), set("showPanelTimerBar", nil, true), "mpt-panel-time"),
@@ -2338,7 +2530,7 @@ function Timer:BuildEditModeSettings()
 		sliderSetting(L["mythicPlusTimerPanelTimerBarChestTimeTextFontSize"] or "+2/+3 time text font size", get("panelTimerBarChestTimeTextFontSize"), set("panelTimerBarChestTimeTextFontSize", function(value) return clampNumber(value, 8, 56, defaults.panelTimerBarChestTimeTextFontSize) end), 8, 56, 1, "mpt-panel-time", nil, allEnabled("showPanelTimerBar", "panelTimerBarChestTimeText")),
 		colorSetting(L["mythicPlusTimerPanelTimerBarChestTimeTextColor"] or "+2/+3 time text color", get("panelTimerBarChestTimeTextColor"), set("panelTimerBarChestTimeTextColor"), defaults.panelTimerBarChestTimeTextColor, "mpt-panel-time", allEnabled("showPanelTimerBar", "panelTimerBarChestTimeText")),
 		checkboxSetting(L["mythicPlusTimerPanelTimerBarFillUp"] or "Fill timer bar up", get("panelTimerBarFillUp"), set("panelTimerBarFillUp"), "mpt-panel-time", enabledWhen("showPanelTimerBar")),
-		anchorSetting("panelTimerBarAnchor", "mpt-panel-time", nil, L["Anchor"] or "Anchor"),
+		anchorSetting("panelTimerBarAnchor", "mpt-panel-time", nil, L["Anchor"] or "Anchor", enabledWhen("showPanelTimerBar")),
 		sliderSetting(L["mythicPlusTimerPanelTimerBarOffsetX"] or L["Offset X"] or "Offset X", get("panelTimerBarOffsetX"), set("panelTimerBarOffsetX", function(value) return clampNumber(value, -800, 800, defaults.panelTimerBarOffsetX) end), -800, 800, 1, "mpt-panel-time", nil, enabledWhen("showPanelTimerBar")),
 		sliderSetting(L["mythicPlusTimerPanelTimerBarOffsetY"] or L["Offset Y"] or "Offset Y", get("panelTimerBarOffsetY"), set("panelTimerBarOffsetY", function(value) return clampNumber(value, -800, 800, defaults.panelTimerBarOffsetY) end), -800, 800, 1, "mpt-panel-time", nil, enabledWhen("showPanelTimerBar")),
 		{ name = L["mythicPlusTimerPanelDeaths"] or "Deaths", kind = SettingType.Collapsible, id = "mpt-panel-deaths", defaultCollapsed = true },
@@ -2351,13 +2543,13 @@ function Timer:BuildEditModeSettings()
 		checkboxSetting(L["mythicPlusTimerDeathShowTimeLost"] or "Show time lost with deaths", get("deathShowTimeLost"), set("deathShowTimeLost"), "mpt-panel-deaths", enabledWhen("showDeaths")),
 		sliderSetting(L["mythicPlusTimerPanelDeathsFontSize"] or L["Text size"] or "Text size", get("panelDeathsFontSize"), set("panelDeathsFontSize", function(value) return clampNumber(value, 8, 56, defaults.panelDeathsFontSize) end), 8, 56, 1, "mpt-panel-deaths", nil, enabledWhen("showDeaths")),
 		sliderSetting(L["mythicPlusTimerPanelDeathIconSize"] or L["Icon size"] or "Icon size", get("panelDeathIconSize"), set("panelDeathIconSize", function(value) return clampNumber(value, 8, 64, defaults.panelDeathIconSize) end), 8, 64, 1, "mpt-panel-deaths", nil, enabledWhen("showDeaths")),
-		anchorSetting("deathsAnchor", "mpt-panel-deaths", nil, L["Anchor"] or "Anchor"),
+		anchorSetting("deathsAnchor", "mpt-panel-deaths", nil, L["Anchor"] or "Anchor", enabledWhen("showDeaths")),
 		sliderSetting(L["mythicPlusTimerDeathsOffsetX"] or L["Offset X"] or "Offset X", get("deathsOffsetX"), set("deathsOffsetX", function(value) return clampNumber(value, -800, 800, defaults.deathsOffsetX) end), -800, 800, 1, "mpt-panel-deaths"),
 		sliderSetting(L["mythicPlusTimerDeathsOffsetY"] or L["Offset Y"] or "Offset Y", get("deathsOffsetY"), set("deathsOffsetY", function(value) return clampNumber(value, -800, 800, defaults.deathsOffsetY) end), -800, 800, 1, "mpt-panel-deaths"),
 		{ name = L["mythicPlusTimerPanelEnemyForces"] or "Enemy forces", kind = SettingType.Collapsible, id = "mpt-panel-enemy", defaultCollapsed = true },
 		checkboxSetting(L["mythicPlusTimerShowEnemyPercent"] or "Show enemy percent", get("showEnemyPercent"), set("showEnemyPercent"), "mpt-panel-enemy"),
 		sliderSetting(L["mythicPlusTimerPanelEnemyPercentFontSize"] or L["Text size"] or "Text size", get("panelEnemyPercentFontSize"), set("panelEnemyPercentFontSize", function(value) return clampNumber(value, 8, 56, defaults.panelEnemyPercentFontSize) end), 8, 56, 1, "mpt-panel-enemy", nil, enabledWhen("showEnemyPercent")),
-		anchorSetting("enemyPercentAnchor", "mpt-panel-enemy", nil, L["Anchor"] or "Anchor"),
+		anchorSetting("enemyPercentAnchor", "mpt-panel-enemy", nil, L["Anchor"] or "Anchor", enabledWhen("showEnemyPercent")),
 		sliderSetting(L["mythicPlusTimerEnemyPercentOffsetX"] or L["Offset X"] or "Offset X", get("enemyPercentOffsetX"), set("enemyPercentOffsetX", function(value) return clampNumber(value, -800, 800, defaults.enemyPercentOffsetX) end), -800, 800, 1, "mpt-panel-enemy"),
 		sliderSetting(L["mythicPlusTimerEnemyPercentOffsetY"] or L["Offset Y"] or "Offset Y", get("enemyPercentOffsetY"), set("enemyPercentOffsetY", function(value) return clampNumber(value, -800, 800, defaults.enemyPercentOffsetY) end), -800, 800, 1, "mpt-panel-enemy"),
 		checkboxSetting(L["mythicPlusTimerShowPanelEnemyBar"] or "Show panel enemy forces bar", get("showPanelEnemyBar"), set("showPanelEnemyBar", nil, true), "mpt-panel-enemy"),
@@ -2375,7 +2567,7 @@ function Timer:BuildEditModeSettings()
 		sliderSetting(L["mythicPlusTimerPanelEnemyBarBorderOffset"] or L["Border offset"] or "Border offset", get("panelEnemyBarBorderOffset"), set("panelEnemyBarBorderOffset", function(value) return clampNumber(value, -300, 300, defaults.panelEnemyBarBorderOffset) end), -300, 300, 1, "mpt-panel-enemy", nil, allEnabledAndNot("panelEnemyBarBorderSeparateOffset", "showPanelEnemyBar", "panelEnemyBarBorderEnabled")),
 		sliderSetting(L["damageMeterBackdropSizeOffsetX"] or "Width offset", get("panelEnemyBarBorderOffsetX"), set("panelEnemyBarBorderOffsetX", function(value) return clampNumber(value, -300, 300, defaults.panelEnemyBarBorderOffsetX) end), -300, 300, 1, "mpt-panel-enemy", nil, allEnabled("showPanelEnemyBar", "panelEnemyBarBorderEnabled", "panelEnemyBarBorderSeparateOffset")),
 		sliderSetting(L["damageMeterBackdropSizeOffsetY"] or "Height offset", get("panelEnemyBarBorderOffsetY"), set("panelEnemyBarBorderOffsetY", function(value) return clampNumber(value, -300, 300, defaults.panelEnemyBarBorderOffsetY) end), -300, 300, 1, "mpt-panel-enemy", nil, allEnabled("showPanelEnemyBar", "panelEnemyBarBorderEnabled", "panelEnemyBarBorderSeparateOffset")),
-		anchorSetting("panelEnemyBarAnchor", "mpt-panel-enemy", nil, L["Anchor"] or "Anchor"),
+		anchorSetting("panelEnemyBarAnchor", "mpt-panel-enemy", nil, L["Anchor"] or "Anchor", enabledWhen("showPanelEnemyBar")),
 		sliderSetting(L["mythicPlusTimerPanelEnemyBarOffsetX"] or L["Offset X"] or "Offset X", get("panelEnemyBarOffsetX"), set("panelEnemyBarOffsetX", function(value) return clampNumber(value, -800, 800, defaults.panelEnemyBarOffsetX) end), -800, 800, 1, "mpt-panel-enemy", nil, enabledWhen("showPanelEnemyBar")),
 		sliderSetting(L["mythicPlusTimerPanelEnemyBarOffsetY"] or L["Offset Y"] or "Offset Y", get("panelEnemyBarOffsetY"), set("panelEnemyBarOffsetY", function(value) return clampNumber(value, -800, 800, defaults.panelEnemyBarOffsetY) end), -800, 800, 1, "mpt-panel-enemy", nil, enabledWhen("showPanelEnemyBar")),
 		checkboxSetting(L["mythicPlusTimerPanelEnemyBarTextEnabled"] or "Show percent in enemy bar", get("panelEnemyBarTextEnabled"), set("panelEnemyBarTextEnabled", nil, true), "mpt-panel-enemy", enabledWhen("showPanelEnemyBar")),
@@ -2388,12 +2580,16 @@ function Timer:BuildEditModeSettings()
 		sliderSetting(L["mythicPlusTimerPanelEnemyBarTextFontSize"] or L["Text size"] or "Text size", get("panelEnemyBarTextFontSize"), set("panelEnemyBarTextFontSize", function(value) return clampNumber(value, 8, 56, defaults.panelEnemyBarTextFontSize) end), 8, 56, 1, "mpt-panel-enemy", nil, allEnabled("showPanelEnemyBar", "panelEnemyBarTextEnabled")),
 		colorSetting(L["mythicPlusTimerPanelEnemyBarTextColor"] or L["Text color"] or "Text color", get("panelEnemyBarTextColor"), set("panelEnemyBarTextColor"), defaults.panelEnemyBarTextColor, "mpt-panel-enemy", allEnabled("showPanelEnemyBar", "panelEnemyBarTextEnabled")),
 		{ name = L["mythicPlusTimerPanelBestTime"] or "Best time", kind = SettingType.Collapsible, id = "mpt-panel-best", defaultCollapsed = true },
+		checkboxSetting(L["mythicPlusTimerShowBestTime"] or "Show best time", get("showBestTime"), set("showBestTime", nil, true), "mpt-panel-best"),
+		checkboxSetting(L["mythicPlusTimerShowBestDelta"] or "Show best time delta", get("showBestDelta"), set("showBestDelta"), "mpt-panel-best", enabledWhen("showBestTime")),
 		sliderSetting(L["mythicPlusTimerPanelBestTimeFontSize"] or L["Text size"] or "Text size", get("panelBestTimeFontSize"), set("panelBestTimeFontSize", function(value) return clampNumber(value, 8, 56, defaults.panelBestTimeFontSize) end), 8, 56, 1, "mpt-panel-best", nil, enabledWhen("showBestTime")),
-		anchorSetting("bestTimeAnchor", "mpt-panel-best", nil, L["Anchor"] or "Anchor"),
+		colorSetting(L["mythicPlusTimerBestTimeColor"] or "Color", get("bestTimeColor"), set("bestTimeColor"), defaults.bestTimeColor, "mpt-panel-best", enabledWhen("showBestTime")),
+		anchorSetting("bestTimeAnchor", "mpt-panel-best", nil, L["Anchor"] or "Anchor", enabledWhen("showBestTime")),
 		sliderSetting(L["mythicPlusTimerBestTimeOffsetX"] or L["Offset X"] or "Offset X", get("bestTimeOffsetX"), set("bestTimeOffsetX", function(value) return clampNumber(value, -800, 800, defaults.bestTimeOffsetX) end), -800, 800, 1, "mpt-panel-best"),
 		sliderSetting(L["mythicPlusTimerBestTimeOffsetY"] or L["Offset Y"] or "Offset Y", get("bestTimeOffsetY"), set("bestTimeOffsetY", function(value) return clampNumber(value, -800, 800, defaults.bestTimeOffsetY) end), -800, 800, 1, "mpt-panel-best"),
 		{ name = L["mythicPlusTimerPanelObjectives"] or "Objectives", kind = SettingType.Collapsible, id = "mpt-panel-objectives", defaultCollapsed = true },
 		checkboxSetting(L["mythicPlusTimerShowObjectives"] or "Show objectives", get("showObjectives"), set("showObjectives", nil, true), "mpt-panel-objectives"),
+		checkboxSetting(L["mythicPlusTimerShowObjectiveValues"] or "Show objective values", get("showObjectiveValues"), set("showObjectiveValues", nil, true), "mpt-panel-objectives", enabledWhen("showObjectives"), shownWhen("showObjectives")),
 		checkboxSetting(L["mythicPlusTimerShowObjectiveTimes"] or "Show objective times", get("showObjectiveTimes"), set("showObjectiveTimes", nil, true), "mpt-panel-objectives", enabledWhen("showObjectives"), shownWhen("showObjectives")),
 		checkboxSetting(L["mythicPlusTimerShowObjectiveBestTimes"] or "Show objective best deltas", get("showObjectiveBestTimes"), set("showObjectiveBestTimes"), "mpt-panel-objectives", objectiveTimesEnabled, objectiveTimesEnabled),
 		dropdownSetting(L["mythicPlusTimerFont"] or "Font", get("panelObjectivesFontFace"), set("panelObjectivesFontFace"), function() return buildMediaOptions("font", true) end, "mpt-panel-objectives", 260, enabledWhen("showObjectives"), shownWhen("showObjectives")),
@@ -2417,7 +2613,7 @@ function Timer:BuildEditModeSettings()
 		}, "mpt-panel-affixes", 160, enabledWhen("showAffixes")),
 		sliderSetting(L["mythicPlusTimerPanelAffixesFontSize"] or L["Text size"] or "Text size", get("panelAffixesFontSize"), set("panelAffixesFontSize", function(value) return clampNumber(value, 8, 56, defaults.panelAffixesFontSize) end), 8, 56, 1, "mpt-panel-affixes", nil, enabledWhen("showAffixes")),
 		sliderSetting(L["mythicPlusTimerPanelAffixIconSize"] or L["Icon size"] or "Icon size", get("panelAffixIconSize"), set("panelAffixIconSize", function(value) return clampNumber(value, 8, 64, defaults.panelAffixIconSize) end), 8, 64, 1, "mpt-panel-affixes", nil, enabledWhen("showAffixes")),
-		anchorSetting("panelAffixesAnchor", "mpt-panel-affixes", nil, L["Anchor"] or "Anchor"),
+		anchorSetting("panelAffixesAnchor", "mpt-panel-affixes", nil, L["Anchor"] or "Anchor", enabledWhen("showAffixes")),
 		sliderSetting(L["mythicPlusTimerPanelAffixesOffsetX"] or L["Offset X"] or "Offset X", get("panelAffixesOffsetX"), set("panelAffixesOffsetX", function(value) return clampNumber(value, -800, 800, defaults.panelAffixesOffsetX) end), -800, 800, 1, "mpt-panel-affixes"),
 		sliderSetting(L["mythicPlusTimerPanelAffixesOffsetY"] or L["Offset Y"] or "Offset Y", get("panelAffixesOffsetY"), set("panelAffixesOffsetY", function(value) return clampNumber(value, -800, 800, defaults.panelAffixesOffsetY) end), -800, 800, 1, "mpt-panel-affixes"),
 		{ name = L["mythicPlusTimerSectionBars"] or "Bars", kind = SettingType.Collapsible, id = barId, defaultCollapsed = true, isShown = isListMode },
@@ -2539,15 +2735,26 @@ function Timer:Init()
 	if self.initialized then return end
 	self.initialized = true
 	self.eventFrame = CreateFrame("Frame")
-	self.eventFrame:SetScript("OnEvent", function(_, event)
+	self.eventFrame:SetScript("OnEvent", function(_, event, ...)
+		if not Timer:IsEnabled() then return end
 		if event == "WORLD_STATE_TIMER_START" or event == "CHALLENGE_MODE_START" then
 			Timer:SyncActiveTimerBase(true)
 			Timer.objectiveSplits = {}
+			Timer:ResetDeathTracking()
+			Timer:RefreshGroupRoster()
 		elseif event == "CHALLENGE_MODE_DEATH_COUNT_UPDATED" then
 			Timer:SyncActiveTimerBase(true)
+		elseif event == "UNIT_DIED" then
+			if Timer:TrackUnitDied(...) then Timer:Refresh() end
+			return
+		elseif event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then
+			Timer:RefreshGroupRoster()
 		elseif event == "WORLD_STATE_TIMER_STOP" or event == "CHALLENGE_MODE_COMPLETED" or event == "CHALLENGE_MODE_RESET" then
 			if event == "CHALLENGE_MODE_COMPLETED" then Timer:RecordBestTime() end
-			if event == "CHALLENGE_MODE_RESET" then Timer.objectiveSplits = {} end
+			if event == "CHALLENGE_MODE_RESET" then
+				Timer.objectiveSplits = {}
+				Timer:ResetDeathTracking()
+			end
 			Timer:SyncActiveTimerBase(true)
 		end
 		Timer:Refresh()
