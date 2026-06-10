@@ -1193,10 +1193,6 @@ local function configureCastStatic(castCfg, castDefaults)
 	if isEmpoweredDefault then
 		state.castBar:SetStatusBarDesaturated(false)
 		setCastbarColorWithGradient(state.castBar, nil, 0, 0, 0, 0)
-	elseif state.castInfo.notInterruptible then
-		clr = castCfg.notInterruptibleColor or castDefaults.notInterruptibleColor or clr
-		state.castBar:SetStatusBarDesaturated(true)
-		setCastbarColorWithGradient(state.castBar, castCfg, clr[1] or 0.9, clr[2] or 0.7, clr[3] or 0.2, clr[4] or 1)
 	else
 		state.castBar:SetStatusBarDesaturated(false)
 		setCastbarColorWithGradient(state.castBar, castCfg, clr[1] or 0.9, clr[2] or 0.7, clr[3] or 0.2, clr[4] or 1)

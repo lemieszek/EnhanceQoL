@@ -938,30 +938,6 @@ function CastbarSettings.BuildStandaloneCastbarSettings(ctx)
 
 	list[#list + 1] = { name = "", kind = settingType.Divider, parentId = section.colors }
 
-	list[#list + 1] = {
-		name = L["Not interruptible color"] or "Not interruptible color",
-		kind = settingType.Color,
-		parentId = section.colors,
-		isEnabled = function() return isCastEnabled() and not isCastGradientEnabled() end,
-		get = function() return getCast({ "cast", "notInterruptibleColor" }, castDef.notInterruptibleColor or { 204 / 255, 204 / 255, 204 / 255, 1 }) end,
-		set = function(_, color)
-			setCastColor({ "cast", "notInterruptibleColor" }, color.r, color.g, color.b, color.a)
-			refreshCastbar()
-		end,
-		colorGet = function() return getCast({ "cast", "notInterruptibleColor" }, castDef.notInterruptibleColor or { 204 / 255, 204 / 255, 204 / 255, 1 }) end,
-		colorSet = function(_, color)
-			setCastColor({ "cast", "notInterruptibleColor" }, color.r, color.g, color.b, color.a)
-			refreshCastbar()
-		end,
-		colorDefault = {
-			r = (castDef.notInterruptibleColor and castDef.notInterruptibleColor[1]) or (204 / 255),
-			g = (castDef.notInterruptibleColor and castDef.notInterruptibleColor[2]) or (204 / 255),
-			b = (castDef.notInterruptibleColor and castDef.notInterruptibleColor[3]) or (204 / 255),
-			a = (castDef.notInterruptibleColor and castDef.notInterruptibleColor[4]) or 1,
-		},
-		hasOpacity = true,
-	}
-
 	list[#list + 1] = checkbox(
 		L["Show interrupt feedback"] or "Show interrupt feedback",
 		function() return getCast({ "cast", "showInterruptFeedback" }, castDef.showInterruptFeedback ~= false) ~= false end,

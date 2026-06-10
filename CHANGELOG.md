@@ -1,11 +1,16 @@
 # Changelog
 
 <!--@eqol-beta@-->
+
 ## [11.2.0-beta1] - 2026-06-10
 
 ### ✨ Added
 
 - Mythic Plus / Timer: Added a beta-only Mythic+ Timer with list and panel layouts, Edit Mode configuration, display formats, timer, enemy forces, objective, affix, death, and best-time controls.
+
+### 🔄 Changed
+
+- Unit Frames / Castbars: Player castbars no longer show a separate non-interruptible cast color, so class-colored and custom player casts stay visually consistent during non-interruptible player casts and channels.
 
 ### 🐛 Fixed
 

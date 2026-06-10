@@ -6973,29 +6973,31 @@ local function buildUnitSettings(unit)
 			list[#list + 1] = { name = "", kind = UF.ui.settingType.Divider, parentId = "cast" }
 		end
 
-		list[#list + 1] = {
-			name = L["Not interruptible color"] or "Not interruptible color",
-			kind = UF.ui.settingType.Color,
-			parentId = "cast",
-			isEnabled = function() return isCastEnabled() and not isCastGradientEnabled() end,
-			get = function() return getValue(unit, { "cast", "notInterruptibleColor" }, castDef.notInterruptibleColor or { 204 / 255, 204 / 255, 204 / 255, 1 }) end,
-			set = function(_, color)
-				setColor(unit, { "cast", "notInterruptibleColor" }, color.r, color.g, color.b, color.a)
-				refresh()
-			end,
-			colorGet = function() return getValue(unit, { "cast", "notInterruptibleColor" }, castDef.notInterruptibleColor or { 204 / 255, 204 / 255, 204 / 255, 1 }) end,
-			colorSet = function(_, color)
-				setColor(unit, { "cast", "notInterruptibleColor" }, color.r, color.g, color.b, color.a)
-				refresh()
-			end,
-			colorDefault = {
-				r = (castDef.notInterruptibleColor and castDef.notInterruptibleColor[1]) or (204 / 255),
-				g = (castDef.notInterruptibleColor and castDef.notInterruptibleColor[2]) or (204 / 255),
-				b = (castDef.notInterruptibleColor and castDef.notInterruptibleColor[3]) or (204 / 255),
-				a = (castDef.notInterruptibleColor and castDef.notInterruptibleColor[4]) or 1,
-			},
-			hasOpacity = true,
-		}
+		if unit ~= "player" then
+			list[#list + 1] = {
+				name = L["Not interruptible color"] or "Not interruptible color",
+				kind = UF.ui.settingType.Color,
+				parentId = "cast",
+				isEnabled = function() return isCastEnabled() and not isCastGradientEnabled() end,
+				get = function() return getValue(unit, { "cast", "notInterruptibleColor" }, castDef.notInterruptibleColor or { 204 / 255, 204 / 255, 204 / 255, 1 }) end,
+				set = function(_, color)
+					setColor(unit, { "cast", "notInterruptibleColor" }, color.r, color.g, color.b, color.a)
+					refresh()
+				end,
+				colorGet = function() return getValue(unit, { "cast", "notInterruptibleColor" }, castDef.notInterruptibleColor or { 204 / 255, 204 / 255, 204 / 255, 1 }) end,
+				colorSet = function(_, color)
+					setColor(unit, { "cast", "notInterruptibleColor" }, color.r, color.g, color.b, color.a)
+					refresh()
+				end,
+				colorDefault = {
+					r = (castDef.notInterruptibleColor and castDef.notInterruptibleColor[1]) or (204 / 255),
+					g = (castDef.notInterruptibleColor and castDef.notInterruptibleColor[2]) or (204 / 255),
+					b = (castDef.notInterruptibleColor and castDef.notInterruptibleColor[3]) or (204 / 255),
+					a = (castDef.notInterruptibleColor and castDef.notInterruptibleColor[4]) or 1,
+				},
+				hasOpacity = true,
+			}
+		end
 
 		list[#list + 1] = checkbox(
 			L["Show interrupt feedback"] or "Show interrupt feedback",
