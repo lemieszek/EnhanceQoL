@@ -3508,6 +3508,19 @@ function UF.ui.appendDataBarSettings(list, unit, def, refresh, refreshSelf, addD
 	dataBarFontOutline.isEnabled = isDataBarEnabled
 	list[#list + 1] = dataBarFontOutline
 
+	list[#list + 1] = checkbox(
+		L["UFDataBarTextUseClassColor"] or "Use class color (data bar text)",
+		function() return getValue(unit, { "dataBar", "useTextClassColor" }, dataBarDef.useTextClassColor == true) == true end,
+		function(val)
+			setValue(unit, { "dataBar", "useTextClassColor" }, val and true or false)
+			refresh()
+			refreshSettingsUI()
+		end,
+		dataBarDef.useTextClassColor == true,
+		"dataBar",
+		isDataBarEnabled
+	)
+
 	list[#list + 1] = {
 		name = L["UFDataBarTextColor"] or "Data bar text color",
 		kind = UF.ui.settingType.Color,
@@ -3517,6 +3530,7 @@ function UF.ui.appendDataBarSettings(list, unit, def, refresh, refreshSelf, addD
 		get = function() return getValue(unit, { "dataBar", "textColor" }, dataBarDef.textColor or { 1, 1, 1, 1 }) end,
 		set = function(_, color)
 			setColor(unit, { "dataBar", "textColor" }, color.r, color.g, color.b, color.a)
+			setValue(unit, { "dataBar", "useTextClassColor" }, false)
 			refresh()
 		end,
 		colorGet = function()
@@ -3525,6 +3539,7 @@ function UF.ui.appendDataBarSettings(list, unit, def, refresh, refreshSelf, addD
 		end,
 		colorSet = function(_, color)
 			setColor(unit, { "dataBar", "textColor" }, color.r, color.g, color.b, color.a)
+			setValue(unit, { "dataBar", "useTextClassColor" }, false)
 			refresh()
 		end,
 		colorDefault = {
@@ -3533,7 +3548,9 @@ function UF.ui.appendDataBarSettings(list, unit, def, refresh, refreshSelf, addD
 			b = (dataBarDef.textColor and dataBarDef.textColor[3]) or 1,
 			a = (dataBarDef.textColor and dataBarDef.textColor[4]) or 1,
 		},
-		isEnabled = isDataBarEnabled,
+		isEnabled = function()
+			return isDataBarEnabled() and getValue(unit, { "dataBar", "useTextClassColor" }, dataBarDef.useTextClassColor == true) ~= true
+		end,
 	}
 
 	local function showDataBarTextOffsets(key, fallback)

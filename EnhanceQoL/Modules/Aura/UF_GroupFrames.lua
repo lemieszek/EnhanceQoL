@@ -2537,6 +2537,7 @@ function GF.CreateDataBarDefaults()
 		font = "__EQOL_GLOBAL_FONT__",
 		fontOutline = "OUTLINE",
 		textColor = { 1, 1, 1, 1 },
+		useTextClassColor = false,
 		offsetLeft = { x = 6, y = 0 },
 		offsetCenter = { x = 0, y = 0 },
 		offsetRight = { x = -6, y = 0 },
@@ -6409,6 +6410,7 @@ function GF:NeedsClassColor(frame, st, cfg)
 	local sc = cfg and cfg.status or {}
 
 	if hc.useClassColor == true or hc.useTextClassColor == true then return true end
+	if cfg.dataBar and cfg.dataBar.useTextClassColor == true then return true end
 
 	local nameMode = sc.nameColorMode
 	if nameMode == nil then nameMode = (tc.useClassColor ~= false) and "CLASS" or "CUSTOM" end
@@ -7559,7 +7561,12 @@ function GF:LayoutButton(self)
 			st._lastDataBarR, st._lastDataBarG, st._lastDataBarB, st._lastDataBarA = dbR, dbG, dbB, dbA
 			st.dataBar:SetStatusBarColor(dbR, dbG, dbB, dbA or 1)
 		end
-		local tr, tg, tb, ta = unpackColor(dbc.textColor, defDB.textColor or GFH.COLOR_WHITE)
+		local tr, tg, tb, ta
+		if dbc.useTextClassColor == true and GF:EnsureUnitClassColor(self, st, getUnit(self)) then
+			tr, tg, tb, ta = st._classR, st._classG, st._classB, st._classA or 1
+		else
+			tr, tg, tb, ta = unpackColor(dbc.textColor, defDB.textColor or GFH.COLOR_WHITE)
+		end
 		if st._lastDataBarTextR ~= tr or st._lastDataBarTextG ~= tg or st._lastDataBarTextB ~= tb or st._lastDataBarTextA ~= ta then
 			st._lastDataBarTextR, st._lastDataBarTextG, st._lastDataBarTextB, st._lastDataBarTextA = tr, tg, tb, ta
 			if st.dataBarTextLeft then st.dataBarTextLeft:SetTextColor(tr, tg, tb, ta) end
@@ -20174,6 +20181,29 @@ local function buildEditModeSettings(kind, editModeId)
 			isShown = isDataBarNameTextEnabled,
 		},
 		{
+			name = L["UFDataBarTextUseClassColor"] or "Use class color (data bar text)",
+			kind = SettingType.Checkbox,
+			field = "dataBarTextClassColor",
+			parentId = "dataBar",
+			get = function()
+				local cfg = getCfg(kind)
+				local dbc = cfg and cfg.dataBar or {}
+				return dbc.useTextClassColor == true
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.dataBar = cfg.dataBar or {}
+				cfg.dataBar.useTextClassColor = value and true or false
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarTextClassColor", cfg.dataBar.useTextClassColor, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			isEnabled = function()
+				local cfg = getCfg(kind)
+				return cfg and cfg.dataBar and cfg.dataBar.enabled == true
+			end,
+		},
+		{
 			name = L["UFDataBarTextColor"] or "Data bar text color",
 			kind = SettingType.Color,
 			field = "dataBarTextColor",
@@ -20192,12 +20222,15 @@ local function buildEditModeSettings(kind, editModeId)
 				if not (cfg and value) then return end
 				cfg.dataBar = cfg.dataBar or {}
 				cfg.dataBar.textColor = { value.r or 1, value.g or 1, value.b or 1, value.a or 1 }
+				cfg.dataBar.useTextClassColor = false
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarTextColor", cfg.dataBar.textColor, nil, true) end
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "dataBarTextClassColor", false, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
 			isEnabled = function()
 				local cfg = getCfg(kind)
-				return cfg and cfg.dataBar and cfg.dataBar.enabled == true
+				local dbc = cfg and cfg.dataBar or {}
+				return cfg and dbc.enabled == true and dbc.useTextClassColor ~= true
 			end,
 		},
 		{
@@ -29976,6 +30009,10 @@ local function applyEditModeData(kind, data)
 	if data.healthTextClassColor ~= nil then
 		cfg.health = cfg.health or {}
 		cfg.health.useTextClassColor = data.healthTextClassColor and true or false
+	end
+	if data.dataBarTextClassColor ~= nil then
+		cfg.dataBar = cfg.dataBar or {}
+		cfg.dataBar.useTextClassColor = data.dataBarTextClassColor and true or false
 	end
 	if data.healthDelimiter ~= nil then
 		cfg.health = cfg.health or {}

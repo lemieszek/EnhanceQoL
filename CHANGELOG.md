@@ -9,9 +9,13 @@
 - Data Panels: Added an Auto Width option so panels can size their background to the visible stream contents.
 - Data Panels: Added a Player Name stream with optional realm display, class color, and custom text color settings.
 - Data Panels: Made the Hearthstone stream clickable, using the configured random/favorite Hearthstone behavior.
+- Unit Frames: Added a class-color option for Data Bar text, separate from the existing Data Bar texture color option.
+
 ### 🐛 Fixed
 
 - Data Panels: Stabilized the FPS and latency stream width so changing numbers no longer shift neighboring streams.
+- Unit Frames / Boss Frames: Fixed the Data Bar not showing correctly in Edit Mode and not refreshing its text on boss frame updates.
+
 ## [11.1.0-beta8] - 2026-06-09
 
 ### ✨ Added

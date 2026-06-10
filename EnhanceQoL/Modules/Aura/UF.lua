@@ -1715,6 +1715,7 @@ local defaults = {
 			font = nil,
 			fontOutline = "OUTLINE",
 			textColor = { 1, 1, 1, 1 },
+			useTextClassColor = false,
 			offsetLeft = { x = 6, y = 0 },
 			offsetCenter = { x = 0, y = 0 },
 			offsetRight = { x = -6, y = 0 },
@@ -9642,6 +9643,18 @@ local function applyBars(cfg, unit)
 			UFHelper.applyFont(st.dataBarTextRight, dcfg.font, dcfg.fontSize or ddef.fontSize or 12, dcfg.fontOutline or ddef.fontOutline)
 			local textColor = dcfg.textColor or ddef.textColor or { 1, 1, 1, 1 }
 			local tr, tg, tb, ta = textColor[1] or 1, textColor[2] or 1, textColor[3] or 1, textColor[4] or 1
+			local useTextClassColor = dcfg.useTextClassColor
+			if useTextClassColor == nil then useTextClassColor = ddef.useTextClassColor end
+			if useTextClassColor == true then
+				local class
+				if UnitIsPlayer and UnitIsPlayer(unit) then
+					class = select(2, UnitClass(unit))
+				elseif unit == UNIT.PET then
+					class = (addon.variables and addon.variables.unitClass) or select(2, UnitClass(UNIT.PLAYER))
+				end
+				local cr, cg, cb, ca = getClassColor(class)
+				if cr then tr, tg, tb, ta = cr, cg, cb, ca or ta end
+			end
 			if st.dataBarTextLeft then st.dataBarTextLeft:SetTextColor(tr, tg, tb, ta) end
 			if st.dataBarTextCenter then st.dataBarTextCenter:SetTextColor(tr, tg, tb, ta) end
 			if st.dataBarTextRight then st.dataBarTextRight:SetTextColor(tr, tg, tb, ta) end
@@ -10276,6 +10289,46 @@ applyBossEditSample = function(idx, cfg)
 	if st.levelText then
 		st.levelText:SetText(sampleLevelText ~= "" and sampleLevelText or "??")
 		st.levelText:Show()
+	end
+	if st.dataBar then
+		if UF.DataBar.IsEnabled(cfg, def) then
+			UF.DataBar.Update(cfg, unit)
+			local dcfg = cfg.dataBar or {}
+			local ddef = def.dataBar or {}
+			local dDelimiter = UFHelper.getTextDelimiter(dcfg, ddef)
+			local dDelimiter2 = UFHelper.getTextDelimiterSecondary(dcfg, ddef, dDelimiter)
+			local dDelimiter3 = UFHelper.getTextDelimiterTertiary(dcfg, ddef, dDelimiter, dDelimiter2)
+			local dHidePercentSymbol = dcfg.hidePercentSymbol == true
+			local dRoundPercent = dcfg.roundPercent == true
+			local function sampleDataBarText(mode)
+				mode = tostring(mode or "NONE"):upper()
+				if mode == "NONE" then return "" end
+				if mode == "NAME" then return (L["UFBossFrame"] or "Boss Frame") .. " " .. idx end
+				if mode == "LEVEL" then return sampleLevelText end
+				return UFHelper.formatText(
+					mode,
+					sampleHealthCur,
+					sampleHealthMax,
+					dcfg.useShortNumbers ~= false,
+					sampleHealthPercent,
+					dDelimiter,
+					dDelimiter2,
+					dDelimiter3,
+					dHidePercentSymbol,
+					sampleLevelText,
+					nil,
+					dRoundPercent,
+					true,
+					sampleHealthAbsorb
+				)
+			end
+			if st.dataBarTextLeft then st.dataBarTextLeft:SetText(sampleDataBarText(dcfg.textLeft or ddef.textLeft or "NAME")) end
+			if st.dataBarTextCenter then st.dataBarTextCenter:SetText(sampleDataBarText(dcfg.textCenter or ddef.textCenter or "CURMAX")) end
+			if st.dataBarTextRight then st.dataBarTextRight:SetText(sampleDataBarText(dcfg.textRight or ddef.textRight or "PERCENT")) end
+			st._dataBarTextDirty = nil
+		else
+			UF.DataBar.Hide(st)
+		end
 	end
 	if st.castBar then
 		if cdef.enabled ~= false then
@@ -11928,7 +11981,10 @@ onEvent = function(self, event, unit, ...)
 		if unit == UNIT.FOCUS then updateHealth(getCfg(UNIT.FOCUS), UNIT.FOCUS) end
 		if isBossUnit(unit) then
 			local bossCfg = getCfg(unit)
-			if bossCfg.enabled then updateHealth(bossCfg, unit) end
+			if bossCfg.enabled then
+				updateHealth(bossCfg, unit)
+				UF.DataBar.Update(bossCfg, unit)
+			end
 		end
 		if event ~= "UNIT_HEAL_PREDICTION" and unit and allowedEventUnit[unit] then updateUnitStatusIndicator(getCfg(unit), unit) end
 	elseif event == "UNIT_MAXPOWER" then
@@ -12024,10 +12080,17 @@ onEvent = function(self, event, unit, ...)
 		if unit == UNIT.PET then updateNameAndLevel(getCfg(UNIT.PET), UNIT.PET) end
 		if isBossUnit(unit) then
 			local bossCfg = getCfg(unit)
-			if bossCfg.enabled then updateNameAndLevel(bossCfg, unit) end
+			if bossCfg.enabled then
+				updateNameAndLevel(bossCfg, unit)
+				UF.DataBar.Update(bossCfg, unit)
+			end
 		end
 	elseif event == "UNIT_CLASSIFICATION_CHANGED" then
 		if unit and states[unit] then UFHelper.updateClassificationIndicator(states[unit], unit, getCfg(unit), defaultsFor(unit), true) end
+		if isBossUnit(unit) then
+			local bossCfg = getCfg(unit)
+			if bossCfg.enabled then UF.DataBar.Update(bossCfg, unit) end
+		end
 	elseif event == "UNIT_FLAGS" then
 		updateUnitStatusIndicator(getCfg(unit), unit)
 		if UF.SupportsCombatIndicator(unit) then updateCombatIndicator(getCfg(unit), unit) end
@@ -12039,7 +12102,10 @@ onEvent = function(self, event, unit, ...)
 		if unit == UNIT.FOCUS then updateHealth(getCfg(UNIT.FOCUS), UNIT.FOCUS) end
 		if isBossUnit(unit) then
 			local bossCfg = getCfg(unit)
-			if bossCfg.enabled then updateHealth(bossCfg, unit) end
+			if bossCfg.enabled then
+				updateHealth(bossCfg, unit)
+				UF.DataBar.Update(bossCfg, unit)
+			end
 		end
 		if allowedEventUnit[UNIT.TARGET_TARGET] then updateUnitStatusIndicator(getCfg(UNIT.TARGET_TARGET), UNIT.TARGET_TARGET) end
 	elseif event == "UNIT_CONNECTION" then
@@ -12063,7 +12129,10 @@ onEvent = function(self, event, unit, ...)
 		if unit == UNIT.FOCUS then updateHealth(getCfg(UNIT.FOCUS), UNIT.FOCUS) end
 		if isBossUnit(unit) then
 			local bossCfg = getCfg(unit)
-			if bossCfg.enabled then updateHealth(bossCfg, unit) end
+			if bossCfg.enabled then
+				updateHealth(bossCfg, unit)
+				UF.DataBar.Update(bossCfg, unit)
+			end
 		end
 	elseif event == "UNIT_THREAT_SITUATION_UPDATE" or event == "UNIT_THREAT_LIST_UPDATE" then
 		if unit ~= "player" and unit ~= "pet" then return end
