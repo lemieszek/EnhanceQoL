@@ -1,3 +1,4 @@
+-- luacheck: globals C_DelvesUI
 local parentAddonName = "EnhanceQoL"
 local addonName, addon = ...
 
@@ -15,11 +16,13 @@ local L = LibStub("AceLocale-3.0"):GetLocale("EnhanceQoL")
 
 local frameLoad = CreateFrame("Frame")
 local hiddenElements = {}
+local collapsedElements = {}
 local alreadyHooked = {}
+local objectiveTrackerUpdateToken = 0
 
 local OBJECTIVE_TRACKER_DEFAULT_SCOPE = "dungeonMythicPlus"
 local OBJECTIVE_TRACKER_SCOPE_GROUPS = {
-	{ key = "dungeonNormal", difficulties = { 1, 150, 216 } },
+	{ key = "dungeonNormal", difficulties = { 1, 150, 205, 216 } },
 	{ key = "dungeonHeroic", difficulties = { 2 } },
 	{ key = "dungeonMythic", difficulties = { 23 } },
 	{ key = OBJECTIVE_TRACKER_DEFAULT_SCOPE, difficulties = { 8 } },
@@ -38,6 +41,13 @@ for _, group in ipairs(OBJECTIVE_TRACKER_SCOPE_GROUPS) do
 	end
 end
 
+local function hasActiveDelve()
+	if not (C_DelvesUI and C_DelvesUI.HasActiveDelve and UnitPosition) then return false end
+	local _, _, _, mapID = UnitPosition("player")
+	if not mapID then return false end
+	return C_DelvesUI.HasActiveDelve(mapID)
+end
+
 local function getObjectiveTrackerScopeSelection()
 	if not addon.db then return nil end
 	local selection = addon.db["mythicPlusObjectiveTrackerScopes"]
@@ -53,7 +63,7 @@ local function shouldManageObjectiveTracker()
 	if not IsInInstance() then return false end
 
 	local difficultyID = select(3, GetInstanceInfo())
-	local scopeKey = OBJECTIVE_TRACKER_SCOPE_LOOKUP[difficultyID]
+	local scopeKey = hasActiveDelve() and "scenarioDelve" or OBJECTIVE_TRACKER_SCOPE_LOOKUP[difficultyID]
 	if not scopeKey then return false end
 
 	local selection = getObjectiveTrackerScopeSelection()
@@ -84,13 +94,19 @@ function addon.MythicPlus.functions.setObjectiveFrames()
 				elseif frame.Header and frame.Header.MinimizeButton then
 					frame.Header.MinimizeButton:Click()
 				end
+				table.insert(collapsedElements, v)
 			end
 		end
-	elseif #hiddenElements > 0 then
+	elseif #hiddenElements > 0 or #collapsedElements > 0 then
 		for i, v in pairs(hiddenElements) do
 			if not v.frame and v.name then v.frame = _G[v.name] end
 			local frame = v.frame
 			if frame and not frame:IsVisible() then frame:Show() end
+		end
+		wipe(hiddenElements)
+		for i, v in pairs(collapsedElements) do
+			if not v.frame and v.name then v.frame = _G[v.name] end
+			local frame = v.frame
 			if frame and frame.IsCollapsed and frame:IsCollapsed() then
 				if frame.SetCollapsed then
 					frame:SetCollapsed(false)
@@ -99,24 +115,36 @@ function addon.MythicPlus.functions.setObjectiveFrames()
 				end
 			end
 		end
-		wipe(hiddenElements)
+		wipe(collapsedElements)
 	end
 end
 
-local firstLoad = true
+local function runObjectiveTrackerUpdate()
+	if addon.MythicPlus and addon.MythicPlus.functions and addon.MythicPlus.functions.setObjectiveFrames then addon.MythicPlus.functions.setObjectiveFrames() end
+end
+
+local function scheduleObjectiveTrackerUpdate()
+	objectiveTrackerUpdateToken = objectiveTrackerUpdateToken + 1
+	local token = objectiveTrackerUpdateToken
+	runObjectiveTrackerUpdate()
+	if not (C_Timer and C_Timer.After) then return end
+	C_Timer.After(0.25, function()
+		if token == objectiveTrackerUpdateToken then runObjectiveTrackerUpdate() end
+	end)
+	C_Timer.After(1, function()
+		if token == objectiveTrackerUpdateToken then runObjectiveTrackerUpdate() end
+	end)
+end
+
 local eventHandlers = {
-	["CHALLENGE_MODE_RESET"] = function() addon.MythicPlus.functions.setObjectiveFrames() end,
-	["CHALLENGE_MODE_START"] = function() addon.MythicPlus.functions.setObjectiveFrames() end,
-	["ZONE_CHANGED_NEW_AREA"] = function() addon.MythicPlus.functions.setObjectiveFrames() end,
-	["PLAYER_ENTERING_WORLD"] = function()
-		if firstLoad then
-			firstLoad = false
-			C_Timer.After(1, function()
-				addon.MythicPlus.functions.setObjectiveFrames()
-				frameLoad:UnregisterEvent("PLAYER_ENTERING_WORLD")
-			end)
-		end
-	end,
+	["ACTIVE_DELVE_DATA_UPDATE"] = scheduleObjectiveTrackerUpdate,
+	["CHALLENGE_MODE_RESET"] = scheduleObjectiveTrackerUpdate,
+	["CHALLENGE_MODE_START"] = scheduleObjectiveTrackerUpdate,
+	["INSTANCE_GROUP_SIZE_CHANGED"] = scheduleObjectiveTrackerUpdate,
+	["ZONE_CHANGED_NEW_AREA"] = scheduleObjectiveTrackerUpdate,
+	["PLAYER_DIFFICULTY_CHANGED"] = scheduleObjectiveTrackerUpdate,
+	["PLAYER_ENTERING_WORLD"] = scheduleObjectiveTrackerUpdate,
+	["UPDATE_INSTANCE_INFO"] = scheduleObjectiveTrackerUpdate,
 }
 
 local function registerEvents(frame)

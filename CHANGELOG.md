@@ -28,6 +28,7 @@
 - Mythic Plus / Timer: Reduced timer drift by resyncing against the active challenge timer when it diverges.
 - Mythic Plus / Timer: Improved panel objective spacing for wrapped objective names.
 - Mythic Plus / Timer: Centered text-only affix hyphens between affix names instead of attaching them to the previous affix.
+- Objective Tracker: Fixed automation for Delves and scenario tracker content, and treats Follower Dungeons as Normal dungeon scope.
 - Settings Center: Fixed custom login UI scale inputs so decimal values below 1 can be entered again.
 - Unit Frames / Boss Frames: Fixed the Data Bar not showing correctly in Edit Mode and not refreshing its text on boss frame updates.
 

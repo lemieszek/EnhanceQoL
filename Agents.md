@@ -45,6 +45,14 @@
 - Before finishing locale work, verify that key order is still alphabetically sorted.
 - Before finishing locale work, verify that no module locale folders were reintroduced under `EnhanceQoL/Modules`.
 
+## Fix Evidence and Debugging
+
+- Only implement bug fixes when the cause is directly verified from code, logs, an in-game reproduction, a trace, or another concrete source of evidence.
+- Do not ship fixes based only on "could be", "might be", "should be", or similar assumptions.
+- If the cause is not fully clear, investigate first instead of patching: add targeted temporary traces, inspect SavedVariables/state, reproduce in-game, or ask for the exact reproduction path.
+- Keep diagnostic traces scoped and removable. Do not leave noisy debug output enabled unless the user explicitly wants temporary instrumentation for testing.
+- When reporting a fix, state the verified cause briefly and what evidence was used. If the cause could not be verified, report the remaining uncertainty and stop before changing behavior.
+
 ## Release and Beta Packaging
 
 - Releases use `BigWigsMods/packager@v2` through `.github/workflows/release.yml`.
