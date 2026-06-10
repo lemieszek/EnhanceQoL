@@ -865,6 +865,19 @@ datapanel.streams = {
 		controls = { datapanel.fontSlider, datapanel.textColor },
 	},
 	{
+		id = "playername",
+		dbKey = "playername",
+		title = (PLAYER or "Player") .. " " .. (NAME or "Name"),
+		defaults = { fontSize = 14, showRealm = false, useClassColor = true, useTextColor = false, textColor = datapanel.normalColor },
+		controls = {
+			datapanel.fontSlider,
+			{ key = "showRealm", text = (SHOW or "Show") .. " " .. (L["Realm"] or "Realm"), default = false },
+			{ key = "useClassColor", text = L["Use class color"] or "Use class color", default = true, refreshOnChange = true },
+			{ key = "useTextColor", text = L["Use custom text color"] or "Use custom text color", default = false, refreshOnChange = true },
+			{ type = "color", key = "textColor", text = L["Text color"] or "Text color", default = datapanel.normalColor },
+		},
+	},
+	{
 		id = "volume",
 		dbKey = "volume",
 		title = MASTER_VOLUME or "Master Volume",

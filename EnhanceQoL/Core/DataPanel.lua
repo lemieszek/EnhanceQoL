@@ -503,6 +503,14 @@ local function hasInlineTexture(text)
 	return text:find("|T", 1, true) or text:find("|A", 1, true)
 end
 
+local function measureFontStringWidth(fontString, currentText, sampleText)
+	if not fontString or type(sampleText) ~= "string" or sampleText == "" then return 0 end
+	fontString:SetText(sampleText)
+	local width = fontString:GetStringWidth()
+	fontString:SetText(currentText or "")
+	return width or 0
+end
+
 local function scheduleInlineReflowAll()
 	for _, panel in pairs(panels) do
 		if panel and panel.ScheduleTextReflow then panel:ScheduleTextReflow() end
@@ -898,6 +906,7 @@ local function seedEditModeRecordFromPanelInfo(panel, defaults, record)
 	record.y = info.y or defaults.y or 0
 	record.width = normalizePanelWidth(info.width, defaults.width)
 	record.height = normalizePanelHeight(info.height, defaults.height)
+	record.autoWidth = info.autoWidth == true
 	record.hideBorder = info.hideBorder and true or false
 	record.clickThrough = info.clickThrough == true
 	record.strata = normalizeStrata(info.strata, defaults.strata)
@@ -944,6 +953,7 @@ local function registerEditModePanel(panel)
 		y = panel.info.y or 0,
 		width = normalizePanelWidth(panel.info.width, panel.frame:GetWidth() or 200),
 		height = normalizePanelHeight(panel.info.height, panel.frame:GetHeight() or 20),
+		autoWidth = panel.info.autoWidth == true,
 		hideBorder = panel.info.hideBorder or false,
 		clickThrough = panel.info.clickThrough == true,
 		strata = normalizeStrata(panel.info.strata, panel.frame:GetFrameStrata()),
@@ -974,6 +984,7 @@ local function registerEditModePanel(panel)
 		textAlphaOutOfCombat = normalizePercent(panel.info.textAlphaOutOfCombat, panel.info.textAlphaInCombat),
 	}
 	panel.info.strata = defaults.strata
+	panel.info.autoWidth = defaults.autoWidth
 	panel.info.contentAnchor = defaults.contentAnchor
 	panel.info.fontFace = defaults.fontFace
 	panel.info.fontStyle = defaults.fontStyle
@@ -1049,8 +1060,23 @@ local function registerEditModePanel(panel)
 			return panel.info and panel.info.backgroundUseCustomTexture == true
 		end
 
+		local function isAutoWidthEnabled(layoutName)
+			if EditMode and EditMode.GetValue then
+				local value = EditMode:GetValue(id, "autoWidth", layoutName)
+				if value ~= nil then return value == true end
+			end
+			return panel.info and panel.info.autoWidth == true
+		end
+
 		settings = {
 			{ name = L["Layout"] or "Layout", kind = SettingType.Collapsible, id = section.layout, defaultCollapsed = false },
+			{
+				name = (L["Auto"] or "Auto") .. " " .. (L["Width"] or "Width"),
+				kind = SettingType.Checkbox,
+				field = "autoWidth",
+				parentId = section.layout,
+				default = defaults.autoWidth,
+			},
 			{
 				name = L["DataPanelWidth"],
 				kind = SettingType.Slider,
@@ -1065,6 +1091,7 @@ local function registerEditModePanel(panel)
 					local num = normalizePanelWidth(value, defaults.width)
 					return tostring(math.floor(num + 0.5))
 				end,
+				isEnabled = function(layoutName) return not isAutoWidthEnabled(layoutName) end,
 				get = function(layoutName)
 					local value
 					if EditMode and EditMode.GetValue then
@@ -1080,7 +1107,7 @@ local function registerEditModePanel(panel)
 						EditMode:SetValue(id, "width", width, layoutName)
 					elseif panel.info then
 						panel.info.width = width
-						panel.frame:SetWidth(width)
+						if panel.info.autoWidth ~= true then panel.frame:SetWidth(width) end
 					end
 				end,
 			},
@@ -1623,6 +1650,7 @@ local function ensureSettings(id, name)
 			y = 0,
 			width = 300,
 			height = 40,
+			autoWidth = false,
 			streams = {},
 			streamSet = {},
 			name = name or ((L["Panel"] or "Panel") .. " " .. id),
@@ -1701,6 +1729,7 @@ local function ensureSettings(id, name)
 	end
 	info.width = normalizePanelWidth(info.width, 300)
 	info.height = normalizePanelHeight(info.height, 40)
+	info.autoWidth = info.autoWidth == true
 
 	addon.db.dataPanels[id] = info
 	if addon.db.dataPanels[tonumber(id)] then addon.db.dataPanels[tonumber(id)] = nil end
@@ -2052,7 +2081,10 @@ function DataPanel.Create(id, name, existingOnly)
 			end
 
 			if not data.usingParts and data.text then
+				local currentText = data.text:GetText()
 				local width = data.text:GetStringWidth()
+				local minWidth = measureFontStringWidth(data.text, currentText, data.minWidthText)
+				if minWidth > width then width = minWidth end
 				if width ~= data.lastWidth then
 					data.lastWidth = width
 					if data.button then data.button:SetWidth(width) end
@@ -2080,6 +2112,7 @@ function DataPanel.Create(id, name, existingOnly)
 		self.suspendEditSync = true
 		if
 			field == "width"
+			or field == "autoWidth"
 			or field == "height"
 			or field == "hideBorder"
 			or field == "clickThrough"
@@ -2178,7 +2211,14 @@ function DataPanel.Create(id, name, existingOnly)
 		local layoutChanged = false
 		if data.width then
 			info.width = normalizePanelWidth(round2(data.width), info.width or 300)
-			self.frame:SetWidth(info.width)
+			if info.autoWidth ~= true then self.frame:SetWidth(info.width) end
+		end
+		if data.autoWidth ~= nil then
+			local desired = data.autoWidth == true
+			if info.autoWidth ~= desired then
+				info.autoWidth = desired
+				layoutChanged = true
+			end
 		end
 		if data.height then
 			info.height = normalizePanelHeight(round2(data.height), info.height or 40)
@@ -2398,7 +2438,8 @@ function DataPanel.Create(id, name, existingOnly)
 		local frameWidth = self.frame and self.frame.GetWidth and self.frame:GetWidth() or 0
 		local contentAnchor = normalizeContentAnchor(self.info and self.info.contentAnchor, "LEFT")
 		local spacing = normalizeStreamGap(self.info and self.info.streamGap, DEFAULT_STREAM_GAP)
-		local changed = force and true or self.lastLayoutAnchor ~= contentAnchor or self.lastLayoutWidth ~= frameWidth or self.lastLayoutSpacing ~= spacing
+		local autoWidth = self.info and self.info.autoWidth == true
+		local changed = force and true or self.lastLayoutAnchor ~= contentAnchor or self.lastLayoutWidth ~= frameWidth or self.lastLayoutSpacing ~= spacing or self.lastLayoutAutoWidth ~= autoWidth
 		if not self.lastOrder or #self.lastOrder ~= #visible then
 			changed = true
 		else
@@ -2419,6 +2460,14 @@ function DataPanel.Create(id, name, existingOnly)
 			local width = (data and data.lastWidth) or 0
 			if i > 1 then totalWidth = totalWidth + spacing end
 			totalWidth = totalWidth + width
+		end
+		if autoWidth and self.frame and self.frame.SetWidth then
+			local targetWidth = normalizePanelWidth(totalWidth + (padding * 2), self.info and self.info.width or frameWidth)
+			if math.abs(targetWidth - frameWidth) >= 0.5 then
+				self.info.width = targetWidth
+				self.frame:SetWidth(targetWidth)
+				frameWidth = targetWidth
+			end
 		end
 		local startX = padding
 		if contentAnchor == "CENTER" then
@@ -2452,6 +2501,7 @@ function DataPanel.Create(id, name, existingOnly)
 		self.lastLayoutAnchor = contentAnchor
 		self.lastLayoutWidth = frameWidth
 		self.lastLayoutSpacing = spacing
+		self.lastLayoutAutoWidth = autoWidth
 	end
 
 	function panel:AddStream(name)
@@ -2532,6 +2582,7 @@ function DataPanel.Create(id, name, existingOnly)
 				data.OnMouseEnter = nil
 				data.OnMouseLeave = nil
 				data.ignoreMenuModifier = sanitizeValue(payload.ignoreMenuModifier)
+				data.minWidthText = sanitizeValue(payload.minWidthText)
 				local onClick = sanitizeValue(payload.OnClick)
 				if onClick ~= nil then data.OnClick = onClick end
 				return
@@ -2871,6 +2922,7 @@ function DataPanel.Create(id, name, existingOnly)
 						textChanged = true
 					end
 				end
+				data.minWidthText = sanitizeValue(payload.minWidthText)
 				local newSize = panel:ApplyStreamFontScale(payload.fontSize or data.fontSize or 14)
 				local fontChanged = newSize and (data.fontSize ~= newSize or data.fontFlags ~= fontFlags or data.fontShadow ~= fontShadow)
 				if fontChanged then
@@ -2879,14 +2931,18 @@ function DataPanel.Create(id, name, existingOnly)
 					data.fontFlags = fontFlags
 					data.fontShadow = fontShadow
 				end
-				if textChanged or fontChanged or wasParts then
+				if textChanged or fontChanged or wasParts or data.lastMinWidthText ~= data.minWidthText then
+					local currentText = data.text:GetText()
 					local width = data.text:GetStringWidth()
+					local minWidth = measureFontStringWidth(data.text, currentText, data.minWidthText)
+					if minWidth > width then width = minWidth end
 					if width ~= data.lastWidth then
 						data.lastWidth = width
 						data.button:SetWidth(width)
 						if self.lastWidths and self.lastWidths[name] then self.lastWidths[name] = width end
 						layoutNeedsRefresh = true
 					end
+					data.lastMinWidthText = data.minWidthText
 					if hasInlineTexture(rawText) then panel:ScheduleTextReflow() end
 				end
 			end

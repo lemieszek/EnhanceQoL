@@ -1,6 +1,16 @@
 # Changelog
 
 <!--@eqol-beta@-->
+## [11.1.0-beta9] - 2026-06-09
+
+### ✨ Added
+
+- Data Panels: Added an Auto Width option so panels can size their background to the visible stream contents.
+- Data Panels: Added a Player Name stream with optional realm display, class color, and custom text color settings.
+- Data Panels: Made the Hearthstone stream clickable, using the configured random/favorite Hearthstone behavior.
+### 🐛 Fixed
+
+- Data Panels: Stabilized the FPS and latency stream width so changing numbers no longer shift neighboring streams.
 ## [11.1.0-beta8] - 2026-06-09
 
 ### ✨ Added

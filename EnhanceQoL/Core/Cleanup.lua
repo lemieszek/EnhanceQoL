@@ -140,6 +140,7 @@ local MIGRATED_DATAPANEL_STREAM_OPTION_POSITION_KEYS = {
 	microbar = true,
 	mythickey = true,
 	pettracker = true,
+	playername = true,
 	realm = true,
 	stats = true,
 	talent = true,

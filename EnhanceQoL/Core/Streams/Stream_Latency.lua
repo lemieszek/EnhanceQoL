@@ -105,7 +105,21 @@ local function smoothFPS(current, interval, window)
 	return emaFPS
 end
 
--- (declared above)
+local function buildMinWidthText(displayMode)
+	if displayMode == "fps" then return "FPS 999" end
+	if displayMode == "ping" then
+		if db.pingMode == "split" then return "H 999 / W 999 ms" end
+		if db.pingMode == "split_vertical" then
+			return ((_G["HOME"] or "Home") .. ": 999 ms\n" .. (_G["WORLD"] or "World") .. ": 999 ms")
+		end
+		return "999 ms"
+	end
+	if db.pingMode == "split" then return "FPS 999 | H 999 / W 999 ms" end
+	if db.pingMode == "split_vertical" then
+		return ("FPS 999\n" .. (_G["HOME"] or "Home") .. ": 999 ms\n" .. (_G["WORLD"] or "World") .. ": 999 ms")
+	end
+	return "FPS 999 | 999 ms"
+end
 
 local function updateLatency(s)
 	s = s or stream
@@ -128,6 +142,7 @@ local function updateLatency(s)
 
 	local size = db.fontSize or 14
 	s.snapshot.tooltip = getOptionsHint()
+	s.snapshot.minWidthText = buildMinWidthText(displayMode)
 
 	local now = GetTime()
 

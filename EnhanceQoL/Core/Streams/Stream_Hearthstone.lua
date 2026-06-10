@@ -1,4 +1,4 @@
--- luacheck: globals EnhanceQoL GetBindLocation NORMAL_FONT_COLOR UNKNOWN C_Item GetItemInfoInstant GetItemIcon
+-- luacheck: globals EnhanceQoL GetBindLocation NORMAL_FONT_COLOR UNKNOWN C_Item GetItemInfoInstant GetItemIcon InCombatLockdown
 local addonName, addon = ...
 local L = addon.L
 
@@ -61,6 +61,13 @@ local function getHearthstoneIcon()
 	return hearthstoneIcon
 end
 
+local function getRandomHearthstoneButton()
+	if not _G.EQOLRandomHearthstoneButton and InCombatLockdown and InCombatLockdown() then return nil end
+	local funcs = addon.MythicPlus and addon.MythicPlus.functions
+	if funcs and funcs.EnsureRandomHearthstoneButton then return funcs.EnsureRandomHearthstoneButton() end
+	return _G.EQOLRandomHearthstoneButton
+end
+
 local function updateHearthstone(s)
 	s = s or stream
 	ensureDB()
@@ -71,7 +78,34 @@ local function updateHearthstone(s)
 	local text = colorize(location)
 	if not db.hideIcon then text = ("|T%d:%d:%d:0:0|t %s"):format(getHearthstoneIcon(), size, size, text) end
 
-	s.snapshot.text = text
+	local secureAttributes
+	local secureKey
+	local button = getRandomHearthstoneButton()
+	if button then
+		secureAttributes = {
+			type1 = "click",
+			clickbutton1 = button,
+		}
+		secureKey = "random:" .. tostring(button)
+	else
+		secureAttributes = {
+			type1 = "macro",
+			macrotext1 = "/use item:6948",
+		}
+		secureKey = "default"
+	end
+
+	s.snapshot.text = nil
+	s.snapshot.parts = {
+		{
+			text = text,
+			secure = {
+				key = secureKey,
+				attributes = secureAttributes,
+				forwardRightClick = true,
+			},
+		},
+	}
 	s.snapshot.fontSize = size
 
 	local tooltip = (L["Hearthstone"] or "Hearthstone") .. ": " .. location
