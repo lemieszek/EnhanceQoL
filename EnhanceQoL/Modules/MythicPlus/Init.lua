@@ -1352,6 +1352,16 @@ local function selectPreferredOrRandomHearthstone()
 	return pool[randomIndex]
 end
 
+function addon.MythicPlus.functions.GetRandomHearthstoneItemID(forceRefresh)
+	if forceRefresh or #availableHearthstones == 0 then
+		setAvailableHearthstone()
+		if #availableHearthstones == 0 then return nil end
+	end
+
+	local hs = selectPreferredOrRandomHearthstone()
+	return hs and hs.id or nil
+end
+
 function addon.MythicPlus.functions.setRandomHearthstone(forceRefresh)
 	if forceRefresh or #availableHearthstones == 0 then
 		setAvailableHearthstone() -- recheck hearthstones

@@ -1,144 +1,42 @@
 # Changelog
 
 <!--@eqol-beta@-->
-## [11.1.0-beta9] - 2026-06-09
+## [11.2.0-beta1] - 2026-06-10
 
 ### ✨ Added
 
-- Cooldown Panels: Added a Segment Stacks quick setup for bar entries that configures a compact segmented stack bar and opens the stack options for final adjustments.
-- Data Panels: Added an Auto Width option so panels can size their background to the visible stream contents.
-- Data Panels: Added a Player Name stream with optional realm display, class color, and custom text color settings.
-- Data Panels: Made the Hearthstone stream clickable, using the configured random/favorite Hearthstone behavior.
-- Mythic Plus / Timer: Added an option to hide objective count values such as 0/1 and 1/1 for a more compact objective list.
-- Mythic Plus / Timer: Added per-player death counts to the death tooltip.
-- Mythic Plus / Timer: Added panel Best Time controls for visibility, delta visibility, and color.
-- Unit Frames: Added a class-color option for Data Bar text, separate from the existing Data Bar texture color option.
+- Mythic Plus / Timer: Added a beta-only Mythic+ Timer with list and panel layouts, Edit Mode configuration, display formats, timer, enemy forces, objective, affix, death, and best-time controls.
 
 ### 🐛 Fixed
 
-- Data Panels: Stabilized the FPS and latency stream width so changing numbers no longer shift neighboring streams.
-- Mythic Plus / Timer: Fixed +2/+3 bar time labels not matching the selected timer bar fill direction.
-- Mythic Plus / Timer: Fixed disabled panel timer/enemy bars leaving their border or overlay text visible.
-- Mythic Plus / Timer: Fixed panel element anchor controls staying clickable while their related element was disabled.
-- Mythic Plus / Timer: Fixed timer-bar chest markers being mirrored for the normal countdown fill direction.
-- Mythic Plus / Timer: Fixed the timer display resetting to the dungeon time limit after a completed run.
-- Mythic Plus / Timer: Removed the combat-log death tracking path and now tracks player death details through the unit death event to avoid protected event registration errors.
-- Mythic Plus / Timer: Expanded panel height dynamically for objective lists so bottom-anchored elements no longer overlap longer objective sets.
-- Mythic Plus / Timer: Kept the timer visible inside a Mythic+ instance after the run is completed.
-- Mythic Plus / Timer: Reduced timer drift by resyncing against the active challenge timer when it diverges.
-- Mythic Plus / Timer: Improved panel objective spacing for wrapped objective names.
-- Mythic Plus / Timer: Centered text-only affix hyphens between affix names instead of attaching them to the previous affix.
-- Objective Tracker: Fixed automation for Delves and scenario tracker content, and treats Follower Dungeons as Normal dungeon scope.
-- Settings Center: Fixed custom login UI scale inputs so decimal values below 1 can be entered again.
-- Unit Frames / Boss Frames: Fixed the Data Bar not showing correctly in Edit Mode and not refreshing its text on boss frame updates.
-
-## [11.1.0-beta8] - 2026-06-09
-
-### ✨ Added
-
-- Mythic Plus / Timer: Added an option to fill the timer bar upward with elapsed time instead of emptying it.
-
-### 🐛 Fixed
-
-- Mythic Plus / Timer: Fixed an Edit Mode font error when global font styling resolved to an invalid WoW font flag.
-- Mythic Plus / Timer: Fixed Edit Mode preview text using a direct font path that could break with global font styling or LSM font fallback settings.
-- Mythic Plus / Timer: Fixed multi-line objectives losing spacing and long panel affix text being clipped.
-- Unit Frames: Fixed the Blizzard Raid Frame bar texture making default health and power bar backdrops appear transparent.
-
-## [11.1.0-beta7] - 2026-06-09
-
-### ✨ Added
-
-- Mythic Plus / Timer: Added timer display formats for time left, time left with total time, and elapsed time with total time.
-- Mythic Plus / Timer: Added an option to show time lost directly next to the death count.
-- Unit Frames / Group Frames: Added options to detach the Data Bar from horizontal frame layouts, including width, offset, strata, and frame-level controls.
-- Unit Frames / Group Frames: Added more Data Bar text choices, including name, level, and level-based health text formats.
-
-### 🐛 Fixed
-
-- Mythic Plus / Timer: Fixed several X/Y offset controls moving elements inconsistently compared to their configured values.
-- Mythic Plus / Timer: Fixed timer and enemy forces bar borders rendering incorrectly at some bar heights or offsets.
-- Mythic Plus / Timer: Fixed timer bar chest time labels and enemy percentage text rendering below bar borders.
-- Mythic Plus / Timer: Added clearer hyphen separation between text-only affixes in panel mode.
-- Resource Bars / Evoker: Fixed Augmentation's Ebon Might bar only updating its remaining duration while resource text was enabled.
-- Resource Bars / Evoker: Fixed stale shared resource bar backdrop and segment visuals after switching between Preservation and Augmentation.
-- Unit Frames / Group Frames: Fixed Data Bar names overlapping other Data Bar text by adding a separate name width limit.
-- Unit Frames / Group Frames: Fixed Data Bar name and level text disappearing when a unit dies.
-
-## [11.1.0-beta6] - 2026-06-09
-
-### ✨ Added
-
-- Cooldown Panels: Added an optional interrupt-spell glow that highlights tracked interrupts when the target is casting an interruptible spell.
-- Mythic Plus: Added a beta-only Mythic+ Timer.
-- Unit Frames / Group Frames: Added a Portrait mode option that can show player class icons instead of unit portraits.
-
-## [11.1.0-beta5] - 2026-06-09
-
-### ✨ Added
-
-- Cooldown Panels: Added an optional tracked-aura glow trigger that can glow a CDM aura entry when another Cooldown Manager aura is active, including a separate optional glow color.
-- Unit Frames / Group Frames: Added a Round percent values option for group health, power, and Data Bar text.
-
-### 🐛 Fixed
-
-- Data Panels: Fixed the Latency stream overriding panel-wide class text colors unless its own custom text color option is enabled.
-- Resource Bars / Druid Forms: Fixed Classic resource bars showing resources from inactive forms when manual visibility rules such as Player is casting were active.
+- Mythic Plus / Timer: Continued beta hardening for bar direction, chest markers, objective spacing, completed-run visibility, time sync, protected death tracking, font fallback, preview rendering, and disabled panel elements.
 
 <!--@end-eqol-beta@-->
 
 ---
 
-## [11.1.0-beta4] - 2026-06-08
+## [11.1.0] - 2026-06-10
 
 ### ✨ Added
 
-- Unit Frames / Group Frames: Added an optional Data Bar for party, raid, main tank, and main assist frames with position, color, texture, font, and health text slot settings.
+- Chat: Added clickable copy links for web URLs in chat messages and included Raid Warning messages in Raid chat history.
+- Cooldown Panels: Added options for active and ready icon border visibility, tracked-aura glow triggers, interrupt-spell glow triggers, and a Segment Stacks quick setup for bar entries.
+- Damage Meter: Added class-colored bar and tooltip backgrounds, tooltip bar background styling, segment linking, and a per-window option to keep manually selected meter types after reloads.
+- Data Panels: Added auto-width panel backgrounds, a Player Name stream with realm, class color, and custom color options, and clickable Hearthstone stream behavior.
+- Group Tools: Added a keybinding entry for the focus marker macro.
 - Resource Bars: Added Vengeance Demon Hunter Soul Fragments tracking for the Secondary resource bar.
+- Unit Frames: Added group-frame Data Bars, more Data Bar text choices, detached Data Bar layout controls, class-icon portrait mode, per-spell healer buff expiration pulse rules, and rounded percent values for health, power, and Data Bar text.
 
 ### 🐛 Fixed
 
-- Cooldown Panels: Fixed cooldown swipe alignment and stale mask state when switching away from the Original Blizzard icon border.
-
----
-
-## [11.1.0-beta3] - 2026-06-08
-
-### 🐛 Fixed
-
-- Damage Meter: Fixed SharedMedia border rendering and secret-number backdrop errors by rendering Damage Meter borders without Blizzard Backdrop edge calculations.
-- Unit Frames / Healer Buff Placement: Fixed healer buff indicators showing cooldown text again after updating when regular buff cooldown text had already been disabled.
-- Unit Frames / Healer Buff Placement: Fixed icon indicators growing back toward the unit frame when anchored outside on the right side with a rightward growth direction.
-- Unit Frames / Raid Frames: Fixed sample auras staying too large and overlapping frames when raid auto-fit was active with Preserve content size set to Off.
-
----
-
-## [11.1.0-beta2] - 2026-06-07
-
-### ✨ Added
-
-- Damage Meter: Added options for class-colored bar and tooltip backgrounds, plus separate tooltip bar background texture and color controls.
-- Unit Frames / Healer Buff Placement: Added per-spell expiration pulse rules with an optional countdown-only display during the pulse window.
-
-### 🐛 Fixed
-
-- Damage Meter: Fixed Current windows switching away from the completed Mythic+ overall view when post-run healing or damage starts a new combat session before leaving the dungeon.
-- Tooltips: Fixed modifier-gated player tooltip details not refreshing reliably when the modifier was pressed or released after already hovering a player.
-
----
-
-## [11.1.0-beta1] - 2026-06-07
-
-### ✨ Added
-
-- Chat: Added an optional setting to turn web links in chat messages into clickable copy links.
-- Chat History: Added Raid Warning messages to the logged Raid channel history.
-- Cooldown Panels: Added per-entry options to hide icon borders while a cooldown is active or while it is ready.
-- Group Tools / Focus Marker: Added a keybinding entry for the focus marker macro.
-
-### 🐛 Fixed
-
-- Resource Bars / Druid Forms: Fixed form-filtered bars such as Energy and Combo Points staying hidden in combat after entering combat from Travel Form or after a combat resurrection.
+- Cooldown Panels: Fixed Original Blizzard icon border transitions so cooldown swipe alignment and mask state update correctly.
+- Damage Meter: Fixed SharedMedia border rendering, secret-number backdrop errors, and completed Mythic+ overall view retention after post-run combat starts.
+- Data Panels: Fixed Latency stream text color handling and stabilized FPS/latency stream widths so changing numbers no longer shift neighboring streams.
+- Objective Tracker: Fixed automation for Delves and scenario tracker content, and treats Follower Dungeons as Normal dungeon scope.
+- Resource Bars: Fixed inactive Druid-form resources appearing under manual visibility rules and Evoker shared bar/backdrop updates after spec changes.
+- Settings Center: Fixed custom login UI scale decimal inputs below 1.
+- Tooltips: Fixed modifier-gated player tooltip details refreshing when modifiers change while hovering.
+- Unit Frames: Fixed group-frame Data Bar overlaps and dead-unit text, Boss Frame Data Bar Edit Mode and update behavior, healer buff cooldown and icon placement regressions, Raid Frame sample aura sizing with auto-fit, and default Raid Frame backdrop transparency with custom bar textures.
 
 ---
 

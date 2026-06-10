@@ -37,11 +37,11 @@ my $is_beta = ($ENV{"EQOL_PACKAGER_BETA"} || "") eq "1";
 if ($is_beta) {
 	s/^[ \t]*--\@(?:eqol-)?beta\@[^\r\n]*(?:\r?\n|\z)//mg;
 	s/^[ \t]*--\@end-(?:eqol-)?beta\@[^\r\n]*(?:\r?\n|\z)//mg;
-	s/^([ \t]*)--\@non-(?:eqol-)?beta\@[^\r\n]*/$1--[===[@non-eqol-beta/mg;
-	s/^([ \t]*)--\@end-non-(?:eqol-)?beta\@[^\r\n]*/$1--@end-non-eqol-beta]===]/mg;
+	s/^([ \t]*)--\@non-(?:eqol-)?beta\@[^\r\n]*/${1}--[===[\@non-eqol-beta/mg;
+	s/^([ \t]*)--\@end-non-(?:eqol-)?beta\@[^\r\n]*/${1}--\@end-non-eqol-beta]===]/mg;
 } else {
-	s/^([ \t]*)--\@(?:eqol-)?beta\@[^\r\n]*/$1--[===[@eqol-beta/mg;
-	s/^([ \t]*)--\@end-(?:eqol-)?beta\@[^\r\n]*/$1--@end-eqol-beta]===]/mg;
+	s/^([ \t]*)--\@(?:eqol-)?beta\@[^\r\n]*/${1}--[===[\@eqol-beta/mg;
+	s/^([ \t]*)--\@end-(?:eqol-)?beta\@[^\r\n]*/${1}--\@end-eqol-beta]===]/mg;
 	s/^[ \t]*--\@non-(?:eqol-)?beta\@[^\r\n]*(?:\r?\n|\z)//mg;
 	s/^[ \t]*--\@end-non-(?:eqol-)?beta\@[^\r\n]*(?:\r?\n|\z)//mg;
 }
@@ -53,11 +53,11 @@ my $is_beta = ($ENV{"EQOL_PACKAGER_BETA"} || "") eq "1";
 if ($is_beta) {
 	s/^[ \t]*<!--\@(?:eqol-)?beta\@-->[^\r\n]*(?:\r?\n|\z)//mg;
 	s/^[ \t]*<!--\@end-(?:eqol-)?beta\@-->[^\r\n]*(?:\r?\n|\z)//mg;
-	s/^([ \t]*)<!--\@non-(?:eqol-)?beta\@-->[^\r\n]*/$1<!--@non-eqol-beta/mg;
-	s/^([ \t]*)<!--\@end-non-(?:eqol-)?beta\@-->[^\r\n]*/$1@end-non-eqol-beta@-->/mg;
+	s/^([ \t]*)<!--\@non-(?:eqol-)?beta\@-->[^\r\n]*/${1}<!--\@non-eqol-beta/mg;
+	s/^([ \t]*)<!--\@end-non-(?:eqol-)?beta\@-->[^\r\n]*/${1}\@end-non-eqol-beta\@-->/mg;
 } else {
-	s/^([ \t]*)<!--\@(?:eqol-)?beta\@-->[^\r\n]*/$1<!--@eqol-beta/mg;
-	s/^([ \t]*)<!--\@end-(?:eqol-)?beta\@-->[^\r\n]*/$1@end-eqol-beta@-->/mg;
+	s/^([ \t]*)<!--\@(?:eqol-)?beta\@-->[^\r\n]*/${1}<!--\@eqol-beta/mg;
+	s/^([ \t]*)<!--\@end-(?:eqol-)?beta\@-->[^\r\n]*/${1}\@end-eqol-beta\@-->/mg;
 	s/^[ \t]*<!--\@non-(?:eqol-)?beta\@-->[^\r\n]*(?:\r?\n|\z)//mg;
 	s/^[ \t]*<!--\@end-non-(?:eqol-)?beta\@-->[^\r\n]*(?:\r?\n|\z)//mg;
 }
