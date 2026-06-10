@@ -21,16 +21,6 @@ local Bars = CooldownPanels.Bars
 if Bars._eqolSupplementLoaded == true then return end
 Bars._eqolSupplementLoaded = true
 Bars.STANDALONE_STACKS_SECTION_ID = Bars.STANDALONE_STACKS_SECTION_ID or "eqolCooldownPanelStandaloneBarStacks"
-Bars.STANDALONE_COLLAPSIBLE_IDS = Bars.STANDALONE_COLLAPSIBLE_IDS
-	or {
-		"eqolCooldownPanelStandaloneBar",
-		"eqolCooldownPanelStandaloneBarBorder",
-		"eqolCooldownPanelStandaloneBarCharges",
-		"eqolCooldownPanelStandaloneBarCooldown",
-		"eqolCooldownPanelStandaloneBarStacks",
-		"eqolCooldownPanelStandaloneBarLabel",
-		"eqolCooldownPanelStandaloneBarVisibility",
-	}
 
 Bars.GetGlobalFontStyleKey = Bars.GetGlobalFontStyleKey
 	or function()
@@ -849,16 +839,8 @@ local function supportsBarMode(entry, mode)
 end
 
 Bars.FocusStandaloneSection = function(panelId, entryId, targetGroupId)
-	panelId = normalizeId(panelId)
-	entryId = normalizeId(entryId)
-	local lib = addon.EditModeLib
-	local setter = lib and lib.internal and lib.internal.SetCollapseState or nil
-	local state = CooldownPanels.GetLayoutEntryStandaloneMenuState and CooldownPanels:GetLayoutEntryStandaloneMenuState(false) or nil
-	if not (panelId and entryId and targetGroupId and setter and state and normalizeId(state.panelId) == panelId and normalizeId(state.entryId) == entryId and state.hostFrame) then return false end
-	for _, groupId in ipairs(Bars.STANDALONE_COLLAPSIBLE_IDS) do
-		setter(lib.internal, state.hostFrame, groupId, groupId ~= targetGroupId)
-	end
-	return true
+	if not (CooldownPanels and CooldownPanels.FocusLayoutEntryStandaloneSettingsGroup) then return false end
+	return CooldownPanels:FocusLayoutEntryStandaloneSettingsGroup(panelId, entryId, targetGroupId)
 end
 
 Bars.EntryHasQuickSetups = function(panelId, entryId)

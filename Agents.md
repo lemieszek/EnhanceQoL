@@ -85,6 +85,15 @@
 - Before adding several new locals to a large file, check whether the file already has local-limit warnings or history, and prefer table fields if in doubt.
 - Do not refactor an existing large file only to reduce locals unless required for the task. Keep changes scoped.
 
+## EditMode Standalone Collapsible Focus
+
+- Use `addon.EditModeLib.internal:FocusSettingGroup(frame, targetGroupId)` to open one `SettingType.Collapsible` group in an EditMode standalone settings dialog and collapse the other groups for the same frame.
+- Do not maintain manual collapsible ID lists in feature modules for standalone dialog focus behavior. `EnhanceQoLEditMode` registers collapsible IDs from `SettingType.Collapsible` setup for the real collapse-state frame.
+- Keep responsibilities separated: feature modules resolve their own active standalone dialog state and `hostFrame`; the EditMode library only receives `frame` and `targetGroupId`.
+- For Cooldown Panels entry standalone dialogs, use `CooldownPanels:FocusLayoutEntryStandaloneSettingsGroup(panelId, entryId, targetGroupId)` instead of calling `addon.EditModeLib.internal:FocusSettingGroup` directly from submodules.
+- For quick setup actions that rebuild the standalone dialog, focus the target group before triggering the refresh/rebuild so the rebuilt dialog opens the intended collapsible group.
+- Do not use `SetCollapseState` loops directly in feature modules unless the shared focus helper cannot apply. Prefer adding a small module-level wrapper that passes the correct `hostFrame` and target group ID to the library.
+
 ## EditMode MultiDropdowns
 
 - `SettingType.MultiDropdown` callbacks must not rebuild or refresh the open EditMode settings dialog while the dropdown menu is open.

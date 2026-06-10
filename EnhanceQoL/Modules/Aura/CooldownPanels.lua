@@ -3543,19 +3543,6 @@ cdp.ENTRY.STYLE_CLIPBOARD = {
 	},
 }
 
-cdp.ENTRY.STANDALONE_COLLAPSIBLE_IDS = {
-	"cooldownPanelStandaloneDisplay",
-	"cooldownPanelStandaloneStacks",
-	"cooldownPanelStandaloneCharges",
-	"cooldownPanelStandaloneCooldownVisuals",
-	"cooldownPanelStandaloneOverlays",
-	"cooldownPanelStandaloneCooldownText",
-	"cooldownPanelStandaloneStaticText",
-	"cooldownPanelStandaloneStateTexture",
-	"cooldownPanelStandaloneGlow",
-	"cooldownPanelStandaloneSound",
-}
-
 cdp.ENTRY.TEXT_INFO_LAYOUTS = {
 	COOLDOWN_ABOVE_TEXT_BELOW = {
 		labelKey = "CooldownPanelQuickSetupCooldownAboveTextBelow",
@@ -11139,16 +11126,19 @@ function CooldownPanels:RefreshLayoutEntryStandaloneMenu(rebuild)
 	if rebuild == true then self:OpenLayoutEntryStandaloneMenu(panelId, entryId, state.anchorFrame or state.dialog or state.hostFrame) end
 end
 
-function CooldownPanels:FocusEntryStaticTextStandaloneSettings(panelId)
+function CooldownPanels:FocusLayoutEntryStandaloneSettingsGroup(panelId, entryId, targetGroupId)
 	panelId = normalizeId(panelId)
+	entryId = normalizeId(entryId)
 	local lib = addon.EditModeLib
-	local setter = lib and lib.internal and lib.internal.SetCollapseState or nil
+	local focusGroup = lib and lib.internal and lib.internal.FocusSettingGroup or nil
 	local state = self:GetLayoutEntryStandaloneMenuState(false)
-	if not (panelId and setter and state and normalizeId(state.panelId) == panelId and state.hostFrame) then return false end
-	for _, groupId in ipairs(cdp.ENTRY.STANDALONE_COLLAPSIBLE_IDS) do
-		setter(lib.internal, state.hostFrame, groupId, groupId ~= "cooldownPanelStandaloneStaticText")
-	end
-	return true
+	if not (panelId and targetGroupId and focusGroup and state and normalizeId(state.panelId) == panelId and state.hostFrame) then return false end
+	if entryId and normalizeId(state.entryId) ~= entryId then return false end
+	return focusGroup(lib.internal, state.hostFrame, targetGroupId)
+end
+
+function CooldownPanels:FocusEntryStaticTextStandaloneSettings(panelId)
+	return self:FocusLayoutEntryStandaloneSettingsGroup(panelId, nil, "cooldownPanelStandaloneStaticText")
 end
 
 function CooldownPanels:GetEditorStandaloneDialogAnchor()
