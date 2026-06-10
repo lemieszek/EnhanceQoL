@@ -20,6 +20,8 @@
 - Mythic Plus / Timer: Fixed +2/+3 bar time labels not matching the selected timer bar fill direction.
 - Mythic Plus / Timer: Fixed disabled panel timer/enemy bars leaving their border or overlay text visible.
 - Mythic Plus / Timer: Fixed panel element anchor controls staying clickable while their related element was disabled.
+- Mythic Plus / Timer: Fixed timer-bar chest markers being mirrored for the normal countdown fill direction.
+- Mythic Plus / Timer: Fixed the timer display resetting to the dungeon time limit after a completed run.
 - Mythic Plus / Timer: Removed the combat-log death tracking path and now tracks player death details through the unit death event to avoid protected event registration errors.
 - Mythic Plus / Timer: Expanded panel height dynamically for objective lists so bottom-anchored elements no longer overlap longer objective sets.
 - Mythic Plus / Timer: Kept the timer visible inside a Mythic+ instance after the run is completed.

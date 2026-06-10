@@ -693,6 +693,9 @@ function Timer:ResolveRunState()
 			self.timerBaseTime = GetTime and GetTime() or 0
 			elapsed = authoritativeElapsed
 		end
+		self.lastRunElapsed = elapsed
+	elseif self.completedElapsed then
+		elapsed = self.completedElapsed
 	end
 	local level, affixes, mapID = getActiveKeystoneInfo()
 	local mapName, timeLimit = getMapInfo(mapID)
@@ -1690,7 +1693,7 @@ function Timer:UpdatePanelTimerBarChestMarkers(timeLimit, twoChest, threeChest)
 	local threeChestTime = tonumber(threeChest) or 0
 	local twoChestTime = tonumber(twoChest) or 0
 	local function markerPosition(chestTime)
-		local ratio = fillUp and ((timeLimit - chestTime) / timeLimit) or (chestTime / timeLimit)
+		local ratio = fillUp and (chestTime / timeLimit) or ((timeLimit - chestTime) / timeLimit)
 		return width * math.max(0, math.min(1, ratio))
 	end
 	local positions = {
@@ -2744,6 +2747,8 @@ function Timer:Init()
 		if not Timer:IsEnabled() then return end
 		if event == "WORLD_STATE_TIMER_START" or event == "CHALLENGE_MODE_START" then
 			Timer:SyncActiveTimerBase(true)
+			Timer.completedElapsed = nil
+			Timer.lastRunElapsed = nil
 			Timer.objectiveSplits = {}
 			Timer:ResetDeathTracking()
 			Timer:RefreshGroupRoster()
@@ -2758,7 +2763,12 @@ function Timer:Init()
 			if event == "CHALLENGE_MODE_COMPLETED" then Timer:RecordBestTime() end
 			if event == "CHALLENGE_MODE_RESET" then
 				Timer.objectiveSplits = {}
+				Timer.completedElapsed = nil
+				Timer.lastRunElapsed = nil
 				Timer:ResetDeathTracking()
+			else
+				local _, activeElapsed = getActiveChallengeTimer()
+				Timer.completedElapsed = tonumber(activeElapsed) or tonumber(Timer.lastRunElapsed) or tonumber(Timer.lastState and Timer.lastState.elapsed) or 0
 			end
 			Timer:SyncActiveTimerBase(true)
 		end
