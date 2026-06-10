@@ -21,6 +21,7 @@
 - Mythic Plus / Timer: Fixed disabled panel timer/enemy bars leaving their border or overlay text visible.
 - Mythic Plus / Timer: Fixed panel element anchor controls staying clickable while their related element was disabled.
 - Mythic Plus / Timer: Removed the combat-log death tracking path and now tracks player death details through the unit death event to avoid protected event registration errors.
+- Mythic Plus / Timer: Expanded panel height dynamically for objective lists so bottom-anchored elements no longer overlap longer objective sets.
 - Mythic Plus / Timer: Kept the timer visible inside a Mythic+ instance after the run is completed.
 - Mythic Plus / Timer: Reduced timer drift by resyncing against the active challenge timer when it diverges.
 - Mythic Plus / Timer: Improved panel objective spacing for wrapped objective names.

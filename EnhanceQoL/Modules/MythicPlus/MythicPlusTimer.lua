@@ -731,6 +731,7 @@ function Timer:GetPreviewState()
 		objectives = {
 			{ text = L["mythicPlusTimerPreviewObjectiveBosses"] or "Defeat bosses", quantity = 2, total = 4, percent = 50, completed = false, splitTime = 612, bestTime = 580 },
 			{ text = L["mythicPlusTimerPreviewObjectiveRescue"] or "Rescue captives", quantity = 6, total = 6, percent = 100, completed = true, splitTime = 494, bestTime = 510 },
+			{ text = L["mythicPlusTimerPreviewObjectiveRelics"] or "Recover relics", quantity = 1, total = 3, percent = 33, completed = false },
 		},
 		enemyForces = { text = L["mythicPlusTimerEnemyForces"] or "Enemy Forces", quantity = math.floor(enemyPercent), total = 100, percent = enemyPercent, completed = false, splitTime = 760, bestTime = 735 },
 	}
@@ -1734,6 +1735,11 @@ end
 function Timer:RenderPanel(state, timeLeft, twoChest, threeChest)
 	self:HidePanelElements()
 	if self:Get("layoutMode") ~= "PANEL" then return 0 end
+	local frame = self:EnsureFrame()
+	local objectiveHeight = self:Get("showObjectives") and self:RenderPanelObjectives(state) or 0
+	local panelHeight = math.max(clampNumber(self:Get("panelHeight"), 24, 300, defaults.panelHeight), objectiveHeight)
+	frame:SetSize(snapSize(clampNumber(self:Get("width"), 120, 800, defaults.width)), snapSize(panelHeight))
+	self:ApplyFrameStyle()
 	local best = self:GetBestTime(state)
 	if state.preview then best = 1612 end
 	local delta = best and state.elapsed and (state.elapsed - best) or nil
@@ -1758,7 +1764,6 @@ function Timer:RenderPanel(state, timeLeft, twoChest, threeChest)
 		self:SetPanelText("best", bestText, "bestTimeAnchor", "bestTimeOffsetX", "bestTimeOffsetY", self:Get("bestTimeColor"), self:Get("panelBestTimeFontSize"))
 	end
 	if self:Get("showAffixes") then self:RenderPanelAffixes(state) end
-	local objectiveHeight = self:Get("showObjectives") and self:RenderPanelObjectives(state) or 0
 	if self:Get("showPanelTimerBar") then
 		local bar = self:EnsurePanelBar("timer")
 		if bar.textFrame then bar.textFrame:Show() end
@@ -1773,7 +1778,7 @@ function Timer:RenderPanel(state, timeLeft, twoChest, threeChest)
 		self:SetPanelBar("enemy", enemyPercent, 100, "panelEnemyBarAnchor", "panelEnemyBarOffsetX", "panelEnemyBarOffsetY", self:Get("panelEnemyBarColor"))
 		self:SetPanelEnemyBarText(enemyPercent)
 	end
-	return math.max(clampNumber(self:Get("panelHeight"), 24, 300, defaults.panelHeight), objectiveHeight)
+	return panelHeight
 end
 
 function Timer:SetRow(index, data)
