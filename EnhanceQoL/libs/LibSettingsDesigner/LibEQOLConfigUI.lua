@@ -3384,7 +3384,50 @@ local function addInputWidget(row, app, control, opts)
 		editBox:SetPoint("RIGHT", row, "RIGHT", -14, 0)
 	end
 	editBox:SetAutoFocus(false)
-	editBox:SetNumeric(control.numeric == true)
+	local fractionalNumeric = false
+	if control.numeric == true then
+		local minValue = tonumber(control.min)
+		local maxValue = tonumber(control.max)
+		local stepValue = tonumber(control.step)
+		local defaultValue = tonumber(control.default)
+		fractionalNumeric = (minValue and minValue ~= math.floor(minValue))
+			or (maxValue and maxValue ~= math.floor(maxValue))
+			or (stepValue and stepValue ~= math.floor(stepValue))
+			or (defaultValue and defaultValue ~= math.floor(defaultValue))
+	end
+	editBox:SetNumeric(control.numeric == true and not fractionalNumeric)
+	if fractionalNumeric then
+		local allowNegative = tonumber(control.min) and tonumber(control.min) < 0
+		editBox:SetScript("OnTextChanged", function(self, userInput)
+			if not userInput or self._eqolSanitizingText then
+				return
+			end
+			local text = self:GetText() or ""
+			local result = {}
+			local hasDecimal = false
+			local hasSign = false
+			for index = 1, #text do
+				local char = text:sub(index, index)
+				if char:match("%d") then
+					result[#result + 1] = char
+				elseif (char == "." or char == ",") and not hasDecimal then
+					hasDecimal = true
+					result[#result + 1] = "."
+				elseif char == "-" and allowNegative and not hasSign and #result == 0 then
+					hasSign = true
+					result[#result + 1] = char
+				end
+			end
+			local sanitized = table.concat(result)
+			if sanitized ~= text then
+				self._eqolSanitizingText = true
+				local cursorPosition = self:GetCursorPosition()
+				self:SetText(sanitized)
+				self:SetCursorPosition(math.min(cursorPosition, #sanitized))
+				self._eqolSanitizingText = nil
+			end
+		end)
+	end
 	if control.maxChars then editBox:SetMaxLetters(control.maxChars) end
 	if control.readOnly then editBox:SetEnabled(false) end
 	editBox:SetScript("OnEnterPressed", function(self)
