@@ -5,6 +5,7 @@
 
 ### ✨ Added
 
+- Cooldown Panels: Added a Segment Stacks quick setup for bar entries that configures a compact segmented stack bar and opens the stack options for final adjustments.
 - Data Panels: Added an Auto Width option so panels can size their background to the visible stream contents.
 - Data Panels: Added a Player Name stream with optional realm display, class color, and custom text color settings.
 - Data Panels: Made the Hearthstone stream clickable, using the configured random/favorite Hearthstone behavior.

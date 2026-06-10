@@ -199,6 +199,7 @@ local getChargeSegmentDescriptors
 local setBooleanAlpha
 local shouldShowChargeSegmentFill
 local refreshChargeBarRuntimeState
+local BAR_STANDALONE_STACKS_SECTION_ID = "eqolCooldownPanelStandaloneBarStacks"
 
 local function getSettingType()
 	local lib = addon.EditModeLib or (addon.EditMode and addon.EditMode.lib)
@@ -837,9 +838,30 @@ local function supportsBarMode(entry, mode)
 	return resolvedType == "SPELL" or resolvedType == "ITEM" or entry.type == "MACRO" or resolvedType == "CDM_AURA"
 end
 
+local function setPendingStandaloneFocusSection(panelId, entryId, sectionId)
+	panelId = normalizeId(panelId)
+	entryId = normalizeId(entryId)
+	if not (panelId and entryId and sectionId) then return end
+	Bars._eqolPendingStandaloneFocusSection = {
+		panelId = panelId,
+		entryId = entryId,
+		sectionId = sectionId,
+	}
+end
+
+local function consumePendingStandaloneFocusSection(ctx, sectionId)
+	local pending = Bars._eqolPendingStandaloneFocusSection
+	if not (pending and ctx and sectionId) then return false end
+	if normalizeId(pending.panelId) ~= normalizeId(ctx.panelId) or normalizeId(pending.entryId) ~= normalizeId(ctx.entryId) then return false end
+	if pending.sectionId ~= sectionId then return false end
+	Bars._eqolPendingStandaloneFocusSection = nil
+	return true
+end
+
 Bars.EntryHasQuickSetups = function(panelId, entryId)
 	local _, entry = getBarEntry(panelId, entryId)
-	return Bars.IsBarDisplayModeValue(entry and entry.displayMode) and supportsBarMode(entry, Bars.BAR_MODE.CHARGES)
+	return Bars.IsBarDisplayModeValue(entry and entry.displayMode)
+		and (supportsBarMode(entry, Bars.BAR_MODE.CHARGES) or supportsBarMode(entry, Bars.BAR_MODE.STACKS))
 end
 
 Bars.ApplySegmentChargesQuickSetup = function(panelId, entryId)
@@ -865,11 +887,41 @@ Bars.ApplySegmentChargesQuickSetup = function(panelId, entryId)
 	return true
 end
 
+Bars.ApplySegmentStacksQuickSetup = function(panelId, entryId)
+	local _, entry = getBarEntry(panelId, entryId)
+	if not supportsBarMode(entry, Bars.BAR_MODE.STACKS) then return false end
+	mutateBarEntry(panelId, entryId, function(target)
+		target.displayMode = Bars.DISPLAY_MODE.BAR
+		target.barMode = Bars.BAR_MODE.STACKS
+		Bars.ApplyNewBarStyleDefaults(target)
+		if type(target.barColor) ~= "table" then target.barColor = getDefaultBarColorForMode(target.barMode) end
+		target.barWidth = 200
+		target.barShowIcon = false
+		target.barShowLabel = false
+		target.barStacksSegmented = true
+		target.barStackMax = 4
+		target.barStackSeparatedOffset = 4
+		target.barStackDividerColor = { 0.10, 0.10, 0.10, 0 }
+		target.barShowStackText = false
+	end, true)
+	setPendingStandaloneFocusSection(panelId, entryId, BAR_STANDALONE_STACKS_SECTION_ID)
+	refreshStandaloneEntryDialogForBars(panelId, entryId, true)
+	return true
+end
+
 Bars.AppendQuickSetupMenu = function(rootDescription, panelId, entryId)
 	if not rootDescription or not Bars.EntryHasQuickSetups(panelId, entryId) then return false end
-	rootDescription:CreateButton(L["CooldownPanelBarChargesSegmented"] or "Segment charges", function()
-		Bars.ApplySegmentChargesQuickSetup(panelId, entryId)
-	end)
+	local _, entry = getBarEntry(panelId, entryId)
+	if supportsBarMode(entry, Bars.BAR_MODE.CHARGES) then
+		rootDescription:CreateButton(L["CooldownPanelBarChargesSegmented"] or "Segment charges", function()
+			Bars.ApplySegmentChargesQuickSetup(panelId, entryId)
+		end)
+	end
+	if supportsBarMode(entry, Bars.BAR_MODE.STACKS) then
+		rootDescription:CreateButton(L["CooldownPanelBarStacksSegmented"] or "Segment stacks", function()
+			Bars.ApplySegmentStacksQuickSetup(panelId, entryId)
+		end)
+	end
 	return true
 end
 
@@ -5256,8 +5308,8 @@ Bars.AppendBarStandaloneDetailHeaders = function(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["Stacks"] or (L["Stacks"] or "Stacks"),
 		kind = SettingType.Collapsible,
-		id = "eqolCooldownPanelStandaloneBarStacks",
-		defaultCollapsed = true,
+		id = BAR_STANDALONE_STACKS_SECTION_ID,
+		defaultCollapsed = not consumePendingStandaloneFocusSection(ctx, BAR_STANDALONE_STACKS_SECTION_ID),
 		isShown = function()
 			local currentEntry = getStandaloneBarContextEntry(ctx)
 			local mode = normalizeBarMode(currentEntry and currentEntry.barMode, Bars.DEFAULTS.barMode)
@@ -6409,8 +6461,8 @@ Bars.BuildBarStandaloneSettings = function(panelId, entryId)
 	Bars.AppendStandaloneSettingsById(settings, detailSettings, "eqolCooldownPanelStandaloneBarCooldown")
 	Bars.AppendStandaloneSettingsByParent(settings, textSettings, "eqolCooldownPanelStandaloneBarCooldown")
 
-	Bars.AppendStandaloneSettingsById(settings, detailSettings, "eqolCooldownPanelStandaloneBarStacks")
-	Bars.AppendStandaloneSettingsByParent(settings, textSettings, "eqolCooldownPanelStandaloneBarStacks")
+	Bars.AppendStandaloneSettingsById(settings, detailSettings, BAR_STANDALONE_STACKS_SECTION_ID)
+	Bars.AppendStandaloneSettingsByParent(settings, textSettings, BAR_STANDALONE_STACKS_SECTION_ID)
 
 	Bars.AppendStandaloneSettingsById(settings, detailSettings, "eqolCooldownPanelStandaloneBarLabel")
 	Bars.AppendStandaloneSettingsByParent(settings, textSettings, "eqolCooldownPanelStandaloneBarLabel")
