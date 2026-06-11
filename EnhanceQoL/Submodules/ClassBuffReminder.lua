@@ -2791,7 +2791,7 @@ end
 
 function Reminder:GetShamanPreferredShieldDisplaySpellId(provider)
 	local specId = self and self.GetCurrentSpecId and self:GetCurrentSpecId() or nil
-	if specId == Reminder.shamanReminder.specRestoration or isUnitHealerRole("player") then
+	if specId == Reminder.shamanReminder.specRestoration then
 		return normalizeSpellId(provider and provider.waterShieldDisplaySpellId) or normalizeSpellId(provider and provider.waterShieldSpellIds and provider.waterShieldSpellIds[1]) or 52127
 	end
 	return normalizeSpellId(provider and provider.lightningShieldDisplaySpellId) or normalizeSpellId(provider and provider.lightningShieldSpellIds and provider.lightningShieldSpellIds[1]) or 192106
@@ -2814,40 +2814,46 @@ function Reminder:AppendShamanShieldMissingEntries(provider, missingEntries)
 	local hasWaterShield = self:UnitHasAnyAuraSpellIdOrDerivedName("player", provider.waterShieldSpellIds)
 	local earthShieldDisplaySpellId = normalizeSpellId(provider.earthShieldDisplaySpellId) or normalizeSpellId(provider.earthShieldSpellIds and provider.earthShieldSpellIds[1]) or 974
 	local earthShieldLabel = safeGetSpellName(earthShieldDisplaySpellId) or "Earth Shield"
+	local hasSelfEarthShield = self:UnitHasAnyAuraSpellIdOrDerivedName("player", provider.earthShieldSelfSpellIds)
+	if not hasSelfEarthShield then hasSelfEarthShield = self:UnitHasAnyAuraSpellIdOrDerivedName("player", provider.earthShieldSpellIds) end
 	local hasEarthShieldOnOther, otherEarthShieldUnitCount = self:AnyOtherEligibleUnitHasAnyAuraSpellId(provider.earthShieldSpellIds)
-	local shouldTrackEarthShieldOnOther = otherEarthShieldUnitCount > 0 and hasKnownSpellInList(provider.earthShieldSpellIds)
+	local canTrackEarthShieldOnOther = otherEarthShieldUnitCount > 0 and hasKnownSpellInList(provider.earthShieldSpellIds)
 
 	if hasElementalOrbit then
-		local hasEarthShield = self:UnitHasAnyAuraSpellIdOrDerivedName("player", provider.earthShieldSelfSpellIds)
-		if not hasEarthShield then hasEarthShield = self:UnitHasAnyAuraSpellIdOrDerivedName("player", provider.earthShieldSpellIds) end
-
-		totalRequirements = totalRequirements + 1
-		if not hasEarthShield then missingEntries[#missingEntries + 1] = makeSelfMissingEntry(earthShieldDisplaySpellId, earthShieldLabel) end
-
-		if shouldTrackEarthShieldOnOther then
-			totalRequirements = totalRequirements + 1
-			if not hasEarthShieldOnOther then missingEntries[#missingEntries + 1] = makeSelfMissingEntry(earthShieldDisplaySpellId, earthShieldLabel) end
-		end
-
 		if not ignoreBasicShields then
-			totalRequirements = totalRequirements + 1
-			if not (hasLightningShield or hasWaterShield) then missingEntries[#missingEntries + 1] = makeSelfMissingEntry(preferredShieldDisplaySpellId, preferredShieldLabel) end
+			totalRequirements = totalRequirements + 2
+			local selfShieldCount = (hasSelfEarthShield and 1 or 0) + (hasLightningShield and 1 or 0) + (hasWaterShield and 1 or 0)
+			if selfShieldCount < 2 then
+				if selfShieldCount <= 0 then
+					missingEntries[#missingEntries + 1] = makeSelfMissingEntry(earthShieldDisplaySpellId, earthShieldLabel)
+					missingEntries[#missingEntries + 1] = makeSelfMissingEntry(preferredShieldDisplaySpellId, preferredShieldLabel)
+				elseif hasSelfEarthShield then
+					missingEntries[#missingEntries + 1] = makeSelfMissingEntry(preferredShieldDisplaySpellId, preferredShieldLabel)
+				else
+					missingEntries[#missingEntries + 1] = makeSelfMissingEntry(earthShieldDisplaySpellId, earthShieldLabel)
+				end
+			end
+
+			if canTrackEarthShieldOnOther then
+				totalRequirements = totalRequirements + 1
+				if not hasEarthShieldOnOther then missingEntries[#missingEntries + 1] = makeSelfMissingEntry(earthShieldDisplaySpellId, earthShieldLabel, nil, nil, nil, 237580) end
+			end
 		end
 
 		return totalRequirements
 	end
 
-	if shouldTrackEarthShieldOnOther then
-		totalRequirements = totalRequirements + 1
-		if not hasEarthShieldOnOther then missingEntries[#missingEntries + 1] = makeSelfMissingEntry(earthShieldDisplaySpellId, earthShieldLabel) end
-	end
-
 	if ignoreBasicShields then return totalRequirements end
 
 	totalRequirements = totalRequirements + 1
-	local hasAnyShield = self:UnitHasAnyAuraSpellIdOrDerivedName("player", provider.shieldSpellIds)
-	if not hasAnyShield and provider.earthShieldSelfSpellIds then hasAnyShield = self:UnitHasAnyAuraSpellIdOrDerivedName("player", provider.earthShieldSelfSpellIds) end
+	local hasAnyShield = hasSelfEarthShield or hasLightningShield or hasWaterShield
 	if not hasAnyShield then missingEntries[#missingEntries + 1] = makeSelfMissingEntry(preferredShieldDisplaySpellId, preferredShieldLabel) end
+
+	if not hasSelfEarthShield and (hasLightningShield or hasWaterShield) and canTrackEarthShieldOnOther then
+		totalRequirements = totalRequirements + 1
+		if not hasEarthShieldOnOther then missingEntries[#missingEntries + 1] = makeSelfMissingEntry(earthShieldDisplaySpellId, earthShieldLabel, nil, nil, nil, 237580) end
+	end
+
 	return totalRequirements
 end
 
