@@ -18,6 +18,9 @@
 
 - Bags: Bag search now temporarily opens collapsed categories that contain matching items, so search results are no longer hidden behind closed category headers.
 - Class Buff Reminder: Buff food, flask, and Shaman shield reminders now update immediately when the matching aura changes, and Shaman Earth Shield requirements now follow the active shield-cap rules with and without Elemental Orbit.
+- Mythic Plus / Timer: Fixed disabled panel timer and enemy forces bars still showing their border.
+- Mythic Plus / Timer: Added more panel objective layout controls, including anchor, column spacing, inverted columns, and an option to hide non-boss objectives.
+- Mythic Plus / Timer: Added an optional time-left label directly on the panel timer bar with position, size, and color controls.
 
 ---
 

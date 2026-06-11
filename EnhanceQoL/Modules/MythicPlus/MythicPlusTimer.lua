@@ -46,6 +46,7 @@ Timer.defaults = Timer.defaults
 		deathShowTimeLost = true,
 		showObjectives = true,
 		showObjectiveValues = true,
+		hideNonBossObjectives = false,
 		showEnemyForces = true,
 		showObjectiveBars = true,
 		showObjectiveTimes = true,
@@ -110,6 +111,8 @@ Timer.defaults = Timer.defaults
 		panelObjectivesFontOutline = GLOBAL_STYLE_KEY,
 		panelObjectivesFontSize = 12,
 		panelObjectivesSpacing = 2,
+		panelObjectivesColumnSpacing = 6,
+		panelObjectivesInvertColumns = false,
 		panelBarWidth = 220,
 		panelBarHeight = 8,
 		panelTimerBarWidth = 290,
@@ -134,6 +137,11 @@ Timer.defaults = Timer.defaults
 		panelTimerBarChestTimeTextOffsetY = 14,
 		panelTimerBarChestTimeTextFontSize = 14,
 		panelTimerBarChestTimeTextColor = { r = 0.55, g = 0.85, b = 1, a = 1 },
+		panelTimerBarTimeLeftText = false,
+		panelTimerBarTimeLeftTextOffsetX = 0,
+		panelTimerBarTimeLeftTextOffsetY = 14,
+		panelTimerBarTimeLeftTextFontSize = 14,
+		panelTimerBarTimeLeftTextColor = { r = 1, g = 1, b = 1, a = 1 },
 		panelTimerBarFillUp = false,
 		panelTimerBarAnchor = "TOP",
 		panelTimerBarOffsetX = 0,
@@ -674,6 +682,7 @@ local function getObjectiveData()
 				total = total,
 				percent = percent,
 				completed = info.completed == true,
+				isBoss = not info.isWeightedProgress and total == 1,
 			}
 			if info.isWeightedProgress or description == _G.SCENARIO_CRITERIA_UNKNOWN or tostring(description):lower():find("enemy forces", 1, true) then
 				enemyForces = objective
@@ -792,7 +801,7 @@ function Timer:GetPreviewState()
 			{ name = "GroupMember5", class = "SHAMAN", count = 1 },
 		},
 		objectives = {
-			{ text = L["mythicPlusTimerPreviewObjectiveBosses"] or "Defeat bosses", quantity = 2, total = 4, percent = 50, completed = false, splitTime = 612, bestTime = 580 },
+			{ text = L["mythicPlusTimerPreviewObjectiveBosses"] or "Defeat bosses", quantity = 2, total = 4, percent = 50, completed = false, splitTime = 612, bestTime = 580, isBoss = true },
 			{ text = L["mythicPlusTimerPreviewObjectiveRescue"] or "Rescue captives", quantity = 6, total = 6, percent = 100, completed = true, splitTime = 494, bestTime = 510 },
 			{ text = L["mythicPlusTimerPreviewObjectiveRelics"] or "Recover relics", quantity = 1, total = 3, percent = 33, completed = false },
 		},
@@ -1224,6 +1233,9 @@ function Timer:EnsurePanelBar(key)
 	bar.text = bar.textFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	bar.text:SetDrawLayer("OVERLAY", 9)
 	bar.text:Hide()
+	bar.timeLeftText = bar.textFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	bar.timeLeftText:SetDrawLayer("OVERLAY", 9)
+	bar.timeLeftText:Hide()
 	bar.borderFrame = CreateFrame("Frame", nil, frame, BackdropTemplateMixin and "BackdropTemplate")
 	bar.borderFrame:EnableMouse(false)
 	bar.borderFrame:Hide()
@@ -1258,6 +1270,7 @@ function Timer:HidePanelElements()
 		if bar.textFrame then bar.textFrame:Hide() end
 		if bar.chestMarkerTextFrame then bar.chestMarkerTextFrame:Hide() end
 		if bar.text then bar.text:Hide() end
+		if bar.timeLeftText then bar.timeLeftText:Hide() end
 		for _, marker in ipairs(bar.chestMarkers or {}) do
 			marker:Hide()
 		end
@@ -1428,6 +1441,7 @@ function Timer:ApplyFrameStyle()
 	for _, bar in pairs(frame.panelBars or {}) do
 		bar:SetFrameLevel(math.max(0, frame:GetFrameLevel() + 1))
 		local prefix = bar.eqolBarKey == "enemy" and "panelEnemyBar" or "panelTimerBar"
+		local visibleKey = bar.eqolBarKey == "enemy" and "showPanelEnemyBar" or "showPanelTimerBar"
 		local panelTexture = resolveMedia("statusbar", self:Get(prefix .. "Texture") or self:Get("texture"), DEFAULT_STATUSBAR)
 		local panelBgTexture = resolveMedia("statusbar", self:Get(prefix .. "BackgroundTexture") or self:Get("barBackgroundTexture"), DEFAULT_STATUSBAR)
 		local panelBgColor = normalizeColor(self:Get(prefix .. "BackgroundColor") or self:Get("barBackgroundColor"), defaults[prefix .. "BackgroundColor"] or defaults.barBackgroundColor)
@@ -1441,7 +1455,7 @@ function Timer:ApplyFrameStyle()
 			local panelBorderOffsetX, panelBorderOffsetY = getBorderOffsets(function(key) return self:Get(key) end, prefix .. "Border", prefix .. "BorderOffset")
 			applyBorderOffset(bar.borderFrame, bar, panelBorderOffsetX, panelBorderOffsetY)
 		end
-		if self:Get(prefix .. "BorderEnabled") then
+		if self:Get(visibleKey) and self:Get(prefix .. "BorderEnabled") then
 			if bar.borderFrame then
 				bar.borderFrame:SetBackdrop({
 					edgeFile = panelBorderTexture,
@@ -1680,6 +1694,7 @@ function Timer:RenderPanelObjectives(state)
 	local style = normalizeFontStyle(self:Get("panelObjectivesFontOutline"))
 	local fontSize = clampNumber(self:Get("panelObjectivesFontSize"), 8, 56, defaults.panelObjectivesFontSize)
 	local spacing = snapToPixel(clampNumber(self:Get("panelObjectivesSpacing"), 0, 24, defaults.panelObjectivesSpacing))
+	local columnSpacing = snapToPixel(clampNumber(self:Get("panelObjectivesColumnSpacing"), 0, 80, defaults.panelObjectivesColumnSpacing))
 	local x = pointOffset(self:Get("panelObjectivesOffsetX"), -800, 800, defaults.panelObjectivesOffsetX)
 	local y = pointOffset(self:Get("panelObjectivesOffsetY"), -800, 800, defaults.panelObjectivesOffsetY)
 	local baseRowHeight = snapSize(fontSize + 2)
@@ -1687,9 +1702,17 @@ function Timer:RenderPanelObjectives(state)
 	local width = snapSize(math.max(80, frameWidth - math.abs(x) * 2 - 12))
 	local rowsHeight = 0
 	local growUp = self:Get("panelObjectivesGrowth") == "UP"
+	local anchor = normalizePoint(self:Get("panelObjectivesAnchor"))
+	local invertColumns = self:Get("panelObjectivesInvertColumns") == true
+	local hideNonBoss = self:Get("hideNonBossObjectives") == true
 	local previous
+	local shownIndex = 0
 	for index, objective in ipairs(state.objectives) do
 		local item = self:EnsurePanelObjective(index)
+		if hideNonBoss and objective.isBoss ~= true then
+			item:Hide()
+		else
+			shownIndex = shownIndex + 1
 		local color = normalizeColor(objective.completed and self:Get("objectiveCompleteColor") or self:Get("objectiveColor"), defaults.objectiveColor)
 		local valueText = self:FormatObjectiveValue(state, objective)
 		local valueWidth = valueText ~= "" and 70 or 0
@@ -1702,13 +1725,31 @@ function Timer:RenderPanelObjectives(state)
 		item.text:SetNonSpaceWrap(false)
 		item.text:SetTextColor(color.r, color.g, color.b, color.a)
 		item.text:ClearAllPoints()
-		item.text:SetPoint("TOPLEFT", item, "TOPLEFT", 0, 0)
-		item.text:SetPoint("RIGHT", item, "RIGHT", -valueWidth, 0)
 		applyFontString(item.value, font, fontSize, style)
 		item.value:SetText(valueText)
 		item.value:SetTextColor(color.r, color.g, color.b, color.a)
 		item.value:ClearAllPoints()
-		item.value:SetPoint("TOPRIGHT", item, "TOPRIGHT", 0, 0)
+		if invertColumns then
+			item.text:SetJustifyH("RIGHT")
+			item.value:SetJustifyH("LEFT")
+			if valueWidth > 0 then
+				item.value:SetPoint("TOPLEFT", item, "TOPLEFT", 0, 0)
+				item.value:SetWidth(valueWidth)
+				item.text:SetPoint("TOPLEFT", item, "TOPLEFT", valueWidth + columnSpacing, 0)
+			else
+				item.text:SetPoint("TOPLEFT", item, "TOPLEFT", 0, 0)
+			end
+			item.text:SetPoint("RIGHT", item, "RIGHT", 0, 0)
+		else
+			item.text:SetJustifyH("LEFT")
+			item.value:SetJustifyH("RIGHT")
+			item.text:SetPoint("TOPLEFT", item, "TOPLEFT", 0, 0)
+			item.text:SetPoint("RIGHT", item, "RIGHT", valueWidth > 0 and -(valueWidth + columnSpacing) or 0, 0)
+			if valueWidth > 0 then
+				item.value:SetPoint("TOPRIGHT", item, "TOPRIGHT", 0, 0)
+				item.value:SetWidth(valueWidth)
+			end
+		end
 		local textHeight = item.text:GetStringHeight() or baseRowHeight
 		local valueHeight = item.value:GetStringHeight() or baseRowHeight
 		local itemHeight = snapSize(math.max(baseRowHeight, textHeight, valueHeight) + 2)
@@ -1722,20 +1763,25 @@ function Timer:RenderPanelObjectives(state)
 			end
 		else
 			if growUp then
-				item:SetPoint("BOTTOM", frame, "TOP", x, y)
+				item:SetPoint("BOTTOM" .. (anchor:find("LEFT", 1, true) and "LEFT" or anchor:find("RIGHT", 1, true) and "RIGHT" or ""), frame, anchor, x, y)
 			else
-				item:SetPoint("TOP", frame, "TOP", x, y)
+				item:SetPoint("TOP" .. (anchor:find("LEFT", 1, true) and "LEFT" or anchor:find("RIGHT", 1, true) and "RIGHT" or ""), frame, anchor, x, y)
 			end
 		end
 		rowsHeight = rowsHeight + itemHeight
-		if index > 1 then rowsHeight = rowsHeight + spacing end
+		if shownIndex > 1 then rowsHeight = rowsHeight + spacing end
 		item:Show()
 		previous = item
+		end
 	end
+	for index = #state.objectives + 1, #(frame.panelObjectives or {}) do
+		frame.panelObjectives[index]:Hide()
+	end
+	if shownIndex == 0 then return 0 end
 	if growUp then
-		return math.max(0, -y) + 6
+		return math.max(0, math.abs(y)) + rowsHeight + 6
 	end
-	return math.max(0, -y) + rowsHeight + 6
+	return math.max(0, math.abs(y)) + rowsHeight + 6
 end
 
 function Timer:ShouldShowDeathDisplay(state)
@@ -1823,6 +1869,35 @@ function Timer:SetPanelEnemyBarText(percent)
 		bar.text:SetPoint("CENTER", bar, "CENTER", 0, offsetY)
 	end
 	bar.text:Show()
+end
+
+function Timer:SetPanelTimerBarTimeLeftText(timeLeft)
+	local frame = self.frame
+	local bar = frame and frame.panelBars and frame.panelBars.timer
+	if not (bar and bar.timeLeftText) then return end
+	if not self:Get("panelTimerBarTimeLeftText") then
+		bar.timeLeftText:Hide()
+		return
+	end
+	local fillUp = self:Get("panelTimerBarFillUp") == true
+	local font = resolveFont(self:Get("fontFace"))
+	local style = normalizeFontStyle(self:Get("fontOutline"))
+	local fontSize = clampNumber(self:Get("panelTimerBarTimeLeftTextFontSize"), 8, 56, defaults.panelTimerBarTimeLeftTextFontSize)
+	local color = normalizeColor(self:Get("panelTimerBarTimeLeftTextColor"), defaults.panelTimerBarTimeLeftTextColor)
+	local offsetX = pointOffset(self:Get("panelTimerBarTimeLeftTextOffsetX"), -200, 200, defaults.panelTimerBarTimeLeftTextOffsetX)
+	local offsetY = pointOffset(self:Get("panelTimerBarTimeLeftTextOffsetY"), -100, 100, defaults.panelTimerBarTimeLeftTextOffsetY)
+	bar.timeLeftText:ClearAllPoints()
+	applyFontString(bar.timeLeftText, font, fontSize, style)
+	bar.timeLeftText:SetText(secondsToText(math.max(0, tonumber(timeLeft) or 0)))
+	bar.timeLeftText:SetTextColor(color.r, color.g, color.b, color.a)
+	if fillUp then
+		bar.timeLeftText:SetJustifyH("RIGHT")
+		bar.timeLeftText:SetPoint("RIGHT", bar, "RIGHT", offsetX, offsetY)
+	else
+		bar.timeLeftText:SetJustifyH("LEFT")
+		bar.timeLeftText:SetPoint("LEFT", bar, "LEFT", offsetX, offsetY)
+	end
+	bar.timeLeftText:Show()
 end
 
 function Timer:UpdatePanelTimerBarChestMarkers(timeLimit, twoChest, threeChest)
@@ -1938,6 +2013,7 @@ function Timer:RenderPanel(state, timeLeft, twoChest, threeChest)
 		local timerBarValue = self:Get("panelTimerBarFillUp") == true and math.min(state.timeLimit or 1, math.max(0, elapsed)) or math.max(0, timeLeft)
 		self:SetPanelBar("timer", timerBarValue, state.timeLimit or 1, "panelTimerBarAnchor", "panelTimerBarOffsetX", "panelTimerBarOffsetY", timeLeft <= 0 and self:Get("panelTimerBarExpiredColor") or self:Get("panelTimerBarColor"))
 		self:UpdatePanelTimerBarChestMarkers(state.timeLimit or 0, twoChest, threeChest)
+		self:SetPanelTimerBarTimeLeftText(timeLeft)
 	end
 	if self:Get("showPanelEnemyBar") then
 		local bar = self:EnsurePanelBar("enemy")
@@ -2708,6 +2784,11 @@ function Timer:BuildEditModeSettings()
 		sliderSetting(L["mythicPlusTimerPanelTimerBarChestTimeTextOffsetY"] or "+2/+3 time text Y offset", get("panelTimerBarChestTimeTextOffsetY"), set("panelTimerBarChestTimeTextOffsetY", function(value) return clampNumber(value, -100, 100, defaults.panelTimerBarChestTimeTextOffsetY) end), -100, 100, 1, "mpt-panel-time", nil, allEnabled("showPanelTimerBar", "panelTimerBarChestTimeText")),
 		sliderSetting(L["mythicPlusTimerPanelTimerBarChestTimeTextFontSize"] or "+2/+3 time text font size", get("panelTimerBarChestTimeTextFontSize"), set("panelTimerBarChestTimeTextFontSize", function(value) return clampNumber(value, 8, 56, defaults.panelTimerBarChestTimeTextFontSize) end), 8, 56, 1, "mpt-panel-time", nil, allEnabled("showPanelTimerBar", "panelTimerBarChestTimeText")),
 		colorSetting(L["mythicPlusTimerPanelTimerBarChestTimeTextColor"] or "+2/+3 time text color", get("panelTimerBarChestTimeTextColor"), set("panelTimerBarChestTimeTextColor"), defaults.panelTimerBarChestTimeTextColor, "mpt-panel-time", allEnabled("showPanelTimerBar", "panelTimerBarChestTimeText")),
+		checkboxSetting(L["mythicPlusTimerPanelTimerBarTimeLeftText"] or "Show time left on bar", get("panelTimerBarTimeLeftText"), set("panelTimerBarTimeLeftText", nil, true), "mpt-panel-time", enabledWhen("showPanelTimerBar"), shownWhen("showPanelTimerBar")),
+		sliderSetting(L["mythicPlusTimerPanelTimerBarTimeLeftTextOffsetX"] or "Time left text X offset", get("panelTimerBarTimeLeftTextOffsetX"), set("panelTimerBarTimeLeftTextOffsetX", function(value) return clampNumber(value, -200, 200, defaults.panelTimerBarTimeLeftTextOffsetX) end), -200, 200, 1, "mpt-panel-time", nil, allEnabled("showPanelTimerBar", "panelTimerBarTimeLeftText"), allShown("showPanelTimerBar", "panelTimerBarTimeLeftText")),
+		sliderSetting(L["mythicPlusTimerPanelTimerBarTimeLeftTextOffsetY"] or "Time left text Y offset", get("panelTimerBarTimeLeftTextOffsetY"), set("panelTimerBarTimeLeftTextOffsetY", function(value) return clampNumber(value, -100, 100, defaults.panelTimerBarTimeLeftTextOffsetY) end), -100, 100, 1, "mpt-panel-time", nil, allEnabled("showPanelTimerBar", "panelTimerBarTimeLeftText"), allShown("showPanelTimerBar", "panelTimerBarTimeLeftText")),
+		sliderSetting(L["mythicPlusTimerPanelTimerBarTimeLeftTextFontSize"] or "Time left text size", get("panelTimerBarTimeLeftTextFontSize"), set("panelTimerBarTimeLeftTextFontSize", function(value) return clampNumber(value, 8, 56, defaults.panelTimerBarTimeLeftTextFontSize) end), 8, 56, 1, "mpt-panel-time", nil, allEnabled("showPanelTimerBar", "panelTimerBarTimeLeftText"), allShown("showPanelTimerBar", "panelTimerBarTimeLeftText")),
+		colorSetting(L["mythicPlusTimerPanelTimerBarTimeLeftTextColor"] or "Time left text color", get("panelTimerBarTimeLeftTextColor"), set("panelTimerBarTimeLeftTextColor"), defaults.panelTimerBarTimeLeftTextColor, "mpt-panel-time", allEnabled("showPanelTimerBar", "panelTimerBarTimeLeftText"), allShown("showPanelTimerBar", "panelTimerBarTimeLeftText")),
 		checkboxSetting(L["mythicPlusTimerPanelTimerBarFillUp"] or "Fill timer bar up", get("panelTimerBarFillUp"), set("panelTimerBarFillUp"), "mpt-panel-time", enabledWhen("showPanelTimerBar")),
 		anchorSetting("panelTimerBarAnchor", "mpt-panel-time", nil, L["Anchor"] or "Anchor", enabledWhen("showPanelTimerBar")),
 		sliderSetting(L["mythicPlusTimerPanelTimerBarOffsetX"] or L["Offset X"] or "Offset X", get("panelTimerBarOffsetX"), set("panelTimerBarOffsetX", function(value) return clampNumber(value, -800, 800, defaults.panelTimerBarOffsetX) end), -800, 800, 1, "mpt-panel-time", nil, enabledWhen("showPanelTimerBar")),
@@ -2769,14 +2850,18 @@ function Timer:BuildEditModeSettings()
 		{ name = L["mythicPlusTimerPanelObjectives"] or "Objectives", kind = SettingType.Collapsible, id = "mpt-panel-objectives", defaultCollapsed = true },
 		checkboxSetting(L["mythicPlusTimerShowObjectives"] or "Show objectives", get("showObjectives"), set("showObjectives", nil, true), "mpt-panel-objectives"),
 		checkboxSetting(L["mythicPlusTimerShowObjectiveValues"] or "Show objective values", get("showObjectiveValues"), set("showObjectiveValues", nil, true), "mpt-panel-objectives", enabledWhen("showObjectives"), shownWhen("showObjectives")),
+		checkboxSetting(L["mythicPlusTimerHideNonBossObjectives"] or "Hide non-boss objectives", get("hideNonBossObjectives"), set("hideNonBossObjectives"), "mpt-panel-objectives", enabledWhen("showObjectives"), shownWhen("showObjectives")),
 		checkboxSetting(L["mythicPlusTimerShowObjectiveTimes"] or "Show objective times", get("showObjectiveTimes"), set("showObjectiveTimes", nil, true), "mpt-panel-objectives", enabledWhen("showObjectives"), shownWhen("showObjectives")),
 		checkboxSetting(L["mythicPlusTimerShowObjectiveBestTimes"] or "Show objective best deltas", get("showObjectiveBestTimes"), set("showObjectiveBestTimes"), "mpt-panel-objectives", objectiveTimesEnabled, objectiveTimesEnabled),
 		dropdownSetting(L["mythicPlusTimerFont"] or "Font", get("panelObjectivesFontFace"), set("panelObjectivesFontFace"), function() return buildMediaOptions("font", true) end, "mpt-panel-objectives", 260, enabledWhen("showObjectives"), shownWhen("showObjectives")),
 		dropdownSetting(L["mythicPlusTimerFontOutline"] or "Font outline", get("panelObjectivesFontOutline"), set("panelObjectivesFontOutline", normalizeFontStyle), buildStyleOptions, "mpt-panel-objectives", 180, enabledWhen("showObjectives"), shownWhen("showObjectives")),
 		sliderSetting(L["mythicPlusTimerPanelObjectivesFontSize"] or L["Text size"] or "Text size", get("panelObjectivesFontSize"), set("panelObjectivesFontSize", function(value) return clampNumber(value, 8, 56, defaults.panelObjectivesFontSize) end), 8, 56, 1, "mpt-panel-objectives", nil, enabledWhen("showObjectives"), shownWhen("showObjectives")),
 		sliderSetting(L["mythicPlusTimerPanelObjectivesSpacing"] or "Spacing", get("panelObjectivesSpacing"), set("panelObjectivesSpacing", function(value) return clampNumber(value, 0, 24, defaults.panelObjectivesSpacing) end), 0, 24, 1, "mpt-panel-objectives", nil, enabledWhen("showObjectives"), shownWhen("showObjectives")),
+		sliderSetting(L["mythicPlusTimerPanelObjectivesColumnSpacing"] or "Column spacing", get("panelObjectivesColumnSpacing"), set("panelObjectivesColumnSpacing", function(value) return clampNumber(value, 0, 80, defaults.panelObjectivesColumnSpacing) end), 0, 80, 1, "mpt-panel-objectives", nil, enabledWhen("showObjectives"), shownWhen("showObjectives")),
+		checkboxSetting(L["mythicPlusTimerPanelObjectivesInvertColumns"] or "Invert columns", get("panelObjectivesInvertColumns"), set("panelObjectivesInvertColumns"), "mpt-panel-objectives", enabledWhen("showObjectives"), shownWhen("showObjectives")),
 		colorSetting(L["mythicPlusTimerObjectiveColor"] or "Objective color", get("objectiveColor"), set("objectiveColor"), defaults.objectiveColor, "mpt-panel-objectives", enabledWhen("showObjectives"), shownWhen("showObjectives")),
 		colorSetting(L["mythicPlusTimerObjectiveCompleteColor"] or "Completed objective color", get("objectiveCompleteColor"), set("objectiveCompleteColor"), defaults.objectiveCompleteColor, "mpt-panel-objectives", enabledWhen("showObjectives"), shownWhen("showObjectives")),
+		anchorSetting("panelObjectivesAnchor", "mpt-panel-objectives", shownWhen("showObjectives"), L["mythicPlusTimerPanelObjectivesAnchor"] or L["Anchor"] or "Anchor", enabledWhen("showObjectives")),
 		dropdownSetting(L["mythicPlusTimerGrowth"] or "Growth direction", get("panelObjectivesGrowth"), set("panelObjectivesGrowth", function(value) return value == "UP" and "UP" or "DOWN" end), {
 			{ value = "DOWN", label = L["damageMeterRowsGrowDown"] or "Down" },
 			{ value = "UP", label = L["damageMeterRowsGrowUp"] or "Up" },
