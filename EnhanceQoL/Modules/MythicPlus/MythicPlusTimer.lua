@@ -1,4 +1,4 @@
--- luacheck: globals UIParent BackdropTemplateMixin CreateFrame C_ChallengeMode C_ScenarioInfo C_Spell C_Timer CUSTOM_CLASS_COLORS Enum GameTooltip GameTooltip_Hide GetInstanceInfo GetNumGroupMembers GetTime GetWorldElapsedTime GetWorldElapsedTimers InCombatLockdown IsInInstance IsInRaid RAID_CLASS_COLORS SecondsToClock UnitClassFromGUID UnitGUID UnitIsDeadOrGhost UnitNameFromGUID issecretvalue IsInGroup GetNumSubgroupMembers LE_PARTY_CATEGORY_INSTANCE
+-- luacheck: globals UIParent BackdropTemplateMixin CreateFrame C_ChallengeMode C_ScenarioInfo C_Spell C_Timer CUSTOM_CLASS_COLORS Enum GameTooltip GameTooltip_Hide GetInstanceInfo GetNumGroupMembers GetTime GetWorldElapsedTime GetWorldElapsedTimers InCombatLockdown IsInInstance IsInRaid RAID_CLASS_COLORS SecondsToClock UnitClass UnitClassFromGUID UnitGUID UnitIsDeadOrGhost UnitName UnitNameFromGUID hooksecurefunc issecretvalue IsInGroup GetNumSubgroupMembers LE_PARTY_CATEGORY_INSTANCE
 local parentAddonName = "EnhanceQoL"
 local addonName, addon = ...
 
@@ -559,6 +559,38 @@ local function isSecretValue(value)
 	return issecretvalue and issecretvalue(value)
 end
 
+local function getCompletionElapsed()
+	if not (C_ChallengeMode and C_ChallengeMode.GetChallengeCompletionInfo) then return nil end
+	local ok, info = pcall(C_ChallengeMode.GetChallengeCompletionInfo)
+	if not ok or type(info) ~= "table" or isSecretValue(info.time) then return nil end
+	local completionTime = tonumber(info.time)
+	if completionTime and completionTime > 0 then return completionTime / 1000 end
+	return nil
+end
+
+local function getCompletionInfo()
+	if not (C_ChallengeMode and C_ChallengeMode.GetChallengeCompletionInfo) then return nil end
+	local ok, info = pcall(C_ChallengeMode.GetChallengeCompletionInfo)
+	if ok and type(info) == "table" then return info end
+	return nil
+end
+
+local function getCompletionNumber(info, key)
+	if not (type(info) == "table" and key) then return nil end
+	local value = info[key]
+	if isSecretValue(value) then return nil end
+	return tonumber(value)
+end
+
+local function getNameFromUnit(unit)
+	if not UnitName then return nil end
+	local name, server = UnitName(unit)
+	if isSecretValue(name) or isSecretValue(server) then return nil end
+	if not name or name == "" then return nil end
+	if server and server ~= "" then return name .. "-" .. server end
+	return name
+end
+
 local function getNameFromGUID(guid)
 	if not UnitNameFromGUID then return nil end
 	local ok, name, server = pcall(UnitNameFromGUID, guid)
@@ -566,6 +598,13 @@ local function getNameFromGUID(guid)
 	if not name or name == "" then return nil end
 	if server and server ~= "" then return name .. "-" .. server end
 	return name
+end
+
+local function getClassFromUnit(unit)
+	if not UnitClass then return nil end
+	local _, classFile = UnitClass(unit)
+	if not isSecretValue(classFile) then return classFile end
+	return nil
 end
 
 local function getClassFromGUID(guid)
@@ -646,6 +685,15 @@ local function getObjectiveData()
 	return objectives, enemyForces
 end
 
+local function cloneTable(value)
+	if type(value) ~= "table" then return value end
+	local copy = {}
+	for key, entry in pairs(value) do
+		copy[key] = cloneTable(entry)
+	end
+	return copy
+end
+
 function Timer:IsEnabled()
 	return self:Get("enabled") == true
 end
@@ -698,16 +746,28 @@ function Timer:ResolveRunState()
 		elapsed = self.completedElapsed
 	end
 	local level, affixes, mapID = getActiveKeystoneInfo()
+	if not active and self.completedInfo then
+		level = getCompletionNumber(self.completedInfo, "level") or level
+		mapID = getCompletionNumber(self.completedInfo, "mapChallengeModeID") or mapID
+	end
+	if not active and self.lastRunInfo then
+		if not level or level <= 0 then level = tonumber(self.lastRunInfo.level) or level end
+		if not mapID then mapID = tonumber(self.lastRunInfo.mapID) end
+		if type(affixes) ~= "table" or #affixes == 0 then affixes = self.lastRunInfo.affixes or affixes end
+	end
 	local mapName, timeLimit = getMapInfo(mapID)
+	if (not mapName or mapName == "") and self.lastRunInfo then mapName = self.lastRunInfo.mapName end
+	if (not timeLimit or timeLimit <= 0) and self.lastRunInfo then timeLimit = self.lastRunInfo.timeLimit end
 	return {
 		active = active,
+		completed = not active and self.completedElapsed ~= nil,
 		timerID = timerID,
 		level = level,
 		affixes = affixes,
 		mapID = mapID,
 		mapName = mapName,
 		timeLimit = timeLimit or 1800,
-		elapsed = active and math.max(0, elapsed or 0) or 0,
+		elapsed = math.max(0, elapsed or 0),
 	}
 end
 
@@ -745,6 +805,29 @@ function Timer:BuildState()
 	local state = self:ResolveRunState()
 	local objectives, enemyForces = getObjectiveData()
 	local deaths, timeLost = getDeathInfo()
+	self:ReconcileDeathCount(deaths)
+	if state.active then
+		self.lastRunInfo = {
+			level = state.level,
+			affixes = cloneTable(state.affixes),
+			mapID = state.mapID,
+			mapName = state.mapName,
+			timeLimit = state.timeLimit,
+		}
+		self.lastObjectives = cloneTable(objectives)
+		self.lastEnemyForces = cloneTable(enemyForces)
+	elseif state.completed then
+		if (not objectives or #objectives == 0) and type(self.lastObjectives) == "table" then objectives = cloneTable(self.lastObjectives) end
+		if not enemyForces then enemyForces = cloneTable(self.lastEnemyForces) end
+		if enemyForces then
+			enemyForces.percent = 100
+			enemyForces.quantity = enemyForces.total or enemyForces.quantity or 100
+			enemyForces.total = enemyForces.total or 100
+			enemyForces.completed = true
+		else
+			enemyForces = { text = L["mythicPlusTimerEnemyForces"] or "Enemy Forces", quantity = 100, total = 100, percent = 100, completed = true }
+		end
+	end
 	state.objectives = objectives
 	state.enemyForces = enemyForces
 	state.deaths = deaths
@@ -770,40 +853,61 @@ end
 
 function Timer:ResetDeathTracking()
 	self.groupMembersByGUID = {}
+	self.aliveMembersByGUID = {}
+	self.deadMemberGuids = {}
 	self.deathDetails = {}
+	self.deathCountSeen = 0
+end
+
+function Timer:ForEachGroupUnit(callback)
+	if type(callback) ~= "function" then return end
+	callback("player")
+	if IsInRaid and IsInRaid() then
+		local count = GetNumGroupMembers and GetNumGroupMembers() or 0
+		for index = 1, count do
+			callback("raid" .. index)
+		end
+	elseif IsInGroup and IsInGroup() then
+		for index = 1, 4 do
+			callback("party" .. index)
+		end
+	end
 end
 
 function Timer:RefreshGroupRoster()
 	self.groupMembersByGUID = self.groupMembersByGUID or {}
+	self.aliveMembersByGUID = self.aliveMembersByGUID or {}
+	self.deadMemberGuids = self.deadMemberGuids or {}
 	for guid in pairs(self.groupMembersByGUID) do
 		self.groupMembersByGUID[guid] = nil
 	end
-	local function addUnit(unit)
+	self:ForEachGroupUnit(function(unit)
 		local guid = UnitGUID and UnitGUID(unit)
 		if not guid or isSecretValue(guid) then return end
 		self.groupMembersByGUID[guid] = true
-	end
-	addUnit("player")
-	if IsInRaid and IsInRaid() then
-		local count = GetNumGroupMembers and GetNumGroupMembers() or 0
-		for index = 1, count do
-			addUnit("raid" .. index)
+		if UnitIsDeadOrGhost and not UnitIsDeadOrGhost(unit) then
+			self.aliveMembersByGUID[guid] = {
+				name = getNameFromUnit(unit) or getNameFromGUID(guid) or tostring(guid),
+				class = getClassFromUnit(unit) or getClassFromGUID(guid),
+			}
+			self.deadMemberGuids[guid] = nil
 		end
-	elseif IsInGroup and IsInGroup() then
-		for index = 1, 4 do
-			addUnit("party" .. index)
-		end
-	end
+	end)
 end
 
-function Timer:AddDeathDetail(guid)
+function Timer:AddDeathDetail(guid, unit)
 	if not guid or isSecretValue(guid) then return end
+	self.deadMemberGuids = self.deadMemberGuids or {}
+	if self.deadMemberGuids[guid] then return end
+	local aliveInfo = self.aliveMembersByGUID and self.aliveMembersByGUID[guid]
 	self.deathDetails = self.deathDetails or {}
 	self.deathDetails[#self.deathDetails + 1] = {
 		time = tonumber(self.lastState and self.lastState.elapsed) or 0,
-		name = getNameFromGUID(guid) or tostring(guid),
-		class = getClassFromGUID(guid),
+		name = (unit and getNameFromUnit(unit)) or (aliveInfo and aliveInfo.name) or getNameFromGUID(guid) or tostring(guid),
+		class = (unit and getClassFromUnit(unit)) or (aliveInfo and aliveInfo.class) or getClassFromGUID(guid),
 	}
+	self.deadMemberGuids[guid] = true
+	if self.aliveMembersByGUID then self.aliveMembersByGUID[guid] = nil end
 	return true
 end
 
@@ -813,6 +917,32 @@ function Timer:TrackUnitDied(guid)
 	if not self.groupMembersByGUID or not self.groupMembersByGUID[guid] then self:RefreshGroupRoster() end
 	if not (self.groupMembersByGUID and self.groupMembersByGUID[guid]) then return end
 	return self:AddDeathDetail(guid)
+end
+
+function Timer:ReconcileDeathCount(deaths)
+	deaths = tonumber(deaths) or 0
+	if not self.deathCountSeen then
+		self.deathCountSeen = deaths
+		self:RefreshGroupRoster()
+		return
+	end
+	if deaths <= self.deathCountSeen then
+		self.deathCountSeen = deaths
+		self:RefreshGroupRoster()
+		return
+	end
+	local remaining = deaths - self.deathCountSeen
+	if not self.aliveMembersByGUID then self:RefreshGroupRoster() end
+	self:ForEachGroupUnit(function(unit)
+		if remaining <= 0 then return end
+		local guid = UnitGUID and UnitGUID(unit)
+		if not guid or isSecretValue(guid) then return end
+		if self.aliveMembersByGUID and self.aliveMembersByGUID[guid] and UnitIsDeadOrGhost and UnitIsDeadOrGhost(unit) then
+			if self:AddDeathDetail(guid, unit) then remaining = remaining - 1 end
+		end
+	end)
+	self.deathCountSeen = deaths
+	self:RefreshGroupRoster()
 end
 
 function Timer:GetDeathMembers()
@@ -892,6 +1022,10 @@ function Timer:GetTimerDisplayText(state, timeLeft)
 	local mode = self:Get("timerDisplay")
 	local elapsed = tonumber(state.elapsed) or 0
 	local total = tonumber(state.timeLimit) or 0
+	if state.completed then
+		if mode == "TIME_LEFT_TOTAL" or mode == "ELAPSED_TOTAL" then return string.format("%s / %s", secondsToText(elapsed), secondsToText(total)) end
+		return secondsToText(elapsed)
+	end
 	if mode == "TIME_LEFT_TOTAL" then return string.format("%s / %s", timeRemainingToText(timeLeft), secondsToText(total)) end
 	if mode == "ELAPSED_TOTAL" then return string.format("%s / %s", secondsToText(elapsed), secondsToText(total)) end
 	return timeRemainingToText(timeLeft)
@@ -1610,6 +1744,36 @@ function Timer:ShouldShowDeathDisplay(state)
 	return (state and tonumber(state.deaths) or 0) > 0
 end
 
+function Timer:ShouldSuppressObjectiveTracker(state, frameShouldShow)
+	if not frameShouldShow or not self:IsEnabled() or self:IsInEditMode() then return false end
+	if not (state and (state.active or state.completed)) then return false end
+	local tracker = _G.ObjectiveTrackerFrame
+	return tracker ~= nil
+end
+
+function Timer:InstallObjectiveTrackerHook()
+	if self.objectiveTrackerHooked then return end
+	local tracker = _G.ObjectiveTrackerFrame
+	if not (tracker and hooksecurefunc) then return end
+	self.objectiveTrackerHooked = true
+	hooksecurefunc(tracker, "Show", function()
+		if Timer:ShouldSuppressObjectiveTracker(Timer.lastState, Timer.frame and Timer.frame:IsShown()) then tracker:Hide() end
+	end)
+end
+
+function Timer:ApplyObjectiveTrackerVisibility(state, frameShouldShow)
+	self:InstallObjectiveTrackerHook()
+	local tracker = _G.ObjectiveTrackerFrame
+	if not tracker then return end
+	if self:ShouldSuppressObjectiveTracker(state, frameShouldShow) then
+		self.objectiveTrackerSuppressed = true
+		tracker:Hide()
+	elseif self.objectiveTrackerSuppressed then
+		self.objectiveTrackerSuppressed = nil
+		if not (addon.db and addon.db["mythicPlusEnableObjectiveTracker"]) and tracker.Update then tracker:Update() end
+	end
+end
+
 function Timer:SetPanelBar(key, value, maxValue, anchorKey, xKey, yKey, color)
 	local bar = self:EnsurePanelBar(key)
 	local widthKey = key == "enemy" and "panelEnemyBarWidth" or "panelTimerBarWidth"
@@ -1995,6 +2159,7 @@ function Timer:Refresh()
 	local shouldShow = enabled and (state.active or inMythicPlus or not self:Get("showOnlyInMythicPlus") or inEditMode)
 	if not shouldShow then
 		frame:Hide()
+		self:ApplyObjectiveTrackerVisibility(state, false)
 		return
 	end
 
@@ -2005,7 +2170,9 @@ function Timer:Refresh()
 	local panelOffset = self:RenderPanel(state, timeLeft, twoChest, threeChest)
 	if self:Get("layoutMode") == "PANEL" then
 		self:LayoutRows(0, panelOffset)
-		frame:SetShown(panelOffset > 0)
+		local panelShown = panelOffset > 0
+		frame:SetShown(panelShown)
+		self:ApplyObjectiveTrackerVisibility(state, panelShown)
 		return
 	end
 
@@ -2108,7 +2275,9 @@ function Timer:Refresh()
 	end
 
 	self:LayoutRows(rows, panelOffset)
-	frame:SetShown(rows > 0 or panelOffset > 0)
+	local frameShown = rows > 0 or panelOffset > 0
+	frame:SetShown(frameShown)
+	self:ApplyObjectiveTrackerVisibility(state, frameShown)
 end
 
 function Timer:ShowTooltip()
@@ -2168,6 +2337,7 @@ function Timer:RegisterEvents()
 end
 
 function Timer:UnregisterEvents()
+	self:ApplyObjectiveTrackerVisibility(self.lastState, false)
 	if self.frame then self.frame:Hide() end
 end
 
@@ -2177,6 +2347,7 @@ function Timer:UpdateEventState()
 		self:Refresh()
 		self:ScheduleTick()
 	else
+		self:ApplyObjectiveTrackerVisibility(self.lastState, false)
 		if self.frame then self.frame:Hide() end
 	end
 end
@@ -2748,7 +2919,11 @@ function Timer:Init()
 		if event == "WORLD_STATE_TIMER_START" or event == "CHALLENGE_MODE_START" then
 			Timer:SyncActiveTimerBase(true)
 			Timer.completedElapsed = nil
+			Timer.completedInfo = nil
 			Timer.lastRunElapsed = nil
+			Timer.lastRunInfo = nil
+			Timer.lastObjectives = nil
+			Timer.lastEnemyForces = nil
 			Timer.objectiveSplits = {}
 			Timer:ResetDeathTracking()
 			Timer:RefreshGroupRoster()
@@ -2764,11 +2939,16 @@ function Timer:Init()
 			if event == "CHALLENGE_MODE_RESET" then
 				Timer.objectiveSplits = {}
 				Timer.completedElapsed = nil
+				Timer.completedInfo = nil
 				Timer.lastRunElapsed = nil
+				Timer.lastRunInfo = nil
+				Timer.lastObjectives = nil
+				Timer.lastEnemyForces = nil
 				Timer:ResetDeathTracking()
 			else
+				Timer.completedInfo = getCompletionInfo()
 				local _, activeElapsed = getActiveChallengeTimer()
-				Timer.completedElapsed = tonumber(activeElapsed) or tonumber(Timer.lastRunElapsed) or tonumber(Timer.lastState and Timer.lastState.elapsed) or 0
+				Timer.completedElapsed = getCompletionElapsed() or tonumber(activeElapsed) or tonumber(Timer.lastRunElapsed) or tonumber(Timer.lastState and Timer.lastState.elapsed) or 0
 			end
 			Timer:SyncActiveTimerBase(true)
 		end

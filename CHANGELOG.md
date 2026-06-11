@@ -27,7 +27,7 @@
 
 ### 🐛 Fixed
 
-- Mythic Plus / Timer: Continued beta hardening for bar direction, chest markers, objective spacing, completed-run visibility, time sync, protected death tracking, font fallback, preview rendering, and disabled panel elements.
+- Mythic Plus / Timer: Continued beta hardening for bar direction, chest markers, objective spacing, completed-run visibility, final completion time, completed-run dungeon/objective data, per-player death aggregation, protected death tracking, Blizzard tracker suppression, font fallback, preview rendering, and disabled panel elements.
 
 <!--@end-eqol-beta@-->
 
