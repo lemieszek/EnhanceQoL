@@ -331,6 +331,79 @@ function datapanel.isFriendsCustomColorEnabled()
 	return datapanel.getValue("friends", { useTextColor = false }, "useTextColor") == true
 end
 
+function datapanel.isPlayerNameCustomColorEnabled()
+	return datapanel.getValue("playername", { useTextColor = false }, "useTextColor") == true
+end
+
+function datapanel.isPlayerNameFactionColorEnabled()
+	local db = datapanel.getDB("playername", { showRealm = false, useFactionColor = false, separateRealmColor = false, realmUseFactionColor = true })
+	return db.useFactionColor == true or (db.showRealm == true and db.separateRealmColor == true and db.realmUseFactionColor == true)
+end
+
+function datapanel.isPlayerNameSeparateRealmColorEnabled()
+	local db = datapanel.getDB("playername", { showRealm = false, separateRealmColor = false })
+	return db.showRealm == true and db.separateRealmColor == true
+end
+
+function datapanel.isPlayerNameRealmCustomColorEnabled()
+	local db = datapanel.getDB("playername", { showRealm = false, separateRealmColor = false, realmUseTextColor = false })
+	return db.showRealm == true and db.separateRealmColor == true and db.realmUseTextColor == true
+end
+
+function datapanel.normalizePlayerNameClassColor(value, db)
+	value = value and true or false
+	if value then
+		db.useFactionColor = false
+		db.useTextColor = false
+	end
+	return value
+end
+
+function datapanel.normalizePlayerNameFactionColor(value, db)
+	value = value and true or false
+	if value then
+		db.useClassColor = false
+		db.useTextColor = false
+	end
+	return value
+end
+
+function datapanel.normalizePlayerNameCustomColor(value, db)
+	value = value and true or false
+	if value then
+		db.useClassColor = false
+		db.useFactionColor = false
+	end
+	return value
+end
+
+function datapanel.normalizePlayerNameRealmClassColor(value, db)
+	value = value and true or false
+	if value then
+		db.realmUseFactionColor = false
+		db.realmUseTextColor = false
+	end
+	return value
+end
+
+function datapanel.normalizePlayerNameRealmFactionColor(value, db)
+	value = value and true or false
+	if value then
+		db.realmUseClassColor = false
+		db.realmUseTextColor = false
+	end
+	return value
+end
+
+function datapanel.normalizePlayerNameRealmCustomColor(value, db)
+	value = value and true or false
+	if value then
+		db.realmUseClassColor = false
+		db.realmUseFactionColor = false
+	end
+	return value
+end
+
 function datapanel.isLatencyCustomColorEnabled()
 	return datapanel.getValue("latency", { useTextColor = false }, "useTextColor") == true
 end
@@ -759,6 +832,8 @@ datapanel.textColor = { type = "color", key = "textColor", text = L["Text color"
 datapanel.useTextColor = { key = "useTextColor", text = L["Use custom text color"] or "Use custom text color", default = false }
 datapanel.hideIcon = { key = "hideIcon", text = L["Hide icon"] or "Hide icon", default = false }
 datapanel.showIcon = { key = "showIcon", text = L["Show icon"] or "Show icon", default = true }
+datapanel.allianceColor = function() return { r = 0.345, g = 0.702, b = 1, a = 1 } end
+datapanel.hordeColor = function() return { r = 1, g = 0.267, b = 0.267, a = 1 } end
 
 datapanel.streams = {
 	{
@@ -868,13 +943,21 @@ datapanel.streams = {
 		id = "playername",
 		dbKey = "playername",
 		title = (PLAYER or "Player") .. " " .. (NAME or "Name"),
-		defaults = { fontSize = 14, showRealm = false, useClassColor = true, useTextColor = false, textColor = datapanel.normalColor },
+		defaults = { fontSize = 14, showRealm = false, useClassColor = true, useFactionColor = false, useTextColor = false, textColor = datapanel.normalColor, allianceColor = datapanel.allianceColor, hordeColor = datapanel.hordeColor, separateRealmColor = false, realmUseClassColor = false, realmUseFactionColor = true, realmUseTextColor = false, realmTextColor = datapanel.normalColor },
 		controls = {
 			datapanel.fontSlider,
-			{ key = "showRealm", text = (SHOW or "Show") .. " " .. (L["Realm"] or "Realm"), default = false },
-			{ key = "useClassColor", text = L["Use class color"] or "Use class color", default = true, refreshOnChange = true },
-			{ key = "useTextColor", text = L["Use custom text color"] or "Use custom text color", default = false, refreshOnChange = true },
-			{ type = "color", key = "textColor", text = L["Text color"] or "Text color", default = datapanel.normalColor },
+			{ key = "showRealm", text = (SHOW or "Show") .. " " .. (L["Realm"] or "Realm"), default = false, refreshOnChange = true },
+			{ key = "useClassColor", text = L["Use class color"] or "Use class color", default = true, normalize = datapanel.normalizePlayerNameClassColor, refreshOnChange = true },
+			{ key = "useFactionColor", text = L["DataPanelUseFactionTextColor"] or "Use faction text color", default = false, normalize = datapanel.normalizePlayerNameFactionColor, refreshOnChange = true },
+			{ type = "color", key = "allianceColor", text = L["DataPanelAllianceTextColor"] or "Alliance text color", default = datapanel.allianceColor, isEnabled = datapanel.isPlayerNameFactionColorEnabled },
+			{ type = "color", key = "hordeColor", text = L["DataPanelHordeTextColor"] or "Horde text color", default = datapanel.hordeColor, isEnabled = datapanel.isPlayerNameFactionColorEnabled },
+			{ key = "useTextColor", text = L["Use custom text color"] or "Use custom text color", default = false, normalize = datapanel.normalizePlayerNameCustomColor, refreshOnChange = true },
+			{ type = "color", key = "textColor", text = L["Text color"] or "Text color", default = datapanel.normalColor, isEnabled = datapanel.isPlayerNameCustomColorEnabled },
+			{ key = "separateRealmColor", text = L["DataPanelPlayerNameSeparateRealmColor"] or "Color realm separately", default = false, refreshOnChange = true },
+			{ key = "realmUseClassColor", text = (L["Realm"] or "Realm") .. " - " .. (L["Use class color"] or "Use class color"), default = false, normalize = datapanel.normalizePlayerNameRealmClassColor, refreshOnChange = true, isEnabled = datapanel.isPlayerNameSeparateRealmColorEnabled },
+			{ key = "realmUseFactionColor", text = (L["Realm"] or "Realm") .. " - " .. (L["DataPanelUseFactionTextColor"] or "Use faction text color"), default = true, normalize = datapanel.normalizePlayerNameRealmFactionColor, refreshOnChange = true, isEnabled = datapanel.isPlayerNameSeparateRealmColorEnabled },
+			{ key = "realmUseTextColor", text = (L["Realm"] or "Realm") .. " - " .. (L["Use custom text color"] or "Use custom text color"), default = false, normalize = datapanel.normalizePlayerNameRealmCustomColor, refreshOnChange = true, isEnabled = datapanel.isPlayerNameSeparateRealmColorEnabled },
+			{ type = "color", key = "realmTextColor", text = L["DataPanelRealmTextColor"] or "Realm text color", default = datapanel.normalColor, isEnabled = datapanel.isPlayerNameRealmCustomColorEnabled },
 		},
 	},
 	{
