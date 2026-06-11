@@ -209,6 +209,8 @@ Timer.defaults = Timer.defaults
 		deathColor = { r = 1, g = 0.2, b = 0.2, a = 1 },
 		objectiveColor = { r = 1, g = 1, b = 1, a = 1 },
 		objectiveCompleteColor = { r = 0.55, g = 0.55, b = 0.55, a = 1 },
+		objectiveBestDeltaFasterColor = { r = 0.15, g = 1, b = 0.25, a = 1 },
+		objectiveBestDeltaSlowerColor = { r = 1, g = 0.25, b = 0.2, a = 1 },
 		enemyForcesColor = { r = 0.95, g = 0.55, b = 0.15, a = 1 },
 		backdropEnabled = true,
 		backdropUseCustomTexture = false,
@@ -357,6 +359,15 @@ end
 local function setTextColor(fontString, color)
 	color = normalizeColor(color, { r = 1, g = 1, b = 1, a = 1 })
 	fontString:SetTextColor(color.r, color.g, color.b, color.a)
+end
+
+local function colorToHex(color)
+	color = normalizeColor(color, { r = 1, g = 1, b = 1, a = 1 })
+	return string.format("ff%02x%02x%02x", math.floor(color.r * 255 + 0.5), math.floor(color.g * 255 + 0.5), math.floor(color.b * 255 + 0.5))
+end
+
+local function wrapColor(text, color)
+	return string.format("|c%s%s|r", colorToHex(color), text)
 end
 
 local function getGlobalFontKey()
@@ -1521,27 +1532,46 @@ end
 function Timer:UpdateObjectiveSplits(state)
 	if not state or state.preview or not state.active then return end
 	self.objectiveSplits = self.objectiveSplits or {}
+	self.objectiveSplitBestTimes = self.objectiveSplitBestTimes or {}
 	for _, objective in ipairs(state.objectives or {}) do
 		if objective.completed then
 			local key = splitKey(objective.text)
 			if not self.objectiveSplits[key] then
+				self.objectiveSplitBestTimes[key] = self:GetBestObjectiveTime(state, objective.text)
 				self.objectiveSplits[key] = state.elapsed
 				self:SetBestObjectiveTime(state, objective.text, state.elapsed)
 			end
 			objective.splitTime = self.objectiveSplits[key]
+			objective.previousBestTime = self.objectiveSplitBestTimes[key]
 		else
 			local key = splitKey(objective.text)
 			objective.splitTime = self.objectiveSplits[key]
+			objective.previousBestTime = self.objectiveSplitBestTimes[key]
 		end
 	end
 	if state.enemyForces and state.enemyForces.completed then
 		local key = splitKey(state.enemyForces.text)
 		if not self.objectiveSplits[key] then
+			self.objectiveSplitBestTimes[key] = self:GetBestObjectiveTime(state, state.enemyForces.text)
 			self.objectiveSplits[key] = state.elapsed
 			self:SetBestObjectiveTime(state, state.enemyForces.text, state.elapsed)
 		end
 		state.enemyForces.splitTime = self.objectiveSplits[key]
+		state.enemyForces.previousBestTime = self.objectiveSplitBestTimes[key]
 	end
+end
+
+function Timer:FormatObjectiveDelta(delta)
+	local seconds = math.floor(math.abs(tonumber(delta) or 0) + 0.5)
+	local sign = (tonumber(delta) or 0) < 0 and "-" or "+"
+	local text
+	if seconds >= 60 then
+		text = string.format("%s%d:%02d", sign, math.floor(seconds / 60), seconds % 60)
+	else
+		text = string.format("%s%ds", sign, seconds)
+	end
+	local color = (tonumber(delta) or 0) < 0 and self:Get("objectiveBestDeltaFasterColor") or self:Get("objectiveBestDeltaSlowerColor")
+	return wrapColor(text, color)
 end
 
 function Timer:FormatObjectiveValue(state, objective)
@@ -1549,8 +1579,8 @@ function Timer:FormatObjectiveValue(state, objective)
 	if self:Get("showObjectiveTimes") and objective.splitTime then
 		valueText = valueText ~= "" and (valueText .. " - " .. secondsToText(objective.splitTime)) or secondsToText(objective.splitTime)
 		if self:Get("showObjectiveBestTimes") then
-			local best = state and state.preview and objective.bestTime or self:GetBestObjectiveTime(state, objective.text)
-			if best then valueText = valueText .. string.format(" (%+.0fs)", objective.splitTime - best) end
+			local best = state and state.preview and objective.bestTime or objective.previousBestTime or self:GetBestObjectiveTime(state, objective.text)
+			if best then valueText = valueText .. " (" .. self:FormatObjectiveDelta(objective.splitTime - best) .. ")" end
 		end
 	end
 	return valueText
@@ -1694,15 +1724,16 @@ function Timer:RenderPanelObjectives(state)
 	local style = normalizeFontStyle(self:Get("panelObjectivesFontOutline"))
 	local fontSize = clampNumber(self:Get("panelObjectivesFontSize"), 8, 56, defaults.panelObjectivesFontSize)
 	local spacing = snapToPixel(clampNumber(self:Get("panelObjectivesSpacing"), 0, 24, defaults.panelObjectivesSpacing))
-	local columnSpacing = snapToPixel(clampNumber(self:Get("panelObjectivesColumnSpacing"), 0, 80, defaults.panelObjectivesColumnSpacing))
+	local columnOffset = snapToPixel(clampNumber(self:Get("panelObjectivesColumnSpacing"), -200, 200, defaults.panelObjectivesColumnSpacing))
 	local x = pointOffset(self:Get("panelObjectivesOffsetX"), -800, 800, defaults.panelObjectivesOffsetX)
 	local y = pointOffset(self:Get("panelObjectivesOffsetY"), -800, 800, defaults.panelObjectivesOffsetY)
 	local baseRowHeight = snapSize(fontSize + 2)
 	local frameWidth = clampNumber(self:Get("width"), 120, 800, defaults.width)
-	local width = snapSize(math.max(80, frameWidth - math.abs(x) * 2 - 12))
+	local width = snapSize(math.max(80, frameWidth - 12))
 	local rowsHeight = 0
 	local growUp = self:Get("panelObjectivesGrowth") == "UP"
 	local anchor = normalizePoint(self:Get("panelObjectivesAnchor"))
+	local itemPointSuffix = anchor:find("LEFT", 1, true) and "LEFT" or anchor:find("RIGHT", 1, true) and "RIGHT" or ""
 	local invertColumns = self:Get("panelObjectivesInvertColumns") == true
 	local hideNonBoss = self:Get("hideNonBossObjectives") == true
 	local previous
@@ -1730,12 +1761,12 @@ function Timer:RenderPanelObjectives(state)
 		item.value:SetTextColor(color.r, color.g, color.b, color.a)
 		item.value:ClearAllPoints()
 		if invertColumns then
-			item.text:SetJustifyH("RIGHT")
+			item.text:SetJustifyH("LEFT")
 			item.value:SetJustifyH("LEFT")
 			if valueWidth > 0 then
 				item.value:SetPoint("TOPLEFT", item, "TOPLEFT", 0, 0)
 				item.value:SetWidth(valueWidth)
-				item.text:SetPoint("TOPLEFT", item, "TOPLEFT", valueWidth + columnSpacing, 0)
+				item.text:SetPoint("TOPLEFT", item, "TOPLEFT", math.max(0, valueWidth + columnOffset), 0)
 			else
 				item.text:SetPoint("TOPLEFT", item, "TOPLEFT", 0, 0)
 			end
@@ -1744,10 +1775,12 @@ function Timer:RenderPanelObjectives(state)
 			item.text:SetJustifyH("LEFT")
 			item.value:SetJustifyH("RIGHT")
 			item.text:SetPoint("TOPLEFT", item, "TOPLEFT", 0, 0)
-			item.text:SetPoint("RIGHT", item, "RIGHT", valueWidth > 0 and -(valueWidth + columnSpacing) or 0, 0)
 			if valueWidth > 0 then
-				item.value:SetPoint("TOPRIGHT", item, "TOPRIGHT", 0, 0)
+				item.value:SetPoint("TOPRIGHT", item, "TOPRIGHT", columnOffset, 0)
 				item.value:SetWidth(valueWidth)
+				item.text:SetPoint("RIGHT", item.value, "LEFT", -4, 0)
+			else
+				item.text:SetPoint("RIGHT", item, "RIGHT", 0, 0)
 			end
 		end
 		local textHeight = item.text:GetStringHeight() or baseRowHeight
@@ -1763,9 +1796,9 @@ function Timer:RenderPanelObjectives(state)
 			end
 		else
 			if growUp then
-				item:SetPoint("BOTTOM" .. (anchor:find("LEFT", 1, true) and "LEFT" or anchor:find("RIGHT", 1, true) and "RIGHT" or ""), frame, anchor, x, y)
+				item:SetPoint("BOTTOM" .. itemPointSuffix, frame, anchor, x, y)
 			else
-				item:SetPoint("TOP" .. (anchor:find("LEFT", 1, true) and "LEFT" or anchor:find("RIGHT", 1, true) and "RIGHT" or ""), frame, anchor, x, y)
+				item:SetPoint("TOP" .. itemPointSuffix, frame, anchor, x, y)
 			end
 		end
 		rowsHeight = rowsHeight + itemHeight
@@ -2857,10 +2890,12 @@ function Timer:BuildEditModeSettings()
 		dropdownSetting(L["mythicPlusTimerFontOutline"] or "Font outline", get("panelObjectivesFontOutline"), set("panelObjectivesFontOutline", normalizeFontStyle), buildStyleOptions, "mpt-panel-objectives", 180, enabledWhen("showObjectives"), shownWhen("showObjectives")),
 		sliderSetting(L["mythicPlusTimerPanelObjectivesFontSize"] or L["Text size"] or "Text size", get("panelObjectivesFontSize"), set("panelObjectivesFontSize", function(value) return clampNumber(value, 8, 56, defaults.panelObjectivesFontSize) end), 8, 56, 1, "mpt-panel-objectives", nil, enabledWhen("showObjectives"), shownWhen("showObjectives")),
 		sliderSetting(L["mythicPlusTimerPanelObjectivesSpacing"] or "Spacing", get("panelObjectivesSpacing"), set("panelObjectivesSpacing", function(value) return clampNumber(value, 0, 24, defaults.panelObjectivesSpacing) end), 0, 24, 1, "mpt-panel-objectives", nil, enabledWhen("showObjectives"), shownWhen("showObjectives")),
-		sliderSetting(L["mythicPlusTimerPanelObjectivesColumnSpacing"] or "Column spacing", get("panelObjectivesColumnSpacing"), set("panelObjectivesColumnSpacing", function(value) return clampNumber(value, 0, 80, defaults.panelObjectivesColumnSpacing) end), 0, 80, 1, "mpt-panel-objectives", nil, enabledWhen("showObjectives"), shownWhen("showObjectives")),
+		sliderSetting(L["mythicPlusTimerPanelObjectivesColumnSpacing"] or "Column offset", get("panelObjectivesColumnSpacing"), set("panelObjectivesColumnSpacing", function(value) return clampNumber(value, -200, 200, defaults.panelObjectivesColumnSpacing) end), -200, 200, 1, "mpt-panel-objectives", nil, enabledWhen("showObjectives"), shownWhen("showObjectives")),
 		checkboxSetting(L["mythicPlusTimerPanelObjectivesInvertColumns"] or "Invert columns", get("panelObjectivesInvertColumns"), set("panelObjectivesInvertColumns"), "mpt-panel-objectives", enabledWhen("showObjectives"), shownWhen("showObjectives")),
 		colorSetting(L["mythicPlusTimerObjectiveColor"] or "Objective color", get("objectiveColor"), set("objectiveColor"), defaults.objectiveColor, "mpt-panel-objectives", enabledWhen("showObjectives"), shownWhen("showObjectives")),
 		colorSetting(L["mythicPlusTimerObjectiveCompleteColor"] or "Completed objective color", get("objectiveCompleteColor"), set("objectiveCompleteColor"), defaults.objectiveCompleteColor, "mpt-panel-objectives", enabledWhen("showObjectives"), shownWhen("showObjectives")),
+		colorSetting(L["mythicPlusTimerObjectiveBestDeltaFasterColor"] or "Faster best delta color", get("objectiveBestDeltaFasterColor"), set("objectiveBestDeltaFasterColor"), defaults.objectiveBestDeltaFasterColor, "mpt-panel-objectives", objectiveTimesEnabled, objectiveTimesEnabled),
+		colorSetting(L["mythicPlusTimerObjectiveBestDeltaSlowerColor"] or "Slower best delta color", get("objectiveBestDeltaSlowerColor"), set("objectiveBestDeltaSlowerColor"), defaults.objectiveBestDeltaSlowerColor, "mpt-panel-objectives", objectiveTimesEnabled, objectiveTimesEnabled),
 		anchorSetting("panelObjectivesAnchor", "mpt-panel-objectives", shownWhen("showObjectives"), L["mythicPlusTimerPanelObjectivesAnchor"] or L["Anchor"] or "Anchor", enabledWhen("showObjectives")),
 		dropdownSetting(L["mythicPlusTimerGrowth"] or "Growth direction", get("panelObjectivesGrowth"), set("panelObjectivesGrowth", function(value) return value == "UP" and "UP" or "DOWN" end), {
 			{ value = "DOWN", label = L["damageMeterRowsGrowDown"] or "Down" },
@@ -2916,6 +2951,8 @@ function Timer:BuildEditModeSettings()
 		colorSetting(L["mythicPlusTimerDeathColor"] or "Death color", get("deathColor"), set("deathColor"), defaults.deathColor, colorId),
 		colorSetting(L["mythicPlusTimerObjectiveColor"] or "Objective color", get("objectiveColor"), set("objectiveColor"), defaults.objectiveColor, colorId),
 		colorSetting(L["mythicPlusTimerObjectiveCompleteColor"] or "Completed objective color", get("objectiveCompleteColor"), set("objectiveCompleteColor"), defaults.objectiveCompleteColor, colorId),
+		colorSetting(L["mythicPlusTimerObjectiveBestDeltaFasterColor"] or "Faster best delta color", get("objectiveBestDeltaFasterColor"), set("objectiveBestDeltaFasterColor"), defaults.objectiveBestDeltaFasterColor, colorId),
+		colorSetting(L["mythicPlusTimerObjectiveBestDeltaSlowerColor"] or "Slower best delta color", get("objectiveBestDeltaSlowerColor"), set("objectiveBestDeltaSlowerColor"), defaults.objectiveBestDeltaSlowerColor, colorId),
 		colorSetting(L["mythicPlusTimerEnemyForcesColor"] or "Enemy forces color", get("enemyForcesColor"), set("enemyForcesColor"), defaults.enemyForcesColor, colorId),
 		{ name = L["Background"] or "Background", kind = SettingType.Collapsible, id = backgroundId, defaultCollapsed = true },
 		checkboxSetting(L["mythicPlusTimerBackdropEnabled"] or "Use background", get("backdropEnabled"), set("backdropEnabled", nil, true), backgroundId),
@@ -3010,6 +3047,7 @@ function Timer:Init()
 			Timer.lastObjectives = nil
 			Timer.lastEnemyForces = nil
 			Timer.objectiveSplits = {}
+			Timer.objectiveSplitBestTimes = {}
 			Timer:ResetDeathTracking()
 			Timer:RefreshGroupRoster()
 		elseif event == "CHALLENGE_MODE_DEATH_COUNT_UPDATED" then
@@ -3023,6 +3061,7 @@ function Timer:Init()
 			if event == "CHALLENGE_MODE_COMPLETED" then Timer:RecordBestTime() end
 			if event == "CHALLENGE_MODE_RESET" then
 				Timer.objectiveSplits = {}
+				Timer.objectiveSplitBestTimes = {}
 				Timer.completedElapsed = nil
 				Timer.completedInfo = nil
 				Timer.lastRunElapsed = nil

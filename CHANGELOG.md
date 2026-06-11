@@ -2,6 +2,19 @@
 
 <!--@eqol-beta@-->
 
+## [11.2.0-beta3] - 2026-06-11
+
+### 🔄 Changed
+
+- Mythic Plus / Timer: Changed panel objective column spacing into a bidirectional column offset.
+
+### 🐛 Fixed
+
+- Mythic Plus / Timer: Fixed panel objective X offsets not moving the objective block as expected.
+- Mythic Plus / Timer: Improved objective best-time deltas with faster/slower colors, signed values, and minute-style formatting for larger differences.
+
+---
+
 ## [11.2.0-beta2] - 2026-06-10
 
 ### ✨ Added
