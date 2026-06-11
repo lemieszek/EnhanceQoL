@@ -6,5 +6,7 @@ addon.variables.NewVersionTableEQOL = {
 	--@eqol-beta@
 	-- 11.2.0-beta1 Mythic+
 	mythicPlusTimerEnabled = true,
+	-- 11.2.0-beta1 Minimap
+	squareMinimapStatsDurability = true,
 	--@end-eqol-beta@
 }

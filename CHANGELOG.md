@@ -2,6 +2,18 @@
 
 <!--@eqol-beta@-->
 
+## [11.2.0-beta2] - 2026-06-10
+
+### ✨ Added
+
+- Minimap Stats: Added an optional durability stat for the square minimap, with configurable placement, icon, size, and durability threshold colors.
+
+### 🐛 Fixed
+
+- Bags: Bag search now temporarily opens collapsed categories that contain matching items, so search results are no longer hidden behind closed category headers.
+
+---
+
 ## [11.2.0-beta1] - 2026-06-10
 
 ### ✨ Added

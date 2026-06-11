@@ -606,9 +606,10 @@ local function hasActiveSearchText()
 end
 
 local function isSectionCollapsed(sectionID)
-	if not sectionID or hasActiveSearchText() then
+	if not sectionID then
 		return false
 	end
+	if hasActiveSearchText() and state.searchMatchedSections and state.searchMatchedSections[sectionID] then return false end
 
 	return getCollapsedSectionsTable()[sectionID] == true
 end
@@ -632,6 +633,13 @@ end
 
 local function isCategoryAssignModeActive()
 	return IsAltKeyDown and IsAltKeyDown()
+end
+
+function Core.MarkSearchMatchedSection(layoutData, sectionID)
+	if not (layoutData and layoutData.searchMatchedSections and sectionID) then return end
+	layoutData.searchMatchedSections[sectionID] = true
+	local definition = layoutData.sectionDefinitionsByID and layoutData.sectionDefinitionsByID[sectionID] or nil
+	if definition and definition.groupCollapseID then layoutData.searchMatchedSections[definition.groupCollapseID] = true end
 end
 
 local function tryAssignCursorItemToSection(sectionID)
@@ -5147,6 +5155,7 @@ local function buildLayoutData()
 	local hasCustomCategories = not oneBagMode and settings.showCategories and addon.HasCustomCategories and addon.HasCustomCategories() or false
 	local ruleUsage = hasCustomCategories and addon.GetCategoryRuleContextUsage and addon.GetCategoryRuleContextUsage() or nil
 	local ruleRuntimeContext = hasCustomCategories and createRuleRuntimeContext(ruleUsage) or nil
+	local searchActive = hasActiveSearchText()
 	local layoutData = {
 		requiredButtonCount = 0,
 		sectionMap = {},
@@ -5169,6 +5178,7 @@ local function buildLayoutData()
 		collapsedItems = {},
 		flatStorageSectionIDs = {},
 		oneBagFreeSlots = {},
+		searchMatchedSections = searchActive and {} or nil,
 	}
 	if oneBagMode then
 		layoutData.sectionDefinitions = {}
@@ -5221,6 +5231,7 @@ local function buildLayoutData()
 				end
 				local hideItem = not oneBagMode and addon.IsCategorySectionHidden and addon.IsCategorySectionHidden(sectionID)
 				local itemRef = info and (info.hyperlink or info.itemID)
+				if searchActive and not hideItem and info.isFiltered ~= true then Core.MarkSearchMatchedSection(layoutData, sectionID) end
 				if hideItem then
 					clearSlotCategoryCacheEntry(bagID, slotID)
 				elseif not oneBagMode and shouldCombineDuplicateItem(itemRef, settings) then
@@ -6183,6 +6194,7 @@ local function rebuildLayout()
 		state.pendingRuleItemDataIDs = {}
 	end
 	local layoutData = buildLayoutData()
+	state.searchMatchedSections = layoutData.searchMatchedSections
 	if not ensureButtonCapacity(layoutData.requiredButtonCount) then
 		return false
 	end
@@ -6285,6 +6297,11 @@ end
 
 function Bags.functions.RefreshSearchState()
 	if not state.frame or not state.frame:IsShown() then
+		return
+	end
+	if hasActiveSearchText() or state.searchLayoutActive then
+		state.searchLayoutActive = hasActiveSearchText()
+		scheduleUpdate(true, true)
 		return
 	end
 
