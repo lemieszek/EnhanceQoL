@@ -368,11 +368,11 @@ Helper.RADIAL_ARC_DEGREES_MIN = 15
 Helper.RADIAL_ARC_DEGREES_MAX = 360
 Helper.EXAMPLE_COOLDOWN_PERCENT = 0.55
 Helper.GLOW_STYLE_OPTIONS = {
+	{ value = "BLIZZARD", labelKey = "Blizzard", fallback = "Blizzard" },
+	{ value = "FLASH", labelKey = "Flash", fallback = "Flash" },
 	{ value = "MARCHING_ANTS", labelKey = "Marching ants", fallback = "Marching ants" },
 	{ value = "PIXEL", labelKey = "Pixel", fallback = "Pixel" },
 	{ value = "PULSING", labelKey = "Pulsing", fallback = "Pulsing" },
-	{ value = "FLASH", labelKey = "Flash", fallback = "Flash" },
-	{ value = "BLIZZARD", labelKey = "Blizzard", fallback = "Blizzard" },
 }
 Helper.VALID_DIRECTIONS = {
 	RIGHT = true,

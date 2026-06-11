@@ -6,8 +6,13 @@
 
 ### ✨ Added
 
+- Cooldown Panels: Added Pixel and Pulsing glow styles for cooldown panel glow effects.
 - Data Panels: Added faction color options for the Player Name stream, including separate realm coloring so the character name and realm can use different color modes.
 - Minimap Stats: Added an optional durability stat for the square minimap, with configurable placement, icon, size, and durability threshold colors.
+
+### 🔄 Changed
+
+- Cooldown Panels: Glow style dropdowns are now sorted alphabetically.
 
 ### 🐛 Fixed
 
