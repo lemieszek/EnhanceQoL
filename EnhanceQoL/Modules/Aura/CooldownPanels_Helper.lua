@@ -369,6 +369,8 @@ Helper.RADIAL_ARC_DEGREES_MAX = 360
 Helper.EXAMPLE_COOLDOWN_PERCENT = 0.55
 Helper.GLOW_STYLE_OPTIONS = {
 	{ value = "MARCHING_ANTS", labelKey = "Marching ants", fallback = "Marching ants" },
+	{ value = "PIXEL", labelKey = "Pixel", fallback = "Pixel" },
+	{ value = "PULSING", labelKey = "Pulsing", fallback = "Pulsing" },
 	{ value = "FLASH", labelKey = "Flash", fallback = "Flash" },
 	{ value = "BLIZZARD", labelKey = "Blizzard", fallback = "Blizzard" },
 }
@@ -414,10 +416,14 @@ function Helper.NormalizeGlowStyle(style, fallback)
 	local normalized = type(style) == "string" and strupper(style) or nil
 	if normalized == "BLIZZARD" or normalized == "CLASSIC" or normalized == "BUTTON_GLOW" then return "BLIZZARD" end
 	if normalized == "MARCHING_ANTS" or normalized == "MARCHINGANTS" or normalized == "ANTS" then return "MARCHING_ANTS" end
+	if normalized == "PIXEL" or normalized == "PIXEL_GLOW" then return "PIXEL" end
+	if normalized == "PULSING" or normalized == "PULSE" then return "PULSING" end
 	if normalized == "FLASH" then return "FLASH" end
 	local normalizedFallback = type(fallback) == "string" and strupper(fallback) or nil
 	if normalizedFallback == "BLIZZARD" or normalizedFallback == "CLASSIC" or normalizedFallback == "BUTTON_GLOW" then return "BLIZZARD" end
 	if normalizedFallback == "FLASH" then return "FLASH" end
+	if normalizedFallback == "PIXEL" or normalizedFallback == "PIXEL_GLOW" then return "PIXEL" end
+	if normalizedFallback == "PULSING" or normalizedFallback == "PULSE" then return "PULSING" end
 	if normalizedFallback == "MARCHING_ANTS" or normalizedFallback == "MARCHINGANTS" or normalizedFallback == "ANTS" then return "MARCHING_ANTS" end
 	return Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle or "MARCHING_ANTS"
 end
