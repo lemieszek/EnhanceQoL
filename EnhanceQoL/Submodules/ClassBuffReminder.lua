@@ -2781,6 +2781,14 @@ local function roguePoisonsHasUnitBuff(provider, unit, reminder)
 	return status and status.missing <= 0
 end
 
+function Reminder:AnyOtherEligibleUnitHasAnyAuraSpellId(spellIds)
+	if type(spellIds) ~= "table" then return false, 0 end
+	if self:GetGroupContext() == GROUP_CONTEXT_SOLO then return false, 0 end
+	self.runtimeOtherEligibleUnits = self.runtimeOtherEligibleUnits or {}
+	local eligibleUnits = self:CollectOtherEligibleUnits(self.runtimeOtherEligibleUnits, true)
+	return anyUnitHasAnyAuraSpellId(self, eligibleUnits, spellIds), #eligibleUnits
+end
+
 function Reminder:GetShamanPreferredShieldDisplaySpellId(provider)
 	local specId = self and self.GetCurrentSpecId and self:GetCurrentSpecId() or nil
 	if specId == Reminder.shamanReminder.specRestoration or isUnitHealerRole("player") then
@@ -2804,15 +2812,22 @@ function Reminder:AppendShamanShieldMissingEntries(provider, missingEntries)
 	local preferredShieldLabel = safeGetSpellName(preferredShieldDisplaySpellId) or safeGetSpellName(52127) or safeGetSpellName(192106) or "Shield"
 	local hasLightningShield = self:UnitHasAnyAuraSpellIdOrDerivedName("player", provider.lightningShieldSpellIds)
 	local hasWaterShield = self:UnitHasAnyAuraSpellIdOrDerivedName("player", provider.waterShieldSpellIds)
+	local earthShieldDisplaySpellId = normalizeSpellId(provider.earthShieldDisplaySpellId) or normalizeSpellId(provider.earthShieldSpellIds and provider.earthShieldSpellIds[1]) or 974
+	local earthShieldLabel = safeGetSpellName(earthShieldDisplaySpellId) or "Earth Shield"
+	local hasEarthShieldOnOther, otherEarthShieldUnitCount = self:AnyOtherEligibleUnitHasAnyAuraSpellId(provider.earthShieldSpellIds)
+	local shouldTrackEarthShieldOnOther = otherEarthShieldUnitCount > 0 and hasKnownSpellInList(provider.earthShieldSpellIds)
 
 	if hasElementalOrbit then
-		local earthShieldDisplaySpellId = normalizeSpellId(provider.earthShieldDisplaySpellId) or normalizeSpellId(provider.earthShieldSpellIds and provider.earthShieldSpellIds[1]) or 974
-		local earthShieldLabel = safeGetSpellName(earthShieldDisplaySpellId) or "Earth Shield"
 		local hasEarthShield = self:UnitHasAnyAuraSpellIdOrDerivedName("player", provider.earthShieldSelfSpellIds)
 		if not hasEarthShield then hasEarthShield = self:UnitHasAnyAuraSpellIdOrDerivedName("player", provider.earthShieldSpellIds) end
 
 		totalRequirements = totalRequirements + 1
 		if not hasEarthShield then missingEntries[#missingEntries + 1] = makeSelfMissingEntry(earthShieldDisplaySpellId, earthShieldLabel) end
+
+		if shouldTrackEarthShieldOnOther then
+			totalRequirements = totalRequirements + 1
+			if not hasEarthShieldOnOther then missingEntries[#missingEntries + 1] = makeSelfMissingEntry(earthShieldDisplaySpellId, earthShieldLabel) end
+		end
 
 		if not ignoreBasicShields then
 			totalRequirements = totalRequirements + 1
@@ -2820,6 +2835,11 @@ function Reminder:AppendShamanShieldMissingEntries(provider, missingEntries)
 		end
 
 		return totalRequirements
+	end
+
+	if shouldTrackEarthShieldOnOther then
+		totalRequirements = totalRequirements + 1
+		if not hasEarthShieldOnOther then missingEntries[#missingEntries + 1] = makeSelfMissingEntry(earthShieldDisplaySpellId, earthShieldLabel) end
 	end
 
 	if ignoreBasicShields then return totalRequirements end
@@ -3282,6 +3302,10 @@ function Reminder:GetShamanEnhancementProvider()
 				33757,
 				319778,
 				318038,
+				974,
+				383648,
+				192106,
+				52127,
 			},
 			knownSpellIds = {
 				319773,
@@ -3343,6 +3367,10 @@ function Reminder:GetShamanRestorationProvider()
 				382024,
 				457481,
 				457496,
+				974,
+				383648,
+				192106,
+				52127,
 			},
 			knownSpellIds = {
 				382021,
@@ -4771,12 +4799,21 @@ function Reminder:SupplementalAuraMatches(aura)
 	local spellId = normalizeSpellId(aura.spellId)
 	local auraName = aura.name
 	if issecretvalue and issecretvalue(auraName) then auraName = nil end
+	local auraIcon = aura.icon
+	if issecretvalue and issecretvalue(auraIcon) then auraIcon = nil end
+	auraIcon = tonumber(auraIcon)
 
 	if self:CanCheckFlaskReminder() then
+		if spellId then
+			for i = 1, #SHARED_FLASK_AURA_IDS do
+				if normalizeSpellId(SHARED_FLASK_AURA_IDS[i]) == spellId then return true end
+			end
+		end
 		local candidates = self:GetFlaskCandidatesForCurrentSpec()
 		if type(candidates) == "table" and Reminder.PreparedAuraDataMatchesValues(self:GetPreparedFlaskCandidateData(candidates), spellId, auraName) then return true end
 	end
 	if self:CanCheckFoodReminder() then
+		if auraIcon and auraIcon == SHARED_FOOD_AURA_ICON_ID then return true end
 		local candidates = self:GetFoodCandidatesForCurrentSpec()
 		if type(candidates) == "table" and Reminder.PreparedAuraDataMatchesValues(self:GetPreparedFoodCandidateData(candidates), spellId, auraName) then return true end
 	end
@@ -6122,7 +6159,10 @@ function Reminder:HandleEvent(event, unit, updateInfo)
 			end
 			if provider and provider.scope == PROVIDER_SCOPE_SELF then
 				local needsUpdate = false
-				local providerTouches = playerUnit and self:ProviderAuraUpdateTouchesUnit(unit, updateInfo, provider) or false
+				local providerTouches = (playerUnit or provider.tracksExternalUnitAuras == true) and self:ProviderAuraUpdateTouchesUnit(unit, updateInfo, provider) or false
+				if not providerTouches and provider.tracksExternalUnitAuras == true and type(updateInfo) == "table" and type(updateInfo.removedAuraInstanceIDs) == "table" then
+					providerTouches = true
+				end
 				local groupCacheTouches = provider.tracksExternalUnitAuras == true and self:GroupBuffCacheAuraUpdateTouchesUnit(unit, updateInfo) or false
 				if groupCacheTouches then
 					if self:ApplyDeltaToGroupBuffStateCaches(unit, updateInfo) == true then

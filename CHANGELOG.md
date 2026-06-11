@@ -11,6 +11,7 @@
 ### 🐛 Fixed
 
 - Bags: Bag search now temporarily opens collapsed categories that contain matching items, so search results are no longer hidden behind closed category headers.
+- Class Buff Reminder: Buff food, flask, and Shaman shield reminders now update immediately when the matching aura changes; Elemental Orbit can also require both a self Earth Shield and an Earth Shield on another group member.
 
 ---
 
