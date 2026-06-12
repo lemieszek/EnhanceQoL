@@ -8,6 +8,10 @@
 
 - Cooldown Panels: Added automatic proc-duration tracking for supported trinket slots, including stacked proc windows such as Gaze of the Alnseer.
 
+### 🔄 Changed
+
+- Unit Frames: Improved aura update performance by avoiding repeated static layout, style, and dispel-indicator work during aura refreshes.
+
 ### 🐛 Fixed
 
 - Class Buff Reminder: Fixed a login/setup error in current-expansion instance checks when the Encounter Journal reports fewer tiers than the expansion level offset expected.

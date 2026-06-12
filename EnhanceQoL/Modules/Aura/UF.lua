@@ -4171,12 +4171,95 @@ function AuraUtil.styleAuraDRText(btn, ac, drFontSizeOverride)
 	end
 end
 
+function AuraUtil.getAuraButtonStyleKey(ac)
+	if type(ac) ~= "table" then return "" end
+	local fontVersion = addon.functions and addon.functions.GetGlobalFontStateVersion and addon.functions.GetGlobalFontStateVersion() or 0
+	if ac._eqolAuraButtonStyleFontVersion == fontVersion and ac._eqolAuraButtonStyleKey then return ac._eqolAuraButtonStyleKey end
+	local countOffset = ac.countOffset
+	local cooldownOffset = ac.cooldownOffset
+	local drOffset = ac.drOffset
+	local borderColor = ac.borderColor
+	local key = table.concat({
+		tostring(fontVersion),
+		tostring(ac.showTooltip),
+		tostring(ac.showCooldown),
+		tostring(ac.showCooldownText),
+		tostring(ac.showCooldownEdge),
+		tostring(ac.showCooldownSwipe),
+		tostring(ac.showCooldownBling),
+		tostring(ac.showStacks),
+		tostring(ac.countAnchor),
+		tostring(countOffset and countOffset.x),
+		tostring(countOffset and countOffset.y),
+		tostring(ac.countFont),
+		tostring(ac.countFontSize),
+		tostring(ac.countFontOutline),
+		tostring(ac.cooldownAnchor),
+		tostring(cooldownOffset and cooldownOffset.x),
+		tostring(cooldownOffset and cooldownOffset.y),
+		tostring(ac.cooldownFont),
+		tostring(ac.cooldownFontSize),
+		tostring(ac.cooldownFontOutline),
+		tostring(ac.borderTexture),
+		tostring(ac.borderRenderMode),
+		tostring(ac.borderOffset),
+		tostring(borderColor and (borderColor[1] or borderColor.r)),
+		tostring(borderColor and (borderColor[2] or borderColor.g)),
+		tostring(borderColor and (borderColor[3] or borderColor.b)),
+		tostring(borderColor and (borderColor[4] or borderColor.a)),
+		tostring(ac.blizzardDispelBorder),
+		tostring(ac.blizzardDispelBorderAlpha),
+		tostring(ac.blizzardDispelBorderAlphaNot),
+		tostring(ac.showDR),
+		tostring(ac.drAnchor),
+		tostring(drOffset and drOffset.x),
+		tostring(drOffset and drOffset.y),
+		tostring(ac.drFont),
+		tostring(ac.drFontSize),
+		tostring(ac.drFontOutline),
+		tostring(ac.drColor),
+	}, "\031")
+	ac._eqolAuraButtonStyleFontVersion = fontVersion
+	ac._eqolAuraButtonStyleKey = key
+	return key
+end
+
 function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulFilter)
 	if not btn or not aura then return end
 	unitToken = unitToken or "target"
 	if issecretvalue and issecretvalue(isDebuff) then
 		harmfulFilter = harmfulFilter or select(2, AuraUtil.getAuraFilters(unitToken, ac))
 		isDebuff = AuraUtil.isAuraFilteredIn(unitToken, aura, harmfulFilter)
+	end
+	local styleKey = AuraUtil.getAuraButtonStyleKey(ac)
+	local showCooldown = ac.showCooldown ~= false
+	local showCooldownText = ac.showCooldownText
+	if showCooldownText == nil then showCooldownText = showCooldown end
+	local needsCooldown = showCooldown or showCooldownText == true
+	local showStacks = ac.showStacks
+	if showStacks == nil then showStacks = true end
+	local borderKey = ac and ac.borderTexture
+	local showBorder = isDebuff == true
+	if not showBorder then
+		local borderKeyName = borderKey and tostring(borderKey):upper() or "DEFAULT"
+		showBorder = borderKeyName ~= "" and borderKeyName ~= "DEFAULT"
+	end
+	local canUseStaticSignature = not needsCooldown and not showStacks and not showBorder and not (ac and ac.blizzardDispelBorder == true) and not (ac and ac.showDR == true)
+	if
+		canUseStaticSignature
+		and aura.auraInstanceID
+		and btn:IsShown()
+		and btn._eqolAuraStyleKey == styleKey
+		and btn._eqolAuraSigUnitToken == unitToken
+		and btn._eqolAuraSigInstanceID == aura.auraInstanceID
+		and btn._eqolAuraSigSample == aura.isSample
+		and btn._eqolAuraSigIsHelpful == aura.isHelpful
+		and btn._eqolAuraSigIsHarmful == aura.isHarmful
+		and btn._eqolAuraSigFromPlayerPet == aura.isFromPlayerOrPlayerPet
+		and btn._eqolAuraSigNameplateOnly == aura.isNameplateOnly
+		and btn._eqolAuraSigRaid == aura.isRaid
+	then
+		return
 	end
 	btn.spellId = aura.spellId
 	btn.auraInstanceID = aura.auraInstanceID
@@ -4185,10 +4268,6 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 	btn._showTooltip = ac.showTooltip ~= false
 	btn.icon:SetTexture(aura.icon or "")
 	btn.cd:Clear()
-	local showCooldown = ac.showCooldown ~= false
-	local showCooldownText = ac.showCooldownText
-	if showCooldownText == nil then showCooldownText = showCooldown end
-	local needsCooldown = showCooldown or showCooldownText == true
 	local drawCooldownEdge = ac.showCooldownEdge ~= false
 	local drawCooldownSwipe = ac.showCooldownSwipe ~= false
 	local drawCooldownBling = ac.showCooldownBling ~= false
@@ -4221,8 +4300,6 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 	btn.cd:SetHideCountdownNumbers(not hasCooldown or showCooldownText == false)
 	AuraUtil.styleAuraCount(btn, ac, countFontSize)
 	AuraUtil.styleAuraCooldownText(btn, ac, cooldownFontSize)
-	local showStacks = ac.showStacks
-	if showStacks == nil then showStacks = true end
 	if showStacks and (issecretvalue and issecretvalue(aura.applications) or aura.applications and aura.applications > 1) then
 		local appStacks = aura.applications
 		if not aura.isSample and aura.auraInstanceID and aura.auraInstanceID > 0 and C_UnitAuras.GetAuraApplicationDisplayCount then
@@ -4237,12 +4314,6 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 	end
 	local dispelR, dispelG, dispelB
 	if btn.border then
-		local borderKey = ac and ac.borderTexture
-		local showBorder = isDebuff == true
-		if not showBorder then
-			local borderKeyName = borderKey and tostring(borderKey):upper() or "DEFAULT"
-			showBorder = borderKeyName ~= "" and borderKeyName ~= "DEFAULT"
-		end
 		if showBorder then
 			local r, g, b = 1, 0.25, 0.25
 			local a = 1
@@ -4411,6 +4482,15 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 		end
 	end
 	btn:Show()
+	btn._eqolAuraStyleKey = styleKey
+	btn._eqolAuraSigUnitToken = unitToken
+	btn._eqolAuraSigInstanceID = aura.auraInstanceID
+	btn._eqolAuraSigSample = aura.isSample
+	btn._eqolAuraSigIsHelpful = aura.isHelpful
+	btn._eqolAuraSigIsHarmful = aura.isHarmful
+	btn._eqolAuraSigFromPlayerPet = aura.isFromPlayerOrPlayerPet
+	btn._eqolAuraSigNameplateOnly = aura.isNameplateOnly
+	btn._eqolAuraSigRaid = aura.isRaid
 end
 
 UF._auraLayout = UF._auraLayout or {}
@@ -4772,18 +4852,30 @@ function AuraUtil.updateTargetAuraIcons(startIndex, unit, refreshBuffs, refreshD
 		buttons = buttons or {}
 		local shown = 0
 		local maxCount = style.max or 0
+		local layoutKey = table.concat({
+			tostring(style.size),
+			tostring(style.padding),
+			tostring(perRow),
+			tostring(primary),
+			tostring(secondary),
+		}, "\031")
+		local layoutChanged = container._eqolAuraLayoutKey ~= layoutKey
 		for i = 1, #order do
 			if shown >= maxCount then break end
 			local auraId = order[i]
 			local aura = auraId and auras[auraId]
 			if aura then
 				shown = shown + 1
+				local oldButton = buttons[shown]
 				local btn
 				btn, buttons = AuraUtil.ensureAuraButton(container, buttons, shown, style)
 				AuraUtil.applyAuraToButton(btn, aura, style, isDebuff, unit, harmfulFilter)
-				AuraUtil.anchorAuraButton(btn, container, shown, style, perRow, primary, secondary)
+				if layoutChanged or oldButton ~= btn or btn._eqolAuraAnchorContainer ~= container then
+					AuraUtil.anchorAuraButton(btn, container, shown, style, perRow, primary, secondary)
+				end
 			end
 		end
+		container._eqolAuraLayoutKey = layoutKey
 		for idx = shown + 1, #buttons do
 			if buttons[idx] then buttons[idx]:Hide() end
 		end
@@ -4803,7 +4895,7 @@ function AuraUtil.updateTargetAuraIcons(startIndex, unit, refreshBuffs, refreshD
 		hideAuraList(st.debuffContainer, st.debuffButtons)
 	end
 
-	AuraUtil.UpdateSingleDispelIndicator(unit, allowSample)
+	if refreshDebuffs ~= false or allowSample then AuraUtil.UpdateSingleDispelIndicator(unit, allowSample) end
 end
 
 function AuraUtil.normalizeAuraQueryLimit(value)
@@ -11889,9 +11981,13 @@ onEvent = function(self, event, unit, ...)
 		local debuffLimit = (debuffAuras.max or 0) + 1
 		local touchBuff
 		local touchDebuff
+		local touchDispel
 		if eventInfo.addedAuras then
 			for _, aura in ipairs(eventInfo.addedAuras) do
 				local isDebuffAura = aura and showDebuffs and AuraUtil.isAuraFilteredIn(unit, aura, harmfulFilter)
+				if aura and not isDebuffAura and (unit == UNIT.PLAYER or unit == UNIT.TARGET or unit == UNIT.FOCUS) and AuraUtil.isAuraFilteredIn(unit, aura, "HARMFUL|INCLUDE_NAME_PLATE_ONLY|RAID_PLAYER_DISPELLABLE") then
+					touchDispel = true
+				end
 				local isBuffAura = aura and showBuffs and not isDebuffAura and AuraUtil.isAuraFilteredIn(unit, aura, helpfulFilter)
 				local shouldHide = false
 				if aura then
@@ -11908,11 +12004,13 @@ onEvent = function(self, event, unit, ...)
 					local _, idx = AuraUtil.cacheTargetAura(aura, unit, "debuff")
 					if oldBuffIdx and oldBuffIdx <= buffLimit then touchBuff = true end
 					if idx and idx <= debuffLimit then touchDebuff = true end
+					touchDispel = true
 				elseif aura and showBuffs and isBuffAura then
 					local oldDebuffIdx = AuraUtil.removeTargetAuraFromKindCache(unit, "debuff", aura.auraInstanceID)
 					local _, idx = AuraUtil.cacheTargetAura(aura, unit, "buff")
 					if oldDebuffIdx and oldDebuffIdx <= debuffLimit then touchDebuff = true end
 					if idx and idx <= buffLimit then touchBuff = true end
+					if oldDebuffIdx then touchDispel = true end
 				end
 			end
 		end
@@ -11931,6 +12029,7 @@ onEvent = function(self, event, unit, ...)
 					end
 					if buffIdx and buffIdx <= buffLimit then touchBuff = true end
 					if debuffIdx and debuffIdx <= debuffLimit then touchDebuff = true end
+					if debuffIdx then touchDispel = true end
 				end
 			end
 		end
@@ -11940,13 +12039,14 @@ onEvent = function(self, event, unit, ...)
 				local debuffIdx = AuraUtil.removeTargetAuraFromKindCache(unit, "debuff", inst)
 				if buffIdx and buffIdx <= buffLimit then touchBuff = true end
 				if debuffIdx and debuffIdx <= debuffLimit then touchDebuff = true end
+				if debuffIdx then touchDispel = true end
 			end
 		end
 		AuraUtil.compactAuraCache(buffCache)
 		AuraUtil.compactAuraCache(debuffCache)
 		if touchBuff or touchDebuff then
 			AuraUtil.updateTargetAuraIcons(nil, unit, touchBuff, touchDebuff)
-		else
+		elseif touchDispel then
 			AuraUtil.UpdateSingleDispelIndicator(unit, false)
 		end
 	elseif
