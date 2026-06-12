@@ -4,6 +4,10 @@
 
 ## [11.2.0-beta4] - 2026-06-11
 
+### ✨ Added
+
+- Cooldown Panels: Added automatic proc-duration tracking for supported trinket slots, including stacked proc windows such as Gaze of the Alnseer.
+
 ### 🐛 Fixed
 
 - Class Buff Reminder: Fixed a login/setup error in current-expansion instance checks when the Encounter Journal reports fewer tiers than the expansion level offset expected.

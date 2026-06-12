@@ -278,10 +278,24 @@ end
 
 local function shouldShowEntryStacks(entry, resolvedType)
 	if not entry then return false end
-	if resolvedType ~= "SPELL" and resolvedType ~= "CDM_AURA" then return false end
+	if resolvedType ~= "SPELL" and resolvedType ~= "CDM_AURA" and resolvedType ~= "SLOT" then return false end
+	if resolvedType == "SLOT" then
+		local slotID = tonumber(entry.slotID)
+		return (slotID == 13 or slotID == 14) and entry.showStacks == true or false
+	end
 	local bars = CooldownPanels.Bars
 	if bars and bars.ShouldEntryShowStacks then return bars.ShouldEntryShowStacks(entry, resolvedType) end
 	return entry.showStacks == true
+end
+
+function CooldownPanels.NormalizePositiveDisplayCount(value)
+	value = Helper.NormalizeDisplayCount(value)
+	if value == nil then return nil end
+	if Api.issecretvalue and Api.issecretvalue(value) then return value end
+	local numeric = tonumber(value)
+	if numeric and numeric <= 0 then return nil end
+	if value == "" or value == "0" then return nil end
+	return value
 end
 
 function CooldownPanels:IngestRankGroupsByRank(entries, keyPrefix)
@@ -3600,11 +3614,17 @@ function cdp.ENTRY.IsStyleClipboardKeyAllowedForEntry(key, entry)
 	if style.SLOT_ONLY_KEYS[key] and entryType ~= "SLOT" then return false end
 	if style.CDM_AURA_ONLY_KEYS[key] and entryType ~= "CDM_AURA" then return false end
 	if style.STATE_TEXTURE_KEYS[key] then return entryType == "SPELL" or entryType == "CDM_AURA" end
-	if key == "showStacks" then return entryType == "SPELL" or entryType == "CDM_AURA" end
+	if key == "showStacks" then
+		if entryType == "SLOT" then
+			local slotID = tonumber(entry and entry.slotID)
+			return slotID == 13 or slotID == 14
+		end
+		return entryType == "SPELL" or entryType == "CDM_AURA"
+	end
 	if key == "activationOverlayOnly" or key == "activationOverlayGlow" or key == "activationOverlayReverse" or key == "activationOverlayColor" then
 		return entryType == "SPELL" or entryType == "ITEM" or entryType == "MACRO"
 	end
-	if key == "autoCooldownDurationEnabled" then return entryType == "SPELL" or entryType == "MACRO" end
+	if key == "autoCooldownDurationEnabled" then return entryType == "SPELL" or entryType == "SLOT" or entryType == "MACRO" end
 	if key == "customCooldownDurationEnabled" or key == "customCooldownDuration" then return entryType == "SPELL" or entryType == "ITEM" or entryType == "SLOT" or entryType == "MACRO" end
 	return true
 end
@@ -5549,6 +5569,7 @@ function CooldownPanels:RebuildSpellIndex()
 	runtime.itemTrackedIds = itemTrackedIds
 	runtime.itemUsesTrackedIds = itemUsesTrackedIds
 	if updateRangeCheckSpells then updateRangeCheckSpells(rangeCheckSpells) end
+	if self.UpdateActiveProcTriggerIndex then self:UpdateActiveProcTriggerIndex() end
 	self:RebuildPowerIndex()
 	self:RebuildChargesIndex()
 	self:PrimeReadySoundStates()
@@ -8642,6 +8663,20 @@ function CooldownPanels:GetEntryAutoCooldownDurationInfo(entry, resolvedType)
 	return nil
 end
 
+function CooldownPanels:GetActiveProcTriggerInfoForItemID(itemID)
+	itemID = tonumber(itemID)
+	if not itemID then return nil end
+	local map = self.activeProcTriggerByItemID
+	local info = map and map[itemID] or nil
+	local triggerSpellID
+	self:ForEachActiveProcTriggerSpellID(info, function(candidateSpellID)
+		if not triggerSpellID then triggerSpellID = candidateSpellID end
+	end)
+	local duration = self:GetActiveProcTriggerConfiguredDuration(info)
+	if not (triggerSpellID and triggerSpellID > 0 and duration and duration > 0) then return nil end
+	return info, triggerSpellID, duration
+end
+
 function CooldownPanels:IsEntryTrinketSlot(entry, resolvedType)
 	if not entry then return false end
 	local typeKey = resolvedType or entry.type
@@ -8653,8 +8688,25 @@ end
 
 function CooldownPanels:SupportsEntryAutoCooldownDuration(entry, resolvedType)
 	if self:IsEntryTrinketSlot(entry, resolvedType) then return true end
+	if (resolvedType or (entry and entry.type)) == "SLOT" and self.SupportsEntryActiveProcTrigger and self:SupportsEntryActiveProcTrigger(entry, resolvedType) then return true end
 	local _, duration = self:GetEntryAutoCooldownDurationInfo(entry, resolvedType)
 	return duration ~= nil
+end
+
+function CooldownPanels:SupportsEntryActiveProcTrigger(entry, resolvedType)
+	if not entry then return false end
+	local typeKey = resolvedType or entry.type
+	if typeKey == "ITEM" then
+		local itemID = tonumber(entry.itemID)
+		if itemID and entry.type == "ITEM" then itemID = self.ResolveEntryItemID(entry, itemID) end
+		return self:GetActiveProcTriggerInfoForItemID(itemID) ~= nil
+	elseif typeKey == "SLOT" then
+		local slotID = tonumber(entry.slotID)
+		if slotID ~= 13 and slotID ~= 14 then return false end
+		local itemID = slotID and Api.GetInventoryItemID and Api.GetInventoryItemID("player", slotID) or nil
+		return self:GetActiveProcTriggerInfoForItemID(itemID) ~= nil
+	end
+	return false
 end
 
 function CooldownPanels:SupportsEntryCDMAuraOverlay(entry, resolvedType)
@@ -8695,6 +8747,95 @@ function CooldownPanels:GetEntryCustomCooldownDuration(entry, resolvedType)
 	local maxDuration = Helper.CUSTOM_COOLDOWN_DURATION_MAX or 300
 	if duration > maxDuration then duration = maxDuration end
 	return duration
+end
+
+function CooldownPanels:GetEntryActiveProcTriggerInfo(entry, resolvedType)
+	if not entry then return nil end
+	local typeKey = resolvedType or entry.type
+	if typeKey == "ITEM" then
+		local itemID = tonumber(entry.itemID)
+		if itemID and entry.type == "ITEM" then itemID = self.ResolveEntryItemID(entry, itemID) end
+		local info, triggerSpellID, duration = self:GetActiveProcTriggerInfoForItemID(itemID)
+		if info then return info, triggerSpellID, itemID, duration end
+	elseif typeKey == "SLOT" then
+		local slotID = tonumber(entry.slotID)
+		if slotID ~= 13 and slotID ~= 14 then return nil end
+		local itemID = slotID and Api.GetInventoryItemID and Api.GetInventoryItemID("player", slotID) or nil
+		local info, triggerSpellID, duration = self:GetActiveProcTriggerInfoForItemID(itemID)
+		if info then return info, triggerSpellID, itemID, duration end
+	end
+	return nil
+end
+
+function CooldownPanels:GetActiveProcTriggerKind(info, triggerSpellID)
+	triggerSpellID = tonumber(triggerSpellID)
+	if not (info and triggerSpellID) then return nil end
+	if tonumber(info.triggerSpellID) == triggerSpellID then return "trigger" end
+	if type(info.triggerSpellIDs) == "table" then
+		for i = 1, #info.triggerSpellIDs do
+			if tonumber(info.triggerSpellIDs[i]) == triggerSpellID then return "trigger" end
+		end
+	end
+	if tonumber(info.startTriggerSpellID) == triggerSpellID then return "start" end
+	if tonumber(info.stackTriggerSpellID) == triggerSpellID then return "stack" end
+	return nil
+end
+
+function CooldownPanels:GetActiveProcTriggerConfiguredDuration(info, triggerKind)
+	if not info then return nil end
+	if triggerKind == "start" then return tonumber(info.startDuration or info.duration) end
+	if triggerKind == "stack" then return tonumber(info.stackDuration or info.duration) end
+	return tonumber(info.duration or info.triggerDuration or info.stackDuration or info.startDuration)
+end
+
+function CooldownPanels:ForEachActiveProcTriggerSpellID(info, callback)
+	if not (info and callback) then return end
+	local function handle(triggerSpellID)
+		triggerSpellID = tonumber(triggerSpellID)
+		if triggerSpellID and triggerSpellID > 0 then callback(triggerSpellID) end
+	end
+	handle(info.triggerSpellID)
+	if type(info.triggerSpellIDs) == "table" then
+		for i = 1, #info.triggerSpellIDs do
+			handle(info.triggerSpellIDs[i])
+		end
+	end
+	handle(info.startTriggerSpellID)
+	handle(info.stackTriggerSpellID)
+end
+
+function CooldownPanels:GetActiveEntryProcTriggerDuration(panelId, entryId, entry, resolvedType)
+	if not (entry and entry.autoCooldownDurationEnabled == true) then return nil end
+	local info, triggerSpellID, itemID, duration = self:GetEntryActiveProcTriggerInfo(entry, resolvedType)
+	if not info then return nil end
+	local runtime = self.runtime
+	local store = runtime and runtime.activeProcTriggerDurations
+	local key = Helper.GetEntryKey(panelId, entryId)
+	local record = store and store[key] or nil
+	if not record then return nil end
+	self:CleanupActiveProcTriggerRecord(record)
+	if record.stackMode == true and (tonumber(record.stackCount) or 0) <= 0 then return nil end
+	local startTime = tonumber(record.startTime)
+	duration = tonumber(record.duration) or duration
+	local endTime = tonumber(record.endTime)
+	if not (startTime and duration and duration > 0 and endTime) then
+		self:ClearEntryActiveProcTriggerDuration(panelId, entryId, true)
+		return nil
+	end
+	local now = self:GetDurationNow()
+	if now >= endTime then
+		self:ClearEntryActiveProcTriggerDuration(panelId, entryId, true)
+		return nil
+	end
+	return {
+		key = "procTrigger:" .. tostring(itemID or triggerSpellID) .. ":" .. tostring(panelId) .. ":" .. tostring(entryId),
+		durationObject = record.durationObject,
+		startTime = startTime,
+		duration = duration,
+		endTime = endTime,
+		stackCount = tonumber(record.stackCount),
+		rate = 1,
+	}
 end
 
 function CooldownPanels:GetCustomCooldownDurationStore()
@@ -8853,7 +8994,7 @@ end
 
 function CooldownPanels:EntryUsesActivationOverlay(entry, resolvedType)
 	if not entry then return false end
-	return self:SupportsEntryCustomCooldownDuration(entry, resolvedType) or self:SupportsEntryCDMAuraOverlay(entry, resolvedType)
+	return self:SupportsEntryCustomCooldownDuration(entry, resolvedType) or self:SupportsEntryActiveProcTrigger(entry, resolvedType) or self:SupportsEntryCDMAuraOverlay(entry, resolvedType)
 end
 
 function CooldownPanels:ShouldTriggerEntryCustomCooldownDuration(entry, castSpellId)
@@ -8921,6 +9062,304 @@ function CooldownPanels:HandleCustomCooldownActivation(castSpellId)
 		end
 	end
 	return started
+end
+
+function CooldownPanels:GetActiveProcTriggerDurationStore()
+	self.runtime = self.runtime or {}
+	local runtime = self.runtime
+	runtime.activeProcTriggerDurations = runtime.activeProcTriggerDurations or {}
+	runtime.activeProcTriggerDurationTimers = runtime.activeProcTriggerDurationTimers or {}
+	runtime.activeProcTriggerStackTimers = runtime.activeProcTriggerStackTimers or {}
+	return runtime.activeProcTriggerDurations, runtime.activeProcTriggerDurationTimers
+end
+
+function CooldownPanels:CleanupActiveProcTriggerRecord(record, now)
+	if not record then return 0 end
+	now = now or self:GetDurationNow()
+	local expirations = record.stackExpirations
+	if type(expirations) ~= "table" then
+		record.stackCount = tonumber(record.stackCount) or 0
+		return record.stackCount
+	end
+	local writeIndex = 1
+	for i = 1, #expirations do
+		local expiration = tonumber(expirations[i])
+		if expiration and expiration > now then
+			expirations[writeIndex] = expiration
+			writeIndex = writeIndex + 1
+		end
+	end
+	for i = writeIndex, #expirations do
+		expirations[i] = nil
+	end
+	record.stackCount = writeIndex - 1
+	return record.stackCount
+end
+
+function CooldownPanels:ScheduleActiveProcTriggerStackCleanup(panelId, entryId)
+	local runtime = self.runtime
+	if not runtime then return end
+	local key = Helper.GetEntryKey(panelId, entryId)
+	runtime.activeProcTriggerStackTimers = runtime.activeProcTriggerStackTimers or {}
+	local timers = runtime.activeProcTriggerStackTimers
+	local oldTimer = timers[key]
+	if oldTimer and oldTimer.Cancel then oldTimer:Cancel() end
+	local store = runtime.activeProcTriggerDurations
+	local record = store and store[key] or nil
+	if not record then
+		timers[key] = nil
+		return
+	end
+	local now = self:GetDurationNow()
+	local nextExpiration
+	for i = 1, #(record.stackExpirations or {}) do
+		local expiration = tonumber(record.stackExpirations[i])
+		if expiration and expiration > now and (not nextExpiration or expiration < nextExpiration) then nextExpiration = expiration end
+	end
+	if not nextExpiration then
+		timers[key] = nil
+		return
+	end
+	timers[key] = C_Timer and C_Timer.NewTimer and C_Timer.NewTimer(math.max(nextExpiration - now, 0.01), function()
+		local currentStore = CooldownPanels.runtime and CooldownPanels.runtime.activeProcTriggerDurations
+		local current = currentStore and currentStore[key] or nil
+		if current then
+			CooldownPanels:CleanupActiveProcTriggerRecord(current)
+			if (tonumber(current.stackCount) or 0) <= 0 then
+				CooldownPanels:ClearEntryActiveProcTriggerDuration(panelId, entryId)
+			else
+				CooldownPanels:RefreshActiveProcTriggerEntries()
+				CooldownPanels:ScheduleActiveProcTriggerStackCleanup(panelId, entryId)
+			end
+		end
+	end) or nil
+end
+
+function CooldownPanels:ClearEntryActiveProcTriggerDuration(panelId, entryId, suppressRefresh)
+	panelId = normalizeId(panelId)
+	entryId = normalizeId(entryId)
+	if not (panelId and entryId and self.runtime) then return false end
+	local key = Helper.GetEntryKey(panelId, entryId)
+	local store = self.runtime.activeProcTriggerDurations
+	local timers = self.runtime.activeProcTriggerDurationTimers
+	local stackTimers = self.runtime.activeProcTriggerStackTimers
+	local hadRecord = store and store[key] ~= nil
+	if store then store[key] = nil end
+	local timer = timers and timers[key] or nil
+	if timer and timer.Cancel then timer:Cancel() end
+	if timers then timers[key] = nil end
+	local stackTimer = stackTimers and stackTimers[key] or nil
+	if stackTimer and stackTimer.Cancel then stackTimer:Cancel() end
+	if stackTimers then stackTimers[key] = nil end
+	if hadRecord and not suppressRefresh then
+		self:RefreshActiveProcTriggerEntries()
+	end
+	return hadRecord
+end
+
+function CooldownPanels:StartEntryActiveProcTriggerDuration(panelId, entryId, entry, resolvedType, info, triggerKind)
+	if not (entry and entry.autoCooldownDurationEnabled == true) then return false end
+	info = info or self:GetEntryActiveProcTriggerInfo(entry, resolvedType)
+	local duration = self:GetActiveProcTriggerConfiguredDuration(info, triggerKind)
+	if not (duration and duration > 0) then return false end
+	panelId = normalizeId(panelId)
+	entryId = normalizeId(entryId)
+	if not (panelId and entryId) then return false end
+	local now = self:GetDurationNow()
+	local durationObject
+	local durationUtil = _G.C_DurationUtil
+	if durationUtil and durationUtil.CreateDuration then
+		durationObject = durationUtil.CreateDuration()
+		if durationObject and durationObject.SetTimeFromStart then durationObject:SetTimeFromStart(now, duration, 1) end
+	end
+	local store, timers = self:GetActiveProcTriggerDurationStore()
+	local key = Helper.GetEntryKey(panelId, entryId)
+	local oldTimer = timers[key]
+	if oldTimer and oldTimer.Cancel then oldTimer:Cancel() end
+	if info.mode == "stacked" or info.mode == "stackedAfterStart" then
+		local current = store[key]
+		if triggerKind == "start" then
+			if type(current) ~= "table" then
+				current = {
+					stackCount = 0,
+					stackExpirations = {},
+					stackMode = true,
+				}
+				store[key] = current
+			end
+			current.armedUntil = now + duration
+			current.startDuration = duration
+			current.stackMode = true
+			current.stackExpirations = current.stackExpirations or {}
+			self:CleanupActiveProcTriggerRecord(current, now)
+			self:ScheduleActiveProcTriggerStackCleanup(panelId, entryId)
+			return true
+		end
+		if triggerKind ~= "stack" then return false end
+		if info.mode == "stackedAfterStart" and not (current and tonumber(current.armedUntil) and tonumber(current.armedUntil) > now) then
+			return false
+		end
+		if type(current) ~= "table" then
+			current = {
+				stackCount = 0,
+				stackExpirations = {},
+				stackMode = true,
+			}
+			store[key] = current
+		end
+		current.stackExpirations = current.stackExpirations or {}
+		current.stackExpirations[#current.stackExpirations + 1] = now + duration
+		current.durationObject = durationObject
+		current.startTime = now
+		current.duration = duration
+		current.endTime = now + duration
+		current.stackMode = true
+		self:CleanupActiveProcTriggerRecord(current, now)
+		self:ScheduleActiveProcTriggerStackCleanup(panelId, entryId)
+		return true
+	end
+	store[key] = {
+		durationObject = durationObject,
+		startTime = now,
+		duration = duration,
+		endTime = now + duration,
+	}
+	if C_Timer and C_Timer.NewTimer then
+		timers[key] = C_Timer.NewTimer(duration, function()
+			local currentStore = CooldownPanels.runtime and CooldownPanels.runtime.activeProcTriggerDurations
+			local current = currentStore and currentStore[key] or nil
+			if current and current.startTime == now and current.duration == duration then CooldownPanels:ClearEntryActiveProcTriggerDuration(panelId, entryId) end
+		end)
+	end
+	return true
+end
+
+function CooldownPanels:RefreshActiveProcTriggerEntries(triggerSpellID)
+	local runtime = self.runtime
+	local allTargets = runtime and runtime.activeProcTriggerEntryTargets
+	if not (allTargets and next(allTargets)) then return false end
+	local panelsToRefresh = cdp.ENTRY.GetPanelRefreshScratch and cdp.ENTRY.GetPanelRefreshScratch(runtime, "_eqolActiveProcTriggerEntryRefreshScratch") or {}
+	local refreshed = false
+	local function refreshPanels(targets)
+		for panelId, entries in pairs(targets or {}) do
+			local panelNeedsRefresh = false
+			for entryId, resolvedType in pairs(entries) do
+				local ok = false
+				if resolvedType == "ITEM" and cdp.ENTRY.TryRefreshVisibleItemEntry then
+					ok = cdp.ENTRY.TryRefreshVisibleItemEntry(panelId, entryId)
+				elseif resolvedType == "SLOT" and cdp.ENTRY.TryRefreshVisibleSlotEntry then
+					ok = cdp.ENTRY.TryRefreshVisibleSlotEntry(panelId, entryId)
+				end
+				if ok then
+					refreshed = true
+				else
+					panelNeedsRefresh = true
+					refreshed = true
+				end
+			end
+			if panelNeedsRefresh then
+				if cdp.ENTRY.QueuePanelRefresh then
+					cdp.ENTRY.QueuePanelRefresh(panelsToRefresh, panelId)
+				elseif self.RequestPanelRefresh then
+					self:RequestPanelRefresh(panelId)
+				elseif self.RefreshPanel then
+					self:RefreshPanel(panelId)
+				end
+			end
+		end
+	end
+	if triggerSpellID then
+		refreshPanels(allTargets[triggerSpellID])
+	else
+		for _, targets in pairs(allTargets) do
+			refreshPanels(targets)
+		end
+	end
+	if cdp.ENTRY.FlushPanelRefreshes and cdp.ENTRY.FlushPanelRefreshes(panelsToRefresh) then refreshed = true end
+	return refreshed
+end
+
+function CooldownPanels:UpdateActiveProcTriggerIndex()
+	self.runtime = self.runtime or {}
+	local runtime = self.runtime
+	local root = ensureRoot()
+	local enabledPanels = runtime.enabledPanels
+	local enabledPanelIds = runtime.enabledPanelIds
+	local procMap = self.activeProcTriggerByItemID
+	local equipped = {}
+	for _, slotID in ipairs({ 13, 14 }) do
+		local itemID = Api.GetInventoryItemID and Api.GetInventoryItemID("player", slotID) or nil
+		if itemID and procMap and procMap[itemID] then equipped[itemID] = procMap[itemID] end
+	end
+	local entryTargets = {}
+	local hasWatched = false
+	if root and root.panels and enabledPanels and next(enabledPanels) and enabledPanelIds and next(equipped) then
+		for i = 1, #enabledPanelIds do
+			local panelId = enabledPanelIds[i]
+			local panel = enabledPanels[panelId] and root.panels[panelId] or nil
+			if panel and panel.entries then
+				for _, entryId in ipairs(panel.order or {}) do
+					local entry = panel.entries[entryId]
+					if entry and entry.autoCooldownDurationEnabled == true and entry.showCooldown ~= false then
+						local itemID
+						if entry.type == "ITEM" then
+							itemID = tonumber(entry.itemID)
+							if itemID then itemID = self.ResolveEntryItemID(entry, itemID) end
+						elseif entry.type == "SLOT" then
+							local slotID = tonumber(entry.slotID)
+							if slotID == 13 or slotID == 14 then itemID = Api.GetInventoryItemID and Api.GetInventoryItemID("player", slotID) or nil end
+						end
+						local info = itemID and equipped[itemID] or nil
+						local duration = self:GetActiveProcTriggerConfiguredDuration(info)
+						if info and duration and duration > 0 then
+							self:ForEachActiveProcTriggerSpellID(info, function(triggerSpellID)
+								entryTargets[triggerSpellID] = entryTargets[triggerSpellID] or {}
+								entryTargets[triggerSpellID][panelId] = entryTargets[triggerSpellID][panelId] or {}
+								entryTargets[triggerSpellID][panelId][entryId] = entry.type
+								hasWatched = true
+							end)
+						end
+					end
+				end
+			end
+		end
+	end
+	runtime.activeProcTriggerEntryTargets = hasWatched and entryTargets or nil
+end
+
+function CooldownPanels:HandleActiveProcTriggerSpell(triggerSpellID)
+	triggerSpellID = tonumber(triggerSpellID)
+	if not triggerSpellID then return false end
+	local runtime = self.runtime
+	local targets = runtime and runtime.activeProcTriggerEntryTargets and runtime.activeProcTriggerEntryTargets[triggerSpellID]
+	if not (targets and next(targets)) then
+		return false
+	end
+	local triggeredItems = self.activeProcTriggerBySpellID and self.activeProcTriggerBySpellID[triggerSpellID] or nil
+	if not (triggeredItems and next(triggeredItems)) then return false end
+	local root = ensureRoot()
+	if not (root and root.panels) then return false end
+	local started = false
+	for panelId, entries in pairs(targets) do
+		local panel = root.panels[panelId]
+		for entryId, resolvedType in pairs(entries) do
+			local entry = panel and panel.entries and panel.entries[entryId] or nil
+			local info, _, itemID = self:GetEntryActiveProcTriggerInfo(entry, resolvedType)
+			local triggerKind = self:GetActiveProcTriggerKind(info, triggerSpellID)
+			if info and triggerKind and itemID and triggeredItems[itemID] then
+				if self:StartEntryActiveProcTriggerDuration(panelId, entryId, entry, resolvedType, info, triggerKind) then started = true end
+			end
+		end
+	end
+	if started then self:RefreshActiveProcTriggerEntries(triggerSpellID) end
+	return started
+end
+
+function CooldownPanels:HandleActiveProcTriggerSpellUpdate(spellID, baseSpellID)
+	local handled = false
+	if spellID then handled = self:HandleActiveProcTriggerSpell(spellID) or handled end
+	if baseSpellID and baseSpellID ~= spellID then handled = self:HandleActiveProcTriggerSpell(baseSpellID) or handled end
+	return handled
 end
 
 function CooldownPanels.IsSpellCooldownInfoActive(cooldownIsActive, cooldownEnabled, startTime, duration)
@@ -12373,7 +12812,9 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			defaultCollapsed = true,
 			isShown = function()
 				local effectiveType = getEffectiveType()
-				return effectiveType == "SPELL" or effectiveType == "CDM_AURA" or effectiveType == "ITEM"
+				local _, currentEntry = getEntry()
+				local slotID = effectiveType == "SLOT" and tonumber(currentEntry and currentEntry.slotID) or nil
+				return effectiveType == "SPELL" or effectiveType == "CDM_AURA" or slotID == 13 or slotID == 14
 			end,
 		},
 		{
@@ -12382,7 +12823,9 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			parentId = "cooldownPanelStandaloneStacks",
 			isShown = function()
 				local effectiveType = getEffectiveType()
-				return effectiveType == "SPELL" or effectiveType == "CDM_AURA"
+				local _, currentEntry = getEntry()
+				local slotID = effectiveType == "SLOT" and tonumber(currentEntry and currentEntry.slotID) or nil
+				return effectiveType == "SPELL" or effectiveType == "CDM_AURA" or slotID == 13 or slotID == 14
 			end,
 			get = function()
 				local _, currentEntry = getEntry()
@@ -12397,7 +12840,9 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			parentId = "cooldownPanelStandaloneStacks",
 			isShown = function()
 				local effectiveType = getEffectiveType()
-				return effectiveType == "SPELL" or effectiveType == "CDM_AURA" or effectiveType == "ITEM"
+				local _, currentEntry = getEntry()
+				local slotID = effectiveType == "SLOT" and tonumber(currentEntry and currentEntry.slotID) or nil
+				return effectiveType == "SPELL" or effectiveType == "CDM_AURA" or slotID == 13 or slotID == 14
 			end,
 			get = function()
 				local _, currentEntry = getEntry()
@@ -17353,9 +17798,10 @@ local function layoutInspectorToggles(inspector, entry)
 		place(inspector.cbShowWhenEmpty, true)
 		place(inspector.cbShowWhenNoCooldown, false)
 	elseif effectiveType == "SLOT" then
+		local slotID = tonumber(entry and entry.slotID)
 		place(inspector.cbAlwaysShow, false)
 		place(inspector.cbCharges, false)
-		place(inspector.cbStacks, false)
+		place(inspector.cbStacks, slotID == 13 or slotID == 14)
 		place(inspector.cbItemCount, false)
 		place(inspector.cbItemUses, false)
 		place(inspector.cbUseHighestRank, false)
@@ -18893,6 +19339,9 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 			local spellId
 			local spellPassState
 			local customCooldownState = self:GetActiveEntryCustomCooldownDuration(panelId, entryId, entry, resolvedType)
+			if not customCooldownState and (resolvedType == "ITEM" or resolvedType == "SLOT") then
+				customCooldownState = self:GetActiveEntryProcTriggerDuration(panelId, entryId, entry, resolvedType)
+			end
 
 			if resolvedType == "SPELL" and baseSpellId then
 				spellId = effectiveSpellId or baseSpellId
@@ -19030,6 +19479,12 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				cooldownEnabledOk = true
 				if showCooldown then show = true end
 				canTriggerReadyGlow = canTriggerReadyGlow or showCooldown
+				if customCooldownState.stackCount and shouldShowEntryStacks(entry, resolvedType) then
+					local normalizedStackCount = CooldownPanels.NormalizePositiveDisplayCount(customCooldownState.stackCount)
+					if normalizedStackCount ~= nil then
+						stackCount = normalizedStackCount
+					end
+				end
 			end
 			if entry.activationOverlayOnly == true and self:EntryUsesActivationOverlay(entry, resolvedType) then
 				show = customCooldownState ~= nil or (spellAuraOverlayData and spellAuraOverlayData.active == true) or false
@@ -19331,7 +19786,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				data.previewSound = previewSound
 				data.readyAt = runtime.readyAt[entryId]
 				data.stanceActive = stanceActive == true
-				data.stackCount = Helper.NormalizeDisplayCount(stackCount)
+				data.stackCount = CooldownPanels.NormalizePositiveDisplayCount(stackCount)
 				data.itemCount = itemCount
 				data.itemUses = itemUses
 				data.emptyItem = emptyItem
@@ -23437,6 +23892,9 @@ function cdp.ENTRY.ApplyVisibleItemRuntime(panelId, runtime, icon, data, resolve
 	if data.showItemCount and data.itemCount ~= nil then
 		icon.count:SetText(data.itemCount)
 		icon.count:Show()
+	elseif data.showStacks and data.stackCount ~= nil then
+		icon.count:SetText(data.stackCount)
+		icon.count:Show()
 	else
 		icon.count:Hide()
 	end
@@ -23675,6 +24133,7 @@ function cdp.ENTRY.TryRefreshVisibleItemEntry(panelId, entryId)
 		if not newVisible and showCooldown and cooldownEnabledOk and isCooldownActive(cooldownStart, cooldownDuration) then newVisible = true end
 	end
 	local customCooldownState = CooldownPanels:GetActiveEntryCustomCooldownDuration(panelId, entryId, entry, "ITEM")
+	if not customCooldownState then customCooldownState = CooldownPanels:GetActiveEntryProcTriggerDuration(panelId, entryId, entry, "ITEM") end
 	if customCooldownState then
 		cooldownStart = customCooldownState.startTime
 		cooldownDuration = customCooldownState.duration
@@ -23721,6 +24180,8 @@ function cdp.ENTRY.TryRefreshVisibleItemEntry(panelId, entryId)
 	data.itemCount = itemCount
 	data.itemUses = itemUses
 	data.emptyItem = emptyItem
+	data.stackCount = nil
+	data.showStacks = false
 	data.cooldownStart = cooldownStart or 0
 	data.cooldownDuration = cooldownDuration or 0
 	data.cooldownEnabled = cooldownEnabled
@@ -23782,6 +24243,7 @@ function cdp.ENTRY.TryRefreshVisibleSlotEntry(panelId, entryId)
 		newVisible = true
 	end
 	local customCooldownState = CooldownPanels:GetActiveEntryCustomCooldownDuration(panelId, entryId, entry, "SLOT")
+	if not customCooldownState then customCooldownState = CooldownPanels:GetActiveEntryProcTriggerDuration(panelId, entryId, entry, "SLOT") end
 	if customCooldownState then
 		cooldownStart = customCooldownState.startTime
 		cooldownDuration = customCooldownState.duration
@@ -23796,6 +24258,8 @@ function cdp.ENTRY.TryRefreshVisibleSlotEntry(panelId, entryId)
 
 	data.cooldownStart = cooldownStart or 0
 	data.cooldownDuration = cooldownDuration or 0
+	data.stackCount = customCooldownState and CooldownPanels.NormalizePositiveDisplayCount(customCooldownState.stackCount) or nil
+	data.showStacks = data.stackCount ~= nil and shouldShowEntryStacks(entry, "SLOT") or false
 	data.cooldownEnabled = cooldownEnabled
 	data.cooldownIsActive = nil
 	data.cooldownRate = 1
@@ -25442,6 +25906,7 @@ function CooldownPanels.EnsureUpdateFrame()
 					CooldownPanels:InvalidateSpellQueryCaches("info")
 				end
 				CooldownPanels:HandleReadySoundSpellEvent(spellId, baseSpellId, true)
+				if CooldownPanels.HandleActiveProcTriggerSpellUpdate then CooldownPanels:HandleActiveProcTriggerSpellUpdate(spellId, baseSpellId) end
 				if gcdChanged then
 					if not CooldownPanels.RequestEnabledPanelRefreshes() then CooldownPanels:RefreshAllPanels() end
 				elseif spellId ~= nil then
@@ -25499,6 +25964,7 @@ function CooldownPanels.EnsureUpdateFrame()
 		if event == "BAG_UPDATE_DELAYED" or event == "PLAYER_EQUIPMENT_CHANGED" or event == "PLAYER_ENTERING_WORLD" then
 			if event == "PLAYER_EQUIPMENT_CHANGED" then CooldownPanels:InvalidateSpellQueryCaches() end
 			updateItemCountCache()
+			if CooldownPanels.UpdateActiveProcTriggerIndex then CooldownPanels:UpdateActiveProcTriggerIndex() end
 		end
 		CooldownPanels:RequestUpdate("Event:" .. event)
 	end)
