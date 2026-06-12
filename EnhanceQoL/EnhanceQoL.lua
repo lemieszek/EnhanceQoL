@@ -3177,6 +3177,7 @@ local function initActionBars()
 	local globalFontStyleKey = addon.functions.GetGlobalFontStyleConfigKey and addon.functions.GetGlobalFontStyleConfigKey() or "__EQOL_GLOBAL_FONT_STYLE__"
 	addon.functions.InitDBValue("globalFontFace", addon.variables.defaultFont)
 	addon.functions.InitDBValue("globalFontStyle", "OUTLINE")
+	if addon.DurationText and addon.DurationText.InitDB then addon.DurationText:InitDB() end
 	addon.functions.InitDBValue("actionBarAnchorEnabled", false)
 	addon.functions.InitDBValue("actionBarFadeStrength", 1)
 	addon.functions.InitDBValue("actionBarFullRangeColoring", false)

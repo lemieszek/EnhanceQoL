@@ -7589,6 +7589,7 @@ function UF.DataBar.Update(cfg, unit)
 	st.dataBar:SetStatusBarColor(r, g, b, a)
 	st.dataBar:Show()
 	st._dataBarTextDirty = true
+	if UF.ScheduleTextUpdate then UF.ScheduleTextUpdate() end
 end
 
 local applyBossEditSample
@@ -7799,6 +7800,7 @@ local function updateHealth(cfg, unit)
 	end
 	UF.DataBar.Update(cfg, unit)
 	st._healthTextDirty = true
+	if UF.ScheduleTextUpdate then UF.ScheduleTextUpdate() end
 end
 
 local function updatePower(cfg, unit, allowVisibilityChanges)
@@ -7873,6 +7875,7 @@ local function updatePower(cfg, unit, allowVisibilityChanges)
 				if st.powerGroup and st.powerGroup.SetAlpha then st.powerGroup:SetAlpha(1) end
 			end
 			st._powerTextDirty = true
+			if UF.ScheduleTextUpdate then UF.ScheduleTextUpdate() end
 			UF.DataBar.Update(cfg, unit)
 		end
 	end
@@ -7936,6 +7939,7 @@ local function updatePower(cfg, unit, allowVisibilityChanges)
 			st._secondaryPowerEnum = enumId
 			st._secondaryPowerToken = resolvedToken
 			st._secondaryPowerTextDirty = true
+			if UF.ScheduleTextUpdate then UF.ScheduleTextUpdate() end
 		end
 	end
 	if not (bar and powerEnabled) then UF.DataBar.Update(cfg, unit) end
@@ -9770,7 +9774,10 @@ local function updateNameAndLevel(cfg, unit, levelOverride)
 		end
 	end
 	if UFHelper and UFHelper.updateClassificationIndicator then UFHelper.updateClassificationIndicator(st, unit, cfg, defaultsFor(unit), false) end
-	if st.dataBarTextLeft or st.dataBarTextCenter or st.dataBarTextRight then st._dataBarTextDirty = true end
+	if st.dataBarTextLeft or st.dataBarTextCenter or st.dataBarTextRight then
+		st._dataBarTextDirty = true
+		if UF.ScheduleTextUpdate then UF.ScheduleTextUpdate() end
+	end
 end
 
 refreshNameAndLevelSoon = function(unit)
@@ -9821,6 +9828,7 @@ local function applyConfig(unit)
 	st._powerTextDirty = true
 	st._secondaryPowerTextDirty = true
 	st._dataBarTextDirty = true
+	if UF.ScheduleTextUpdate then UF.ScheduleTextUpdate() end
 	if unit == UNIT.TARGET then syncTargetRangeFadeConfig(cfg, def) end
 	if not cfg.enabled then
 		if st and st.frame then
@@ -10546,6 +10554,7 @@ function UF.RecomputeAnyUFEnabled()
 end
 
 local function anyUFEnabled()
+	if UF._anyUFEnabledCached ~= nil then return UF._anyUFEnabledCached == true end
 	return UF.HasUnitRuntimeConsumers and UF.HasUnitRuntimeConsumers() or false
 end
 
@@ -10554,29 +10563,28 @@ function UF.UnitHasDirtyTexts(unit)
 	return st and (st._healthTextDirty or st._powerTextDirty or st._secondaryPowerTextDirty or st._dataBarTextDirty) and true or false
 end
 
-function UF.UpdateTextUnits(force, dirtyOnly)
-	if not dirtyOnly then
-		UF.UpdateUnitTexts(UNIT.PLAYER, force)
-		UF.UpdateUnitTexts(UNIT.TARGET, force)
-		UF.UpdateUnitTexts(UNIT.TARGET_TARGET, force)
-		UF.UpdateUnitTexts(UNIT.FOCUS, force)
-		UF.UpdateUnitTexts(UNIT.PET, force)
-		local bossCount = UF.GetBossFrameCount()
-		for i = 1, bossCount do
-			UF.UpdateUnitTexts("boss" .. i, force)
-		end
-		return
-	end
-
+function UF.UpdateDirtyTextUnits(force)
 	if UF.UnitHasDirtyTexts(UNIT.PLAYER) then UF.UpdateUnitTexts(UNIT.PLAYER, force) end
 	if UF.UnitHasDirtyTexts(UNIT.TARGET) then UF.UpdateUnitTexts(UNIT.TARGET, force) end
 	if UF.UnitHasDirtyTexts(UNIT.TARGET_TARGET) then UF.UpdateUnitTexts(UNIT.TARGET_TARGET, force) end
 	if UF.UnitHasDirtyTexts(UNIT.FOCUS) then UF.UpdateUnitTexts(UNIT.FOCUS, force) end
 	if UF.UnitHasDirtyTexts(UNIT.PET) then UF.UpdateUnitTexts(UNIT.PET, force) end
-	local bossCount = UF.GetBossFrameCount()
-	for i = 1, bossCount do
+	for i = 1, maxBossFrames do
 		local unit = "boss" .. i
 		if UF.UnitHasDirtyTexts(unit) then UF.UpdateUnitTexts(unit, force) end
+	end
+end
+
+function UF.UpdateTextUnits(force)
+	UF.UpdateUnitTexts(UNIT.PLAYER, force)
+	UF.UpdateUnitTexts(UNIT.TARGET, force)
+	UF.UpdateUnitTexts(UNIT.TARGET_TARGET, force)
+	UF.UpdateUnitTexts(UNIT.FOCUS, force)
+	UF.UpdateUnitTexts(UNIT.PET, force)
+	local bossCfg = states.boss and states.boss.cfg
+	local bossCount = UF.GetBossFrameCount(bossCfg)
+	for i = 1, bossCount do
+		UF.UpdateUnitTexts("boss" .. i, force)
 	end
 end
 
@@ -10586,8 +10594,7 @@ function UF.HasDirtyTexts()
 	if UF.UnitHasDirtyTexts(UNIT.TARGET_TARGET) then return true end
 	if UF.UnitHasDirtyTexts(UNIT.FOCUS) then return true end
 	if UF.UnitHasDirtyTexts(UNIT.PET) then return true end
-	local bossCount = UF.GetBossFrameCount()
-	for i = 1, bossCount do
+	for i = 1, maxBossFrames do
 		if UF.UnitHasDirtyTexts("boss" .. i) then return true end
 	end
 	return false
@@ -11578,25 +11585,35 @@ end
 
 function UF.UpdateAllTexts(force)
 	if force then
-		UF.UpdateTextUnits(true, false)
+		UF.UpdateTextUnits(true)
 		return
 	end
 	if not UF.HasDirtyTexts() then return end
-	UF.UpdateTextUnits(false, true)
+	UF.UpdateDirtyTextUnits(false)
 end
 
-function UF.EnsureTextTicker()
-	if UF._textTicker or not NewTicker then return end
-	UF._textTicker = NewTicker(TEXT_UPDATE_INTERVAL, function()
+function UF.ScheduleTextUpdate()
+	if UF._textUpdateScheduled then return end
+	UF._textUpdateScheduled = true
+	local function run()
+		UF._textUpdateScheduled = nil
 		if not anyUFEnabled() then return end
-		if not UF.HasDirtyTexts() then return end
-		UF.UpdateTextUnits(false, true)
-	end)
+		UF._lastTextUpdateAt = GetTime and GetTime() or 0
+		UF.UpdateAllTexts(false)
+	end
+	local now = GetTime and GetTime() or 0
+	local delay = TEXT_UPDATE_INTERVAL - (now - (UF._lastTextUpdateAt or 0))
+	if delay <= 0 and RunNextFrame then
+		RunNextFrame(run)
+	elseif After then
+		After(delay > 0 and delay or 0, run)
+	else
+		run()
+	end
 end
 
-function UF.CancelTextTicker()
-	if UF._textTicker and UF._textTicker.Cancel then UF._textTicker:Cancel() end
-	UF._textTicker = nil
+function UF.CancelTextUpdate()
+	UF._textUpdateScheduled = nil
 end
 
 function UF.UpdateAllPvPIndicators()
@@ -12284,7 +12301,7 @@ local function ensureEventHandling()
 	if not anyUFEnabled() then
 		hideBossFrames()
 		UF.ScheduleRangeFadeRefresh(true)
-		UF.CancelTextTicker()
+		UF.CancelTextUpdate()
 		if UFHelper and UFHelper.disableCombatFeedbackAll then UFHelper.disableCombatFeedbackAll(states) end
 		if eventFrame and eventFrame.UnregisterAllEvents then eventFrame:UnregisterAllEvents() end
 		if eventFrame then eventFrame:SetScript("OnEvent", nil) end
@@ -12358,7 +12375,6 @@ local function ensureEventHandling()
 	UF._registerUnitScopedEvents(anyPortraitEnabled())
 	syncTargetRangeFadeConfig(ensureDB(UNIT.TARGET), defaultsFor(UNIT.TARGET))
 	UF.ScheduleRangeFadeRefresh(false)
-	UF.EnsureTextTicker()
 	UF.UpdateAllTexts(true)
 end
 
