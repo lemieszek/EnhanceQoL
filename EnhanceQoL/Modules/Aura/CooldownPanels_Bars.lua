@@ -2509,6 +2509,16 @@ local function getCooldownProgress(startTime, duration, rate)
 	return clamp(((now - start) * modifier) / total, 0, 1)
 end
 
+Bars.IsSpellCooldownActiveForBars = Bars.IsSpellCooldownActiveForBars or function(cooldownIsActive, cooldownEnabled, startTime, duration)
+	if CooldownPanels.IsSpellCooldownInfoActive then return CooldownPanels.IsSpellCooldownInfoActive(cooldownIsActive, cooldownEnabled, startTime, duration) end
+	if cooldownEnabled == false or cooldownEnabled == 0 then return false end
+	local start = safeNumber(startTime)
+	local total = safeNumber(duration)
+	if not (start and total and start > 0 and total > 0) then return false end
+	local now = (Api.GetTime and Api.GetTime()) or GetTime()
+	return (start + total) > now
+end
+
 local function getDurationObjectRemaining(durationObject)
 	if not (durationObject and durationObject.GetRemainingDuration) then return nil end
 	return safeNumber(durationObject.GetRemainingDuration(durationObject, Api.DurationModifierRealTime))
@@ -2714,8 +2724,7 @@ refreshChargeBarRuntimeState = function(state, icon, runtimeData)
 	if type(chargesInfo) == "table" and not (Api.issecretvalue and Api.issecretvalue(chargesInfo.isActive)) and type(chargesInfo.isActive) == "boolean" then
 		chargeApiIsActive = chargesInfo.isActive
 	end
-	local cooldownApiIsActive = nil
-	if not (Api.issecretvalue and Api.issecretvalue(cooldownIsActive)) and type(cooldownIsActive) == "boolean" then cooldownApiIsActive = cooldownIsActive end
+	local cooldownApiIsActive = Bars.IsSpellCooldownActiveForBars(cooldownIsActive, cooldownEnabled, cooldownStart, cooldownDuration)
 	local chargeInfoActive = chargeApiIsActive == true
 
 	local displayedCharges = chargesInfo and safeNumber(chargesInfo.currentCharges) or getDisplayedCharges(icon)
@@ -2854,7 +2863,7 @@ refreshChargeBarRuntimeState = function(state, icon, runtimeData)
 	state.cooldownRemaining = cooldownRemaining
 	state.cooldownEnabled = cooldownEnabled
 	state.cooldownGCD = cooldownGCD == true
-	state.cooldownIsActive = cooldownIsActive == true
+	state.cooldownIsActive = cooldownApiIsActive == true
 	state.cooldownInfoActive = cachedCooldownActive == true
 	state.lastNonGCDCooldownActive = cachedCooldownActive == true
 	state.lastNonGCDCooldownDurationObject = cachedCooldownDurationObject
@@ -3348,7 +3357,7 @@ buildBarState = function(panelId, entryId, entry, icon, preview, runtimeDataOver
 					durationObject = CooldownPanels.GetCachedSpellCooldownDurationObject and CooldownPanels:GetCachedSpellCooldownDurationObject(spellId, true) or nil
 					startTime, duration, enabled, rate, cooldownGCD, isActive = CooldownPanels:GetCachedSpellCooldownInfo(spellId, true)
 				end
-				local cooldownActive = CooldownPanels.IsSpellCooldownInfoActive and CooldownPanels.IsSpellCooldownInfoActive(isActive, enabled, startTime, duration) and cooldownGCD ~= true
+				local cooldownActive = Bars.IsSpellCooldownActiveForBars(isActive, enabled, startTime, duration) and cooldownGCD ~= true
 				if cooldownActive then
 					progress = getDurationObjectElapsedProgress(durationObject) or getCooldownProgress(startTime, duration, rate) or 0
 					valueText = Bars.GetCooldownValueText(icon, durationObject, startTime, duration, rate)
