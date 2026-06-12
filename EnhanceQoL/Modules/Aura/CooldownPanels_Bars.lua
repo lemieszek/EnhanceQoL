@@ -1756,6 +1756,11 @@ local function ensureBarFrame(icon)
 	frame.fillBg:SetAllPoints(frame.fill)
 	frame.fillBg:SetTexture("Interface\\Buttons\\WHITE8x8")
 	frame.fillBg:SetVertexColor(0, 0, 0, 0.35)
+	frame.inactiveDurationFill = frame.fill:CreateTexture(nil, "OVERLAY")
+	frame.inactiveDurationFill:SetAllPoints(frame.fill)
+	frame.inactiveDurationFill:SetTexture("Interface\\TargetingFrame\\UI-StatusBar")
+	frame.inactiveDurationFill:SetVertexColor(0.30, 0.88, 0.46, 1)
+	frame.inactiveDurationFill:SetAlpha(0)
 	frame.dividerOverlay = CreateFrame("Frame", nil, frame.body)
 	frame.dividerOverlay:SetAllPoints(frame.body)
 	frame.dividerOverlay:EnableMouse(false)
@@ -3116,6 +3121,8 @@ Bars.ResetBarRuntimeState = function(state)
 	state.chargeInfoActive = nil
 	state.cooldownDurationObject = nil
 	state.chargeDurationObject = nil
+	state.inactiveDurationCondition = nil
+	state.hasInactiveDurationCondition = nil
 	state.rawCooldownDurationObject = nil
 	state.cooldownRemaining = nil
 	state.cooldownEnabled = nil
@@ -3420,6 +3427,10 @@ buildBarState = function(panelId, entryId, entry, icon, preview, runtimeDataOver
 				cooldownValueVisible = true
 				cooldownVisibilityActive = true
 				state.fillDurationObject = durationObject
+				if durationObject.IsActive then
+					state.inactiveDurationCondition = durationObject:IsActive(Api.DurationModifierRealTime)
+					state.hasInactiveDurationCondition = true
+				end
 				Bars.UseNativeDurationValueText(state, durationObject)
 				state.timerDirection = cdp.BAR_STATUS_TIMER_DIRECTION_REMAINING
 			elseif runtimeData and auraActive then
@@ -4180,6 +4191,12 @@ layoutBarFrame = function(barFrame, icon, span, layout, state)
 	barFrame.fill:ClearAllPoints()
 	barFrame.fill:SetPoint("TOPLEFT", barFrame.body, "TOPLEFT", fillInset, -fillInset)
 	barFrame.fill:SetPoint("BOTTOMRIGHT", barFrame.body, "BOTTOMRIGHT", -fillInset, fillInset)
+	if barFrame.inactiveDurationFill then
+		barFrame.inactiveDurationFill:ClearAllPoints()
+		barFrame.inactiveDurationFill:SetPoint("TOPLEFT", barFrame.fill, "TOPLEFT", 0, 0)
+		barFrame.inactiveDurationFill:SetPoint("BOTTOMRIGHT", barFrame.fill, "BOTTOMRIGHT", 0, 0)
+		barFrame.inactiveDurationFill:SetTexture(fillTexturePath)
+	end
 	if barFrame.dividerOverlay then
 		barFrame.dividerOverlay:ClearAllPoints()
 		barFrame.dividerOverlay:SetPoint("TOPLEFT", barFrame.body, "TOPLEFT", 0, 0)
@@ -4232,6 +4249,7 @@ layoutBarFrame = function(barFrame, icon, span, layout, state)
 		valueDefaultFontPath, valueDefaultFontSize, valueDefaultFontStyle = CooldownPanels:GetCooldownFontDefaults(icon and icon:GetParent() or nil)
 	end
 	if useChargeSegments then
+		if barFrame.inactiveDurationFill then barFrame.inactiveDurationFill:SetAlpha(0) end
 		layoutChargeSegmentsIntoBar(
 			barFrame,
 			icon,
@@ -4253,6 +4271,7 @@ layoutBarFrame = function(barFrame, icon, span, layout, state)
 			effectiveScale
 		)
 	elseif useStackSegments then
+		if barFrame.inactiveDurationFill then barFrame.inactiveDurationFill:SetAlpha(0) end
 		Bars.LayoutStackSegmentsIntoBar(
 			barFrame,
 			icon,
@@ -4279,6 +4298,14 @@ layoutBarFrame = function(barFrame, icon, span, layout, state)
 		barFrame.fill:Show()
 		barFrame.fillBg:Show()
 		barFrame.fill:SetStatusBarColor(fillColor[1], fillColor[2], fillColor[3], fillColor[4])
+		if barFrame.inactiveDurationFill then
+			barFrame.inactiveDurationFill:SetVertexColor(fillColor[1], fillColor[2], fillColor[3], 1)
+			if state.hasInactiveDurationCondition == true and barFrame.inactiveDurationFill.SetAlphaFromBoolean then
+				barFrame.inactiveDurationFill:SetAlphaFromBoolean(state.inactiveDurationCondition, 0, fillColor[4] or 1)
+			else
+				barFrame.inactiveDurationFill:SetAlpha(0)
+			end
+		end
 		if state.mode == Bars.BAR_MODE.STACKS then
 			local ufHelper = addon.Aura and addon.Aura.UFHelper
 			if ufHelper and ufHelper.applyStatusBarReverseFill then ufHelper.applyStatusBarReverseFill(barFrame.fill, false) end

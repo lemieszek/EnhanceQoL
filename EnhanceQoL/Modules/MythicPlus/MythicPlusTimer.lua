@@ -156,7 +156,7 @@ Timer.defaults = Timer.defaults
 		panelEnemyBarBorderTexture = "EQOL: Midnight 12px",
 		panelEnemyBarBorderColor = { r = 0.3254902064800263, g = 0.94117653369903564, b = 1, a = 1 },
 		panelEnemyBarBorderSize = 5,
-		panelEnemyBarBorderOffset = 2,
+		panelEnemyBarBorderOffset = 1,
 		panelEnemyBarBorderSeparateOffset = false,
 		panelEnemyBarBorderOffsetX = 0,
 		panelEnemyBarBorderOffsetY = 0,
@@ -1051,29 +1051,32 @@ function Timer:GetTimerDisplayText(state, timeLeft)
 	return timeRemainingToText(timeLeft)
 end
 
-local function buildDungeonAbbreviation(name)
-	if type(name) ~= "string" or name == "" then return L["mythicPlusTimerUnknownDungeon"] or "Mythic+ Dungeon" end
-	local short = ""
-	for word in name:gmatch("[%w']+") do
-		if #word > 2 then short = short .. word:sub(1, 1):upper() end
-	end
-	return short ~= "" and short or name
+local function normalizeDungeonAbbreviation(label, mapName)
+	if type(label) ~= "string" or label == "" then return nil end
+	if type(mapName) == "string" and mapName ~= "" and label:lower() == mapName:lower() then return nil end
+	return label
 end
 
 function Timer:GetDungeonAbbreviation(state)
 	if not state then return nil end
-	local mapID = state.mapID
+	local mapID = tonumber(state.mapID)
 	local mapLabels = addon.MythicPlus and addon.MythicPlus.variables and addon.MythicPlus.variables.challengeMapID
-	if mapID and type(mapLabels) == "table" and mapLabels[mapID] then return mapLabels[mapID] end
+	if mapID and type(mapLabels) == "table" then
+		local label = normalizeDungeonAbbreviation(mapLabels[mapID] or mapLabels[tostring(mapID)], state.mapName)
+		if label then return label end
+	end
 	local compendium = addon.MythicPlus and addon.MythicPlus.variables and addon.MythicPlus.variables.portalCompendium
 	if mapID and type(compendium) == "table" then
 		for _, section in pairs(compendium) do
 			for _, data in pairs(section.spells or {}) do
-				if type(data.cId) == "table" and data.cId[mapID] and data.text then return data.textID and data.textID[mapID] or data.text end
+				if type(data.cId) == "table" and data.cId[mapID] and data.text then
+					local label = normalizeDungeonAbbreviation(data.textID and data.textID[mapID] or data.text, state.mapName)
+					if label then return label end
+				end
 			end
 		end
 	end
-	return buildDungeonAbbreviation(state.mapName)
+	return nil
 end
 
 function Timer:GetDungeonDisplayText(state)
@@ -1760,13 +1763,14 @@ function Timer:RenderPanelObjectives(state)
 		item.value:SetText(valueText)
 		item.value:SetTextColor(color.r, color.g, color.b, color.a)
 		item.value:ClearAllPoints()
+		local columnGap = snapToPixel(math.max(0, 8 + columnOffset))
 		if invertColumns then
-			item.text:SetJustifyH("LEFT")
+			item.text:SetJustifyH("RIGHT")
 			item.value:SetJustifyH("LEFT")
 			if valueWidth > 0 then
 				item.value:SetPoint("TOPLEFT", item, "TOPLEFT", 0, 0)
 				item.value:SetWidth(valueWidth)
-				item.text:SetPoint("TOPLEFT", item, "TOPLEFT", math.max(0, valueWidth + columnOffset), 0)
+				item.text:SetPoint("TOPLEFT", item.value, "TOPRIGHT", columnGap, 0)
 			else
 				item.text:SetPoint("TOPLEFT", item, "TOPLEFT", 0, 0)
 			end
@@ -1776,9 +1780,9 @@ function Timer:RenderPanelObjectives(state)
 			item.value:SetJustifyH("RIGHT")
 			item.text:SetPoint("TOPLEFT", item, "TOPLEFT", 0, 0)
 			if valueWidth > 0 then
-				item.value:SetPoint("TOPRIGHT", item, "TOPRIGHT", columnOffset, 0)
+				item.value:SetPoint("TOPRIGHT", item, "TOPRIGHT", 0, 0)
 				item.value:SetWidth(valueWidth)
-				item.text:SetPoint("RIGHT", item.value, "LEFT", -4, 0)
+				item.text:SetPoint("RIGHT", item.value, "LEFT", -columnGap, 0)
 			else
 				item.text:SetPoint("RIGHT", item, "RIGHT", 0, 0)
 			end
@@ -2424,15 +2428,27 @@ function Timer:ScheduleTick()
 	end)
 end
 
+function Timer:ScheduleRunInfoRefresh()
+	if not C_Timer then return end
+	C_Timer.After(0.2, function()
+		if Timer:IsEnabled() and isInMythicPlus() then Timer:Refresh() end
+	end)
+	C_Timer.After(1, function()
+		if Timer:IsEnabled() and isInMythicPlus() then Timer:Refresh() end
+	end)
+end
+
 function Timer:RegisterEvents()
 	local frame = self.eventFrame
 	if not frame or self.eventsRegistered then return end
 	frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+	frame:RegisterEvent("PLAYER_DIFFICULTY_CHANGED")
 	frame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 	frame:RegisterEvent("WORLD_STATE_TIMER_START")
 	frame:RegisterEvent("WORLD_STATE_TIMER_STOP")
 	frame:RegisterEvent("CHALLENGE_MODE_START")
 	frame:RegisterEvent("CHALLENGE_MODE_COMPLETED")
+	frame:RegisterEvent("CHALLENGE_MODE_MAPS_UPDATE")
 	frame:RegisterEvent("CHALLENGE_MODE_DEATH_COUNT_UPDATED")
 	frame:RegisterEvent("CHALLENGE_MODE_RESET")
 	frame:RegisterEvent("SCENARIO_UPDATE")
@@ -3050,13 +3066,15 @@ function Timer:Init()
 			Timer.objectiveSplitBestTimes = {}
 			Timer:ResetDeathTracking()
 			Timer:RefreshGroupRoster()
+			Timer:ScheduleRunInfoRefresh()
 		elseif event == "CHALLENGE_MODE_DEATH_COUNT_UPDATED" then
 			Timer:SyncActiveTimerBase(true)
 		elseif event == "UNIT_DIED" then
 			if Timer:TrackUnitDied(...) then Timer:Refresh() end
 			return
-		elseif event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then
+		elseif event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" or event == "PLAYER_DIFFICULTY_CHANGED" or event == "CHALLENGE_MODE_MAPS_UPDATE" then
 			Timer:RefreshGroupRoster()
+			if event == "PLAYER_DIFFICULTY_CHANGED" or event == "CHALLENGE_MODE_MAPS_UPDATE" then Timer:ScheduleRunInfoRefresh() end
 		elseif event == "WORLD_STATE_TIMER_STOP" or event == "CHALLENGE_MODE_COMPLETED" or event == "CHALLENGE_MODE_RESET" then
 			if event == "CHALLENGE_MODE_COMPLETED" then Timer:RecordBestTime() end
 			if event == "CHALLENGE_MODE_RESET" then

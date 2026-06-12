@@ -1477,7 +1477,12 @@ function Reminder:GetCurrentExpansionInstanceCache()
 	local cache = CURRENT_EXPANSION_INSTANCE_CACHE[expansionLevel]
 	if cache then return cache end
 
-	if not (EJ_SelectTier and EJ_GetInstanceByIndex) then return nil end
+	if not (EJ_SelectTier and EJ_GetInstanceByIndex and EJ_GetNumTiers and EJ_GetTierInfo) then
+		local isLoaded = (C_AddOns and C_AddOns.IsAddOnLoaded) or _G.IsAddOnLoaded
+		local loadAddOn = (C_AddOns and C_AddOns.LoadAddOn) or _G.UIParentLoadAddOn or _G.LoadAddOn
+		if isLoaded and loadAddOn and not isLoaded("Blizzard_EncounterJournal") then pcall(loadAddOn, "Blizzard_EncounterJournal") end
+	end
+	if not (EJ_SelectTier and EJ_GetInstanceByIndex and EJ_GetNumTiers and EJ_GetTierInfo) then return nil end
 
 	cache = {
 		instances = {},
@@ -1486,7 +1491,26 @@ function Reminder:GetCurrentExpansionInstanceCache()
 	CURRENT_EXPANSION_INSTANCE_CACHE[expansionLevel] = cache
 
 	local previousTier = EJ_GetCurrentTier and EJ_GetCurrentTier() or nil
-	EJ_SelectTier(expansionLevel + 1)
+	local selectedTier
+	local tierCount = EJ_GetNumTiers and EJ_GetNumTiers() or nil
+	if issecretvalue and issecretvalue(tierCount) then tierCount = nil end
+	if type(tierCount) == "number" and tierCount > 0 then
+		local expansionName = _G["EXPANSION_NAME" .. expansionLevel]
+		if issecretvalue and issecretvalue(expansionName) then expansionName = nil end
+		if type(expansionName) == "string" and EJ_GetTierInfo then
+			for i = 1, tierCount do
+				if EJ_GetTierInfo(i) == expansionName then
+					selectedTier = i
+					break
+				end
+			end
+		end
+	end
+	if not selectedTier then
+		CURRENT_EXPANSION_INSTANCE_CACHE[expansionLevel] = nil
+		return nil
+	end
+	EJ_SelectTier(selectedTier)
 
 	for _, showRaid in ipairs({ false, true }) do
 		local index = 1

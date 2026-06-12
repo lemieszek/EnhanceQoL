@@ -2,6 +2,18 @@
 
 <!--@eqol-beta@-->
 
+## [11.2.0-beta4] - 2026-06-11
+
+### 🐛 Fixed
+
+- Class Buff Reminder: Fixed a login/setup error in current-expansion instance checks when the Encounter Journal reports fewer tiers than the expansion level offset expected.
+- Cooldown Panels / Bars: Fixed tracked aura bars for permanent auras on 12.0.7 so active auras with inactive duration objects keep showing the configured fill color instead of appearing empty.
+- Mythic Plus / Timer: Fixed inverted panel objective columns so the value and objective columns swap sides cleanly instead of collapsing together.
+- Mythic Plus / Timer: Fixed dungeon abbreviation labels by refreshing again when Blizzard publishes the challenge map ID after the first key-start update.
+- Mythic Plus / Timer: Fixed the panel enemy forces bar default border offset so it visually matches the timer bar when both bars use the same width.
+
+---
+
 ## [11.2.0-beta3] - 2026-06-11
 
 ### 🔄 Changed
