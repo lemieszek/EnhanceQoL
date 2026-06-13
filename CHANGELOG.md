@@ -7,6 +7,8 @@
 ### ✨ Added
 
 - Action Tracker: Added optional visual markers for GCD gaps and interrupted casts.
+- Data Panels: Added a class-color option for the Time stream and saved raid/dungeon lockouts to the Time tooltip, including reset timers and local/realm time details.
+- Data Panels: Added AddOn usage details to the Latency tooltip, with top AddOns sorted by memory usage and CPU timing shown when the game has CPU data available.
 
 ### 🐛 Fixed
 

@@ -408,6 +408,15 @@ function datapanel.isLatencyCustomColorEnabled()
 	return datapanel.getValue("latency", { useTextColor = false }, "useTextColor") == true
 end
 
+function datapanel.isTimeCustomColorEnabled()
+	return datapanel.getValue("time", { useClassColor = false }, "useClassColor") ~= true
+end
+
+function datapanel.normalizeTimeClassColor(value, db)
+	value = value and true or false
+	return value
+end
+
 function datapanel.isFriendsSplitDisplayEnabled()
 	return datapanel.getValue("friends", { splitDisplay = false }, "splitDisplay") == true
 end
@@ -854,14 +863,16 @@ datapanel.streams = {
 		id = "time",
 		dbKey = "time",
 		title = L["Time"] or "Time",
-		defaults = { fontSize = 14, displayMode = "server", use24Hour = true, showSeconds = false, leftClickAction = "clock", timeColor = datapanel.normalColor },
+		defaults = { fontSize = 14, displayMode = "server", use24Hour = true, showSeconds = false, leftClickAction = "clock", useClassColor = false, timeColor = datapanel.normalColor, showLockouts = true },
 		controls = {
 			datapanel.fontSlider,
 			{ type = "dropdown", key = "displayMode", text = L["Time display"] or "Time display", list = { server = L["Server time"] or "Server time", localTime = L["Local time"] or "Local time", both = L["Server + Local"] or "Server + Local" }, default = "server" },
 			{ key = "use24Hour", text = L["24-hour format"] or "24-hour format", default = true },
 			{ key = "showSeconds", text = L["Show seconds"] or "Show seconds", default = false },
 			{ type = "dropdown", key = "leftClickAction", text = L["Left-click action"] or "Left-click action", list = { clock = L["Time left-click opens stopwatch"] or "Open stopwatch", calendar = L["Time left-click opens calendar"] or "Open calendar" }, default = "clock", normalize = function(value) return value == "calendar" and "calendar" or "clock" end },
-			{ type = "color", key = "timeColor", text = L["Time color"] or "Time color", default = datapanel.normalColor },
+			{ key = "useClassColor", text = L["timeUseClassColor"] or "Use class color", default = false, normalize = datapanel.normalizeTimeClassColor, refreshOnChange = true },
+			{ type = "color", key = "timeColor", text = L["Time color"] or "Time color", default = datapanel.normalColor, isEnabled = datapanel.isTimeCustomColorEnabled },
+			{ key = "showLockouts", text = L["timeShowLockouts"] or "Show saved instances in tooltip", default = true },
 		},
 	},
 	{
@@ -1084,12 +1095,14 @@ datapanel.streams = {
 		id = "latency",
 		dbKey = "latency",
 		title = L["Latency"] or "Latency",
-		defaults = { fontSize = 14, displayMode = "both", useTextColor = false, textColor = datapanel.normalColor, fpsInterval = 0.25, pingInterval = 1, fpsSmoothWindow = 0.75, pingMode = "max", pingThresholdLow = 50, pingThresholdMid = 150, pingColorLow = { r = 0, g = 1, b = 0, a = 1 }, pingColorMid = { r = 1, g = 0.65, b = 0, a = 1 }, pingColorHigh = { r = 1, g = 0, b = 0, a = 1 } },
+		defaults = { fontSize = 14, displayMode = "both", useTextColor = false, textColor = datapanel.normalColor, fpsInterval = 0.25, pingInterval = 1, fpsSmoothWindow = 0.75, pingMode = "max", showCpuTooltip = true, cpuTooltipEntries = 8, pingThresholdLow = 50, pingThresholdMid = 150, pingColorLow = { r = 0, g = 1, b = 0, a = 1 }, pingColorMid = { r = 1, g = 0.65, b = 0, a = 1 }, pingColorHigh = { r = 1, g = 0, b = 0, a = 1 } },
 		controls = {
 			datapanel.fontSlider,
 			{ key = "useTextColor", text = L["Use custom text color"] or "Use custom text color", default = false, refreshOnChange = true },
 			{ type = "color", key = "textColor", text = L["Text color"] or "Text color", default = datapanel.normalColor, isEnabled = datapanel.isLatencyCustomColorEnabled },
 			{ type = "dropdown", key = "displayMode", text = L["latencyPanelDisplay"] or "Panel display", list = { both = L["latencyPanelDisplayBoth"] or "FPS + Latency", ping = L["latencyPanelDisplayPing"] or "Latency only", fps = L["latencyPanelDisplayFPS"] or "FPS only" }, default = "both" },
+			{ key = "showCpuTooltip", text = L["latencyShowCpuTooltip"] or "Show AddOn CPU usage in tooltip", default = true },
+			{ type = "slider", key = "cpuTooltipEntries", text = L["latencyCpuTooltipEntries"] or "AddOn tooltip entries", min = 1, max = 20, step = 1, default = 8 },
 			{ type = "slider", key = "fpsInterval", text = L["FPS update interval (s)"] or "FPS update interval (s)", min = 0.1, max = 1, step = 0.05, default = 0.25 },
 			{ type = "slider", key = "fpsSmoothWindow", text = L["FPS smoothing window (s)"] or "FPS smoothing window (s)", min = 0, max = 1.5, step = 0.05, default = 0.75 },
 			{ type = "slider", key = "pingInterval", text = L["Ping update interval (s)"] or "Ping update interval (s)", min = 0.5, max = 3, step = 0.25, default = 1 },
