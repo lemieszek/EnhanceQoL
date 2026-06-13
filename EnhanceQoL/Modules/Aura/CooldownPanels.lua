@@ -1680,8 +1680,12 @@ CooldownPanels._styleCacheRoots = CooldownPanels._styleCacheRoots
 		pandemicGlowEntry = setmetatable({}, { __mode = "k" }),
 		procGlowPanel = setmetatable({}, { __mode = "k" }),
 		procGlowEntry = setmetatable({}, { __mode = "k" }),
+		glowPixelOptions = setmetatable({}, { __mode = "k" }),
+		glowPixelEntry = setmetatable({}, { __mode = "k" }),
 		iconLayoutEntry = setmetatable({}, { __mode = "k" }),
 	}
+CooldownPanels._styleCacheRoots.glowPixelOptions = CooldownPanels._styleCacheRoots.glowPixelOptions or setmetatable({}, { __mode = "k" })
+CooldownPanels._styleCacheRoots.glowPixelEntry = CooldownPanels._styleCacheRoots.glowPixelEntry or setmetatable({}, { __mode = "k" })
 CooldownPanels.POWER_USABLE_REFRESH_DELAY = CooldownPanels.POWER_USABLE_REFRESH_DELAY or 0.05
 
 function CooldownPanels.FillCachedColor(cache, r, g, b, a)
@@ -3056,6 +3060,22 @@ function CooldownPanels:SetFixedGroupLayoutOverride(panelId, groupId, field, val
 		baseValue = select(4, self:ResolveEntryGlowStyle(layout, nil))
 		currentValue = select(4, self:ResolveEntryGlowStyle(currentLayout, nil))
 		nextValue = Helper.NormalizeGlowInset(value, baseValue)
+	elseif field == "glowPixelBorder" then
+		baseValue = layout and layout.glowPixelBorder == true
+		currentValue = currentLayout and currentLayout.glowPixelBorder == true or false
+		nextValue = value == true
+	elseif field == "glowPixelCount" then
+		baseValue = Helper.NormalizeGlowPixelCount(layout and layout.glowPixelCount, Helper.PANEL_LAYOUT_DEFAULTS.glowPixelCount or 8)
+		currentValue = Helper.NormalizeGlowPixelCount(currentLayout and currentLayout.glowPixelCount, baseValue)
+		nextValue = Helper.NormalizeGlowPixelCount(value, baseValue)
+	elseif field == "glowPixelSpeed" then
+		baseValue = Helper.NormalizeGlowPixelSpeed(layout and layout.glowPixelSpeed, Helper.PANEL_LAYOUT_DEFAULTS.glowPixelSpeed or 0.25)
+		currentValue = Helper.NormalizeGlowPixelSpeed(currentLayout and currentLayout.glowPixelSpeed, baseValue)
+		nextValue = Helper.NormalizeGlowPixelSpeed(value, baseValue)
+	elseif field == "glowPixelThickness" then
+		baseValue = Helper.NormalizeGlowPixelThickness(layout and layout.glowPixelThickness, Helper.PANEL_LAYOUT_DEFAULTS.glowPixelThickness or 2)
+		currentValue = Helper.NormalizeGlowPixelThickness(currentLayout and currentLayout.glowPixelThickness, baseValue)
+		nextValue = Helper.NormalizeGlowPixelThickness(value, baseValue)
 	elseif field == "readyGlowColor" then
 		baseValue = select(2, self:ResolveEntryGlowStyle(layout, nil))
 		currentValue = select(2, self:ResolveEntryGlowStyle(currentLayout, nil))
@@ -3096,6 +3116,7 @@ function CooldownPanels:SetFixedGroupLayoutOverride(panelId, groupId, field, val
 	self:ClearFixedGroupEffectiveLayoutCache(panelId, group.id)
 	if field == "readyGlowCheckPower" then self:RebuildPowerIndex() end
 	self:InvalidateLayoutEditGrid(panelId)
+	if field == "procGlowStyle" or field == "readyGlowStyle" or field == "pandemicGlowStyle" then self:ScheduleLayoutFixedGroupStandaloneMenuRefresh(panelId, group.id) end
 	return true
 end
 
@@ -6896,6 +6917,78 @@ function CooldownPanels:ResolveEntryProcGlowEnabled(layout, entry)
 	return entry.procGlowEnabled ~= false
 end
 
+function CooldownPanels:ResolveGlowPixelOptions(layout, entry)
+	layout = layout or Helper.PANEL_LAYOUT_DEFAULTS
+	local cache = CooldownPanels._styleCacheRoots.glowPixelOptions[layout]
+	local srcBorder = layout and layout.glowPixelBorder or nil
+	local srcCount = layout and layout.glowPixelCount or nil
+	local srcSpeed = layout and layout.glowPixelSpeed or nil
+	local srcThickness = layout and layout.glowPixelThickness or nil
+	if not cache or cache.srcBorder ~= srcBorder or cache.srcCount ~= srcCount or cache.srcSpeed ~= srcSpeed or cache.srcThickness ~= srcThickness then
+		cache = cache or {}
+		cache.srcBorder = srcBorder
+		cache.srcCount = srcCount
+		cache.srcSpeed = srcSpeed
+		cache.srcThickness = srcThickness
+		cache.border = srcBorder == true
+		cache.count = Helper.NormalizeGlowPixelCount(srcCount, Helper.PANEL_LAYOUT_DEFAULTS.glowPixelCount or 8)
+		cache.frequency = Helper.NormalizeGlowPixelSpeed(srcSpeed, Helper.PANEL_LAYOUT_DEFAULTS.glowPixelSpeed or 0.25)
+		cache.thickness = Helper.NormalizeGlowPixelThickness(srcThickness, Helper.PANEL_LAYOUT_DEFAULTS.glowPixelThickness or 2)
+		CooldownPanels._styleCacheRoots.glowPixelOptions[layout] = cache
+	end
+	if not entry or not (entry.glowUseGlobal == false or entry.procGlowUseGlobal == false) then return cache end
+	local entryCache = CooldownPanels._styleCacheRoots.glowPixelEntry[entry]
+	if
+		not entryCache
+		or entryCache.panelCache ~= cache
+		or entryCache.srcBorder ~= entry.glowPixelBorder
+		or entryCache.srcCount ~= entry.glowPixelCount
+		or entryCache.srcSpeed ~= entry.glowPixelSpeed
+		or entryCache.srcThickness ~= entry.glowPixelThickness
+	then
+		entryCache = entryCache or {}
+		entryCache.panelCache = cache
+		entryCache.srcBorder = entry.glowPixelBorder
+		entryCache.srcCount = entry.glowPixelCount
+		entryCache.srcSpeed = entry.glowPixelSpeed
+		entryCache.srcThickness = entry.glowPixelThickness
+		entryCache.border = type(entry.glowPixelBorder) == "boolean" and entry.glowPixelBorder == true or cache.border == true
+		entryCache.count = Helper.NormalizeGlowPixelCount(entry.glowPixelCount, cache.count)
+		entryCache.frequency = Helper.NormalizeGlowPixelSpeed(entry.glowPixelSpeed, cache.frequency)
+		entryCache.thickness = Helper.NormalizeGlowPixelThickness(entry.glowPixelThickness, cache.thickness)
+		CooldownPanels._styleCacheRoots.glowPixelEntry[entry] = entryCache
+	end
+	return entryCache
+end
+
+function CooldownPanels:SetEntryGlowPixelOption(entry, layout, field, value)
+	if not entry then return false end
+	local panelOptions = self:ResolveGlowPixelOptions(layout, nil)
+	local currentValue = entry[field]
+	local nextValue
+	if field == "glowPixelBorder" then
+		local normalized = value == true
+		nextValue = normalized == (panelOptions and panelOptions.border == true) and nil or normalized
+	elseif field == "glowPixelCount" then
+		local fallback = panelOptions and panelOptions.count or Helper.PANEL_LAYOUT_DEFAULTS.glowPixelCount or 8
+		local normalized = Helper.NormalizeGlowPixelCount(value, fallback)
+		nextValue = normalized == fallback and nil or normalized
+	elseif field == "glowPixelSpeed" then
+		local fallback = panelOptions and panelOptions.frequency or Helper.PANEL_LAYOUT_DEFAULTS.glowPixelSpeed or 0.25
+		local normalized = Helper.NormalizeGlowPixelSpeed(value, fallback)
+		nextValue = normalized == fallback and nil or normalized
+	elseif field == "glowPixelThickness" then
+		local fallback = panelOptions and panelOptions.thickness or Helper.PANEL_LAYOUT_DEFAULTS.glowPixelThickness or 2
+		local normalized = Helper.NormalizeGlowPixelThickness(value, fallback)
+		nextValue = normalized == fallback and nil or normalized
+	else
+		return false
+	end
+	if currentValue == nextValue then return false end
+	entry[field] = nextValue
+	return true
+end
+
 function CooldownPanels:ClearEntryStateTexture(entry)
 	if type(entry) ~= "table" then return end
 	entry.stateTextureInput = ""
@@ -8328,7 +8421,7 @@ local function setAssistedHighlight(frame, enabled)
 	if highlight.Anim and highlight.Anim.IsPlaying and not highlight.Anim:IsPlaying() then highlight.Anim:Play() end
 end
 
-local function setGlow(frame, enabled, glowColor, glowKey, glowCondition, glowAlphaOn, glowAlphaOff, glowStyle, glowInset)
+local function setGlow(frame, enabled, glowColor, glowKey, glowCondition, glowAlphaOn, glowAlphaOff, glowStyle, glowInset, glowOptions)
 	if not frame then return end
 	glowKey = glowKey or "EQOL_SIMPLE"
 	local alphaOn = glowAlphaOn == nil and 1 or glowAlphaOn
@@ -8352,6 +8445,10 @@ local function setGlow(frame, enabled, glowColor, glowKey, glowCondition, glowAl
 		state.requestedColorA = nil
 		state.requestedStyle = nil
 		state.requestedInset = nil
+		state.pixelBorder = nil
+		state.pixelCount = nil
+		state.pixelSpeed = nil
+		state.pixelThickness = nil
 		state.condition = nil
 		state.alphaOn = nil
 		state.alphaOff = nil
@@ -8362,6 +8459,10 @@ local function setGlow(frame, enabled, glowColor, glowKey, glowCondition, glowAl
 	local requestedColorG = glowColor and (glowColor[2] or glowColor.g) or nil
 	local requestedColorB = glowColor and (glowColor[3] or glowColor.b) or nil
 	local requestedColorA = glowColor and (glowColor[4] or glowColor.a) or nil
+	local requestedPixelBorder = type(glowOptions) == "table" and glowOptions.border == true or false
+	local requestedPixelCount = Helper.NormalizeGlowPixelCount(type(glowOptions) == "table" and glowOptions.count or nil, Helper.PANEL_LAYOUT_DEFAULTS.glowPixelCount or 8)
+	local requestedPixelSpeed = Helper.NormalizeGlowPixelSpeed(type(glowOptions) == "table" and glowOptions.frequency or nil, Helper.PANEL_LAYOUT_DEFAULTS.glowPixelSpeed or 0.25)
+	local requestedPixelThickness = Helper.NormalizeGlowPixelThickness(type(glowOptions) == "table" and glowOptions.thickness or nil, Helper.PANEL_LAYOUT_DEFAULTS.glowPixelThickness or 2)
 	local issecretvalue = Api and Api.issecretvalue
 	local hasSecretCondition = issecretvalue and ((glowCondition ~= nil and issecretvalue(glowCondition)) or (state.condition ~= nil and issecretvalue(state.condition)))
 	if
@@ -8372,6 +8473,10 @@ local function setGlow(frame, enabled, glowColor, glowKey, glowCondition, glowAl
 		and state.requestedColorA == requestedColorA
 		and state.requestedStyle == glowStyle
 		and state.requestedInset == glowInset
+		and state.pixelBorder == requestedPixelBorder
+		and state.pixelCount == requestedPixelCount
+		and state.pixelSpeed == requestedPixelSpeed
+		and state.pixelThickness == requestedPixelThickness
 		and not hasSecretCondition
 		and state.condition == glowCondition
 		and state.alphaOn == alphaOn
@@ -8383,21 +8488,39 @@ local function setGlow(frame, enabled, glowColor, glowKey, glowCondition, glowAl
 	local normalizedGlowColor = Helper.NormalizeColor(glowColor, fallbackColor)
 	local normalizedGlowStyle = Helper.NormalizeGlowStyle(glowStyle, "BLIZZARD")
 	local normalizedGlowInset = Helper.NormalizeGlowInset(glowInset, 0)
+	local pixelBorder = requestedPixelBorder
+	local pixelCount = requestedPixelCount
+	local pixelSpeed = requestedPixelSpeed
+	local pixelThickness = requestedPixelThickness
 	local colorChanged = false
 	local styleChanged = state.style ~= normalizedGlowStyle
 	local insetChanged = state.inset ~= normalizedGlowInset
+	local pixelChanged = normalizedGlowStyle == "PIXEL"
+		and (state.pixelBorder ~= pixelBorder or state.pixelCount ~= pixelCount or state.pixelSpeed ~= pixelSpeed or state.pixelThickness ~= pixelThickness)
 	local currentGlowColor = state.color
 	colorChanged = not currentGlowColor
 		or currentGlowColor[1] ~= normalizedGlowColor[1]
 		or currentGlowColor[2] ~= normalizedGlowColor[2]
 		or currentGlowColor[3] ~= normalizedGlowColor[3]
 		or currentGlowColor[4] ~= normalizedGlowColor[4]
-	if Glow and (not wasEnabled or colorChanged or styleChanged or insetChanged) then
-		Glow.Start(frame, glowKey, normalizedGlowStyle, { color = normalizedGlowColor, cooldown = frame.cooldown, inset = normalizedGlowInset })
+	if Glow and (not wasEnabled or colorChanged or styleChanged or insetChanged or pixelChanged) then
+		Glow.Start(frame, glowKey, normalizedGlowStyle, {
+			color = normalizedGlowColor,
+			cooldown = frame.cooldown,
+			inset = normalizedGlowInset,
+			border = pixelBorder,
+			count = pixelCount,
+			frequency = pixelSpeed,
+			thickness = pixelThickness,
+		})
 	end
 	state.enabled = true
 	state.style = normalizedGlowStyle
 	state.inset = normalizedGlowInset
+	state.pixelBorder = pixelBorder
+	state.pixelCount = pixelCount
+	state.pixelSpeed = pixelSpeed
+	state.pixelThickness = pixelThickness
 	state.requestedColorR = requestedColorR
 	state.requestedColorG = requestedColorG
 	state.requestedColorB = requestedColorB
@@ -8435,7 +8558,7 @@ local function stopGlowKeys(frame, ...)
 	end
 end
 
-local function setPreviewGlow(frame, enabled, glowColor, glowStyle, glowInset)
+local function setPreviewGlow(frame, enabled, glowColor, glowStyle, glowInset, glowOptions)
 	if not frame then return end
 	if not enabled then
 		setGlow(frame, false, nil, PREVIEW_GLOW_KEY)
@@ -8444,7 +8567,7 @@ local function setPreviewGlow(frame, enabled, glowColor, glowStyle, glowInset)
 	end
 	if Glow then
 		CooldownPanels.HidePreviewGlowBorder(frame)
-		setGlow(frame, true, glowColor, PREVIEW_GLOW_KEY, nil, nil, nil, glowStyle, glowInset)
+		setGlow(frame, true, glowColor, PREVIEW_GLOW_KEY, nil, nil, nil, glowStyle, glowInset, glowOptions)
 		return
 	end
 	setGlow(frame, false, nil, PREVIEW_GLOW_KEY)
@@ -11870,6 +11993,12 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		refreshEntryViews()
 	end
 
+	local function setGlowPixelOption(field, value)
+		local _, currentEntry = getEntry()
+		if not currentEntry or not (currentEntry.glowUseGlobal == false or currentEntry.procGlowUseGlobal == false) then return end
+		if CooldownPanels:SetEntryGlowPixelOption(currentEntry, getLayout(), field, value) then refreshEntryViews() end
+	end
+
 	local function setPandemicGlowInset(_, value)
 		local _, currentEntry = getEntry()
 		if not currentEntry then return end
@@ -12349,6 +12478,26 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		local _, currentEntry = getEntry()
 		local _, inset = CooldownPanels:ResolveEntryProcGlowVisual(layout, currentEntry)
 		return inset
+	end
+
+	local function getResolvedGlowPixelOptions()
+		local layout = getLayout()
+		local _, currentEntry = getEntry()
+		return CooldownPanels:ResolveGlowPixelOptions(layout, currentEntry)
+	end
+
+	local function usesPixelGlowStyle()
+		local effectiveType = getEffectiveType()
+		if effectiveType == "MACRO" then return false end
+		if getResolvedGlowStyle() == "PIXEL" then return true end
+		if effectiveType == "SPELL" and getResolvedProcGlowStyle() == "PIXEL" then return true end
+		if effectiveType == "CDM_AURA" and getResolvedPandemicGlowStyle() == "PIXEL" then return true end
+		return false
+	end
+
+	local function canEditGlowPixelOptions()
+		local _, currentEntry = getEntry()
+		return currentEntry and usesPixelGlowStyle() and (currentEntry.glowUseGlobal == false or currentEntry.procGlowUseGlobal == false) or false
 	end
 
 	local function getResolvedReadyGlowCheckPower()
@@ -14316,6 +14465,69 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 		},
 		{
+			name = L["CooldownPanelPixelGlowLines"] or "Pixel glow lines",
+			kind = SettingType.Slider,
+			parentId = "cooldownPanelStandaloneGlow",
+			minValue = 1,
+			maxValue = 32,
+			valueStep = 1,
+			allowInput = true,
+			isShown = usesPixelGlowStyle,
+			disabled = function() return not canEditGlowPixelOptions() end,
+			get = function()
+				local options = getResolvedGlowPixelOptions()
+				return options and options.count or Helper.PANEL_LAYOUT_DEFAULTS.glowPixelCount or 8
+			end,
+			set = function(_, value) setGlowPixelOption("glowPixelCount", value) end,
+			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
+		},
+		{
+			name = L["CooldownPanelPixelGlowSpeed"] or "Pixel glow speed",
+			kind = SettingType.Slider,
+			parentId = "cooldownPanelStandaloneGlow",
+			minValue = 0.05,
+			maxValue = 2,
+			valueStep = 0.05,
+			allowInput = true,
+			isShown = usesPixelGlowStyle,
+			disabled = function() return not canEditGlowPixelOptions() end,
+			get = function()
+				local options = getResolvedGlowPixelOptions()
+				return options and options.frequency or Helper.PANEL_LAYOUT_DEFAULTS.glowPixelSpeed or 0.25
+			end,
+			set = function(_, value) setGlowPixelOption("glowPixelSpeed", value) end,
+			formatter = function(value) return string.format("%.2f", tonumber(value) or 0) end,
+		},
+		{
+			name = L["CooldownPanelPixelGlowThickness"] or "Pixel glow thickness",
+			kind = SettingType.Slider,
+			parentId = "cooldownPanelStandaloneGlow",
+			minValue = 1,
+			maxValue = 10,
+			valueStep = 1,
+			allowInput = true,
+			isShown = usesPixelGlowStyle,
+			disabled = function() return not canEditGlowPixelOptions() end,
+			get = function()
+				local options = getResolvedGlowPixelOptions()
+				return options and options.thickness or Helper.PANEL_LAYOUT_DEFAULTS.glowPixelThickness or 2
+			end,
+			set = function(_, value) setGlowPixelOption("glowPixelThickness", value) end,
+			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
+		},
+		{
+			name = L["CooldownPanelPixelGlowBorder"] or "Pixel glow border",
+			kind = SettingType.Checkbox,
+			parentId = "cooldownPanelStandaloneGlow",
+			isShown = usesPixelGlowStyle,
+			disabled = function() return not canEditGlowPixelOptions() end,
+			get = function()
+				local options = getResolvedGlowPixelOptions()
+				return options and options.border == true or false
+			end,
+			set = function(_, value) setGlowPixelOption("glowPixelBorder", value) end,
+		},
+		{
 			name = L["CooldownPanelGlowInsetPandemic"] or "Pandemic glow inset",
 			kind = SettingType.Slider,
 			parentId = "cooldownPanelStandaloneGlow",
@@ -14570,6 +14782,9 @@ function CooldownPanels:RefreshLayoutPanelStandaloneMenu()
 			local title = panel.name or L["cooldownPanelDefaultName"]
 		if dialog.context then dialog.context.title = title end
 		if dialog.Title and title then dialog.Title:SetText(title) end
+		if dialog.UpdateSettings then dialog:UpdateSettings() end
+		if dialog.UpdateButtons then dialog:UpdateButtons() end
+		if dialog.Layout then dialog:Layout() end
 	end
 end
 
@@ -14759,6 +14974,20 @@ function CooldownPanels:BuildLayoutFixedGroupStandaloneSettings(panelId, groupId
 	local function setOverride(field, value)
 		if not CooldownPanels:SetFixedGroupLayoutOverride(panelId, groupId, field, value) then return end
 		refreshLivePreview()
+	end
+	local function usesPixelGlowStyle()
+		local layout = getLayout()
+		if Helper.NormalizeGlowStyle(select(3, CooldownPanels:ResolveEntryGlowStyle(layout, nil)), Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle) == "PIXEL" then return true end
+		if Helper.NormalizeGlowStyle(select(1, CooldownPanels:ResolveEntryProcGlowVisual(layout, nil)), layout and layout.readyGlowStyle or Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle) == "PIXEL" then
+			return true
+		end
+		if
+			Helper.NormalizeGlowStyle(select(2, CooldownPanels:ResolveEntryPandemicGlowVisual(layout, nil)), layout and layout.readyGlowStyle or Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle)
+			== "PIXEL"
+		then
+			return true
+		end
+		return false
 	end
 
 	return {
@@ -15113,6 +15342,65 @@ function CooldownPanels:BuildLayoutFixedGroupStandaloneSettings(panelId, groupId
 			end,
 			set = function(_, value) setOverride("readyGlowInset", value) end,
 			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
+		},
+		{
+			name = L["CooldownPanelPixelGlowLines"] or "Pixel glow lines",
+			kind = SettingType.Slider,
+			parentId = "cooldownPanelStandaloneFixedGroupGlow",
+			minValue = 1,
+			maxValue = 32,
+			valueStep = 1,
+			allowInput = true,
+			isShown = usesPixelGlowStyle,
+			get = function()
+				local layout = getLayout()
+				return Helper.NormalizeGlowPixelCount(layout and layout.glowPixelCount, Helper.PANEL_LAYOUT_DEFAULTS.glowPixelCount or 8)
+			end,
+			set = function(_, value) setOverride("glowPixelCount", value) end,
+			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
+		},
+		{
+			name = L["CooldownPanelPixelGlowSpeed"] or "Pixel glow speed",
+			kind = SettingType.Slider,
+			parentId = "cooldownPanelStandaloneFixedGroupGlow",
+			minValue = 0.05,
+			maxValue = 2,
+			valueStep = 0.05,
+			allowInput = true,
+			isShown = usesPixelGlowStyle,
+			get = function()
+				local layout = getLayout()
+				return Helper.NormalizeGlowPixelSpeed(layout and layout.glowPixelSpeed, Helper.PANEL_LAYOUT_DEFAULTS.glowPixelSpeed or 0.25)
+			end,
+			set = function(_, value) setOverride("glowPixelSpeed", value) end,
+			formatter = function(value) return string.format("%.2f", tonumber(value) or 0) end,
+		},
+		{
+			name = L["CooldownPanelPixelGlowThickness"] or "Pixel glow thickness",
+			kind = SettingType.Slider,
+			parentId = "cooldownPanelStandaloneFixedGroupGlow",
+			minValue = 1,
+			maxValue = 10,
+			valueStep = 1,
+			allowInput = true,
+			isShown = usesPixelGlowStyle,
+			get = function()
+				local layout = getLayout()
+				return Helper.NormalizeGlowPixelThickness(layout and layout.glowPixelThickness, Helper.PANEL_LAYOUT_DEFAULTS.glowPixelThickness or 2)
+			end,
+			set = function(_, value) setOverride("glowPixelThickness", value) end,
+			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
+		},
+		{
+			name = L["CooldownPanelPixelGlowBorder"] or "Pixel glow border",
+			kind = SettingType.Checkbox,
+			parentId = "cooldownPanelStandaloneFixedGroupGlow",
+			isShown = usesPixelGlowStyle,
+			get = function()
+				local layout = getLayout()
+				return layout and layout.glowPixelBorder == true or false
+			end,
+			set = function(_, value) setOverride("glowPixelBorder", value) end,
 		},
 		{
 			name = L["CooldownPanelGlowColor"] or "Ready glow color",
@@ -19544,6 +19832,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				local entryCheckPower = resolvedType == "SPELL" and self:ResolveEntryCheckPower(entryLayout, entry)
 				local readyGlowCheckPower = resolvedType == "SPELL" and glowReady and self:ResolveEntryReadyGlowCheckPower(entryLayout, entry)
 				local procGlowEnabled = resolvedType == "SPELL" and CooldownPanels:ResolveEntryProcGlowEnabled(entryLayout, entry)
+				local glowPixelOptions = CooldownPanels:ResolveGlowPixelOptions(entryLayout, entry)
 				local procActive = resolvedType == "SPELL" and isSpellFlagged(overlayGlowSpells, baseSpellId, effectiveSpellId)
 				local overlayGlow = procActive and procGlowEnabled
 				local otherAuraGlowActive = cdmAuraOtherAuraGlow and CooldownPanels:IsCDMAuraGlowOtherAuraActive(panelId, entryId, entry, entryLayout)
@@ -19772,6 +20061,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				data.readyGlowColor = glowColor
 				data.readyGlowStyle = glowStyle
 				data.readyGlowInset = glowInset
+				data.glowPixelOptions = glowPixelOptions
 				data.readyGlowCheckPower = readyGlowCheckPower == true
 				data.readyGlowResourceBlocked = readyGlowResourceBlocked == true
 				data.interruptGlow = false
@@ -20488,7 +20778,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 			end
 			if layoutEditActive then
 				stopGlowKeys(icon, "EQOL_SIMPLE", "EQOL_OVERLAY", "EQOL_READY", "EQOL_INTERRUPT")
-				setPreviewGlow(icon, simpleGlowEnabled, simpleGlowColor, simpleGlowStyle, simpleGlowInset)
+				setPreviewGlow(icon, simpleGlowEnabled, simpleGlowColor, simpleGlowStyle, simpleGlowInset, data.glowPixelOptions)
 			else
 				setPreviewGlow(icon, false)
 				if data.liveGlowAllowed == false then
@@ -20508,19 +20798,31 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 							0,
 							1,
 							data.overlayGlowStyle or data.readyGlowStyle,
-							data.overlayGlowInset or data.readyGlowInset
+							data.overlayGlowInset or data.readyGlowInset,
+							data.glowPixelOptions
 						)
-						setGlow(icon, true, data.readyGlowColor, "EQOL_READY", data.spellReadyCondition, 1, 0, data.readyGlowStyle, data.readyGlowInset)
+						setGlow(icon, true, data.readyGlowColor, "EQOL_READY", data.spellReadyCondition, 1, 0, data.readyGlowStyle, data.readyGlowInset, data.glowPixelOptions)
 					else
-						setGlow(icon, overlayGlow, overlayGlowColor, "EQOL_OVERLAY", nil, nil, nil, data.overlayGlowStyle or data.readyGlowStyle, data.overlayGlowInset or data.readyGlowInset)
+						setGlow(
+							icon,
+							overlayGlow,
+							overlayGlowColor,
+							"EQOL_OVERLAY",
+							nil,
+							nil,
+							nil,
+							data.overlayGlowStyle or data.readyGlowStyle,
+							data.overlayGlowInset or data.readyGlowInset,
+							data.glowPixelOptions
+						)
 						setGlow(icon, false, nil, "EQOL_READY")
 					end
-					setGlow(icon, data.interruptGlow == true, data.readyGlowColor, "EQOL_INTERRUPT", data.interruptGlowCondition, 0, 1, data.readyGlowStyle, data.readyGlowInset)
+					setGlow(icon, data.interruptGlow == true, data.readyGlowColor, "EQOL_INTERRUPT", data.interruptGlowCondition, 0, 1, data.readyGlowStyle, data.readyGlowInset, data.glowPixelOptions)
 				else
 					setGlow(icon, false, nil, "EQOL_OVERLAY")
 					setGlow(icon, false, nil, "EQOL_READY")
-					setGlow(icon, simpleGlowEnabled, simpleGlowColor, "EQOL_SIMPLE", nil, nil, nil, simpleGlowStyle, simpleGlowInset)
-					setGlow(icon, data.interruptGlow == true, data.readyGlowColor, "EQOL_INTERRUPT", data.interruptGlowCondition, 0, 1, data.readyGlowStyle, data.readyGlowInset)
+					setGlow(icon, simpleGlowEnabled, simpleGlowColor, "EQOL_SIMPLE", nil, nil, nil, simpleGlowStyle, simpleGlowInset, data.glowPixelOptions)
+					setGlow(icon, data.interruptGlow == true, data.readyGlowColor, "EQOL_INTERRUPT", data.interruptGlowCondition, 0, 1, data.readyGlowStyle, data.readyGlowInset, data.glowPixelOptions)
 				end
 			end
 			if showGhostIcon then
@@ -21244,6 +21546,14 @@ applyEditLayout = function(panelId, field, value, skipRefresh)
 		layout.pandemicGlowStyle = Helper.NormalizeGlowStyle(value, layout.pandemicGlowStyle or layout.readyGlowStyle or Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle)
 	elseif field == "readyGlowInset" then
 		layout.readyGlowInset = Helper.NormalizeGlowInset(value, layout.readyGlowInset or Helper.PANEL_LAYOUT_DEFAULTS.readyGlowInset or 0)
+	elseif field == "glowPixelBorder" then
+		layout.glowPixelBorder = value == true
+	elseif field == "glowPixelCount" then
+		layout.glowPixelCount = Helper.NormalizeGlowPixelCount(value, layout.glowPixelCount or Helper.PANEL_LAYOUT_DEFAULTS.glowPixelCount or 8)
+	elseif field == "glowPixelSpeed" then
+		layout.glowPixelSpeed = Helper.NormalizeGlowPixelSpeed(value, layout.glowPixelSpeed or Helper.PANEL_LAYOUT_DEFAULTS.glowPixelSpeed or 0.25)
+	elseif field == "glowPixelThickness" then
+		layout.glowPixelThickness = Helper.NormalizeGlowPixelThickness(value, layout.glowPixelThickness or Helper.PANEL_LAYOUT_DEFAULTS.glowPixelThickness or 2)
 	elseif field == "readyGlowColor" then
 		layout.readyGlowColor = Helper.NormalizeColor(value, Helper.PANEL_LAYOUT_DEFAULTS.readyGlowColor)
 	elseif field == "pandemicGlowInset" then
@@ -21408,6 +21718,10 @@ applyEditLayout = function(panelId, field, value, skipRefresh)
 
 	if not skipRefresh then CooldownPanels:RefreshPanelForCurrentEditContext(panelId, false) end
 	if field == "layoutMode" and not skipRefresh then refreshStandaloneSettings() end
+	if (field == "procGlowStyle" or field == "readyGlowStyle" or field == "pandemicGlowStyle") and not skipRefresh then
+		CooldownPanels:RefreshLayoutPanelStandaloneMenu()
+		refreshStandaloneSettings()
+	end
 end
 
 local function getCopySettingsEntries(panelKey)
@@ -21461,6 +21775,14 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 		for _, entry in pairs(panel.entries) do
 			if entry and entry.type == "CDM_AURA" then return true end
 		end
+		return false
+	end
+	local function usesPixelGlowStyle()
+		if Helper.NormalizeGlowStyle(layout.readyGlowStyle, Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle) == "PIXEL" then return true end
+		if Helper.NormalizeGlowStyle(select(1, CooldownPanels:ResolveEntryProcGlowVisual(layout, nil)), layout.readyGlowStyle or Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle) == "PIXEL" then
+			return true
+		end
+		if Helper.NormalizeGlowStyle(layout.pandemicGlowStyle, layout.readyGlowStyle or Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle) == "PIXEL" then return true end
 		return false
 	end
 	local function setStaticTextEntryId(entryId)
@@ -22834,6 +23156,57 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 			},
 			{
+				name = L["CooldownPanelPixelGlowLines"] or "Pixel glow lines",
+				kind = SettingType.Slider,
+				parentId = "cooldownPanelGlow",
+				minValue = 1,
+				maxValue = 32,
+				valueStep = 1,
+				allowInput = true,
+				isShown = usesPixelGlowStyle,
+				default = Helper.PANEL_LAYOUT_DEFAULTS.glowPixelCount or 8,
+				get = function() return Helper.NormalizeGlowPixelCount(layout.glowPixelCount, Helper.PANEL_LAYOUT_DEFAULTS.glowPixelCount or 8) end,
+				set = function(_, value) applyEditLayout(panelId, "glowPixelCount", value) end,
+				formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
+			},
+			{
+				name = L["CooldownPanelPixelGlowSpeed"] or "Pixel glow speed",
+				kind = SettingType.Slider,
+				parentId = "cooldownPanelGlow",
+				minValue = 0.05,
+				maxValue = 2,
+				valueStep = 0.05,
+				allowInput = true,
+				isShown = usesPixelGlowStyle,
+				default = Helper.PANEL_LAYOUT_DEFAULTS.glowPixelSpeed or 0.25,
+				get = function() return Helper.NormalizeGlowPixelSpeed(layout.glowPixelSpeed, Helper.PANEL_LAYOUT_DEFAULTS.glowPixelSpeed or 0.25) end,
+				set = function(_, value) applyEditLayout(panelId, "glowPixelSpeed", value) end,
+				formatter = function(value) return string.format("%.2f", tonumber(value) or 0) end,
+			},
+			{
+				name = L["CooldownPanelPixelGlowThickness"] or "Pixel glow thickness",
+				kind = SettingType.Slider,
+				parentId = "cooldownPanelGlow",
+				minValue = 1,
+				maxValue = 10,
+				valueStep = 1,
+				allowInput = true,
+				isShown = usesPixelGlowStyle,
+				default = Helper.PANEL_LAYOUT_DEFAULTS.glowPixelThickness or 2,
+				get = function() return Helper.NormalizeGlowPixelThickness(layout.glowPixelThickness, Helper.PANEL_LAYOUT_DEFAULTS.glowPixelThickness or 2) end,
+				set = function(_, value) applyEditLayout(panelId, "glowPixelThickness", value) end,
+				formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
+			},
+			{
+				name = L["CooldownPanelPixelGlowBorder"] or "Pixel glow border",
+				kind = SettingType.Checkbox,
+				parentId = "cooldownPanelGlow",
+				isShown = usesPixelGlowStyle,
+				default = Helper.PANEL_LAYOUT_DEFAULTS.glowPixelBorder == true,
+				get = function() return layout.glowPixelBorder == true end,
+				set = function(_, value) applyEditLayout(panelId, "glowPixelBorder", value) end,
+			},
+			{
 				name = L["CooldownPanelGlowColor"] or "Ready glow color",
 				kind = SettingType.Color,
 				parentId = "cooldownPanelGlow",
@@ -23785,18 +24158,29 @@ function cdp.ENTRY.ApplyVisibleSpellRuntime(panelId, runtime, icon, data, resolv
 	elseif useSecretReadyGlow then
 		setGlow(icon, false, nil, "EQOL_SIMPLE")
 		if secretReadyGlowAllowed then
-			setGlow(icon, overlayGlow, overlayGlowColor, "EQOL_OVERLAY", data.spellReadyCondition, 0, 1, data.overlayGlowStyle or data.readyGlowStyle, data.overlayGlowInset or data.readyGlowInset)
-			setGlow(icon, true, data.readyGlowColor, "EQOL_READY", data.spellReadyCondition, 1, 0, data.readyGlowStyle, data.readyGlowInset)
+			setGlow(
+				icon,
+				overlayGlow,
+				overlayGlowColor,
+				"EQOL_OVERLAY",
+				data.spellReadyCondition,
+				0,
+				1,
+				data.overlayGlowStyle or data.readyGlowStyle,
+				data.overlayGlowInset or data.readyGlowInset,
+				data.glowPixelOptions
+			)
+			setGlow(icon, true, data.readyGlowColor, "EQOL_READY", data.spellReadyCondition, 1, 0, data.readyGlowStyle, data.readyGlowInset, data.glowPixelOptions)
 		else
-			setGlow(icon, overlayGlow, overlayGlowColor, "EQOL_OVERLAY", nil, nil, nil, data.overlayGlowStyle or data.readyGlowStyle, data.overlayGlowInset or data.readyGlowInset)
+			setGlow(icon, overlayGlow, overlayGlowColor, "EQOL_OVERLAY", nil, nil, nil, data.overlayGlowStyle or data.readyGlowStyle, data.overlayGlowInset or data.readyGlowInset, data.glowPixelOptions)
 			setGlow(icon, false, nil, "EQOL_READY")
 		end
-		setGlow(icon, data.interruptGlow == true, data.readyGlowColor, "EQOL_INTERRUPT", data.interruptGlowCondition, 0, 1, data.readyGlowStyle, data.readyGlowInset)
+		setGlow(icon, data.interruptGlow == true, data.readyGlowColor, "EQOL_INTERRUPT", data.interruptGlowCondition, 0, 1, data.readyGlowStyle, data.readyGlowInset, data.glowPixelOptions)
 	else
 		setGlow(icon, false, nil, "EQOL_OVERLAY")
 		setGlow(icon, false, nil, "EQOL_READY")
-		setGlow(icon, simpleGlowEnabled, simpleGlowColor, "EQOL_SIMPLE", nil, nil, nil, simpleGlowStyle, simpleGlowInset)
-		setGlow(icon, data.interruptGlow == true, data.readyGlowColor, "EQOL_INTERRUPT", data.interruptGlowCondition, 0, 1, data.readyGlowStyle, data.readyGlowInset)
+		setGlow(icon, simpleGlowEnabled, simpleGlowColor, "EQOL_SIMPLE", nil, nil, nil, simpleGlowStyle, simpleGlowInset, data.glowPixelOptions)
+		setGlow(icon, data.interruptGlow == true, data.readyGlowColor, "EQOL_INTERRUPT", data.interruptGlowCondition, 0, 1, data.readyGlowStyle, data.readyGlowInset, data.glowPixelOptions)
 	end
 
 	return true
@@ -23952,7 +24336,7 @@ function cdp.ENTRY.ApplyVisibleItemRuntime(panelId, runtime, icon, data, resolve
 		setGlow(icon, false, nil, "EQOL_OVERLAY")
 		setGlow(icon, false, nil, "EQOL_READY")
 		setGlow(icon, false, nil, "EQOL_INTERRUPT")
-		setGlow(icon, simpleGlowEnabled, simpleGlowColor, "EQOL_SIMPLE", nil, nil, nil, simpleGlowStyle, simpleGlowInset)
+		setGlow(icon, simpleGlowEnabled, simpleGlowColor, "EQOL_SIMPLE", nil, nil, nil, simpleGlowStyle, simpleGlowInset, data.glowPixelOptions)
 	end
 
 	return true

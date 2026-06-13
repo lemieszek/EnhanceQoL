@@ -190,6 +190,10 @@ Helper.PANEL_LAYOUT_DEFAULTS = {
 	readyGlowInset = 0,
 	readyGlowDuration = 0,
 	readyGlowCheckPower = false,
+	glowPixelBorder = false,
+	glowPixelCount = 8,
+	glowPixelSpeed = 0.25,
+	glowPixelThickness = 2,
 	noDesaturation = false,
 	cdmAuraAlwaysShowMode = "HIDE",
 	checkPower = false,
@@ -429,6 +433,12 @@ function Helper.NormalizeGlowStyle(style, fallback)
 end
 
 function Helper.NormalizeGlowInset(value, fallback) return Helper.ClampInt(value, -Helper.GLOW_INSET_RANGE, Helper.GLOW_INSET_RANGE, fallback) end
+
+function Helper.NormalizeGlowPixelCount(value, fallback) return Helper.ClampInt(value, 1, 32, fallback) end
+
+function Helper.NormalizeGlowPixelSpeed(value, fallback) return Helper.ClampNumber(value, 0.05, 2, fallback) end
+
+function Helper.NormalizeGlowPixelThickness(value, fallback) return Helper.ClampInt(value, 1, 10, fallback) end
 
 function Helper.NormalizeTextureInput(value)
 	if type(value) ~= "string" then return "" end
@@ -705,6 +715,12 @@ function Helper.NormalizeFixedGroupLayoutOverrides(value)
 	if value.readyGlowStyle ~= nil then normalized.readyGlowStyle = Helper.NormalizeGlowStyle(value.readyGlowStyle, Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle) end
 	if value.readyGlowInset ~= nil then normalized.readyGlowInset = Helper.NormalizeGlowInset(value.readyGlowInset, Helper.PANEL_LAYOUT_DEFAULTS.readyGlowInset or 0) end
 	if value.readyGlowColor ~= nil then normalized.readyGlowColor = Helper.NormalizeColor(value.readyGlowColor, Helper.PANEL_LAYOUT_DEFAULTS.readyGlowColor) end
+	if type(value.glowPixelBorder) == "boolean" then normalized.glowPixelBorder = value.glowPixelBorder == true end
+	if value.glowPixelCount ~= nil then normalized.glowPixelCount = Helper.NormalizeGlowPixelCount(value.glowPixelCount, Helper.PANEL_LAYOUT_DEFAULTS.glowPixelCount or 8) end
+	if value.glowPixelSpeed ~= nil then normalized.glowPixelSpeed = Helper.NormalizeGlowPixelSpeed(value.glowPixelSpeed, Helper.PANEL_LAYOUT_DEFAULTS.glowPixelSpeed or 0.25) end
+	if value.glowPixelThickness ~= nil then
+		normalized.glowPixelThickness = Helper.NormalizeGlowPixelThickness(value.glowPixelThickness, Helper.PANEL_LAYOUT_DEFAULTS.glowPixelThickness or 2)
+	end
 	if value.pandemicGlowStyle ~= nil then normalized.pandemicGlowStyle = Helper.NormalizeGlowStyle(value.pandemicGlowStyle, Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle) end
 	if value.pandemicGlowInset ~= nil then normalized.pandemicGlowInset = Helper.NormalizeGlowInset(value.pandemicGlowInset, Helper.PANEL_LAYOUT_DEFAULTS.readyGlowInset or 0) end
 	if value.pandemicGlowColor ~= nil then
@@ -2270,6 +2286,11 @@ function Helper.NormalizePanel(panel, defaults)
 	panel.layout.readyGlowInset = Helper.NormalizeGlowInset(panel.layout.readyGlowInset, layoutDefaults.readyGlowInset or Helper.PANEL_LAYOUT_DEFAULTS.readyGlowInset or 0)
 	panel.layout.pandemicGlowInset =
 		Helper.NormalizeGlowInset(panel.layout.pandemicGlowInset, layoutDefaults.pandemicGlowInset or panel.layout.readyGlowInset or Helper.PANEL_LAYOUT_DEFAULTS.readyGlowInset or 0)
+	panel.layout.glowPixelBorder = panel.layout.glowPixelBorder == true
+	panel.layout.glowPixelCount = Helper.NormalizeGlowPixelCount(panel.layout.glowPixelCount, layoutDefaults.glowPixelCount or Helper.PANEL_LAYOUT_DEFAULTS.glowPixelCount or 8)
+	panel.layout.glowPixelSpeed = Helper.NormalizeGlowPixelSpeed(panel.layout.glowPixelSpeed, layoutDefaults.glowPixelSpeed or Helper.PANEL_LAYOUT_DEFAULTS.glowPixelSpeed or 0.25)
+	panel.layout.glowPixelThickness =
+		Helper.NormalizeGlowPixelThickness(panel.layout.glowPixelThickness, layoutDefaults.glowPixelThickness or Helper.PANEL_LAYOUT_DEFAULTS.glowPixelThickness or 2)
 	panel.layout.pandemicGlowColor = Helper.NormalizeColor(
 		panel.layout.pandemicGlowColor,
 		layoutDefaults.pandemicGlowColor or panel.layout.readyGlowColor or Helper.PANEL_LAYOUT_DEFAULTS.pandemicGlowColor or Helper.PANEL_LAYOUT_DEFAULTS.readyGlowColor
@@ -2377,6 +2398,10 @@ function Helper.NormalizeEntry(entry, defaults)
 	if entry.glowInset ~= nil then entry.glowInset = Helper.NormalizeGlowInset(entry.glowInset, nil) end
 	if entry.pandemicGlowInset ~= nil then entry.pandemicGlowInset = Helper.NormalizeGlowInset(entry.pandemicGlowInset, nil) end
 	if entry.procGlowInset ~= nil then entry.procGlowInset = Helper.NormalizeGlowInset(entry.procGlowInset, nil) end
+	if entry.glowPixelBorder ~= nil then entry.glowPixelBorder = entry.glowPixelBorder == true end
+	if entry.glowPixelCount ~= nil then entry.glowPixelCount = Helper.NormalizeGlowPixelCount(entry.glowPixelCount, nil) end
+	if entry.glowPixelSpeed ~= nil then entry.glowPixelSpeed = Helper.NormalizeGlowPixelSpeed(entry.glowPixelSpeed, nil) end
+	if entry.glowPixelThickness ~= nil then entry.glowPixelThickness = Helper.NormalizeGlowPixelThickness(entry.glowPixelThickness, nil) end
 	if type(entry.pandemicGlow) ~= "boolean" then entry.pandemicGlow = Helper.ENTRY_DEFAULTS.pandemicGlow end
 	if type(entry.hideIcon) ~= "boolean" then entry.hideIcon = Helper.ENTRY_DEFAULTS.hideIcon end
 	entry.customIconID = nil
@@ -2466,6 +2491,10 @@ function Helper.NormalizeEntry(entry, defaults)
 			and entry.pandemicGlowColor == nil
 			and entry.pandemicGlowStyle == nil
 			and entry.pandemicGlowInset == nil
+			and entry.glowPixelBorder == nil
+			and entry.glowPixelCount == nil
+			and entry.glowPixelSpeed == nil
+			and entry.glowPixelThickness == nil
 	end
 	if type(entry.soundReady) ~= "boolean" then entry.soundReady = Helper.ENTRY_DEFAULTS.soundReady end
 	if type(entry.soundReadyFile) ~= "string" or entry.soundReadyFile == "" then entry.soundReadyFile = Helper.ENTRY_DEFAULTS.soundReadyFile end

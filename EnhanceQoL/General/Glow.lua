@@ -545,6 +545,59 @@ local function ensurePixelTexture(overlay, index)
 	return texture
 end
 
+local function ensurePixelBorderTexture(overlay, index)
+	local texture = overlay and overlay.borderTextures and overlay.borderTextures[index]
+	if texture then return texture end
+	texture = overlay:CreateTexture(nil, "BACKGROUND")
+	texture:SetTexture(PIXEL_GLOW_TEXTURE)
+	if texture.SetBlendMode then texture:SetBlendMode("ADD") end
+	overlay.borderTextures[index] = texture
+	return texture
+end
+
+local function updatePixelBorder(overlay, enabled, thickness, color)
+	if not overlay then return end
+	if not enabled then
+		for i = 1, #(overlay.borderTextures or {}) do
+			overlay.borderTextures[i]:Hide()
+		end
+		return
+	end
+
+	local top = ensurePixelBorderTexture(overlay, 1)
+	local right = ensurePixelBorderTexture(overlay, 2)
+	local bottom = ensurePixelBorderTexture(overlay, 3)
+	local left = ensurePixelBorderTexture(overlay, 4)
+	local alpha = (color[4] or 1) * 0.25
+	for i = 1, 4 do
+		overlay.borderTextures[i]:SetVertexColor(color[1], color[2], color[3], alpha)
+	end
+
+	top:ClearAllPoints()
+	top:SetPoint("TOPLEFT", overlay, "TOPLEFT", 0, 0)
+	top:SetPoint("TOPRIGHT", overlay, "TOPRIGHT", 0, 0)
+	top:SetHeight(thickness)
+	top:Show()
+
+	right:ClearAllPoints()
+	right:SetPoint("TOPRIGHT", overlay, "TOPRIGHT", 0, 0)
+	right:SetPoint("BOTTOMRIGHT", overlay, "BOTTOMRIGHT", 0, 0)
+	right:SetWidth(thickness)
+	right:Show()
+
+	bottom:ClearAllPoints()
+	bottom:SetPoint("BOTTOMLEFT", overlay, "BOTTOMLEFT", 0, 0)
+	bottom:SetPoint("BOTTOMRIGHT", overlay, "BOTTOMRIGHT", 0, 0)
+	bottom:SetHeight(thickness)
+	bottom:Show()
+
+	left:ClearAllPoints()
+	left:SetPoint("TOPLEFT", overlay, "TOPLEFT", 0, 0)
+	left:SetPoint("BOTTOMLEFT", overlay, "BOTTOMLEFT", 0, 0)
+	left:SetWidth(thickness)
+	left:Show()
+end
+
 local function pixelSegmentAvailable(distance, width, height)
 	local perimeter = (width + height) * 2
 	if perimeter <= 0 then return 0 end
@@ -615,6 +668,7 @@ local function ensurePixelOverlay(host)
 	overlay:EnableMouse(false)
 	overlay:Hide()
 	overlay.textures = {}
+	overlay.borderTextures = {}
 	overlay:SetScript("OnUpdate", pixelOverlayOnUpdate)
 	host._eqolPixelOverlay = overlay
 	return overlay
@@ -637,6 +691,7 @@ local function updatePixelOverlay(host, opts)
 	local frequency = normalizeScalar(opts, "frequency", 0.25)
 	local period = 4
 	if frequency and frequency ~= 0 then period = 1 / frequency end
+	local border = type(opts) == "table" and opts.border == true
 
 	overlay:SetParent(host)
 	overlay:SetFrameStrata(host:GetFrameStrata())
@@ -655,6 +710,7 @@ local function updatePixelOverlay(host, opts)
 	for i = 1, count * 2 do
 		ensurePixelTexture(overlay, i)
 	end
+	updatePixelBorder(overlay, border, thickness, color)
 
 	overlay.info = overlay.info or {}
 	overlay.info.count = count
@@ -678,6 +734,9 @@ local function stopPixel(host)
 	if not overlay then return end
 	for i = 1, #(overlay.textures or {}) do
 		overlay.textures[i]:Hide()
+	end
+	for i = 1, #(overlay.borderTextures or {}) do
+		overlay.borderTextures[i]:Hide()
 	end
 	overlay:Hide()
 end
