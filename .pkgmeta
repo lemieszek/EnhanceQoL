@@ -4,6 +4,10 @@ externals:
   EnhanceQoL/libs/LibDataBroker-1.1:
     url: https://github.com/tekkub/libdatabroker-1-1
     tag: latest
+  EnhanceQoL/libs/LibSettingsDesigner:
+    url: https://github.com/R41z0r/LibSettingsDesigner.git
+    branch: main
+    path: runtime/LibSettingsDesigner
 
 enable-nolib-creation: no
 
