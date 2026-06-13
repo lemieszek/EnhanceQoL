@@ -24,6 +24,12 @@ local BORDER_SIZE_MIN = 1
 local BORDER_SIZE_MAX = 24
 local BORDER_OFFSET_MIN = -20
 local BORDER_OFFSET_MAX = 20
+local GCD_SPELL_ID = 61304
+local GCD_FALLBACK = 1.5
+local GCD_MIN = 0.5
+local GCD_MAX = 2
+local GCD_GAP_THRESHOLD = 1.25
+local GCD_GAP_MAX_COUNT = 9
 local PREVIEW_INTERVAL = 1.35
 local PREVIEW_TEXTURE_FALLBACK = "Interface\\ICONS\\INV_Misc_QuestionMark"
 local PREVIEW_SPELL_IDS = {
@@ -42,6 +48,8 @@ ActionTracker.defaults = ActionTracker.defaults
 		direction = "RIGHT",
 		fadeDuration = 0,
 		showElapsed = false,
+		showGCDGaps = false,
+		showInterruptedCasts = false,
 		borderEnabled = false,
 		borderTexture = "DEFAULT",
 		borderSize = 1,
@@ -58,6 +66,8 @@ local DB_SPACING = "actionTrackerSpacing"
 local DB_DIRECTION = "actionTrackerDirection"
 local DB_FADE = "actionTrackerFadeDuration"
 local DB_SHOW_ELAPSED = "actionTrackerShowElapsed"
+local DB_SHOW_GCD_GAPS = "actionTrackerShowGCDGaps"
+local DB_SHOW_INTERRUPTED_CASTS = "actionTrackerShowInterruptedCasts"
 local DB_BORDER_ENABLED = "actionTrackerBorderEnabled"
 local DB_BORDER_TEXTURE = "actionTrackerBorderTexture"
 local DB_BORDER_SIZE = "actionTrackerBorderSize"
@@ -222,6 +232,8 @@ function ActionTracker:GetFadeDuration()
 end
 
 function ActionTracker:GetShowElapsed() return getValue(DB_SHOW_ELAPSED, defaults.showElapsed) == true end
+function ActionTracker:GetShowGCDGaps() return getValue(DB_SHOW_GCD_GAPS, defaults.showGCDGaps) == true end
+function ActionTracker:GetShowInterruptedCasts() return getValue(DB_SHOW_INTERRUPTED_CASTS, defaults.showInterruptedCasts) == true end
 function ActionTracker:GetBorderEnabled() return getValue(DB_BORDER_ENABLED, defaults.borderEnabled) == true end
 function ActionTracker:GetBorderTextureKey() return normalizeBorderTexture(getValue(DB_BORDER_TEXTURE, defaults.borderTexture)) end
 function ActionTracker:GetBorderSize() return clampNumber(getValue(DB_BORDER_SIZE, defaults.borderSize), BORDER_SIZE_MIN, BORDER_SIZE_MAX, defaults.borderSize) end
@@ -253,6 +265,34 @@ local function formatElapsed(elapsed)
 	return string.format("%dm%02ds", minutes, seconds)
 end
 
+local function getCurrentGCDDuration()
+	if C_Spell and C_Spell.GetSpellCooldown then
+		local info = C_Spell.GetSpellCooldown(GCD_SPELL_ID)
+		local duration = tonumber(info and info.duration)
+		if duration and duration >= GCD_MIN and duration <= GCD_MAX then return duration end
+	end
+	return GCD_FALLBACK
+end
+
+local function getEntryTexture(entry)
+	if not entry then return nil end
+	if entry.kind == "gap" then return "Interface\\Buttons\\WHITE8x8" end
+	if entry.texture then return entry.texture end
+	if entry.spellID and C_Spell and C_Spell.GetSpellTexture then return C_Spell.GetSpellTexture(entry.spellID) end
+	return nil
+end
+
+local function getEntryLabel(entry)
+	if not entry then return nil end
+	if entry.kind == "gap" then return string.format("+%d\nGCD", entry.gcdCount or 1) end
+	if entry.kind == "interrupted" then return entry.wasKicked and "KICK" or "X" end
+	return nil
+end
+
+local function setTextureVertexColor(texture, r, g, b, a)
+	if texture and texture.SetVertexColor then texture:SetVertexColor(r, g, b, a) end
+end
+
 function ActionTracker:TrimEntries()
 	local maxIcons = self:GetMaxIcons()
 	while #self.entries > maxIcons do
@@ -264,6 +304,10 @@ local function applyIconSize(icon, size)
 	icon:SetSize(size, size)
 	if icon.texture then icon.texture:SetAllPoints(icon) end
 	if icon.cooldown then icon.cooldown:SetAllPoints(icon) end
+	if icon.markerText and icon.markerText.SetFont then
+		local font, _, flags = icon.markerText:GetFont()
+		if font then icon.markerText:SetFont(font, math.max(10, math.floor(size * 0.34)), flags) end
+	end
 	if icon.timeText and icon.timeText.SetWidth then icon.timeText:SetWidth(size + 8) end
 end
 
@@ -312,6 +356,13 @@ function ActionTracker:EnsureFrame()
 		icon.cooldown = CreateFrame("Cooldown", nil, icon, "CooldownFrameTemplate")
 		icon.cooldown:SetAllPoints(icon)
 
+		icon.markerText = icon:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		icon.markerText:SetPoint("CENTER")
+		icon.markerText:SetJustifyH("CENTER")
+		icon.markerText:SetJustifyV("MIDDLE")
+		icon.markerText:SetText("")
+		icon.markerText:Hide()
+
 		icon.timeText = icon:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 		icon.timeText:SetPoint("TOP", icon, "BOTTOM", 0, -TIME_LABEL_PADDING)
 		icon.timeText:SetJustifyH("CENTER")
@@ -323,9 +374,25 @@ function ActionTracker:EnsureFrame()
 		icon.timeText:Hide()
 
 		icon:SetScript("OnEnter", function(selfIcon)
+			local entry = selfIcon.entry
+			if entry and entry.kind == "gap" then
+				GameTooltip:SetOwner(selfIcon, "ANCHOR_RIGHT")
+				GameTooltip:SetText(L["actionTrackerGCDGap"] or "GCD gap")
+				GameTooltip:AddLine((L["actionTrackerGCDGapTooltip"] or "No tracked action for about %d GCDs (%s)."):format(entry.gcdCount or 1, formatElapsed(entry.elapsed or 0)), 1, 1, 1, true)
+				GameTooltip:Show()
+				return
+			end
+
 			if not selfIcon.spellID then return end
 			GameTooltip:SetOwner(selfIcon, "ANCHOR_RIGHT")
 			GameTooltip:SetSpellByID(selfIcon.spellID)
+			if entry and entry.kind == "interrupted" then
+				if entry.wasKicked then
+					GameTooltip:AddLine(L["actionTrackerKicked"] or "Kicked", 1, 0.2, 0.2, true)
+				else
+					GameTooltip:AddLine(L["actionTrackerInterrupted"] or "Interrupted", 1, 0.2, 0.2, true)
+				end
+			end
 			GameTooltip:Show()
 		end)
 		icon:SetScript("OnLeave", GameTooltip_Hide)
@@ -446,11 +513,37 @@ function ActionTracker:RefreshIcons()
 		local icon = frame.icons[i]
 		local entry = i <= maxIcons and entries[i] or nil
 		if entry then
-			local texture = entry.texture or (entry.spellID and C_Spell.GetSpellTexture(entry.spellID))
+			local texture = getEntryTexture(entry)
 			icon.texture:SetTexture(texture)
+			if entry.kind == "gap" then
+				setTextureVertexColor(icon.texture, 0.18, 0.18, 0.18, 0.85)
+			elseif entry.kind == "interrupted" then
+				setTextureVertexColor(icon.texture, 0.45, 0.45, 0.45, 1)
+			else
+				setTextureVertexColor(icon.texture, 1, 1, 1, 1)
+			end
 			icon.spellID = entry.spellID
+			icon.entry = entry
 
-			if entry.cooldownDuration then
+			local markerText = getEntryLabel(entry)
+			if markerText and icon.markerText then
+				icon.markerText:SetText(markerText)
+				if entry.kind == "gap" then
+					icon.markerText:SetTextColor(1, 0.15, 0.15, 1)
+				elseif entry.kind == "interrupted" then
+					if entry.wasKicked then
+						icon.markerText:SetTextColor(1, 0.1, 0.1, 1)
+					else
+						icon.markerText:SetTextColor(1, 0.75, 0.15, 1)
+					end
+				end
+				icon.markerText:Show()
+			elseif icon.markerText then
+				icon.markerText:SetText("")
+				icon.markerText:Hide()
+			end
+
+			if entry.kind == "spell" and entry.cooldownDuration then
 				icon.cooldown:SetCooldownFromDurationObject(entry.cooldownDuration)
 				icon.cooldown:SetDrawEdge(false)
 				icon.cooldown:SetDrawBling(false)
@@ -461,8 +554,12 @@ function ActionTracker:RefreshIcons()
 
 			icon:SetAlpha(self:GetEntryAlpha(entry, now, fade))
 			if icon.timeText then
-				if showElapsed and i > 1 and entries[i - 1] then
-					local delta = (entry.time or now) - (entries[i - 1].time or now)
+				local previousEntry = entries[i - 1]
+				if showElapsed and entry.kind == "gap" then
+					icon.timeText:SetText(formatElapsed(entry.elapsed or 0))
+					icon.timeText:Show()
+				elseif showElapsed and i > 1 and previousEntry and not (entry.kind == "spell" and previousEntry.kind == "gap") then
+					local delta = (entry.time or now) - (previousEntry.time or now)
 					icon.timeText:SetText(formatElapsed(delta))
 					icon.timeText:Show()
 				else
@@ -473,9 +570,15 @@ function ActionTracker:RefreshIcons()
 			icon:Show()
 		elseif previewActive and i <= maxIcons then
 			icon.spellID = nil
+			icon.entry = nil
 			icon.texture:SetTexture(getPreviewTexture(i))
+			setTextureVertexColor(icon.texture, 1, 1, 1, 1)
 			icon.cooldown:Clear()
 			icon:SetAlpha(1)
+			if icon.markerText then
+				icon.markerText:SetText("")
+				icon.markerText:Hide()
+			end
 			if icon.timeText then
 				if showElapsed and i > 1 then
 					icon.timeText:SetText(formatElapsed(PREVIEW_INTERVAL))
@@ -488,9 +591,15 @@ function ActionTracker:RefreshIcons()
 			icon:Show()
 		else
 			icon.spellID = nil
+			icon.entry = nil
 			icon.texture:SetTexture(nil)
+			setTextureVertexColor(icon.texture, 1, 1, 1, 1)
 			icon.cooldown:Clear()
 			icon:SetAlpha(0)
+			if icon.markerText then
+				icon.markerText:SetText("")
+				icon.markerText:Hide()
+			end
 			if icon.timeText then
 				icon.timeText:SetText("")
 				icon.timeText:Hide()
@@ -569,8 +678,47 @@ end
 
 function ActionTracker:ClearEntries()
 	wipe(self.entries)
+	wipe(self.runtime)
 	self:StopFadeUpdate()
 	self:RefreshIcons()
+end
+
+function ActionTracker:AppendEntry(entry)
+	if type(entry) ~= "table" then return end
+	self.entries[#self.entries + 1] = entry
+	local maxIcons = self:GetMaxIcons()
+	while #self.entries > maxIcons do
+		table.remove(self.entries, 1)
+	end
+end
+
+function ActionTracker:AddGCDGapIfNeeded(now)
+	if not self:GetShowGCDGaps() then return end
+
+	local lastTime = self.runtime.lastTrackedActionTime
+	if not lastTime then return end
+
+	local gcd = tonumber(self.runtime.lastGCDDuration) or GCD_FALLBACK
+	if gcd < GCD_MIN or gcd > GCD_MAX then gcd = GCD_FALLBACK end
+
+	local elapsed = (now or GetTime()) - lastTime
+	if elapsed <= (gcd * GCD_GAP_THRESHOLD) then return end
+
+	local missed = math.floor(elapsed / gcd) - 1
+	if missed < 1 then missed = 1 end
+	if missed > GCD_GAP_MAX_COUNT then missed = GCD_GAP_MAX_COUNT end
+
+	self:AppendEntry({
+		kind = "gap",
+		time = now,
+		gcdCount = missed,
+		elapsed = elapsed,
+	})
+end
+
+function ActionTracker:UpdateTimelineAnchor(now)
+	self.runtime.lastTrackedActionTime = now or GetTime()
+	self.runtime.lastGCDDuration = getCurrentGCDDuration()
 end
 
 function ActionTracker:AddEntry(spellID)
@@ -582,20 +730,50 @@ function ActionTracker:AddEntry(spellID)
 	local texture = C_Spell.GetSpellTexture(spellID)
 	if not texture then return end
 
+	local now = GetTime()
+	self:AddGCDGapIfNeeded(now)
+
 	local entry = {
+		kind = "spell",
 		spellID = spellID,
 		texture = texture,
-		time = GetTime(),
+		time = now,
 	}
 
 	local duration = C_Spell.GetSpellCooldownDuration(spellID)
 	entry.cooldownDuration = duration
 
-	self.entries[#self.entries + 1] = entry
-	local maxIcons = self:GetMaxIcons()
-	while #self.entries > maxIcons do
-		table.remove(self.entries, 1)
+	self:AppendEntry(entry)
+	self:UpdateTimelineAnchor(now)
+
+	self:RefreshIcons()
+	self:UpdateFadeState(true)
+end
+
+function ActionTracker:AddInterruptedCast(spellID, castGUID, interruptedBy)
+	if not self:GetShowInterruptedCasts() then return end
+
+	local ignoreList = self.ignoreList
+	if spellID and ignoreList and ignoreList[spellID] then return end
+
+	if castGUID then
+		self.runtime.interruptedCastGUIDs = self.runtime.interruptedCastGUIDs or {}
+		if self.runtime.interruptedCastGUIDs[castGUID] then return end
+		self.runtime.interruptedCastGUIDs[castGUID] = true
 	end
+
+	local texture = spellID and C_Spell.GetSpellTexture(spellID) or nil
+	if not texture then texture = PREVIEW_TEXTURE_FALLBACK end
+
+	local now = GetTime()
+
+	self:AppendEntry({
+		kind = "interrupted",
+		spellID = spellID,
+		texture = texture,
+		time = now,
+		wasKicked = interruptedBy ~= nil,
+	})
 
 	self:RefreshIcons()
 	self:UpdateFadeState(true)
@@ -605,6 +783,18 @@ function ActionTracker:OnEvent(event, unit, arg2, arg3, arg4)
 	if event == "UNIT_SPELLCAST_SUCCEEDED" then
 		local spellID = arg3
 		self:AddEntry(spellID)
+	elseif event == "UNIT_SPELLCAST_INTERRUPTED" then
+		self:AddInterruptedCast(arg3, arg2, arg4)
+	end
+end
+
+function ActionTracker:UpdateOptionalEventRegistration()
+	if not self.eventsRegistered or not self.frame then return end
+
+	if self:GetShowInterruptedCasts() then
+		self.frame:RegisterUnitEvent("UNIT_SPELLCAST_INTERRUPTED", "player")
+	else
+		self.frame:UnregisterEvent("UNIT_SPELLCAST_INTERRUPTED")
 	end
 end
 
@@ -614,11 +804,13 @@ function ActionTracker:RegisterEvents()
 	frame:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
 	frame:SetScript("OnEvent", function(_, event, ...) ActionTracker:OnEvent(event, ...) end)
 	self.eventsRegistered = true
+	self:UpdateOptionalEventRegistration()
 end
 
 function ActionTracker:UnregisterEvents()
 	if not self.eventsRegistered or not self.frame then return end
 	self.frame:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+	self.frame:UnregisterEvent("UNIT_SPELLCAST_INTERRUPTED")
 	self.frame:SetScript("OnEvent", nil)
 	self.eventsRegistered = false
 end
@@ -643,6 +835,12 @@ function ActionTracker:ApplyLayoutData(data)
 	local fade = tonumber(data.fade) or defaults.fadeDuration
 	if fade < 0 then fade = 0 end
 	local showElapsed = data.showElapsed == true
+	local showGCDGaps = data.showGCDGaps
+	if showGCDGaps == nil then showGCDGaps = self:GetShowGCDGaps() end
+	showGCDGaps = showGCDGaps == true
+	local showInterruptedCasts = data.showInterruptedCasts
+	if showInterruptedCasts == nil then showInterruptedCasts = self:GetShowInterruptedCasts() end
+	showInterruptedCasts = showInterruptedCasts == true
 	local borderEnabled = data.borderEnabled
 	if borderEnabled == nil then borderEnabled = self:GetBorderEnabled() end
 	borderEnabled = borderEnabled == true
@@ -657,6 +855,8 @@ function ActionTracker:ApplyLayoutData(data)
 	addon.db[DB_DIRECTION] = direction
 	addon.db[DB_FADE] = fade
 	addon.db[DB_SHOW_ELAPSED] = showElapsed
+	addon.db[DB_SHOW_GCD_GAPS] = showGCDGaps
+	addon.db[DB_SHOW_INTERRUPTED_CASTS] = showInterruptedCasts
 	addon.db[DB_BORDER_ENABLED] = borderEnabled
 	addon.db[DB_BORDER_TEXTURE] = borderTexture
 	addon.db[DB_BORDER_SIZE] = borderSize
@@ -702,6 +902,15 @@ local function applySetting(field, value)
 		local showElapsed = value == true
 		addon.db[DB_SHOW_ELAPSED] = showElapsed
 		value = showElapsed
+	elseif field == "showGCDGaps" then
+		local showGCDGaps = value == true
+		addon.db[DB_SHOW_GCD_GAPS] = showGCDGaps
+		value = showGCDGaps
+	elseif field == "showInterruptedCasts" then
+		local showInterruptedCasts = value == true
+		addon.db[DB_SHOW_INTERRUPTED_CASTS] = showInterruptedCasts
+		value = showInterruptedCasts
+		ActionTracker:UpdateOptionalEventRegistration()
 	elseif field == "borderEnabled" then
 		local borderEnabled = value == true
 		addon.db[DB_BORDER_ENABLED] = borderEnabled
@@ -814,6 +1023,22 @@ function ActionTracker:RegisterEditMode()
 				set = function(_, value) applySetting("showElapsed", value) end,
 			},
 			{
+				name = L["actionTrackerShowGCDGaps"] or "Show GCD gaps",
+				kind = SettingType.Checkbox,
+				field = "showGCDGaps",
+				default = defaults.showGCDGaps,
+				get = function() return ActionTracker:GetShowGCDGaps() end,
+				set = function(_, value) applySetting("showGCDGaps", value) end,
+			},
+			{
+				name = L["actionTrackerShowInterruptedCasts"] or "Show interrupted casts",
+				kind = SettingType.Checkbox,
+				field = "showInterruptedCasts",
+				default = defaults.showInterruptedCasts,
+				get = function() return ActionTracker:GetShowInterruptedCasts() end,
+				set = function(_, value) applySetting("showInterruptedCasts", value) end,
+			},
+			{
 				name = EMBLEM_BORDER,
 				kind = SettingType.Collapsible,
 				id = "border",
@@ -896,6 +1121,8 @@ function ActionTracker:RegisterEditMode()
 		record.direction = self:GetDirection()
 		record.fade = self:GetFadeDuration()
 		record.showElapsed = self:GetShowElapsed()
+		record.showGCDGaps = self:GetShowGCDGaps()
+		record.showInterruptedCasts = self:GetShowInterruptedCasts()
 		record.borderEnabled = self:GetBorderEnabled()
 		record.borderTexture = self:GetBorderTextureKey()
 		do
@@ -920,6 +1147,8 @@ function ActionTracker:RegisterEditMode()
 			direction = self:GetDirection(),
 			fade = self:GetFadeDuration(),
 			showElapsed = self:GetShowElapsed(),
+			showGCDGaps = self:GetShowGCDGaps(),
+			showInterruptedCasts = self:GetShowInterruptedCasts(),
 			borderEnabled = self:GetBorderEnabled(),
 			borderTexture = self:GetBorderTextureKey(),
 			borderColor = (function()
