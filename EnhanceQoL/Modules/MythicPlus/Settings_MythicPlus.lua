@@ -145,7 +145,7 @@ local function buildSettings()
 	function addon.MythicPlus.functions.refreshTalentReminderSettings()
 		local frame = addon.ConfigCenterFrame
 		if not (frame and frame.IsShown and frame:IsShown()) then return end
-		local state = frame._LibEQOLConfigState
+		local state = frame._LibSettingsDesignerState
 		if state and state.RenderContent then state:RenderContent() end
 	end
 

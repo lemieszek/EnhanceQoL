@@ -1,11 +1,10 @@
-local MODULE_MAJOR, MINOR = "LibEQOLConfig-1.0", 1
-local LibStub = _G.LibStub
-assert(LibStub, MODULE_MAJOR .. " requires LibStub")
+local addonName, addon = ...
+addon = addon or _G[addonName] or {}
+addon.LibSettingsDesigner = addon.LibSettingsDesigner or {}
 
-local lib = LibStub:NewLibrary(MODULE_MAJOR, MINOR)
-if not lib then
-	return
-end
+local MINOR = 1
+local lib = addon.LibSettingsDesigner.Config or {}
+addon.LibSettingsDesigner.Config = lib
 lib.MINOR = MINOR
 
 local apps = lib.apps or {}

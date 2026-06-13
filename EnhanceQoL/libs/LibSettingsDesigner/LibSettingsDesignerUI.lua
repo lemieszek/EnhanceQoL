@@ -1,11 +1,10 @@
-local MODULE_MAJOR, MINOR = "LibEQOLConfigUI-1.0", 2
-local LibStub = _G.LibStub
-assert(LibStub, MODULE_MAJOR .. " requires LibStub")
+local addonName, addon = ...
+addon = addon or _G[addonName] or {}
+addon.LibSettingsDesigner = addon.LibSettingsDesigner or {}
 
-local lib = LibStub:NewLibrary(MODULE_MAJOR, MINOR)
-if not lib then
-	return
-end
+local MINOR = 2
+local lib = addon.LibSettingsDesigner.UI or {}
+addon.LibSettingsDesigner.UI = lib
 lib.MINOR = MINOR
 
 local CreateFrame = _G.CreateFrame
@@ -1398,9 +1397,12 @@ end
 
 function lib.AddNoteText(panel, text, color, y, width, template)
 	local cleanText = tostring(text or ""):gsub("\\\n", "\n")
-	local height = lib.EstimateTextHeight(cleanText, width, 15, 18)
 	local inset = panel.NoteInset or 10
 	local frame = createText(panel, template or FONT_TEXT, cleanText, type(color) == "table" and color or TEXT.muted)
+	frame:SetWidth(width)
+	if frame.Text and frame.Text.SetWidth then frame.Text:SetWidth(width) end
+	local measuredHeight = frame.Text and frame.Text.GetStringHeight and frame.Text:GetStringHeight()
+	local height = math.max(1, math.ceil(tonumber(measuredHeight) or lib.EstimateTextHeight(cleanText, width, 15, 18)))
 	frame:SetPoint("TOPLEFT", panel, "TOPLEFT", inset, y)
 	frame:SetPoint("RIGHT", panel, "RIGHT", -inset, 0)
 	frame:SetHeight(height)
@@ -1533,7 +1535,10 @@ function lib.ShowControlNotePanel(state, row, control)
 			y = lib.RenderNoteBlock(panel, block, y, textWidth)
 		end
 	end
-	local height = math.max(40, math.abs(y))
+	if y < -panel.NoteInset then
+		y = y + 6
+	end
+	local height = math.max(40, math.abs(y) + panel.NoteInset)
 	snapSize(panel, width, height)
 	snapPoint(panel, "TOPLEFT", row, "TOPRIGHT", 12, 0)
 	panel:Show()
@@ -2803,8 +2808,8 @@ function lib.PlaySoundDropdownPreview(control, optionOrValue, optionLabel)
 			end
 		end
 	end
-	if not sound and LibStub then
-		local lsm = LibStub("LibSharedMedia-3.0", true)
+	if not sound and _G.LibStub then
+		local lsm = _G.LibStub("LibSharedMedia-3.0", true)
 		if lsm then
 			sound = lsm:Fetch("sound", value, true)
 		end
@@ -5793,8 +5798,8 @@ local function createFrame(app)
 	frame.ResizeGrip:SetScript("OnMouseUp", function(self)
 		self._eqolResizing = nil
 		lib.SaveFrameSize(app, frame:GetWidth(), frame:GetHeight())
-		if frame._LibEQOLConfigState then
-			frame._LibEQOLConfigState:RenderContent()
+		if frame._LibSettingsDesignerState then
+			frame._LibSettingsDesignerState:RenderContent()
 		end
 	end)
 	frame.ResizeGrip:SetScript("OnHide", function(self)
@@ -5819,8 +5824,8 @@ local function createFrame(app)
 			self._eqolLastWidth = width
 			self._eqolLastHeight = height
 			frame:SetSize(width, height)
-			if frame._LibEQOLConfigState then
-				updateContentMetrics(frame._LibEQOLConfigState)
+			if frame._LibSettingsDesignerState then
+				updateContentMetrics(frame._LibSettingsDesignerState)
 			end
 		end
 	end)
@@ -5843,7 +5848,7 @@ local function createFrame(app)
 	frame.Scroll:SetScrollChild(frame.Content)
 
 	local state = initializeState(frame, app)
-	frame._LibEQOLConfigState = state
+	frame._LibSettingsDesignerState = state
 	updateContentMetrics(state)
 
 	frame.SearchBox:SetScript("OnTextChanged", function()
@@ -5903,7 +5908,8 @@ end
 
 function lib:Open(appOrID, pageID, focusControlID)
 	local _ = self
-	local app = type(appOrID) == "table" and appOrID or LibStub("LibEQOLConfig-1.0"):GetAddOn(appOrID)
+	local config = addon.LibSettingsDesigner and addon.LibSettingsDesigner.Config
+	local app = type(appOrID) == "table" and appOrID or (config and config:GetAddOn(appOrID))
 	if not app then
 		return nil
 	end
@@ -5912,9 +5918,9 @@ function lib:Open(appOrID, pageID, focusControlID)
 		frame = createFrame(app)
 		frames[app.id] = frame
 	else
-		frame._LibEQOLConfigState:RenderSidebar()
+		frame._LibSettingsDesignerState:RenderSidebar()
 	end
-	local state = frame._LibEQOLConfigState
+	local state = frame._LibSettingsDesignerState
 	pageID, focusControlID = lib.ResolveOpenTarget(app, pageID, focusControlID)
 	if pageID and pageID ~= "dashboard" then
 		state:SetPage(pageID, focusControlID)
@@ -5929,7 +5935,8 @@ function lib:Open(appOrID, pageID, focusControlID)
 end
 
 function lib:GetFrame(appOrID)
-	local app = type(appOrID) == "table" and appOrID or LibStub("LibEQOLConfig-1.0"):GetAddOn(appOrID)
+	local config = addon.LibSettingsDesigner and addon.LibSettingsDesigner.Config
+	local app = type(appOrID) == "table" and appOrID or (config and config:GetAddOn(appOrID))
 	if not app then
 		return nil
 	end
@@ -5937,7 +5944,8 @@ function lib:GetFrame(appOrID)
 end
 
 function lib:Toggle(appOrID, pageID, focusControlID)
-	local app = type(appOrID) == "table" and appOrID or LibStub("LibEQOLConfig-1.0"):GetAddOn(appOrID)
+	local config = addon.LibSettingsDesigner and addon.LibSettingsDesigner.Config
+	local app = type(appOrID) == "table" and appOrID or (config and config:GetAddOn(appOrID))
 	if not app then
 		return nil
 	end

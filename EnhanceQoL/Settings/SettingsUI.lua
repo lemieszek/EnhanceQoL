@@ -1,8 +1,9 @@
--- SettingsUI.lua (modern LibEQOLConfig based)
+-- SettingsUI.lua (modern LibSettingsDesigner based)
 local addonName, addon = ...
 local L = LibStub("AceLocale-3.0"):GetLocale(addonName)
-local ConfigLib = LibStub("LibEQOLConfig-1.0", true)
-local ConfigUILib = LibStub("LibEQOLConfigUI-1.0", true)
+local LibSettingsDesigner = addon.LibSettingsDesigner
+local ConfigLib = LibSettingsDesigner and LibSettingsDesigner.Config
+local ConfigUILib = LibSettingsDesigner and LibSettingsDesigner.UI
 
 -- Optional: Prefix für Settings-Variablen
 local prefix = "EQOL_"
@@ -842,7 +843,7 @@ function addon.functions.HideConfigCenterUntilFrameHidden(externalFrame)
 	if not app then return end
 	local frame = ConfigUILib.GetFrame and ConfigUILib:GetFrame(app) or addon.ConfigCenterFrame
 	if not (frame and frame.IsShown and frame:IsShown()) then return end
-	local state = frame._LibEQOLConfigState
+	local state = frame._LibSettingsDesignerState
 	local restorePageID = state and state.view == "page" and state.selectedPageID or nil
 	frame:Hide()
 	externalFrame._eqolConfigCenterRestore = {
