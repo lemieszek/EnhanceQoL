@@ -7,6 +7,7 @@
 ### ✨ Added
 
 - Cooldown Panels: Added automatic proc-duration tracking for supported trinket slots, including stacked proc windows such as Gaze of the Alnseer.
+- Unit Frames: Added the Name max width option to player, target, focus, and boss Data Bars.
 
 ### 🔄 Changed
 

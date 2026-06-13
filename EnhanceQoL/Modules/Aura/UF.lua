@@ -1714,6 +1714,7 @@ local defaults = {
 			fontSize = 12,
 			font = nil,
 			fontOutline = "OUTLINE",
+			nameMaxChars = 0,
 			textColor = { 1, 1, 1, 1 },
 			useTextClassColor = false,
 			offsetLeft = { x = 6, y = 0 },
@@ -3922,6 +3923,10 @@ function AuraUtil.ensureAuraButton(container, icons, index, ac)
 	if not container then return nil end
 	icons = icons or {}
 	local btn = icons[index]
+	local layerParent = container._eqolAuraLayerParent or container
+	local ensureSize = ac and ac.size
+	local ensureStrata = ac and ac.strata
+	local ensureLevelOffset = ac and ac.frameLevelOffset
 	if not btn then
 		btn = CreateFrame("Button", nil, container, "BackdropTemplate")
 		btn:SetSize(ac.size, ac.size)
@@ -3989,6 +3994,15 @@ function AuraUtil.ensureAuraButton(container, icons, index, ac)
 		end)
 		icons[index] = btn
 	else
+		if
+			btn._eqolAuraEnsureContainer == container
+			and btn._eqolAuraEnsureLayerParent == layerParent
+			and btn._eqolAuraEnsureSize == ensureSize
+			and btn._eqolAuraEnsureStrata == ensureStrata
+			and btn._eqolAuraEnsureLevelOffset == ensureLevelOffset
+		then
+			return btn, icons
+		end
 		if AuraUtil.setAuraButtonSize then
 			AuraUtil.setAuraButtonSize(btn, ac and ac.size)
 		elseif ac and ac.size and btn.SetSize then
@@ -4037,6 +4051,11 @@ function AuraUtil.ensureAuraButton(container, icons, index, ac)
 	end
 
 	if AuraUtil.syncAuraButtonLayer then AuraUtil.syncAuraButtonLayer(btn, container, ac) end
+	btn._eqolAuraEnsureContainer = container
+	btn._eqolAuraEnsureLayerParent = layerParent
+	btn._eqolAuraEnsureSize = ensureSize
+	btn._eqolAuraEnsureStrata = ensureStrata
+	btn._eqolAuraEnsureLevelOffset = ensureLevelOffset
 
 	return btn, icons
 end
@@ -4224,7 +4243,7 @@ function AuraUtil.getAuraButtonStyleKey(ac)
 	return key
 end
 
-function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulFilter)
+function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulFilter, canShowPlayerDispel)
 	if not btn or not aura then return end
 	unitToken = unitToken or "target"
 	if issecretvalue and issecretvalue(isDebuff) then
@@ -4244,6 +4263,7 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 		local borderKeyName = borderKey and tostring(borderKey):upper() or "DEFAULT"
 		showBorder = borderKeyName ~= "" and borderKeyName ~= "DEFAULT"
 	end
+	if canShowPlayerDispel == nil then canShowPlayerDispel = AuraUtil.CanUnitShowPlayerDispel(unitToken, aura.isSample) end
 	local canUseStaticSignature = not needsCooldown and not showStacks and not showBorder and not (ac and ac.blizzardDispelBorder == true) and not (ac and ac.showDR == true)
 	if
 		canUseStaticSignature
@@ -4298,8 +4318,11 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 	if cooldownFontSize ~= nil and cooldownFontSize < 1 then cooldownFontSize = nil end
 	local countFontSize = ac.countFontSize
 	btn.cd:SetHideCountdownNumbers(not hasCooldown or showCooldownText == false)
-	AuraUtil.styleAuraCount(btn, ac, countFontSize)
-	AuraUtil.styleAuraCooldownText(btn, ac, cooldownFontSize)
+	if btn._eqolAuraTextStyleKey ~= styleKey then
+		AuraUtil.styleAuraCount(btn, ac, countFontSize)
+		AuraUtil.styleAuraCooldownText(btn, ac, cooldownFontSize)
+		btn._eqolAuraTextStyleKey = styleKey
+	end
 	if showStacks and (issecretvalue and issecretvalue(aura.applications) or aura.applications and aura.applications > 1) then
 		local appStacks = aura.applications
 		if not aura.isSample and aura.auraInstanceID and aura.auraInstanceID > 0 and C_UnitAuras.GetAuraApplicationDisplayCount then
@@ -4336,7 +4359,7 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 					local canActivePlayerDispel = aura.canActivePlayerDispel
 					if issecretvalue and issecretvalue(dispelName) then dispelName = nil end
 					if issecretvalue and issecretvalue(canActivePlayerDispel) then canActivePlayerDispel = nil end
-					if (not dispelName or dispelName == "") and canActivePlayerDispel == true then dispelName = "Magic" end
+					if canShowPlayerDispel and (not dispelName or dispelName == "") and canActivePlayerDispel == true then dispelName = "Magic" end
 					fr, fg, fb = UFHelper.getDebuffColorFromName(dispelName or "None")
 				end
 				if fr then
@@ -4353,82 +4376,110 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 				b = customBorderColor[3] or customBorderColor.b or b
 				a = customBorderColor[4] or customBorderColor.a or a
 			end
-			local borderMode = tostring((ac and ac.borderRenderMode) or "EDGE"):upper()
-			local useOverlayBorderMode = borderMode == "OVERLAY"
-			local borderTex, borderCoords, borderIsEdge
-			if UFHelper and UFHelper.resolveAuraBorderTexture then
-				borderTex, borderCoords, borderIsEdge = UFHelper.resolveAuraBorderTexture(borderKey)
-			else
-				borderTex = "Interface\\Buttons\\UI-Debuff-Overlays"
-				borderCoords = { 0.296875, 0.5703125, 0, 0.515625 }
-				borderIsEdge = false
-			end
-			local renderAsEdge = borderIsEdge and not useOverlayBorderMode
-			if renderAsEdge and borderTex and borderTex ~= "" then
-				local borderFrame = UFHelper and UFHelper.ensureAuraBorderFrame and UFHelper.ensureAuraBorderFrame(btn)
-				if borderFrame then
-					local edgeSize = (UFHelper and UFHelper.calcAuraBorderSize and UFHelper.calcAuraBorderSize(btn, ac)) or 1
-					local borderOffset = tonumber(ac and ac.borderOffset) or 0
-					local edgeInset = (edgeSize or 1) * 0.5
-					local anchorInset = edgeInset - borderOffset
-					local insetVal = edgeSize
-					if borderFrame._eqolAuraBorderTex ~= borderTex or borderFrame._eqolAuraBorderEdgeSize ~= edgeSize then
-						borderFrame:SetBackdrop({
-							bgFile = "Interface\\Buttons\\WHITE8x8",
-							edgeFile = borderTex,
-							edgeSize = edgeSize,
-							insets = { left = insetVal, right = insetVal, top = insetVal, bottom = insetVal },
-						})
-						borderFrame:SetBackdropColor(0, 0, 0, 0)
-						borderFrame._eqolAuraBorderTex = borderTex
-						borderFrame._eqolAuraBorderEdgeSize = edgeSize
+			if
+				btn._eqolAuraBorderStyleKey ~= styleKey
+				or btn._eqolAuraBorderKey ~= borderKey
+				or btn._eqolAuraBorderButtonSize ~= btn._eqolAuraButtonSize
+			then
+				local borderMode = tostring((ac and ac.borderRenderMode) or "EDGE"):upper()
+				local useOverlayBorderMode = borderMode == "OVERLAY"
+				local borderTex, borderCoords, borderIsEdge
+				if UFHelper and UFHelper.resolveAuraBorderTexture then
+					borderTex, borderCoords, borderIsEdge = UFHelper.resolveAuraBorderTexture(borderKey)
+				else
+					borderTex = "Interface\\Buttons\\UI-Debuff-Overlays"
+					borderCoords = { 0.296875, 0.5703125, 0, 0.515625 }
+					borderIsEdge = false
+				end
+				local renderAsEdge = borderIsEdge and not useOverlayBorderMode
+				btn._eqolAuraBorderRenderAsEdge = renderAsEdge
+				btn._eqolAuraBorderStyleKey = styleKey
+				btn._eqolAuraBorderKey = borderKey
+				btn._eqolAuraBorderButtonSize = btn._eqolAuraButtonSize
+				if renderAsEdge and borderTex and borderTex ~= "" then
+					local borderFrame = UFHelper and UFHelper.ensureAuraBorderFrame and UFHelper.ensureAuraBorderFrame(btn)
+					btn._eqolAuraBorderFrame = borderFrame
+					if borderFrame then
+						local edgeSize = (UFHelper and UFHelper.calcAuraBorderSize and UFHelper.calcAuraBorderSize(btn, ac)) or 1
+						local borderOffset = tonumber(ac and ac.borderOffset) or 0
+						local edgeInset = (edgeSize or 1) * 0.5
+						local anchorInset = edgeInset - borderOffset
+						local insetVal = edgeSize
+						if borderFrame._eqolAuraBorderTex ~= borderTex or borderFrame._eqolAuraBorderEdgeSize ~= edgeSize then
+							borderFrame:SetBackdrop({
+								bgFile = "Interface\\Buttons\\WHITE8x8",
+								edgeFile = borderTex,
+								edgeSize = edgeSize,
+								insets = { left = insetVal, right = insetVal, top = insetVal, bottom = insetVal },
+							})
+							borderFrame:SetBackdropColor(0, 0, 0, 0)
+							borderFrame._eqolAuraBorderTex = borderTex
+							borderFrame._eqolAuraBorderEdgeSize = edgeSize
+						end
+						borderFrame:ClearAllPoints()
+						borderFrame:SetPoint("TOPLEFT", btn, "TOPLEFT", anchorInset, -anchorInset)
+						borderFrame:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -anchorInset, anchorInset)
+						borderFrame._eqolAuraBorderInset = anchorInset
 					end
-					borderFrame:ClearAllPoints()
-					borderFrame:SetPoint("TOPLEFT", btn, "TOPLEFT", anchorInset, -anchorInset)
-					borderFrame:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -anchorInset, anchorInset)
-					borderFrame._eqolAuraBorderInset = anchorInset
+					btn.border:Hide()
+				else
+					if UFHelper and UFHelper.hideAuraBorderFrame then UFHelper.hideAuraBorderFrame(btn) end
+					btn._eqolAuraBorderFrame = nil
+					btn.border:SetTexture(borderTex or "")
+					local useOverlayBorderGeometry = useOverlayBorderMode and not borderCoords
+					if borderCoords then
+						btn.border:SetTexCoord(borderCoords[1], borderCoords[2], borderCoords[3], borderCoords[4])
+					else
+						btn.border:SetTexCoord(0, 1, 0, 1)
+					end
+					if useOverlayBorderGeometry then
+						local bw = btn:GetWidth()
+						local bh = btn:GetHeight()
+						if not bw or bw <= 0 then bw = (ac and ac.size) or 24 end
+						if not bh or bh <= 0 then bh = bw end
+						btn.border:ClearAllPoints()
+						btn.border:SetPoint("CENTER", btn, "CENTER", 0, 0)
+						btn.border:SetSize((bw or 24) + 1, (bh or 24) + 1)
+					else
+						btn.border:SetAllPoints(btn)
+					end
+				end
+			end
+			if btn._eqolAuraBorderRenderAsEdge then
+				local borderFrame = btn._eqolAuraBorderFrame
+				if borderFrame then
 					borderFrame:SetBackdropBorderColor(r, g, b, a)
 					borderFrame:Show()
 				end
 				btn.border:Hide()
 			else
-				if UFHelper and UFHelper.hideAuraBorderFrame then UFHelper.hideAuraBorderFrame(btn) end
-				btn.border:SetTexture(borderTex or "")
-				local useOverlayBorderGeometry = useOverlayBorderMode and not borderCoords
-				if borderCoords then
-					btn.border:SetTexCoord(borderCoords[1], borderCoords[2], borderCoords[3], borderCoords[4])
-				else
-					btn.border:SetTexCoord(0, 1, 0, 1)
-				end
-				if useOverlayBorderGeometry then
-					local bw = btn:GetWidth()
-					local bh = btn:GetHeight()
-					if not bw or bw <= 0 then bw = (ac and ac.size) or 24 end
-					if not bh or bh <= 0 then bh = bw end
-					btn.border:ClearAllPoints()
-					btn.border:SetPoint("CENTER", btn, "CENTER", 0, 0)
-					btn.border:SetSize((bw or 24) + 1, (bh or 24) + 1)
-				else
-					btn.border:SetAllPoints(btn)
-				end
 				btn.border:SetVertexColor(r, g, b, a)
 				btn.border:Show()
 			end
 		else
 			if UFHelper and UFHelper.hideAuraBorderFrame then UFHelper.hideAuraBorderFrame(btn) end
+			btn._eqolAuraBorderStyleKey = nil
+			btn._eqolAuraBorderKey = nil
+			btn._eqolAuraBorderButtonSize = nil
+			btn._eqolAuraBorderRenderAsEdge = nil
+			btn._eqolAuraBorderFrame = nil
 			btn.border:SetTexture(nil)
 			btn.border:Hide()
 		end
 	end
 	if btn.dispelIcon then
-		local showIcon = isDebuff and ac and ac.blizzardDispelBorder == true
+		local showIcon = isDebuff and ac and ac.blizzardDispelBorder == true and canShowPlayerDispel
 		if showIcon then
-			local baseSize = btn:GetWidth()
-			if not baseSize or baseSize <= 0 then baseSize = (ac and ac.size) or 0 end
-			local iconSize = baseSize and baseSize > 0 and (baseSize * 0.4) or 12
-			btn.dispelIcon:ClearAllPoints()
-			btn.dispelIcon:SetPoint("TOPLEFT", btn, "TOPLEFT", 1, -1)
-			btn.dispelIcon:SetSize(iconSize, iconSize)
+			if btn._eqolAuraDispelIconStyleKey ~= styleKey or btn._eqolAuraDispelIconButtonSize ~= btn._eqolAuraButtonSize then
+				local baseSize = btn:GetWidth()
+				if not baseSize or baseSize <= 0 then baseSize = (ac and ac.size) or 0 end
+				local iconSize = baseSize and baseSize > 0 and (baseSize * 0.4) or 12
+				btn.dispelIcon:ClearAllPoints()
+				btn.dispelIcon:SetPoint("TOPLEFT", btn, "TOPLEFT", 1, -1)
+				btn.dispelIcon:SetSize(iconSize, iconSize)
+				btn._eqolAuraDispelIconStyleKey = styleKey
+				btn._eqolAuraDispelIconButtonSize = btn._eqolAuraButtonSize
+			end
 			if dispelR then
 				btn.dispelIcon:SetVertexColor(dispelR, dispelG, dispelB, 1)
 			else
@@ -4442,6 +4493,8 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 			btn.dispelIcon:SetAlphaFromBoolean(canActivePlayerDispel, alphaOn, alphaOff)
 			btn.dispelIcon:Show()
 		else
+			btn._eqolAuraDispelIconStyleKey = nil
+			btn._eqolAuraDispelIconButtonSize = nil
 			btn.dispelIcon:Hide()
 		end
 	end
@@ -4462,7 +4515,10 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 					btn._lastDRText = text
 					btn.drText:SetText(text)
 				end
-				AuraUtil.styleAuraDRText(btn, ac)
+				if btn._eqolAuraDRStyleKey ~= styleKey then
+					AuraUtil.styleAuraDRText(btn, ac)
+					btn._eqolAuraDRStyleKey = styleKey
+				end
 				local col = ac.drColor or { 1, 1, 1, 1 }
 				btn.drText:SetTextColor(col[1] or 1, col[2] or 1, col[3] or 1, col[4] or 1)
 				btn.drText:Show()
@@ -4818,6 +4874,7 @@ function AuraUtil.updateTargetAuraIcons(startIndex, unit, refreshBuffs, refreshD
 
 	local width = (st.auraContainer and st.auraContainer:GetWidth()) or (st.barGroup and st.barGroup:GetWidth()) or (st.frame and st.frame:GetWidth()) or 0
 	local auraLayout = UF._auraLayout
+	local canShowPlayerDispel = AuraUtil.CanUnitShowPlayerDispel(unit, allowSample)
 	local buffAnchor = buffStyle.anchor or "BOTTOM"
 	local buffPrimary, buffSecondary = auraLayout.resolveGrowth(buffStyle, buffAnchor, buffStyle.growth)
 	local perRow = auraLayout.calcPerRow(st, buffStyle, width, buffPrimary)
@@ -4852,14 +4909,11 @@ function AuraUtil.updateTargetAuraIcons(startIndex, unit, refreshBuffs, refreshD
 		buttons = buttons or {}
 		local shown = 0
 		local maxCount = style.max or 0
-		local layoutKey = table.concat({
-			tostring(style.size),
-			tostring(style.padding),
-			tostring(perRow),
-			tostring(primary),
-			tostring(secondary),
-		}, "\031")
-		local layoutChanged = container._eqolAuraLayoutKey ~= layoutKey
+		local layoutChanged = container._eqolAuraLayoutSize ~= style.size
+			or container._eqolAuraLayoutPadding ~= style.padding
+			or container._eqolAuraLayoutPerRow ~= perRow
+			or container._eqolAuraLayoutPrimary ~= primary
+			or container._eqolAuraLayoutSecondary ~= secondary
 		for i = 1, #order do
 			if shown >= maxCount then break end
 			local auraId = order[i]
@@ -4869,13 +4923,17 @@ function AuraUtil.updateTargetAuraIcons(startIndex, unit, refreshBuffs, refreshD
 				local oldButton = buttons[shown]
 				local btn
 				btn, buttons = AuraUtil.ensureAuraButton(container, buttons, shown, style)
-				AuraUtil.applyAuraToButton(btn, aura, style, isDebuff, unit, harmfulFilter)
+				AuraUtil.applyAuraToButton(btn, aura, style, isDebuff, unit, harmfulFilter, canShowPlayerDispel)
 				if layoutChanged or oldButton ~= btn or btn._eqolAuraAnchorContainer ~= container then
 					AuraUtil.anchorAuraButton(btn, container, shown, style, perRow, primary, secondary)
 				end
 			end
 		end
-		container._eqolAuraLayoutKey = layoutKey
+		container._eqolAuraLayoutSize = style.size
+		container._eqolAuraLayoutPadding = style.padding
+		container._eqolAuraLayoutPerRow = perRow
+		container._eqolAuraLayoutPrimary = primary
+		container._eqolAuraLayoutSecondary = secondary
 		for idx = shown + 1, #buttons do
 			if buttons[idx] then buttons[idx]:Hide() end
 		end
@@ -5600,10 +5658,21 @@ function AuraUtil.HideSingleDispelIndicator(unit)
 	end
 end
 
+function AuraUtil.CanUnitShowPlayerDispel(unit, allowSample)
+	if allowSample then return true end
+	if unit == UNIT.PLAYER or unit == "player" then return true end
+	if unit ~= UNIT.TARGET and unit ~= UNIT.FOCUS then return false end
+	return UnitExists and UnitExists(unit) and UnitIsFriend and UnitIsFriend("player", unit) == true
+end
+
 function AuraUtil.UpdateSingleDispelIndicator(unit, allowSample)
 	if unit ~= UNIT.PLAYER and unit ~= UNIT.TARGET and unit ~= UNIT.FOCUS then return end
 	local st = states[unit]
 	if not st then return end
+	if not AuraUtil.CanUnitShowPlayerDispel(unit, allowSample) then
+		AuraUtil.HideSingleDispelIndicator(unit)
+		return
+	end
 
 	local function clampNumber(value, minValue, maxValue, fallback)
 		local v = tonumber(value)
@@ -5716,16 +5785,8 @@ function AuraUtil.UpdateSingleDispelIndicator(unit, allowSample)
 	if overlayEnabled == nil then overlayEnabled = defDispel.enabled ~= false end
 	local glowEnabled = dcfg.glowEnabled
 	if glowEnabled == nil then glowEnabled = defDispel.glowEnabled == true end
-	local indicatorAllowedForUnit = true
-	if not allowSample and (unit == UNIT.TARGET or unit == UNIT.FOCUS) then indicatorAllowedForUnit = UnitExists and UnitExists(unit) and UnitIsFriend and UnitIsFriend("player", unit) == true end
 
 	if not overlayEnabled and not glowEnabled then
-		hideTint()
-		stopGlow()
-		return
-	end
-
-	if not indicatorAllowedForUnit then
 		hideTint()
 		stopGlow()
 		return
@@ -7622,10 +7683,21 @@ end
 function UF.DataBar.GetText(mode, unit, cfg, def, cur, maxv, percentVal)
 	mode = tostring(mode or "NONE"):upper()
 	if mode == "NONE" then return "" end
-	if mode == "NAME" then return (UnitName and UnitName(unit)) or UF.DataBar.GetFallbackName(unit) end
-	if mode == "LEVEL" then return (UFHelper and UFHelper.getUnitLevelText and UFHelper.getUnitLevelText(unit, nil, UF.ShouldHideClassificationText(cfg, unit))) or "" end
 	local dcfg = (cfg and cfg.dataBar) or {}
 	local ddef = (def and def.dataBar) or {}
+	if mode == "NAME" then
+		local text = (UnitName and UnitName(unit)) or UF.DataBar.GetFallbackName(unit)
+		local maxChars = tonumber(dcfg.nameMaxChars)
+		if maxChars == nil then maxChars = tonumber(ddef.nameMaxChars) end
+		if maxChars and maxChars > 0 and UFHelper and UFHelper.getNameLimitWidth and UFHelper.truncateTextToWidth then
+			local fontSize = dcfg.fontSize or ddef.fontSize or 12
+			local fontOutline = dcfg.fontOutline or ddef.fontOutline or "OUTLINE"
+			local maxWidth = UFHelper.getNameLimitWidth(dcfg.font or ddef.font, fontSize, fontOutline, maxChars)
+			if maxWidth and maxWidth > 0 then text = UFHelper.truncateTextToWidth(dcfg.font or ddef.font, fontSize, fontOutline, text, maxWidth) end
+		end
+		return text
+	end
+	if mode == "LEVEL" then return (UFHelper and UFHelper.getUnitLevelText and UFHelper.getUnitLevelText(unit, nil, UF.ShouldHideClassificationText(cfg, unit))) or "" end
 	local delimiter, delimiter2, delimiter3 = UFHelper.getTextDelimiter(dcfg, ddef), UFHelper.getTextDelimiterSecondary(dcfg, ddef), UFHelper.getTextDelimiterTertiary(dcfg, ddef)
 	if UFHelper.resolveTextDelimiters then delimiter, delimiter2, delimiter3 = UFHelper.resolveTextDelimiters(delimiter, delimiter2, delimiter3) end
 	local levelText
@@ -11982,10 +12054,11 @@ onEvent = function(self, event, unit, ...)
 		local touchBuff
 		local touchDebuff
 		local touchDispel
+		local trackDispel = AuraUtil.CanUnitShowPlayerDispel(unit, false)
 		if eventInfo.addedAuras then
 			for _, aura in ipairs(eventInfo.addedAuras) do
 				local isDebuffAura = aura and showDebuffs and AuraUtil.isAuraFilteredIn(unit, aura, harmfulFilter)
-				if aura and not isDebuffAura and (unit == UNIT.PLAYER or unit == UNIT.TARGET or unit == UNIT.FOCUS) and AuraUtil.isAuraFilteredIn(unit, aura, "HARMFUL|INCLUDE_NAME_PLATE_ONLY|RAID_PLAYER_DISPELLABLE") then
+				if trackDispel and aura and not isDebuffAura and AuraUtil.isAuraFilteredIn(unit, aura, "HARMFUL|INCLUDE_NAME_PLATE_ONLY|RAID_PLAYER_DISPELLABLE") then
 					touchDispel = true
 				end
 				local isBuffAura = aura and showBuffs and not isDebuffAura and AuraUtil.isAuraFilteredIn(unit, aura, helpfulFilter)
@@ -12004,13 +12077,13 @@ onEvent = function(self, event, unit, ...)
 					local _, idx = AuraUtil.cacheTargetAura(aura, unit, "debuff")
 					if oldBuffIdx and oldBuffIdx <= buffLimit then touchBuff = true end
 					if idx and idx <= debuffLimit then touchDebuff = true end
-					touchDispel = true
+					if trackDispel then touchDispel = true end
 				elseif aura and showBuffs and isBuffAura then
 					local oldDebuffIdx = AuraUtil.removeTargetAuraFromKindCache(unit, "debuff", aura.auraInstanceID)
 					local _, idx = AuraUtil.cacheTargetAura(aura, unit, "buff")
 					if oldDebuffIdx and oldDebuffIdx <= debuffLimit then touchDebuff = true end
 					if idx and idx <= buffLimit then touchBuff = true end
-					if oldDebuffIdx then touchDispel = true end
+					if trackDispel and oldDebuffIdx then touchDispel = true end
 				end
 			end
 		end
@@ -12029,7 +12102,7 @@ onEvent = function(self, event, unit, ...)
 					end
 					if buffIdx and buffIdx <= buffLimit then touchBuff = true end
 					if debuffIdx and debuffIdx <= debuffLimit then touchDebuff = true end
-					if debuffIdx then touchDispel = true end
+					if trackDispel and debuffIdx then touchDispel = true end
 				end
 			end
 		end
@@ -12039,7 +12112,7 @@ onEvent = function(self, event, unit, ...)
 				local debuffIdx = AuraUtil.removeTargetAuraFromKindCache(unit, "debuff", inst)
 				if buffIdx and buffIdx <= buffLimit then touchBuff = true end
 				if debuffIdx and debuffIdx <= debuffLimit then touchDebuff = true end
-				if debuffIdx then touchDispel = true end
+				if trackDispel and debuffIdx then touchDispel = true end
 			end
 		end
 		AuraUtil.compactAuraCache(buffCache)

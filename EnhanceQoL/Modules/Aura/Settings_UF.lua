@@ -3436,6 +3436,31 @@ function UF.ui.appendDataBarSettings(list, unit, def, refresh, refreshSelf, addD
 	end, dataBarDef.textRight or "PERCENT", "dataBar")
 	list[#list].isEnabled = isDataBarEnabled
 
+	local function isDataBarNameTextEnabled()
+		if not isDataBarEnabled() then return false end
+		return normalizeTextMode(getValue(unit, { "dataBar", "textLeft" }, dataBarDef.textLeft or "NAME")) == "NAME"
+			or normalizeTextMode(getValue(unit, { "dataBar", "textCenter" }, dataBarDef.textCenter or "CURMAX")) == "NAME"
+			or normalizeTextMode(getValue(unit, { "dataBar", "textRight" }, dataBarDef.textRight or "PERCENT")) == "NAME"
+	end
+
+	local dataBarNameMaxChars = slider(
+		L["Name max width"] or "Name max width",
+		0,
+		40,
+		1,
+		function() return getValue(unit, { "dataBar", "nameMaxChars" }, dataBarDef.nameMaxChars or 0) end,
+		function(val)
+			setValue(unit, { "dataBar", "nameMaxChars" }, val or 0)
+			refresh()
+		end,
+		dataBarDef.nameMaxChars or 0,
+		"dataBar",
+		true
+	)
+	dataBarNameMaxChars.isEnabled = isDataBarNameTextEnabled
+	dataBarNameMaxChars.isShown = isDataBarNameTextEnabled
+	list[#list + 1] = dataBarNameMaxChars
+
 	local function dataBarDelimiterCount()
 		local leftMode = getValue(unit, { "dataBar", "textLeft" }, dataBarDef.textLeft or "NAME")
 		local centerMode = getValue(unit, { "dataBar", "textCenter" }, dataBarDef.textCenter or "CURMAX")
