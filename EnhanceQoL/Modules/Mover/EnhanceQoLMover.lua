@@ -127,5 +127,5 @@ function addon.Mover.functions.InitSettings()
 end
 
 function addon.Mover.functions.treeCallback(container, group)
-	if addon.SettingsLayout.moverCategory then Settings.OpenToCategory(addon.SettingsLayout.moverCategory:GetID()) end
+	if addon.functions and addon.functions.OpenConfigCenter then addon.functions.OpenConfigCenter("interface.mover", "moverEnabled") end
 end

@@ -833,8 +833,9 @@ function addon.functions.OpenConfigCenter(pageID, focusControlID)
 	local app = ensureConfigApp()
 	if ConfigUILib and app then
 		addon.ConfigCenterFrame = ConfigUILib:Open(app, pageID, focusControlID)
-		return
+		return addon.ConfigCenterFrame ~= nil
 	end
+	return false
 end
 
 function addon.functions.HideConfigCenterUntilFrameHidden(externalFrame)

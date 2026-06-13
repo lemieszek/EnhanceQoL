@@ -2,7 +2,15 @@
 
 <!--@eqol-beta@-->
 
-## [11.2.0-beta4] - 2026-06-11
+## [11.2.0-beta5] - 2026-06-13
+
+### 🐛 Fixed
+
+- Settings: Removed leftover legacy settings-opening paths so the minimap button, addon compartment entry, Mover shortcut, and loot-toast quick menu all open the new Settings Center consistently.
+
+---
+
+## [11.2.0-beta4] - 2026-06-13
 
 ### ✨ Added
 

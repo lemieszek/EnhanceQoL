@@ -6148,38 +6148,11 @@ end
 
 local function initCharacter() addon.functions.initItemInventory() end
 
-local function OpenLegacySettingsRoot()
-	if not (Settings and Settings.OpenToCategory) then return end
-	if not (addon.SettingsLayout and addon.SettingsLayout.rootCategory) then return end
-
-	if InCombatLockdown and InCombatLockdown() then
-		addon.variables = addon.variables or {}
-		addon.variables.pendingSettingsOpen = true
-		return
-	end
-
-	addon.variables = addon.variables or {}
-	addon.variables.pendingSettingsOpen = nil
-	Settings.OpenToCategory(addon.SettingsLayout.rootCategory:GetID())
-end
-
-local OpenModernSettingsRoot
-
 local function OpenSettingsRoot()
-	OpenModernSettingsRoot()
+	if addon.functions and addon.functions.OpenConfigCenter then addon.functions.OpenConfigCenter() end
 end
 
-OpenModernSettingsRoot = function()
-	if addon.functions and addon.functions.OpenConfigCenter then
-		addon.functions.OpenConfigCenter()
-		return
-	end
-	OpenLegacySettingsRoot()
-end
-
-addon.functions.OpenLegacySettingsRoot = OpenLegacySettingsRoot
 addon.functions.OpenSettingsRoot = OpenSettingsRoot
-addon.functions.OpenModernSettingsRoot = OpenModernSettingsRoot
 
 function addon.functions.checkReloadFrame()
 	if addon.variables.requireReload == false then return end
@@ -6234,7 +6207,9 @@ local function CreateUI()
 			first = false
 			root:CreateTitle(L["SettingsLootHeaderToasts"])
 			root:CreateButton(L["SettingsLootAddInclude"], function() local dialog = StaticPopup_Show("EQOL_LOOT_INCLUDE_ADD") end)
-			root:CreateButton(OPTIONS, function() Settings.OpenToCategory(addon.SettingsLayout.vendorEconomyCalootCategorytegory:GetID(), L["enableLootToastFilter"]) end)
+			root:CreateButton(OPTIONS, function()
+				if addon.functions and addon.functions.OpenConfigCenter then addon.functions.OpenConfigCenter("general.loot", "enableLootToastFilter") end
+			end)
 		end
 
 		DoDevider()
@@ -7421,7 +7396,6 @@ local eventHandlers = {
 				addon.variables.pendingExtraActionArtwork = nil
 				if addon.functions.ApplyExtraActionArtworkSetting then addon.functions.ApplyExtraActionArtworkSetting() end
 			end
-			if addon.variables.pendingSettingsOpen then OpenSettingsRoot() end
 		end
 	end,
 	["QUEST_COMPLETE"] = function()
