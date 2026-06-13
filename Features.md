@@ -1,5 +1,19 @@
 # EnhanceQoL Features
 
+## TODO: 12.0.7 Duration Text Infrastructure
+
+`EnhanceQoL/General/DurationText.lua` and `EnhanceQoL/Settings/DurationText.lua` are currently not loaded by the addon. They were prepared for the expected 12.0.7 duration/cooldown text APIs, but the feature should stay disabled until it has real consumers.
+
+Before enabling it:
+- Add `General\DurationText.lua` to `EnhanceQoL/EnhanceQoL.toc`, beta-gated at first.
+- Add `Settings\DurationText.lua` back to `EnhanceQoL/Settings/SettingsUI.xml`, beta-gated at first.
+- Verify the settings page appears and writes `addon.db.durationText` correctly.
+- Connect at least one real consumer before exposing the settings, for example Cooldown Panels charge duration text or ResourceBars aura duration text.
+- Make settings changes invalidate and refresh active displays.
+- Keep safe handling for Blizzard secret values: pass duration objects through Blizzard APIs and do not convert secret values with Lua arithmetic or `tonumber`.
+- Update all locale files if any user-facing setting text changes.
+- Keep the feature beta-only until 12.0.7 APIs and one reference integration are verified in game.
+
 ## Core Module
 
 ### Chat
