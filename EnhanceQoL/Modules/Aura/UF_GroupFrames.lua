@@ -81,6 +81,10 @@ local groupDebuffFilterOptions = {
 	{ value = "DISPEL", label = L["UFGroupDebuffFilterDispel"] or "Dispellable" },
 	{ value = GROUP_DEBUFF_FILTER_IMPORTANT, label = L["UFGroupDebuffFilterImportant"] or "Important spells" },
 }
+GF.groupBuffFilterOptions = {
+	{ value = "RAID_IN_COMBAT", label = L["UFGroupBuffFilterRaidInCombat"] or "Healer buffs" },
+	{ value = "RAID", label = L["UFGroupBuffFilterRaid"] or "Helpful effects" },
+}
 
 GF.blizzardDispelIndicatorModeOptions = {
 	{ value = GF.BLIZZARD_DISPEL_MODE_BY_ME, label = L["UFAuraRendererBlizzardDispelModeByMe"] or "Dispellable by me", text = L["UFAuraRendererBlizzardDispelModeByMe"] or "Dispellable by me" },
@@ -449,12 +453,52 @@ function GF.NormalizeBuffHelpfulFilterMode(value)
 end
 
 function GF.GetBuffHelpfulFilter(ac)
+	local selection = ac and ac.buff and ac.buff.filterSelection
+	if type(selection) == "table" then
+		if not GFH.SelectionHasAny(selection) then return nil end
+		local filters = {}
+		if GFH.SelectionContains(selection, "RAID_IN_COMBAT") then filters[#filters + 1] = (AURA_FILTERS and AURA_FILTERS.helpful) or "HELPFUL|INCLUDE_NAME_PLATE_ONLY|RAID_IN_COMBAT|PLAYER" end
+		if GFH.SelectionContains(selection, "RAID") then filters[#filters + 1] = "HELPFUL|INCLUDE_NAME_PLATE_ONLY|RAID|PLAYER" end
+		if #filters == 0 then return nil end
+		if #filters == 1 then return filters[1] end
+		return filters
+	end
 	local mode = GF.NormalizeBuffHelpfulFilterMode(ac and ac.buff and ac.buff.helpfulFilterMode)
 	if mode == "RAID" then return "HELPFUL|INCLUDE_NAME_PLATE_ONLY|RAID|PLAYER" end
 	return (AURA_FILTERS and AURA_FILTERS.helpful) or "HELPFUL|INCLUDE_NAME_PLATE_ONLY|RAID_IN_COMBAT|PLAYER"
 end
 
+function GF.DefaultGroupBuffSelection() return { RAID_IN_COMBAT = true } end
 local function defaultGroupDebuffSelection() return { [GROUP_DEBUFF_FILTER_ALL] = true } end
+
+function GF.GetGroupBuffFilterSelection(typeCfg)
+	if type(typeCfg) ~= "table" then return nil end
+	local selection = typeCfg.filterSelection
+	if type(selection) ~= "table" then return nil end
+	return selection
+end
+
+function GF.IsGroupBuffFilterSelected(typeCfg, value)
+	local selection = GF.GetGroupBuffFilterSelection(typeCfg)
+	if selection == nil then return value == "RAID_IN_COMBAT" end
+	return GFH.SelectionContains(selection, value)
+end
+
+function GF.SetGroupBuffFilterSelected(typeCfg, value, state)
+	if type(typeCfg) ~= "table" or value == nil then return {} end
+	local selection = typeCfg.filterSelection
+	if type(selection) ~= "table" then
+		selection = {}
+		typeCfg.filterSelection = selection
+	end
+
+	if state then
+		selection[value] = true
+	else
+		selection[value] = nil
+	end
+	return selection
+end
 
 local function getGroupDebuffFilterSelection(typeCfg)
 	if type(typeCfg) ~= "table" then return nil end
@@ -519,6 +563,14 @@ local function exportGroupDebuffSelection(typeCfg)
 	local selection = typeCfg and typeCfg.filterSelection
 	if type(selection) == "table" then return GF._sharedEdit.csm(selection) end
 	return defaultGroupDebuffSelection()
+end
+
+function GF.ExportGroupBuffSelection(typeCfg)
+	local selection = typeCfg and typeCfg.filterSelection
+	if type(selection) == "table" then return GF._sharedEdit.csm(selection) end
+	local mode = GF.NormalizeBuffHelpfulFilterMode(typeCfg and typeCfg.helpfulFilterMode)
+	if mode == "RAID" then return { RAID = true } end
+	return GF.DefaultGroupBuffSelection()
 end
 
 function GF.CaptureGroupAuraSlotResults(...)
@@ -9657,6 +9709,8 @@ local function fullScanGroupAuras(
 		else
 			helpfulScanFilter = "HELPFUL|INCLUDE_NAME_PLATE_ONLY|PLAYER"
 		end
+	elseif type(helpfulFilter) == "table" then
+		helpfulScanFilter = "HELPFUL|INCLUDE_NAME_PLATE_ONLY"
 	end
 
 	local function storeAura(aura)
@@ -9930,8 +9984,11 @@ function GF:UpdateAuras(self, updateInfo)
 	local buffMax = normalizeMax(st._auraLayout and st._auraLayout.buff and st._auraLayout.buff.maxCount)
 	local debuffMax = normalizeMax(st._auraLayout and st._auraLayout.debuff and st._auraLayout.debuff.maxCount)
 	local externalMax = normalizeMax(st._auraLayout and st._auraLayout.externals and st._auraLayout.externals.maxCount)
+	local helpfulNeedsWideScan = type(helpfulFilter) == "table"
 	if wantsHealerBuffPlacement then
 		-- Healer buff placement needs the full helpful aura set; capped scans can miss tracked spells.
+		auraQueryMax.helpful = nil
+	elseif helpfulNeedsWideScan then
 		auraQueryMax.helpful = nil
 	elseif wantBuff and buffMax then
 		local extra = (wantExternals and externalMax) or 0
@@ -15496,6 +15553,14 @@ function GF._copyUnitAuraIconsToGroup(sectionId, srcAuras, dest)
 		local enabled = source.enabled
 		if enabled ~= nil then
 			buff.enabled = enabled and true or false
+			copied = true
+		end
+		if type(source.filterSelection) == "table" then
+			buff.filterSelection = GF._sharedEdit.csm(source.filterSelection)
+			copied = true
+		elseif source.helpfulFilterMode ~= nil then
+			buff.helpfulFilterMode = GF.NormalizeBuffHelpfulFilterMode(source.helpfulFilterMode)
+			buff.filterSelection = GF.ExportGroupBuffSelection(buff)
 			copied = true
 		end
 		if source.size ~= nil then
@@ -25984,33 +26049,29 @@ local function buildEditModeSettings(kind, editModeId)
 		},
 		{
 			name = L["UFGroupBuffFilter"] or "Buff filter",
-			kind = SettingType.Dropdown,
-			field = "buffHelpfulFilterMode",
+			kind = SettingType.MultiDropdown,
+			field = "buffFilters",
+			height = 80,
 			parentId = "buffs",
-			values = {
-				{
-					value = "RAID_IN_COMBAT",
-					label = L["UFGroupBuffFilterRaidInCombat"] or "Healer buffs",
-					text = L["UFGroupBuffFilterRaidInCombat"] or "Healer buffs",
-				},
-				{
-					value = "RAID",
-					label = L["UFGroupBuffFilterRaid"] or "Helpful effects",
-					text = L["UFGroupBuffFilterRaid"] or "Helpful effects",
-				},
-			},
-			get = function()
+			values = GF.groupBuffFilterOptions,
+			isSelected = function(_, value)
 				local cfg = getCfg(kind)
 				local ac = ensureAuraConfig(cfg)
-				local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.buff) or {}
-				return GF.NormalizeBuffHelpfulFilterMode(ac.buff.helpfulFilterMode or def.helpfulFilterMode)
+				return GF.IsGroupBuffFilterSelected(ac.buff, value)
 			end,
-			set = function(_, value)
+			setSelected = function(_, value, state)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				local ac = ensureAuraConfig(cfg)
+				local selection = GF.SetGroupBuffFilterSelected(ac.buff, value, state)
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "buffFilters", GF._sharedEdit.csm(selection), nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			isShown = function() return kind == "party" or kind == "raid" end,
+			isEnabled = function()
 				local cfg = getCfg(kind)
 				local ac = ensureAuraConfig(cfg)
-				ac.buff.helpfulFilterMode = GF.NormalizeBuffHelpfulFilterMode(value)
-				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "buffHelpfulFilterMode", ac.buff.helpfulFilterMode, nil, true) end
-				GF:ApplyHeaderAttributes(kind)
+				return ac.buff.enabled == true
 			end,
 		},
 		{
@@ -30875,7 +30936,12 @@ local function applyEditModeData(kind, data)
 	if data.buffBorderTexture ~= nil then ac.buff.borderTexture = GF.NormalizeAuraBorderTexture(data.buffBorderTexture, ac.buff.borderTexture or "DEFAULT", ac.buff.iconShape) end
 	if data.buffBorderSize ~= nil then ac.buff.borderSize = clampNumber(data.buffBorderSize, 1, 64, ac.buff.borderSize or 2) end
 	if data.buffBorderOffset ~= nil then ac.buff.borderOffset = clampNumber(data.buffBorderOffset, -64, 64, ac.buff.borderOffset or 0) end
-	if data.buffHelpfulFilterMode ~= nil then ac.buff.helpfulFilterMode = GF.NormalizeBuffHelpfulFilterMode(data.buffHelpfulFilterMode) end
+	if data.buffFilters ~= nil then
+		ac.buff.filterSelection = GF._sharedEdit.csm(data.buffFilters)
+	elseif data.buffHelpfulFilterMode ~= nil then
+		ac.buff.helpfulFilterMode = GF.NormalizeBuffHelpfulFilterMode(data.buffHelpfulFilterMode)
+		ac.buff.filterSelection = GF.ExportGroupBuffSelection(ac.buff)
+	end
 	if data.buffCooldownEnabled ~= nil then ac.buff.showCooldown = data.buffCooldownEnabled and true or false end
 	if data.buffCooldownTextEnabled ~= nil then ac.buff.showCooldownText = data.buffCooldownTextEnabled and true or false end
 	if data.buffCooldownTextAnchor ~= nil then ac.buff.cooldownAnchor = data.buffCooldownTextAnchor end
@@ -31733,7 +31799,7 @@ function GF:EnsureEditMode()
 				buffBorderTexture = GF.NormalizeAuraBorderTexture(ac.buff.borderTexture, defBuff.borderTexture or "DEFAULT", ac.buff.iconShape or defBuff.iconShape),
 				buffBorderSize = ac.buff.borderSize or defBuff.borderSize or 2,
 				buffBorderOffset = ac.buff.borderOffset or defBuff.borderOffset or 0,
-				buffHelpfulFilterMode = GF.NormalizeBuffHelpfulFilterMode(ac.buff.helpfulFilterMode or defBuff.helpfulFilterMode),
+				buffFilters = GF.ExportGroupBuffSelection(ac.buff),
 				buffCooldownEnabled = (ac.buff.showCooldown ~= nil and ac.buff.showCooldown ~= false) or (ac.buff.showCooldown == nil and defBuff.showCooldown ~= false),
 				buffCooldownTextEnabled = (ac.buff.showCooldownText ~= nil and ac.buff.showCooldownText ~= false) or (ac.buff.showCooldownText == nil and defBuff.showCooldownText ~= false),
 				buffCooldownTextAnchor = ac.buff.cooldownAnchor or defBuff.cooldownAnchor or "CENTER",

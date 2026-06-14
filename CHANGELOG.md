@@ -4,6 +4,10 @@
 
 ## [11.2.0-beta6] - 2026-06-14
 
+### ✨ Added
+
+- Group Frames / Auras: Added multi-select buff filters so healer buffs and helpful effects can be shown together on party and raid frames.
+
 ### 🐛 Fixed
 
 - Mythic Plus / Timer: Fixed objective split times so previously completed boss objectives are not recalculated when later bosses are defeated.
