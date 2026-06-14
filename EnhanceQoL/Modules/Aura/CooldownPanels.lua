@@ -10710,7 +10710,6 @@ function cdp.ENTRY.ApplyIconShapeBorder(icon, border, textureKey, layout, defaul
 			parent = border,
 			primaryTexture = border.shapeBorderTexture,
 			texturesKey = "shapeBorderTextures",
-			drawLayer = "OVERLAY",
 		})
 		if not ok then return false end
 	else

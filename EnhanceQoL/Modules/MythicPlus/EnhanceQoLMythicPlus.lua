@@ -523,8 +523,6 @@ local function applyBRBorderFrame(frame, target, enabled, textureKey, borderSize
 				borderSize = borderSize,
 				borderOffset = borderOffset,
 				color = borderColor,
-				drawLayer = "OVERLAY",
-				subLevel = 4,
 			})
 		end
 		return
@@ -2002,8 +2000,6 @@ local function applyBloodlustBorderFrame(frame, target, enabled, textureKey, bor
 				borderSize = borderSize,
 				borderOffset = borderOffset,
 				color = borderColor,
-				drawLayer = "OVERLAY",
-				subLevel = 4,
 			})
 		end
 		return

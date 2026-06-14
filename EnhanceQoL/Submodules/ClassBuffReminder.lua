@@ -3810,8 +3810,6 @@ function Reminder:ApplyShapeBorder(frame, backdropFrame, enabled, borderTexture,
 	end
 	if not Reminder.IsShapeBorderPath(shape) then
 		if not (backdropFrame and backdropFrame.SetBackdrop) then return end
-		backdropFrame:SetFrameStrata(frame:GetFrameStrata())
-		backdropFrame:SetFrameLevel((frame:GetFrameLevel() or 0) + 1)
 		backdropFrame:SetBackdrop({
 			edgeFile = resolveBorderTexture(borderTexture),
 			edgeSize = borderSize,
@@ -3834,8 +3832,6 @@ function Reminder:ApplyShapeBorder(frame, backdropFrame, enabled, borderTexture,
 			borderSize = borderSize,
 			borderOffset = borderOffset,
 			color = { r, g, b, a },
-			drawLayer = "OVERLAY",
-			subLevel = 4,
 		})
 	end
 end

@@ -4292,7 +4292,6 @@ function AuraUtil.ApplyIconShapeBorder(btn, ac, r, g, b, a)
 		parent = btn.overlay or btn,
 		primaryTexture = btn.border,
 		texturesKey = "_eqolAuraShapeBorderTextures",
-		drawLayer = "OVERLAY",
 		allowNone = true,
 	})
 end

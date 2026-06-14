@@ -503,8 +503,6 @@ function ActionTracker:UpdateBorderVisuals()
 						borderSize = borderSize,
 						borderOffset = borderOffset,
 						color = { r, g, b, a },
-						drawLayer = "OVERLAY",
-						subLevel = 4,
 					})
 				end
 			end
