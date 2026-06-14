@@ -8632,8 +8632,6 @@ local function setGlow(frame, enabled, glowColor, glowKey, glowCondition, glowAl
 			frequency = pixelSpeed,
 			thickness = pixelThickness,
 			shape = frame._eqolGlowShape,
-			hostFrameLevelOffset = 8,
-			frameLevel = 8,
 		})
 	end
 	state.enabled = true

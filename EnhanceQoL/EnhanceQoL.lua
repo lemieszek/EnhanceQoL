@@ -7058,14 +7058,48 @@ local eventHandlers = {
 				}
 			end
 
+			local function trimProfileName(profileName)
+				if type(profileName) ~= "string" then return nil end
+				local trimmed = profileName:gsub("^%s+", ""):gsub("%s+$", "")
+				if trimmed == "" then return nil end
+				return trimmed
+			end
+
+			if type(EnhanceQoLDB.profiles) ~= "table" then EnhanceQoLDB.profiles = {} end
+			local renamedProfiles = nil
+			for profileName, profileData in pairs(EnhanceQoLDB.profiles) do
+				local normalizedName = trimProfileName(profileName)
+				if not normalizedName then
+					EnhanceQoLDB.profiles[profileName] = nil
+				elseif normalizedName ~= profileName then
+					if type(profileData) == "table" and type(EnhanceQoLDB.profiles[normalizedName]) ~= "table" then EnhanceQoLDB.profiles[normalizedName] = profileData end
+					EnhanceQoLDB.profiles[profileName] = nil
+					renamedProfiles = renamedProfiles or {}
+					renamedProfiles[profileName] = normalizedName
+				elseif type(profileData) ~= "table" then
+					EnhanceQoLDB.profiles[profileName] = {}
+				end
+			end
+			if not next(EnhanceQoLDB.profiles) then EnhanceQoLDB.profiles.Default = {} end
+
 			local defaultProfile = "Default"
 
 			if not EnhanceQoLDB.profileKeys then EnhanceQoLDB.profileKeys = {} end
+			for key, profileName in pairs(EnhanceQoLDB.profileKeys) do
+				local normalizedName = renamedProfiles and renamedProfiles[profileName] or trimProfileName(profileName)
+				if normalizedName and EnhanceQoLDB.profiles[normalizedName] then
+					EnhanceQoLDB.profileKeys[key] = normalizedName
+				else
+					EnhanceQoLDB.profileKeys[key] = nil
+				end
+			end
 			local name, realm = UnitName("player"), GetRealmName()
 
 			-- check for global profile
-			if EnhanceQoLDB.profileGlobal then
-				defaultProfile = EnhanceQoLDB.profileGlobal
+			local globalProfile = renamedProfiles and renamedProfiles[EnhanceQoLDB.profileGlobal] or trimProfileName(EnhanceQoLDB.profileGlobal)
+			if globalProfile and EnhanceQoLDB.profiles[globalProfile] then
+				EnhanceQoLDB.profileGlobal = globalProfile
+				defaultProfile = globalProfile
 			else
 				EnhanceQoLDB.profileGlobal = defaultProfile
 			end

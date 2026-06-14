@@ -1536,10 +1536,12 @@ function Timer:UpdateObjectiveSplits(state)
 	if not state or state.preview or not state.active then return end
 	self.objectiveSplits = self.objectiveSplits or {}
 	self.objectiveSplitBestTimes = self.objectiveSplitBestTimes or {}
+	self.objectiveStates = self.objectiveStates or {}
 	for _, objective in ipairs(state.objectives or {}) do
+		local key = splitKey(objective.text)
+		local objectiveState = self.objectiveStates[key] or {}
 		if objective.completed then
-			local key = splitKey(objective.text)
-			if not self.objectiveSplits[key] then
+			if objectiveState.seen and objectiveState.completed ~= true and not self.objectiveSplits[key] then
 				self.objectiveSplitBestTimes[key] = self:GetBestObjectiveTime(state, objective.text)
 				self.objectiveSplits[key] = state.elapsed
 				self:SetBestObjectiveTime(state, objective.text, state.elapsed)
@@ -1547,20 +1549,26 @@ function Timer:UpdateObjectiveSplits(state)
 			objective.splitTime = self.objectiveSplits[key]
 			objective.previousBestTime = self.objectiveSplitBestTimes[key]
 		else
-			local key = splitKey(objective.text)
 			objective.splitTime = self.objectiveSplits[key]
 			objective.previousBestTime = self.objectiveSplitBestTimes[key]
 		end
+		objectiveState.seen = true
+		objectiveState.completed = objective.completed == true
+		self.objectiveStates[key] = objectiveState
 	end
-	if state.enemyForces and state.enemyForces.completed then
+	if state.enemyForces then
 		local key = splitKey(state.enemyForces.text)
-		if not self.objectiveSplits[key] then
+		local objectiveState = self.objectiveStates[key] or {}
+		if state.enemyForces.completed and objectiveState.seen and objectiveState.completed ~= true and not self.objectiveSplits[key] then
 			self.objectiveSplitBestTimes[key] = self:GetBestObjectiveTime(state, state.enemyForces.text)
 			self.objectiveSplits[key] = state.elapsed
 			self:SetBestObjectiveTime(state, state.enemyForces.text, state.elapsed)
 		end
 		state.enemyForces.splitTime = self.objectiveSplits[key]
 		state.enemyForces.previousBestTime = self.objectiveSplitBestTimes[key]
+		objectiveState.seen = true
+		objectiveState.completed = state.enemyForces.completed == true
+		self.objectiveStates[key] = objectiveState
 	end
 end
 
@@ -1582,7 +1590,8 @@ function Timer:FormatObjectiveValue(state, objective)
 	if self:Get("showObjectiveTimes") and objective.splitTime then
 		valueText = valueText ~= "" and (valueText .. " - " .. secondsToText(objective.splitTime)) or secondsToText(objective.splitTime)
 		if self:Get("showObjectiveBestTimes") then
-			local best = state and state.preview and objective.bestTime or objective.previousBestTime or self:GetBestObjectiveTime(state, objective.text)
+			local best = state and state.preview and objective.bestTime or objective.previousBestTime
+			if not best and not (state and state.active) then best = self:GetBestObjectiveTime(state, objective.text) end
 			if best then valueText = valueText .. " (" .. self:FormatObjectiveDelta(objective.splitTime - best) .. ")" end
 		end
 	end
@@ -3063,6 +3072,7 @@ function Timer:Init()
 			Timer.lastEnemyForces = nil
 			Timer.objectiveSplits = {}
 			Timer.objectiveSplitBestTimes = {}
+			Timer.objectiveStates = {}
 			Timer:ResetDeathTracking()
 			Timer:RefreshGroupRoster()
 			Timer:ScheduleRunInfoRefresh()
@@ -3079,6 +3089,7 @@ function Timer:Init()
 			if event == "CHALLENGE_MODE_RESET" then
 				Timer.objectiveSplits = {}
 				Timer.objectiveSplitBestTimes = {}
+				Timer.objectiveStates = {}
 				Timer.completedElapsed = nil
 				Timer.completedInfo = nil
 				Timer.lastRunElapsed = nil

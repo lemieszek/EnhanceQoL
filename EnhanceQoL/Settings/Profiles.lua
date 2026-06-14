@@ -402,6 +402,13 @@ local function createGlobalFontSettings(section)
 end
 
 -- Build a sorted dropdown list, optionally keeping an empty entry pinned to the top
+local function trimAddonProfileName(name)
+	if type(name) ~= "string" then return nil end
+	local trimmed = name:gsub("^%s+", ""):gsub("%s+$", "")
+	if trimmed == "" then return nil end
+	return trimmed
+end
+
 local function buildSortedProfileList(orderTarget, excludeFunc, includeEmpty)
 	local list = {}
 	local order = orderTarget or {}
@@ -414,7 +421,11 @@ local function buildSortedProfileList(orderTarget, excludeFunc, includeEmpty)
 
 	local entries = {}
 	for name in pairs(EnhanceQoLDB.profiles) do
-		if not excludeFunc or not excludeFunc(name) then table.insert(entries, name) end
+		local normalizedName = trimAddonProfileName(name)
+		if normalizedName and not entries[normalizedName] and (not excludeFunc or not excludeFunc(normalizedName)) then
+			entries[normalizedName] = true
+			table.insert(entries, normalizedName)
+		end
 	end
 
 	table.sort(entries, function(a, b)
@@ -1719,8 +1730,9 @@ function addon.functions.initProfile()
 				end
 			end,
 			OnAccept = function(self)
-				local id = self:GetEditBox():GetText()
-				if id and id ~= "" then
+				local editBox = self.editBox or self.GetEditBox and self:GetEditBox()
+				local id = trimAddonProfileName(editBox and editBox:GetText())
+				if id then
 					if not EnhanceQoLDB.profiles[id] or type(EnhanceQoLDB.profiles[id]) ~= "table" then EnhanceQoLDB.profiles[id] = {} end
 				end
 			end,

@@ -2,6 +2,15 @@
 
 <!--@eqol-beta@-->
 
+## [11.2.0-beta6] - 2026-06-14
+
+### 🐛 Fixed
+
+- Mythic Plus / Timer: Fixed objective split times so previously completed boss objectives are not recalculated when later bosses are defeated.
+- Profiles: Fixed blank addon profiles that could be created from the profile dialog and then could not be deleted from the profile list.
+
+---
+
 ## [11.2.0-beta5] - 2026-06-14
 
 ### ✨ Added
