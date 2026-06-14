@@ -1763,24 +1763,24 @@ function Timer:RenderPanelObjectives(state)
 		item.value:SetText(valueText)
 		item.value:SetTextColor(color.r, color.g, color.b, color.a)
 		item.value:ClearAllPoints()
-		local columnGap = snapToPixel(math.max(0, 8 + columnOffset))
+		local columnGap = snapToPixel(4)
 		if invertColumns then
 			item.text:SetJustifyH("RIGHT")
 			item.value:SetJustifyH("LEFT")
 			if valueWidth > 0 then
 				item.value:SetPoint("TOPLEFT", item, "TOPLEFT", 0, 0)
 				item.value:SetWidth(valueWidth)
-				item.text:SetPoint("TOPLEFT", item.value, "TOPRIGHT", columnGap, 0)
+				item.text:SetPoint("TOPLEFT", item, "TOPLEFT", math.max(0, valueWidth + columnGap + columnOffset), 0)
 			else
 				item.text:SetPoint("TOPLEFT", item, "TOPLEFT", 0, 0)
 			end
-			item.text:SetPoint("RIGHT", item, "RIGHT", 0, 0)
+			item.text:SetPoint("RIGHT", item, "RIGHT", columnOffset, 0)
 		else
 			item.text:SetJustifyH("LEFT")
 			item.value:SetJustifyH("RIGHT")
 			item.text:SetPoint("TOPLEFT", item, "TOPLEFT", 0, 0)
 			if valueWidth > 0 then
-				item.value:SetPoint("TOPRIGHT", item, "TOPRIGHT", 0, 0)
+				item.value:SetPoint("TOPRIGHT", item, "TOPRIGHT", columnOffset, 0)
 				item.value:SetWidth(valueWidth)
 				item.text:SetPoint("RIGHT", item.value, "LEFT", -columnGap, 0)
 			else
@@ -1965,11 +1965,10 @@ function Timer:UpdatePanelTimerBarChestMarkers(timeLimit, twoChest, threeChest)
 	local width = bar:GetWidth() or clampNumber(self:Get("panelTimerBarWidth"), 20, 800, defaults.panelTimerBarWidth)
 	local height = bar:GetHeight() or clampNumber(self:Get("panelTimerBarHeight"), 1, 64, defaults.panelTimerBarHeight)
 	local elapsed = tonumber(self.lastState and self.lastState.elapsed) or 0
-	local fillUp = self:Get("panelTimerBarFillUp") == true
 	local threeChestTime = tonumber(threeChest) or 0
 	local twoChestTime = tonumber(twoChest) or 0
 	local function markerPosition(chestTime)
-		local ratio = fillUp and (chestTime / timeLimit) or ((timeLimit - chestTime) / timeLimit)
+		local ratio = chestTime / timeLimit
 		return width * math.max(0, math.min(1, ratio))
 	end
 	local positions = {
