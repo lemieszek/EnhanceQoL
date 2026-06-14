@@ -2,122 +2,45 @@
 
 <!--@eqol-beta@-->
 
-## [11.2.0-beta6] - 2026-06-14
+## [11.3.0-beta1] - 2026-06-14
 
 ### ✨ Added
 
-- Group Frames / Auras: Added multi-select buff filters so healer buffs and helpful effects can be shown together on party and raid frames.
+- Mythic Plus / Timer: Added the Mythic+ Timer back as a beta feature for continued testing.
 
-### 🐛 Fixed
+### 🔄 Changed
 
-- Mythic Plus / Timer: Fixed objective split times so previously completed boss objectives are not recalculated when later bosses are defeated.
-- Profiles: Fixed blank addon profiles that could be created from the profile dialog and then could not be deleted from the profile list.
+- Mythic Plus / Timer: Continued beta polish for layout, objective display, completed-run details, and best-time information.
+
+<!--@end-eqol-beta@-->
 
 ---
 
-## [11.2.0-beta5] - 2026-06-14
+## [11.2.0] - 2026-06-14
 
 ### ✨ Added
 
 - Action Tracker: Added optional visual markers for GCD gaps and interrupted casts.
-- Data Panels: Added a class-color option for the Time stream and saved raid/dungeon lockouts to the Time tooltip, including reset timers and local/realm time details.
-- Data Panels: Added AddOn usage details to the Latency tooltip, with top AddOns sorted by memory usage and CPU timing shown when the game has CPU data available.
-- Icon Shapes: Added shared icon-shape support for cooldown panels, Unit Frame auras, group-frame auras, Class Buff Reminder, Mage Food Reminder, Bloodlust/Battle Resurrection trackers, and Action Tracker.
-- Icon Shapes: Added selectable Square, Round, Hexagon, Diamond, Star, and Round Star shape support where the feature can render shaped icons cleanly.
-- Icon Shapes: Added shape-specific border options, including tintable 1 px borders for custom shape assets.
+- Cooldown Panels: Added Pixel and Pulsing glow styles, Pixel glow controls, and automatic proc-duration tracking for supported trinket slots.
+- Data Panels: Added Player Name and Time stream color options, raid/dungeon lockout details in the Time tooltip, and AddOn usage details in the Latency tooltip.
+- Group Frames / Auras: Added multi-select buff filters so healer buffs and helpful effects can be shown together on party and raid frames.
+- Icon Shapes: Added shared icon-shape support, selectable shape styles, and shape-specific border options across supported icon-based features.
+- Minimap Stats: Added an optional durability stat for the square minimap.
+- Unit Frames: Added a Name max width option to player, target, focus, and boss Data Bars.
 
 ### 🔄 Changed
 
-- Icon Shapes: Shape, border, and glow option lists now come from shared logic so future shape additions can be reused by multiple icon-based features without rebuilding each module separately.
-- Cooldown Panels: Non-default icon shapes now keep the Blizzard cooldown swipe highlight disabled and use Pulsing as the supported glow style.
-- Unit Frames / Group Frames: Non-default aura icon shapes now restrict border choices to compatible shape borders instead of showing regular SharedMedia borders that cannot match the mask.
-
-### 🐛 Fixed
-
-- Action Tracker: Fixed icon-shape dropdown changes sometimes needing a second selection before the preview updated.
-- Class Buff Reminder: Fixed Blizzard-style glow leftovers staying visible in the preview after switching to a non-default icon shape, and fixed shape borders not applying correctly to round previews.
-- Cooldown Panels: Fixed glow dropdown labels and glow textures not refreshing immediately after changing the icon shape.
-- Mage Food Reminder: Fixed shaped icons still showing the old square background or static border layer.
-- Mythic Plus: Fixed a Lua warning caused by the Mythic Plus tracker setup exceeding Lua's upvalue limit.
-- Settings: Removed leftover legacy settings-opening paths so the minimap button, addon compartment entry, Mover shortcut, and loot-toast quick menu all open the new Settings Center consistently.
-- Trackers: Fixed Bloodlust and Battle Resurrection tracker shaped icons showing leftover square backdrop/border visuals.
-- Unit Frames: Fixed Data Bar name width limiting so target names keep rendering correctly in instances.
-- Unit Frames: Fixed shape border sizing and edge offsets for aura icon borders so tintable 1 px borders resize more predictably.
-
----
-
-## [11.2.0-beta4] - 2026-06-13
-
-### ✨ Added
-
-- Cooldown Panels: Added automatic proc-duration tracking for supported trinket slots, including stacked proc windows such as Gaze of the Alnseer.
-- Cooldown Panels: Added Pixel glow controls for line count, speed, thickness, and an optional border in Edit Mode, including panel, fixed-group, and entry overrides.
-- Unit Frames: Added the Name max width option to player, target, focus, and boss Data Bars.
-
-### 🔄 Changed
-
+- Unit Frames / Castbars: Player castbars no longer show a separate non-interruptible cast color, so class-colored and custom player casts stay visually consistent.
 - Unit Frames: Improved aura update performance by avoiding repeated static layout, style, and dispel-indicator work during aura refreshes.
-
-### 🐛 Fixed
-
-- Class Buff Reminder: Fixed a login/setup error in current-expansion instance checks when the Encounter Journal reports fewer tiers than the expansion level offset expected.
-- Cooldown Panels / Bars: Fixed tracked aura bars for permanent auras on 12.0.7 so active auras with inactive duration objects keep showing the configured fill color instead of appearing empty.
-- Mythic Plus / Timer: Fixed inverted panel objective columns so the value and objective columns swap sides cleanly instead of collapsing together.
-- Mythic Plus / Timer: Fixed dungeon abbreviation labels by refreshing again when Blizzard publishes the challenge map ID after the first key-start update.
-- Mythic Plus / Timer: Fixed the panel enemy forces bar default border offset so it visually matches the timer bar when both bars use the same width.
-
----
-
-## [11.2.0-beta3] - 2026-06-11
-
-### 🔄 Changed
-
-- Mythic Plus / Timer: Changed panel objective column spacing into a bidirectional column offset.
-
-### 🐛 Fixed
-
-- Mythic Plus / Timer: Fixed panel objective X offsets not moving the objective block as expected.
-- Mythic Plus / Timer: Improved objective best-time deltas with faster/slower colors, signed values, and minute-style formatting for larger differences.
-
----
-
-## [11.2.0-beta2] - 2026-06-10
-
-### ✨ Added
-
-- Cooldown Panels: Added Pixel and Pulsing glow styles for cooldown panel glow effects.
-- Data Panels: Added faction color options for the Player Name stream, including separate realm coloring so the character name and realm can use different color modes.
-- Minimap Stats: Added an optional durability stat for the square minimap, with configurable placement, icon, size, and durability threshold colors.
-
-### 🔄 Changed
-
-- Cooldown Panels: Glow style dropdowns are now sorted alphabetically.
 
 ### 🐛 Fixed
 
 - Bags: Bag search now temporarily opens collapsed categories that contain matching items, so search results are no longer hidden behind closed category headers.
 - Class Buff Reminder: Buff food, flask, and Shaman shield reminders now update immediately when the matching aura changes, and Shaman Earth Shield requirements now follow the active shield-cap rules with and without Elemental Orbit.
-- Mythic Plus / Timer: Fixed disabled panel timer and enemy forces bars still showing their border.
-- Mythic Plus / Timer: Added more panel objective layout controls, including anchor, column spacing, inverted columns, and an option to hide non-boss objectives.
-- Mythic Plus / Timer: Added an optional time-left label directly on the panel timer bar with position, size, and color controls.
-
----
-
-## [11.2.0-beta1] - 2026-06-10
-
-### ✨ Added
-
-- Mythic Plus / Timer: Added a beta-only Mythic+ Timer with list and panel layouts, Edit Mode configuration, display formats, timer, enemy forces, objective, affix, death, and best-time controls.
-
-### 🔄 Changed
-
-- Unit Frames / Castbars: Player castbars no longer show a separate non-interruptible cast color, so class-colored and custom player casts stay visually consistent during non-interruptible player casts and channels.
-
-### 🐛 Fixed
-
-- Mythic Plus / Timer: Continued beta hardening for bar direction, chest markers, objective spacing, completed-run visibility, final completion time, completed-run dungeon/objective data, per-player death aggregation, protected death tracking, Blizzard tracker suppression, font fallback, preview rendering, and disabled panel elements.
-
-<!--@end-eqol-beta@-->
+- Cooldown Panels / Bars: Fixed tracked aura bars for permanent auras on 12.0.7 so active auras with inactive duration objects keep showing the configured fill color.
+- Profiles: Fixed blank addon profiles that could be created from the profile dialog and then could not be deleted from the profile list.
+- Settings: Removed leftover legacy settings-opening paths so the minimap button, addon compartment entry, Mover shortcut, and loot-toast quick menu all open the new Settings Center consistently.
+- Unit Frames: Fixed Data Bar name width limiting so target names keep rendering correctly in instances.
 
 ---
 
