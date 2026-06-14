@@ -416,6 +416,9 @@ local COSMETIC_BAR_KEYS = {
 	"useAbsoluteThresholdColors",
 	"absoluteThresholdColorPointCount",
 	"absoluteThresholdColorPoints",
+	"useTextThresholdColors",
+	"textThresholdColorPointCount",
+	"textThresholdColorPoints",
 	"showCooldownText",
 	"cooldownTextFontSize",
 	"backdrop",
@@ -435,6 +438,9 @@ ResourceBars.POWER_TYPE_STYLE_OVERRIDE_KEYS = {
 	"gradientStartColor",
 	"gradientEndColor",
 	"gradientDirection",
+	"useTextThresholdColors",
+	"textThresholdColorPointCount",
+	"textThresholdColorPoints",
 	"useHolyThreeColor",
 	"holyThreeColor",
 	"useMaelstromFiveColor",
@@ -1172,6 +1178,7 @@ function ResourceBars.UpdateAuraDurationText(bar)
 		bar.text:Show()
 		bar._textShown = true
 	end
+	ResourceBars.ApplyTextThresholdColor(bar, cfg, remaining, pType, total)
 end
 
 function ResourceBars.UpdateAuraDurationThresholdColor(bar)
@@ -2678,6 +2685,10 @@ local function applyFontToString(fs, cfg)
 	if addon.functions and addon.functions.ApplyFontStyleShadow then addon.functions.ApplyFontStyleShadow(fs, styleChoice, "OUTLINE") end
 	local r, g, b, a = resolveFontColor(cfg)
 	fs:SetTextColor(r, g, b, a)
+	local parent = fs.GetParent and fs:GetParent()
+	if parent then
+		parent._textColorR, parent._textColorG, parent._textColorB, parent._textColorA = r, g, b, a
+	end
 end
 
 local function ensureBackdropFrames(frame)
@@ -3467,6 +3478,30 @@ function ResourceBars.ResolveAbsoluteThresholdColor(cfg, currentValue, pType, ma
 	end
 	if not selectedColor then return nil end
 	return selectedColor[1] or 1, selectedColor[2] or 1, selectedColor[3] or 1, selectedColor[4] or 1
+end
+
+function ResourceBars.GetTextThresholdColorConfig(cfg)
+	if type(cfg) ~= "table" or cfg.useTextThresholdColors ~= true then return nil end
+	local proxy = ResourceBars.GetRuntimeCfgSubtable(cfg, "textThresholdColorProxy")
+	proxy.useAbsoluteThresholdColors = true
+	proxy.absoluteThresholdColorPointCount = cfg.textThresholdColorPointCount
+	proxy.absoluteThresholdColorPoints = cfg.textThresholdColorPoints
+	return proxy
+end
+
+function ResourceBars.ResolveTextThresholdColor(cfg, currentValue, pType, maxValue)
+	local proxy = ResourceBars.GetTextThresholdColorConfig(cfg)
+	if not proxy then return nil end
+	return ResourceBars.ResolveAbsoluteThresholdColor(proxy, currentValue, pType, maxValue)
+end
+
+function ResourceBars.ApplyTextThresholdColor(bar, cfg, currentValue, pType, maxValue)
+	if not (bar and bar.text) then return end
+	local r, g, b, a = ResourceBars.ResolveTextThresholdColor(cfg, currentValue, pType, maxValue)
+	if r == nil then r, g, b, a = resolveFontColor(cfg) end
+	if bar._textColorR == r and bar._textColorG == g and bar._textColorB == b and bar._textColorA == a then return end
+	bar.text:SetTextColor(r, g, b, a)
+	bar._textColorR, bar._textColorG, bar._textColorB, bar._textColorA = r, g, b, a
 end
 
 function ResourceBars.ResolveAbsoluteThresholdColorForSecretPower(cfg, pType, powerEnum, curPower, maxPower, baseColor, maxColor)
@@ -5665,6 +5700,7 @@ function updatePowerBar(type, runeSlot)
 					bar.text:Show()
 					bar._textShown = true
 				end
+				ResourceBars.ApplyTextThresholdColor(bar, cfg, percentDisplay, type, 100)
 			end
 		end
 
@@ -5747,6 +5783,7 @@ function updatePowerBar(type, runeSlot)
 							bar.text:Show()
 							bar._textShown = true
 						end
+						ResourceBars.ApplyTextThresholdColor(bar, cfg, stacks, type, logicalMax)
 					end
 				end
 
@@ -5868,6 +5905,7 @@ function updatePowerBar(type, runeSlot)
 						bar.text:Show()
 						bar._textShown = true
 					end
+					ResourceBars.ApplyTextThresholdColor(bar, cfg, stacks, type, logicalMax)
 				end
 			end
 		end
@@ -5992,6 +6030,7 @@ function updatePowerBar(type, runeSlot)
 	bar._lastVal = barValue
 	local percent = getPowerPercent("player", pType, curPower, maxPower)
 	local percentStr = formatPercentDisplay(percent, cfg)
+	local thresholdSampleValue = isSoulShards and displayCur or curPower
 	if bar.text then
 		local useShortNumbers = cfg.shortNumbers ~= false
 		if style == "NONE" then
@@ -6025,6 +6064,7 @@ function updatePowerBar(type, runeSlot)
 				bar.text:Show()
 				bar._textShown = true
 			end
+			ResourceBars.ApplyTextThresholdColor(bar, cfg, thresholdSampleValue, type, isSoulShards and displayMax or maxPower)
 		end
 	end
 
@@ -6053,7 +6093,6 @@ function updatePowerBar(type, runeSlot)
 	local maxPowerSecret = addon.variables.isMidnight and issecretvalue and issecretvalue(maxPower)
 	local hasSecretPower = curPowerSecret or maxPowerSecret
 	local reachedThree = useHolyThreeColor and not curPowerSecret and curPower >= holyThreeThreshold
-	local thresholdSampleValue = isSoulShards and displayCur or curPower
 	local secretThresholdR, secretThresholdG, secretThresholdB, secretThresholdA
 	if hasSecretPower and thresholdModeForBar == "PERCENT" then
 		secretThresholdR, secretThresholdG, secretThresholdB, secretThresholdA =

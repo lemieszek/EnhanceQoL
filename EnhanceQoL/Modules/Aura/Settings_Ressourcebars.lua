@@ -3107,6 +3107,214 @@ registerEditModeBars = function()
 					default = globalFontConfigKey(),
 				}
 
+				if barType ~= "HEALTH" and barType ~= "STAGGER" then
+					local function textThresholdColorModeAndCap()
+						if barType == "VOID_METAMORPHOSIS" then return "ABSOLUTE", ABSOLUTE_THRESHOLD_COLOR_VALUE_CAP_VOID_METAMORPHOSIS, 1 end
+						if barType == "MANA" or barType == "ENERGY" or barType == "RAGE" or barType == "FURY" or barType == "FOCUS" or barType == "INSANITY" or barType == "LUNAR_POWER" then
+							return "PERCENT", ABSOLUTE_THRESHOLD_COLOR_VALUE_CAP_PERCENT, 0
+						end
+						if ResourceBars and ResourceBars.GetThresholdColorModeAndCap then
+							local mode, cap, minValue = ResourceBars.GetThresholdColorModeAndCap(barType)
+							return mode or "ABSOLUTE", tonumber(cap) or ABSOLUTE_THRESHOLD_COLOR_VALUE_CAP, tonumber(minValue) or 1
+						end
+						if ResourceBars and ResourceBars.separatorEligible and ResourceBars.separatorEligible[barType] then return "ABSOLUTE", ABSOLUTE_THRESHOLD_COLOR_VALUE_CAP, 1 end
+						return "ABSOLUTE", ABSOLUTE_THRESHOLD_COLOR_VALUE_CAP_CONTINUOUS, 1
+					end
+
+					local textThresholdMode, textThresholdValueCap, textThresholdValueMin = textThresholdColorModeAndCap()
+					local isPercentTextThresholdMode = textThresholdMode == "PERCENT"
+
+					local function clampTextThresholdValue(value)
+						local n = tonumber(value)
+						if n == nil then return nil end
+						if isPercentTextThresholdMode then
+							n = math.floor((n * 10) + 0.5) / 10
+						else
+							n = math.floor(n + 0.5)
+						end
+						if n < textThresholdValueMin then n = textThresholdValueMin end
+						if n > textThresholdValueCap then n = textThresholdValueCap end
+						return n
+					end
+
+					local function getDefaultTextThresholdPoint(index)
+						if ResourceBars and ResourceBars.GetDefaultAbsoluteThresholdColorPoint then
+							local value, color = ResourceBars.GetDefaultAbsoluteThresholdColorPoint(index, barType)
+							local r, g, b, a = toColorComponents(color, { 1, 1, 1, 1 })
+							return clampTextThresholdValue(value) or clampTextThresholdValue(index) or textThresholdValueMin, { r, g, b, a }
+						end
+						local fallback = ABSOLUTE_THRESHOLD_COLOR_DEFAULTS[index] or ABSOLUTE_THRESHOLD_COLOR_DEFAULTS[#ABSOLUTE_THRESHOLD_COLOR_DEFAULTS] or { value = index, color = { 1, 1, 1, 1 } }
+						local value = clampTextThresholdValue(fallback.value or fallback[1]) or clampTextThresholdValue(index) or 1
+						local color = fallback.color or fallback[2] or { 1, 1, 1, 1 }
+						local r, g, b, a = toColorComponents(color, { 1, 1, 1, 1 })
+						return value, { r, g, b, a }
+					end
+
+					local function isTextThresholdColorsEnabled()
+						local c = curSpecCfg()
+						return c and c.useTextThresholdColors == true
+					end
+
+					local function getTextThresholdPointCount()
+						local c = curSpecCfg()
+						local count = tonumber(c and c.textThresholdColorPointCount) or tonumber(cfg and cfg.textThresholdColorPointCount) or ABSOLUTE_THRESHOLD_COLOR_DEFAULT_COUNT
+						if count < 1 then count = 1 end
+						if count > ABSOLUTE_THRESHOLD_COLOR_MAX_POINTS then count = ABSOLUTE_THRESHOLD_COLOR_MAX_POINTS end
+						return math.floor(count + 0.5)
+					end
+
+					local function ensureTextThresholdPoint(index)
+						local c = curSpecCfg()
+						if not c then return nil end
+						if type(c.textThresholdColorPoints) ~= "table" then c.textThresholdColorPoints = {} end
+						local point = c.textThresholdColorPoints[index]
+						if type(point) ~= "table" then
+							point = {}
+							c.textThresholdColorPoints[index] = point
+						end
+						local defaultValue, defaultColor = getDefaultTextThresholdPoint(index)
+						point.value = clampTextThresholdValue(point.value or point[1]) or defaultValue
+						local r, g, b, a = toColorComponents(point.color or point[2], defaultColor)
+						point.color = { r, g, b, a }
+						return point, defaultValue, defaultColor
+					end
+
+					local function getTextThresholdPointValue(index)
+						local c = curSpecCfg()
+						local points = c and c.textThresholdColorPoints
+						if type(points) ~= "table" then points = cfg and cfg.textThresholdColorPoints end
+						local point = type(points) == "table" and points[index] or nil
+						local defaultValue = select(1, getDefaultTextThresholdPoint(index))
+						return clampTextThresholdValue(point and (point.value or point[1])) or defaultValue
+					end
+
+					local function setTextThresholdPointValue(index, value)
+						local point, defaultValue = ensureTextThresholdPoint(index)
+						if not point then return end
+						point.value = clampTextThresholdValue(value) or defaultValue
+						queueRefresh()
+					end
+
+					local function getTextThresholdPointUIColor(index)
+						local c = curSpecCfg()
+						local points = c and c.textThresholdColorPoints
+						if type(points) ~= "table" then points = cfg and cfg.textThresholdColorPoints end
+						local point = type(points) == "table" and points[index] or nil
+						local _, defaultColor = getDefaultTextThresholdPoint(index)
+						local r, g, b, a = toColorComponents(point and (point.color or point[2]) or defaultColor, defaultColor)
+						return { r = r, g = g, b = b, a = a }
+					end
+
+					local function setTextThresholdPointColor(index, value)
+						local point, _, defaultColor = ensureTextThresholdPoint(index)
+						if not point then return end
+						point.color = toColorArray(value, defaultColor)
+						queueRefresh()
+					end
+
+					settingsList[#settingsList + 1] = {
+						name = (L["Text"] or "Text") .. " " .. ((isPercentTextThresholdMode and (L["Threshold colors"] or "Threshold colors")) or (L["Absolute threshold colors"] or "Absolute threshold colors")),
+						kind = settingType.Collapsible,
+						id = "textthresholdcolors",
+						defaultCollapsed = true,
+					}
+
+					settingsList[#settingsList + 1] = {
+						name = (L["Text"] or "Text") .. " " .. ((isPercentTextThresholdMode and (L["Use threshold colors"] or "Use threshold colors")) or (L["Use absolute threshold colors"] or "Use absolute threshold colors")),
+						kind = settingType.Checkbox,
+						field = "useTextThresholdColors",
+						parentId = "textthresholdcolors",
+						default = false,
+						get = isTextThresholdColorsEnabled,
+						set = function(_, value)
+							local c = curSpecCfg()
+							if not c then return end
+							c.useTextThresholdColors = value and true or false
+							if c.useTextThresholdColors then
+								if c.textThresholdColorPointCount == nil then c.textThresholdColorPointCount = ABSOLUTE_THRESHOLD_COLOR_DEFAULT_COUNT end
+								for i = 1, getTextThresholdPointCount() do
+									ensureTextThresholdPoint(i)
+								end
+							end
+							queueRefresh()
+							refreshSettingsUI()
+						end,
+					}
+
+					settingsList[#settingsList + 1] = {
+						name = (L["Text"] or "Text") .. " " .. (L["Threshold points"] or "Threshold points"),
+						kind = settingType.Dropdown,
+						height = 180,
+						field = "textThresholdColorPointCount",
+						parentId = "textthresholdcolors",
+						values = (function()
+							local values = {}
+							for i = 1, ABSOLUTE_THRESHOLD_COLOR_MAX_POINTS do
+								values[#values + 1] = { value = i, label = tostring(i), text = tostring(i) }
+							end
+							return values
+						end)(),
+						get = function() return getTextThresholdPointCount() end,
+						set = function(_, value)
+							local c = curSpecCfg()
+							if not c then return end
+							local count = tonumber(value) or ABSOLUTE_THRESHOLD_COLOR_DEFAULT_COUNT
+							if count < 1 then count = 1 end
+							if count > ABSOLUTE_THRESHOLD_COLOR_MAX_POINTS then count = ABSOLUTE_THRESHOLD_COLOR_MAX_POINTS end
+							c.textThresholdColorPointCount = math.floor(count + 0.5)
+							for i = 1, c.textThresholdColorPointCount do
+								ensureTextThresholdPoint(i)
+							end
+							queueRefresh()
+							refreshSettingsUI()
+						end,
+						default = ABSOLUTE_THRESHOLD_COLOR_DEFAULT_COUNT,
+						isEnabled = isTextThresholdColorsEnabled,
+					}
+
+					for i = 1, ABSOLUTE_THRESHOLD_COLOR_MAX_POINTS do
+						local defaultValue, defaultColor = getDefaultTextThresholdPoint(i)
+
+						settingsList[#settingsList + 1] = {
+							name = (L["Text"] or "Text") .. " " .. string.format((isPercentTextThresholdMode and (L["Threshold point %d value (%%)"] or "Point %d value (%%)")) or (L["Threshold point %d value"] or "Point %d value"), i),
+							kind = settingType.Slider,
+							allowInput = true,
+							field = "textThresholdPointValue" .. i,
+							parentId = "textthresholdcolors",
+							minValue = textThresholdValueMin,
+							maxValue = textThresholdValueCap,
+							valueStep = isPercentTextThresholdMode and 0.1 or 1,
+							get = function() return getTextThresholdPointValue(i) end,
+							set = function(_, value) setTextThresholdPointValue(i, value) end,
+							default = defaultValue,
+							formatter = function(value)
+								local n = tonumber(value) or 0
+								if isPercentTextThresholdMode then
+									n = math.floor((n * 10) + 0.5) / 10
+									return string.format("%.1f", n)
+								end
+								return tostring(math.floor(n + 0.5))
+							end,
+							isEnabled = isTextThresholdColorsEnabled,
+							isShown = function() return isTextThresholdColorsEnabled() and i <= getTextThresholdPointCount() end,
+						}
+
+						settingsList[#settingsList + 1] = {
+							name = (L["Text"] or "Text") .. " " .. string.format(L["Point %d color"] or "Point %d color", i),
+							kind = settingType.Color,
+							parentId = "textthresholdcolors",
+							default = { r = defaultColor[1] or 1, g = defaultColor[2] or 1, b = defaultColor[3] or 1, a = defaultColor[4] or 1 },
+							get = function() return getTextThresholdPointUIColor(i) end,
+							set = function(_, value) setTextThresholdPointColor(i, value) end,
+							colorGet = function() return getTextThresholdPointUIColor(i) end,
+							colorSet = function(_, value) setTextThresholdPointColor(i, value) end,
+							hasOpacity = true,
+							isEnabled = isTextThresholdColorsEnabled,
+							isShown = function() return isTextThresholdColorsEnabled() and i <= getTextThresholdPointCount() end,
+						}
+					end
+				end
+
 				local outlineOptions = getFontStyleEntries()
 				settingsList[#settingsList + 1] = {
 					name = L["Outline"],

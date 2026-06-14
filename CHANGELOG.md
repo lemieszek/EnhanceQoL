@@ -2,17 +2,34 @@
 
 <!--@eqol-beta@-->
 
-## [11.2.0-beta5] - 2026-06-13
+## [11.2.0-beta5] - 2026-06-14
 
 ### ✨ Added
 
 - Action Tracker: Added optional visual markers for GCD gaps and interrupted casts.
 - Data Panels: Added a class-color option for the Time stream and saved raid/dungeon lockouts to the Time tooltip, including reset timers and local/realm time details.
 - Data Panels: Added AddOn usage details to the Latency tooltip, with top AddOns sorted by memory usage and CPU timing shown when the game has CPU data available.
+- Icon Shapes: Added shared icon-shape support for cooldown panels, Unit Frame auras, group-frame auras, Class Buff Reminder, Mage Food Reminder, Bloodlust/Battle Resurrection trackers, and Action Tracker.
+- Icon Shapes: Added selectable Square, Round, Hexagon, Diamond, Star, and Round Star shape support where the feature can render shaped icons cleanly.
+- Icon Shapes: Added shape-specific border options, including tintable 1 px borders for custom shape assets.
+
+### 🔄 Changed
+
+- Icon Shapes: Shape, border, and glow option lists now come from shared logic so future shape additions can be reused by multiple icon-based features without rebuilding each module separately.
+- Cooldown Panels: Non-default icon shapes now keep the Blizzard cooldown swipe highlight disabled and use Pulsing as the supported glow style.
+- Unit Frames / Group Frames: Non-default aura icon shapes now restrict border choices to compatible shape borders instead of showing regular SharedMedia borders that cannot match the mask.
 
 ### 🐛 Fixed
 
+- Action Tracker: Fixed icon-shape dropdown changes sometimes needing a second selection before the preview updated.
+- Class Buff Reminder: Fixed Blizzard-style glow leftovers staying visible in the preview after switching to a non-default icon shape, and fixed shape borders not applying correctly to round previews.
+- Cooldown Panels: Fixed glow dropdown labels and glow textures not refreshing immediately after changing the icon shape.
+- Mage Food Reminder: Fixed shaped icons still showing the old square background or static border layer.
+- Mythic Plus: Fixed a Lua warning caused by the Mythic Plus tracker setup exceeding Lua's upvalue limit.
 - Settings: Removed leftover legacy settings-opening paths so the minimap button, addon compartment entry, Mover shortcut, and loot-toast quick menu all open the new Settings Center consistently.
+- Trackers: Fixed Bloodlust and Battle Resurrection tracker shaped icons showing leftover square backdrop/border visuals.
+- Unit Frames: Fixed Data Bar name width limiting so target names keep rendering correctly in instances.
+- Unit Frames: Fixed shape border sizing and edge offsets for aura icon borders so tintable 1 px borders resize more predictably.
 
 ---
 
