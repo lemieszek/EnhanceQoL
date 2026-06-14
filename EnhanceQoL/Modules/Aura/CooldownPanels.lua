@@ -1580,7 +1580,16 @@ function CooldownPanels:UpdateCursorAnchorState()
 	end
 end
 
-function CooldownPanels:GetGlowStyleOptions(panelId) return Helper.GLOW_STYLE_OPTIONS or {} end
+function CooldownPanels:GetGlowStyleOptions(panelId, layout)
+	layout = layout or (panelId and self:GetPanel(panelId) and self:GetPanel(panelId).layout) or nil
+	local shape = cdp.ENTRY.NormalizeIconShape(layout and layout.iconShape, Helper.PANEL_LAYOUT_DEFAULTS.iconShape)
+	if not cdp.ENTRY.IsIconShapeBackdropBorderCompatible(shape) then
+		for _, option in ipairs(Helper.GLOW_STYLE_OPTIONS or {}) do
+			if option.value == "PULSING" then return { option } end
+		end
+	end
+	return Helper.GLOW_STYLE_OPTIONS or {}
+end
 
 function CooldownPanels:IsInterruptGlowSupported(entry)
 	if not (entry and entry.type == "SPELL") then return false end
@@ -1605,6 +1614,7 @@ cdp.ICON_BORDER = cdp.ICON_BORDER or {
 	SHAPE_METAL_LIGHT = "SHAPE_ATLAS_CHARACTERCREATE_RING_METALLIGHT",
 	SHAPE_COMMUNITIES_BLUE = "SHAPE_ATLAS_COMMUNITIES_RING_BLUE",
 	SHAPE_HEXAGON_1PX = "SHAPE_TEXTURE_HEXAGON_1PX",
+	SHAPE_DIAMOND_1PX = "SHAPE_TEXTURE_DIAMOND_1PX",
 	OVERLAY_ATLAS = "UI-HUD-CoolDownManager-IconOverlay",
 	MASK_ATLAS = "UI-HUD-CoolDownManager-Mask",
 	DEFAULT_SWIPE_TEXTURE = "Interface\\Buttons\\WHITE8X8",
@@ -1614,7 +1624,7 @@ cdp.ICON_BORDER = cdp.ICON_BORDER or {
 	OVERLAY_OFFSET_X_NUDGE = 0,
 	ICON_BOTTOM_INSET = 2,
 }
-cdp.ICON_SHAPE = cdp.ICON_SHAPE or addon.IconShape or { DEFAULT = "DEFAULT", SQUARE = "SQUARE", ROUND = "ROUND", STAR = "STAR", HEXAGON = "HEXAGON" }
+cdp.ICON_SHAPE = cdp.ICON_SHAPE or addon.IconShape or { DEFAULT = "DEFAULT", SQUARE = "SQUARE", ROUND = "ROUND", STAR = "STAR", HEXAGON = "HEXAGON", DIAMOND = "DIAMOND" }
 cdp.ICON_BORDER.SHAPE_ATLASES = cdp.ICON_BORDER.SHAPE_ATLASES or {
 	[cdp.ICON_BORDER.SHAPE_METAL_LIGHT] = {
 		atlas = "charactercreate-ring-metallight",
@@ -1636,11 +1646,20 @@ cdp.ICON_BORDER.SHAPE_ATLASES = cdp.ICON_BORDER.SHAPE_ATLASES or {
 		thicknessMode = "layers",
 		tint = true,
 	},
+	[cdp.ICON_BORDER.SHAPE_DIAMOND_1PX] = {
+		texture = "Interface\\AddOns\\EnhanceQoL\\Assets\\diamond_border.tga",
+		labelKey = "CooldownPanelIconBorderDiamond1px",
+		label = "Diamond 1 px",
+		shapes = { DIAMOND = true },
+		thicknessMode = "layers",
+		tint = true,
+	},
 }
 cdp.ICON_BORDER.SHAPE_ATLAS_ORDER = cdp.ICON_BORDER.SHAPE_ATLAS_ORDER or {
 	cdp.ICON_BORDER.SHAPE_METAL_LIGHT,
 	cdp.ICON_BORDER.SHAPE_COMMUNITIES_BLUE,
 	cdp.ICON_BORDER.SHAPE_HEXAGON_1PX,
+	cdp.ICON_BORDER.SHAPE_DIAMOND_1PX,
 }
 
 function cdp.ENTRY.IsIconShapeBackdropBorderCompatible(shape)
@@ -1717,6 +1736,13 @@ end
 function cdp.ENTRY.NormalizeIconShape(value, fallback)
 	if addon.IconShape and addon.IconShape.Normalize then return addon.IconShape.Normalize(value, fallback) end
 	return Helper.NormalizeIconShape(value, fallback)
+end
+
+function cdp.ENTRY.NormalizeGlowStyleForIconShape(style, fallback, shape)
+	local normalized = Helper.NormalizeGlowStyle(style, fallback)
+	shape = cdp.ENTRY.NormalizeIconShape(shape, Helper.PANEL_LAYOUT_DEFAULTS.iconShape)
+	if not cdp.ENTRY.IsIconShapeBackdropBorderCompatible(shape) then return "PULSING" end
+	return normalized
 end
 
 function cdp.ENTRY.GetIconShapeOptions()
@@ -6882,14 +6908,16 @@ function CooldownPanels:ResolveEntryGlowStyle(layout, entry)
 	local srcColor = layout and layout.readyGlowColor or nil
 	local srcStyle = layout and layout.readyGlowStyle or nil
 	local srcInset = layout and layout.readyGlowInset or nil
-	if not panelCache or panelCache.srcColor ~= srcColor or panelCache.srcStyle ~= srcStyle or panelCache.srcInset ~= srcInset then
+	local srcShape = layout and layout.iconShape or nil
+	if not panelCache or panelCache.srcColor ~= srcColor or panelCache.srcStyle ~= srcStyle or panelCache.srcInset ~= srcInset or panelCache.srcShape ~= srcShape then
 		panelCache = panelCache or {}
 		panelCache.srcColor = srcColor
 		panelCache.srcStyle = srcStyle
 		panelCache.srcInset = srcInset
+		panelCache.srcShape = srcShape
 		local r, g, b, a = Helper.ResolveColor(srcColor, Helper.PANEL_LAYOUT_DEFAULTS.readyGlowColor)
 		panelCache.color = CooldownPanels.FillCachedColor(panelCache.color, r, g, b, a)
-		panelCache.style = Helper.NormalizeGlowStyle(srcStyle, Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle)
+		panelCache.style = cdp.ENTRY.NormalizeGlowStyleForIconShape(srcStyle, Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle, srcShape)
 		panelCache.inset = Helper.NormalizeGlowInset(srcInset, Helper.PANEL_LAYOUT_DEFAULTS.readyGlowInset or 0)
 		panelCache.version = (panelCache.version or 0) + 1
 		CooldownPanels._styleCacheRoots.glowPanel[layout] = panelCache
@@ -6904,7 +6932,7 @@ function CooldownPanels:ResolveEntryGlowStyle(layout, entry)
 		cache.srcInset = entry.glowInset
 		local r, g, b, a = Helper.ResolveColor(entry.glowColor, panelCache.color)
 		cache.color = CooldownPanels.FillCachedColor(cache.color, r, g, b, a)
-		cache.style = Helper.NormalizeGlowStyle(entry.glowStyle, panelCache.style)
+		cache.style = cdp.ENTRY.NormalizeGlowStyleForIconShape(entry.glowStyle, panelCache.style, srcShape)
 		cache.inset = Helper.NormalizeGlowInset(entry.glowInset, panelCache.inset)
 		CooldownPanels._styleCacheRoots.glowEntry[entry] = cache
 	end
@@ -6928,11 +6956,13 @@ function CooldownPanels:ResolveEntryPandemicGlowVisual(layout, entry)
 	local srcColor = layout and layout.pandemicGlowColor or nil
 	local srcStyle = layout and layout.pandemicGlowStyle or nil
 	local srcInset = layout and layout.pandemicGlowInset or nil
+	local srcShape = layout and layout.iconShape or nil
 	if
 		not panelCache
 		or panelCache.srcColor ~= srcColor
 		or panelCache.srcStyle ~= srcStyle
 		or panelCache.srcInset ~= srcInset
+		or panelCache.srcShape ~= srcShape
 		or panelCache.readyColor ~= panelReadyColor
 		or panelCache.readyStyle ~= panelReadyStyle
 		or panelCache.readyInset ~= panelReadyInset
@@ -6941,12 +6971,13 @@ function CooldownPanels:ResolveEntryPandemicGlowVisual(layout, entry)
 		panelCache.srcColor = srcColor
 		panelCache.srcStyle = srcStyle
 		panelCache.srcInset = srcInset
+		panelCache.srcShape = srcShape
 		panelCache.readyColor = panelReadyColor
 		panelCache.readyStyle = panelReadyStyle
 		panelCache.readyInset = panelReadyInset
 		local r, g, b, a = Helper.ResolveColor(srcColor, panelReadyColor)
 		panelCache.color = CooldownPanels.FillCachedColor(panelCache.color, r, g, b, a)
-		panelCache.style = Helper.NormalizeGlowStyle(srcStyle, panelReadyStyle)
+		panelCache.style = cdp.ENTRY.NormalizeGlowStyleForIconShape(srcStyle, panelReadyStyle, srcShape)
 		panelCache.inset = Helper.NormalizeGlowInset(srcInset, panelReadyInset)
 		panelCache.version = (panelCache.version or 0) + 1
 		CooldownPanels._styleCacheRoots.pandemicGlowPanel[layout] = panelCache
@@ -6961,7 +6992,7 @@ function CooldownPanels:ResolveEntryPandemicGlowVisual(layout, entry)
 		cache.srcInset = entry.pandemicGlowInset
 		local r, g, b, a = Helper.ResolveColor(entry.pandemicGlowColor, panelCache.color)
 		cache.color = CooldownPanels.FillCachedColor(cache.color, r, g, b, a)
-		cache.style = Helper.NormalizeGlowStyle(entry.pandemicGlowStyle, panelCache.style)
+		cache.style = cdp.ENTRY.NormalizeGlowStyleForIconShape(entry.pandemicGlowStyle, panelCache.style, srcShape)
 		cache.inset = Helper.NormalizeGlowInset(entry.pandemicGlowInset, panelCache.inset)
 		CooldownPanels._styleCacheRoots.pandemicGlowEntry[entry] = cache
 	end
@@ -6973,13 +7004,22 @@ function CooldownPanels:ResolveEntryProcGlowVisual(layout, entry)
 	local panelCache = CooldownPanels._styleCacheRoots.procGlowPanel[layout]
 	local srcStyle = layout and layout.procGlowStyle or nil
 	local srcInset = layout and layout.procGlowInset or nil
-	if not panelCache or panelCache.srcStyle ~= srcStyle or panelCache.srcInset ~= srcInset or panelCache.readyStyle ~= panelReadyStyle or panelCache.readyInset ~= panelReadyInset then
+	local srcShape = layout and layout.iconShape or nil
+	if
+		not panelCache
+		or panelCache.srcStyle ~= srcStyle
+		or panelCache.srcInset ~= srcInset
+		or panelCache.srcShape ~= srcShape
+		or panelCache.readyStyle ~= panelReadyStyle
+		or panelCache.readyInset ~= panelReadyInset
+	then
 		panelCache = panelCache or {}
 		panelCache.srcStyle = srcStyle
 		panelCache.srcInset = srcInset
+		panelCache.srcShape = srcShape
 		panelCache.readyStyle = panelReadyStyle
 		panelCache.readyInset = panelReadyInset
-		panelCache.style = Helper.NormalizeGlowStyle(srcStyle, panelReadyStyle)
+		panelCache.style = cdp.ENTRY.NormalizeGlowStyleForIconShape(srcStyle, panelReadyStyle, srcShape)
 		panelCache.inset = Helper.NormalizeGlowInset(srcInset, panelReadyInset)
 		panelCache.version = (panelCache.version or 0) + 1
 		CooldownPanels._styleCacheRoots.procGlowPanel[layout] = panelCache
@@ -6991,7 +7031,7 @@ function CooldownPanels:ResolveEntryProcGlowVisual(layout, entry)
 		cache.panelVersion = panelCache.version
 		cache.srcStyle = entry.procGlowStyle
 		cache.srcInset = entry.procGlowInset
-		cache.style = Helper.NormalizeGlowStyle(entry.procGlowStyle, panelCache.style)
+		cache.style = cdp.ENTRY.NormalizeGlowStyleForIconShape(entry.procGlowStyle, panelCache.style, srcShape)
 		cache.inset = Helper.NormalizeGlowInset(entry.procGlowInset, panelCache.inset)
 		CooldownPanels._styleCacheRoots.procGlowEntry[entry] = cache
 	end
@@ -8588,6 +8628,7 @@ local function setGlow(frame, enabled, glowColor, glowKey, glowCondition, glowAl
 	local pixelCount = requestedPixelCount
 	local pixelSpeed = requestedPixelSpeed
 	local pixelThickness = requestedPixelThickness
+	local shapeChanged = state.shape ~= frame._eqolGlowShape
 	local colorChanged = false
 	local styleChanged = state.style ~= normalizedGlowStyle
 	local insetChanged = state.inset ~= normalizedGlowInset
@@ -8599,7 +8640,7 @@ local function setGlow(frame, enabled, glowColor, glowKey, glowCondition, glowAl
 		or currentGlowColor[2] ~= normalizedGlowColor[2]
 		or currentGlowColor[3] ~= normalizedGlowColor[3]
 		or currentGlowColor[4] ~= normalizedGlowColor[4]
-	if Glow and (not wasEnabled or colorChanged or styleChanged or insetChanged or pixelChanged) then
+	if Glow and (not wasEnabled or colorChanged or styleChanged or insetChanged or pixelChanged or shapeChanged) then
 		Glow.Start(frame, glowKey, normalizedGlowStyle, {
 			color = normalizedGlowColor,
 			cooldown = frame.cooldown,
@@ -10687,6 +10728,7 @@ function cdp.ENTRY.ApplyIconShapeBorder(icon, border, textureKey, layout, defaul
 				end
 			elseif info.texture then
 				texture:SetTexture(info.texture)
+				if texture.SetTexCoord then texture:SetTexCoord(0, 1, 0, 1) end
 			end
 			local layerX, layerY = cdp.ENTRY.GetIconShapeBorderLayerOffset(i)
 			texture:ClearAllPoints()
@@ -14560,7 +14602,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			get = function() return getResolvedProcGlowStyle() end,
 			set = setProcGlowStyle,
 			generator = function(_, root)
-				for _, option in ipairs(CooldownPanels:GetGlowStyleOptions(panelId)) do
+				for _, option in ipairs(CooldownPanels:GetGlowStyleOptions(panelId, getLayout())) do
 					local label = L[option.labelKey] or option.fallback
 					root:CreateRadio(label, function() return getResolvedProcGlowStyle() == option.value end, function() setProcGlowStyle(nil, option.value) end)
 				end
@@ -14596,7 +14638,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			get = function() return getResolvedGlowStyle() end,
 			set = setGlowStyle,
 			generator = function(_, root)
-				for _, option in ipairs(CooldownPanels:GetGlowStyleOptions(panelId)) do
+				for _, option in ipairs(CooldownPanels:GetGlowStyleOptions(panelId, getLayout())) do
 					local label = L[option.labelKey] or option.fallback
 					root:CreateRadio(label, function() return getResolvedGlowStyle() == option.value end, function() setGlowStyle(nil, option.value) end)
 				end
@@ -14615,7 +14657,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			get = function() return getResolvedPandemicGlowStyle() end,
 			set = setPandemicGlowStyle,
 			generator = function(_, root)
-				for _, option in ipairs(CooldownPanels:GetGlowStyleOptions(panelId)) do
+				for _, option in ipairs(CooldownPanels:GetGlowStyleOptions(panelId, getLayout())) do
 					local label = L[option.labelKey] or option.fallback
 					root:CreateRadio(label, function() return getResolvedPandemicGlowStyle() == option.value end, function() setPandemicGlowStyle(nil, option.value) end)
 				end
@@ -15445,7 +15487,7 @@ function CooldownPanels:BuildLayoutFixedGroupStandaloneSettings(panelId, groupId
 			end,
 			set = function(_, value) setOverride("procGlowStyle", value) end,
 			generator = function(_, root)
-				for _, option in ipairs(CooldownPanels:GetGlowStyleOptions(panelId)) do
+				for _, option in ipairs(CooldownPanels:GetGlowStyleOptions(panelId, getLayout())) do
 					local label = L[option.labelKey] or option.fallback
 					root:CreateRadio(label, function()
 						local layout = getLayout()
@@ -15493,7 +15535,7 @@ function CooldownPanels:BuildLayoutFixedGroupStandaloneSettings(panelId, groupId
 			end,
 			set = function(_, value) setOverride("readyGlowStyle", value) end,
 			generator = function(_, root)
-				for _, option in ipairs(CooldownPanels:GetGlowStyleOptions(panelId)) do
+				for _, option in ipairs(CooldownPanels:GetGlowStyleOptions(panelId, getLayout())) do
 					local label = L[option.labelKey] or option.fallback
 					root:CreateRadio(label, function()
 						local layout = getLayout()
@@ -15599,7 +15641,7 @@ function CooldownPanels:BuildLayoutFixedGroupStandaloneSettings(panelId, groupId
 			end,
 			set = function(_, value) setOverride("pandemicGlowStyle", value) end,
 			generator = function(_, root)
-				for _, option in ipairs(CooldownPanels:GetGlowStyleOptions(panelId)) do
+				for _, option in ipairs(CooldownPanels:GetGlowStyleOptions(panelId, getLayout())) do
 					local label = L[option.labelKey] or option.fallback
 					root:CreateRadio(label, function()
 						local layout = getLayout()
@@ -23266,7 +23308,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				end,
 				set = function(_, value) applyEditLayout(panelId, "procGlowStyle", value) end,
 				generator = function(_, root)
-					for _, option in ipairs(CooldownPanels:GetGlowStyleOptions(panelId)) do
+					for _, option in ipairs(CooldownPanels:GetGlowStyleOptions(panelId, layout)) do
 						local label = L[option.labelKey] or option.fallback
 						root:CreateRadio(
 							label,
@@ -23307,15 +23349,15 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				kind = SettingType.Dropdown,
 				parentId = "cooldownPanelGlow",
 				height = 180,
-				default = Helper.NormalizeGlowStyle(layout.readyGlowStyle, Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle),
-				get = function() return Helper.NormalizeGlowStyle(layout.readyGlowStyle, Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle) end,
+				default = cdp.ENTRY.NormalizeGlowStyleForIconShape(layout.readyGlowStyle, Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle, layout.iconShape),
+				get = function() return cdp.ENTRY.NormalizeGlowStyleForIconShape(layout.readyGlowStyle, Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle, layout.iconShape) end,
 				set = function(_, value) applyEditLayout(panelId, "readyGlowStyle", value) end,
 				generator = function(_, root)
-					for _, option in ipairs(CooldownPanels:GetGlowStyleOptions(panelId)) do
+					for _, option in ipairs(CooldownPanels:GetGlowStyleOptions(panelId, layout)) do
 						local label = L[option.labelKey] or option.fallback
 						root:CreateRadio(
 							label,
-							function() return Helper.NormalizeGlowStyle(layout.readyGlowStyle, Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle) == option.value end,
+							function() return cdp.ENTRY.NormalizeGlowStyleForIconShape(layout.readyGlowStyle, Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle, layout.iconShape) == option.value end,
 							function() applyEditLayout(panelId, "readyGlowStyle", option.value) end
 						)
 					end
@@ -23326,15 +23368,15 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				kind = SettingType.Dropdown,
 				parentId = "cooldownPanelGlow",
 				height = 180,
-				default = Helper.NormalizeGlowStyle(layout.pandemicGlowStyle, layout.readyGlowStyle or Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle),
-				get = function() return Helper.NormalizeGlowStyle(layout.pandemicGlowStyle, layout.readyGlowStyle or Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle) end,
+				default = cdp.ENTRY.NormalizeGlowStyleForIconShape(layout.pandemicGlowStyle, layout.readyGlowStyle or Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle, layout.iconShape),
+				get = function() return cdp.ENTRY.NormalizeGlowStyleForIconShape(layout.pandemicGlowStyle, layout.readyGlowStyle or Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle, layout.iconShape) end,
 				set = function(_, value) applyEditLayout(panelId, "pandemicGlowStyle", value) end,
 				generator = function(_, root)
-					for _, option in ipairs(CooldownPanels:GetGlowStyleOptions(panelId)) do
+					for _, option in ipairs(CooldownPanels:GetGlowStyleOptions(panelId, layout)) do
 						local label = L[option.labelKey] or option.fallback
 						root:CreateRadio(
 							label,
-							function() return Helper.NormalizeGlowStyle(layout.pandemicGlowStyle, layout.readyGlowStyle or Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle) == option.value end,
+							function() return cdp.ENTRY.NormalizeGlowStyleForIconShape(layout.pandemicGlowStyle, layout.readyGlowStyle or Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle, layout.iconShape) == option.value end,
 							function() applyEditLayout(panelId, "pandemicGlowStyle", option.value) end
 						)
 					end

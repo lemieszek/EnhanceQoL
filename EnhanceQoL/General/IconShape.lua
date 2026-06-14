@@ -15,9 +15,11 @@ IconShape.SQUARE = "SQUARE"
 IconShape.ROUND = "ROUND"
 IconShape.STAR = "STAR"
 IconShape.HEXAGON = "HEXAGON"
+IconShape.DIAMOND = "DIAMOND"
 IconShape.HEXAGON_MASK_TEXTURE = "Interface\\AddOns\\Blizzard_SharedTalentUI\\talents-hexagon-mask.png"
 IconShape.ROUND_MASK_TEXTURE = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
 IconShape.STAR_MASK_TEXTURE = "Interface\\AddOns\\EnhanceQoL\\Assets\\StarShape.tga"
+IconShape.DIAMOND_MASK_TEXTURE = "Interface\\AddOns\\EnhanceQoL\\Assets\\diamond_mask.tga"
 IconShape.DEFAULT_SWIPE_TEXTURE = "Interface\\Buttons\\WHITE8X8"
 
 function IconShape.Normalize(value, fallback)
@@ -26,12 +28,14 @@ function IconShape.Normalize(value, fallback)
 	if normalized == IconShape.ROUND or normalized == "CIRCLE" then return IconShape.ROUND end
 	if normalized == IconShape.SQUARE then return IconShape.SQUARE end
 	if normalized == IconShape.STAR then return IconShape.STAR end
+	if normalized == IconShape.DIAMOND then return IconShape.DIAMOND end
 	if normalized == IconShape.DEFAULT or normalized == "NONE" then return IconShape.DEFAULT end
 	local normalizedFallback = type(fallback) == "string" and strupper(fallback) or nil
 	if normalizedFallback == IconShape.HEXAGON or normalizedFallback == "HEX" then return IconShape.HEXAGON end
 	if normalizedFallback == IconShape.ROUND or normalizedFallback == "CIRCLE" then return IconShape.ROUND end
 	if normalizedFallback == IconShape.SQUARE then return IconShape.SQUARE end
 	if normalizedFallback == IconShape.STAR then return IconShape.STAR end
+	if normalizedFallback == IconShape.DIAMOND then return IconShape.DIAMOND end
 	return IconShape.DEFAULT
 end
 
@@ -44,6 +48,7 @@ function IconShape.GetOptions(localeTable, opts)
 		{ value = IconShape.ROUND, label = (localeTable and localeTable["settingsIconShapeRound"]) or "Round" },
 		{ value = IconShape.STAR, label = (localeTable and localeTable["settingsIconShapeStar"]) or "Star" },
 		{ value = IconShape.HEXAGON, label = (localeTable and localeTable["settingsIconShapeHexagon"]) or "Hexagon" },
+		{ value = IconShape.DIAMOND, label = (localeTable and localeTable["settingsIconShapeDiamond"]) or "Diamond" },
 	}
 	if not next(excluded) then return options end
 
@@ -60,6 +65,7 @@ function IconShape.GetMaskTexture(shape)
 	if shape == IconShape.ROUND then return IconShape.ROUND_MASK_TEXTURE end
 	if shape == IconShape.STAR then return IconShape.STAR_MASK_TEXTURE end
 	if shape == IconShape.HEXAGON then return IconShape.HEXAGON_MASK_TEXTURE end
+	if shape == IconShape.DIAMOND then return IconShape.DIAMOND_MASK_TEXTURE end
 	return nil
 end
 
@@ -116,6 +122,7 @@ function IconShape.GetCooldownSwipeTexture(shape, blizzardSwipeTexture)
 	if shape == IconShape.HEXAGON then return IconShape.HEXAGON_MASK_TEXTURE end
 	if shape == IconShape.ROUND then return IconShape.ROUND_MASK_TEXTURE end
 	if shape == IconShape.STAR then return IconShape.STAR_MASK_TEXTURE end
+	if shape == IconShape.DIAMOND then return IconShape.DIAMOND_MASK_TEXTURE end
 	if shape == IconShape.SQUARE then return IconShape.DEFAULT_SWIPE_TEXTURE end
 	if type(blizzardSwipeTexture) == "string" and blizzardSwipeTexture ~= "" then return blizzardSwipeTexture end
 	return IconShape.DEFAULT_SWIPE_TEXTURE

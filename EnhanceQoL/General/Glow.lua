@@ -35,6 +35,9 @@ Glow.STYLE.AUTOCAST = Glow.STYLE.SHINE
 local BLIZZARD_GLOW_TEXTURE = [[Interface\SpellActivationOverlay\IconAlert]]
 local BLIZZARD_ANTS_TEXTURE = [[Interface\SpellActivationOverlay\IconAlertAnts]]
 local PIXEL_GLOW_TEXTURE = [[Interface\Buttons\WHITE8X8]]
+local HEXAGON_BORDER_TEXTURE = [[Interface\AddOns\EnhanceQoL\Assets\hexagon_1px.tga]]
+local DIAMOND_GLOW_TEXTURE = [[Interface\AddOns\EnhanceQoL\Assets\diamond_glow.tga]]
+local ROUND_PULSING_ATLAS = "ChallengeMode-KeystoneSlotFrameGlow"
 local MARCHING_ANTS_ATLAS = "VisualAlert_Ants_Flipbook"
 local FLASH_GLOW_ATLAS = "UI-CooldownManager-VisualAlert-Glow"
 local BLIZZ_CONTAINER_RATIO = 66 / 45
@@ -79,6 +82,38 @@ local function normalizeStyle(style)
 	if normalized == "SHINE" or normalized == "AUTOCAST" or normalized == "AUTOCAST_SHINE" then return Glow.STYLE.SHINE end
 	if normalized == "PROC" or normalized == "PROC_GLOW" then return Glow.STYLE.PROC end
 	return Glow.STYLE.BLIZZARD
+end
+
+local function isHexagonShape(opts)
+	local shape = type(opts) == "table" and opts.shape or nil
+	if addon.IconShape and addon.IconShape.Normalize then
+		return addon.IconShape.Normalize(shape) == addon.IconShape.HEXAGON
+	end
+	return type(shape) == "string" and shape:upper() == "HEXAGON"
+end
+
+local function isRoundShape(opts)
+	local shape = type(opts) == "table" and opts.shape or nil
+	if addon.IconShape and addon.IconShape.Normalize then
+		return addon.IconShape.Normalize(shape) == addon.IconShape.ROUND
+	end
+	if type(shape) ~= "string" then return false end
+	shape = shape:upper()
+	return shape == "ROUND" or shape == "CIRCLE"
+end
+
+local function isDiamondShape(opts)
+	local shape = type(opts) == "table" and opts.shape or nil
+	if addon.IconShape and addon.IconShape.Normalize then
+		return addon.IconShape.Normalize(shape) == addon.IconShape.DIAMOND
+	end
+	return type(shape) == "string" and shape:upper() == "DIAMOND"
+end
+
+local function setFullTexture(texture, path)
+	if not texture then return end
+	texture:SetTexture(path)
+	if texture.SetTexCoord then texture:SetTexCoord(0, 1, 0, 1) end
 end
 
 local function roundOffset(value)
@@ -755,6 +790,14 @@ local function ensurePulsingOverlay(host)
 		if texture.SetBlendMode then texture:SetBlendMode("ADD") end
 		overlay.lines[i] = texture
 	end
+	overlay.shapeTextures = {}
+	for i = 1, 3 do
+		local texture = overlay:CreateTexture(nil, "OVERLAY")
+		texture:SetTexture(HEXAGON_BORDER_TEXTURE)
+		if texture.SetBlendMode then texture:SetBlendMode("ADD") end
+		texture:Hide()
+		overlay.shapeTextures[i] = texture
+	end
 
 	local anim = overlay:CreateAnimationGroup()
 	anim:SetLooping("BOUNCE")
@@ -794,11 +837,109 @@ local function updatePulsingOverlay(host, opts)
 
 	overlay:SetParent(host)
 	overlay:SetFrameStrata(host:GetFrameStrata())
+	if isHexagonShape(opts) or isRoundShape(opts) or isDiamondShape(opts) then frameLevel = max(frameLevel, 8) end
 	overlay:SetFrameLevel(max(0, (host:GetFrameLevel() or 0) + frameLevel))
 	overlay:ClearAllPoints()
 	overlay:SetPoint("TOPLEFT", host, "TOPLEFT", -inset + xOffset, inset + yOffset)
 	overlay:SetPoint("BOTTOMRIGHT", host, "BOTTOMRIGHT", inset + xOffset, -inset + yOffset)
 	overlay:SetAlpha(color[4])
+
+	if isHexagonShape(opts) then
+		for i = 1, 4 do
+			overlay.lines[i]:Hide()
+		end
+		local width, height = getSafeFrameSize(host)
+		width = max(1, width + (inset * 2))
+		height = max(1, height + (inset * 2))
+		local layers = overlay.shapeTextures or {}
+		local alphas = { 0.18, 0.35, 1 }
+		for i = 1, 3 do
+			local texture = layers[i]
+			if texture then
+				local grow = (3 - i) * max(1, thickness)
+				setFullTexture(texture, HEXAGON_BORDER_TEXTURE)
+				texture:ClearAllPoints()
+				texture:SetPoint("CENTER", overlay, "CENTER", 0, 0)
+				texture:SetSize(width + (grow * 2), height + (grow * 2))
+				texture:SetVertexColor(color[1], color[2], color[3], alphas[i])
+				texture:Show()
+			end
+		end
+		if overlay.AlphaAnim then
+			local frequency = normalizeScalar(opts, "frequency", 0.25) or 0.25
+			overlay.AlphaAnim:SetFromAlpha(color[4] * 0.35)
+			overlay.AlphaAnim:SetToAlpha(color[4])
+			overlay.AlphaAnim:SetDuration(max(0.05, frequency * 2))
+		end
+		return overlay
+	end
+
+	if isDiamondShape(opts) then
+		for i = 1, 4 do
+			overlay.lines[i]:Hide()
+		end
+		local width, height = getSafeFrameSize(host)
+		width = max(1, width + (inset * 2))
+		height = max(1, height + (inset * 2))
+		local layers = overlay.shapeTextures or {}
+		local alphas = { 0.18, 0.35, 1 }
+		for i = 1, 3 do
+			local texture = layers[i]
+			if texture then
+				local grow = (3 - i) * max(1, thickness)
+				setFullTexture(texture, DIAMOND_GLOW_TEXTURE)
+				texture:ClearAllPoints()
+				texture:SetPoint("CENTER", overlay, "CENTER", 0, 0)
+				texture:SetSize(width + (grow * 2), height + (grow * 2))
+				texture:SetVertexColor(color[1], color[2], color[3], alphas[i])
+				texture:Show()
+			end
+		end
+		if overlay.AlphaAnim then
+			local frequency = normalizeScalar(opts, "frequency", 0.25) or 0.25
+			overlay.AlphaAnim:SetFromAlpha(color[4] * 0.35)
+			overlay.AlphaAnim:SetToAlpha(color[4])
+			overlay.AlphaAnim:SetDuration(max(0.05, frequency * 2))
+		end
+		return overlay
+	end
+
+	if isRoundShape(opts) then
+		for i = 1, 4 do
+			overlay.lines[i]:Hide()
+		end
+		local width, height = getSafeFrameSize(host)
+		width = max(1, width + (inset * 2) + (thickness * 4))
+		height = max(1, height + (inset * 2) + (thickness * 4))
+		local layers = overlay.shapeTextures or {}
+		for i = 2, #layers do
+			layers[i]:Hide()
+		end
+		local texture = layers[1]
+		if texture then
+			texture:ClearAllPoints()
+			texture:SetPoint("CENTER", overlay, "CENTER", 0, 0)
+			texture:SetSize(width, height)
+			if texture.SetAtlas then
+				texture:SetAtlas(ROUND_PULSING_ATLAS, false)
+			else
+				texture:SetTexture(nil)
+			end
+			texture:SetVertexColor(color[1], color[2], color[3], 1)
+			texture:Show()
+		end
+		if overlay.AlphaAnim then
+			local frequency = normalizeScalar(opts, "frequency", 0.25) or 0.25
+			overlay.AlphaAnim:SetFromAlpha(color[4] * 0.35)
+			overlay.AlphaAnim:SetToAlpha(color[4])
+			overlay.AlphaAnim:SetDuration(max(0.05, frequency * 2))
+		end
+		return overlay
+	end
+
+	for i = 1, #(overlay.shapeTextures or {}) do
+		overlay.shapeTextures[i]:Hide()
+	end
 
 	local top, right, bottom, left = overlay.lines[1], overlay.lines[2], overlay.lines[3], overlay.lines[4]
 	top:ClearAllPoints()
