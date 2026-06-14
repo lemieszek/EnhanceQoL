@@ -208,6 +208,7 @@ Helper.PANEL_LAYOUT_DEFAULTS = {
 	hideOnCooldown = false,
 	showOnCooldown = false,
 	showIconTexture = true,
+	iconShape = "DEFAULT",
 	iconBorderEnabled = false,
 	iconBorderTexture = "DEFAULT",
 	iconBorderSize = 1,
@@ -433,6 +434,11 @@ function Helper.NormalizeGlowStyle(style, fallback)
 end
 
 function Helper.NormalizeGlowInset(value, fallback) return Helper.ClampInt(value, -Helper.GLOW_INSET_RANGE, Helper.GLOW_INSET_RANGE, fallback) end
+
+function Helper.NormalizeIconShape(value, fallback)
+	if addon.IconShape and addon.IconShape.Normalize then return addon.IconShape.Normalize(value, fallback) end
+	return "DEFAULT"
+end
 
 function Helper.NormalizeGlowPixelCount(value, fallback) return Helper.ClampInt(value, 1, 32, fallback) end
 
@@ -2268,6 +2274,7 @@ function Helper.NormalizePanel(panel, defaults)
 	panel.layout.iconSizeSeparate = panel.layout.iconSizeSeparate == true
 	panel.layout.iconWidth = Helper.ClampInt(panel.layout.iconWidth, 12, 128, panel.layout.iconSize or layoutDefaults.iconWidth or Helper.PANEL_LAYOUT_DEFAULTS.iconWidth or 36)
 	panel.layout.iconHeight = Helper.ClampInt(panel.layout.iconHeight, 12, 128, panel.layout.iconSize or layoutDefaults.iconHeight or Helper.PANEL_LAYOUT_DEFAULTS.iconHeight or 36)
+	panel.layout.iconShape = Helper.NormalizeIconShape(panel.layout.iconShape, layoutDefaults.iconShape or Helper.PANEL_LAYOUT_DEFAULTS.iconShape)
 	panel.layout.spacing = Helper.ClampInt(panel.layout.spacing, 0, Helper.SPACING_RANGE or 200, layoutDefaults.spacing or Helper.PANEL_LAYOUT_DEFAULTS.spacing or 2)
 	panel.layout.radialArcDegrees = Helper.ClampInt(
 		panel.layout.radialArcDegrees,

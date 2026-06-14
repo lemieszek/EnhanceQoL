@@ -1602,6 +1602,9 @@ cdp.ICON_BORDER = cdp.ICON_BORDER or {
 	DEFAULT = "DEFAULT",
 	BLIZZARD = "BLIZZARD",
 	BLIZZARD_ALIAS = "ORIGINAL_BLIZZARD",
+	SHAPE_METAL_LIGHT = "SHAPE_ATLAS_CHARACTERCREATE_RING_METALLIGHT",
+	SHAPE_COMMUNITIES_BLUE = "SHAPE_ATLAS_COMMUNITIES_RING_BLUE",
+	SHAPE_HEXAGON_1PX = "SHAPE_TEXTURE_HEXAGON_1PX",
 	OVERLAY_ATLAS = "UI-HUD-CoolDownManager-IconOverlay",
 	MASK_ATLAS = "UI-HUD-CoolDownManager-Mask",
 	DEFAULT_SWIPE_TEXTURE = "Interface\\Buttons\\WHITE8X8",
@@ -1611,8 +1614,52 @@ cdp.ICON_BORDER = cdp.ICON_BORDER or {
 	OVERLAY_OFFSET_X_NUDGE = 0,
 	ICON_BOTTOM_INSET = 2,
 }
+cdp.ICON_SHAPE = cdp.ICON_SHAPE or addon.IconShape or { DEFAULT = "DEFAULT", SQUARE = "SQUARE", ROUND = "ROUND", STAR = "STAR", HEXAGON = "HEXAGON" }
+cdp.ICON_BORDER.SHAPE_ATLASES = cdp.ICON_BORDER.SHAPE_ATLASES or {
+	[cdp.ICON_BORDER.SHAPE_METAL_LIGHT] = {
+		atlas = "charactercreate-ring-metallight",
+		labelKey = "CooldownPanelIconBorderCharacterCreateMetalLight",
+		label = "Metal light ring",
+		shapes = { ROUND = true },
+	},
+	[cdp.ICON_BORDER.SHAPE_COMMUNITIES_BLUE] = {
+		atlas = "communities-ring-blue",
+		labelKey = "CooldownPanelIconBorderCommunitiesRingBlue",
+		label = "Communities blue ring",
+		shapes = { ROUND = true },
+	},
+	[cdp.ICON_BORDER.SHAPE_HEXAGON_1PX] = {
+		texture = "Interface\\AddOns\\EnhanceQoL\\Assets\\Hexagon_1px.tga",
+		labelKey = "CooldownPanelIconBorderHexagon1px",
+		label = "Hexagon 1 px",
+		shapes = { HEXAGON = true },
+		thicknessMode = "layers",
+		tint = true,
+	},
+}
+cdp.ICON_BORDER.SHAPE_ATLAS_ORDER = cdp.ICON_BORDER.SHAPE_ATLAS_ORDER or {
+	cdp.ICON_BORDER.SHAPE_METAL_LIGHT,
+	cdp.ICON_BORDER.SHAPE_COMMUNITIES_BLUE,
+	cdp.ICON_BORDER.SHAPE_HEXAGON_1PX,
+}
 
-local function iconBorderOptions()
+function cdp.ENTRY.IsIconShapeBackdropBorderCompatible(shape)
+	shape = cdp.ENTRY.NormalizeIconShape(shape, Helper.PANEL_LAYOUT_DEFAULTS.iconShape)
+	return shape == cdp.ICON_SHAPE.DEFAULT or shape == cdp.ICON_SHAPE.SQUARE
+end
+
+function cdp.ENTRY.IsShapeIconBorderTexture(value)
+	return type(value) == "string" and cdp.ICON_BORDER.SHAPE_ATLASES[value] ~= nil
+end
+
+function cdp.ENTRY.IsShapeIconBorderCompatible(value, shape)
+	local info = type(value) == "string" and cdp.ICON_BORDER.SHAPE_ATLASES[value] or nil
+	if not info then return false end
+	shape = cdp.ENTRY.NormalizeIconShape(shape, Helper.PANEL_LAYOUT_DEFAULTS.iconShape)
+	return type(info.shapes) ~= "table" or info.shapes[shape] == true
+end
+
+local function iconBorderOptions(shape)
 	local list = {}
 	local seen = {}
 	local function add(value, label)
@@ -1620,6 +1667,13 @@ local function iconBorderOptions()
 		if lv == "" or seen[lv] then return end
 		seen[lv] = true
 		list[#list + 1] = { value = value, label = label or value }
+	end
+	if not cdp.ENTRY.IsIconShapeBackdropBorderCompatible(shape) then
+		for _, value in ipairs(cdp.ICON_BORDER.SHAPE_ATLAS_ORDER) do
+			local info = cdp.ICON_BORDER.SHAPE_ATLASES[value]
+			if cdp.ENTRY.IsShapeIconBorderCompatible(value, shape) then add(value, L[info.labelKey] or info.label) end
+		end
+		return list
 	end
 	add(cdp.ICON_BORDER.DEFAULT, _G.DEFAULT or (L and L["Default"]) or "Default")
 	add(cdp.ICON_BORDER.BLIZZARD, L["CooldownPanelIconBorderBlizzard"] or "Original Blizzard")
@@ -1633,7 +1687,17 @@ local function iconBorderOptions()
 	return list
 end
 
-local function normalizeIconBorderTexture(value, fallback)
+local function normalizeIconBorderTexture(value, fallback, shape)
+	if not cdp.ENTRY.IsIconShapeBackdropBorderCompatible(shape) then
+		if cdp.ENTRY.IsShapeIconBorderCompatible(value, shape) then return value end
+		if cdp.ENTRY.IsShapeIconBorderCompatible(fallback, shape) then return fallback end
+		for _, shapeValue in ipairs(cdp.ICON_BORDER.SHAPE_ATLAS_ORDER) do
+			if cdp.ENTRY.IsShapeIconBorderCompatible(shapeValue, shape) then return shapeValue end
+		end
+		return cdp.ICON_BORDER.DEFAULT
+	end
+	if cdp.ENTRY.IsShapeIconBorderTexture(value) then value = nil end
+	if cdp.ENTRY.IsShapeIconBorderTexture(fallback) then fallback = nil end
 	if type(value) == "string" and value ~= "" then
 		local upperValue = strupper(value)
 		if upperValue == cdp.ICON_BORDER.BLIZZARD or upperValue == cdp.ICON_BORDER.BLIZZARD_ALIAS then return cdp.ICON_BORDER.BLIZZARD end
@@ -1641,6 +1705,26 @@ local function normalizeIconBorderTexture(value, fallback)
 	end
 	if type(fallback) == "string" and fallback ~= "" then return fallback end
 	return cdp.ICON_BORDER.DEFAULT
+end
+
+function cdp.ENTRY.SupportsIconBorderSize(value, shape)
+	local textureKey = normalizeIconBorderTexture(value, Helper.PANEL_LAYOUT_DEFAULTS.iconBorderTexture, shape)
+	if cdp.ENTRY.IsIconShapeBackdropBorderCompatible(shape) then return not cdp.ENTRY.IsBlizzardIconBorderTexture(textureKey) end
+	local info = cdp.ICON_BORDER.SHAPE_ATLASES[textureKey]
+	return info and info.thicknessMode == "layers"
+end
+
+function cdp.ENTRY.NormalizeIconShape(value, fallback)
+	if addon.IconShape and addon.IconShape.Normalize then return addon.IconShape.Normalize(value, fallback) end
+	return Helper.NormalizeIconShape(value, fallback)
+end
+
+function cdp.ENTRY.GetIconShapeOptions()
+	if addon.IconShape and addon.IconShape.GetOptions then return addon.IconShape.GetOptions(L, { exclude = { STAR = true } }) end
+	return {
+		{ value = "DEFAULT", label = L["settingsIconShapeDefault"] or _G.DEFAULT or "Default" },
+		{ value = "HEXAGON", label = L["settingsIconShapeHexagon"] or "Hexagon" },
+	}
 end
 
 function cdp.ENTRY.IsBlizzardIconBorderTexture(value)
@@ -1704,6 +1788,7 @@ local function clearRuntimeLayoutShapeCache(runtime)
 	runtime._eqolLayoutIconSizeSeparate = nil
 	runtime._eqolLayoutIconWidth = nil
 	runtime._eqolLayoutIconHeight = nil
+	runtime._eqolLayoutIconShape = nil
 	runtime._eqolLayoutSpacing = nil
 	runtime._eqolLayoutMode = nil
 	runtime._eqolLayoutDirection = nil
@@ -1778,6 +1863,7 @@ local function didLayoutShapeChange(runtime, layout, layoutCount)
 		and runtime._eqolLayoutIconSizeSeparate == layout.iconSizeSeparate
 		and runtime._eqolLayoutIconWidth == layout.iconWidth
 		and runtime._eqolLayoutIconHeight == layout.iconHeight
+		and runtime._eqolLayoutIconShape == layout.iconShape
 		and runtime._eqolLayoutSpacing == layout.spacing
 		and runtime._eqolLayoutMode == layout.layoutMode
 		and runtime._eqolLayoutDirection == layout.direction
@@ -1811,6 +1897,7 @@ local function didLayoutShapeChange(runtime, layout, layoutCount)
 	runtime._eqolLayoutIconSizeSeparate = layout.iconSizeSeparate
 	runtime._eqolLayoutIconWidth = layout.iconWidth
 	runtime._eqolLayoutIconHeight = layout.iconHeight
+	runtime._eqolLayoutIconShape = layout.iconShape
 	runtime._eqolLayoutSpacing = layout.spacing
 	runtime._eqolLayoutMode = layout.layoutMode
 	runtime._eqolLayoutDirection = layout.direction
@@ -7536,10 +7623,12 @@ function CooldownPanels:ApplyEntryIconVisualLayout(icon, layout, entry, panel, f
 	offsetY = offsetY + (fixedOffsetY or 0)
 	local currentWidth, currentHeight = icon:GetSize()
 	local previewBlingSize = icon.previewBling and (size * 1.5) or nil
+	local iconShape = cdp.ENTRY.NormalizeIconShape(layout and layout.iconShape, Helper.PANEL_LAYOUT_DEFAULTS.iconShape)
 	if
 		icon._eqolVisualSize == size
 		and icon._eqolVisualWidth == width
 		and icon._eqolVisualHeight == height
+		and icon._eqolVisualShape == iconShape
 		and currentWidth == width
 		and currentHeight == height
 		and icon._eqolVisualAnchor == slotAnchor
@@ -7576,6 +7665,8 @@ function CooldownPanels:ApplyEntryIconVisualLayout(icon, layout, entry, panel, f
 		end
 	end
 	CooldownPanels.UpdatePreviewGlowBorderLayout(icon, size)
+	cdp.ENTRY.ApplyIconShape(icon, layout)
+	icon._eqolVisualShape = iconShape
 	if icon.previewBling then
 		if icon.previewBling._eqolVisualAnchor ~= icon then
 			icon.previewBling:ClearAllPoints()
@@ -7780,6 +7871,7 @@ function cdp.RUNTIME.HasPlacementChange(icon, snapshot, data, fixedLayoutCache, 
 		or snapshot.layoutIconSizeSeparate ~= (layout and layout.iconSizeSeparate)
 		or snapshot.layoutIconWidth ~= (layout and layout.iconWidth)
 		or snapshot.layoutIconHeight ~= (layout and layout.iconHeight)
+		or snapshot.layoutIconShape ~= (layout and layout.iconShape)
 		or snapshot.layoutSpacing ~= (layout and layout.spacing)
 		or snapshot.fixedLocalIndex ~= fixedLocalIndex
 		or snapshot.fixedCount ~= fixedCount
@@ -7810,6 +7902,7 @@ function cdp.RUNTIME.WritePlacementSnapshot(icon, snapshot, data, fixedLayoutCac
 	snapshot.layoutIconSizeSeparate = layout and layout.iconSizeSeparate or nil
 	snapshot.layoutIconWidth = layout and layout.iconWidth or nil
 	snapshot.layoutIconHeight = layout and layout.iconHeight or nil
+	snapshot.layoutIconShape = layout and layout.iconShape or nil
 	snapshot.layoutSpacing = layout and layout.spacing or nil
 	snapshot.fixedLocalIndex = fixedLocalIndex
 	snapshot.fixedCount = fixedCount
@@ -8165,6 +8258,7 @@ local function createIconFrame(parent)
 	icon.cooldown = CreateFrame("Cooldown", nil, icon, "CooldownFrameTemplate")
 	icon.cooldown:SetAllPoints(icon)
 	icon.cooldown:SetHideCountdownNumbers(true)
+	icon.cooldown._eqolOwnerIcon = icon
 
 	icon.overlay = CreateFrame("Frame", nil, icon)
 	icon.overlay:SetAllPoints(icon)
@@ -8449,6 +8543,7 @@ local function setGlow(frame, enabled, glowColor, glowKey, glowCondition, glowAl
 		state.pixelCount = nil
 		state.pixelSpeed = nil
 		state.pixelThickness = nil
+		state.shape = nil
 		state.condition = nil
 		state.alphaOn = nil
 		state.alphaOff = nil
@@ -8477,6 +8572,7 @@ local function setGlow(frame, enabled, glowColor, glowKey, glowCondition, glowAl
 		and state.pixelCount == requestedPixelCount
 		and state.pixelSpeed == requestedPixelSpeed
 		and state.pixelThickness == requestedPixelThickness
+		and state.shape == frame._eqolGlowShape
 		and not hasSecretCondition
 		and state.condition == glowCondition
 		and state.alphaOn == alphaOn
@@ -8512,6 +8608,7 @@ local function setGlow(frame, enabled, glowColor, glowKey, glowCondition, glowAl
 			count = pixelCount,
 			frequency = pixelSpeed,
 			thickness = pixelThickness,
+			shape = frame._eqolGlowShape,
 		})
 	end
 	state.enabled = true
@@ -8521,6 +8618,7 @@ local function setGlow(frame, enabled, glowColor, glowKey, glowCondition, glowAl
 	state.pixelCount = pixelCount
 	state.pixelSpeed = pixelSpeed
 	state.pixelThickness = pixelThickness
+	state.shape = frame._eqolGlowShape
 	state.requestedColorR = requestedColorR
 	state.requestedColorG = requestedColorG
 	state.requestedColorB = requestedColorB
@@ -10355,9 +10453,12 @@ end
 
 local function setCooldownDrawState(cooldown, drawEdge, drawBling, drawSwipe)
 	if not cooldown then return end
-	if cooldown.SetDrawEdge and cooldown._eqolDrawEdge ~= drawEdge then
-		cooldown:SetDrawEdge(drawEdge)
-		cooldown._eqolDrawEdge = drawEdge
+	local owner = cooldown._eqolOwnerIcon
+	local effectiveDrawEdge = drawEdge
+	if owner and not cdp.ENTRY.IsIconShapeBackdropBorderCompatible(owner._eqolIconShape) then effectiveDrawEdge = false end
+	if cooldown.SetDrawEdge and cooldown._eqolDrawEdge ~= effectiveDrawEdge then
+		cooldown:SetDrawEdge(effectiveDrawEdge)
+		cooldown._eqolDrawEdge = effectiveDrawEdge
 	end
 	if cooldown.SetDrawBling and cooldown._eqolDrawBling ~= drawBling then
 		cooldown:SetDrawBling(drawBling)
@@ -10378,45 +10479,28 @@ function cdp.ENTRY.GetCooldownSwipeColor(data)
 	return 1, 1, 1, 1
 end
 
+function cdp.ENTRY.GetCooldownSwipeTexture(icon)
+	local iconShape = addon.IconShape
+	if iconShape and iconShape.GetCooldownSwipeTexture then
+		return iconShape.GetCooldownSwipeTexture(icon and icon._eqolIconShape, icon and icon._eqolBlizzardIconBorderEnabled == true and cdp.ICON_BORDER.SWIPE_TEXTURE or nil)
+	end
+	return cdp.ICON_BORDER.DEFAULT_SWIPE_TEXTURE
+end
+
 function cdp.ENTRY.ApplyCooldownSwipeVisual(icon, data)
 	if not (icon and icon.cooldown) then return end
-	local r, g, b, a = cdp.ENTRY.GetCooldownSwipeColor(data)
-	local needsCustomSwipeColor = data and (data.activationOverlayActive == true or data.resolvedType == "CDM_AURA") or false
-	if icon.cooldown.SetSwipeTexture and icon._eqolBlizzardSwipeTextureApplied then
-		if icon._eqolSwipeTextureR ~= r or icon._eqolSwipeTextureG ~= g or icon._eqolSwipeTextureB ~= b or icon._eqolSwipeTextureA ~= a then
-			local ok = pcall(icon.cooldown.SetSwipeTexture, icon.cooldown, cdp.ICON_BORDER.SWIPE_TEXTURE, r, g, b, a)
-			if ok then
-				icon._eqolSwipeTextureR, icon._eqolSwipeTextureG, icon._eqolSwipeTextureB, icon._eqolSwipeTextureA = r, g, b, a
-			end
-		end
-	end
-	if needsCustomSwipeColor and icon.cooldown.SetSwipeColor then
-		if icon._eqolSwipeColorR ~= r or icon._eqolSwipeColorG ~= g or icon._eqolSwipeColorB ~= b or icon._eqolSwipeColorA ~= a then
-			icon.cooldown:SetSwipeColor(r, g, b, a)
-			icon._eqolSwipeColorR, icon._eqolSwipeColorG, icon._eqolSwipeColorB, icon._eqolSwipeColorA = r, g, b, a
-		end
-	elseif not needsCustomSwipeColor then
-		if icon.cooldown.SetSwipeColor and icon._eqolSwipeColorR ~= nil then icon.cooldown:SetSwipeColor(0, 0, 0, 0.8) end
-		icon._eqolSwipeColorR, icon._eqolSwipeColorG, icon._eqolSwipeColorB, icon._eqolSwipeColorA = nil, nil, nil, nil
-	end
-	if needsCustomSwipeColor and icon.cooldown.SetSwipeTexture and not icon._eqolBlizzardSwipeTextureApplied then
-		local ok = pcall(icon.cooldown.SetSwipeTexture, icon.cooldown, cdp.ICON_BORDER.SWIPE_TEXTURE, r, g, b, a)
-		if ok then
-			icon._eqolBlizzardSwipeTextureApplied = true
-			icon._eqolSwipeTextureR, icon._eqolSwipeTextureG, icon._eqolSwipeTextureB, icon._eqolSwipeTextureA = r, g, b, a
-		end
+	if addon.IconShape and addon.IconShape.ApplyCooldownSwipeVisual then
+		addon.IconShape.ApplyCooldownSwipeVisual(icon.cooldown, icon, cdp.ENTRY.GetCooldownSwipeColor, data, {
+			blizzardSwipeTexture = icon._eqolBlizzardIconBorderEnabled == true and cdp.ICON_BORDER.SWIPE_TEXTURE or nil,
+			customColor = data and (data.activationOverlayActive == true or data.resolvedType == "CDM_AURA") or false,
+		})
 	end
 end
 
 function cdp.ENTRY.ResetCooldownSwipeVisual(icon)
 	if not (icon and icon.cooldown) then return end
-	if icon.cooldown.SetSwipeTexture then
-		pcall(icon.cooldown.SetSwipeTexture, icon.cooldown, cdp.ICON_BORDER.DEFAULT_SWIPE_TEXTURE, 0, 0, 0, 0.8)
-	end
-	if icon.cooldown.SetSwipeColor then icon.cooldown:SetSwipeColor(0, 0, 0, 0.8) end
+	if addon.IconShape and addon.IconShape.ResetCooldownSwipeVisual then addon.IconShape.ResetCooldownSwipeVisual(icon.cooldown, icon) end
 	icon._eqolBlizzardSwipeTextureApplied = nil
-	icon._eqolSwipeTextureR, icon._eqolSwipeTextureG, icon._eqolSwipeTextureB, icon._eqolSwipeTextureA = nil, nil, nil, nil
-	icon._eqolSwipeColorR, icon._eqolSwipeColorG, icon._eqolSwipeColorB, icon._eqolSwipeColorA = nil, nil, nil, nil
 end
 
 function cdp.ENTRY.EnsureBlizzardIconOverlay(icon)
@@ -10433,23 +10517,18 @@ end
 
 function cdp.ENTRY.ApplyBlizzardCooldownMask(icon, maskTexture)
 	local cooldown = icon and icon.cooldown
-	if not (cooldown and cooldown.GetRegions and cooldown.GetNumRegions) then return end
-	for index = 1, cooldown:GetNumRegions() do
-		local region = select(index, cooldown:GetRegions())
-		if region then
-			if maskTexture then
-				if region.AddMaskTexture and region._eqolBlizzardCooldownMask ~= maskTexture then
-					if region._eqolBlizzardCooldownMask and region.RemoveMaskTexture then
-						pcall(region.RemoveMaskTexture, region, region._eqolBlizzardCooldownMask)
-					end
-					local ok = pcall(region.AddMaskTexture, region, maskTexture)
-					region._eqolBlizzardCooldownMask = ok and maskTexture or nil
-				end
-			elseif region._eqolBlizzardCooldownMask and region.RemoveMaskTexture then
-				pcall(region.RemoveMaskTexture, region, region._eqolBlizzardCooldownMask)
-				region._eqolBlizzardCooldownMask = nil
-			end
-		end
+	if addon.IconShape and addon.IconShape.ApplyCooldownRegionMask then addon.IconShape.ApplyCooldownRegionMask(cooldown, maskTexture, "_eqolBlizzardCooldownMask") end
+end
+
+function cdp.ENTRY.ApplyIconShape(icon, layout)
+	if not icon then return end
+	local shape = cdp.ENTRY.NormalizeIconShape(layout and layout.iconShape, Helper.PANEL_LAYOUT_DEFAULTS.iconShape)
+	if addon.IconShape and addon.IconShape.ApplyFrameShape then
+		addon.IconShape.ApplyFrameShape(icon, shape, {
+			textures = { icon.texture, icon.editorGhostTexture, icon.rangeOverlay, icon.stateTexture, icon.stateTextureSecond },
+			cooldown = icon.cooldown,
+			refreshSwipe = function(frame) cdp.ENTRY.ApplyCooldownSwipeVisual(frame, frame._eqolRuntimeData) end,
+		})
 	end
 end
 
@@ -10536,17 +10615,100 @@ function cdp.ENTRY.ApplyBlizzardIconSkin(icon)
 			icon._eqolBlizzardCooldownWidth = nil
 			icon._eqolBlizzardCooldownHeight = nil
 		end
-		if icon.cooldown.SetSwipeTexture then
-			local runtimeData = icon._eqolRuntimeData
-			local r, g, b, a = cdp.ENTRY.GetCooldownSwipeColor(runtimeData)
-			local ok = pcall(icon.cooldown.SetSwipeTexture, icon.cooldown, cdp.ICON_BORDER.SWIPE_TEXTURE, r, g, b, a)
-			if ok then
-				icon._eqolBlizzardSwipeTextureApplied = true
-				icon._eqolSwipeTextureR, icon._eqolSwipeTextureG, icon._eqolSwipeTextureB, icon._eqolSwipeTextureA = r, g, b, a
-			end
-		end
 		cdp.ENTRY.ApplyCooldownSwipeVisual(icon, icon._eqolRuntimeData)
 	end
+end
+
+function cdp.ENTRY.HideIconShapeBorder(border)
+	if border and border.shapeBorderTexture then border.shapeBorderTexture:Hide() end
+	if border and border.shapeBorderTextures then
+		for i = 1, #border.shapeBorderTextures do
+			border.shapeBorderTextures[i]:Hide()
+		end
+	end
+end
+
+function cdp.ENTRY.EnsureIconShapeBorderTexture(border, index)
+	if not border then return nil end
+	border.shapeBorderTextures = border.shapeBorderTextures or {}
+	local texture = border.shapeBorderTextures[index]
+	if not texture and index == 1 and border.shapeBorderTexture then
+		texture = border.shapeBorderTexture
+		border.shapeBorderTextures[index] = texture
+	end
+	if not texture then
+		texture = border:CreateTexture(nil, "OVERLAY")
+		border.shapeBorderTextures[index] = texture
+		if index == 1 then border.shapeBorderTexture = texture end
+	end
+	return texture
+end
+
+function cdp.ENTRY.GetIconShapeBorderLayerOffset(index)
+	if index <= 1 then return 0, 0 end
+	local remaining = index - 2
+	local radius = 1
+	while remaining >= radius * 8 do
+		remaining = remaining - (radius * 8)
+		radius = radius + 1
+	end
+	local side = math.floor(remaining / (radius * 2))
+	local step = remaining % (radius * 2)
+	if side == 0 then return -radius + step, -radius end
+	if side == 1 then return radius, -radius + step end
+	if side == 2 then return radius - step, radius end
+	return -radius, radius - step
+end
+
+function cdp.ENTRY.ApplyIconShapeBorder(icon, border, textureKey, layout, defaults)
+	local info = cdp.ICON_BORDER.SHAPE_ATLASES[textureKey]
+	if not (icon and border and info) then return false end
+	local color = Helper.NormalizeColor(layout.iconBorderColor, defaults.iconBorderColor)
+	local offset = Helper.ClampInt(layout.iconBorderOffset, -64, 64, defaults.iconBorderOffset or 0)
+	local edgeSize = Helper.ClampInt(layout.iconBorderSize, 1, 64, defaults.iconBorderSize or 1)
+	if border._eqolBorderOffset ~= offset then
+		border:ClearAllPoints()
+		border:SetPoint("TOPLEFT", icon, "TOPLEFT", -offset, offset)
+		border:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", offset, -offset)
+		border._eqolBorderOffset = offset
+	end
+	if border.SetBackdrop then pcall(border.SetBackdrop, border, nil) end
+	border._eqolBorderEdgeFile = nil
+	border._eqolBorderEdgeSize = nil
+
+	local layerCount = info.thicknessMode == "layers" and math.min(edgeSize, 24) or 1
+	for i = 1, layerCount do
+		local texture = cdp.ENTRY.EnsureIconShapeBorderTexture(border, i)
+		if texture then
+			if info.atlas then
+				local ok = texture.SetAtlas and pcall(texture.SetAtlas, texture, info.atlas, false)
+				if not ok then
+					texture:Hide()
+				end
+			elseif info.texture then
+				texture:SetTexture(info.texture)
+			end
+			local layerX, layerY = cdp.ENTRY.GetIconShapeBorderLayerOffset(i)
+			texture:ClearAllPoints()
+			texture:SetPoint("TOPLEFT", border, "TOPLEFT", layerX, -layerY)
+			texture:SetPoint("BOTTOMRIGHT", border, "BOTTOMRIGHT", layerX, -layerY)
+			if info.tint == true then
+				texture:SetVertexColor(color[1] or 1, color[2] or 1, color[3] or 1, color[4] or 1)
+			else
+				texture:SetVertexColor(1, 1, 1, color[4] or 1)
+			end
+			texture:Show()
+		end
+	end
+	for i = layerCount + 1, #(border.shapeBorderTextures or {}) do
+		border.shapeBorderTextures[i]:Hide()
+	end
+	border._eqolShapeBorderAtlas = info.atlas
+	border._eqolShapeBorderTexture = info.texture
+	border._eqolShapeBorderEdgeSize = edgeSize
+	border._eqolIconBorderEnabled = true
+	border:Show()
+	return true
 end
 
 local function applyIconBorder(icon, layout)
@@ -10557,18 +10719,29 @@ local function applyIconBorder(icon, layout)
 	border._eqolIconBorderEnabled = nil
 	if not enabled then
 		cdp.ENTRY.ClearBlizzardIconSkin(icon)
+		cdp.ENTRY.HideIconShapeBorder(border)
 		border:Hide()
 		return
 	end
 
-	local textureKey = normalizeIconBorderTexture(layout.iconBorderTexture, defaults.iconBorderTexture)
+	local iconShape = cdp.ENTRY.NormalizeIconShape(layout.iconShape, defaults.iconShape)
+	local textureKey = normalizeIconBorderTexture(layout.iconBorderTexture, defaults.iconBorderTexture, iconShape)
 	if cdp.ENTRY.IsBlizzardIconBorderTexture(textureKey) then
+		cdp.ENTRY.HideIconShapeBorder(border)
 		border:Hide()
-		cdp.ENTRY.ApplyBlizzardIconSkin(icon)
+		if iconShape == cdp.ICON_SHAPE.DEFAULT then
+			cdp.ENTRY.ApplyBlizzardIconSkin(icon)
+		else
+			cdp.ENTRY.ClearBlizzardIconSkin(icon)
+		end
 		return
 	end
 
 	cdp.ENTRY.ClearBlizzardIconSkin(icon)
+	if cdp.ENTRY.IsShapeIconBorderCompatible(textureKey, iconShape) then
+		if cdp.ENTRY.ApplyIconShapeBorder(icon, border, textureKey, layout, defaults) then return end
+	end
+	cdp.ENTRY.HideIconShapeBorder(border)
 	border._eqolIconBorderEnabled = true
 	local edgeSize = Helper.ClampInt(layout.iconBorderSize, 1, 64, defaults.iconBorderSize or 1)
 	local offset = Helper.ClampInt(layout.iconBorderOffset, -64, 64, defaults.iconBorderOffset or 0)
@@ -10764,6 +10937,7 @@ local function applyIconLayout(frame, count, layout)
 		icon._eqolVisualSize = nil
 		icon._eqolVisualWidth = nil
 		icon._eqolVisualHeight = nil
+		icon._eqolVisualShape = nil
 		icon._eqolVisualAnchor = nil
 		icon._eqolVisualOffsetX = nil
 		icon._eqolVisualOffsetY = nil
@@ -21647,10 +21821,12 @@ applyEditLayout = function(panelId, field, value, skipRefresh)
 		layout.showTooltips = value == true
 	elseif field == "showIconTexture" then
 		layout.showIconTexture = value ~= false
+	elseif field == "iconShape" then
+		layout.iconShape = cdp.ENTRY.NormalizeIconShape(value, Helper.PANEL_LAYOUT_DEFAULTS.iconShape)
 	elseif field == "iconBorderEnabled" then
 		layout.iconBorderEnabled = value == true
 	elseif field == "iconBorderTexture" then
-		layout.iconBorderTexture = normalizeIconBorderTexture(value, layout.iconBorderTexture or Helper.PANEL_LAYOUT_DEFAULTS.iconBorderTexture)
+		layout.iconBorderTexture = normalizeIconBorderTexture(value, layout.iconBorderTexture or Helper.PANEL_LAYOUT_DEFAULTS.iconBorderTexture, layout.iconShape)
 	elseif field == "iconBorderSize" then
 		layout.iconBorderSize = Helper.ClampInt(value, 1, 64, layout.iconBorderSize or Helper.PANEL_LAYOUT_DEFAULTS.iconBorderSize)
 	elseif field == "iconBorderOffset" then
@@ -22527,6 +22703,25 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				set = function(_, value) applyEditLayout(panelId, "showIconTexture", value) end,
 			},
 			{
+				name = L["settingsIconShapeLabel"] or "Icon shape",
+				kind = SettingType.Dropdown,
+				field = "iconShape",
+				parentId = "cooldownPanelDisplay",
+				height = 80,
+				default = cdp.ENTRY.NormalizeIconShape(layout.iconShape, Helper.PANEL_LAYOUT_DEFAULTS.iconShape),
+				get = function() return cdp.ENTRY.NormalizeIconShape(layout.iconShape, Helper.PANEL_LAYOUT_DEFAULTS.iconShape) end,
+				set = function(_, value) applyEditLayout(panelId, "iconShape", value) end,
+				generator = function(_, root)
+					for _, option in ipairs(cdp.ENTRY.GetIconShapeOptions()) do
+						root:CreateRadio(
+							option.label,
+							function() return cdp.ENTRY.NormalizeIconShape(layout.iconShape, Helper.PANEL_LAYOUT_DEFAULTS.iconShape) == option.value end,
+							function() applyEditLayout(panelId, "iconShape", option.value) end
+						)
+					end
+				end,
+			},
+			{
 				name = L["CooldownPanelIconBorder"] or "Icon border",
 				kind = SettingType.CheckboxColor,
 				field = "iconBorderEnabled",
@@ -22546,14 +22741,14 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				parentId = "cooldownPanelDisplay",
 				height = 180,
 				disabled = function() return layout.iconBorderEnabled ~= true end,
-				default = normalizeIconBorderTexture(layout.iconBorderTexture, Helper.PANEL_LAYOUT_DEFAULTS.iconBorderTexture),
-				get = function() return normalizeIconBorderTexture(layout.iconBorderTexture, Helper.PANEL_LAYOUT_DEFAULTS.iconBorderTexture) end,
+				default = normalizeIconBorderTexture(layout.iconBorderTexture, Helper.PANEL_LAYOUT_DEFAULTS.iconBorderTexture, layout.iconShape),
+				get = function() return normalizeIconBorderTexture(layout.iconBorderTexture, Helper.PANEL_LAYOUT_DEFAULTS.iconBorderTexture, layout.iconShape) end,
 				set = function(_, value) applyEditLayout(panelId, "iconBorderTexture", value) end,
 				generator = function(_, root)
-					for _, option in ipairs(iconBorderOptions()) do
+					for _, option in ipairs(iconBorderOptions(layout.iconShape)) do
 						root:CreateRadio(
 							option.label,
-							function() return normalizeIconBorderTexture(layout.iconBorderTexture, Helper.PANEL_LAYOUT_DEFAULTS.iconBorderTexture) == option.value end,
+							function() return normalizeIconBorderTexture(layout.iconBorderTexture, Helper.PANEL_LAYOUT_DEFAULTS.iconBorderTexture, layout.iconShape) == option.value end,
 							function() applyEditLayout(panelId, "iconBorderTexture", option.value) end
 						)
 					end
@@ -22569,7 +22764,10 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				maxValue = 64,
 				valueStep = 1,
 				allowInput = true,
-				disabled = function() return layout.iconBorderEnabled ~= true or cdp.ENTRY.IsBlizzardIconBorderTexture(layout.iconBorderTexture) end,
+				disabled = function()
+					return layout.iconBorderEnabled ~= true
+						or not cdp.ENTRY.SupportsIconBorderSize(layout.iconBorderTexture, layout.iconShape)
+				end,
 				get = function() return Helper.ClampInt(layout.iconBorderSize, 1, 64, Helper.PANEL_LAYOUT_DEFAULTS.iconBorderSize) end,
 				set = function(_, value) applyEditLayout(panelId, "iconBorderSize", value) end,
 				formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
