@@ -59,6 +59,258 @@ function IconShape.GetOptions(localeTable, opts)
 	return filtered
 end
 
+IconShape.BORDER = IconShape.BORDER or {
+	NONE = "NONE",
+	ROUND_METAL_LIGHT = "SHAPE_ATLAS_CHARACTERCREATE_RING_METALLIGHT",
+	ROUND_COMMUNITIES_BLUE = "SHAPE_ATLAS_COMMUNITIES_RING_BLUE",
+	HEXAGON_1PX = "SHAPE_TEXTURE_HEXAGON_1PX",
+	DIAMOND_1PX = "SHAPE_TEXTURE_DIAMOND_1PX",
+}
+
+IconShape.BORDER_DEFINITIONS = IconShape.BORDER_DEFINITIONS or {
+	[IconShape.BORDER.ROUND_METAL_LIGHT] = {
+		atlas = "charactercreate-ring-metallight",
+		labelKey = "CooldownPanelIconBorderCharacterCreateMetalLight",
+		label = "Metal light ring",
+		shapes = { ROUND = true },
+	},
+	[IconShape.BORDER.ROUND_COMMUNITIES_BLUE] = {
+		atlas = "communities-ring-blue",
+		labelKey = "CooldownPanelIconBorderCommunitiesRingBlue",
+		label = "Communities blue ring",
+		shapes = { ROUND = true },
+	},
+	[IconShape.BORDER.HEXAGON_1PX] = {
+		texture = "Interface\\AddOns\\EnhanceQoL\\Assets\\hexagon_1px.tga",
+		labelKey = "CooldownPanelIconBorderHexagon1px",
+		label = "Hexagon 1 px",
+		shapes = { HEXAGON = true },
+		thicknessMode = "layers",
+		tint = true,
+	},
+	[IconShape.BORDER.DIAMOND_1PX] = {
+		texture = "Interface\\AddOns\\EnhanceQoL\\Assets\\diamond_border.tga",
+		labelKey = "CooldownPanelIconBorderDiamond1px",
+		label = "Diamond 1 px",
+		shapes = { DIAMOND = true },
+		thicknessMode = "layers",
+		tint = true,
+	},
+}
+
+IconShape.BORDER_ORDER = IconShape.BORDER_ORDER or {
+	IconShape.BORDER.ROUND_METAL_LIGHT,
+	IconShape.BORDER.ROUND_COMMUNITIES_BLUE,
+	IconShape.BORDER.HEXAGON_1PX,
+	IconShape.BORDER.DIAMOND_1PX,
+}
+
+function IconShape.IsBackdropBorderCompatible(shape)
+	shape = IconShape.Normalize(shape)
+	return shape == IconShape.DEFAULT or shape == IconShape.SQUARE
+end
+
+function IconShape.GetBorderInfo(value)
+	if type(value) ~= "string" then return nil end
+	return IconShape.BORDER_DEFINITIONS[value]
+end
+
+function IconShape.IsShapeBorder(value)
+	return IconShape.GetBorderInfo(value) ~= nil
+end
+
+function IconShape.IsNoBorder(value)
+	return type(value) == "string" and strupper(value) == IconShape.BORDER.NONE
+end
+
+function IconShape.IsBorderCompatible(value, shape)
+	local info = IconShape.GetBorderInfo(value)
+	if not info then return false end
+	shape = IconShape.Normalize(shape)
+	return type(info.shapes) ~= "table" or info.shapes[shape] == true
+end
+
+function IconShape.SupportsBorderSize(value, shape)
+	if IconShape.IsNoBorder(value) then return false end
+	if IconShape.IsBackdropBorderCompatible(shape) then return true end
+	local info = IconShape.GetBorderInfo(value)
+	return info and info.thicknessMode == "layers" or false
+end
+
+function IconShape.SupportsBorderOffset(value, shape)
+	if IconShape.IsNoBorder(value) then return false end
+	if IconShape.IsBackdropBorderCompatible(shape) then return true end
+	value = IconShape.NormalizeBorder(value, nil, shape)
+	return IconShape.IsBorderCompatible(value, shape) == true
+end
+
+function IconShape.HideBorderTextures(owner, opts)
+	opts = opts or {}
+	local textures = owner and owner[opts.texturesKey or "_eqolIconShapeBorderTextures"]
+	if not textures then return end
+	for i = 1, #textures do
+		if textures[i] then textures[i]:Hide() end
+	end
+end
+
+function IconShape.EnsureBorderTexture(owner, index, opts)
+	if not owner then return nil end
+	opts = opts or {}
+	local key = opts.texturesKey or "_eqolIconShapeBorderTextures"
+	owner[key] = owner[key] or {}
+	local texture = owner[key][index]
+	if not texture and index == 1 and opts.primaryTexture then
+		texture = opts.primaryTexture
+		owner[key][index] = texture
+	end
+	if not texture then
+		local parent = opts.parent or owner
+		if not (parent and parent.CreateTexture) then return nil end
+		texture = parent:CreateTexture(nil, opts.drawLayer or "OVERLAY")
+		owner[key][index] = texture
+	end
+	if texture.SetDrawLayer and opts.drawLayer then texture:SetDrawLayer(opts.drawLayer, opts.subLevel or 1) end
+	return texture
+end
+
+function IconShape.GetBorderLayerOffset(index)
+	if index <= 1 then return 0, 0 end
+	local remaining = index - 2
+	local radius = 1
+	while remaining >= radius * 8 do
+		remaining = remaining - (radius * 8)
+		radius = radius + 1
+	end
+	local side = math.floor(remaining / (radius * 2))
+	local step = remaining % (radius * 2)
+	if side == 0 then return -radius + step, -radius end
+	if side == 1 then return radius, -radius + step end
+	if side == 2 then return radius - step, radius end
+	return -radius, radius - step
+end
+
+function IconShape.ApplyBorder(owner, borderKey, shape, opts)
+	opts = opts or {}
+	shape = IconShape.Normalize(shape)
+	borderKey = IconShape.NormalizeBorder(borderKey, opts.fallbackBorderKey, shape, opts)
+	local info = IconShape.GetBorderInfo(borderKey)
+	if not (owner and info and IconShape.IsBorderCompatible(borderKey, shape)) then return false end
+
+	local borderSize = tonumber(opts.borderSize) or 1
+	if borderSize < 1 then borderSize = 1 end
+	local borderOffset = tonumber(opts.borderOffset) or 0
+	if borderOffset < -64 then borderOffset = -64 end
+	if borderOffset > 64 then borderOffset = 64 end
+	local pointFrame = opts.pointFrame or owner
+	local color = opts.color or { 1, 1, 1, 1 }
+	local layerCount = info.thicknessMode == "layers" and math.min(math.floor(borderSize + 0.5), 24) or 1
+
+	for i = 1, layerCount do
+		local texture = IconShape.EnsureBorderTexture(owner, i, opts)
+		if texture then
+			if info.atlas and texture.SetAtlas then
+				texture:SetAtlas(info.atlas, false)
+			elseif info.texture then
+				texture:SetTexture(info.texture)
+				if texture.SetTexCoord then texture:SetTexCoord(0, 1, 0, 1) end
+			else
+				texture:Hide()
+			end
+			local layerX, layerY = IconShape.GetBorderLayerOffset(i)
+			texture:ClearAllPoints()
+			texture:SetPoint("TOPLEFT", pointFrame, "TOPLEFT", -borderOffset + layerX, borderOffset - layerY)
+			texture:SetPoint("BOTTOMRIGHT", pointFrame, "BOTTOMRIGHT", borderOffset + layerX, -borderOffset - layerY)
+			if info.tint == true then
+				texture:SetVertexColor(color[1] or 1, color[2] or 1, color[3] or 1, color[4] or 1)
+			else
+				texture:SetVertexColor(1, 1, 1, color[4] or 1)
+			end
+			texture:Show()
+		end
+	end
+
+	local textures = owner[opts.texturesKey or "_eqolIconShapeBorderTextures"]
+	for i = layerCount + 1, #(textures or {}) do
+		if textures[i] then textures[i]:Hide() end
+	end
+	return true, borderKey, info
+end
+
+function IconShape.GetFirstBorderForShape(shape)
+	shape = IconShape.Normalize(shape)
+	for _, value in ipairs(IconShape.BORDER_ORDER) do
+		if IconShape.IsBorderCompatible(value, shape) then return value end
+	end
+	return nil
+end
+
+function IconShape.NormalizeBorder(value, fallback, shape, opts)
+	opts = opts or {}
+	shape = IconShape.Normalize(shape)
+	if opts.allowNone and IconShape.IsNoBorder(value) then return IconShape.BORDER.NONE end
+	if opts.allowNone and IconShape.IsNoBorder(fallback) then fallback = nil end
+	if not IconShape.IsBackdropBorderCompatible(shape) then
+		if IconShape.IsBorderCompatible(value, shape) then return value end
+		if IconShape.IsBorderCompatible(fallback, shape) then return fallback end
+		return IconShape.GetFirstBorderForShape(shape) or (opts.emptyValue or "DEFAULT")
+	end
+	if IconShape.IsShapeBorder(value) then value = nil end
+	if IconShape.IsShapeBorder(fallback) then fallback = nil end
+	if type(value) == "string" and value ~= "" then return value end
+	if type(fallback) == "string" and fallback ~= "" then return fallback end
+	return opts.emptyValue or "DEFAULT"
+end
+
+function IconShape.GetBorderOptions(localeTable, shape, opts)
+	opts = opts or {}
+	shape = IconShape.Normalize(shape, IconShape.DEFAULT)
+	local list = {}
+	local seen = {}
+	local function add(value, label)
+		local key = tostring(value or ""):lower()
+		if key == "" or seen[key] then return end
+		seen[key] = true
+		list[#list + 1] = { value = value, label = label or value }
+	end
+
+	if not IconShape.IsBackdropBorderCompatible(shape) then
+		if opts.includeNone then add(IconShape.BORDER.NONE, opts.noneLabel or _G.NONE or "None") end
+		for _, value in ipairs(IconShape.BORDER_ORDER) do
+			local info = IconShape.GetBorderInfo(value)
+			if info and IconShape.IsBorderCompatible(value, shape) then add(value, (localeTable and localeTable[info.labelKey]) or info.label) end
+		end
+		return list
+	end
+
+	local defaultOptions = opts.defaultOptions
+	if type(defaultOptions) == "table" then
+		for _, option in ipairs(defaultOptions) do
+			add(option.value, option.label)
+		end
+	elseif opts.includeDefault ~= false then
+		add(opts.defaultValue or "DEFAULT", opts.defaultLabel or _G.DEFAULT or "Default")
+	end
+
+	if opts.includeLSM ~= false then
+		local names = opts.lsmNames
+		local hash = opts.lsmHash
+		if (not names or not hash) and addon.functions then
+			names = addon.functions.GetLSMMediaNames and addon.functions.GetLSMMediaNames(opts.lsmType or "border")
+			hash = addon.functions.GetLSMMediaHash and addon.functions.GetLSMMediaHash(opts.lsmType or "border")
+		end
+		names = type(names) == "table" and names or {}
+		hash = type(hash) == "table" and hash or {}
+		for i = 1, #names do
+			local name = names[i]
+			local path = hash[name]
+			if type(path) == "string" and path ~= "" then add(name, tostring(name)) end
+		end
+	end
+
+	if opts.sort == true then table.sort(list, function(a, b) return tostring(a.label) < tostring(b.label) end) end
+	return list
+end
+
 function IconShape.GetMaskTexture(shape)
 	shape = IconShape.Normalize(shape)
 	if shape == IconShape.SQUARE then return IconShape.DEFAULT_SWIPE_TEXTURE end

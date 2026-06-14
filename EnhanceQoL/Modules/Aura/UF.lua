@@ -2035,6 +2035,7 @@ local defaults = {
 			borderRenderMode = "EDGE",
 			borderSize = nil,
 			borderOffset = 0,
+			iconShape = "DEFAULT",
 			showTooltip = true,
 			hidePermanentAuras = false,
 			anchor = "BOTTOM",
@@ -4190,6 +4191,110 @@ function AuraUtil.styleAuraDRText(btn, ac, drFontSizeOverride)
 	end
 end
 
+function AuraUtil.NormalizeIconShape(value, fallback)
+	if addon.IconShape and addon.IconShape.Normalize then return addon.IconShape.Normalize(value, fallback) end
+	local normalized = type(value) == "string" and value:upper() or nil
+	if normalized == "HEXAGON" or normalized == "HEX" then return "HEXAGON" end
+	if normalized == "ROUND" or normalized == "CIRCLE" then return "ROUND" end
+	if normalized == "SQUARE" then return "SQUARE" end
+	if normalized == "DIAMOND" then return "DIAMOND" end
+	local normalizedFallback = type(fallback) == "string" and fallback:upper() or nil
+	if normalizedFallback == "HEXAGON" or normalizedFallback == "HEX" then return "HEXAGON" end
+	if normalizedFallback == "ROUND" or normalizedFallback == "CIRCLE" then return "ROUND" end
+	if normalizedFallback == "SQUARE" then return "SQUARE" end
+	if normalizedFallback == "DIAMOND" then return "DIAMOND" end
+	return "DEFAULT"
+end
+
+function AuraUtil.IsIconShapeBackdropBorderCompatible(shape)
+	if addon.IconShape and addon.IconShape.IsBackdropBorderCompatible then return addon.IconShape.IsBackdropBorderCompatible(shape) end
+	shape = AuraUtil.NormalizeIconShape(shape, "DEFAULT")
+	return shape == "DEFAULT" or shape == "SQUARE"
+end
+
+function AuraUtil.HideIconShapeBorderTextures(btn)
+	local textures = btn and btn._eqolAuraShapeBorderTextures
+	if not textures then return end
+	for i = 1, #textures do
+		if textures[i] then textures[i]:Hide() end
+	end
+end
+
+function AuraUtil.EnsureIconShapeBorderTexture(btn, index)
+	if not btn then return nil end
+	btn._eqolAuraShapeBorderTextures = btn._eqolAuraShapeBorderTextures or {}
+	local texture = btn._eqolAuraShapeBorderTextures[index]
+	if not texture and index == 1 and btn.border then
+		texture = btn.border
+		btn._eqolAuraShapeBorderTextures[index] = texture
+	end
+	if not texture then
+		local parent = btn.overlay or btn
+		texture = parent:CreateTexture(nil, "OVERLAY")
+		texture:SetDrawLayer("OVERLAY", 1)
+		btn._eqolAuraShapeBorderTextures[index] = texture
+	end
+	return texture
+end
+
+function AuraUtil.GetIconShapeBorderLayerOffset(index)
+	if index <= 1 then return 0, 0 end
+	local remaining = index - 2
+	local radius = 1
+	while remaining >= radius * 8 do
+		remaining = remaining - (radius * 8)
+		radius = radius + 1
+	end
+	local side = math.floor(remaining / (radius * 2))
+	local step = remaining % (radius * 2)
+	if side == 0 then return -radius + step, -radius end
+	if side == 1 then return radius, -radius + step end
+	if side == 2 then return radius - step, radius end
+	return -radius, radius - step
+end
+
+function AuraUtil.ApplyIconShape(btn, shape)
+	if not btn then return end
+	shape = AuraUtil.NormalizeIconShape(shape, "DEFAULT")
+	if addon.IconShape and addon.IconShape.ApplyFrameShape then
+		addon.IconShape.ApplyFrameShape(btn, shape, {
+			textures = { btn.icon },
+			cooldown = btn.cd,
+			maskKey = "_eqolAuraIconShapeMask",
+			textureMaskKey = "_eqolAuraIconShapeRegionMask",
+			refreshSwipe = function(button)
+				if addon.IconShape and addon.IconShape.ApplyCooldownSwipeVisual then
+					addon.IconShape.ApplyCooldownSwipeVisual(button.cd, button, nil, nil, { customColor = false })
+				end
+			end,
+		})
+	end
+end
+
+function AuraUtil.ApplyIconShapeBorder(btn, ac, r, g, b, a)
+	if not (btn and btn.border) then return false end
+	local shape = AuraUtil.NormalizeIconShape(ac and ac.iconShape, "DEFAULT")
+	local borderKey = ac and ac.borderTexture
+	if addon.IconShape and addon.IconShape.NormalizeBorder then borderKey = addon.IconShape.NormalizeBorder(borderKey, nil, shape, { allowNone = true }) end
+	if not (addon.IconShape and addon.IconShape.GetBorderInfo and addon.IconShape.GetBorderInfo(borderKey)) then return false end
+	local borderSize = (UFHelper and UFHelper.calcAuraBorderSize and UFHelper.calcAuraBorderSize(btn, ac)) or 1
+	local borderOffset = tonumber(ac and ac.borderOffset) or 0
+	if UFHelper and UFHelper.hideAuraBorderFrame then UFHelper.hideAuraBorderFrame(btn) end
+	btn._eqolAuraBorderFrame = nil
+	btn._eqolAuraBorderRenderAsEdge = nil
+	return addon.IconShape.ApplyBorder(btn, borderKey, shape, {
+		borderSize = borderSize,
+		borderOffset = borderOffset,
+		color = { r or 1, g or 1, b or 1, a or 1 },
+		pointFrame = btn,
+		parent = btn.overlay or btn,
+		primaryTexture = btn.border,
+		texturesKey = "_eqolAuraShapeBorderTextures",
+		drawLayer = "OVERLAY",
+		allowNone = true,
+	})
+end
+
 function AuraUtil.getAuraButtonStyleKey(ac)
 	if type(ac) ~= "table" then return "" end
 	local fontVersion = addon.functions and addon.functions.GetGlobalFontStateVersion and addon.functions.GetGlobalFontStateVersion() or 0
@@ -4219,8 +4324,10 @@ function AuraUtil.getAuraButtonStyleKey(ac)
 		tostring(ac.cooldownFont),
 		tostring(ac.cooldownFontSize),
 		tostring(ac.cooldownFontOutline),
+		tostring(ac.iconShape),
 		tostring(ac.borderTexture),
 		tostring(ac.borderRenderMode),
+		tostring(ac.borderSize),
 		tostring(ac.borderOffset),
 		tostring(borderColor and (borderColor[1] or borderColor.r)),
 		tostring(borderColor and (borderColor[2] or borderColor.g)),
@@ -4259,9 +4366,10 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 	if showStacks == nil then showStacks = true end
 	local borderKey = ac and ac.borderTexture
 	local showBorder = isDebuff == true
+	local borderKeyName = borderKey and tostring(borderKey):upper() or "DEFAULT"
+	if borderKeyName == "NONE" then showBorder = false end
 	if not showBorder then
-		local borderKeyName = borderKey and tostring(borderKey):upper() or "DEFAULT"
-		showBorder = borderKeyName ~= "" and borderKeyName ~= "DEFAULT"
+		showBorder = borderKeyName ~= "" and borderKeyName ~= "DEFAULT" and borderKeyName ~= "NONE"
 	end
 	if canShowPlayerDispel == nil then canShowPlayerDispel = AuraUtil.CanUnitShowPlayerDispel(unitToken, aura.isSample) end
 	local canUseStaticSignature = not needsCooldown and not showStacks and not showBorder and not (ac and ac.blizzardDispelBorder == true) and not (ac and ac.showDR == true)
@@ -4287,10 +4395,12 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 	btn.isDebuff = isDebuff
 	btn._showTooltip = ac.showTooltip ~= false
 	btn.icon:SetTexture(aura.icon or "")
+	AuraUtil.ApplyIconShape(btn, ac and ac.iconShape)
 	btn.cd:Clear()
 	local drawCooldownEdge = ac.showCooldownEdge ~= false
 	local drawCooldownSwipe = ac.showCooldownSwipe ~= false
 	local drawCooldownBling = ac.showCooldownBling ~= false
+	if not AuraUtil.IsIconShapeBackdropBorderCompatible(ac and ac.iconShape) then drawCooldownEdge = false end
 	local hasCooldown = false
 	if btn.cd.SetDrawEdge then btn.cd:SetDrawEdge(false) end
 	if btn.cd.SetDrawSwipe then btn.cd:SetDrawSwipe(false) end
@@ -4314,6 +4424,7 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 	if btn.cd.SetDrawEdge then btn.cd:SetDrawEdge(hasCooldown and showCooldown and drawCooldownEdge) end
 	if btn.cd.SetDrawSwipe then btn.cd:SetDrawSwipe(hasCooldown and showCooldown and drawCooldownSwipe) end
 	if btn.cd.SetDrawBling then btn.cd:SetDrawBling(hasCooldown and showCooldown and drawCooldownBling) end
+	AuraUtil.ApplyIconShape(btn, ac and ac.iconShape)
 	local cooldownFontSize = ac.cooldownFontSize
 	if cooldownFontSize ~= nil and cooldownFontSize < 1 then cooldownFontSize = nil end
 	local countFontSize = ac.countFontSize
@@ -4396,7 +4507,17 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 				btn._eqolAuraBorderStyleKey = styleKey
 				btn._eqolAuraBorderKey = borderKey
 				btn._eqolAuraBorderButtonSize = btn._eqolAuraButtonSize
-				if renderAsEdge and borderTex and borderTex ~= "" then
+				if not AuraUtil.IsIconShapeBackdropBorderCompatible(ac and ac.iconShape) then
+					if AuraUtil.ApplyIconShapeBorder(btn, ac, r, g, b, a) then
+						btn._eqolAuraBorderShape = ac and ac.iconShape
+					else
+						if UFHelper and UFHelper.hideAuraBorderFrame then UFHelper.hideAuraBorderFrame(btn) end
+						AuraUtil.HideIconShapeBorderTextures(btn)
+						btn._eqolAuraBorderFrame = nil
+						btn._eqolAuraBorderRenderAsEdge = nil
+					end
+				elseif renderAsEdge and borderTex and borderTex ~= "" then
+					AuraUtil.HideIconShapeBorderTextures(btn)
 					local borderFrame = UFHelper and UFHelper.ensureAuraBorderFrame and UFHelper.ensureAuraBorderFrame(btn)
 					btn._eqolAuraBorderFrame = borderFrame
 					if borderFrame then
@@ -4423,6 +4544,7 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 					end
 					btn.border:Hide()
 				else
+					AuraUtil.HideIconShapeBorderTextures(btn)
 					if UFHelper and UFHelper.hideAuraBorderFrame then UFHelper.hideAuraBorderFrame(btn) end
 					btn._eqolAuraBorderFrame = nil
 					btn.border:SetTexture(borderTex or "")
@@ -4445,7 +4567,15 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 					end
 				end
 			end
-			if btn._eqolAuraBorderRenderAsEdge then
+			if not AuraUtil.IsIconShapeBackdropBorderCompatible(ac and ac.iconShape) then
+				if AuraUtil.ApplyIconShapeBorder(btn, ac, r, g, b, a) then
+					btn._eqolAuraBorderShape = ac and ac.iconShape
+				else
+					if UFHelper and UFHelper.hideAuraBorderFrame then UFHelper.hideAuraBorderFrame(btn) end
+					AuraUtil.HideIconShapeBorderTextures(btn)
+				end
+			elseif btn._eqolAuraBorderRenderAsEdge then
+				AuraUtil.HideIconShapeBorderTextures(btn)
 				local borderFrame = btn._eqolAuraBorderFrame
 				if borderFrame then
 					borderFrame:SetBackdropBorderColor(r, g, b, a)
@@ -4453,6 +4583,7 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 				end
 				btn.border:Hide()
 			else
+				AuraUtil.HideIconShapeBorderTextures(btn)
 				btn.border:SetVertexColor(r, g, b, a)
 				btn.border:Show()
 			end
@@ -4463,6 +4594,7 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 			btn._eqolAuraBorderButtonSize = nil
 			btn._eqolAuraBorderRenderAsEdge = nil
 			btn._eqolAuraBorderFrame = nil
+			AuraUtil.HideIconShapeBorderTextures(btn)
 			btn.border:SetTexture(nil)
 			btn.border:Hide()
 		end
@@ -4759,6 +4891,8 @@ function AuraUtil.prepareSingleAuraSectionStyle(section)
 	if padding == nil then padding = tonumber(style.padding) end
 	style.padding = padding or 0
 	style.max = AuraUtil.normalizeAuraQueryLimit(style.max) or 16
+	style.iconShape = AuraUtil.NormalizeIconShape(style.iconShape, "DEFAULT")
+	if addon.IconShape and addon.IconShape.NormalizeBorder then style.borderTexture = addon.IconShape.NormalizeBorder(style.borderTexture, "DEFAULT", style.iconShape, { allowNone = true }) end
 	if style.showTooltip == nil then style.showTooltip = true end
 	if style.cooldownFontSize == nil or style.cooldownFontSize < 1 then style.cooldownFontSize = 12 end
 	return style
@@ -7686,16 +7820,7 @@ function UF.DataBar.GetText(mode, unit, cfg, def, cur, maxv, percentVal)
 	local dcfg = (cfg and cfg.dataBar) or {}
 	local ddef = (def and def.dataBar) or {}
 	if mode == "NAME" then
-		local text = (UnitName and UnitName(unit)) or UF.DataBar.GetFallbackName(unit)
-		local maxChars = tonumber(dcfg.nameMaxChars)
-		if maxChars == nil then maxChars = tonumber(ddef.nameMaxChars) end
-		if maxChars and maxChars > 0 and UFHelper and UFHelper.getNameLimitWidth and UFHelper.truncateTextToWidth then
-			local fontSize = dcfg.fontSize or ddef.fontSize or 12
-			local fontOutline = dcfg.fontOutline or ddef.fontOutline or "OUTLINE"
-			local maxWidth = UFHelper.getNameLimitWidth(dcfg.font or ddef.font, fontSize, fontOutline, maxChars)
-			if maxWidth and maxWidth > 0 then text = UFHelper.truncateTextToWidth(dcfg.font or ddef.font, fontSize, fontOutline, text, maxWidth) end
-		end
-		return text
+		return (UnitName and UnitName(unit)) or UF.DataBar.GetFallbackName(unit)
 	end
 	if mode == "LEVEL" then return (UFHelper and UFHelper.getUnitLevelText and UFHelper.getUnitLevelText(unit, nil, UF.ShouldHideClassificationText(cfg, unit))) or "" end
 	local delimiter, delimiter2, delimiter3 = UFHelper.getTextDelimiter(dcfg, ddef), UFHelper.getTextDelimiterSecondary(dcfg, ddef), UFHelper.getTextDelimiterTertiary(dcfg, ddef)
@@ -8129,6 +8254,31 @@ local function layoutTexts(bar, leftFS, centerFS, rightFS, cfg, width)
 		rightFS:SetPoint("RIGHT", bar, "RIGHT", rightCfg.x or 0, rightCfg.y or 0)
 		rightFS:SetJustifyH("RIGHT")
 	end
+end
+
+function UF.ApplyDataBarNameCharLimit(st, cfg, def)
+	if not st then return end
+	local maxChars = tonumber(cfg and cfg.nameMaxChars)
+	if maxChars == nil then maxChars = tonumber(def and def.nameMaxChars) end
+	maxChars = maxChars or 0
+	local width
+	if maxChars > 0 and UFHelper and UFHelper.getNameLimitWidth then
+		width = UFHelper.getNameLimitWidth(cfg and cfg.font or def and def.font, cfg and cfg.fontSize or def and def.fontSize or 12, cfg and cfg.fontOutline or def and def.fontOutline or "OUTLINE", maxChars)
+	end
+	local function apply(fontString, mode)
+		if not fontString then return end
+		if fontString.SetMaxLines then fontString:SetMaxLines(1) end
+		if fontString.SetWordWrap then fontString:SetWordWrap(false) end
+		if fontString.SetNonSpaceWrap then fontString:SetNonSpaceWrap(false) end
+		if tostring(mode or "NONE"):upper() == "NAME" and width and width > 0 then
+			fontString:SetWidth(width)
+		else
+			fontString:SetWidth(0)
+		end
+	end
+	apply(st.dataBarTextLeft, cfg and cfg.textLeft or def and def.textLeft or "NAME")
+	apply(st.dataBarTextCenter, cfg and cfg.textCenter or def and def.textCenter or "CURMAX")
+	apply(st.dataBarTextRight, cfg and cfg.textRight or def and def.textRight or "PERCENT")
 end
 
 setFrameLevelAbove = function(child, parent, offset)
@@ -9228,7 +9378,10 @@ local function layoutFrame(cfg, unit)
 	layoutTexts(healthSlot, st.healthTextLeft, st.healthTextCenter, st.healthTextRight, cfg.health, width)
 	layoutTexts(st.power, st.powerTextLeft, st.powerTextCenter, st.powerTextRight, cfg.power, width)
 	if st.secondaryPower then layoutTexts(st.secondaryPower, st.secondaryPowerTextLeft, st.secondaryPowerTextCenter, st.secondaryPowerTextRight, cfg.secondaryPower, width) end
-	if st.dataBar then layoutTexts(st.dataBar, st.dataBarTextLeft, st.dataBarTextCenter, st.dataBarTextRight, cfg.dataBar, frameWidth) end
+	if st.dataBar then
+		layoutTexts(st.dataBar, st.dataBarTextLeft, st.dataBarTextCenter, st.dataBarTextRight, cfg.dataBar, frameWidth)
+		UF.ApplyDataBarNameCharLimit(st, cfg.dataBar, (def and def.dataBar) or {})
+	end
 	if st.castBar and unit == UNIT.TARGET then applyCastLayout(cfg, unit) end
 
 	-- Apply border only around the bar region wrapper

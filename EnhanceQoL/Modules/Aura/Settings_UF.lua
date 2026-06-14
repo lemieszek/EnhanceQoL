@@ -597,6 +597,7 @@ local checkboxDropdown
 local slider
 local checkbox
 local borderOptions
+local iconShapeOptions
 
 local function appendUnitAuraSettings(list, unit, def, refreshSelf)
 	if not (unit == "player" or unit == "target" or unit == "focus" or isBossUnit(unit)) then return end
@@ -717,6 +718,21 @@ local function appendUnitAuraSettings(list, unit, def, refreshSelf)
 	end
 
 	local function getAuraAnchorValue(sectionKey) return getAuraSectionValue(sectionKey, { "anchor" }, auraDef.anchor or "BOTTOM") end
+	local function getAuraSectionShape(sectionKey)
+		if UF and UF.AuraUtil and UF.AuraUtil.NormalizeIconShape then
+			return UF.AuraUtil.NormalizeIconShape(getAuraSectionValue(sectionKey, { "iconShape" }, auraDef.iconShape or "DEFAULT"), auraDef.iconShape or "DEFAULT")
+		end
+		return getAuraSectionValue(sectionKey, { "iconShape" }, auraDef.iconShape or "DEFAULT")
+	end
+	local function getAuraBorderValue(sectionKey)
+		local shape = getAuraSectionShape(sectionKey)
+		local value = getAuraSectionValue(sectionKey, { "borderTexture" }, auraDef.borderTexture or "DEFAULT")
+		if addon.IconShape and addon.IconShape.NormalizeBorder then return addon.IconShape.NormalizeBorder(value, auraDef.borderTexture or "DEFAULT", shape, { allowNone = true }) end
+		return value
+	end
+	local function getAuraBorderOptions(sectionKey)
+		return borderOptions(getAuraSectionShape(sectionKey))
+	end
 
 	local function defaultAuraGrowth(sectionKey)
 		local anchor = getAuraAnchorValue(sectionKey)
@@ -730,9 +746,21 @@ local function appendUnitAuraSettings(list, unit, def, refreshSelf)
 
 		local function isSectionEnabled() return getAuraSectionValue(sectionKey, { "enabled" }, auraDef.enabled ~= false) == true end
 		local function isEdgeBorderMode()
-			local texture = tostring(getAuraSectionValue(sectionKey, { "borderTexture" }, auraDef.borderTexture or "DEFAULT") or "DEFAULT"):upper()
+			local shape = getAuraSectionShape(sectionKey)
+			local texture = tostring(getAuraBorderValue(sectionKey) or "DEFAULT"):upper()
+			if addon.IconShape and addon.IconShape.IsBackdropBorderCompatible and not addon.IconShape.IsBackdropBorderCompatible(shape) then
+				return isSectionEnabled() and addon.IconShape.SupportsBorderSize and addon.IconShape.SupportsBorderSize(texture, shape) == true
+			end
 			local mode = tostring(getAuraSectionValue(sectionKey, { "borderRenderMode" }, auraDef.borderRenderMode or "EDGE") or "EDGE"):upper()
 			return isSectionEnabled() and mode ~= "OVERLAY" and texture ~= "DEFAULT"
+		end
+		local function supportsBorderOffset()
+			local shape = getAuraSectionShape(sectionKey)
+			local texture = getAuraBorderValue(sectionKey)
+			if addon.IconShape and addon.IconShape.IsBackdropBorderCompatible and not addon.IconShape.IsBackdropBorderCompatible(shape) then
+				return isSectionEnabled() and addon.IconShape.SupportsBorderOffset and addon.IconShape.SupportsBorderOffset(texture, shape) == true
+			end
+			return isEdgeBorderMode()
 		end
 		local function isShowCooldown() return getAuraSectionValue(sectionKey, { "showCooldown" }, auraDef.showCooldown ~= false) ~= false end
 		local function isShowCooldownText()
@@ -846,6 +874,31 @@ local function appendUnitAuraSettings(list, unit, def, refreshSelf)
 		end, auraDef.size or 24, parentId, true)
 		list[#list].isEnabled = isSectionEnabled
 
+		list[#list + 1] = radioDropdown(
+			L["settingsIconShapeLabel"] or "Icon shape",
+			iconShapeOptions,
+			function()
+				if UF and UF.AuraUtil and UF.AuraUtil.NormalizeIconShape then
+					return UF.AuraUtil.NormalizeIconShape(getAuraSectionValue(sectionKey, { "iconShape" }, auraDef.iconShape or "DEFAULT"), auraDef.iconShape or "DEFAULT")
+				end
+				return getAuraSectionValue(sectionKey, { "iconShape" }, auraDef.iconShape or "DEFAULT")
+			end,
+			function(val)
+				if UF and UF.AuraUtil and UF.AuraUtil.NormalizeIconShape then val = UF.AuraUtil.NormalizeIconShape(val, "DEFAULT") end
+				setAuraSectionValue(sectionKey, { "iconShape" }, val or "DEFAULT")
+				if addon.IconShape and addon.IconShape.NormalizeBorder then
+					local border = getAuraSectionValue(sectionKey, { "borderTexture" }, auraDef.borderTexture or "DEFAULT")
+					setAuraSectionValue(sectionKey, { "borderTexture" }, addon.IconShape.NormalizeBorder(border, auraDef.borderTexture or "DEFAULT", val or "DEFAULT", { allowNone = true }))
+				end
+				refreshSelf()
+				refreshSettingsUI()
+				refreshAuras()
+			end,
+			auraDef.iconShape or "DEFAULT",
+			parentId
+		)
+		list[#list].isEnabled = isSectionEnabled
+
 		list[#list + 1] = slider(
 			labelPrefix .. " " .. (L["Aura per row"] or "per row"),
 			0,
@@ -904,9 +957,10 @@ local function appendUnitAuraSettings(list, unit, def, refreshSelf)
 
 		list[#list + 1] = checkboxDropdown(
 			L["Aura border texture"] or "Aura border texture",
-			borderOptions,
-			function() return getAuraSectionValue(sectionKey, { "borderTexture" }, auraDef.borderTexture or "DEFAULT") end,
+			function() return getAuraBorderOptions(sectionKey) end,
+			function() return getAuraBorderValue(sectionKey) end,
 			function(val)
+				if addon.IconShape and addon.IconShape.NormalizeBorder then val = addon.IconShape.NormalizeBorder(val, auraDef.borderTexture or "DEFAULT", getAuraSectionShape(sectionKey), { allowNone = true }) end
 				setAuraSectionValue(sectionKey, { "borderTexture" }, val or "DEFAULT")
 				refreshSelf()
 				refreshSettingsUI()
@@ -929,7 +983,10 @@ local function appendUnitAuraSettings(list, unit, def, refreshSelf)
 			refreshSettingsUI()
 			refreshAuras()
 		end, ((auraDef.borderRenderMode or "EDGE"):upper() == "OVERLAY") and "OVERLAY" or "EDGE", parentId)
-		list[#list].isEnabled = isSectionEnabled
+		list[#list].isEnabled = function()
+			local shape = getAuraSectionShape(sectionKey)
+			return isSectionEnabled() and (not addon.IconShape or not addon.IconShape.IsBackdropBorderCompatible or addon.IconShape.IsBackdropBorderCompatible(shape))
+		end
 
 		list[#list + 1] = slider(L["Border size (Edge)"] or "Border size (Edge)", 1, 64, 1, function()
 			local iconSize = getAuraSectionValue(sectionKey, { "size" }, auraDef.size or 24)
@@ -962,7 +1019,7 @@ local function appendUnitAuraSettings(list, unit, def, refreshSelf)
 			parentId,
 			true
 		)
-		list[#list].isEnabled = isEdgeBorderMode
+		list[#list].isEnabled = supportsBorderOffset
 
 		if isDebuff then
 			list[#list + 1] = checkbox(
@@ -1887,7 +1944,21 @@ local function textureOptions()
 end
 UF.ui.textureOptions = textureOptions
 
-function borderOptions()
+function borderOptions(shape)
+	local names, hash = getCachedLSMMedia("border")
+	if addon.IconShape and addon.IconShape.GetBorderOptions then
+		return addon.IconShape.GetBorderOptions(L, shape, {
+			defaultOptions = {
+				{ value = "DEFAULT", label = DEFAULT },
+				{ value = "SOLID", label = "Solid" },
+			},
+			lsmNames = names,
+			lsmHash = hash,
+			includeNone = true,
+			noneLabel = _G.NONE or "None",
+			sort = true,
+		})
+	end
 	local list = {}
 	local seen = {}
 	local function add(value, label)
@@ -1898,7 +1969,6 @@ function borderOptions()
 	end
 	add("DEFAULT", DEFAULT)
 	add("SOLID", "Solid")
-	local names, hash = getCachedLSMMedia("border")
 	for i = 1, #names do
 		local name = names[i]
 		local path = hash[name]
@@ -1906,6 +1976,17 @@ function borderOptions()
 	end
 	table.sort(list, function(a, b) return tostring(a.label) < tostring(b.label) end)
 	return list
+end
+
+function iconShapeOptions()
+	if addon.IconShape and addon.IconShape.GetOptions then return addon.IconShape.GetOptions(L) end
+	return {
+		{ value = "DEFAULT", label = L["settingsIconShapeDefault"] or DEFAULT or "Default" },
+		{ value = "SQUARE", label = L["settingsIconShapeSquare"] or "Square" },
+		{ value = "ROUND", label = L["settingsIconShapeRound"] or "Round" },
+		{ value = "HEXAGON", label = L["settingsIconShapeHexagon"] or "Hexagon" },
+		{ value = "DIAMOND", label = L["settingsIconShapeDiamond"] or "Diamond" },
+	}
 end
 
 function radioDropdown(name, options, getter, setter, default, parentId)

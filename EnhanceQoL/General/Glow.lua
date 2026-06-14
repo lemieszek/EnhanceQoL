@@ -963,7 +963,11 @@ local function updatePulsingOverlay(host, opts)
 	left:SetWidth(thickness)
 
 	for i = 1, 4 do
-		overlay.lines[i]:SetVertexColor(color[1], color[2], color[3], 1)
+		local line = overlay.lines[i]
+		line:SetTexture(PIXEL_GLOW_TEXTURE)
+		if line.SetTexCoord then line:SetTexCoord(0, 1, 0, 1) end
+		line:SetVertexColor(color[1], color[2], color[3], 1)
+		line:Show()
 	end
 	if overlay.AlphaAnim then
 		local frequency = normalizeScalar(opts, "frequency", 0.25) or 0.25

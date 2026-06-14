@@ -1611,10 +1611,10 @@ cdp.ICON_BORDER = cdp.ICON_BORDER or {
 	DEFAULT = "DEFAULT",
 	BLIZZARD = "BLIZZARD",
 	BLIZZARD_ALIAS = "ORIGINAL_BLIZZARD",
-	SHAPE_METAL_LIGHT = "SHAPE_ATLAS_CHARACTERCREATE_RING_METALLIGHT",
-	SHAPE_COMMUNITIES_BLUE = "SHAPE_ATLAS_COMMUNITIES_RING_BLUE",
-	SHAPE_HEXAGON_1PX = "SHAPE_TEXTURE_HEXAGON_1PX",
-	SHAPE_DIAMOND_1PX = "SHAPE_TEXTURE_DIAMOND_1PX",
+	SHAPE_METAL_LIGHT = addon.IconShape and addon.IconShape.BORDER and addon.IconShape.BORDER.ROUND_METAL_LIGHT or "SHAPE_ATLAS_CHARACTERCREATE_RING_METALLIGHT",
+	SHAPE_COMMUNITIES_BLUE = addon.IconShape and addon.IconShape.BORDER and addon.IconShape.BORDER.ROUND_COMMUNITIES_BLUE or "SHAPE_ATLAS_COMMUNITIES_RING_BLUE",
+	SHAPE_HEXAGON_1PX = addon.IconShape and addon.IconShape.BORDER and addon.IconShape.BORDER.HEXAGON_1PX or "SHAPE_TEXTURE_HEXAGON_1PX",
+	SHAPE_DIAMOND_1PX = addon.IconShape and addon.IconShape.BORDER and addon.IconShape.BORDER.DIAMOND_1PX or "SHAPE_TEXTURE_DIAMOND_1PX",
 	OVERLAY_ATLAS = "UI-HUD-CoolDownManager-IconOverlay",
 	MASK_ATLAS = "UI-HUD-CoolDownManager-Mask",
 	DEFAULT_SWIPE_TEXTURE = "Interface\\Buttons\\WHITE8X8",
@@ -1625,53 +1625,22 @@ cdp.ICON_BORDER = cdp.ICON_BORDER or {
 	ICON_BOTTOM_INSET = 2,
 }
 cdp.ICON_SHAPE = cdp.ICON_SHAPE or addon.IconShape or { DEFAULT = "DEFAULT", SQUARE = "SQUARE", ROUND = "ROUND", STAR = "STAR", HEXAGON = "HEXAGON", DIAMOND = "DIAMOND" }
-cdp.ICON_BORDER.SHAPE_ATLASES = cdp.ICON_BORDER.SHAPE_ATLASES or {
-	[cdp.ICON_BORDER.SHAPE_METAL_LIGHT] = {
-		atlas = "charactercreate-ring-metallight",
-		labelKey = "CooldownPanelIconBorderCharacterCreateMetalLight",
-		label = "Metal light ring",
-		shapes = { ROUND = true },
-	},
-	[cdp.ICON_BORDER.SHAPE_COMMUNITIES_BLUE] = {
-		atlas = "communities-ring-blue",
-		labelKey = "CooldownPanelIconBorderCommunitiesRingBlue",
-		label = "Communities blue ring",
-		shapes = { ROUND = true },
-	},
-	[cdp.ICON_BORDER.SHAPE_HEXAGON_1PX] = {
-		texture = "Interface\\AddOns\\EnhanceQoL\\Assets\\Hexagon_1px.tga",
-		labelKey = "CooldownPanelIconBorderHexagon1px",
-		label = "Hexagon 1 px",
-		shapes = { HEXAGON = true },
-		thicknessMode = "layers",
-		tint = true,
-	},
-	[cdp.ICON_BORDER.SHAPE_DIAMOND_1PX] = {
-		texture = "Interface\\AddOns\\EnhanceQoL\\Assets\\diamond_border.tga",
-		labelKey = "CooldownPanelIconBorderDiamond1px",
-		label = "Diamond 1 px",
-		shapes = { DIAMOND = true },
-		thicknessMode = "layers",
-		tint = true,
-	},
-}
-cdp.ICON_BORDER.SHAPE_ATLAS_ORDER = cdp.ICON_BORDER.SHAPE_ATLAS_ORDER or {
-	cdp.ICON_BORDER.SHAPE_METAL_LIGHT,
-	cdp.ICON_BORDER.SHAPE_COMMUNITIES_BLUE,
-	cdp.ICON_BORDER.SHAPE_HEXAGON_1PX,
-	cdp.ICON_BORDER.SHAPE_DIAMOND_1PX,
-}
+cdp.ICON_BORDER.SHAPE_ATLASES = cdp.ICON_BORDER.SHAPE_ATLASES or (addon.IconShape and addon.IconShape.BORDER_DEFINITIONS) or {}
+cdp.ICON_BORDER.SHAPE_ATLAS_ORDER = cdp.ICON_BORDER.SHAPE_ATLAS_ORDER or (addon.IconShape and addon.IconShape.BORDER_ORDER) or {}
 
 function cdp.ENTRY.IsIconShapeBackdropBorderCompatible(shape)
+	if addon.IconShape and addon.IconShape.IsBackdropBorderCompatible then return addon.IconShape.IsBackdropBorderCompatible(shape) end
 	shape = cdp.ENTRY.NormalizeIconShape(shape, Helper.PANEL_LAYOUT_DEFAULTS.iconShape)
 	return shape == cdp.ICON_SHAPE.DEFAULT or shape == cdp.ICON_SHAPE.SQUARE
 end
 
 function cdp.ENTRY.IsShapeIconBorderTexture(value)
+	if addon.IconShape and addon.IconShape.IsShapeBorder then return addon.IconShape.IsShapeBorder(value) end
 	return type(value) == "string" and cdp.ICON_BORDER.SHAPE_ATLASES[value] ~= nil
 end
 
 function cdp.ENTRY.IsShapeIconBorderCompatible(value, shape)
+	if addon.IconShape and addon.IconShape.IsBorderCompatible then return addon.IconShape.IsBorderCompatible(value, shape) end
 	local info = type(value) == "string" and cdp.ICON_BORDER.SHAPE_ATLASES[value] or nil
 	if not info then return false end
 	shape = cdp.ENTRY.NormalizeIconShape(shape, Helper.PANEL_LAYOUT_DEFAULTS.iconShape)
@@ -1679,6 +1648,15 @@ function cdp.ENTRY.IsShapeIconBorderCompatible(value, shape)
 end
 
 local function iconBorderOptions(shape)
+	if addon.IconShape and addon.IconShape.GetBorderOptions then
+		return addon.IconShape.GetBorderOptions(L, shape, {
+			defaultOptions = {
+				{ value = cdp.ICON_BORDER.DEFAULT, label = _G.DEFAULT or (L and L["Default"]) or "Default" },
+				{ value = cdp.ICON_BORDER.BLIZZARD, label = L["CooldownPanelIconBorderBlizzard"] or "Original Blizzard" },
+			},
+			includeLSM = true,
+		})
+	end
 	local list = {}
 	local seen = {}
 	local function add(value, label)
@@ -1708,6 +1686,7 @@ end
 
 local function normalizeIconBorderTexture(value, fallback, shape)
 	if not cdp.ENTRY.IsIconShapeBackdropBorderCompatible(shape) then
+		if addon.IconShape and addon.IconShape.NormalizeBorder then return addon.IconShape.NormalizeBorder(value, fallback, shape, { emptyValue = cdp.ICON_BORDER.DEFAULT }) end
 		if cdp.ENTRY.IsShapeIconBorderCompatible(value, shape) then return value end
 		if cdp.ENTRY.IsShapeIconBorderCompatible(fallback, shape) then return fallback end
 		for _, shapeValue in ipairs(cdp.ICON_BORDER.SHAPE_ATLAS_ORDER) do
@@ -1728,6 +1707,7 @@ end
 
 function cdp.ENTRY.SupportsIconBorderSize(value, shape)
 	local textureKey = normalizeIconBorderTexture(value, Helper.PANEL_LAYOUT_DEFAULTS.iconBorderTexture, shape)
+	if addon.IconShape and addon.IconShape.SupportsBorderSize and not cdp.ENTRY.IsIconShapeBackdropBorderCompatible(shape) then return addon.IconShape.SupportsBorderSize(textureKey, shape) == true end
 	if cdp.ENTRY.IsIconShapeBackdropBorderCompatible(shape) then return not cdp.ENTRY.IsBlizzardIconBorderTexture(textureKey) end
 	local info = cdp.ICON_BORDER.SHAPE_ATLASES[textureKey]
 	return info and info.thicknessMode == "layers"
@@ -10717,33 +10697,47 @@ function cdp.ENTRY.ApplyIconShapeBorder(icon, border, textureKey, layout, defaul
 	border._eqolBorderEdgeFile = nil
 	border._eqolBorderEdgeSize = nil
 
-	local layerCount = info.thicknessMode == "layers" and math.min(edgeSize, 24) or 1
-	for i = 1, layerCount do
-		local texture = cdp.ENTRY.EnsureIconShapeBorderTexture(border, i)
-		if texture then
-			if info.atlas then
-				local ok = texture.SetAtlas and pcall(texture.SetAtlas, texture, info.atlas, false)
-				if not ok then
-					texture:Hide()
+	if addon.IconShape and addon.IconShape.ApplyBorder then
+		local ok = addon.IconShape.ApplyBorder(border, textureKey, layout.iconShape, {
+			borderSize = edgeSize,
+			borderOffset = 0,
+			color = color,
+			pointFrame = border,
+			parent = border,
+			primaryTexture = border.shapeBorderTexture,
+			texturesKey = "shapeBorderTextures",
+			drawLayer = "OVERLAY",
+		})
+		if not ok then return false end
+	else
+		local layerCount = info.thicknessMode == "layers" and math.min(edgeSize, 24) or 1
+		for i = 1, layerCount do
+			local texture = cdp.ENTRY.EnsureIconShapeBorderTexture(border, i)
+			if texture then
+				if info.atlas then
+					local ok = texture.SetAtlas and pcall(texture.SetAtlas, texture, info.atlas, false)
+					if not ok then
+						texture:Hide()
+					end
+				elseif info.texture then
+					texture:SetTexture(info.texture)
+					if texture.SetTexCoord then texture:SetTexCoord(0, 1, 0, 1) end
 				end
-			elseif info.texture then
-				texture:SetTexture(info.texture)
-				if texture.SetTexCoord then texture:SetTexCoord(0, 1, 0, 1) end
+				local layerX, layerY = cdp.ENTRY.GetIconShapeBorderLayerOffset(i)
+				texture:ClearAllPoints()
+				texture:SetPoint("TOPLEFT", border, "TOPLEFT", layerX, -layerY)
+				texture:SetPoint("BOTTOMRIGHT", border, "BOTTOMRIGHT", layerX, -layerY)
+				if info.tint == true then
+					texture:SetVertexColor(color[1] or 1, color[2] or 1, color[3] or 1, color[4] or 1)
+				else
+					texture:SetVertexColor(1, 1, 1, color[4] or 1)
+				end
+				texture:Show()
 			end
-			local layerX, layerY = cdp.ENTRY.GetIconShapeBorderLayerOffset(i)
-			texture:ClearAllPoints()
-			texture:SetPoint("TOPLEFT", border, "TOPLEFT", layerX, -layerY)
-			texture:SetPoint("BOTTOMRIGHT", border, "BOTTOMRIGHT", layerX, -layerY)
-			if info.tint == true then
-				texture:SetVertexColor(color[1] or 1, color[2] or 1, color[3] or 1, color[4] or 1)
-			else
-				texture:SetVertexColor(1, 1, 1, color[4] or 1)
-			end
-			texture:Show()
 		end
-	end
-	for i = layerCount + 1, #(border.shapeBorderTextures or {}) do
-		border.shapeBorderTextures[i]:Hide()
+		for i = layerCount + 1, #(border.shapeBorderTextures or {}) do
+			border.shapeBorderTextures[i]:Hide()
+		end
 	end
 	border._eqolShapeBorderAtlas = info.atlas
 	border._eqolShapeBorderTexture = info.texture
@@ -21936,7 +21930,7 @@ applyEditLayout = function(panelId, field, value, skipRefresh)
 
 	if not skipRefresh then CooldownPanels:RefreshPanelForCurrentEditContext(panelId, false) end
 	if field == "layoutMode" and not skipRefresh then refreshStandaloneSettings() end
-	if (field == "procGlowStyle" or field == "readyGlowStyle" or field == "pandemicGlowStyle") and not skipRefresh then
+	if (field == "iconShape" or field == "procGlowStyle" or field == "readyGlowStyle" or field == "pandemicGlowStyle") and not skipRefresh then
 		CooldownPanels:RefreshLayoutPanelStandaloneMenu()
 		refreshStandaloneSettings()
 	end
