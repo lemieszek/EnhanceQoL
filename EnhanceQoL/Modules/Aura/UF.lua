@@ -4195,11 +4195,13 @@ function AuraUtil.NormalizeIconShape(value, fallback)
 	if addon.IconShape and addon.IconShape.Normalize then return addon.IconShape.Normalize(value, fallback) end
 	local normalized = type(value) == "string" and value:upper() or nil
 	if normalized == "HEXAGON" or normalized == "HEX" then return "HEXAGON" end
+	if normalized == "ROUND_STAR" or normalized == "ROUNDSTAR" or normalized == "ROUND-STAR" then return "ROUND_STAR" end
 	if normalized == "ROUND" or normalized == "CIRCLE" then return "ROUND" end
 	if normalized == "SQUARE" then return "SQUARE" end
 	if normalized == "DIAMOND" then return "DIAMOND" end
 	local normalizedFallback = type(fallback) == "string" and fallback:upper() or nil
 	if normalizedFallback == "HEXAGON" or normalizedFallback == "HEX" then return "HEXAGON" end
+	if normalizedFallback == "ROUND_STAR" or normalizedFallback == "ROUNDSTAR" or normalizedFallback == "ROUND-STAR" then return "ROUND_STAR" end
 	if normalizedFallback == "ROUND" or normalizedFallback == "CIRCLE" then return "ROUND" end
 	if normalizedFallback == "SQUARE" then return "SQUARE" end
 	if normalizedFallback == "DIAMOND" then return "DIAMOND" end
@@ -5775,7 +5777,7 @@ function AuraUtil.HideSingleDispelIndicator(unit)
 
 	local target = st.barGroup or st.frame
 	if addon.Glow and addon.Glow.Stop and target then
-		addon.Glow.Stop(target, "EQOL_DISPEL")
+		addon.Glow.Stop(target, "EQOL_DISPEL", true)
 		return
 	end
 
@@ -5852,7 +5854,7 @@ function AuraUtil.UpdateSingleDispelIndicator(unit, allowSample)
 
 		local target = st.barGroup or st.frame
 		if addon.Glow and addon.Glow.Stop and target then
-			addon.Glow.Stop(target, "EQOL_DISPEL")
+			addon.Glow.Stop(target, "EQOL_DISPEL", true)
 			return
 		end
 
@@ -6028,6 +6030,7 @@ function AuraUtil.UpdateSingleDispelIndicator(unit, allowSample)
 			thickness = thickness,
 			xOffset = xoff,
 			yOffset = yoff,
+			hostFrameLevelOffset = 8,
 			frameLevel = 8,
 		})
 	elseif appliedEffect == "SHINE" and canShine then

@@ -154,7 +154,39 @@ function GF.ShowEditModeReloadIfRequired()
 	addon.variables.requireReload = true
 	if addon.functions and addon.functions.checkReloadFrame then addon.functions.checkReloadFrame() end
 end
-local function borderOptions()
+function GF.NormalizeAuraIconShape(value, fallback)
+	if AuraUtil and AuraUtil.NormalizeIconShape then return AuraUtil.NormalizeIconShape(value, fallback or "DEFAULT") end
+	if addon.IconShape and addon.IconShape.Normalize then return addon.IconShape.Normalize(value, fallback or "DEFAULT") end
+	return value or fallback or "DEFAULT"
+end
+
+function GF.IsAuraIconShapeBackdropCompatible(shape)
+	if AuraUtil and AuraUtil.IsIconShapeBackdropBorderCompatible then return AuraUtil.IsIconShapeBackdropBorderCompatible(shape) end
+	if addon.IconShape and addon.IconShape.IsBackdropBorderCompatible then return addon.IconShape.IsBackdropBorderCompatible(shape) end
+	shape = GF.NormalizeAuraIconShape(shape, "DEFAULT")
+	return shape == "DEFAULT" or shape == "SQUARE"
+end
+
+function GF.NormalizeAuraBorderTexture(value, fallback, shape)
+	if addon.IconShape and addon.IconShape.NormalizeBorder then return addon.IconShape.NormalizeBorder(value, fallback or "DEFAULT", shape, { allowNone = true }) end
+	return value or fallback or "DEFAULT"
+end
+
+local function borderOptions(shape)
+	local names = addon.functions and addon.functions.GetLSMMediaNames and addon.functions.GetLSMMediaNames("border") or {}
+	local hash = addon.functions and addon.functions.GetLSMMediaHash and addon.functions.GetLSMMediaHash("border") or {}
+	if addon.IconShape and addon.IconShape.GetBorderOptions then
+		return addon.IconShape.GetBorderOptions(L, shape, {
+			defaultOptions = {
+				{ value = "DEFAULT", label = "Default (Border)" },
+				{ value = "SOLID", label = "Solid" },
+			},
+			lsmNames = names,
+			lsmHash = hash,
+			includeNone = true,
+			noneLabel = _G.NONE or "None",
+		})
+	end
 	local list = {}
 	local seen = {}
 	local function add(value, label)
@@ -165,8 +197,6 @@ local function borderOptions()
 	end
 	add("DEFAULT", "Default (Border)")
 	add("SOLID", "Solid")
-	local names = addon.functions and addon.functions.GetLSMMediaNames and addon.functions.GetLSMMediaNames("border") or {}
-	local hash = addon.functions and addon.functions.GetLSMMediaHash and addon.functions.GetLSMMediaHash("border") or {}
 	for i = 1, #names do
 		local name = names[i]
 		local path = hash[name]
@@ -175,8 +205,25 @@ local function borderOptions()
 	return list
 end
 
-local function isAuraBorderAdjustable(typeCfg, defaultCfg)
+function GF.IsAuraBorderAdjustable(typeCfg, defaultCfg)
+	local shape = GF.NormalizeAuraIconShape((typeCfg and typeCfg.iconShape) or (defaultCfg and defaultCfg.iconShape), "DEFAULT")
 	local borderTexture = (typeCfg and typeCfg.borderTexture) or (defaultCfg and defaultCfg.borderTexture) or "DEFAULT"
+	borderTexture = GF.NormalizeAuraBorderTexture(borderTexture, "DEFAULT", shape)
+	if addon.IconShape and addon.IconShape.IsNoBorder and addon.IconShape.IsNoBorder(borderTexture) then return false end
+	if not GF.IsAuraIconShapeBackdropCompatible(shape) then
+		return addon.IconShape and addon.IconShape.SupportsBorderOffset and addon.IconShape.SupportsBorderOffset(borderTexture, shape) == true
+	end
+	return tostring(borderTexture or "DEFAULT"):upper() ~= "DEFAULT"
+end
+
+function GF.IsAuraBorderSizeAdjustable(typeCfg, defaultCfg)
+	local shape = GF.NormalizeAuraIconShape((typeCfg and typeCfg.iconShape) or (defaultCfg and defaultCfg.iconShape), "DEFAULT")
+	local borderTexture = (typeCfg and typeCfg.borderTexture) or (defaultCfg and defaultCfg.borderTexture) or "DEFAULT"
+	borderTexture = GF.NormalizeAuraBorderTexture(borderTexture, "DEFAULT", shape)
+	if addon.IconShape and addon.IconShape.IsNoBorder and addon.IconShape.IsNoBorder(borderTexture) then return false end
+	if not GF.IsAuraIconShapeBackdropCompatible(shape) then
+		return addon.IconShape and addon.IconShape.SupportsBorderSize and addon.IconShape.SupportsBorderSize(borderTexture, shape) == true
+	end
 	return tostring(borderTexture or "DEFAULT"):upper() ~= "DEFAULT"
 end
 
@@ -1390,6 +1437,34 @@ end
 
 local layoutTexts = GFH.LayoutTexts
 
+function GF.ApplyDataBarNameCharLimit(self, st, cfg, def, rootCfg)
+	if not st then return end
+	cfg = cfg or EMPTY
+	def = def or EMPTY
+	local maxChars = tonumber(cfg.nameMaxChars)
+	if maxChars == nil then maxChars = tonumber(def.nameMaxChars) end
+	maxChars = maxChars or 0
+	local width
+	if maxChars > 0 and UFHelper and UFHelper.getNameLimitWidth then
+		local fontSize = GF.ScaleContentValue(self, cfg.fontSize or def.fontSize or 12, rootCfg, 1)
+		width = UFHelper.getNameLimitWidth(cfg.font or def.font, fontSize, cfg.fontOutline or def.fontOutline or "OUTLINE", maxChars)
+	end
+	local function apply(fontString, mode)
+		if not fontString then return end
+		if fontString.SetMaxLines then fontString:SetMaxLines(1) end
+		if fontString.SetWordWrap then fontString:SetWordWrap(false) end
+		if fontString.SetNonSpaceWrap then fontString:SetNonSpaceWrap(false) end
+		if tostring(mode or "NONE"):upper() == "NAME" and width and width > 0 then
+			fontString:SetWidth(width)
+		else
+			fontString:SetWidth(0)
+		end
+	end
+	apply(st.dataBarTextLeft, cfg.textLeft or def.textLeft or "NONE")
+	apply(st.dataBarTextCenter, cfg.textCenter or def.textCenter or "NONE")
+	apply(st.dataBarTextRight, cfg.textRight or def.textRight or "NONE")
+end
+
 local function setFrameLevelAbove(child, parent, offset)
 	if not child or not parent then return end
 	if child.SetFrameStrata and parent.GetFrameStrata then child:SetFrameStrata(parent:GetFrameStrata()) end
@@ -2223,7 +2298,7 @@ end
 
 function GF.StopDispelGlowFrame(frame, effect)
 	if addon.Glow and addon.Glow.Stop and frame then
-		addon.Glow.Stop(frame, DISPEL_GLOW_KEY)
+		addon.Glow.Stop(frame, DISPEL_GLOW_KEY, true)
 		return
 	end
 	if not (LCG and frame) then return end
@@ -7163,6 +7238,7 @@ function GF:LayoutButton(self)
 	layoutTexts(st.health, st.healthTextLeft, st.healthTextCenter, st.healthTextRight, GF.GetScaledBarTextConfig(cfg.health, contentScale), scale, layoutAnchor or st.health)
 	layoutTexts(st.power, st.powerTextLeft, st.powerTextCenter, st.powerTextRight, GF.GetScaledBarTextConfig(cfg.power, contentScale), scale)
 	layoutTexts(st.dataBar, st.dataBarTextLeft, st.dataBarTextCenter, st.dataBarTextRight, GF.GetScaledBarTextConfig(cfg.dataBar, contentScale), scale)
+	GF.ApplyDataBarNameCharLimit(self, st, cfg.dataBar, (def and def.dataBar) or EMPTY, cfg)
 	if st.statusText then
 		local scfg = cfg.status or {}
 		local us = scfg.unitStatus or {}
@@ -7915,6 +7991,7 @@ GF.EXTERNAL_GLOW_STYLE_OPTIONS = GF.EXTERNAL_GLOW_STYLE_OPTIONS
 		{ value = "MARCHING_ANTS", label = "Marching ants" },
 		{ value = "FLASH", label = "Flash" },
 		{ value = "BLIZZARD", label = "Blizzard" },
+		{ value = "PULSING", label = "Pulsing" },
 	}
 
 function GF.NormalizeExternalGlowStyle(style, fallback)
@@ -7922,12 +7999,29 @@ function GF.NormalizeExternalGlowStyle(style, fallback)
 	if normalized == "BLIZZARD" then return "BLIZZARD" end
 	if normalized == "FLASH" then return "FLASH" end
 	if normalized == "MARCHING_ANTS" or normalized == "MARCHINGANTS" or normalized == "ANTS" then return "MARCHING_ANTS" end
+	if normalized == "PULSING" or normalized == "PULSE" then return "PULSING" end
 
 	normalized = type(fallback) == "string" and string.upper(fallback) or nil
 	if normalized == "BLIZZARD" then return "BLIZZARD" end
 	if normalized == "FLASH" then return "FLASH" end
 	if normalized == "MARCHING_ANTS" or normalized == "MARCHINGANTS" or normalized == "ANTS" then return "MARCHING_ANTS" end
+	if normalized == "PULSING" or normalized == "PULSE" then return "PULSING" end
 	return "MARCHING_ANTS"
+end
+
+function GF.NormalizeExternalGlowStyleForIconShape(style, fallback, shape)
+	shape = GF.NormalizeAuraIconShape(shape, "DEFAULT")
+	if not GF.IsAuraIconShapeBackdropCompatible(shape) then return "PULSING" end
+	return GF.NormalizeExternalGlowStyle(style, fallback)
+end
+
+function GF.GetExternalGlowStyleOptions(shape)
+	if not GF.IsAuraIconShapeBackdropCompatible(shape) then
+		for _, option in ipairs(GF.EXTERNAL_GLOW_STYLE_OPTIONS) do
+			if option.value == "PULSING" then return { option } end
+		end
+	end
+	return GF.EXTERNAL_GLOW_STYLE_OPTIONS
 end
 
 function GF.NormalizeExternalGlowInset(value, fallback) return clampNumber(value, -20, 20, fallback or 0) end
@@ -7940,7 +8034,7 @@ end
 
 function GF.StopExternalGlow(btn)
 	if not btn then return end
-	if btn._eqolExternalGlowManaged and addon.Glow and addon.Glow.Stop then addon.Glow.Stop(btn, GF.EXTERNAL_GLOW_KEY) end
+	if btn._eqolExternalGlowManaged and addon.Glow and addon.Glow.Stop then addon.Glow.Stop(btn, GF.EXTERNAL_GLOW_KEY, true) end
 	btn._eqolExternalGlowManaged = nil
 	btn._eqolExternalGlowState = nil
 end
@@ -7954,21 +8048,26 @@ function GF.ApplyExternalGlow(btn, style)
 		return
 	end
 
-	local glowStyle = GF.NormalizeExternalGlowStyle(style.externalGlowStyle, "MARCHING_ANTS")
+	local glowStyle = GF.NormalizeExternalGlowStyleForIconShape(style.externalGlowStyle, "MARCHING_ANTS", style.iconShape)
 	local glowInset = GF.NormalizeExternalGlowInset(style.externalGlowInset, 0)
 	local r, g, b, a = unpackColor(style.externalGlowColor, { 1, 0.25, 0.25, 1 })
+	local shape = GF.NormalizeAuraIconShape(style.iconShape, "DEFAULT")
 	local state = btn._eqolExternalGlowState
-	if state and state.style == glowStyle and state.inset == glowInset and state.r == r and state.g == g and state.b == b and state.a == a then return end
+	if state and state.style == glowStyle and state.inset == glowInset and state.r == r and state.g == g and state.b == b and state.a == a and state.shape == shape then return end
 
 	Glow.Start(btn, GF.EXTERNAL_GLOW_KEY, glowStyle, {
 		color = { r, g, b, a },
 		cooldown = btn.cd,
 		inset = glowInset,
+		shape = shape,
+		hostFrameLevelOffset = 8,
+		frameLevel = 8,
 	})
 
 	state = state or {}
 	state.style = glowStyle
 	state.inset = glowInset
+	state.shape = shape
 	state.r = r
 	state.g = g
 	state.b = b
@@ -8997,7 +9096,8 @@ function GF:LayoutAuras(self)
 			style.showCooldown = typeCfg.showCooldown ~= false
 			style.blizzardDispelBorder = typeCfg.showDispelIcon == true
 			style.borderColor = typeCfg.borderColor
-			style.borderTexture = typeCfg.borderTexture
+			style.iconShape = GF.NormalizeAuraIconShape(typeCfg.iconShape, "DEFAULT")
+			style.borderTexture = GF.NormalizeAuraBorderTexture(typeCfg.borderTexture, "DEFAULT", style.iconShape)
 			style.borderSize = GF.ScaleContentValue(self, typeCfg.borderSize, cfg, 1)
 			style.borderOffset = GF.ScaleContentValue(self, typeCfg.borderOffset, cfg, 0)
 			if typeCfg.showCooldownText ~= nil then style.showCooldownText = typeCfg.showCooldownText end
@@ -9024,7 +9124,7 @@ function GF:LayoutAuras(self)
 				local glowEnabled = typeCfg.glowEnabled
 				if glowEnabled == nil then glowEnabled = def.glowEnabled == true end
 				style.externalGlowEnabled = glowEnabled == true
-				style.externalGlowStyle = GF.NormalizeExternalGlowStyle(typeCfg.glowStyle, def.glowStyle or "MARCHING_ANTS")
+				style.externalGlowStyle = GF.NormalizeExternalGlowStyleForIconShape(typeCfg.glowStyle, def.glowStyle or "MARCHING_ANTS", style.iconShape)
 				style.externalGlowInset = GF.ScaleContentValue(self, GF.NormalizeExternalGlowInset(typeCfg.glowInset, def.glowInset or 0), cfg, 0)
 				local r, g, b, a = unpackColor(GF.GetExternalGlowColor(typeCfg, def), { 1, 0.25, 0.25, 1 })
 				local glowColor = style.externalGlowColor or {}
@@ -10813,6 +10913,7 @@ function GF:UpdateDispelGlow(self, r, g, b)
 			thickness = thickness,
 			xOffset = xoff,
 			yOffset = yoff,
+			hostFrameLevelOffset = glowFrameLevel,
 			frameLevel = glowFrameLevel,
 		})
 	elseif appliedEffect == "SHINE" and canShine then
@@ -11361,13 +11462,6 @@ function GF:UpdateHealthValue(self, unit, st)
 					if dbLeft == "NAME" or dbCenter == "NAME" or dbRight == "NAME" then
 						dbNameText = (UnitName and UnitName(unit)) or ""
 						if isEditModeActive() and self._eqolPreview and st._previewName then dbNameText = st._previewName end
-						local dbNameMaxChars = tonumber(dbc.nameMaxChars)
-						if dbNameMaxChars == nil then dbNameMaxChars = tonumber(defDB.nameMaxChars) end
-						if dbNameMaxChars and dbNameMaxChars > 0 and UFHelper and UFHelper.getNameLimitWidth and UFHelper.truncateTextToWidth then
-							local dbFontSize = GF.ScaleContentValue(self, dbc.fontSize or defDB.fontSize or 12, cfg, 1)
-							local dbMaxWidth = UFHelper.getNameLimitWidth(dbc.font or defDB.font, dbFontSize, dbc.fontOutline or defDB.fontOutline or "OUTLINE", dbNameMaxChars)
-							if dbMaxWidth and dbMaxWidth > 0 then dbNameText = UFHelper.truncateTextToWidth(dbc.font or defDB.font, dbFontSize, dbc.fontOutline or defDB.fontOutline or "OUTLINE", dbNameText, dbMaxWidth) end
-						end
 					end
 					local dbMissingValue = missingValue
 					if dbMissingValue == nil and (GFH.TextModeUsesDeficit(dbLeft) or GFH.TextModeUsesDeficit(dbCenter) or GFH.TextModeUsesDeficit(dbRight)) then
@@ -16598,6 +16692,50 @@ local function buildEditModeSettings(kind, editModeId)
 				end)
 			end
 		end
+	end
+	local function auraIconShapeSetting(typeKey, field, parentId)
+		return {
+			name = L["settingsIconShapeLabel"] or "Icon shape",
+			kind = SettingType.Dropdown,
+			field = field,
+			parentId = parentId,
+			height = 120,
+			get = function()
+				local cfg = getCfg(kind)
+				local ac = ensureAuraConfig(cfg)
+				local typeCfg = ac and ac[typeKey] or {}
+				local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras[typeKey]) or {}
+				return GF.NormalizeAuraIconShape(typeCfg.iconShape, def.iconShape or "DEFAULT")
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				local ac = ensureAuraConfig(cfg)
+				local typeCfg = ac[typeKey]
+				local shape = GF.NormalizeAuraIconShape(value, "DEFAULT")
+				typeCfg.iconShape = shape
+				typeCfg.borderTexture = GF.NormalizeAuraBorderTexture(typeCfg.borderTexture, "DEFAULT", shape)
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, field, shape, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+				requestEditModeSettingsRefresh()
+			end,
+			generator = function(_, root, data)
+					local options = addon.IconShape and addon.IconShape.GetOptions and addon.IconShape.GetOptions(L) or {
+						{ value = "DEFAULT", label = L["settingsIconShapeDefault"] or DEFAULT or "Default" },
+						{ value = "SQUARE", label = L["settingsIconShapeSquare"] or "Square" },
+						{ value = "ROUND", label = L["settingsIconShapeRound"] or "Round" },
+						{ value = "ROUND_STAR", label = L["settingsIconShapeRoundStar"] or "Round star" },
+						{ value = "HEXAGON", label = L["settingsIconShapeHexagon"] or "Hexagon" },
+						{ value = "DIAMOND", label = L["settingsIconShapeDiamond"] or "Diamond" },
+					}
+				for _, option in ipairs(options) do
+					root:CreateRadio(option.label, function() return data.get and data.get() == option.value end, function()
+						if data.set then data.set(nil, option.value) end
+						data.customDefaultText = option.label
+					end)
+				end
+			end,
+		}
 	end
 	local sortGroupOptions = {
 		{ value = "GROUP", label = L["Group"] or "Group" },
@@ -26000,6 +26138,7 @@ local function buildEditModeSettings(kind, editModeId)
 				GF:ApplyHeaderAttributes(kind)
 			end,
 		},
+		auraIconShapeSetting("buff", "buffIconShape", "buffs"),
 		{
 			name = L["Buff per row"] or "Buff per row",
 			kind = SettingType.Slider,
@@ -26081,30 +26220,40 @@ local function buildEditModeSettings(kind, editModeId)
 				local cfg = getCfg(kind)
 				local ac = ensureAuraConfig(cfg)
 				local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.buff) or {}
-				return ac.buff.borderTexture or def.borderTexture or "DEFAULT"
+				local shape = GF.NormalizeAuraIconShape(ac.buff.iconShape, def.iconShape or "DEFAULT")
+				return GF.NormalizeAuraBorderTexture(ac.buff.borderTexture, def.borderTexture or "DEFAULT", shape)
 			end,
 			set = function(_, value)
 				local cfg = getCfg(kind)
 				if not cfg then return end
 				local ac = ensureAuraConfig(cfg)
-				ac.buff.borderTexture = value or "DEFAULT"
+				local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.buff) or {}
+				local shape = GF.NormalizeAuraIconShape(ac.buff.iconShape, def.iconShape or "DEFAULT")
+				ac.buff.borderTexture = GF.NormalizeAuraBorderTexture(value, def.borderTexture or "DEFAULT", shape)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "buffBorderTexture", ac.buff.borderTexture, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 				requestEditModeSettingsRefresh()
 			end,
 			generator = function(_, root)
-				for _, option in ipairs(borderOptions()) do
+				local cfg = getCfg(kind)
+				local ac = ensureAuraConfig(cfg)
+				local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.buff) or {}
+				local shape = GF.NormalizeAuraIconShape(ac.buff.iconShape, def.iconShape or "DEFAULT")
+				for _, option in ipairs(borderOptions(shape)) do
 					root:CreateRadio(option.label, function()
 						local cfg = getCfg(kind)
 						local ac = ensureAuraConfig(cfg)
 						local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.buff) or {}
-						return (ac.buff.borderTexture or def.borderTexture or "DEFAULT") == option.value
+						local currentShape = GF.NormalizeAuraIconShape(ac.buff.iconShape, def.iconShape or "DEFAULT")
+						return GF.NormalizeAuraBorderTexture(ac.buff.borderTexture, def.borderTexture or "DEFAULT", currentShape) == option.value
 					end, function()
 						local cfg = getCfg(kind)
 						if not cfg then return end
 						local ac = ensureAuraConfig(cfg)
-						ac.buff.borderTexture = option.value
-						if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "buffBorderTexture", option.value, nil, true) end
+						local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.buff) or {}
+						local currentShape = GF.NormalizeAuraIconShape(ac.buff.iconShape, def.iconShape or "DEFAULT")
+						ac.buff.borderTexture = GF.NormalizeAuraBorderTexture(option.value, def.borderTexture or "DEFAULT", currentShape)
+						if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "buffBorderTexture", ac.buff.borderTexture, nil, true) end
 						GF:ApplyHeaderAttributes(kind)
 						requestEditModeSettingsRefresh()
 					end)
@@ -26139,7 +26288,7 @@ local function buildEditModeSettings(kind, editModeId)
 				local cfg = getCfg(kind)
 				local ac = ensureAuraConfig(cfg)
 				local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.buff) or {}
-				return isAuraBorderAdjustable(ac.buff, def)
+				return GF.IsAuraBorderSizeAdjustable(ac.buff, def)
 			end,
 		},
 		{
@@ -26170,7 +26319,7 @@ local function buildEditModeSettings(kind, editModeId)
 				local cfg = getCfg(kind)
 				local ac = ensureAuraConfig(cfg)
 				local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.buff) or {}
-				return isAuraBorderAdjustable(ac.buff, def)
+				return GF.IsAuraBorderAdjustable(ac.buff, def)
 			end,
 		},
 		{
@@ -26761,6 +26910,7 @@ local function buildEditModeSettings(kind, editModeId)
 				GF:ApplyHeaderAttributes(kind)
 			end,
 		},
+		auraIconShapeSetting("debuff", "debuffIconShape", "debuffs"),
 		{
 			name = L["Debuff per row"] or "Debuff per row",
 			kind = SettingType.Slider,
@@ -26859,30 +27009,40 @@ local function buildEditModeSettings(kind, editModeId)
 				local cfg = getCfg(kind)
 				local ac = ensureAuraConfig(cfg)
 				local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.debuff) or {}
-				return ac.debuff.borderTexture or def.borderTexture or "DEFAULT"
+				local shape = GF.NormalizeAuraIconShape(ac.debuff.iconShape, def.iconShape or "DEFAULT")
+				return GF.NormalizeAuraBorderTexture(ac.debuff.borderTexture, def.borderTexture or "DEFAULT", shape)
 			end,
 			set = function(_, value)
 				local cfg = getCfg(kind)
 				if not cfg then return end
 				local ac = ensureAuraConfig(cfg)
-				ac.debuff.borderTexture = value or "DEFAULT"
+				local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.debuff) or {}
+				local shape = GF.NormalizeAuraIconShape(ac.debuff.iconShape, def.iconShape or "DEFAULT")
+				ac.debuff.borderTexture = GF.NormalizeAuraBorderTexture(value, def.borderTexture or "DEFAULT", shape)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "debuffBorderTexture", ac.debuff.borderTexture, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 				requestEditModeSettingsRefresh()
 			end,
 			generator = function(_, root)
-				for _, option in ipairs(borderOptions()) do
+				local cfg = getCfg(kind)
+				local ac = ensureAuraConfig(cfg)
+				local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.debuff) or {}
+				local shape = GF.NormalizeAuraIconShape(ac.debuff.iconShape, def.iconShape or "DEFAULT")
+				for _, option in ipairs(borderOptions(shape)) do
 					root:CreateRadio(option.label, function()
 						local cfg = getCfg(kind)
 						local ac = ensureAuraConfig(cfg)
 						local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.debuff) or {}
-						return (ac.debuff.borderTexture or def.borderTexture or "DEFAULT") == option.value
+						local currentShape = GF.NormalizeAuraIconShape(ac.debuff.iconShape, def.iconShape or "DEFAULT")
+						return GF.NormalizeAuraBorderTexture(ac.debuff.borderTexture, def.borderTexture or "DEFAULT", currentShape) == option.value
 					end, function()
 						local cfg = getCfg(kind)
 						if not cfg then return end
 						local ac = ensureAuraConfig(cfg)
-						ac.debuff.borderTexture = option.value
-						if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "debuffBorderTexture", option.value, nil, true) end
+						local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.debuff) or {}
+						local currentShape = GF.NormalizeAuraIconShape(ac.debuff.iconShape, def.iconShape or "DEFAULT")
+						ac.debuff.borderTexture = GF.NormalizeAuraBorderTexture(option.value, def.borderTexture or "DEFAULT", currentShape)
+						if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "debuffBorderTexture", ac.debuff.borderTexture, nil, true) end
 						GF:ApplyHeaderAttributes(kind)
 						requestEditModeSettingsRefresh()
 					end)
@@ -26917,7 +27077,7 @@ local function buildEditModeSettings(kind, editModeId)
 				local cfg = getCfg(kind)
 				local ac = ensureAuraConfig(cfg)
 				local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.debuff) or {}
-				return isAuraBorderAdjustable(ac.debuff, def)
+				return GF.IsAuraBorderSizeAdjustable(ac.debuff, def)
 			end,
 		},
 		{
@@ -26948,7 +27108,7 @@ local function buildEditModeSettings(kind, editModeId)
 				local cfg = getCfg(kind)
 				local ac = ensureAuraConfig(cfg)
 				local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.debuff) or {}
-				return isAuraBorderAdjustable(ac.debuff, def)
+				return GF.IsAuraBorderAdjustable(ac.debuff, def)
 			end,
 		},
 		{
@@ -27532,6 +27692,7 @@ local function buildEditModeSettings(kind, editModeId)
 				GF:ApplyHeaderAttributes(kind)
 			end,
 		},
+		auraIconShapeSetting("externals", "externalIconShape", "externals"),
 		{
 			name = L["External per row"] or "External per row",
 			kind = SettingType.Slider,
@@ -27624,17 +27785,21 @@ local function buildEditModeSettings(kind, editModeId)
 				local cfg = getCfg(kind)
 				local ac = ensureAuraConfig(cfg)
 				local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.externals) or {}
-				return GF.NormalizeExternalGlowStyle(ac.externals.glowStyle, def.glowStyle or "MARCHING_ANTS")
+				return GF.NormalizeExternalGlowStyleForIconShape(ac.externals.glowStyle, def.glowStyle or "MARCHING_ANTS", ac.externals.iconShape or def.iconShape)
 			end,
 			set = function(_, value)
 				local cfg = getCfg(kind)
 				local ac = ensureAuraConfig(cfg)
-				ac.externals.glowStyle = GF.NormalizeExternalGlowStyle(value, ac.externals.glowStyle or "MARCHING_ANTS")
+				local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.externals) or {}
+				ac.externals.glowStyle = GF.NormalizeExternalGlowStyleForIconShape(value, ac.externals.glowStyle or def.glowStyle or "MARCHING_ANTS", ac.externals.iconShape or def.iconShape)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "externalGlowStyle", ac.externals.glowStyle, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
 			generator = function(_, root, data)
-				for _, option in ipairs(GF.EXTERNAL_GLOW_STYLE_OPTIONS) do
+				local cfg = getCfg(kind)
+				local ac = ensureAuraConfig(cfg)
+				local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.externals) or {}
+				for _, option in ipairs(GF.GetExternalGlowStyleOptions(ac.externals.iconShape or def.iconShape)) do
 					root:CreateRadio(option.label, function() return data.get and data.get() == option.value end, function()
 						if data.set then data.set(nil, option.value) end
 						data.customDefaultText = option.label
@@ -27708,30 +27873,40 @@ local function buildEditModeSettings(kind, editModeId)
 				local cfg = getCfg(kind)
 				local ac = ensureAuraConfig(cfg)
 				local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.externals) or {}
-				return ac.externals.borderTexture or def.borderTexture or "DEFAULT"
+				local shape = GF.NormalizeAuraIconShape(ac.externals.iconShape, def.iconShape or "DEFAULT")
+				return GF.NormalizeAuraBorderTexture(ac.externals.borderTexture, def.borderTexture or "DEFAULT", shape)
 			end,
 			set = function(_, value)
 				local cfg = getCfg(kind)
 				if not cfg then return end
 				local ac = ensureAuraConfig(cfg)
-				ac.externals.borderTexture = value or "DEFAULT"
+				local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.externals) or {}
+				local shape = GF.NormalizeAuraIconShape(ac.externals.iconShape, def.iconShape or "DEFAULT")
+				ac.externals.borderTexture = GF.NormalizeAuraBorderTexture(value, def.borderTexture or "DEFAULT", shape)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "externalBorderTexture", ac.externals.borderTexture, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 				requestEditModeSettingsRefresh()
 			end,
 			generator = function(_, root)
-				for _, option in ipairs(borderOptions()) do
+				local cfg = getCfg(kind)
+				local ac = ensureAuraConfig(cfg)
+				local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.externals) or {}
+				local shape = GF.NormalizeAuraIconShape(ac.externals.iconShape, def.iconShape or "DEFAULT")
+				for _, option in ipairs(borderOptions(shape)) do
 					root:CreateRadio(option.label, function()
 						local cfg = getCfg(kind)
 						local ac = ensureAuraConfig(cfg)
 						local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.externals) or {}
-						return (ac.externals.borderTexture or def.borderTexture or "DEFAULT") == option.value
+						local currentShape = GF.NormalizeAuraIconShape(ac.externals.iconShape, def.iconShape or "DEFAULT")
+						return GF.NormalizeAuraBorderTexture(ac.externals.borderTexture, def.borderTexture or "DEFAULT", currentShape) == option.value
 					end, function()
 						local cfg = getCfg(kind)
 						if not cfg then return end
 						local ac = ensureAuraConfig(cfg)
-						ac.externals.borderTexture = option.value
-						if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "externalBorderTexture", option.value, nil, true) end
+						local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.externals) or {}
+						local currentShape = GF.NormalizeAuraIconShape(ac.externals.iconShape, def.iconShape or "DEFAULT")
+						ac.externals.borderTexture = GF.NormalizeAuraBorderTexture(option.value, def.borderTexture or "DEFAULT", currentShape)
+						if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "externalBorderTexture", ac.externals.borderTexture, nil, true) end
 						GF:ApplyHeaderAttributes(kind)
 						requestEditModeSettingsRefresh()
 					end)
@@ -27766,7 +27941,7 @@ local function buildEditModeSettings(kind, editModeId)
 				local cfg = getCfg(kind)
 				local ac = ensureAuraConfig(cfg)
 				local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.externals) or {}
-				return isAuraBorderAdjustable(ac.externals, def)
+				return GF.IsAuraBorderSizeAdjustable(ac.externals, def)
 			end,
 		},
 		{
@@ -27795,7 +27970,7 @@ local function buildEditModeSettings(kind, editModeId)
 				local cfg = getCfg(kind)
 				local ac = ensureAuraConfig(cfg)
 				local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.externals) or {}
-				return isAuraBorderAdjustable(ac.externals, def)
+				return GF.IsAuraBorderAdjustable(ac.externals, def)
 			end,
 		},
 		{
@@ -27826,7 +28001,7 @@ local function buildEditModeSettings(kind, editModeId)
 				local cfg = getCfg(kind)
 				local ac = ensureAuraConfig(cfg)
 				local def = (DEFAULTS[kind] and DEFAULTS[kind].auras and DEFAULTS[kind].auras.externals) or {}
-				return isAuraBorderAdjustable(ac.externals, def)
+				return GF.IsAuraBorderAdjustable(ac.externals, def)
 			end,
 		},
 		{
@@ -30690,10 +30865,14 @@ local function applyEditModeData(kind, data)
 	if data.buffOffsetX ~= nil then ac.buff.x = data.buffOffsetX end
 	if data.buffOffsetY ~= nil then ac.buff.y = data.buffOffsetY end
 	if data.buffSize ~= nil then ac.buff.size = data.buffSize end
+	if data.buffIconShape ~= nil then
+		ac.buff.iconShape = GF.NormalizeAuraIconShape(data.buffIconShape, ac.buff.iconShape or "DEFAULT")
+		ac.buff.borderTexture = GF.NormalizeAuraBorderTexture(ac.buff.borderTexture, "DEFAULT", ac.buff.iconShape)
+	end
 	if data.buffPerRow ~= nil then ac.buff.perRow = data.buffPerRow end
 	if data.buffMax ~= nil then ac.buff.max = GF.ClampAuraCount(data.buffMax, ac.buff.max or 6) or ac.buff.max or 6 end
 	if data.buffSpacing ~= nil then ac.buff.spacing = data.buffSpacing end
-	if data.buffBorderTexture ~= nil then ac.buff.borderTexture = data.buffBorderTexture end
+	if data.buffBorderTexture ~= nil then ac.buff.borderTexture = GF.NormalizeAuraBorderTexture(data.buffBorderTexture, ac.buff.borderTexture or "DEFAULT", ac.buff.iconShape) end
 	if data.buffBorderSize ~= nil then ac.buff.borderSize = clampNumber(data.buffBorderSize, 1, 64, ac.buff.borderSize or 2) end
 	if data.buffBorderOffset ~= nil then ac.buff.borderOffset = clampNumber(data.buffBorderOffset, -64, 64, ac.buff.borderOffset or 0) end
 	if data.buffHelpfulFilterMode ~= nil then ac.buff.helpfulFilterMode = GF.NormalizeBuffHelpfulFilterMode(data.buffHelpfulFilterMode) end
@@ -30732,11 +30911,15 @@ local function applyEditModeData(kind, data)
 	if data.debuffOffsetX ~= nil then ac.debuff.x = data.debuffOffsetX end
 	if data.debuffOffsetY ~= nil then ac.debuff.y = data.debuffOffsetY end
 	if data.debuffSize ~= nil then ac.debuff.size = data.debuffSize end
+	if data.debuffIconShape ~= nil then
+		ac.debuff.iconShape = GF.NormalizeAuraIconShape(data.debuffIconShape, ac.debuff.iconShape or "DEFAULT")
+		ac.debuff.borderTexture = GF.NormalizeAuraBorderTexture(ac.debuff.borderTexture, "DEFAULT", ac.debuff.iconShape)
+	end
 	if data.debuffPerRow ~= nil then ac.debuff.perRow = data.debuffPerRow end
 	if data.debuffMax ~= nil then ac.debuff.max = GF.ClampAuraCount(data.debuffMax, ac.debuff.max or 6) or ac.debuff.max or 6 end
 	if data.debuffDisplayLargerRoleSpecific ~= nil then ac.debuff.displayLargerRoleSpecificDebuffs = data.debuffDisplayLargerRoleSpecific and true or false end
 	if data.debuffSpacing ~= nil then ac.debuff.spacing = data.debuffSpacing end
-	if data.debuffBorderTexture ~= nil then ac.debuff.borderTexture = data.debuffBorderTexture end
+	if data.debuffBorderTexture ~= nil then ac.debuff.borderTexture = GF.NormalizeAuraBorderTexture(data.debuffBorderTexture, ac.debuff.borderTexture or "DEFAULT", ac.debuff.iconShape) end
 	if data.debuffBorderSize ~= nil then ac.debuff.borderSize = clampNumber(data.debuffBorderSize, 1, 64, ac.debuff.borderSize or 2) end
 	if data.debuffBorderOffset ~= nil then ac.debuff.borderOffset = clampNumber(data.debuffBorderOffset, -64, 64, ac.debuff.borderOffset or 0) end
 	if data.debuffShowDispelIcon ~= nil then ac.debuff.showDispelIcon = data.debuffShowDispelIcon and true or false end
@@ -30774,14 +30957,19 @@ local function applyEditModeData(kind, data)
 	if data.externalOffsetX ~= nil then ac.externals.x = data.externalOffsetX end
 	if data.externalOffsetY ~= nil then ac.externals.y = data.externalOffsetY end
 	if data.externalSize ~= nil then ac.externals.size = data.externalSize end
+	if data.externalIconShape ~= nil then
+		ac.externals.iconShape = GF.NormalizeAuraIconShape(data.externalIconShape, ac.externals.iconShape or "DEFAULT")
+		ac.externals.borderTexture = GF.NormalizeAuraBorderTexture(ac.externals.borderTexture, "DEFAULT", ac.externals.iconShape)
+		ac.externals.glowStyle = GF.NormalizeExternalGlowStyleForIconShape(ac.externals.glowStyle, "MARCHING_ANTS", ac.externals.iconShape)
+	end
 	if data.externalPerRow ~= nil then ac.externals.perRow = data.externalPerRow end
 	if data.externalMax ~= nil then ac.externals.max = GF.ClampAuraCount(data.externalMax, ac.externals.max or 4) or ac.externals.max or 4 end
 	if data.externalSpacing ~= nil then ac.externals.spacing = data.externalSpacing end
 	if data.externalGlowEnabled ~= nil then ac.externals.glowEnabled = data.externalGlowEnabled and true or false end
 	if data.externalGlowColor ~= nil then ac.externals.glowColor = data.externalGlowColor end
-	if data.externalGlowStyle ~= nil then ac.externals.glowStyle = GF.NormalizeExternalGlowStyle(data.externalGlowStyle, ac.externals.glowStyle or "MARCHING_ANTS") end
+	if data.externalGlowStyle ~= nil then ac.externals.glowStyle = GF.NormalizeExternalGlowStyleForIconShape(data.externalGlowStyle, ac.externals.glowStyle or "MARCHING_ANTS", ac.externals.iconShape) end
 	if data.externalGlowInset ~= nil then ac.externals.glowInset = GF.NormalizeExternalGlowInset(data.externalGlowInset, ac.externals.glowInset or 0) end
-	if data.externalBorderTexture ~= nil then ac.externals.borderTexture = data.externalBorderTexture end
+	if data.externalBorderTexture ~= nil then ac.externals.borderTexture = GF.NormalizeAuraBorderTexture(data.externalBorderTexture, ac.externals.borderTexture or "DEFAULT", ac.externals.iconShape) end
 	if data.externalBorderSize ~= nil then ac.externals.borderSize = clampNumber(data.externalBorderSize, 1, 64, ac.externals.borderSize or 2) end
 	if data.externalBorderColor ~= nil then ac.externals.borderColor = data.externalBorderColor end
 	if data.externalBorderOffset ~= nil then ac.externals.borderOffset = clampNumber(data.externalBorderOffset, -64, 64, ac.externals.borderOffset or 0) end
@@ -31541,7 +31729,8 @@ function GF:EnsureEditMode()
 				buffPerRow = ac.buff.perRow or 6,
 				buffMax = GF.ClampAuraCount(ac.buff.max, 6) or 6,
 				buffSpacing = ac.buff.spacing or 2,
-				buffBorderTexture = ac.buff.borderTexture or defBuff.borderTexture or "DEFAULT",
+				buffIconShape = GF.NormalizeAuraIconShape(ac.buff.iconShape, defBuff.iconShape or "DEFAULT"),
+				buffBorderTexture = GF.NormalizeAuraBorderTexture(ac.buff.borderTexture, defBuff.borderTexture or "DEFAULT", ac.buff.iconShape or defBuff.iconShape),
 				buffBorderSize = ac.buff.borderSize or defBuff.borderSize or 2,
 				buffBorderOffset = ac.buff.borderOffset or defBuff.borderOffset or 0,
 				buffHelpfulFilterMode = GF.NormalizeBuffHelpfulFilterMode(ac.buff.helpfulFilterMode or defBuff.helpfulFilterMode),
@@ -31572,7 +31761,8 @@ function GF:EnsureEditMode()
 				debuffMax = GF.ClampAuraCount(ac.debuff.max, 6) or 6,
 				debuffDisplayLargerRoleSpecific = GF.IsBlizzardLargerRoleDebuffEnabled(cfg, def),
 				debuffSpacing = ac.debuff.spacing or 2,
-				debuffBorderTexture = ac.debuff.borderTexture or defDebuff.borderTexture or "DEFAULT",
+				debuffIconShape = GF.NormalizeAuraIconShape(ac.debuff.iconShape, defDebuff.iconShape or "DEFAULT"),
+				debuffBorderTexture = GF.NormalizeAuraBorderTexture(ac.debuff.borderTexture, defDebuff.borderTexture or "DEFAULT", ac.debuff.iconShape or defDebuff.iconShape),
 				debuffBorderSize = ac.debuff.borderSize or defDebuff.borderSize or 2,
 				debuffBorderOffset = ac.debuff.borderOffset or defDebuff.borderOffset or 0,
 				debuffShowDispelIcon = (ac.debuff.showDispelIcon ~= nil and ac.debuff.showDispelIcon ~= false) or (ac.debuff.showDispelIcon == nil and defDebuff.showDispelIcon ~= false),
@@ -31601,11 +31791,12 @@ function GF:EnsureEditMode()
 				externalPerRow = ac.externals.perRow or 6,
 				externalMax = GF.ClampAuraCount(ac.externals.max, 4) or 4,
 				externalSpacing = ac.externals.spacing or 2,
+				externalIconShape = GF.NormalizeAuraIconShape(ac.externals.iconShape, defExt.iconShape or "DEFAULT"),
 				externalGlowEnabled = (ac.externals.glowEnabled ~= nil and ac.externals.glowEnabled == true) or (ac.externals.glowEnabled == nil and defExt.glowEnabled == true),
 				externalGlowColor = GF.GetExternalGlowColor(ac.externals, defExt),
-				externalGlowStyle = GF.NormalizeExternalGlowStyle(ac.externals.glowStyle, defExt.glowStyle or "MARCHING_ANTS"),
+				externalGlowStyle = GF.NormalizeExternalGlowStyleForIconShape(ac.externals.glowStyle, defExt.glowStyle or "MARCHING_ANTS", ac.externals.iconShape or defExt.iconShape),
 				externalGlowInset = GF.NormalizeExternalGlowInset(ac.externals.glowInset, defExt.glowInset or 0),
-				externalBorderTexture = ac.externals.borderTexture or defExt.borderTexture or "DEFAULT",
+				externalBorderTexture = GF.NormalizeAuraBorderTexture(ac.externals.borderTexture, defExt.borderTexture or "DEFAULT", ac.externals.iconShape or defExt.iconShape),
 				externalBorderSize = ac.externals.borderSize or defExt.borderSize or 2,
 				externalBorderColor = ac.externals.borderColor or defExt.borderColor or { 1, 0.25, 0.25, 1 },
 				externalBorderOffset = ac.externals.borderOffset or defExt.borderOffset or 0,

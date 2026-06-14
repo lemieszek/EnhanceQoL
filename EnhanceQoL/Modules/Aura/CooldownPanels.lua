@@ -1624,7 +1624,7 @@ cdp.ICON_BORDER = cdp.ICON_BORDER or {
 	OVERLAY_OFFSET_X_NUDGE = 0,
 	ICON_BOTTOM_INSET = 2,
 }
-cdp.ICON_SHAPE = cdp.ICON_SHAPE or addon.IconShape or { DEFAULT = "DEFAULT", SQUARE = "SQUARE", ROUND = "ROUND", STAR = "STAR", HEXAGON = "HEXAGON", DIAMOND = "DIAMOND" }
+cdp.ICON_SHAPE = cdp.ICON_SHAPE or addon.IconShape or { DEFAULT = "DEFAULT", SQUARE = "SQUARE", ROUND = "ROUND", ROUND_STAR = "ROUND_STAR", STAR = "STAR", HEXAGON = "HEXAGON", DIAMOND = "DIAMOND" }
 cdp.ICON_BORDER.SHAPE_ATLASES = cdp.ICON_BORDER.SHAPE_ATLASES or (addon.IconShape and addon.IconShape.BORDER_DEFINITIONS) or {}
 cdp.ICON_BORDER.SHAPE_ATLAS_ORDER = cdp.ICON_BORDER.SHAPE_ATLAS_ORDER or (addon.IconShape and addon.IconShape.BORDER_ORDER) or {}
 
@@ -1729,6 +1729,7 @@ function cdp.ENTRY.GetIconShapeOptions()
 	if addon.IconShape and addon.IconShape.GetOptions then return addon.IconShape.GetOptions(L, { exclude = { STAR = true } }) end
 	return {
 		{ value = "DEFAULT", label = L["settingsIconShapeDefault"] or _G.DEFAULT or "Default" },
+		{ value = "ROUND_STAR", label = L["settingsIconShapeRoundStar"] or "Round star" },
 		{ value = "HEXAGON", label = L["settingsIconShapeHexagon"] or "Hexagon" },
 	}
 end
@@ -8567,7 +8568,7 @@ local function setGlow(frame, enabled, glowColor, glowKey, glowCondition, glowAl
 		state.condition = nil
 		state.alphaOn = nil
 		state.alphaOff = nil
-		if Glow then Glow.Stop(frame, glowKey) end
+		if Glow then Glow.Stop(frame, glowKey, true) end
 		return
 	end
 	local requestedColorR = glowColor and (glowColor[1] or glowColor.r) or nil
@@ -8621,6 +8622,7 @@ local function setGlow(frame, enabled, glowColor, glowKey, glowCondition, glowAl
 		or currentGlowColor[3] ~= normalizedGlowColor[3]
 		or currentGlowColor[4] ~= normalizedGlowColor[4]
 	if Glow and (not wasEnabled or colorChanged or styleChanged or insetChanged or pixelChanged or shapeChanged) then
+		if styleChanged or shapeChanged then Glow.Stop(frame, glowKey, true) end
 		Glow.Start(frame, glowKey, normalizedGlowStyle, {
 			color = normalizedGlowColor,
 			cooldown = frame.cooldown,
@@ -8630,6 +8632,8 @@ local function setGlow(frame, enabled, glowColor, glowKey, glowCondition, glowAl
 			frequency = pixelSpeed,
 			thickness = pixelThickness,
 			shape = frame._eqolGlowShape,
+			hostFrameLevelOffset = 8,
+			frameLevel = 8,
 		})
 	end
 	state.enabled = true

@@ -47,6 +47,7 @@ local function initReminderDefaults()
 	init("mageFoodReminder", false)
 	init("mageFoodReminderPos", { point = defaultPos.point, x = defaultPos.x, y = defaultPos.y })
 	init("mageFoodReminderScale", 1)
+	init("mageFoodReminderIconShape", "DEFAULT")
 	init("mageFoodReminderSound", true)
 	init("mageFoodReminderUseCustomSound", false)
 	init("mageFoodReminderJoinSoundFile", nil)
@@ -86,6 +87,23 @@ local function updateButtonMouseState()
 	end
 end
 
+local function normalizeIconShape(value)
+	if addon.IconShape and addon.IconShape.Normalize then return addon.IconShape.Normalize(value, "DEFAULT") end
+	if type(value) == "string" and value ~= "" then return value end
+	return "DEFAULT"
+end
+
+local function getIconShape() return normalizeIconShape(addon.db and addon.db.mageFoodReminderIconShape) end
+
+local function applyIconShape(button)
+	if not (button and button.icon and addon.IconShape and addon.IconShape.ApplyFrameShape) then return end
+	addon.IconShape.ApplyFrameShape(button, getIconShape(), {
+		textures = { button.icon },
+		maskKey = "_eqolMageFoodReminderMask",
+		textureMaskKey = "_eqolMageFoodReminderTextureMask",
+	})
+end
+
 local function ensureAnchor()
 	if reminderAnchor then return reminderAnchor end
 
@@ -104,7 +122,7 @@ local function ensureAnchor()
 		insets = { left = 3, right = 3, top = 3, bottom = 3 },
 	})
 	anchor:SetBackdropColor(0, 0, 0, 0)
-	anchor:SetBackdropBorderColor(1, 0.82, 0, 0.9)
+	anchor:SetBackdropBorderColor(1, 0.82, 0, 0)
 	anchor:SetAlpha(0.999) -- ensure mouse events
 	anchor:EnableMouse(false)
 	anchor:RegisterForDrag("LeftButton")
@@ -192,6 +210,7 @@ local function applyButtonSettings()
 	if brButton then
 		brButton:ClearAllPoints()
 		brButton:SetAllPoints(anchor)
+		applyIconShape(brButton)
 	end
 	updateButtonMouseState()
 
@@ -206,8 +225,10 @@ local function applyButtonSettings()
 
 	if editModeActive then
 		anchor:SetBackdropColor(0.05, 0.05, 0.05, 0.6)
+		anchor:SetBackdropBorderColor(1, 0.82, 0, 0.9)
 	else
 		anchor:SetBackdropColor(0, 0, 0, 0)
+		anchor:SetBackdropBorderColor(1, 0.82, 0, 0)
 	end
 end
 
@@ -251,12 +272,14 @@ local function createLeaveFrame()
 
 	local bg = brButton:CreateTexture(nil, "BACKGROUND")
 	bg:SetAllPoints(brButton)
-	bg:SetColorTexture(0, 0, 0, 0.8)
+	bg:SetColorTexture(0, 0, 0, 0)
+	brButton.bg = bg
 
 	local icon = brButton:CreateTexture(nil, "ARTWORK")
 	icon:SetAllPoints(brButton)
 	icon:SetTexture(136813) -- door icon
 	brButton.icon = icon
+	applyIconShape(brButton)
 
 	local jumpGroup = brButton:CreateAnimationGroup()
 	local up = jumpGroup:CreateAnimation("Translation")
@@ -306,12 +329,14 @@ local function createBRFrame()
 
 	local bg = brButton:CreateTexture(nil, "BACKGROUND")
 	bg:SetAllPoints(brButton)
-	bg:SetColorTexture(0, 0, 0, 0.8)
+	bg:SetColorTexture(0, 0, 0, 0)
+	brButton.bg = bg
 
 	local icon = brButton:CreateTexture(nil, "ARTWORK")
 	icon:SetAllPoints(brButton)
 	icon:SetTexture(134029)
 	brButton.icon = icon
+	applyIconShape(brButton)
 
 	local jumpGroup = brButton:CreateAnimationGroup()
 	local up = jumpGroup:CreateAnimation("Translation")
@@ -533,6 +558,34 @@ registerEditModeFrame = function()
 						value = 2.0
 					end
 					return string.format("%.2f", value)
+				end,
+			}
+
+			settings[#settings + 1] = {
+				name = L["settingsIconShapeLabel"] or "Icon shape",
+				kind = SettingType.Dropdown,
+				height = 160,
+				default = "DEFAULT",
+				get = getIconShape,
+				set = function(_, value)
+					addon.db.mageFoodReminderIconShape = normalizeIconShape(value)
+					applyButtonSettings()
+				end,
+				generator = function(_, root)
+						local options = addon.IconShape and addon.IconShape.GetOptions and addon.IconShape.GetOptions(L) or {
+							{ value = "DEFAULT", label = _G.DEFAULT or "Default" },
+							{ value = "SQUARE", label = "Square" },
+							{ value = "ROUND", label = "Round" },
+							{ value = "ROUND_STAR", label = L["settingsIconShapeRoundStar"] or "Round star" },
+							{ value = "HEXAGON", label = "Hexagon" },
+							{ value = "DIAMOND", label = "Diamond" },
+						}
+					for _, option in ipairs(options) do
+						root:CreateRadio(option.label, function() return getIconShape() == option.value end, function()
+							addon.db.mageFoodReminderIconShape = normalizeIconShape(option.value)
+							applyButtonSettings()
+						end)
+					end
 				end,
 			}
 		end

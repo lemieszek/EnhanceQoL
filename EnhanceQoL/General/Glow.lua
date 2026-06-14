@@ -37,6 +37,7 @@ local BLIZZARD_ANTS_TEXTURE = [[Interface\SpellActivationOverlay\IconAlertAnts]]
 local PIXEL_GLOW_TEXTURE = [[Interface\Buttons\WHITE8X8]]
 local HEXAGON_BORDER_TEXTURE = [[Interface\AddOns\EnhanceQoL\Assets\hexagon_1px.tga]]
 local DIAMOND_GLOW_TEXTURE = [[Interface\AddOns\EnhanceQoL\Assets\diamond_glow.tga]]
+local ROUND_STAR_GLOW_TEXTURE = [[Interface\AddOns\EnhanceQoL\Assets\round_star_border.tga]]
 local ROUND_PULSING_ATLAS = "ChallengeMode-KeystoneSlotFrameGlow"
 local MARCHING_ANTS_ATLAS = "VisualAlert_Ants_Flipbook"
 local FLASH_GLOW_ATLAS = "UI-CooldownManager-VisualAlert-Glow"
@@ -100,6 +101,16 @@ local function isRoundShape(opts)
 	if type(shape) ~= "string" then return false end
 	shape = shape:upper()
 	return shape == "ROUND" or shape == "CIRCLE"
+end
+
+local function isRoundStarShape(opts)
+	local shape = type(opts) == "table" and opts.shape or nil
+	if addon.IconShape and addon.IconShape.Normalize then
+		return addon.IconShape.Normalize(shape) == addon.IconShape.ROUND_STAR
+	end
+	if type(shape) ~= "string" then return false end
+	shape = shape:upper()
+	return shape == "ROUND_STAR" or shape == "ROUNDSTAR" or shape == "ROUND-STAR"
 end
 
 local function isDiamondShape(opts)
@@ -837,7 +848,7 @@ local function updatePulsingOverlay(host, opts)
 
 	overlay:SetParent(host)
 	overlay:SetFrameStrata(host:GetFrameStrata())
-	if isHexagonShape(opts) or isRoundShape(opts) or isDiamondShape(opts) then frameLevel = max(frameLevel, 8) end
+	if isHexagonShape(opts) or isRoundShape(opts) or isRoundStarShape(opts) or isDiamondShape(opts) then frameLevel = max(frameLevel, 8) end
 	overlay:SetFrameLevel(max(0, (host:GetFrameLevel() or 0) + frameLevel))
 	overlay:ClearAllPoints()
 	overlay:SetPoint("TOPLEFT", host, "TOPLEFT", -inset + xOffset, inset + yOffset)
@@ -888,6 +899,36 @@ local function updatePulsingOverlay(host, opts)
 			if texture then
 				local grow = (3 - i) * max(1, thickness)
 				setFullTexture(texture, DIAMOND_GLOW_TEXTURE)
+				texture:ClearAllPoints()
+				texture:SetPoint("CENTER", overlay, "CENTER", 0, 0)
+				texture:SetSize(width + (grow * 2), height + (grow * 2))
+				texture:SetVertexColor(color[1], color[2], color[3], alphas[i])
+				texture:Show()
+			end
+		end
+		if overlay.AlphaAnim then
+			local frequency = normalizeScalar(opts, "frequency", 0.25) or 0.25
+			overlay.AlphaAnim:SetFromAlpha(color[4] * 0.35)
+			overlay.AlphaAnim:SetToAlpha(color[4])
+			overlay.AlphaAnim:SetDuration(max(0.05, frequency * 2))
+		end
+		return overlay
+	end
+
+	if isRoundStarShape(opts) then
+		for i = 1, 4 do
+			overlay.lines[i]:Hide()
+		end
+		local width, height = getSafeFrameSize(host)
+		width = max(1, width + (inset * 2))
+		height = max(1, height + (inset * 2))
+		local layers = overlay.shapeTextures or {}
+		local alphas = { 0.18, 0.35, 1 }
+		for i = 1, 3 do
+			local texture = layers[i]
+			if texture then
+				local grow = (3 - i) * max(1, thickness)
+				setFullTexture(texture, ROUND_STAR_GLOW_TEXTURE)
 				texture:ClearAllPoints()
 				texture:SetPoint("CENTER", overlay, "CENTER", 0, 0)
 				texture:SetSize(width + (grow * 2), height + (grow * 2))
@@ -1225,6 +1266,26 @@ local function stopBlizzard(host)
 	end
 end
 
+local function stopBackendImmediately(host)
+	if not host then return end
+	stopMarchingAnts(host)
+	stopFlash(host)
+	stopPixel(host)
+	stopPulsing(host)
+	local overlay = host._eqolBlizzardOverlay
+	if overlay then
+		if overlay.animIn and overlay.animIn:IsPlaying() then overlay.animIn:Stop() end
+		if overlay.animOut and overlay.animOut:IsPlaying() then overlay.animOut:Stop() end
+		resetBlizzardOverlayVisuals(overlay)
+		overlay:Hide()
+	end
+	if LCG then
+		if LCG.ButtonGlow_Stop then LCG.ButtonGlow_Stop(host) end
+		if LCG.AutoCastGlow_Stop then LCG.AutoCastGlow_Stop(host, "") end
+		if LCG.ProcGlow_Stop then LCG.ProcGlow_Stop(host, "") end
+	end
+end
+
 local BACKENDS = {
 	[Glow.STYLE.BLIZZARD] = {
 		start = function(host, opts) startBlizzard(host, opts) end,
@@ -1375,10 +1436,14 @@ end
 
 function Glow.Refresh(target, key, style, opts) return Glow.Start(target, key, style, opts) end
 
-function Glow.Stop(target, key)
+function Glow.Stop(target, key, immediate)
 	local state = getState(target, normalizeKey(key), false)
 	if not state then return end
-	stopBackend(state)
+	if immediate then
+		stopBackendImmediately(state.host)
+	else
+		stopBackend(state)
+	end
 	state.active = false
 	state.style = nil
 	state.alphaMode = nil

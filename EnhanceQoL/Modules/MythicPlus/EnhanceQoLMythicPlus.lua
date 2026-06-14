@@ -258,6 +258,73 @@ end
 
 local function getBRConfiguredIcon() return normalizeBRIcon(addon.db and addon.db["mythicPlusBRTrackerIcon"]) end
 
+local function normalizeTrackerIconShape(value, fallback)
+	if addon.IconShape and addon.IconShape.Normalize then return addon.IconShape.Normalize(value, fallback or "DEFAULT") end
+	if type(value) == "string" and value ~= "" then return value end
+	return fallback or "DEFAULT"
+end
+
+local function isTrackerBackdropBorderCompatible(shape)
+	if addon.IconShape and addon.IconShape.IsBackdropBorderCompatible then return addon.IconShape.IsBackdropBorderCompatible(shape) end
+	shape = normalizeTrackerIconShape(shape, "DEFAULT")
+	return shape == "DEFAULT" or shape == "SQUARE"
+end
+
+local function getBRIconShape() return normalizeTrackerIconShape(addon.db and addon.db["mythicPlusBRTrackerIconShape"], "DEFAULT") end
+
+local function getBloodlustIconShape() return normalizeTrackerIconShape(addon.db and addon.db["mythicPlusBloodlustTrackerIconShape"], "DEFAULT") end
+
+local function normalizeTrackerShapeBorderTexture(value, shape)
+	if addon.IconShape and addon.IconShape.NormalizeBorder then return addon.IconShape.NormalizeBorder(value, "DEFAULT", shape, { allowNone = true }) end
+	if type(value) ~= "string" or value == "" then return "DEFAULT" end
+	return value
+end
+
+local function getTrackerBorderOptions(shape)
+	if addon.IconShape and addon.IconShape.GetBorderOptions then
+		return addon.IconShape.GetBorderOptions(L, shape, {
+			defaultOptions = {
+				{ value = "DEFAULT", label = _G.DEFAULT or "Default" },
+				{ value = "SOLID", label = "Solid" },
+			},
+			includeNone = true,
+			noneLabel = _G.NONE or "None",
+		})
+	end
+	return nil
+end
+
+local function getTrackerIconShapeOptions()
+	if addon.IconShape and addon.IconShape.GetOptions then return addon.IconShape.GetOptions(L) end
+	return {
+		{ value = "DEFAULT", label = _G.DEFAULT or "Default" },
+		{ value = "SQUARE", label = "Square" },
+		{ value = "ROUND", label = "Round" },
+		{ value = "ROUND_STAR", label = L["settingsIconShapeRoundStar"] or "Round star" },
+		{ value = "HEXAGON", label = "Hexagon" },
+		{ value = "DIAMOND", label = "Diamond" },
+	}
+end
+
+local function applyTrackerIconShape(frame, texture, cooldown, shape)
+	if not (frame and texture and addon.IconShape and addon.IconShape.ApplyFrameShape) then return end
+	shape = normalizeTrackerIconShape(shape, "DEFAULT")
+	addon.IconShape.ApplyFrameShape(frame, shape, {
+		textures = { texture },
+		cooldown = cooldown,
+		maskKey = "_eqolMythicTrackerMask",
+		textureMaskKey = "_eqolMythicTrackerTextureMask",
+	})
+end
+
+addon.MythicPlus.functions.NormalizeTrackerIconShape = normalizeTrackerIconShape
+addon.MythicPlus.functions.GetBRConfiguredIcon = getBRConfiguredIcon
+addon.MythicPlus.functions.GetBRIconShape = getBRIconShape
+addon.MythicPlus.functions.GetBloodlustIconShape = getBloodlustIconShape
+addon.MythicPlus.functions.GetTrackerBorderOptions = getTrackerBorderOptions
+addon.MythicPlus.functions.GetTrackerIconShapeOptions = getTrackerIconShapeOptions
+addon.MythicPlus.functions.ApplyTrackerIconShape = applyTrackerIconShape
+
 local function normalizeTrackerIconZoom(value)
 	local zoom = tonumber(value) or 0
 	zoom = math.floor(zoom + 0.5)
@@ -271,6 +338,8 @@ local function applyTrackerIconZoom(texture, zoom)
 	local inset = normalizeTrackerIconZoom(zoom) / 100
 	texture:SetTexCoord(inset, 1 - inset, inset, 1 - inset)
 end
+
+addon.MythicPlus.functions.ApplyTrackerIconZoom = applyTrackerIconZoom
 
 local function normalizeBRTextPoint(value, fallback)
 	if type(value) == "string" and BR_TEXT_POINT_SET[value] then return value end
@@ -401,6 +470,7 @@ local function getBRCachedMediaNames(mediaType)
 end
 
 local function normalizeBRBorderTexture(value)
+	value = normalizeTrackerShapeBorderTexture(value, getBRIconShape())
 	if type(value) ~= "string" or value == "" then return "DEFAULT" end
 	if value == "DEFAULT" or value == "SOLID" then return value end
 	return value
@@ -436,9 +506,27 @@ end
 
 local function applyBRBorderFrame(frame, target, enabled, textureKey, borderSize, borderOffset, borderColor)
 	if not frame or not target or not frame.SetBackdrop then return end
-	if not enabled then
+	local shape = getBRIconShape()
+	local owner = target.GetObjectType and target:GetObjectType() == "Texture" and target:GetParent() or target
+	if addon.IconShape and addon.IconShape.HideBorderTextures then addon.IconShape.HideBorderTextures(owner) end
+	if not enabled or (addon.IconShape and addon.IconShape.IsNoBorder and addon.IconShape.IsNoBorder(textureKey)) then
 		frame:SetBackdrop(nil)
 		frame:Hide()
+		return
+	end
+
+	if not isTrackerBackdropBorderCompatible(shape) then
+		frame:SetBackdrop(nil)
+		frame:Hide()
+		if addon.IconShape and addon.IconShape.ApplyBorder then
+			addon.IconShape.ApplyBorder(owner, textureKey, shape, {
+				borderSize = borderSize,
+				borderOffset = borderOffset,
+				color = borderColor,
+				drawLayer = "OVERLAY",
+				subLevel = 4,
+			})
+		end
 		return
 	end
 
@@ -582,7 +670,7 @@ local function applyBRCooldownVisualSettings()
 	local db = addon.db or {}
 	if brButton and brButton.cooldownFrame then
 		local cooldown = brButton.cooldownFrame
-		if cooldown.SetDrawSwipe then cooldown:SetDrawSwipe(db["mythicPlusBRTrackerCooldownDrawSwipe"] ~= false) end
+		if cooldown.SetDrawSwipe then cooldown:SetDrawSwipe(isTrackerBackdropBorderCompatible(getBRIconShape()) and db["mythicPlusBRTrackerCooldownDrawSwipe"] ~= false) end
 		if cooldown.SetDrawEdge then cooldown:SetDrawEdge(db["mythicPlusBRTrackerCooldownDrawEdge"] == true) end
 		if cooldown.SetDrawBling then cooldown:SetDrawBling(db["mythicPlusBRTrackerCooldownDrawBling"] == true) end
 		applyBRLiveCooldownTextStyle(true)
@@ -731,6 +819,7 @@ local function applyBRLayoutData(data)
 	local size = normalizeBRSize(addon.db["mythicPlusBRButtonSize"] or config.size or defaultButtonSize)
 	local iconId = normalizeBRIcon(addon.db["mythicPlusBRTrackerIcon"])
 	local iconZoom = normalizeTrackerIconZoom(addon.db["mythicPlusBRTrackerIconZoom"])
+	local iconShape = getBRIconShape()
 	local borderEnabled = addon.db["mythicPlusBRTrackerBorderEnabled"] ~= false
 	local borderTexture = normalizeBRBorderTexture(addon.db["mythicPlusBRTrackerBorderTexture"])
 	local borderSize = normalizeBRBorderSize(addon.db["mythicPlusBRTrackerBorderSize"])
@@ -765,6 +854,7 @@ local function applyBRLayoutData(data)
 		addon.db["mythicPlusBRButtonSize"] = size
 		addon.db["mythicPlusBRTrackerIcon"] = iconId
 		addon.db["mythicPlusBRTrackerIconZoom"] = iconZoom
+		addon.db["mythicPlusBRTrackerIconShape"] = iconShape
 		addon.db["mythicPlusBRTrackerBorderEnabled"] = borderEnabled
 		addon.db["mythicPlusBRTrackerBorderTexture"] = borderTexture
 		addon.db["mythicPlusBRTrackerBorderSize"] = borderSize
@@ -802,6 +892,7 @@ local function applyBRLayoutData(data)
 			brAnchor.previewIcon:SetAllPoints(brAnchor)
 			brAnchor.previewIcon:SetTexture(iconId)
 			applyTrackerIconZoom(brAnchor.previewIcon, iconZoom)
+			applyTrackerIconShape(brAnchor, brAnchor.previewIcon, nil, iconShape)
 		end
 	end
 
@@ -813,6 +904,7 @@ local function applyBRLayoutData(data)
 		if brButton.icon then
 			brButton.icon:SetTexture(iconId)
 			applyTrackerIconZoom(brButton.icon, iconZoom)
+			applyTrackerIconShape(brButton, brButton.icon, brButton.cooldownFrame, iconShape)
 		end
 	end
 
@@ -841,8 +933,9 @@ local function ensureBRAnchor()
 
 		brAnchor.previewIcon = brAnchor:CreateTexture(nil, "ARTWORK")
 		brAnchor.previewIcon:SetAllPoints(brAnchor)
-		brAnchor.previewIcon:SetTexture(getBRConfiguredIcon())
-		applyTrackerIconZoom(brAnchor.previewIcon, addon.db and addon.db["mythicPlusBRTrackerIconZoom"])
+		brAnchor.previewIcon:SetTexture(addon.MythicPlus.functions.GetBRConfiguredIcon())
+		addon.MythicPlus.functions.ApplyTrackerIconZoom(brAnchor.previewIcon, addon.db and addon.db["mythicPlusBRTrackerIconZoom"])
+		addon.MythicPlus.functions.ApplyTrackerIconShape(brAnchor, brAnchor.previewIcon, nil, addon.MythicPlus.functions.GetBRIconShape())
 
 		brAnchor.previewBorder = CreateFrame("Frame", nil, brAnchor, "BackdropTemplate")
 		brAnchor.previewBorder:SetFrameLevel((brAnchor:GetFrameLevel() or 0) + 4)
@@ -1116,6 +1209,38 @@ local function ensureBRAnchor()
 					end,
 				},
 				{
+					name = L["settingsIconShapeLabel"] or "Icon shape",
+					kind = settingType.Dropdown,
+					parentId = "mythicPlusBRTrackerLayout",
+					height = 160,
+					default = "DEFAULT",
+					get = function() return addon.MythicPlus.functions.GetBRIconShape() end,
+					set = function(_, value)
+						if addon.db then
+							addon.db["mythicPlusBRTrackerIconShape"] = addon.MythicPlus.functions.NormalizeTrackerIconShape(value, "DEFAULT")
+							addon.db["mythicPlusBRTrackerBorderTexture"] = normalizeBRBorderTexture(addon.db["mythicPlusBRTrackerBorderTexture"])
+						end
+						applyBRLayoutData()
+						if addon.EditModeLib and addon.EditModeLib.internal and addon.EditModeLib.internal.RefreshSettingValues then addon.EditModeLib.internal:RefreshSettingValues() end
+						if EditMode and EditMode.RefreshFrame then EditMode:RefreshFrame(BR_EDITMODE_ID) end
+					end,
+					generator = function(_, root)
+						local options = addon.MythicPlus.functions.GetTrackerIconShapeOptions()
+						for i = 1, #options do
+							local option = options[i]
+							root:CreateRadio(option.label, function() return addon.MythicPlus.functions.GetBRIconShape() == option.value end, function()
+								if addon.db then
+									addon.db["mythicPlusBRTrackerIconShape"] = addon.MythicPlus.functions.NormalizeTrackerIconShape(option.value, "DEFAULT")
+									addon.db["mythicPlusBRTrackerBorderTexture"] = normalizeBRBorderTexture(addon.db["mythicPlusBRTrackerBorderTexture"])
+								end
+								applyBRLayoutData()
+								if addon.EditModeLib and addon.EditModeLib.internal and addon.EditModeLib.internal.RefreshSettingValues then addon.EditModeLib.internal:RefreshSettingValues() end
+								if EditMode and EditMode.RefreshFrame then EditMode:RefreshFrame(BR_EDITMODE_ID) end
+							end)
+						end
+					end,
+				},
+				{
 					name = "Border",
 					kind = settingType.Collapsible,
 					id = "mythicPlusBRTrackerBorder",
@@ -1140,17 +1265,19 @@ local function ensureBRAnchor()
 					set = function(_, value)
 						if addon.db then addon.db["mythicPlusBRTrackerBorderTexture"] = normalizeBRBorderTexture(value) end
 						applyBRBorderVisualSettings()
+						if addon.EditModeLib and addon.EditModeLib.internal and addon.EditModeLib.internal.RefreshSettingValues then addon.EditModeLib.internal:RefreshSettingValues() end
 					end,
 					generator = function(_, root)
-						local options = buildBorderEntries()
+						local options = addon.MythicPlus.functions.GetTrackerBorderOptions(addon.MythicPlus.functions.GetBRIconShape()) or buildBorderEntries()
 						for i = 1, #options do
 							local option = options[i]
 							root:CreateRadio(
 								option.label,
 								function() return normalizeBRBorderTexture(addon.db and addon.db["mythicPlusBRTrackerBorderTexture"]) == option.value end,
 								function()
-									if addon.db then addon.db["mythicPlusBRTrackerBorderTexture"] = option.value end
+									if addon.db then addon.db["mythicPlusBRTrackerBorderTexture"] = normalizeBRBorderTexture(option.value) end
 									applyBRBorderVisualSettings()
+									if addon.EditModeLib and addon.EditModeLib.internal and addon.EditModeLib.internal.RefreshSettingValues then addon.EditModeLib.internal:RefreshSettingValues() end
 								end
 							)
 						end
@@ -1651,7 +1778,8 @@ local function createBRFrame()
 
 		local bg = brButton:CreateTexture(nil, "BACKGROUND")
 		bg:SetAllPoints(brButton)
-		bg:SetColorTexture(0, 0, 0, 0.8)
+		bg:SetColorTexture(0, 0, 0, 0)
+		brButton.bg = bg
 
 		local icon = brButton:CreateTexture(nil, "ARTWORK")
 		icon:SetAllPoints(brButton)
@@ -1737,6 +1865,7 @@ local function getCachedMediaNames(mediaType)
 end
 
 local function normalizeBloodlustBorderTexture(value)
+	value = normalizeTrackerShapeBorderTexture(value, getBloodlustIconShape())
 	if type(value) ~= "string" or value == "" then return "DEFAULT" end
 	if value == "DEFAULT" or value == "SOLID" then return value end
 	return value
@@ -1851,13 +1980,32 @@ local function applyBloodlustAnchorPreviewIcon()
 	if not (bloodlustAnchor and bloodlustAnchor.previewIcon) then return end
 	bloodlustAnchor.previewIcon:SetTexture(getBloodlustConfiguredIcon())
 	applyTrackerIconZoom(bloodlustAnchor.previewIcon, addon.db and addon.db["mythicPlusBloodlustTrackerIconZoom"])
+	applyTrackerIconShape(bloodlustAnchor, bloodlustAnchor.previewIcon, nil, getBloodlustIconShape())
 end
 
 local function applyBloodlustBorderFrame(frame, target, enabled, textureKey, borderSize, borderOffset, borderColor)
 	if not frame or not target or not frame.SetBackdrop then return end
-	if not enabled then
+	local shape = getBloodlustIconShape()
+	local owner = target.GetObjectType and target:GetObjectType() == "Texture" and target:GetParent() or target
+	if addon.IconShape and addon.IconShape.HideBorderTextures then addon.IconShape.HideBorderTextures(owner) end
+	if not enabled or (addon.IconShape and addon.IconShape.IsNoBorder and addon.IconShape.IsNoBorder(textureKey)) then
 		frame:SetBackdrop(nil)
 		frame:Hide()
+		return
+	end
+
+	if not isTrackerBackdropBorderCompatible(shape) then
+		frame:SetBackdrop(nil)
+		frame:Hide()
+		if addon.IconShape and addon.IconShape.ApplyBorder then
+			addon.IconShape.ApplyBorder(owner, textureKey, shape, {
+				borderSize = borderSize,
+				borderOffset = borderOffset,
+				color = borderColor,
+				drawLayer = "OVERLAY",
+				subLevel = 4,
+			})
+		end
 		return
 	end
 
@@ -1936,7 +2084,7 @@ local function applyBloodlustCooldownVisualSettings()
 	local db = addon.db or {}
 	if bloodlustButton and bloodlustButton.cooldownFrame then
 		local cooldown = bloodlustButton.cooldownFrame
-		if cooldown.SetDrawSwipe then cooldown:SetDrawSwipe(db["mythicPlusBloodlustTrackerCooldownDrawSwipe"] ~= false) end
+		if cooldown.SetDrawSwipe then cooldown:SetDrawSwipe(isTrackerBackdropBorderCompatible(getBloodlustIconShape()) and db["mythicPlusBloodlustTrackerCooldownDrawSwipe"] ~= false) end
 		if cooldown.SetDrawEdge then cooldown:SetDrawEdge(db["mythicPlusBloodlustTrackerCooldownDrawEdge"] == true) end
 		if cooldown.SetDrawBling then cooldown:SetDrawBling(db["mythicPlusBloodlustTrackerCooldownDrawBling"] == true) end
 		applyBloodlustLiveCooldownTextStyle(true)
@@ -2014,6 +2162,7 @@ local function applyBloodlustLayoutData(data)
 	local size = normalizeBloodlustSize(addon.db["mythicPlusBloodlustButtonSize"] or config.size or defaultButtonSize)
 	local iconId = normalizeBloodlustIcon(addon.db["mythicPlusBloodlustTrackerIcon"])
 	local iconZoom = normalizeTrackerIconZoom(addon.db["mythicPlusBloodlustTrackerIconZoom"])
+	local iconShape = getBloodlustIconShape()
 	local cooldownTextSize = normalizeBloodlustCooldownTextSize(addon.db["mythicPlusBloodlustTrackerCooldownTextSize"])
 	local cooldownTextOutline = normalizeBloodlustCooldownOutline(addon.db["mythicPlusBloodlustTrackerCooldownTextOutline"])
 	local cooldownTextColor = normalizeBloodlustCooldownColor(addon.db["mythicPlusBloodlustTrackerCooldownTextColor"])
@@ -2035,6 +2184,7 @@ local function applyBloodlustLayoutData(data)
 		addon.db["mythicPlusBloodlustButtonSize"] = size
 		addon.db["mythicPlusBloodlustTrackerIcon"] = iconId
 		addon.db["mythicPlusBloodlustTrackerIconZoom"] = iconZoom
+		addon.db["mythicPlusBloodlustTrackerIconShape"] = iconShape
 		addon.db["mythicPlusBloodlustTrackerCooldownTextSize"] = cooldownTextSize
 		addon.db["mythicPlusBloodlustTrackerCooldownTextOutline"] = cooldownTextOutline
 		addon.db["mythicPlusBloodlustTrackerCooldownTextColor"] = cooldownTextColor
@@ -2068,6 +2218,7 @@ local function applyBloodlustLayoutData(data)
 		if timerFontSize < 10 then timerFontSize = 10 end
 		bloodlustButton.defaultIcon = iconId
 		if bloodlustButton.icon then applyTrackerIconZoom(bloodlustButton.icon, iconZoom) end
+		if bloodlustButton.icon then applyTrackerIconShape(bloodlustButton, bloodlustButton.icon, bloodlustButton.cooldownFrame, iconShape) end
 		if bloodlustButton.status then bloodlustButton.status:SetFont(addon.variables.defaultFont, timerFontSize, "OUTLINE") end
 		if bloodlustButton.cooldownFrame then bloodlustButton.cooldownFrame:SetScale(1) end
 	end
@@ -2428,6 +2579,40 @@ local function ensureBloodlustAnchor()
 					end,
 				},
 				{
+					name = L["settingsIconShapeLabel"] or "Icon shape",
+					kind = settingType.Dropdown,
+					parentId = "mythicPlusBloodlustTrackerLayout",
+					height = 160,
+					default = "DEFAULT",
+					get = getBloodlustIconShape,
+					set = function(_, value)
+						if addon.db then
+							addon.db["mythicPlusBloodlustTrackerIconShape"] = normalizeTrackerIconShape(value, "DEFAULT")
+							addon.db["mythicPlusBloodlustTrackerBorderTexture"] = normalizeBloodlustBorderTexture(addon.db["mythicPlusBloodlustTrackerBorderTexture"])
+						end
+						applyBloodlustLayoutData()
+						if addon.MythicPlus and addon.MythicPlus.functions and addon.MythicPlus.functions.refreshBloodlustTracker then addon.MythicPlus.functions.refreshBloodlustTracker(false) end
+						if addon.EditModeLib and addon.EditModeLib.internal and addon.EditModeLib.internal.RefreshSettingValues then addon.EditModeLib.internal:RefreshSettingValues() end
+						if EditMode and EditMode.RefreshFrame then EditMode:RefreshFrame(BLOODLUST_EDITMODE_ID) end
+					end,
+					generator = function(_, root)
+						local options = getTrackerIconShapeOptions()
+						for i = 1, #options do
+							local option = options[i]
+							root:CreateRadio(option.label, function() return getBloodlustIconShape() == option.value end, function()
+								if addon.db then
+									addon.db["mythicPlusBloodlustTrackerIconShape"] = normalizeTrackerIconShape(option.value, "DEFAULT")
+									addon.db["mythicPlusBloodlustTrackerBorderTexture"] = normalizeBloodlustBorderTexture(addon.db["mythicPlusBloodlustTrackerBorderTexture"])
+								end
+								applyBloodlustLayoutData()
+								if addon.MythicPlus and addon.MythicPlus.functions and addon.MythicPlus.functions.refreshBloodlustTracker then addon.MythicPlus.functions.refreshBloodlustTracker(false) end
+								if addon.EditModeLib and addon.EditModeLib.internal and addon.EditModeLib.internal.RefreshSettingValues then addon.EditModeLib.internal:RefreshSettingValues() end
+								if EditMode and EditMode.RefreshFrame then EditMode:RefreshFrame(BLOODLUST_EDITMODE_ID) end
+							end)
+						end
+					end,
+				},
+				{
 					name = L["Border"] or "Border",
 					kind = settingType.Collapsible,
 					id = "mythicPlusBloodlustTrackerBorder",
@@ -2452,17 +2637,19 @@ local function ensureBloodlustAnchor()
 					set = function(_, value)
 						if addon.db then addon.db["mythicPlusBloodlustTrackerBorderTexture"] = normalizeBloodlustBorderTexture(value) end
 						applyBloodlustBorderVisualSettings()
+						if addon.EditModeLib and addon.EditModeLib.internal and addon.EditModeLib.internal.RefreshSettingValues then addon.EditModeLib.internal:RefreshSettingValues() end
 					end,
 					generator = function(_, root)
-						local options = buildBorderEntries()
+						local options = getTrackerBorderOptions(getBloodlustIconShape()) or buildBorderEntries()
 						for i = 1, #options do
 							local option = options[i]
 							root:CreateRadio(
 								option.label,
 								function() return normalizeBloodlustBorderTexture(addon.db and addon.db["mythicPlusBloodlustTrackerBorderTexture"]) == option.value end,
 								function()
-									if addon.db then addon.db["mythicPlusBloodlustTrackerBorderTexture"] = option.value end
+									if addon.db then addon.db["mythicPlusBloodlustTrackerBorderTexture"] = normalizeBloodlustBorderTexture(option.value) end
 									applyBloodlustBorderVisualSettings()
+									if addon.EditModeLib and addon.EditModeLib.internal and addon.EditModeLib.internal.RefreshSettingValues then addon.EditModeLib.internal:RefreshSettingValues() end
 								end
 							)
 						end
@@ -2943,7 +3130,8 @@ local function createBloodlustFrame()
 
 		local bg = bloodlustButton:CreateTexture(nil, "BACKGROUND")
 		bg:SetAllPoints(bloodlustButton)
-		bg:SetColorTexture(0, 0, 0, 0.8)
+		bg:SetColorTexture(0, 0, 0, 0)
+		bloodlustButton.bg = bg
 
 		local icon = bloodlustButton:CreateTexture(nil, "ARTWORK")
 		icon:SetAllPoints(bloodlustButton)

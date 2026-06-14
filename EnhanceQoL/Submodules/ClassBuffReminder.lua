@@ -92,6 +92,7 @@ local BORDER_SIZE_MIN = 1
 local BORDER_SIZE_MAX = 24
 local BORDER_OFFSET_MIN = -20
 local BORDER_OFFSET_MAX = 20
+Reminder.DB_ICON_SHAPE = Reminder.DB_ICON_SHAPE or "classBuffReminderIconShape"
 
 Reminder.runeTracking = Reminder.runeTracking or {
 	auraIds = {
@@ -290,6 +291,7 @@ Reminder.defaults = Reminder.defaults
 		displayMode = DISPLAY_MODE_ICON_ONLY,
 		growthDirection = GROWTH_RIGHT,
 		growthFromCenter = false,
+		iconShape = "DEFAULT",
 		trackFlasks = false,
 		trackFlasksContent = Reminder.CreateDefaultTrackingContentSelection(),
 		trackFlasksInstanceOnly = false,
@@ -360,6 +362,7 @@ if defaults.borderTexture == nil or defaults.borderTexture == "" then defaults.b
 if defaults.borderSize == nil then defaults.borderSize = 1 end
 if defaults.borderOffset == nil then defaults.borderOffset = 0 end
 if type(defaults.borderColor) ~= "table" then defaults.borderColor = { r = 1, g = 1, b = 1, a = 1 } end
+if defaults.iconShape == nil then defaults.iconShape = "DEFAULT" end
 
 local PROVIDER_SCOPE_GROUP = "GROUP"
 local PROVIDER_SCOPE_SELF = "SELF"
@@ -967,9 +970,51 @@ local function normalizeTextOutline(value)
 end
 
 local function normalizeBorderTexture(value)
+	if addon.IconShape and addon.IconShape.NormalizeBorder then return addon.IconShape.NormalizeBorder(value, defaults.borderTexture or "DEFAULT", Reminder:GetIconShape(), { allowNone = true }) end
 	if type(value) ~= "string" or value == "" then return defaults.borderTexture or "DEFAULT" end
 	if value == "DEFAULT" or value == "SOLID" then return value end
 	return value
+end
+
+function Reminder.NormalizeIconShape(value, fallback)
+	if addon.IconShape and addon.IconShape.Normalize then return addon.IconShape.Normalize(value, fallback or defaults.iconShape or "DEFAULT") end
+	if type(value) == "string" and value ~= "" then return value end
+	return fallback or defaults.iconShape or "DEFAULT"
+end
+
+function Reminder.IsBackdropBorderCompatible(shape)
+	if addon.IconShape and addon.IconShape.IsBackdropBorderCompatible then return addon.IconShape.IsBackdropBorderCompatible(shape) end
+	shape = Reminder.NormalizeIconShape(shape, "DEFAULT")
+	return shape == "DEFAULT" or shape == "SQUARE"
+end
+
+function Reminder.IsShapeBorderPath(shape)
+	return not Reminder.IsBackdropBorderCompatible(shape)
+end
+
+function Reminder.GetBorderOptions(shape)
+	if addon.IconShape and addon.IconShape.GetBorderOptions then
+		return addon.IconShape.GetBorderOptions(L, shape, {
+			defaultOptions = {
+				{ value = "DEFAULT", label = _G.DEFAULT or "Default" },
+				{ value = "SOLID", label = "Solid" },
+			},
+			includeNone = true,
+			noneLabel = _G.NONE or "None",
+		})
+	end
+	local options = {
+		{ value = "DEFAULT", label = _G.DEFAULT or "Default" },
+		{ value = "SOLID", label = "Solid" },
+	}
+	local mediaOptions = addon.functions and addon.functions.GetLSMMediaOptions and addon.functions.GetLSMMediaOptions("border") or {}
+	for i = 1, #mediaOptions do
+		options[#options + 1] = {
+			value = mediaOptions[i].value,
+			label = mediaOptions[i].label,
+		}
+	end
+	return options
 end
 
 local function resolveBorderTexture(value)
@@ -1018,6 +1063,7 @@ Reminder.GLOW_STYLE_OPTIONS = Reminder.GLOW_STYLE_OPTIONS
 		{ value = "BLIZZARD", labelKey = "Blizzard", fallback = "Blizzard" },
 		{ value = "MARCHING_ANTS", labelKey = "Marching ants", fallback = "Marching ants" },
 		{ value = "FLASH", labelKey = "Flash", fallback = "Flash" },
+		{ value = "PULSING", labelKey = "Pulsing", fallback = "Pulsing" },
 	}
 
 local function normalizeGlowStyle(value)
@@ -1025,7 +1071,23 @@ local function normalizeGlowStyle(value)
 	if normalized == "BLIZZARD" or normalized == "CLASSIC" or normalized == "BUTTON_GLOW" then return "BLIZZARD" end
 	if normalized == "MARCHING_ANTS" or normalized == "MARCHINGANTS" or normalized == "ANTS" then return "MARCHING_ANTS" end
 	if normalized == "FLASH" then return "FLASH" end
+	if normalized == "PULSING" or normalized == "PULSE" then return "PULSING" end
 	return "MARCHING_ANTS"
+end
+
+function Reminder.NormalizeGlowStyleForIconShape(value, shape)
+	shape = Reminder.NormalizeIconShape(shape, defaults.iconShape or "DEFAULT")
+	if not Reminder.IsBackdropBorderCompatible(shape) then return "PULSING" end
+	return normalizeGlowStyle(value)
+end
+
+function Reminder.GetGlowStyleOptions(shape)
+	if not Reminder.IsBackdropBorderCompatible(shape) then
+		for _, option in ipairs(Reminder.GLOW_STYLE_OPTIONS or {}) do
+			if option.value == "PULSING" then return { option } end
+		end
+	end
+	return Reminder.GLOW_STYLE_OPTIONS or {}
 end
 
 local function normalizeGlowInset(value)
@@ -1053,21 +1115,6 @@ local function centeredAxisOffset(index, count, step)
 	local spacing = tonumber(step)
 	if not idx or not total or not spacing then return 0 end
 	return ((idx - 1) - ((total - 1) / 2)) * spacing
-end
-
-local function getBorderOptions()
-	local options = {
-		{ value = "DEFAULT", label = _G.DEFAULT or "Default" },
-		{ value = "SOLID", label = "Solid" },
-	}
-	local mediaOptions = addon.functions and addon.functions.GetLSMMediaOptions and addon.functions.GetLSMMediaOptions("border") or {}
-	for i = 1, #mediaOptions do
-		options[#options + 1] = {
-			value = mediaOptions[i].value,
-			label = mediaOptions[i].label,
-		}
-	end
-	return options
 end
 
 local function safeIsPlayerSpell(spellId)
@@ -3719,7 +3766,9 @@ end
 
 function Reminder:GetGrowthDirection() return normalizeGrowthDirection(getValue(DB_GROWTH_DIRECTION, defaults.growthDirection)) end
 
-function Reminder:GetGlowStyle() return normalizeGlowStyle(getValue(DB_GLOW_STYLE, defaults.glowStyle)) end
+function Reminder:GetIconShape() return Reminder.NormalizeIconShape(getValue(Reminder.DB_ICON_SHAPE, defaults.iconShape), defaults.iconShape or "DEFAULT") end
+
+function Reminder:GetGlowStyle() return Reminder.NormalizeGlowStyleForIconShape(getValue(DB_GLOW_STYLE, defaults.glowStyle), self:GetIconShape()) end
 
 function Reminder:GetGlowInset() return normalizeGlowInset(getValue(DB_GLOW_INSET, defaults.glowInset)) end
 function Reminder:GetGlowColor() return normalizeColor(getValue(DB_GLOW_COLOR, defaults.glowColor), defaults.glowColor) end
@@ -3737,6 +3786,58 @@ function Reminder:GetIconCountTextStyle()
 	local offsetX = clamp(getValue(DB_XY_TEXT_OFFSET_X, defaults.xyTextOffsetX), -60, 60, defaults.xyTextOffsetX)
 	local offsetY = clamp(getValue(DB_XY_TEXT_OFFSET_Y, defaults.xyTextOffsetY), -60, 60, defaults.xyTextOffsetY)
 	return size, outline, r, g, b, a, offsetX, offsetY
+end
+
+function Reminder:ApplyIconShape(frame, texture, shape)
+	if not (addon.IconShape and addon.IconShape.ApplyFrameShape and frame) then return end
+	shape = Reminder.NormalizeIconShape(shape or self:GetIconShape(), defaults.iconShape or "DEFAULT")
+	addon.IconShape.ApplyFrameShape(frame, shape, {
+		textures = { texture },
+		maskKey = "_eqolClassBuffReminderMask",
+		textureMaskKey = "_eqolClassBuffReminderTextureMask",
+	})
+end
+
+function Reminder:ApplyShapeBorder(frame, backdropFrame, enabled, borderTexture, borderSize, borderOffset, r, g, b, a, shape)
+	shape = Reminder.NormalizeIconShape(shape or self:GetIconShape(), defaults.iconShape or "DEFAULT")
+	if addon.IconShape and addon.IconShape.HideBorderTextures then addon.IconShape.HideBorderTextures(frame) end
+	if not enabled or (addon.IconShape and addon.IconShape.IsNoBorder and addon.IconShape.IsNoBorder(borderTexture)) then
+		if backdropFrame and backdropFrame.SetBackdrop then
+			backdropFrame:SetBackdrop(nil)
+			backdropFrame:Hide()
+		end
+		return
+	end
+	if not Reminder.IsShapeBorderPath(shape) then
+		if not (backdropFrame and backdropFrame.SetBackdrop) then return end
+		backdropFrame:SetFrameStrata(frame:GetFrameStrata())
+		backdropFrame:SetFrameLevel((frame:GetFrameLevel() or 0) + 1)
+		backdropFrame:SetBackdrop({
+			edgeFile = resolveBorderTexture(borderTexture),
+			edgeSize = borderSize,
+			insets = { left = 0, right = 0, top = 0, bottom = 0 },
+		})
+		backdropFrame:SetBackdropBorderColor(r, g, b, a)
+		backdropFrame:SetBackdropColor(0, 0, 0, 0)
+		backdropFrame:ClearAllPoints()
+		backdropFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", -borderOffset, borderOffset)
+		backdropFrame:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", borderOffset, -borderOffset)
+		backdropFrame:Show()
+		return
+	end
+	if backdropFrame and backdropFrame.SetBackdrop then
+		backdropFrame:SetBackdrop(nil)
+		backdropFrame:Hide()
+	end
+	if addon.IconShape and addon.IconShape.ApplyBorder then
+		addon.IconShape.ApplyBorder(frame, borderTexture, shape, {
+			borderSize = borderSize,
+			borderOffset = borderOffset,
+			color = { r, g, b, a },
+			drawLayer = "OVERLAY",
+			subLevel = 4,
+		})
+	end
 end
 
 function Reminder:BuildMissingSoundOptions()
@@ -5027,6 +5128,10 @@ function Reminder:EnsureFrame()
 		sampleIcon:SetAllPoints(sample)
 		sampleIcon:SetTexture(safeGetSpellIcon(SAMPLE_SPELL_IDS[i]))
 		sample.icon = sampleIcon
+		local sampleBorder = CreateFrame("Frame", nil, sample, "BackdropTemplate")
+		sampleBorder:EnableMouse(false)
+		sampleBorder:Hide()
+		sample.border = sampleBorder
 		sample:Hide()
 		frame.sampleIcons[i] = sample
 	end
@@ -5172,6 +5277,7 @@ function Reminder:RenderSelfMissingIcons(missingEntries)
 	local borderSize = self:GetBorderSize()
 	local borderOffset = self:GetBorderOffset()
 	local borderR, borderG, borderB, borderA = self:GetBorderColor()
+	local iconShape = self:GetIconShape()
 
 	local width, height
 	if direction == GROWTH_UP or direction == GROWTH_DOWN then
@@ -5224,25 +5330,10 @@ function Reminder:RenderSelfMissingIcons(missingEntries)
 
 		iconFrame:SetPoint("CENTER", container, "CENTER", x, y)
 		if iconFrame.icon then iconFrame.icon:SetTexture(texture) end
-		if iconFrame.border and iconFrame.border.SetBackdrop then
-			iconFrame.border:SetFrameStrata(iconFrame:GetFrameStrata())
-			iconFrame.border:SetFrameLevel((iconFrame:GetFrameLevel() or 0) + 1)
-			if borderEnabled then
-				iconFrame.border:SetBackdrop({
-					edgeFile = resolveBorderTexture(borderTexture),
-					edgeSize = borderSize,
-				})
-				iconFrame.border:SetBackdropBorderColor(borderR, borderG, borderB, borderA)
-				iconFrame.border:SetBackdropColor(0, 0, 0, 0)
-				iconFrame.border:ClearAllPoints()
-				iconFrame.border:SetPoint("TOPLEFT", iconFrame, "TOPLEFT", -borderOffset, borderOffset)
-				iconFrame.border:SetPoint("BOTTOMRIGHT", iconFrame, "BOTTOMRIGHT", borderOffset, -borderOffset)
-				iconFrame.border:Show()
-			else
-				iconFrame.border:SetBackdrop(nil)
-				iconFrame.border:Hide()
-			end
-		end
+		iconFrame._eqolVisualSize = scaledIconSize
+		iconFrame._eqolBaseSlotSize = scaledIconSize
+		self:ApplyIconShape(iconFrame, iconFrame.icon, iconShape)
+		self:ApplyShapeBorder(iconFrame, iconFrame.border, borderEnabled, borderTexture, borderSize, borderOffset, borderR, borderG, borderB, borderA, iconShape)
 		if iconFrame.countText then
 			if iconFrame.countText.SetFont then iconFrame.countText:SetFont(fontPath, scaledXYTextSize, textOutlineFlags(xyTextOutline)) end
 			iconFrame.countText:SetTextColor(xyTextR, xyTextG, xyTextB, xyTextA)
@@ -5295,7 +5386,7 @@ function Reminder:SetGlowShown(show)
 	self.glowTargets = self.glowTargets or {}
 	if show ~= true then
 		for target in pairs(self.glowTargets) do
-			Glow.Stop(target, REMINDER_GLOW_KEY)
+			Glow.Stop(target, REMINDER_GLOW_KEY, true)
 			self.glowTargets[target] = nil
 		end
 		self.glowShown = false
@@ -5305,15 +5396,18 @@ function Reminder:SetGlowShown(show)
 		self.glowActiveColorG = nil
 		self.glowActiveColorB = nil
 		self.glowActiveColorA = nil
+		self.glowActiveShape = nil
 		return
 	end
 
 	local style = self:GetGlowStyle()
 	local inset = self:GetGlowInset()
 	local colorR, colorG, colorB, colorA = self:GetGlowColor()
+	local iconShape = self:GetIconShape()
 	local styleChanged = self.glowActiveStyle ~= style
 	local insetChanged = self.glowActiveInset ~= inset
 	local colorChanged = self.glowActiveColorR ~= colorR or self.glowActiveColorG ~= colorG or self.glowActiveColorB ~= colorB or self.glowActiveColorA ~= colorA
+	local shapeChanged = self.glowActiveShape ~= iconShape
 	local targets = self:GetGlowTargets() or {}
 	local nextTargets = {}
 	for i = 1, #targets do
@@ -5323,16 +5417,20 @@ function Reminder:SetGlowShown(show)
 
 	for target in pairs(self.glowTargets) do
 		if not nextTargets[target] then
-			Glow.Stop(target, REMINDER_GLOW_KEY)
+			Glow.Stop(target, REMINDER_GLOW_KEY, true)
 			self.glowTargets[target] = nil
 		end
 	end
 
 	for target in pairs(nextTargets) do
-		if styleChanged or insetChanged or colorChanged or not self.glowTargets[target] then
+		if styleChanged or insetChanged or colorChanged or shapeChanged or not self.glowTargets[target] then
+			if styleChanged or shapeChanged then Glow.Stop(target, REMINDER_GLOW_KEY, true) end
 			Glow.Start(target, REMINDER_GLOW_KEY, style, {
 				inset = inset,
 				color = { colorR, colorG, colorB, colorA },
+				shape = iconShape,
+				hostFrameLevelOffset = 8,
+				frameLevel = 8,
 			})
 		end
 		self.glowTargets[target] = true
@@ -5346,6 +5444,44 @@ function Reminder:SetGlowShown(show)
 	self.glowActiveColorG = hasGlow and colorG or nil
 	self.glowActiveColorB = hasGlow and colorB or nil
 	self.glowActiveColorA = hasGlow and colorA or nil
+	self.glowActiveShape = hasGlow and iconShape or nil
+end
+
+function Reminder:StopAllGlowTargetsImmediate()
+	if not Glow then return end
+	self.glowTargets = self.glowTargets or {}
+	for target in pairs(self.glowTargets) do
+		Glow.Stop(target, REMINDER_GLOW_KEY, true)
+		self.glowTargets[target] = nil
+	end
+	local frame = self.frame
+	if frame then
+		if frame.iconHolder then Glow.Stop(frame.iconHolder, REMINDER_GLOW_KEY, true) end
+		if type(frame.missingIcons) == "table" then
+			for i = 1, #frame.missingIcons do
+				if frame.missingIcons[i] then Glow.Stop(frame.missingIcons[i], REMINDER_GLOW_KEY, true) end
+			end
+		end
+		if type(frame.sampleIcons) == "table" then
+			for i = 1, #frame.sampleIcons do
+				if frame.sampleIcons[i] then Glow.Stop(frame.sampleIcons[i], REMINDER_GLOW_KEY, true) end
+			end
+		end
+	end
+	self.glowShown = false
+	self.glowActiveStyle = nil
+	self.glowActiveInset = nil
+	self.glowActiveColorR = nil
+	self.glowActiveColorG = nil
+	self.glowActiveColorB = nil
+	self.glowActiveColorA = nil
+	self.glowActiveShape = nil
+end
+
+function Reminder:RestartGlowAfterVisualChange()
+	local showGlow = getValue(DB_GLOW, defaults.glow) == true
+	self:StopAllGlowTargetsImmediate()
+	if showGlow then self:SetGlowShown(true) end
 end
 
 function Reminder:HideSamplePreview()
@@ -5373,6 +5509,12 @@ function Reminder:ApplySamplePreview(iconSize, scale, iconGap)
 	if type(spacing) ~= "number" then spacing = math.floor((6 * (scale or 1)) + 0.5) end
 	if spacing < 0 then spacing = 0 end
 	local count = math.min(SAMPLE_ICON_COUNT, #frame.sampleIcons)
+	local iconShape = self:GetIconShape()
+	local borderEnabled = self:IsBorderEnabled()
+	local borderTexture = self:GetBorderTextureKey()
+	local borderSize = self:GetBorderSize()
+	local borderOffset = self:GetBorderOffset()
+	local borderR, borderG, borderB, borderA = self:GetBorderColor()
 
 	for i = 1, count do
 		local sample = frame.sampleIcons[i]
@@ -5380,6 +5522,10 @@ function Reminder:ApplySamplePreview(iconSize, scale, iconGap)
 		sample:ClearAllPoints()
 		sample:SetSize(iconSize, iconSize)
 		if sample.icon then sample.icon:SetTexture(safeGetSpellIcon(sid)) end
+		sample._eqolVisualSize = iconSize
+		sample._eqolBaseSlotSize = iconSize
+		self:ApplyIconShape(sample, sample.icon, iconShape)
+		self:ApplyShapeBorder(sample, sample.border, borderEnabled, borderTexture, borderSize, borderOffset, borderR, borderG, borderB, borderA, iconShape)
 		sample:SetAlpha(i == 1 and 1 or 0.85)
 		sample:Show()
 
@@ -5427,6 +5573,7 @@ function Reminder:ApplyVisualSettings()
 	local iconGap = clamp(getValue(DB_ICON_GAP, defaults.iconGap), 0, 40, defaults.iconGap)
 	local displayMode = normalizeDisplayMode(getValue(DB_DISPLAY_MODE, defaults.displayMode))
 	local growthDirection = normalizeGrowthDirection(getValue(DB_GROWTH_DIRECTION, defaults.growthDirection))
+	local iconShape = self:GetIconShape()
 	local xyTextSize, xyTextOutline, xyTextR, xyTextG, xyTextB, xyTextA, xyOffsetX, xyOffsetY = self:GetIconCountTextStyle()
 	local borderEnabled = self:IsBorderEnabled()
 	local borderTexture = self:GetBorderTextureKey()
@@ -5449,6 +5596,7 @@ function Reminder:ApplyVisualSettings()
 		if addon.db[DB_FONT_SIZE] ~= fontSize then addon.db[DB_FONT_SIZE] = fontSize end
 		if addon.db[DB_ICON_GAP] ~= iconGap then addon.db[DB_ICON_GAP] = iconGap end
 		if addon.db[DB_GROWTH_DIRECTION] ~= growthDirection then addon.db[DB_GROWTH_DIRECTION] = growthDirection end
+		if addon.db[Reminder.DB_ICON_SHAPE] ~= iconShape then addon.db[Reminder.DB_ICON_SHAPE] = iconShape end
 		if addon.db[DB_BORDER_ENABLED] ~= borderEnabled then addon.db[DB_BORDER_ENABLED] = borderEnabled end
 		if addon.db[DB_BORDER_TEXTURE] ~= borderTexture then addon.db[DB_BORDER_TEXTURE] = borderTexture end
 		if addon.db[DB_BORDER_SIZE] ~= borderSize then addon.db[DB_BORDER_SIZE] = borderSize end
@@ -5469,6 +5617,9 @@ function Reminder:ApplyVisualSettings()
 
 	frame:SetScale(1)
 	frame.iconHolder:SetSize(scaledIconSize, scaledIconSize)
+	frame.iconHolder._eqolVisualSize = scaledIconSize
+	frame.iconHolder._eqolBaseSlotSize = scaledIconSize
+	self:ApplyIconShape(frame.iconHolder, frame.icon, iconShape)
 	frame.iconHolder:ClearAllPoints()
 	frame.iconHolder:SetShown(true)
 
@@ -5510,10 +5661,16 @@ function Reminder:ApplyVisualSettings()
 		frame:SetSize(width, height)
 	end
 
+	if not Reminder.IsShapeBorderPath(iconShape) then
+		if addon.IconShape and addon.IconShape.HideBorderTextures then addon.IconShape.HideBorderTextures(frame.iconHolder) end
+	else
+		self:ApplyShapeBorder(frame.iconHolder, nil, borderEnabled, borderTexture, borderSize, borderOffset, borderR, borderG, borderB, borderA, iconShape)
+	end
+
 	if frame.border and frame.border.SetBackdrop then
 		frame.border:SetFrameStrata(frame:GetFrameStrata())
 		frame.border:SetFrameLevel((frame:GetFrameLevel() or 0) + 5)
-		if borderEnabled then
+		if borderEnabled and not Reminder.IsShapeBorderPath(iconShape) then
 			frame.border:SetBackdrop({
 				edgeFile = resolveBorderTexture(borderTexture),
 				edgeSize = borderSize,
@@ -6297,6 +6454,7 @@ local function editModeSetNumber(key, value, minValue, maxValue, fallback)
 	if not addon.db then return end
 	addon.db[key] = clamp(value, minValue, maxValue, fallback)
 	Reminder:ApplyVisualSettings()
+	if key == DB_BORDER_SIZE or key == DB_BORDER_OFFSET then Reminder:RestartGlowAfterVisualChange() end
 	Reminder:RequestUpdate(true)
 end
 
@@ -6305,11 +6463,12 @@ local function editModeSetColor(key, value, fallback)
 	local r, g, b, a = normalizeColor(value, fallback)
 	addon.db[key] = { r = r, g = g, b = b, a = a }
 	Reminder:ApplyVisualSettings()
+	if key == DB_BORDER_COLOR then Reminder:RestartGlowAfterVisualChange() end
 	Reminder:RequestUpdate(true)
 end
 
 local function editModeSetGlowStyle(value)
-	if addon.db then addon.db[DB_GLOW_STYLE] = normalizeGlowStyle(value) end
+	if addon.db then addon.db[DB_GLOW_STYLE] = Reminder.NormalizeGlowStyleForIconShape(value, Reminder:GetIconShape()) end
 	Reminder:RequestUpdate(true)
 end
 
@@ -6335,6 +6494,19 @@ local function editModeSetGrowthFromCenter(value)
 	Reminder:ApplyVisualSettings()
 	Reminder:RequestUpdate(true)
 end
+
+	local function editModeSetIconShape(value)
+		if addon.db then
+			local shape = Reminder.NormalizeIconShape(value, defaults.iconShape or "DEFAULT")
+			addon.db[Reminder.DB_ICON_SHAPE] = shape
+			addon.db[DB_BORDER_TEXTURE] = normalizeBorderTexture(addon.db[DB_BORDER_TEXTURE])
+			addon.db[DB_GLOW_STYLE] = Reminder.NormalizeGlowStyleForIconShape(addon.db[DB_GLOW_STYLE], shape)
+		end
+		Reminder:StopAllGlowTargetsImmediate()
+		Reminder:ApplyVisualSettings()
+		Reminder:RestartGlowAfterVisualChange()
+		Reminder:RequestUpdate(true)
+	end
 
 function Reminder.EditModeRefreshRuntimeAfterTrackingChange()
 	if Reminder.OnSettingChanged then
@@ -6462,12 +6634,12 @@ function editModeSettingsBuilders.buildClassBuffs()
 			parentId = "classBuffs",
 			height = 180,
 			default = defaults.glowStyle,
-			get = function() return normalizeGlowStyle(getValue(DB_GLOW_STYLE, defaults.glowStyle)) end,
+			get = function() return Reminder.NormalizeGlowStyleForIconShape(getValue(DB_GLOW_STYLE, defaults.glowStyle), Reminder:GetIconShape()) end,
 			set = function(_, value) editModeSetGlowStyle(value) end,
 			generator = function(_, root)
-				for _, option in ipairs(Reminder.GLOW_STYLE_OPTIONS or {}) do
+				for _, option in ipairs(Reminder.GetGlowStyleOptions(Reminder:GetIconShape())) do
 					local label = L[option.labelKey] or option.fallback
-					root:CreateRadio(label, function() return normalizeGlowStyle(getValue(DB_GLOW_STYLE, defaults.glowStyle)) == option.value end, function() editModeSetGlowStyle(option.value) end)
+					root:CreateRadio(label, function() return Reminder.NormalizeGlowStyleForIconShape(getValue(DB_GLOW_STYLE, defaults.glowStyle), Reminder:GetIconShape()) == option.value end, function() editModeSetGlowStyle(option.value) end)
 				end
 			end,
 			isEnabled = function() return getValue(DB_GLOW, defaults.glow) == true end,
@@ -6923,6 +7095,28 @@ function editModeSettingsBuilders.buildLayout()
 			formatter = function(value) return tostring(math.floor((tonumber(value) or defaults.iconSize) + 0.5)) end,
 		},
 		{
+			name = L["settingsIconShapeLabel"] or "Icon shape",
+			kind = SettingType.Dropdown,
+			parentId = "anchorSize",
+			height = 160,
+			default = defaults.iconShape or "DEFAULT",
+			get = function() return Reminder:GetIconShape() end,
+			set = function(_, value) editModeSetIconShape(value) end,
+			generator = function(_, root)
+					local options = addon.IconShape and addon.IconShape.GetOptions and addon.IconShape.GetOptions(L) or {
+						{ value = "DEFAULT", label = _G.DEFAULT or "Default" },
+						{ value = "SQUARE", label = "Square" },
+						{ value = "ROUND", label = "Round" },
+						{ value = "ROUND_STAR", label = L["settingsIconShapeRoundStar"] or "Round star" },
+						{ value = "HEXAGON", label = "Hexagon" },
+						{ value = "DIAMOND", label = "Diamond" },
+					}
+				for _, option in ipairs(options) do
+					root:CreateRadio(option.label, function() return Reminder:GetIconShape() == option.value end, function() editModeSetIconShape(option.value) end)
+				end
+			end,
+		},
+		{
 			name = L["Icon gap"] or "Icon gap",
 			kind = SettingType.Slider,
 			parentId = "anchorSize",
@@ -7066,44 +7260,39 @@ function editModeSettingsBuilders.buildBorder()
 			kind = SettingType.Checkbox,
 			parentId = "border",
 			default = defaults.borderEnabled == true,
-			get = function() return Reminder:IsBorderEnabled() end,
-			set = function(_, value)
-				if addon.db then addon.db["classBuffReminderBorderEnabled"] = value == true end
-				Reminder:ApplyVisualSettings()
-				Reminder:RequestUpdate(true)
-			end,
-		},
+				get = function() return Reminder:IsBorderEnabled() end,
+				set = function(_, value)
+					if addon.db then addon.db["classBuffReminderBorderEnabled"] = value == true end
+					Reminder:ApplyVisualSettings()
+					Reminder:RestartGlowAfterVisualChange()
+					Reminder:RequestUpdate(true)
+				end,
+			},
 		{
 			name = L["Border texture"] or "Border texture",
 			kind = SettingType.Dropdown,
 			parentId = "border",
 			height = 220,
-			get = function() return Reminder:GetBorderTextureKey() end,
-			set = function(_, value)
-				if addon.db then addon.db["classBuffReminderBorderTexture"] = (type(value) == "string" and value ~= "" and value) or "DEFAULT" end
-				Reminder:ApplyVisualSettings()
-				Reminder:RequestUpdate(true)
-			end,
+				get = function() return Reminder:GetBorderTextureKey() end,
+				set = function(_, value)
+					if addon.db then addon.db["classBuffReminderBorderTexture"] = normalizeBorderTexture(value) end
+					Reminder:ApplyVisualSettings()
+					Reminder:RestartGlowAfterVisualChange()
+					Reminder:RequestUpdate(true)
+				end,
 			generator = function(_, root)
-				local options = {
-					{ value = "DEFAULT", label = _G.DEFAULT or "Default" },
-					{ value = "SOLID", label = "Solid" },
-				}
-				local mediaOptions = addon.functions and addon.functions.GetLSMMediaOptions and addon.functions.GetLSMMediaOptions("border") or {}
-				for i = 1, #mediaOptions do
-					options[#options + 1] = {
-						value = mediaOptions[i].value,
-						label = mediaOptions[i].label,
-					}
-				end
+				local options = Reminder.GetBorderOptions(Reminder:GetIconShape())
 				for i = 1, #options do
-					local option = options[i]
-					root:CreateRadio(option.label, function() return Reminder:GetBorderTextureKey() == option.value end, function()
-						if addon.db then addon.db["classBuffReminderBorderTexture"] = option.value end
-						Reminder:ApplyVisualSettings()
-						Reminder:RequestUpdate(true)
-					end)
-				end
+						local option = options[i]
+						local optionValue = option.value
+						local optionLabel = option.label
+						root:CreateRadio(optionLabel, function() return Reminder:GetBorderTextureKey() == optionValue end, function()
+							if addon.db then addon.db["classBuffReminderBorderTexture"] = normalizeBorderTexture(optionValue) end
+							Reminder:ApplyVisualSettings()
+							Reminder:RestartGlowAfterVisualChange()
+							Reminder:RequestUpdate(true)
+						end)
+					end
 			end,
 			isEnabled = function() return Reminder:IsBorderEnabled() end,
 		},

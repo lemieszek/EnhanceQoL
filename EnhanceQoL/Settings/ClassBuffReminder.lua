@@ -29,6 +29,7 @@ local DB = {
 	DISPLAY_MODE = "classBuffReminderDisplayMode",
 	GROWTH_DIRECTION = "classBuffReminderGrowthDirection",
 	GROWTH_FROM_CENTER = "classBuffReminderGrowthFromCenter",
+	ICON_SHAPE = "classBuffReminderIconShape",
 	TRACK_FLASKS = "classBuffReminderTrackFlasks",
 	TRACK_FLASKS_CONTENT = "classBuffReminderTrackFlasksContent",
 	TRACK_FLASKS_INSTANCE_ONLY = "classBuffReminderTrackFlasksInstanceOnly",
@@ -110,6 +111,7 @@ local defaults = (Reminder and Reminder.defaults)
 		displayMode = "ICON_ONLY",
 		growthDirection = "RIGHT",
 		growthFromCenter = false,
+		iconShape = "DEFAULT",
 		trackFlasks = false,
 		trackFlasksContent = createDefaultTrackingContentSelection(),
 		trackFlasksInstanceOnly = false,
@@ -242,6 +244,35 @@ local function openFoodSettings()
 	if addon.functions and addon.functions.OpenConfigCenter then addon.functions.OpenConfigCenter("gameplay.macrosconsumables", "buffFoodMacroEnabled") end
 end
 
+local function normalizeIconShape(value)
+	if addon.IconShape and addon.IconShape.Normalize then return addon.IconShape.Normalize(value, defaults.iconShape or "DEFAULT") end
+	if type(value) == "string" and value ~= "" then return value end
+	return defaults.iconShape or "DEFAULT"
+end
+
+local function getIconShapeOptions()
+	if addon.IconShape and addon.IconShape.GetOptions then return addon.IconShape.GetOptions(L) end
+	return {
+		{ value = "DEFAULT", label = _G.DEFAULT or "Default" },
+		{ value = "SQUARE", label = "Square" },
+		{ value = "ROUND", label = "Round" },
+		{ value = "ROUND_STAR", label = L["settingsIconShapeRoundStar"] or "Round star" },
+		{ value = "HEXAGON", label = "Hexagon" },
+		{ value = "DIAMOND", label = "Diamond" },
+	}
+end
+
+local function refreshReminderVisuals()
+	if Reminder and Reminder.StopAllGlowTargetsImmediate then
+		Reminder:StopAllGlowTargetsImmediate()
+	elseif Reminder and Reminder.SetGlowShown then
+		Reminder:SetGlowShown(false)
+	end
+	if Reminder and Reminder.ApplyVisualSettings then Reminder:ApplyVisualSettings() end
+	if Reminder and Reminder.RestartGlowAfterVisualChange then Reminder:RestartGlowAfterVisualChange() end
+	refreshReminder()
+end
+
 local expandable = addon.functions.SettingsCreateExpandableSection(cat, {
 	name = L["Class Buff Reminder"] or "Class Buff Reminder",
 	description = L["configCenterPageDescClassBuffReminder"]
@@ -258,6 +289,19 @@ addon.functions.SettingsCreateText(cat, L["ClassBuffReminderDesc"] or "Shows how
 })
 
 addon.functions.SettingsCreateText(cat, "|cffffd700" .. (L["ClassBuffReminderEditModeHint"] or "Use Edit Mode to position the reminder.") .. "|r", {
+	parentSection = expandable,
+})
+
+addon.functions.SettingsCreateDropdown(cat, {
+	var = DB.ICON_SHAPE,
+	text = L["settingsIconShapeLabel"] or "Icon shape",
+	default = defaults.iconShape or "DEFAULT",
+	get = function() return normalizeIconShape(addon.db and addon.db[DB.ICON_SHAPE]) end,
+	func = function(value)
+		if addon.db then addon.db[DB.ICON_SHAPE] = normalizeIconShape(value) end
+		refreshReminderVisuals()
+	end,
+	optionfunc = getIconShapeOptions,
 	parentSection = expandable,
 })
 
@@ -516,6 +560,7 @@ function addon.functions.initClassBuffReminder()
 	init(DB.DISPLAY_MODE, defaults.displayMode)
 	init(DB.GROWTH_DIRECTION, defaults.growthDirection)
 	init(DB.GROWTH_FROM_CENTER, defaults.growthFromCenter)
+	init(DB.ICON_SHAPE, defaults.iconShape or "DEFAULT")
 	init(DB.TRACK_FLASKS, defaults.trackFlasks)
 	init(DB.TRACK_FOOD, defaults.trackFood)
 	init(DB.TRACK_WEAPON_BUFFS, defaults.trackWeaponBuffs)

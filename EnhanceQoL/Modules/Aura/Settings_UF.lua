@@ -1980,13 +1980,14 @@ end
 
 function iconShapeOptions()
 	if addon.IconShape and addon.IconShape.GetOptions then return addon.IconShape.GetOptions(L) end
-	return {
-		{ value = "DEFAULT", label = L["settingsIconShapeDefault"] or DEFAULT or "Default" },
-		{ value = "SQUARE", label = L["settingsIconShapeSquare"] or "Square" },
-		{ value = "ROUND", label = L["settingsIconShapeRound"] or "Round" },
-		{ value = "HEXAGON", label = L["settingsIconShapeHexagon"] or "Hexagon" },
-		{ value = "DIAMOND", label = L["settingsIconShapeDiamond"] or "Diamond" },
-	}
+		return {
+			{ value = "DEFAULT", label = L["settingsIconShapeDefault"] or DEFAULT or "Default" },
+			{ value = "SQUARE", label = L["settingsIconShapeSquare"] or "Square" },
+			{ value = "ROUND", label = L["settingsIconShapeRound"] or "Round" },
+			{ value = "ROUND_STAR", label = L["settingsIconShapeRoundStar"] or "Round star" },
+			{ value = "HEXAGON", label = L["settingsIconShapeHexagon"] or "Hexagon" },
+			{ value = "DIAMOND", label = L["settingsIconShapeDiamond"] or "Diamond" },
+		}
 end
 
 function radioDropdown(name, options, getter, setter, default, parentId)

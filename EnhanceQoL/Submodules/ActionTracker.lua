@@ -23,7 +23,7 @@ local TIME_LABEL_HEIGHT = TIME_LABEL_FONT_SIZE + TIME_LABEL_PADDING
 local BORDER_SIZE_MIN = 1
 local BORDER_SIZE_MAX = 24
 local BORDER_OFFSET_MIN = -20
-local BORDER_OFFSET_MAX = 20
+local BORDER_OFFSET_MAX = 100
 local GCD_SPELL_ID = 61304
 local GCD_FALLBACK = 1.5
 local GCD_MIN = 0.5
@@ -50,6 +50,7 @@ ActionTracker.defaults = ActionTracker.defaults
 		showElapsed = false,
 		showGCDGaps = false,
 		showInterruptedCasts = false,
+		iconShape = "DEFAULT",
 		borderEnabled = false,
 		borderTexture = "DEFAULT",
 		borderSize = 1,
@@ -68,6 +69,7 @@ local DB_FADE = "actionTrackerFadeDuration"
 local DB_SHOW_ELAPSED = "actionTrackerShowElapsed"
 local DB_SHOW_GCD_GAPS = "actionTrackerShowGCDGaps"
 local DB_SHOW_INTERRUPTED_CASTS = "actionTrackerShowInterruptedCasts"
+local DB_ICON_SHAPE = "actionTrackerIconShape"
 local DB_BORDER_ENABLED = "actionTrackerBorderEnabled"
 local DB_BORDER_TEXTURE = "actionTrackerBorderTexture"
 local DB_BORDER_SIZE = "actionTrackerBorderSize"
@@ -145,13 +147,26 @@ end
 
 local function isLikelyFilePath(value) return type(value) == "string" and (value:find("\\", 1, true) or value:find("/", 1, true)) ~= nil end
 
-local function normalizeBorderTexture(value)
-	if type(value) ~= "string" or value == "" then return defaults.borderTexture or "DEFAULT" end
+local function normalizeIconShape(value, fallback)
+	if addon.IconShape and addon.IconShape.Normalize then return addon.IconShape.Normalize(value, fallback or defaults.iconShape or "DEFAULT") end
+	if type(value) == "string" and value ~= "" then return value end
+	return fallback or defaults.iconShape or "DEFAULT"
+end
+
+local function isBackdropBorderCompatible(shape)
+	if addon.IconShape and addon.IconShape.IsBackdropBorderCompatible then return addon.IconShape.IsBackdropBorderCompatible(shape) end
+	shape = normalizeIconShape(shape, "DEFAULT")
+	return shape == "DEFAULT" or shape == "SQUARE"
+end
+
+local function normalizeBorderTexture(value, fallback, shape)
+	if addon.IconShape and addon.IconShape.NormalizeBorder then return addon.IconShape.NormalizeBorder(value, fallback or defaults.borderTexture or "DEFAULT", shape or normalizeIconShape(nil), { allowNone = true }) end
+	if type(value) ~= "string" or value == "" then return fallback or defaults.borderTexture or "DEFAULT" end
 	return value
 end
 
 local function resolveBorderTexture(value)
-	local key = normalizeBorderTexture(value)
+	local key = normalizeBorderTexture(value, defaults.borderTexture, "DEFAULT")
 	if key == "DEFAULT" or key == "SOLID" then return "Interface\\Buttons\\WHITE8x8" end
 	if isLikelyFilePath(key) then return key end
 	local hash = getCachedMediaHash("border")
@@ -160,7 +175,18 @@ local function resolveBorderTexture(value)
 	return "Interface\\Buttons\\WHITE8x8"
 end
 
-local function getBorderOptions()
+local function getBorderOptions(shape)
+	if addon.IconShape and addon.IconShape.GetBorderOptions then
+		return addon.IconShape.GetBorderOptions(L, shape, {
+			defaultOptions = {
+				{ value = "DEFAULT", label = _G.DEFAULT or "Default" },
+				{ value = "SOLID", label = "Solid" },
+			},
+			includeNone = true,
+			noneLabel = _G.NONE or "None",
+		})
+	end
+
 	local options = {}
 	local seen = {}
 
@@ -192,6 +218,11 @@ local function getBorderOptions()
 	end
 
 	return options
+end
+
+local function refreshEditModeSettingValues()
+	if addon.EditModeLib and addon.EditModeLib.internal and addon.EditModeLib.internal.RefreshSettingValues then addon.EditModeLib.internal:RefreshSettingValues() end
+	if EditMode and EditMode.RefreshFrame then EditMode:RefreshFrame(EDITMODE_ID) end
 end
 
 local function getPreviewTexture(index)
@@ -234,8 +265,12 @@ end
 function ActionTracker:GetShowElapsed() return getValue(DB_SHOW_ELAPSED, defaults.showElapsed) == true end
 function ActionTracker:GetShowGCDGaps() return getValue(DB_SHOW_GCD_GAPS, defaults.showGCDGaps) == true end
 function ActionTracker:GetShowInterruptedCasts() return getValue(DB_SHOW_INTERRUPTED_CASTS, defaults.showInterruptedCasts) == true end
+function ActionTracker:GetIconShape() return normalizeIconShape(getValue(DB_ICON_SHAPE, defaults.iconShape), defaults.iconShape or "DEFAULT") end
 function ActionTracker:GetBorderEnabled() return getValue(DB_BORDER_ENABLED, defaults.borderEnabled) == true end
-function ActionTracker:GetBorderTextureKey() return normalizeBorderTexture(getValue(DB_BORDER_TEXTURE, defaults.borderTexture)) end
+function ActionTracker:GetBorderTextureKey()
+	local shape = self:GetIconShape()
+	return normalizeBorderTexture(getValue(DB_BORDER_TEXTURE, defaults.borderTexture), defaults.borderTexture or "DEFAULT", shape)
+end
 function ActionTracker:GetBorderSize() return clampNumber(getValue(DB_BORDER_SIZE, defaults.borderSize), BORDER_SIZE_MIN, BORDER_SIZE_MAX, defaults.borderSize) end
 function ActionTracker:GetBorderOffset() return clampNumber(getValue(DB_BORDER_OFFSET, defaults.borderOffset), BORDER_OFFSET_MIN, BORDER_OFFSET_MAX, defaults.borderOffset) end
 
@@ -309,6 +344,16 @@ local function applyIconSize(icon, size)
 		if font then icon.markerText:SetFont(font, math.max(10, math.floor(size * 0.34)), flags) end
 	end
 	if icon.timeText and icon.timeText.SetWidth then icon.timeText:SetWidth(size + 8) end
+end
+
+local function applyIconShape(icon, shape)
+	if not (addon.IconShape and addon.IconShape.ApplyFrameShape) then return end
+	addon.IconShape.ApplyFrameShape(icon, shape, {
+		textures = { icon.texture },
+		cooldown = icon.cooldown,
+		maskKey = "_eqolActionTrackerMask",
+		textureMaskKey = "_eqolActionTrackerTextureMask",
+	})
 end
 
 local function ensureIconBorder(icon)
@@ -429,25 +474,44 @@ function ActionTracker:UpdateBorderVisuals()
 	local borderSize = self:GetBorderSize()
 	local borderOffset = self:GetBorderOffset()
 	local r, g, b, a = self:GetBorderColor()
+	local shape = self:GetIconShape()
+	local backdropBorder = isBackdropBorderCompatible(shape)
 
 	for i = 1, MAX_ICONS_LIMIT do
 		local icon = frame.icons[i]
 		local border = ensureIconBorder(icon)
-		if borderEnabled and icon:IsShown() then
-			border:SetBackdrop({
-				edgeFile = resolveBorderTexture(borderTexture),
-				edgeSize = borderSize,
-				insets = { left = 0, right = 0, top = 0, bottom = 0 },
-			})
-			border:SetBackdropBorderColor(r, g, b, a)
-			border:SetBackdropColor(0, 0, 0, 0)
-			border:ClearAllPoints()
-			border:SetPoint("TOPLEFT", icon, "TOPLEFT", -borderOffset, borderOffset)
-			border:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", borderOffset, -borderOffset)
-			border:Show()
+		local noBorder = addon.IconShape and addon.IconShape.IsNoBorder and addon.IconShape.IsNoBorder(borderTexture)
+		if borderEnabled and not noBorder and icon:IsShown() then
+			if addon.IconShape and addon.IconShape.HideBorderTextures then addon.IconShape.HideBorderTextures(icon) end
+			if backdropBorder then
+				border:SetBackdrop({
+					edgeFile = resolveBorderTexture(borderTexture),
+					edgeSize = borderSize,
+					insets = { left = 0, right = 0, top = 0, bottom = 0 },
+				})
+				border:SetBackdropBorderColor(r, g, b, a)
+				border:SetBackdropColor(0, 0, 0, 0)
+				border:ClearAllPoints()
+				border:SetPoint("TOPLEFT", icon, "TOPLEFT", -borderOffset, borderOffset)
+				border:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", borderOffset, -borderOffset)
+				border:Show()
+			else
+				border:SetBackdrop(nil)
+				border:Hide()
+				if addon.IconShape and addon.IconShape.ApplyBorder then
+					addon.IconShape.ApplyBorder(icon, borderTexture, shape, {
+						borderSize = borderSize,
+						borderOffset = borderOffset,
+						color = { r, g, b, a },
+						drawLayer = "OVERLAY",
+						subLevel = 4,
+					})
+				end
+			end
 		else
 			border:SetBackdrop(nil)
 			border:Hide()
+			if addon.IconShape and addon.IconShape.HideBorderTextures then addon.IconShape.HideBorderTextures(icon) end
 		end
 	end
 end
@@ -462,6 +526,7 @@ function ActionTracker:UpdateLayout()
 	local direction = self:GetDirection()
 	local showElapsed = self:GetShowElapsed()
 	local labelExtra = showElapsed and TIME_LABEL_HEIGHT or 0
+	local iconShape = self:GetIconShape()
 
 	if direction == "LEFT" or direction == "RIGHT" then
 		local total = (iconSize * maxIcons) + (spacing * (maxIcons - 1))
@@ -481,6 +546,9 @@ function ActionTracker:UpdateLayout()
 		local yOffset = (showElapsed and (direction == "LEFT" or direction == "RIGHT")) and (labelExtra / 2) or 0
 
 		applyIconSize(icon, iconSize)
+		icon._eqolVisualSize = iconSize
+		icon._eqolBaseSlotSize = iconSize
+		applyIconShape(icon, iconShape)
 		icon:ClearAllPoints()
 		if direction == "RIGHT" then
 			icon:SetPoint("LEFT", frame, "LEFT", offset, yOffset)
@@ -506,11 +574,13 @@ function ActionTracker:RefreshIcons()
 	local fade = self:GetFadeDuration()
 	local showElapsed = self:GetShowElapsed()
 	local previewActive = self.previewActive == true and #entries == 0
+	local iconShape = self:GetIconShape()
 
 	self:TrimEntries()
 
 	for i = 1, MAX_ICONS_LIMIT do
 		local icon = frame.icons[i]
+		applyIconShape(icon, iconShape)
 		local entry = i <= maxIcons and entries[i] or nil
 		if entry then
 			local texture = getEntryTexture(entry)
@@ -841,10 +911,11 @@ function ActionTracker:ApplyLayoutData(data)
 	local showInterruptedCasts = data.showInterruptedCasts
 	if showInterruptedCasts == nil then showInterruptedCasts = self:GetShowInterruptedCasts() end
 	showInterruptedCasts = showInterruptedCasts == true
+	local iconShape = normalizeIconShape(data.iconShape or self:GetIconShape(), defaults.iconShape or "DEFAULT")
 	local borderEnabled = data.borderEnabled
 	if borderEnabled == nil then borderEnabled = self:GetBorderEnabled() end
 	borderEnabled = borderEnabled == true
-	local borderTexture = normalizeBorderTexture(data.borderTexture or self:GetBorderTextureKey())
+	local borderTexture = normalizeBorderTexture(data.borderTexture or self:GetBorderTextureKey(), defaults.borderTexture or "DEFAULT", iconShape)
 	local borderSize = clampNumber(data.borderSize ~= nil and data.borderSize or self:GetBorderSize(), BORDER_SIZE_MIN, BORDER_SIZE_MAX, defaults.borderSize)
 	local borderOffset = clampNumber(data.borderOffset ~= nil and data.borderOffset or self:GetBorderOffset(), BORDER_OFFSET_MIN, BORDER_OFFSET_MAX, defaults.borderOffset)
 	local borderR, borderG, borderB, borderA = normalizeColor(data.borderColor or getValue(DB_BORDER_COLOR, defaults.borderColor), defaults.borderColor)
@@ -857,6 +928,7 @@ function ActionTracker:ApplyLayoutData(data)
 	addon.db[DB_SHOW_ELAPSED] = showElapsed
 	addon.db[DB_SHOW_GCD_GAPS] = showGCDGaps
 	addon.db[DB_SHOW_INTERRUPTED_CASTS] = showInterruptedCasts
+	addon.db[DB_ICON_SHAPE] = iconShape
 	addon.db[DB_BORDER_ENABLED] = borderEnabled
 	addon.db[DB_BORDER_TEXTURE] = borderTexture
 	addon.db[DB_BORDER_SIZE] = borderSize
@@ -871,6 +943,7 @@ end
 
 local function applySetting(field, value)
 	if not addon.db then return end
+	local refreshSettings = false
 
 	if field == "maxIcons" then
 		local maxIcons = tonumber(value) or defaults.maxIcons
@@ -911,14 +984,21 @@ local function applySetting(field, value)
 		addon.db[DB_SHOW_INTERRUPTED_CASTS] = showInterruptedCasts
 		value = showInterruptedCasts
 		ActionTracker:UpdateOptionalEventRegistration()
+	elseif field == "iconShape" then
+		local iconShape = normalizeIconShape(value, defaults.iconShape or "DEFAULT")
+		addon.db[DB_ICON_SHAPE] = iconShape
+		addon.db[DB_BORDER_TEXTURE] = normalizeBorderTexture(addon.db[DB_BORDER_TEXTURE], defaults.borderTexture or "DEFAULT", iconShape)
+		value = iconShape
+		refreshSettings = true
 	elseif field == "borderEnabled" then
 		local borderEnabled = value == true
 		addon.db[DB_BORDER_ENABLED] = borderEnabled
 		value = borderEnabled
 	elseif field == "borderTexture" then
-		local borderTexture = normalizeBorderTexture(value)
+		local borderTexture = normalizeBorderTexture(value, defaults.borderTexture or "DEFAULT", ActionTracker:GetIconShape())
 		addon.db[DB_BORDER_TEXTURE] = borderTexture
 		value = borderTexture
+		refreshSettings = true
 	elseif field == "borderSize" then
 		local borderSize = clampNumber(value, BORDER_SIZE_MIN, BORDER_SIZE_MAX, defaults.borderSize)
 		addon.db[DB_BORDER_SIZE] = borderSize
@@ -938,6 +1018,7 @@ local function applySetting(field, value)
 	ActionTracker:UpdateLayout()
 	ActionTracker:RefreshIcons()
 	ActionTracker:UpdateFadeState(true)
+	if refreshSettings then refreshEditModeSettingValues() end
 end
 
 function ActionTracker:RegisterEditMode()
@@ -1039,6 +1120,30 @@ function ActionTracker:RegisterEditMode()
 				set = function(_, value) applySetting("showInterruptedCasts", value) end,
 			},
 			{
+				name = L["settingsIconShapeLabel"] or "Icon shape",
+				kind = SettingType.Dropdown,
+				field = "iconShape",
+				height = 160,
+				default = defaults.iconShape or "DEFAULT",
+				get = function() return ActionTracker:GetIconShape() end,
+				set = function(_, value) applySetting("iconShape", value) end,
+				generator = function(_, root)
+						local options = addon.IconShape and addon.IconShape.GetOptions and addon.IconShape.GetOptions(L) or {
+							{ value = "DEFAULT", label = _G.DEFAULT or "Default" },
+							{ value = "SQUARE", label = "Square" },
+							{ value = "ROUND", label = "Round" },
+							{ value = "ROUND_STAR", label = L["settingsIconShapeRoundStar"] or "Round star" },
+							{ value = "HEXAGON", label = "Hexagon" },
+							{ value = "DIAMOND", label = "Diamond" },
+						}
+					for _, option in ipairs(options) do
+						local optionValue = option.value
+						local optionLabel = option.label
+						root:CreateRadio(optionLabel, function() return ActionTracker:GetIconShape() == optionValue end, function() applySetting("iconShape", optionValue) end)
+					end
+				end,
+			},
+			{
 				name = EMBLEM_BORDER,
 				kind = SettingType.Collapsible,
 				id = "border",
@@ -1062,8 +1167,10 @@ function ActionTracker:RegisterEditMode()
 				get = function() return ActionTracker:GetBorderTextureKey() end,
 				set = function(_, value) applySetting("borderTexture", value) end,
 				generator = function(_, root)
-					for _, option in ipairs(getBorderOptions()) do
-						root:CreateRadio(option.label, function() return ActionTracker:GetBorderTextureKey() == option.value end, function() applySetting("borderTexture", option.value) end)
+					for _, option in ipairs(getBorderOptions(ActionTracker:GetIconShape())) do
+						local optionValue = option.value
+						local optionLabel = option.label
+						root:CreateRadio(optionLabel, function() return ActionTracker:GetBorderTextureKey() == optionValue end, function() applySetting("borderTexture", optionValue) end)
 					end
 				end,
 				isEnabled = function() return ActionTracker:GetBorderEnabled() end,
@@ -1123,6 +1230,7 @@ function ActionTracker:RegisterEditMode()
 		record.showElapsed = self:GetShowElapsed()
 		record.showGCDGaps = self:GetShowGCDGaps()
 		record.showInterruptedCasts = self:GetShowInterruptedCasts()
+		record.iconShape = self:GetIconShape()
 		record.borderEnabled = self:GetBorderEnabled()
 		record.borderTexture = self:GetBorderTextureKey()
 		do
@@ -1149,6 +1257,7 @@ function ActionTracker:RegisterEditMode()
 			showElapsed = self:GetShowElapsed(),
 			showGCDGaps = self:GetShowGCDGaps(),
 			showInterruptedCasts = self:GetShowInterruptedCasts(),
+			iconShape = self:GetIconShape(),
 			borderEnabled = self:GetBorderEnabled(),
 			borderTexture = self:GetBorderTextureKey(),
 			borderColor = (function()
