@@ -19,6 +19,14 @@
 
 ---
 
+## [11.2.1] - 2026-06-15
+
+### 🐛 Fixed
+
+- Profiles: Migrates blank legacy profile names instead of deleting their saved settings.
+
+---
+
 ## [11.2.0] - 2026-06-14
 
 ### ✨ Added

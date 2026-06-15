@@ -7066,18 +7066,55 @@ local eventHandlers = {
 			end
 
 			if type(EnhanceQoLDB.profiles) ~= "table" then EnhanceQoLDB.profiles = {} end
+			local function profileHasSavedData(profileData)
+				return type(profileData) == "table" and next(profileData) ~= nil
+			end
+			local function getUniqueProfileName(baseName)
+				baseName = trimProfileName(baseName) or "Recovered Profile"
+				if EnhanceQoLDB.profiles[baseName] == nil then return baseName end
+				local index = 2
+				local candidate = baseName .. " " .. index
+				while EnhanceQoLDB.profiles[candidate] ~= nil do
+					index = index + 1
+					candidate = baseName .. " " .. index
+				end
+				return candidate
+			end
+			local function getProfileMigrationTarget(profileName, profileData, normalizedName)
+				if normalizedName then
+					if normalizedName == profileName then return profileName end
+					if type(EnhanceQoLDB.profiles[normalizedName]) ~= "table" then return normalizedName end
+					return getUniqueProfileName(normalizedName)
+				end
+				if type(profileData) ~= "table" then return nil end
+				if not profileHasSavedData(EnhanceQoLDB.profiles.Default) then return "Default" end
+				return getUniqueProfileName("Recovered Profile")
+			end
 			local renamedProfiles = nil
-			for profileName, profileData in pairs(EnhanceQoLDB.profiles) do
+			local profileNames = {}
+			for profileName in pairs(EnhanceQoLDB.profiles) do
+				profileNames[#profileNames + 1] = profileName
+			end
+			for i = 1, #profileNames do
+				local profileName = profileNames[i]
+				local profileData = EnhanceQoLDB.profiles[profileName]
 				local normalizedName = trimProfileName(profileName)
-				if not normalizedName then
+				if type(profileData) ~= "table" and not normalizedName then
 					EnhanceQoLDB.profiles[profileName] = nil
-				elseif normalizedName ~= profileName then
-					if type(profileData) == "table" and type(EnhanceQoLDB.profiles[normalizedName]) ~= "table" then EnhanceQoLDB.profiles[normalizedName] = profileData end
+				elseif type(profileData) ~= "table" then
+					local targetName = getProfileMigrationTarget(profileName, {}, normalizedName)
+					EnhanceQoLDB.profiles[targetName] = {}
 					EnhanceQoLDB.profiles[profileName] = nil
 					renamedProfiles = renamedProfiles or {}
-					renamedProfiles[profileName] = normalizedName
-				elseif type(profileData) ~= "table" then
-					EnhanceQoLDB.profiles[profileName] = {}
+					renamedProfiles[profileName] = targetName
+				else
+					local targetName = getProfileMigrationTarget(profileName, profileData, normalizedName)
+					if targetName and targetName ~= profileName then
+						EnhanceQoLDB.profiles[targetName] = profileData
+						EnhanceQoLDB.profiles[profileName] = nil
+						renamedProfiles = renamedProfiles or {}
+						renamedProfiles[profileName] = targetName
+					end
 				end
 			end
 			if not next(EnhanceQoLDB.profiles) then EnhanceQoLDB.profiles.Default = {} end
