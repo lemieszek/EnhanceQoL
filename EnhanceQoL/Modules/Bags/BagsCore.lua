@@ -182,6 +182,32 @@ state.pendingRuleItemDataIDs = state.pendingRuleItemDataIDs or {}
 state.bagSlotPanels = state.bagSlotPanels or {}
 state.footerRegions = state.footerRegions or {}
 
+function addon.functions.IsAuctionHouseBagFadeActive()
+	return addon.variables
+		and addon.variables.auctionHouseOpen == true
+		and addon.Bags
+		and addon.Bags.IsEnabled
+		and addon.Bags.IsEnabled() == true
+end
+
+function addon.functions.CanAuctionHouseSellBagItem(bag, slot)
+	if not (bag and slot and ItemLocation and C_AuctionHouse and C_AuctionHouse.IsSellItemValid) then return false end
+	if tonumber(bag) and tonumber(bag) < 0 then return false end
+	local itemLocation = ItemLocation:CreateFromBagAndSlot(bag, slot)
+	if not (itemLocation and itemLocation.IsValid and itemLocation:IsValid()) then return false end
+	if C_Item and C_Item.DoesItemExist and not C_Item.DoesItemExist(itemLocation) then return false end
+	return C_AuctionHouse.IsSellItemValid(itemLocation, false) == true
+end
+
+function addon.functions.ShouldFadeAuctionHouseBagItem(bag, slot)
+	if not addon.functions.IsAuctionHouseBagFadeActive() then return false end
+	return addon.functions.CanAuctionHouseSellBagItem(bag, slot) ~= true
+end
+
+function addon.functions.RefreshAuctionHouseBagFade()
+	if addon.Bags and addon.Bags.functions and addon.Bags.functions.RequestLayoutUpdate then addon.Bags.functions.RequestLayoutUpdate(false, true) end
+end
+
 local applyConfiguredOverlayAnchors
 local applyConfiguredItemButtonFonts
 local applyActiveSkin
@@ -3517,7 +3543,8 @@ local function hasMatchingButtonRenderState(
 	overlayVersion,
 	fontSignature,
 	stackCountLayoutSignature,
-	freeSlotSignature
+	freeSlotSignature,
+	auctionHouseFaded
 )
 	return button._bagsRenderBagID == bagID
 		and button._bagsRenderSlotID == slotID
@@ -3540,11 +3567,24 @@ local function hasMatchingButtonRenderState(
 		and button._bagsRenderFontSignature == fontSignature
 		and button._bagsRenderStackCountLayoutSignature == stackCountLayoutSignature
 		and button._bagsRenderFreeSlotSignature == freeSlotSignature
+		and button._bagsRenderAuctionHouseFaded == auctionHouseFaded
 end
 
 local function updateButtonSearchState(button, isFiltered)
 	button:SetMatchesSearch(not isFiltered)
 	button._bagsRenderFiltered = isFiltered
+end
+
+state.applyAuctionHouseItemFade = state.applyAuctionHouseItemFade or function(button, texture, faded)
+	if not button then return end
+	if button.Icon then button.Icon:SetAlpha(texture and 1 or 0.35) end
+	if faded then
+		if SetItemButtonTextureVertexColor then
+			SetItemButtonTextureVertexColor(button, 0.22, 0.22, 0.22)
+		elseif button.Icon and button.Icon.SetVertexColor then
+			button.Icon:SetVertexColor(0.22, 0.22, 0.22, 1)
+		end
+	end
 end
 
 local function storeButtonRenderState(
@@ -3570,7 +3610,8 @@ local function storeButtonRenderState(
 	overlayVersion,
 	fontSignature,
 	stackCountLayoutSignature,
-	freeSlotSignature
+	freeSlotSignature,
+	auctionHouseFaded
 )
 	button._bagsRenderBagID = bagID
 	button._bagsRenderSlotID = slotID
@@ -3594,6 +3635,7 @@ local function storeButtonRenderState(
 	button._bagsRenderFontSignature = fontSignature
 	button._bagsRenderStackCountLayoutSignature = stackCountLayoutSignature
 	button._bagsRenderFreeSlotSignature = freeSlotSignature
+	button._bagsRenderAuctionHouseFaded = auctionHouseFaded
 end
 
 local function getCurrentItemButtonSkinSignature()
@@ -3677,6 +3719,7 @@ local function updateButtonData(button, mapping, overlayRuntime, textAppearance,
 	local isKnownToy = tooltipFlags and tooltipFlags.isKnownToy or false
 	local hasUsageRequirement = tooltipFlags and tooltipFlags.hasUsageRequirement or false
 	local isUnusableRecipe = (texture and Bags.functions.IsRecipeUnusableByPlayer and Bags.functions.IsRecipeUnusableByPlayer(itemID, itemLink) or false) or isKnownToy or hasUsageRequirement
+	local auctionHouseFaded = texture and addon.functions and addon.functions.ShouldFadeAuctionHouseBagItem and addon.functions.ShouldFadeAuctionHouseBagItem(bagID, slotID) or false
 	local freeSlotSignature = getFreeSlotRenderSignature(freeSlotGroup)
 	overlayRuntime = overlayRuntime or getOverlayRuntimeConfig()
 	fontSignature = fontSignature or getTextAppearanceSignature(textAppearance)
@@ -3705,7 +3748,8 @@ local function updateButtonData(button, mapping, overlayRuntime, textAppearance,
 		overlayVersion,
 		fontSignature,
 		stackCountLayoutSignature,
-		freeSlotSignature
+		freeSlotSignature,
+		auctionHouseFaded
 	) then
 		if not button:IsShown() then
 			button:Show()
@@ -3732,6 +3776,7 @@ local function updateButtonData(button, mapping, overlayRuntime, textAppearance,
 		if Bags.functions.ApplyRecipeUsabilityVisual then
 			Bags.functions.ApplyRecipeUsabilityVisual(button, isUnusableRecipe)
 		end
+		state.applyAuctionHouseItemFade(button, texture, auctionHouseFaded)
 		return
 	end
 
@@ -3743,7 +3788,7 @@ local function updateButtonData(button, mapping, overlayRuntime, textAppearance,
 	button:SetItemButtonTexture(texture)
 	state.applyCraftedQualityPreference(button, quality, itemLink, isBound, true)
 	SetItemButtonCount(button, displayCount)
-	SetItemButtonDesaturated(button, desaturated)
+	SetItemButtonDesaturated(button, desaturated or auctionHouseFaded)
 	button:UpdateExtended()
 	button:UpdateQuestItem(questIsQuestItem, questID, questIsActive)
 	button:UpdateNewItem(quality)
@@ -3770,6 +3815,7 @@ local function updateButtonData(button, mapping, overlayRuntime, textAppearance,
 	if addon.RefreshItemButtonCooldownMask then
 		addon.RefreshItemButtonCooldownMask(button)
 	end
+	state.applyAuctionHouseItemFade(button, texture, auctionHouseFaded)
 	updateReagentBagVisuals(button)
 	applyConfiguredItemButtonFonts(button, textAppearance, fontSignature)
 	state.applyStackCountLayoutIfNeeded(button, stackCountLayoutSignature)
@@ -3801,7 +3847,8 @@ local function updateButtonData(button, mapping, overlayRuntime, textAppearance,
 		overlayVersion,
 		fontSignature,
 		stackCountLayoutSignature,
-		freeSlotSignature
+		freeSlotSignature,
+		auctionHouseFaded
 	)
 	button._bagsPendingRenderTexture = nil
 	button._bagsHasPendingRenderTexture = nil

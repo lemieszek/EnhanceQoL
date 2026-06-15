@@ -7490,7 +7490,9 @@ local eventHandlers = {
 		if addon.functions.shouldAutoChooseQuest() and IsQuestCompletable() then CompleteQuest() end
 	end,
 	["AUCTION_HOUSE_SHOW"] = function()
+		addon.variables.auctionHouseOpen = true
 		if addon.db["closeBagsOnAuctionHouse"] and not addon.functions.isRestrictedContent() then CloseAllBags() end
+		if addon.functions.RefreshAuctionHouseBagFade then addon.functions.RefreshAuctionHouseBagFade() end
 		if addon.db["persistAuctionHouseFilter"] then
 			if not AuctionHouseFrame.SearchBar.FilterButton.eqolHooked then
 				hooksecurefunc(AuctionHouseFrame.SearchBar.FilterButton, "Reset", function(self)
@@ -7519,6 +7521,8 @@ local eventHandlers = {
 		end
 	end,
 	["AUCTION_HOUSE_CLOSED"] = function()
+		addon.variables.auctionHouseOpen = false
+		if addon.functions.RefreshAuctionHouseBagFade then addon.functions.RefreshAuctionHouseBagFade() end
 		if not addon.db["persistAuctionHouseFilter"] then return end
 		if AuctionHouseFrame.SearchBar.FilterButton.ClearFiltersButton:IsShown() then
 			addon.variables.safedAuctionFilters = AuctionHouseFrame.SearchBar.FilterButton.filters

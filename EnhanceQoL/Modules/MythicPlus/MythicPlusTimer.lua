@@ -1043,9 +1043,11 @@ function Timer:GetTimerDisplayText(state, timeLeft)
 	local elapsed = tonumber(state.elapsed) or 0
 	local total = tonumber(state.timeLimit) or 0
 	if state.completed then
+		if mode == "TOTAL" then return secondsToText(total) end
 		if mode == "TIME_LEFT_TOTAL" or mode == "ELAPSED_TOTAL" then return string.format("%s / %s", secondsToText(elapsed), secondsToText(total)) end
 		return secondsToText(elapsed)
 	end
+	if mode == "TOTAL" then return secondsToText(total) end
 	if mode == "TIME_LEFT_TOTAL" then return string.format("%s / %s", timeRemainingToText(timeLeft), secondsToText(total)) end
 	if mode == "ELAPSED_TOTAL" then return string.format("%s / %s", secondsToText(elapsed), secondsToText(total)) end
 	return timeRemainingToText(timeLeft)
@@ -2740,6 +2742,7 @@ function Timer:BuildEditModeSettings()
 			{ value = "TIME_LEFT", label = L["mythicPlusTimerTimerDisplayTimeLeft"] or "Time left" },
 			{ value = "TIME_LEFT_TOTAL", label = L["mythicPlusTimerTimerDisplayTimeLeftTotal"] or "Time left / total time" },
 			{ value = "ELAPSED_TOTAL", label = L["mythicPlusTimerTimerDisplayElapsedTotal"] or "Time elapsed / total time" },
+			{ value = "TOTAL", label = L["mythicPlusTimerTimerDisplayTotal"] or "Total time" },
 		}, displayId, 220, enabledWhen("showTimer"), isListMode),
 		checkboxSetting(L["mythicPlusTimerShowChestTimers"] or "Show +2/+3 timers", get("showChestTimers"), set("showChestTimers"), displayId, nil, isListMode),
 		checkboxSetting(L["mythicPlusTimerShowDeaths"] or "Show deaths", get("showDeaths"), set("showDeaths"), displayId, nil, isListMode),
@@ -2804,6 +2807,7 @@ function Timer:BuildEditModeSettings()
 			{ value = "TIME_LEFT", label = L["mythicPlusTimerTimerDisplayTimeLeft"] or "Time left" },
 			{ value = "TIME_LEFT_TOTAL", label = L["mythicPlusTimerTimerDisplayTimeLeftTotal"] or "Time left / total time" },
 			{ value = "ELAPSED_TOTAL", label = L["mythicPlusTimerTimerDisplayElapsedTotal"] or "Time elapsed / total time" },
+			{ value = "TOTAL", label = L["mythicPlusTimerTimerDisplayTotal"] or "Total time" },
 		}, "mpt-panel-time", 220, enabledWhen("showTimer")),
 		sliderSetting(L["mythicPlusTimerPanelTimerFontSize"] or L["Text size"] or "Text size", get("panelTimerFontSize"), set("panelTimerFontSize", function(value) return clampNumber(value, 8, 72, defaults.panelTimerFontSize) end), 8, 72, 1, "mpt-panel-time", nil, enabledWhen("showTimer")),
 		anchorSetting("timerAnchor", "mpt-panel-time", nil, L["Anchor"] or "Anchor", enabledWhen("showTimer")),

@@ -6,7 +6,10 @@
 
 ### ✨ Added
 
+- Bags: Custom bag items that cannot be listed now darken while the Auction House is open.
+- Group Frames / Raid Frames: Added a Groups per row slider for grouped raid frames, allowing layouts such as 3-3-2 while keeping 8 as the default.
 - Mythic Plus / Timer: Added the Mythic+ Timer back as a beta feature for continued testing.
+- Mythic Plus / Timer: Added a Total Time option to the timer display mode.
 
 ### 🔄 Changed
 

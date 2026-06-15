@@ -1839,6 +1839,15 @@ function GF.TrimCsvToken(token)
 	return normalized
 end
 
+function GF.NormalizeRaidGroupsPerRow(value, fallback)
+	local v = tonumber(value)
+	if not v then v = tonumber(fallback) or 8 end
+	v = floor(v + 0.5)
+	if v < 2 then return 2 end
+	if v > 8 then return 8 end
+	return v
+end
+
 function GF.GetSelectedRaidGroups(cfg)
 	local selected = {}
 	local count = 0
@@ -3716,6 +3725,7 @@ local DEFAULTS = {
 			},
 		},
 		groupingOrder = "TANK,HEALER,DAMAGER",
+		groupsPerRow = 8,
 		growth = "RIGHT",
 		healerBuffPlacement = {
 			_eqolNormalized = true,
@@ -12617,6 +12627,7 @@ function GF:UpdatePreviewLayout(kind)
 	local groupedPreviewBlockCount = 0
 	local previewGroupSpecs
 	local groupGrowth
+	local groupsPerRow = 8
 	local previewScale = 1
 	local sortMethod
 	local useGroupedCustomSort = false
@@ -12626,6 +12637,7 @@ function GF:UpdatePreviewLayout(kind)
 		viewportColumns = maxColumns
 		columnSpacing = roundToPixel(clampNumber(tonumber(cfg.columnSpacing) or spacing, 0, 40, spacing), scale)
 		groupGrowth = GF.ResolveRaidCrossGrowth(cfg, growth)
+		groupsPerRow = GF.NormalizeRaidGroupsPerRow(cfg.groupsPerRow, DEFAULTS.raid and DEFAULTS.raid.groupsPerRow)
 		if kind == "raid" then
 			sortMethod = resolveSortMethod(cfg)
 			local customSort = GFH and GFH.EnsureCustomSortConfig and GFH.EnsureCustomSortConfig(cfg)
@@ -12766,7 +12778,9 @@ function GF:UpdatePreviewLayout(kind)
 			perGroupWidth = w
 			perGroupHeight = h * unitsPerColumn + spacing * max(0, unitsPerColumn - 1)
 		end
-		previewScale = (GFH.GetRaidViewportScaleForGroups and GFH.GetRaidViewportScaleForGroups(groupGrowth, perGroupWidth, perGroupHeight, columnSpacing, viewportColumns, groupedPreviewBlockCount))
+		local runtimeGroupsPerLine = min(groupedPreviewBlockCount, groupsPerRow)
+		local viewportGroupsPerLine = min(viewportColumns, groupsPerRow)
+		previewScale = (GFH.GetRaidViewportScaleForGroups and GFH.GetRaidViewportScaleForGroups(groupGrowth, perGroupWidth, perGroupHeight, columnSpacing, viewportGroupsPerLine, runtimeGroupsPerLine))
 			or 1
 		maxShown = min(#frames, #groupedPreviewEntries)
 	elseif raidStyle then
@@ -12785,7 +12799,7 @@ function GF:UpdatePreviewLayout(kind)
 	if raidStyle then
 		local visualRuntimeCount = 1
 		if useGroupedPreview then
-			visualRuntimeCount = groupedPreviewBlockCount
+			visualRuntimeCount = min(groupedPreviewBlockCount, groupsPerRow)
 		else
 			visualRuntimeCount = max(1, math.ceil((maxShown or 0) / max(1, unitsPerColumn)))
 		end
@@ -12824,25 +12838,28 @@ function GF:UpdatePreviewLayout(kind)
 			baseGroupHeight = roundToEvenPixel(baseGroupHeight, scale)
 			if isHorizontal then
 				if groupGrowth == "LEFT" or groupGrowth == "RIGHT" then
-					totalSpan = groupWidth * groupedPreviewBlockCount + visualColumnSpacing * max(0, groupedPreviewBlockCount - 1)
+					local runtimeGroupsPerLine = min(groupedPreviewBlockCount, groupsPerRow)
+					totalSpan = groupWidth * runtimeGroupsPerLine + visualColumnSpacing * max(0, runtimeGroupsPerLine - 1)
 				else
 					totalSpan = groupWidth
 				end
 			else
 				if groupGrowth == "UP" or groupGrowth == "DOWN" then
-					totalSpan = groupHeight * groupedPreviewBlockCount + visualColumnSpacing * max(0, groupedPreviewBlockCount - 1)
+					local runtimeGroupsPerLine = min(groupedPreviewBlockCount, groupsPerRow)
+					totalSpan = groupHeight * runtimeGroupsPerLine + visualColumnSpacing * max(0, runtimeGroupsPerLine - 1)
 				else
 					totalSpan = groupHeight
 				end
 			end
 			crossGrowth = groupGrowth
 			if groupedPreviewBlockCount > 0 then
+				local runtimeGroupLines = max(1, math.ceil(groupedPreviewBlockCount / groupsPerRow))
 				if isHorizontal then
 					viewportCrossSpan = baseGroupHeight * viewportColumns + columnSpacing * max(0, viewportColumns - 1)
-					contentCrossSpan = groupHeight * groupedPreviewBlockCount + visualColumnSpacing * max(0, groupedPreviewBlockCount - 1)
+					contentCrossSpan = groupHeight * runtimeGroupLines + visualColumnSpacing * max(0, runtimeGroupLines - 1)
 				else
 					viewportCrossSpan = baseGroupWidth * viewportColumns + columnSpacing * max(0, viewportColumns - 1)
-					contentCrossSpan = groupWidth * groupedPreviewBlockCount + visualColumnSpacing * max(0, groupedPreviewBlockCount - 1)
+					contentCrossSpan = groupWidth * runtimeGroupLines + visualColumnSpacing * max(0, runtimeGroupLines - 1)
 				end
 			end
 		elseif raidStyle then
@@ -12899,6 +12916,8 @@ function GF:UpdatePreviewLayout(kind)
 				btn:ClearAllPoints()
 				if raidStyle and groupedEntry then
 					local groupIndex = groupedEntry.groupIndex - 1
+					local groupSlot = groupIndex % groupsPerRow
+					local groupLine = floor(groupIndex / groupsPerRow)
 					local unitIndex = groupedEntry.unitIndex - 1
 					local groupOffsetX, groupOffsetY = 0, 0
 					local groupWidth, groupHeight
@@ -12912,13 +12931,17 @@ function GF:UpdatePreviewLayout(kind)
 					groupWidth = roundToPixel(groupWidth, scale)
 					groupHeight = roundToPixel(groupHeight, scale)
 					if groupGrowth == "LEFT" then
-						groupOffsetX = roundToPixel(groupIndex * (groupWidth + visualColumnSpacing) * -1, scale)
+						groupOffsetX = roundToPixel(groupSlot * (groupWidth + visualColumnSpacing) * -1, scale)
+						groupOffsetY = roundToPixel(groupLine * (groupHeight + visualColumnSpacing) * -1, scale)
 					elseif groupGrowth == "UP" then
-						groupOffsetY = roundToPixel(groupIndex * (groupHeight + visualColumnSpacing), scale)
+						groupOffsetY = roundToPixel(groupSlot * (groupHeight + visualColumnSpacing), scale)
+						groupOffsetX = roundToPixel(groupLine * (groupWidth + visualColumnSpacing), scale)
 					elseif groupGrowth == "RIGHT" then
-						groupOffsetX = roundToPixel(groupIndex * (groupWidth + visualColumnSpacing), scale)
+						groupOffsetX = roundToPixel(groupSlot * (groupWidth + visualColumnSpacing), scale)
+						groupOffsetY = roundToPixel(groupLine * (groupHeight + visualColumnSpacing) * -1, scale)
 					else
-						groupOffsetY = roundToPixel(groupIndex * (groupHeight + visualColumnSpacing) * -1, scale)
+						groupOffsetY = roundToPixel(groupSlot * (groupHeight + visualColumnSpacing) * -1, scale)
+						groupOffsetX = roundToPixel(groupLine * (groupWidth + visualColumnSpacing), scale)
 					end
 					local unitOffsetX, unitOffsetY = 0, 0
 					if isHorizontal then
@@ -14101,48 +14124,30 @@ local function applyRaidGroupHeaders(cfg, layout, groupSpecs, forceShow, forceHi
 				local anchorRelativePoint = layout and layout.centerRelativePoint or groupStartPoint
 				local anchorOffsetX = tonumber(layout and layout.centerOffsetX) or 0
 				local anchorOffsetY = tonumber(layout and layout.centerOffsetY) or 0
-				if i == 1 then
-					if Pixel and Pixel.SetPoint then
-						Pixel.SetPoint(header, groupStartPoint, anchor, anchorRelativePoint, anchorOffsetX, anchorOffsetY)
-					else
-						header:SetPoint(groupStartPoint, anchor, anchorRelativePoint, anchorOffsetX, anchorOffsetY)
-					end
+				local groupsPerRow = GF.NormalizeRaidGroupsPerRow(layout and layout.groupsPerRow, 8)
+				local groupSlot = (i - 1) % groupsPerRow
+				local groupLine = floor((i - 1) / groupsPerRow)
+				local spacing = roundToPixel(layout.columnSpacing or 0, layout.scale)
+				local perHeaderW = roundToPixel((layout and layout.perHeaderW) or (layout and layout.w) or 0, layout and layout.scale)
+				local perHeaderH = roundToPixel((layout and layout.perHeaderH) or (layout and layout.h) or 0, layout and layout.scale)
+				local groupOffsetX, groupOffsetY = 0, 0
+				if groupGrowth == "LEFT" then
+					groupOffsetX = roundToPixel(groupSlot * (perHeaderW + spacing) * -1, layout.scale)
+					groupOffsetY = roundToPixel(groupLine * (perHeaderH + spacing) * -1, layout.scale)
+				elseif groupGrowth == "UP" then
+					groupOffsetY = roundToPixel(groupSlot * (perHeaderH + spacing), layout.scale)
+					groupOffsetX = roundToPixel(groupLine * (perHeaderW + spacing), layout.scale)
+				elseif groupGrowth == "RIGHT" then
+					groupOffsetX = roundToPixel(groupSlot * (perHeaderW + spacing), layout.scale)
+					groupOffsetY = roundToPixel(groupLine * (perHeaderH + spacing) * -1, layout.scale)
 				else
-					local previous = headers[i - 1]
-					if previous and previous._eqolSpecialHide ~= true then
-						local spacing = roundToPixel(layout.columnSpacing or 0, layout.scale)
-						if groupGrowth == "LEFT" then
-							if Pixel and Pixel.SetPoint then
-								Pixel.SetPoint(header, "TOPRIGHT", previous, "TOPLEFT", -spacing, 0)
-							else
-								header:SetPoint("TOPRIGHT", previous, "TOPLEFT", -spacing, 0)
-							end
-						elseif groupGrowth == "UP" then
-							if Pixel and Pixel.SetPoint then
-								Pixel.SetPoint(header, "BOTTOMLEFT", previous, "TOPLEFT", 0, spacing)
-							else
-								header:SetPoint("BOTTOMLEFT", previous, "TOPLEFT", 0, spacing)
-							end
-						elseif groupGrowth == "RIGHT" then
-							if Pixel and Pixel.SetPoint then
-								Pixel.SetPoint(header, "TOPLEFT", previous, "TOPRIGHT", spacing, 0)
-							else
-								header:SetPoint("TOPLEFT", previous, "TOPRIGHT", spacing, 0)
-							end
-						else
-							if Pixel and Pixel.SetPoint then
-								Pixel.SetPoint(header, "TOPLEFT", previous, "BOTTOMLEFT", 0, -spacing)
-							else
-								header:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, -spacing)
-							end
-						end
-					else
-						if Pixel and Pixel.SetPoint then
-							Pixel.SetPoint(header, groupStartPoint, anchor, anchorRelativePoint, anchorOffsetX, anchorOffsetY)
-						else
-							header:SetPoint(groupStartPoint, anchor, anchorRelativePoint, anchorOffsetX, anchorOffsetY)
-						end
-					end
+					groupOffsetY = roundToPixel(groupSlot * (perHeaderH + spacing) * -1, layout.scale)
+					groupOffsetX = roundToPixel(groupLine * (perHeaderW + spacing), layout.scale)
+				end
+				if Pixel and Pixel.SetPoint then
+					Pixel.SetPoint(header, groupStartPoint, anchor, anchorRelativePoint, anchorOffsetX + groupOffsetX, anchorOffsetY + groupOffsetY)
+				else
+					header:SetPoint(groupStartPoint, anchor, anchorRelativePoint, anchorOffsetX + groupOffsetX, anchorOffsetY + groupOffsetY)
 				end
 			end
 
@@ -14506,6 +14511,7 @@ function GF:ApplyHeaderAttributes(kind, options)
 			local isHorizontal = (growth == "RIGHT" or growth == "LEFT")
 			local unitsPer = raidUnitsPerColumn or 5
 			local groupSpecs = raidGroupSpecs or GF:BuildRaidGroupHeaderSpecs(cfg, sortMethod, useGroupedCustomSort)
+			local groupsPerRow = GF.NormalizeRaidGroupsPerRow(cfg.groupsPerRow, DEFAULTS.raid and DEFAULTS.raid.groupsPerRow)
 			local perHeaderW, perHeaderH
 			if isHorizontal then
 				perHeaderW = w * unitsPer + spacing * max(0, unitsPer - 1)
@@ -14517,10 +14523,13 @@ function GF:ApplyHeaderAttributes(kind, options)
 			perHeaderW = roundToEvenPixel(perHeaderW, scale)
 			perHeaderH = roundToEvenPixel(perHeaderH, scale)
 			local runtimeGroupCount = #groupSpecs
+			local runtimeGroupsPerLine = min(runtimeGroupCount, groupsPerRow)
+			local runtimeGroupLines = max(1, math.ceil(runtimeGroupCount / groupsPerRow))
 			local viewportGroupCount = max(1, floor((tonumber(raidMaxColumns) or 1) + 0.5))
+			if groupsPerRow < viewportGroupCount then viewportGroupCount = groupsPerRow end
 			local groupViewportScale = (
 				GFH.GetRaidViewportScaleForGroups
-				and GFH.GetRaidViewportScaleForGroups(cfg.groupGrowth, perHeaderW, perHeaderH, layoutColumnSpacing or spacing, viewportGroupCount, runtimeGroupCount)
+				and GFH.GetRaidViewportScaleForGroups(cfg.groupGrowth, perHeaderW, perHeaderH, layoutColumnSpacing or spacing, viewportGroupCount, runtimeGroupsPerLine)
 			) or 1
 			groupViewportScale = GF.NormalizeRaidAutoFitScale(groupViewportScale)
 			local groupRenderW, groupRenderH, groupXOffset, groupYOffset, groupRenderSpacing = GF.GetRaidAutoFitLayoutMetrics(
@@ -14533,7 +14542,7 @@ function GF:ApplyHeaderAttributes(kind, options)
 				groupViewportScale,
 				scale,
 				viewportGroupCount,
-				runtimeGroupCount
+				runtimeGroupsPerLine
 			)
 			local renderedPerHeaderW, renderedPerHeaderH
 			if isHorizontal then
@@ -14548,13 +14557,13 @@ function GF:ApplyHeaderAttributes(kind, options)
 				local totalSpan
 				if isHorizontal then
 					if cfg.groupGrowth == "LEFT" or cfg.groupGrowth == "RIGHT" then
-						totalSpan = renderedPerHeaderW * runtimeGroupCount + groupRenderSpacing * max(0, runtimeGroupCount - 1)
+						totalSpan = renderedPerHeaderW * runtimeGroupsPerLine + groupRenderSpacing * max(0, runtimeGroupsPerLine - 1)
 					else
 						totalSpan = renderedPerHeaderW
 					end
 				else
 					if cfg.groupGrowth == "UP" or cfg.groupGrowth == "DOWN" then
-						totalSpan = renderedPerHeaderH * runtimeGroupCount + groupRenderSpacing * max(0, runtimeGroupCount - 1)
+						totalSpan = renderedPerHeaderH * runtimeGroupsPerLine + groupRenderSpacing * max(0, runtimeGroupsPerLine - 1)
 					else
 						totalSpan = renderedPerHeaderH
 					end
@@ -14564,10 +14573,10 @@ function GF:ApplyHeaderAttributes(kind, options)
 				local contentCrossSpan
 				if isHorizontal then
 					viewportCrossSpan = perHeaderH * viewportGroupCount + (layoutColumnSpacing or spacing) * max(0, viewportGroupCount - 1)
-					contentCrossSpan = renderedPerHeaderH * runtimeGroupCount + groupRenderSpacing * max(0, runtimeGroupCount - 1)
+					contentCrossSpan = renderedPerHeaderH * runtimeGroupLines + groupRenderSpacing * max(0, runtimeGroupLines - 1)
 				else
 					viewportCrossSpan = perHeaderW * viewportGroupCount + (layoutColumnSpacing or spacing) * max(0, viewportGroupCount - 1)
-					contentCrossSpan = renderedPerHeaderW * runtimeGroupCount + groupRenderSpacing * max(0, runtimeGroupCount - 1)
+					contentCrossSpan = renderedPerHeaderW * runtimeGroupLines + groupRenderSpacing * max(0, runtimeGroupLines - 1)
 				end
 				local crossOffsetX, crossOffsetY = GF.ComputeViewportCenteringOffset(cfg.groupGrowth, viewportCrossSpan, contentCrossSpan, scale)
 				groupCenterOffsetX = groupCenterOffsetX + crossOffsetX
@@ -14603,6 +14612,7 @@ function GF:ApplyHeaderAttributes(kind, options)
 				startPoint = getGrowthStartPoint(growth),
 				growth = growth,
 				groupGrowth = cfg.groupGrowth,
+				groupsPerRow = groupsPerRow,
 				groupScale = groupViewportScale,
 				centerRelativePoint = centerGrowthActive and GF.GetCenterGrowthRelativePoint(growth) or nil,
 				centerOffsetX = groupCenterOffsetX,
@@ -15080,6 +15090,7 @@ GF._groupCopySectionRules = {
 		{ "spacing" },
 		{ "growth" },
 		{ "groupGrowth" },
+		{ "groupsPerRow" },
 		{ "barTexture" },
 		{ "unitsPerColumn" },
 		{ "maxColumns" },
@@ -15212,6 +15223,7 @@ GF._groupCopySectionRules = {
 		{ "viewerRoleFilter" },
 		{ "unitsPerColumn" },
 		{ "maxColumns" },
+		{ "groupsPerRow" },
 		{ "columnSpacing" },
 		{ "groupBy" },
 		{ "groupingOrder" },
@@ -17904,14 +17916,43 @@ local function buildEditModeSettings(kind, editModeId)
 					end)
 				end
 			end,
-		},
-		{
-			name = L["Frame texture"] or "Frame texture",
-			kind = SettingType.Dropdown,
-			field = "barTexture",
-			parentId = "layout",
-			height = 180,
-			get = function()
+			},
+			{
+				name = L["UFGroupGroupsPerRow"] or "Groups per row",
+				kind = SettingType.Slider,
+				allowInput = true,
+				field = "groupsPerRow",
+				parentId = "layout",
+				minValue = 2,
+				maxValue = 8,
+				valueStep = 1,
+				default = (DEFAULTS.raid and DEFAULTS.raid.groupsPerRow) or 8,
+				get = function()
+					if not raidKind then return (DEFAULTS.raid and DEFAULTS.raid.groupsPerRow) or 8 end
+					local cfg = getCfg(kind)
+					return GF.NormalizeRaidGroupsPerRow(cfg and cfg.groupsPerRow, DEFAULTS.raid and DEFAULTS.raid.groupsPerRow)
+				end,
+				set = function(_, value)
+					if not raidKind then return end
+					local cfg = getCfg(kind)
+					if not cfg then return end
+					local v = GF.NormalizeRaidGroupsPerRow(value, cfg.groupsPerRow or (DEFAULTS.raid and DEFAULTS.raid.groupsPerRow))
+					cfg.groupsPerRow = v
+					if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "groupsPerRow", v, nil, true) end
+					GF:ApplyHeaderAttributes(kind)
+					if GF._previewActive and GF._previewActive[kind] then GF:UpdatePreviewLayout(kind) end
+					GF:RefreshGroupIndicators()
+				end,
+				isShown = function() return isRaidGroupFilterShown() end,
+				isEnabled = function() return raidKind and isRaidGroupFilterShown() end,
+			},
+			{
+				name = L["Frame texture"] or "Frame texture",
+				kind = SettingType.Dropdown,
+				field = "barTexture",
+				parentId = "layout",
+				height = 180,
+				get = function()
 				local cfg = getCfg(kind)
 				local tex = cfg and cfg.barTexture
 				if not tex or tex == "" or tex == BAR_TEX_INHERIT then return BAR_TEX_INHERIT end
@@ -30042,6 +30083,7 @@ local function applyEditModeData(kind, data)
 			cfg.groupGrowth = (GFH.NormalizeGrowthDirection and GFH.NormalizeGrowthDirection(data.groupGrowth, nil)) or ((growth == "RIGHT" or growth == "LEFT") and "DOWN" or "RIGHT")
 		end
 	end
+	if kind == "raid" and data.groupsPerRow ~= nil then cfg.groupsPerRow = GF.NormalizeRaidGroupsPerRow(data.groupsPerRow, cfg.groupsPerRow or (DEFAULTS.raid and DEFAULTS.raid.groupsPerRow)) end
 	if data.barTexture ~= nil then
 		if data.barTexture == BAR_TEX_INHERIT then
 			cfg.barTexture = BAR_TEX_INHERIT
@@ -31210,6 +31252,7 @@ local function applyEditModeData(kind, data)
 			local v = clampNumber(data.maxColumns, 1, 10, cfg.maxColumns or 8)
 			cfg.maxColumns = floor(v + 0.5)
 		end
+		if data.groupsPerRow ~= nil then cfg.groupsPerRow = GF.NormalizeRaidGroupsPerRow(data.groupsPerRow, cfg.groupsPerRow or (DEFAULTS.raid and DEFAULTS.raid.groupsPerRow)) end
 		if data.dynamicScaleMin ~= nil then cfg.dynamicScaleMin = clampNumber(data.dynamicScaleMin, 0, 1, cfg.dynamicScaleMin or 0) end
 		if data.dynamicContentScale ~= nil and data.dynamicScaleMin == nil then cfg.dynamicScaleMin = data.dynamicContentScale and 1 or 0 end
 		if data.columnSpacing ~= nil then cfg.columnSpacing = clampNumber(data.columnSpacing, 0, 40, cfg.columnSpacing or 0) end
@@ -31433,6 +31476,7 @@ function GF:EnsureEditMode()
 				hideInClientScene = (cfg.hideInClientScene ~= nil and cfg.hideInClientScene == true) or ((cfg.hideInClientScene == nil) and (def.hideInClientScene ~= false)),
 				unitsPerColumn = cfg.unitsPerColumn or (DEFAULTS[kind] and DEFAULTS[kind].unitsPerColumn) or (DEFAULTS.raid and DEFAULTS.raid.unitsPerColumn) or 5,
 				maxColumns = cfg.maxColumns or (DEFAULTS[kind] and DEFAULTS[kind].maxColumns) or (DEFAULTS.raid and DEFAULTS.raid.maxColumns) or 8,
+				groupsPerRow = kind == "raid" and GF.NormalizeRaidGroupsPerRow(cfg.groupsPerRow, DEFAULTS.raid and DEFAULTS.raid.groupsPerRow) or nil,
 				dynamicScaleMin = GF.GetDynamicContentScaleAmount(cfg),
 				columnSpacing = cfg.columnSpacing or (DEFAULTS[kind] and DEFAULTS[kind].columnSpacing) or (DEFAULTS.raid and DEFAULTS.raid.columnSpacing) or 0,
 				customSortEnabled = resolveSortMethod(cfg) == "NAMELIST",
