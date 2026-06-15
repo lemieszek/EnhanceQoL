@@ -23,6 +23,7 @@ IconShape.ROUND_STAR_MASK_TEXTURE = "Interface\\AddOns\\EnhanceQoL\\Assets\\roun
 IconShape.STAR_MASK_TEXTURE = "Interface\\AddOns\\EnhanceQoL\\Assets\\StarShape.tga"
 IconShape.DIAMOND_MASK_TEXTURE = "Interface\\AddOns\\EnhanceQoL\\Assets\\diamond_mask.tga"
 IconShape.DEFAULT_SWIPE_TEXTURE = "Interface\\Buttons\\WHITE8X8"
+IconShape.SQUARE_TEX_COORDS = { 0.07, 0.93, 0.07, 0.93 }
 
 function IconShape.Normalize(value, fallback)
 	local normalized = type(value) == "string" and strupper(value) or nil
@@ -328,7 +329,6 @@ end
 
 function IconShape.GetMaskTexture(shape)
 	shape = IconShape.Normalize(shape)
-	if shape == IconShape.SQUARE then return IconShape.DEFAULT_SWIPE_TEXTURE end
 	if shape == IconShape.ROUND then return IconShape.ROUND_MASK_TEXTURE end
 	if shape == IconShape.ROUND_STAR then return IconShape.ROUND_STAR_MASK_TEXTURE end
 	if shape == IconShape.STAR then return IconShape.STAR_MASK_TEXTURE end
@@ -448,6 +448,29 @@ function IconShape.ResetCooldownSwipeVisual(cooldown, owner)
 	end
 end
 
+function IconShape.StoreTextureTexCoord(texture, key)
+	if not (texture and texture.GetTexCoord) then return end
+	key = key or "_eqolIconShapeTexCoord"
+	if texture[key] then return end
+	texture[key] = { texture:GetTexCoord() }
+end
+
+function IconShape.RestoreTextureTexCoord(texture, key)
+	if not (texture and texture.SetTexCoord) then return end
+	key = key or "_eqolIconShapeTexCoord"
+	local coords = texture[key]
+	if type(coords) == "table" and #coords >= 4 then
+		texture:SetTexCoord(unpack(coords))
+	end
+	texture[key] = nil
+end
+
+function IconShape.ApplyTextureTexCoord(texture, coords, key)
+	if not (texture and texture.SetTexCoord and type(coords) == "table") then return end
+	IconShape.StoreTextureTexCoord(texture, key)
+	texture:SetTexCoord(coords[1] or 0, coords[2] or 1, coords[3] or 0, coords[4] or 1)
+end
+
 function IconShape.ApplyFrameShape(frame, shape, opts)
 	if not frame then return end
 	opts = opts or {}
@@ -456,6 +479,20 @@ function IconShape.ApplyFrameShape(frame, shape, opts)
 		frame._eqolIconShape = IconShape.DEFAULT
 		for _, texture in ipairs(opts.textures or {}) do
 			IconShape.ClearTextureMask(texture, opts.textureMaskKey)
+			IconShape.RestoreTextureTexCoord(texture, opts.textureTexCoordKey)
+		end
+		IconShape.ApplyCooldownRegionMask(opts.cooldown, nil, opts.textureMaskKey)
+		frame._eqolGlowShape = nil
+		IconShape.ResetCooldownSwipeVisual(opts.cooldown, frame)
+		if opts.refreshSwipe then opts.refreshSwipe(frame) end
+		return
+	end
+
+	if shape == IconShape.SQUARE then
+		frame._eqolIconShape = IconShape.SQUARE
+		for _, texture in ipairs(opts.textures or {}) do
+			IconShape.ClearTextureMask(texture, opts.textureMaskKey)
+			IconShape.ApplyTextureTexCoord(texture, opts.squareTexCoords or IconShape.SQUARE_TEX_COORDS, opts.textureTexCoordKey)
 		end
 		IconShape.ApplyCooldownRegionMask(opts.cooldown, nil, opts.textureMaskKey)
 		frame._eqolGlowShape = nil
@@ -468,6 +505,7 @@ function IconShape.ApplyFrameShape(frame, shape, opts)
 	frame._eqolIconShape = shape
 	frame._eqolGlowShape = shape
 	for _, texture in ipairs(opts.textures or {}) do
+		IconShape.RestoreTextureTexCoord(texture, opts.textureTexCoordKey)
 		IconShape.ApplyTextureMask(texture, mask, opts.textureMaskKey)
 	end
 	IconShape.ApplyCooldownRegionMask(opts.cooldown, mask, opts.textureMaskKey)

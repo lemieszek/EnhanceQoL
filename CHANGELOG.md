@@ -13,6 +13,7 @@
 
 ### 🔄 Changed
 
+- Icon Shapes: Square icons now use a clean cropped square texture style.
 - Mythic Plus / Timer: Continued beta polish for layout, objective display, completed-run details, and best-time information.
 
 <!--@end-eqol-beta@-->
