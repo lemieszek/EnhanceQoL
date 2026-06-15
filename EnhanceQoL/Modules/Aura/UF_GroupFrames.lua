@@ -9159,6 +9159,7 @@ function GF:LayoutAuras(self)
 			style.blizzardDispelBorder = typeCfg.showDispelIcon == true
 			style.borderColor = typeCfg.borderColor
 			style.iconShape = GF.NormalizeAuraIconShape(typeCfg.iconShape, "DEFAULT")
+			style.iconZoom = addon.IconShape and addon.IconShape.NormalizeIconZoom and addon.IconShape.NormalizeIconZoom(typeCfg.iconZoom) or clampNumber(typeCfg.iconZoom, 0, 35, 0)
 			style.borderTexture = GF.NormalizeAuraBorderTexture(typeCfg.borderTexture, "DEFAULT", style.iconShape)
 			style.borderSize = GF.ScaleContentValue(self, typeCfg.borderSize, cfg, 1)
 			style.borderOffset = GF.ScaleContentValue(self, typeCfg.borderOffset, cfg, 0)
@@ -16812,6 +16813,35 @@ local function buildEditModeSettings(kind, editModeId)
 					end)
 				end
 			end,
+		}
+	end
+	local function auraIconZoomSetting(typeKey, field, parentId)
+		return {
+			name = L["Icon zoom"] or "Icon zoom",
+			kind = SettingType.Slider,
+			field = field,
+			parentId = parentId,
+			default = 0,
+			minValue = 0,
+			maxValue = 35,
+			valueStep = 1,
+			get = function()
+				local cfg = getCfg(kind)
+				local ac = ensureAuraConfig(cfg)
+				local typeCfg = ac and ac[typeKey] or {}
+				return addon.IconShape and addon.IconShape.NormalizeIconZoom and addon.IconShape.NormalizeIconZoom(typeCfg.iconZoom) or clampNumber(typeCfg.iconZoom, 0, 35, 0)
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				local ac = ensureAuraConfig(cfg)
+				local typeCfg = ac[typeKey]
+				local zoom = addon.IconShape and addon.IconShape.NormalizeIconZoom and addon.IconShape.NormalizeIconZoom(value) or clampNumber(value, 0, 35, 0)
+				typeCfg.iconZoom = zoom
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, field, zoom, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 		}
 	end
 	local sortGroupOptions = {
@@ -26241,6 +26271,7 @@ local function buildEditModeSettings(kind, editModeId)
 			end,
 		},
 		auraIconShapeSetting("buff", "buffIconShape", "buffs"),
+		auraIconZoomSetting("buff", "buffIconZoom", "buffs"),
 		{
 			name = L["Buff per row"] or "Buff per row",
 			kind = SettingType.Slider,
@@ -27013,6 +27044,7 @@ local function buildEditModeSettings(kind, editModeId)
 			end,
 		},
 		auraIconShapeSetting("debuff", "debuffIconShape", "debuffs"),
+		auraIconZoomSetting("debuff", "debuffIconZoom", "debuffs"),
 		{
 			name = L["Debuff per row"] or "Debuff per row",
 			kind = SettingType.Slider,
@@ -27795,6 +27827,7 @@ local function buildEditModeSettings(kind, editModeId)
 			end,
 		},
 		auraIconShapeSetting("externals", "externalIconShape", "externals"),
+		auraIconZoomSetting("externals", "externalIconZoom", "externals"),
 		{
 			name = L["External per row"] or "External per row",
 			kind = SettingType.Slider,
@@ -30972,6 +31005,7 @@ local function applyEditModeData(kind, data)
 		ac.buff.iconShape = GF.NormalizeAuraIconShape(data.buffIconShape, ac.buff.iconShape or "DEFAULT")
 		ac.buff.borderTexture = GF.NormalizeAuraBorderTexture(ac.buff.borderTexture, "DEFAULT", ac.buff.iconShape)
 	end
+	if data.buffIconZoom ~= nil then ac.buff.iconZoom = addon.IconShape and addon.IconShape.NormalizeIconZoom and addon.IconShape.NormalizeIconZoom(data.buffIconZoom) or clampNumber(data.buffIconZoom, 0, 35, ac.buff.iconZoom or 0) end
 	if data.buffPerRow ~= nil then ac.buff.perRow = data.buffPerRow end
 	if data.buffMax ~= nil then ac.buff.max = GF.ClampAuraCount(data.buffMax, ac.buff.max or 6) or ac.buff.max or 6 end
 	if data.buffSpacing ~= nil then ac.buff.spacing = data.buffSpacing end
@@ -31023,6 +31057,7 @@ local function applyEditModeData(kind, data)
 		ac.debuff.iconShape = GF.NormalizeAuraIconShape(data.debuffIconShape, ac.debuff.iconShape or "DEFAULT")
 		ac.debuff.borderTexture = GF.NormalizeAuraBorderTexture(ac.debuff.borderTexture, "DEFAULT", ac.debuff.iconShape)
 	end
+	if data.debuffIconZoom ~= nil then ac.debuff.iconZoom = addon.IconShape and addon.IconShape.NormalizeIconZoom and addon.IconShape.NormalizeIconZoom(data.debuffIconZoom) or clampNumber(data.debuffIconZoom, 0, 35, ac.debuff.iconZoom or 0) end
 	if data.debuffPerRow ~= nil then ac.debuff.perRow = data.debuffPerRow end
 	if data.debuffMax ~= nil then ac.debuff.max = GF.ClampAuraCount(data.debuffMax, ac.debuff.max or 6) or ac.debuff.max or 6 end
 	if data.debuffDisplayLargerRoleSpecific ~= nil then ac.debuff.displayLargerRoleSpecificDebuffs = data.debuffDisplayLargerRoleSpecific and true or false end
@@ -31070,6 +31105,7 @@ local function applyEditModeData(kind, data)
 		ac.externals.borderTexture = GF.NormalizeAuraBorderTexture(ac.externals.borderTexture, "DEFAULT", ac.externals.iconShape)
 		ac.externals.glowStyle = GF.NormalizeExternalGlowStyleForIconShape(ac.externals.glowStyle, "MARCHING_ANTS", ac.externals.iconShape)
 	end
+	if data.externalIconZoom ~= nil then ac.externals.iconZoom = addon.IconShape and addon.IconShape.NormalizeIconZoom and addon.IconShape.NormalizeIconZoom(data.externalIconZoom) or clampNumber(data.externalIconZoom, 0, 35, ac.externals.iconZoom or 0) end
 	if data.externalPerRow ~= nil then ac.externals.perRow = data.externalPerRow end
 	if data.externalMax ~= nil then ac.externals.max = GF.ClampAuraCount(data.externalMax, ac.externals.max or 4) or ac.externals.max or 4 end
 	if data.externalSpacing ~= nil then ac.externals.spacing = data.externalSpacing end
@@ -31840,6 +31876,7 @@ function GF:EnsureEditMode()
 				buffMax = GF.ClampAuraCount(ac.buff.max, 6) or 6,
 				buffSpacing = ac.buff.spacing or 2,
 				buffIconShape = GF.NormalizeAuraIconShape(ac.buff.iconShape, defBuff.iconShape or "DEFAULT"),
+				buffIconZoom = addon.IconShape and addon.IconShape.NormalizeIconZoom and addon.IconShape.NormalizeIconZoom(ac.buff.iconZoom or defBuff.iconZoom) or clampNumber(ac.buff.iconZoom or defBuff.iconZoom, 0, 35, 0),
 				buffBorderTexture = GF.NormalizeAuraBorderTexture(ac.buff.borderTexture, defBuff.borderTexture or "DEFAULT", ac.buff.iconShape or defBuff.iconShape),
 				buffBorderSize = ac.buff.borderSize or defBuff.borderSize or 2,
 				buffBorderOffset = ac.buff.borderOffset or defBuff.borderOffset or 0,
@@ -31872,6 +31909,7 @@ function GF:EnsureEditMode()
 				debuffDisplayLargerRoleSpecific = GF.IsBlizzardLargerRoleDebuffEnabled(cfg, def),
 				debuffSpacing = ac.debuff.spacing or 2,
 				debuffIconShape = GF.NormalizeAuraIconShape(ac.debuff.iconShape, defDebuff.iconShape or "DEFAULT"),
+				debuffIconZoom = addon.IconShape and addon.IconShape.NormalizeIconZoom and addon.IconShape.NormalizeIconZoom(ac.debuff.iconZoom or defDebuff.iconZoom) or clampNumber(ac.debuff.iconZoom or defDebuff.iconZoom, 0, 35, 0),
 				debuffBorderTexture = GF.NormalizeAuraBorderTexture(ac.debuff.borderTexture, defDebuff.borderTexture or "DEFAULT", ac.debuff.iconShape or defDebuff.iconShape),
 				debuffBorderSize = ac.debuff.borderSize or defDebuff.borderSize or 2,
 				debuffBorderOffset = ac.debuff.borderOffset or defDebuff.borderOffset or 0,
@@ -31902,6 +31940,7 @@ function GF:EnsureEditMode()
 				externalMax = GF.ClampAuraCount(ac.externals.max, 4) or 4,
 				externalSpacing = ac.externals.spacing or 2,
 				externalIconShape = GF.NormalizeAuraIconShape(ac.externals.iconShape, defExt.iconShape or "DEFAULT"),
+				externalIconZoom = addon.IconShape and addon.IconShape.NormalizeIconZoom and addon.IconShape.NormalizeIconZoom(ac.externals.iconZoom or defExt.iconZoom) or clampNumber(ac.externals.iconZoom or defExt.iconZoom, 0, 35, 0),
 				externalGlowEnabled = (ac.externals.glowEnabled ~= nil and ac.externals.glowEnabled == true) or (ac.externals.glowEnabled == nil and defExt.glowEnabled == true),
 				externalGlowColor = GF.GetExternalGlowColor(ac.externals, defExt),
 				externalGlowStyle = GF.NormalizeExternalGlowStyleForIconShape(ac.externals.glowStyle, defExt.glowStyle or "MARCHING_ANTS", ac.externals.iconShape or defExt.iconShape),

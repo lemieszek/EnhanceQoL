@@ -7066,15 +7066,16 @@ local eventHandlers = {
 			end
 
 			if type(EnhanceQoLDB.profiles) ~= "table" then EnhanceQoLDB.profiles = {} end
+			local renamedProfiles = nil
 			local function profileHasSavedData(profileData)
 				return type(profileData) == "table" and next(profileData) ~= nil
 			end
 			local function getUniqueProfileName(baseName)
 				baseName = trimProfileName(baseName) or "Recovered Profile"
-				if EnhanceQoLDB.profiles[baseName] == nil then return baseName end
+				if not profileHasSavedData(EnhanceQoLDB.profiles[baseName]) then return baseName end
 				local index = 2
 				local candidate = baseName .. " " .. index
-				while EnhanceQoLDB.profiles[candidate] ~= nil do
+				while profileHasSavedData(EnhanceQoLDB.profiles[candidate]) do
 					index = index + 1
 					candidate = baseName .. " " .. index
 				end
@@ -7083,14 +7084,34 @@ local eventHandlers = {
 			local function getProfileMigrationTarget(profileName, profileData, normalizedName)
 				if normalizedName then
 					if normalizedName == profileName then return profileName end
-					if type(EnhanceQoLDB.profiles[normalizedName]) ~= "table" then return normalizedName end
+					if not profileHasSavedData(EnhanceQoLDB.profiles[normalizedName]) then return normalizedName end
 					return getUniqueProfileName(normalizedName)
 				end
 				if type(profileData) ~= "table" then return nil end
 				if not profileHasSavedData(EnhanceQoLDB.profiles.Default) then return "Default" end
 				return getUniqueProfileName("Recovered Profile")
 			end
-			local renamedProfiles = nil
+			local function resolveProfileReference(profileName)
+				local normalizedName = renamedProfiles and renamedProfiles[profileName] or trimProfileName(profileName)
+				if normalizedName and type(EnhanceQoLDB.profiles[normalizedName]) == "table" then return normalizedName end
+				return nil
+			end
+			local function chooseFallbackProfile()
+				if type(EnhanceQoLDB.profiles.Default) == "table" then
+					if profileHasSavedData(EnhanceQoLDB.profiles.Default) then return "Default" end
+				else
+					EnhanceQoLDB.profiles.Default = {}
+				end
+
+				local foundProfile = nil
+				for profileName, profileData in pairs(EnhanceQoLDB.profiles) do
+					if profileName ~= "Default" and type(profileName) == "string" and profileName == trimProfileName(profileName) and profileHasSavedData(profileData) then
+						if foundProfile then return "Default" end
+						foundProfile = profileName
+					end
+				end
+				return foundProfile or "Default"
+			end
 			local profileNames = {}
 			for profileName in pairs(EnhanceQoLDB.profiles) do
 				profileNames[#profileNames + 1] = profileName
@@ -7121,10 +7142,10 @@ local eventHandlers = {
 
 			local defaultProfile = "Default"
 
-			if not EnhanceQoLDB.profileKeys then EnhanceQoLDB.profileKeys = {} end
+			if type(EnhanceQoLDB.profileKeys) ~= "table" then EnhanceQoLDB.profileKeys = {} end
 			for key, profileName in pairs(EnhanceQoLDB.profileKeys) do
-				local normalizedName = renamedProfiles and renamedProfiles[profileName] or trimProfileName(profileName)
-				if normalizedName and EnhanceQoLDB.profiles[normalizedName] then
+				local normalizedName = resolveProfileReference(profileName)
+				if type(key) == "string" and key ~= "" and normalizedName then
 					EnhanceQoLDB.profileKeys[key] = normalizedName
 				else
 					EnhanceQoLDB.profileKeys[key] = nil
@@ -7133,24 +7154,26 @@ local eventHandlers = {
 			local name, realm = UnitName("player"), GetRealmName()
 
 			-- check for global profile
-			local globalProfile = renamedProfiles and renamedProfiles[EnhanceQoLDB.profileGlobal] or trimProfileName(EnhanceQoLDB.profileGlobal)
-			if globalProfile and EnhanceQoLDB.profiles[globalProfile] then
+			local globalProfile = resolveProfileReference(EnhanceQoLDB.profileGlobal) or chooseFallbackProfile()
+			if globalProfile and type(EnhanceQoLDB.profiles[globalProfile]) == "table" then
 				EnhanceQoLDB.profileGlobal = globalProfile
 				defaultProfile = globalProfile
 			else
 				EnhanceQoLDB.profileGlobal = defaultProfile
 			end
 
-			if EnhanceQoLDB.profileKeys[UnitGUID("player")] then
-				defaultProfile = EnhanceQoLDB.profileKeys[UnitGUID("player")]
-			elseif EnhanceQoLDB.profileKeys[name .. " - " .. realm] then
+			local playerGUID = UnitGUID("player")
+			local legacyProfileKey = name and realm and name .. " - " .. realm
+			if playerGUID and EnhanceQoLDB.profileKeys[playerGUID] and type(EnhanceQoLDB.profiles[EnhanceQoLDB.profileKeys[playerGUID]]) == "table" then
+				defaultProfile = EnhanceQoLDB.profileKeys[playerGUID]
+			elseif legacyProfileKey and EnhanceQoLDB.profileKeys[legacyProfileKey] and type(EnhanceQoLDB.profiles[EnhanceQoLDB.profileKeys[legacyProfileKey]]) == "table" then
 				-- Legacy AceDB transform to new model
-				EnhanceQoLDB.profileKeys[UnitGUID("player")] = EnhanceQoLDB.profileKeys[name .. " - " .. realm]
-				EnhanceQoLDB.profileKeys[name .. " - " .. realm] = nil
-				defaultProfile = EnhanceQoLDB.profileKeys[UnitGUID("player")]
+				if playerGUID then EnhanceQoLDB.profileKeys[playerGUID] = EnhanceQoLDB.profileKeys[legacyProfileKey] end
+				EnhanceQoLDB.profileKeys[legacyProfileKey] = nil
+				defaultProfile = playerGUID and EnhanceQoLDB.profileKeys[playerGUID] or EnhanceQoLDB.profileGlobal
 			else
 				defaultProfile = EnhanceQoLDB.profileGlobal
-				EnhanceQoLDB.profileKeys[UnitGUID("player")] = defaultProfile
+				if playerGUID then EnhanceQoLDB.profileKeys[playerGUID] = defaultProfile end
 			end
 
 			if not EnhanceQoLDB.profiles[defaultProfile] or type(EnhanceQoLDB.profiles[defaultProfile]) ~= "table" then EnhanceQoLDB.profiles[defaultProfile] = {} end

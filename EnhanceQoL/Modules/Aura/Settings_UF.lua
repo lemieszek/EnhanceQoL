@@ -724,6 +724,10 @@ local function appendUnitAuraSettings(list, unit, def, refreshSelf)
 		end
 		return getAuraSectionValue(sectionKey, { "iconShape" }, auraDef.iconShape or "DEFAULT")
 	end
+	local function getAuraSectionIconZoom(sectionKey)
+		if addon.IconShape and addon.IconShape.NormalizeIconZoom then return addon.IconShape.NormalizeIconZoom(getAuraSectionValue(sectionKey, { "iconZoom" }, auraDef.iconZoom or 0)) end
+		return clampNumber(getAuraSectionValue(sectionKey, { "iconZoom" }, auraDef.iconZoom or 0), 0, 35, auraDef.iconZoom or 0)
+	end
 	local function getAuraBorderValue(sectionKey)
 		local shape = getAuraSectionShape(sectionKey)
 		local value = getAuraSectionValue(sectionKey, { "borderTexture" }, auraDef.borderTexture or "DEFAULT")
@@ -896,6 +900,28 @@ local function appendUnitAuraSettings(list, unit, def, refreshSelf)
 			end,
 			auraDef.iconShape or "DEFAULT",
 			parentId
+		)
+		list[#list].isEnabled = isSectionEnabled
+
+		list[#list + 1] = slider(
+			labelPrefix .. " " .. (L["Icon zoom"] or "Icon zoom"),
+			0,
+			35,
+			1,
+			function() return getAuraSectionIconZoom(sectionKey) end,
+			function(val)
+				if addon.IconShape and addon.IconShape.NormalizeIconZoom then
+					val = addon.IconShape.NormalizeIconZoom(val)
+				else
+					val = clampNumber(val, 0, 35, auraDef.iconZoom or 0)
+				end
+				setAuraSectionValue(sectionKey, { "iconZoom" }, val or 0)
+				refreshSelf()
+				refreshAuras()
+			end,
+			auraDef.iconZoom or 0,
+			parentId,
+			true
 		)
 		list[#list].isEnabled = isSectionEnabled
 

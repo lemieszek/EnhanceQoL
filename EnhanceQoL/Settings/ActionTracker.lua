@@ -178,6 +178,7 @@ function addon.functions.initActionTracker()
 	end
 	addon.functions.InitDBValue("actionTrackerShowInterruptedCasts", defaults.showInterruptedCasts or false)
 	addon.functions.InitDBValue("actionTrackerIconShape", defaults.iconShape or "DEFAULT")
+	addon.functions.InitDBValue("actionTrackerIconZoom", defaults.iconZoom or 0)
 	addon.functions.InitDBValue("actionTrackerBorderEnabled", defaults.borderEnabled == true)
 	addon.functions.InitDBValue("actionTrackerBorderTexture", defaults.borderTexture or "DEFAULT")
 	addon.functions.InitDBValue("actionTrackerBorderColor", defaults.borderColor or { r = 1, g = 1, b = 1, a = 1 })

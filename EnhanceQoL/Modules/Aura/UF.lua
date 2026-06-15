@@ -2036,6 +2036,7 @@ local defaults = {
 			borderSize = nil,
 			borderOffset = 0,
 			iconShape = "DEFAULT",
+			iconZoom = 0,
 			showTooltip = true,
 			hidePermanentAuras = false,
 			anchor = "BOTTOM",
@@ -4255,7 +4256,7 @@ function AuraUtil.GetIconShapeBorderLayerOffset(index)
 	return -radius, radius - step
 end
 
-function AuraUtil.ApplyIconShape(btn, shape)
+function AuraUtil.ApplyIconShape(btn, shape, iconZoom)
 	if not btn then return end
 	shape = AuraUtil.NormalizeIconShape(shape, "DEFAULT")
 	if addon.IconShape and addon.IconShape.ApplyFrameShape then
@@ -4264,6 +4265,8 @@ function AuraUtil.ApplyIconShape(btn, shape)
 			cooldown = btn.cd,
 			maskKey = "_eqolAuraIconShapeMask",
 			textureMaskKey = "_eqolAuraIconShapeRegionMask",
+			textureTexCoordKey = "_eqolAuraIconTexCoord",
+			iconZoom = iconZoom,
 			refreshSwipe = function(button)
 				if addon.IconShape and addon.IconShape.ApplyCooldownSwipeVisual then
 					addon.IconShape.ApplyCooldownSwipeVisual(button.cd, button, nil, nil, { customColor = false })
@@ -4396,7 +4399,7 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 	btn.isDebuff = isDebuff
 	btn._showTooltip = ac.showTooltip ~= false
 	btn.icon:SetTexture(aura.icon or "")
-	AuraUtil.ApplyIconShape(btn, ac and ac.iconShape)
+	AuraUtil.ApplyIconShape(btn, ac and ac.iconShape, ac and ac.iconZoom)
 	btn.cd:Clear()
 	local drawCooldownEdge = ac.showCooldownEdge ~= false
 	local drawCooldownSwipe = ac.showCooldownSwipe ~= false
@@ -4425,7 +4428,7 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 	if btn.cd.SetDrawEdge then btn.cd:SetDrawEdge(hasCooldown and showCooldown and drawCooldownEdge) end
 	if btn.cd.SetDrawSwipe then btn.cd:SetDrawSwipe(hasCooldown and showCooldown and drawCooldownSwipe) end
 	if btn.cd.SetDrawBling then btn.cd:SetDrawBling(hasCooldown and showCooldown and drawCooldownBling) end
-	AuraUtil.ApplyIconShape(btn, ac and ac.iconShape)
+	AuraUtil.ApplyIconShape(btn, ac and ac.iconShape, ac and ac.iconZoom)
 	local cooldownFontSize = ac.cooldownFontSize
 	if cooldownFontSize ~= nil and cooldownFontSize < 1 then cooldownFontSize = nil end
 	local countFontSize = ac.countFontSize
@@ -4893,6 +4896,7 @@ function AuraUtil.prepareSingleAuraSectionStyle(section)
 	style.padding = padding or 0
 	style.max = AuraUtil.normalizeAuraQueryLimit(style.max) or 16
 	style.iconShape = AuraUtil.NormalizeIconShape(style.iconShape, "DEFAULT")
+	if addon.IconShape and addon.IconShape.NormalizeIconZoom then style.iconZoom = addon.IconShape.NormalizeIconZoom(style.iconZoom) end
 	if addon.IconShape and addon.IconShape.NormalizeBorder then style.borderTexture = addon.IconShape.NormalizeBorder(style.borderTexture, "DEFAULT", style.iconShape, { allowNone = true }) end
 	if style.showTooltip == nil then style.showTooltip = true end
 	if style.cooldownFontSize == nil or style.cooldownFontSize < 1 then style.cooldownFontSize = 12 end

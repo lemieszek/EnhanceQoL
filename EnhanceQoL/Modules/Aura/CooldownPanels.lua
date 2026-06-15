@@ -1871,6 +1871,7 @@ local function didLayoutShapeChange(runtime, layout, layoutCount)
 		and runtime._eqolLayoutIconWidth == layout.iconWidth
 		and runtime._eqolLayoutIconHeight == layout.iconHeight
 		and runtime._eqolLayoutIconShape == layout.iconShape
+		and runtime._eqolLayoutIconZoom == layout.iconZoom
 		and runtime._eqolLayoutSpacing == layout.spacing
 		and runtime._eqolLayoutMode == layout.layoutMode
 		and runtime._eqolLayoutDirection == layout.direction
@@ -1905,6 +1906,7 @@ local function didLayoutShapeChange(runtime, layout, layoutCount)
 	runtime._eqolLayoutIconWidth = layout.iconWidth
 	runtime._eqolLayoutIconHeight = layout.iconHeight
 	runtime._eqolLayoutIconShape = layout.iconShape
+	runtime._eqolLayoutIconZoom = layout.iconZoom
 	runtime._eqolLayoutSpacing = layout.spacing
 	runtime._eqolLayoutMode = layout.layoutMode
 	runtime._eqolLayoutDirection = layout.direction
@@ -7645,11 +7647,13 @@ function CooldownPanels:ApplyEntryIconVisualLayout(icon, layout, entry, panel, f
 	local currentWidth, currentHeight = icon:GetSize()
 	local previewBlingSize = icon.previewBling and (size * 1.5) or nil
 	local iconShape = cdp.ENTRY.NormalizeIconShape(layout and layout.iconShape, Helper.PANEL_LAYOUT_DEFAULTS.iconShape)
+	local iconZoom = addon.IconShape and addon.IconShape.NormalizeIconZoom and addon.IconShape.NormalizeIconZoom(layout and layout.iconZoom) or Helper.ClampInt(layout and layout.iconZoom, 0, 35, 0)
 	if
 		icon._eqolVisualSize == size
 		and icon._eqolVisualWidth == width
 		and icon._eqolVisualHeight == height
 		and icon._eqolVisualShape == iconShape
+		and icon._eqolVisualIconZoom == iconZoom
 		and currentWidth == width
 		and currentHeight == height
 		and icon._eqolVisualAnchor == slotAnchor
@@ -7688,6 +7692,7 @@ function CooldownPanels:ApplyEntryIconVisualLayout(icon, layout, entry, panel, f
 	CooldownPanels.UpdatePreviewGlowBorderLayout(icon, size)
 	cdp.ENTRY.ApplyIconShape(icon, layout)
 	icon._eqolVisualShape = iconShape
+	icon._eqolVisualIconZoom = iconZoom
 	if icon.previewBling then
 		if icon.previewBling._eqolVisualAnchor ~= icon then
 			icon.previewBling:ClearAllPoints()
@@ -7893,6 +7898,7 @@ function cdp.RUNTIME.HasPlacementChange(icon, snapshot, data, fixedLayoutCache, 
 		or snapshot.layoutIconWidth ~= (layout and layout.iconWidth)
 		or snapshot.layoutIconHeight ~= (layout and layout.iconHeight)
 		or snapshot.layoutIconShape ~= (layout and layout.iconShape)
+		or snapshot.layoutIconZoom ~= (layout and layout.iconZoom)
 		or snapshot.layoutSpacing ~= (layout and layout.spacing)
 		or snapshot.fixedLocalIndex ~= fixedLocalIndex
 		or snapshot.fixedCount ~= fixedCount
@@ -7924,6 +7930,7 @@ function cdp.RUNTIME.WritePlacementSnapshot(icon, snapshot, data, fixedLayoutCac
 	snapshot.layoutIconWidth = layout and layout.iconWidth or nil
 	snapshot.layoutIconHeight = layout and layout.iconHeight or nil
 	snapshot.layoutIconShape = layout and layout.iconShape or nil
+	snapshot.layoutIconZoom = layout and layout.iconZoom or nil
 	snapshot.layoutSpacing = layout and layout.spacing or nil
 	snapshot.fixedLocalIndex = fixedLocalIndex
 	snapshot.fixedCount = fixedCount
@@ -10550,6 +10557,8 @@ function cdp.ENTRY.ApplyIconShape(icon, layout)
 		addon.IconShape.ApplyFrameShape(icon, shape, {
 			textures = { icon.texture, icon.editorGhostTexture, icon.rangeOverlay, icon.stateTexture, icon.stateTextureSecond },
 			cooldown = icon.cooldown,
+			textureTexCoordKey = "_eqolCooldownPanelIconTexCoord",
+			iconZoom = layout and layout.iconZoom,
 			refreshSwipe = function(frame) cdp.ENTRY.ApplyCooldownSwipeVisual(frame, frame._eqolRuntimeData) end,
 		})
 	end
@@ -10975,6 +10984,7 @@ local function applyIconLayout(frame, count, layout)
 		icon._eqolVisualWidth = nil
 		icon._eqolVisualHeight = nil
 		icon._eqolVisualShape = nil
+		icon._eqolVisualIconZoom = nil
 		icon._eqolVisualAnchor = nil
 		icon._eqolVisualOffsetX = nil
 		icon._eqolVisualOffsetY = nil
@@ -21676,6 +21686,24 @@ function CooldownPanels:RefreshPanelForCurrentEditContext(panelId, refreshEditor
 	if refreshEditor and CooldownPanels:IsEditorOpen() then CooldownPanels:RefreshEditor() end
 end
 
+function CooldownPanels:RefreshPanelIconZoom(panelId)
+	local panel = self:GetPanel(panelId)
+	local layout = panel and panel.layout
+	local runtime = getRuntime(panelId)
+	local frame = runtime and runtime.frame
+	local icons = frame and frame.icons
+	if not (layout and icons) then return false end
+	local iconZoom = addon.IconShape and addon.IconShape.NormalizeIconZoom and addon.IconShape.NormalizeIconZoom(layout.iconZoom) or Helper.ClampInt(layout.iconZoom, 0, 35, 0)
+	for i = 1, #icons do
+		local icon = icons[i]
+		if icon then
+			cdp.ENTRY.ApplyIconShape(icon, layout)
+			icon._eqolVisualIconZoom = iconZoom
+		end
+	end
+	return true
+end
+
 applyEditLayout = function(panelId, field, value, skipRefresh)
 	local panel = CooldownPanels:GetPanel(panelId)
 	if not panel then return end
@@ -21860,6 +21888,10 @@ applyEditLayout = function(panelId, field, value, skipRefresh)
 		layout.showIconTexture = value ~= false
 	elseif field == "iconShape" then
 		layout.iconShape = cdp.ENTRY.NormalizeIconShape(value, Helper.PANEL_LAYOUT_DEFAULTS.iconShape)
+	elseif field == "iconZoom" then
+		local iconZoom = addon.IconShape and addon.IconShape.NormalizeIconZoom and addon.IconShape.NormalizeIconZoom(value) or Helper.ClampInt(value, 0, 35, layout.iconZoom or 0)
+		if layout.iconZoom == iconZoom then return end
+		layout.iconZoom = iconZoom
 	elseif field == "iconBorderEnabled" then
 		layout.iconBorderEnabled = value == true
 	elseif field == "iconBorderTexture" then
@@ -21929,6 +21961,10 @@ applyEditLayout = function(panelId, field, value, skipRefresh)
 
 	if Helper.IsFixedLayout(layout) then CooldownPanels.BumpFixedGroupEffectiveLayoutVersion(panel) end
 
+	if field == "iconZoom" and not skipRefresh then
+		CooldownPanels:RefreshPanelIconZoom(panelId)
+		return
+	end
 	if not skipRefresh then CooldownPanels:RefreshPanelForCurrentEditContext(panelId, false) end
 	if field == "layoutMode" and not skipRefresh then refreshStandaloneSettings() end
 	if (field == "iconShape" or field == "procGlowStyle" or field == "readyGlowStyle" or field == "pandemicGlowStyle") and not skipRefresh then
@@ -22757,6 +22793,19 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 						)
 					end
 				end,
+			},
+			{
+				name = L["Icon zoom"] or "Icon zoom",
+				kind = SettingType.Slider,
+				field = "iconZoom",
+				parentId = "cooldownPanelDisplay",
+				default = addon.IconShape and addon.IconShape.NormalizeIconZoom and addon.IconShape.NormalizeIconZoom(layout.iconZoom) or Helper.ClampInt(layout.iconZoom, 0, 35, 0),
+				minValue = 0,
+				maxValue = 35,
+				valueStep = 1,
+				get = function() return addon.IconShape and addon.IconShape.NormalizeIconZoom and addon.IconShape.NormalizeIconZoom(layout.iconZoom) or Helper.ClampInt(layout.iconZoom, 0, 35, 0) end,
+				set = function(_, value) applyEditLayout(panelId, "iconZoom", value) end,
+				formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 			},
 			{
 				name = L["CooldownPanelIconBorder"] or "Icon border",

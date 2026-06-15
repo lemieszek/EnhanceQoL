@@ -209,6 +209,7 @@ Helper.PANEL_LAYOUT_DEFAULTS = {
 	showOnCooldown = false,
 	showIconTexture = true,
 	iconShape = "DEFAULT",
+	iconZoom = 0,
 	iconBorderEnabled = false,
 	iconBorderTexture = "DEFAULT",
 	iconBorderSize = 1,

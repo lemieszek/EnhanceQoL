@@ -48,6 +48,7 @@ local function initReminderDefaults()
 	init("mageFoodReminderPos", { point = defaultPos.point, x = defaultPos.x, y = defaultPos.y })
 	init("mageFoodReminderScale", 1)
 	init("mageFoodReminderIconShape", "DEFAULT")
+	init("mageFoodReminderIconZoom", 0)
 	init("mageFoodReminderSound", true)
 	init("mageFoodReminderUseCustomSound", false)
 	init("mageFoodReminderJoinSoundFile", nil)
@@ -94,6 +95,13 @@ local function normalizeIconShape(value)
 end
 
 local function getIconShape() return normalizeIconShape(addon.db and addon.db.mageFoodReminderIconShape) end
+local function getIconZoom()
+	if addon.IconShape and addon.IconShape.NormalizeIconZoom then return addon.IconShape.NormalizeIconZoom(addon.db and addon.db.mageFoodReminderIconZoom) end
+	local zoom = tonumber(addon.db and addon.db.mageFoodReminderIconZoom) or 0
+	if zoom < 0 then zoom = 0 end
+	if zoom > 35 then zoom = 35 end
+	return zoom
+end
 
 local function applyIconShape(button)
 	if not (button and button.icon and addon.IconShape and addon.IconShape.ApplyFrameShape) then return end
@@ -101,6 +109,8 @@ local function applyIconShape(button)
 		textures = { button.icon },
 		maskKey = "_eqolMageFoodReminderMask",
 		textureMaskKey = "_eqolMageFoodReminderTextureMask",
+		textureTexCoordKey = "_eqolMageFoodReminderTexCoord",
+		iconZoom = getIconZoom(),
 	})
 end
 
@@ -587,6 +597,21 @@ registerEditModeFrame = function()
 						end)
 					end
 				end,
+			}
+
+			settings[#settings + 1] = {
+				name = L["Icon zoom"] or "Icon zoom",
+				kind = SettingType.Slider,
+				minValue = 0,
+				maxValue = 35,
+				valueStep = 1,
+				default = 0,
+				get = getIconZoom,
+				set = function(_, value)
+					addon.db.mageFoodReminderIconZoom = addon.IconShape and addon.IconShape.NormalizeIconZoom and addon.IconShape.NormalizeIconZoom(value) or math.max(0, math.min(35, math.floor((tonumber(value) or 0) + 0.5)))
+					applyButtonSettings()
+				end,
+				formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 			}
 		end
 

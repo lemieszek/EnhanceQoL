@@ -51,6 +51,7 @@ ActionTracker.defaults = ActionTracker.defaults
 		showGCDGaps = false,
 		showInterruptedCasts = false,
 		iconShape = "DEFAULT",
+		iconZoom = 0,
 		borderEnabled = false,
 		borderTexture = "DEFAULT",
 		borderSize = 1,
@@ -70,6 +71,7 @@ local DB_SHOW_ELAPSED = "actionTrackerShowElapsed"
 local DB_SHOW_GCD_GAPS = "actionTrackerShowGCDGaps"
 local DB_SHOW_INTERRUPTED_CASTS = "actionTrackerShowInterruptedCasts"
 local DB_ICON_SHAPE = "actionTrackerIconShape"
+local DB_ICON_ZOOM = "actionTrackerIconZoom"
 local DB_BORDER_ENABLED = "actionTrackerBorderEnabled"
 local DB_BORDER_TEXTURE = "actionTrackerBorderTexture"
 local DB_BORDER_SIZE = "actionTrackerBorderSize"
@@ -266,6 +268,10 @@ function ActionTracker:GetShowElapsed() return getValue(DB_SHOW_ELAPSED, default
 function ActionTracker:GetShowGCDGaps() return getValue(DB_SHOW_GCD_GAPS, defaults.showGCDGaps) == true end
 function ActionTracker:GetShowInterruptedCasts() return getValue(DB_SHOW_INTERRUPTED_CASTS, defaults.showInterruptedCasts) == true end
 function ActionTracker:GetIconShape() return normalizeIconShape(getValue(DB_ICON_SHAPE, defaults.iconShape), defaults.iconShape or "DEFAULT") end
+function ActionTracker:GetIconZoom()
+	if addon.IconShape and addon.IconShape.NormalizeIconZoom then return addon.IconShape.NormalizeIconZoom(getValue(DB_ICON_ZOOM, defaults.iconZoom)) end
+	return clampNumber(getValue(DB_ICON_ZOOM, defaults.iconZoom), 0, 35, defaults.iconZoom or 0)
+end
 function ActionTracker:GetBorderEnabled() return getValue(DB_BORDER_ENABLED, defaults.borderEnabled) == true end
 function ActionTracker:GetBorderTextureKey()
 	local shape = self:GetIconShape()
@@ -353,6 +359,8 @@ local function applyIconShape(icon, shape)
 		cooldown = icon.cooldown,
 		maskKey = "_eqolActionTrackerMask",
 		textureMaskKey = "_eqolActionTrackerTextureMask",
+		textureTexCoordKey = "_eqolActionTrackerTexCoord",
+		iconZoom = ActionTracker:GetIconZoom(),
 	})
 end
 
@@ -910,6 +918,7 @@ function ActionTracker:ApplyLayoutData(data)
 	if showInterruptedCasts == nil then showInterruptedCasts = self:GetShowInterruptedCasts() end
 	showInterruptedCasts = showInterruptedCasts == true
 	local iconShape = normalizeIconShape(data.iconShape or self:GetIconShape(), defaults.iconShape or "DEFAULT")
+	local iconZoom = addon.IconShape and addon.IconShape.NormalizeIconZoom and addon.IconShape.NormalizeIconZoom(data.iconZoom or self:GetIconZoom()) or clampNumber(data.iconZoom or self:GetIconZoom(), 0, 35, defaults.iconZoom or 0)
 	local borderEnabled = data.borderEnabled
 	if borderEnabled == nil then borderEnabled = self:GetBorderEnabled() end
 	borderEnabled = borderEnabled == true
@@ -927,6 +936,7 @@ function ActionTracker:ApplyLayoutData(data)
 	addon.db[DB_SHOW_GCD_GAPS] = showGCDGaps
 	addon.db[DB_SHOW_INTERRUPTED_CASTS] = showInterruptedCasts
 	addon.db[DB_ICON_SHAPE] = iconShape
+	addon.db[DB_ICON_ZOOM] = iconZoom
 	addon.db[DB_BORDER_ENABLED] = borderEnabled
 	addon.db[DB_BORDER_TEXTURE] = borderTexture
 	addon.db[DB_BORDER_SIZE] = borderSize
@@ -988,6 +998,10 @@ local function applySetting(field, value)
 		addon.db[DB_BORDER_TEXTURE] = normalizeBorderTexture(addon.db[DB_BORDER_TEXTURE], defaults.borderTexture or "DEFAULT", iconShape)
 		value = iconShape
 		refreshSettings = true
+	elseif field == "iconZoom" then
+		local iconZoom = addon.IconShape and addon.IconShape.NormalizeIconZoom and addon.IconShape.NormalizeIconZoom(value) or clampNumber(value, 0, 35, defaults.iconZoom or 0)
+		addon.db[DB_ICON_ZOOM] = iconZoom
+		value = iconZoom
 	elseif field == "borderEnabled" then
 		local borderEnabled = value == true
 		addon.db[DB_BORDER_ENABLED] = borderEnabled
@@ -1142,6 +1156,18 @@ function ActionTracker:RegisterEditMode()
 				end,
 			},
 			{
+				name = L["Icon zoom"] or "Icon zoom",
+				kind = SettingType.Slider,
+				field = "iconZoom",
+				minValue = 0,
+				maxValue = 35,
+				valueStep = 1,
+				default = defaults.iconZoom or 0,
+				get = function() return ActionTracker:GetIconZoom() end,
+				set = function(_, value) applySetting("iconZoom", value) end,
+				formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
+			},
+			{
 				name = EMBLEM_BORDER,
 				kind = SettingType.Collapsible,
 				id = "border",
@@ -1229,6 +1255,7 @@ function ActionTracker:RegisterEditMode()
 		record.showGCDGaps = self:GetShowGCDGaps()
 		record.showInterruptedCasts = self:GetShowInterruptedCasts()
 		record.iconShape = self:GetIconShape()
+		record.iconZoom = self:GetIconZoom()
 		record.borderEnabled = self:GetBorderEnabled()
 		record.borderTexture = self:GetBorderTextureKey()
 		do
@@ -1256,6 +1283,7 @@ function ActionTracker:RegisterEditMode()
 			showGCDGaps = self:GetShowGCDGaps(),
 			showInterruptedCasts = self:GetShowInterruptedCasts(),
 			iconShape = self:GetIconShape(),
+			iconZoom = self:GetIconZoom(),
 			borderEnabled = self:GetBorderEnabled(),
 			borderTexture = self:GetBorderTextureKey(),
 			borderColor = (function()

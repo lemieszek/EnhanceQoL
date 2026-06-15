@@ -30,6 +30,7 @@ local DB = {
 	GROWTH_DIRECTION = "classBuffReminderGrowthDirection",
 	GROWTH_FROM_CENTER = "classBuffReminderGrowthFromCenter",
 	ICON_SHAPE = "classBuffReminderIconShape",
+	ICON_ZOOM = "classBuffReminderIconZoom",
 	TRACK_FLASKS = "classBuffReminderTrackFlasks",
 	TRACK_FLASKS_CONTENT = "classBuffReminderTrackFlasksContent",
 	TRACK_FLASKS_INSTANCE_ONLY = "classBuffReminderTrackFlasksInstanceOnly",
@@ -112,6 +113,7 @@ local defaults = (Reminder and Reminder.defaults)
 		growthDirection = "RIGHT",
 		growthFromCenter = false,
 		iconShape = "DEFAULT",
+		iconZoom = 0,
 		trackFlasks = false,
 		trackFlasksContent = createDefaultTrackingContentSelection(),
 		trackFlasksInstanceOnly = false,
@@ -250,6 +252,14 @@ local function normalizeIconShape(value)
 	return defaults.iconShape or "DEFAULT"
 end
 
+local function normalizeIconZoom(value)
+	if addon.IconShape and addon.IconShape.NormalizeIconZoom then return addon.IconShape.NormalizeIconZoom(value, defaults.iconZoom or 0) end
+	value = tonumber(value) or defaults.iconZoom or 0
+	if value < 0 then value = 0 end
+	if value > 35 then value = 35 end
+	return math.floor(value + 0.5)
+end
+
 local function getIconShapeOptions()
 	if addon.IconShape and addon.IconShape.GetOptions then return addon.IconShape.GetOptions(L) end
 	return {
@@ -302,6 +312,21 @@ addon.functions.SettingsCreateDropdown(cat, {
 		refreshReminderVisuals()
 	end,
 	optionfunc = getIconShapeOptions,
+	parentSection = expandable,
+})
+
+addon.functions.SettingsCreateSlider(cat, {
+	var = DB.ICON_ZOOM,
+	text = L["Icon zoom"] or "Icon zoom",
+	min = 0,
+	max = 35,
+	step = 1,
+	default = defaults.iconZoom or 0,
+	get = function() return normalizeIconZoom(addon.db and addon.db[DB.ICON_ZOOM]) end,
+	func = function(value)
+		if addon.db then addon.db[DB.ICON_ZOOM] = normalizeIconZoom(value) end
+		refreshReminderVisuals()
+	end,
 	parentSection = expandable,
 })
 
@@ -561,6 +586,7 @@ function addon.functions.initClassBuffReminder()
 	init(DB.GROWTH_DIRECTION, defaults.growthDirection)
 	init(DB.GROWTH_FROM_CENTER, defaults.growthFromCenter)
 	init(DB.ICON_SHAPE, defaults.iconShape or "DEFAULT")
+	init(DB.ICON_ZOOM, defaults.iconZoom or 0)
 	init(DB.TRACK_FLASKS, defaults.trackFlasks)
 	init(DB.TRACK_FOOD, defaults.trackFood)
 	init(DB.TRACK_WEAPON_BUFFS, defaults.trackWeaponBuffs)

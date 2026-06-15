@@ -93,6 +93,7 @@ local BORDER_SIZE_MAX = 24
 local BORDER_OFFSET_MIN = -20
 local BORDER_OFFSET_MAX = 20
 Reminder.DB_ICON_SHAPE = Reminder.DB_ICON_SHAPE or "classBuffReminderIconShape"
+Reminder.DB_ICON_ZOOM = Reminder.DB_ICON_ZOOM or "classBuffReminderIconZoom"
 
 Reminder.runeTracking = Reminder.runeTracking or {
 	auraIds = {
@@ -363,6 +364,7 @@ if defaults.borderSize == nil then defaults.borderSize = 1 end
 if defaults.borderOffset == nil then defaults.borderOffset = 0 end
 if type(defaults.borderColor) ~= "table" then defaults.borderColor = { r = 1, g = 1, b = 1, a = 1 } end
 if defaults.iconShape == nil then defaults.iconShape = "DEFAULT" end
+if defaults.iconZoom == nil then defaults.iconZoom = 0 end
 
 local PROVIDER_SCOPE_GROUP = "GROUP"
 local PROVIDER_SCOPE_SELF = "SELF"
@@ -3767,6 +3769,10 @@ end
 function Reminder:GetGrowthDirection() return normalizeGrowthDirection(getValue(DB_GROWTH_DIRECTION, defaults.growthDirection)) end
 
 function Reminder:GetIconShape() return Reminder.NormalizeIconShape(getValue(Reminder.DB_ICON_SHAPE, defaults.iconShape), defaults.iconShape or "DEFAULT") end
+function Reminder:GetIconZoom()
+	if addon.IconShape and addon.IconShape.NormalizeIconZoom then return addon.IconShape.NormalizeIconZoom(getValue(Reminder.DB_ICON_ZOOM, defaults.iconZoom)) end
+	return clamp(getValue(Reminder.DB_ICON_ZOOM, defaults.iconZoom), 0, 35, defaults.iconZoom or 0)
+end
 
 function Reminder:GetGlowStyle() return Reminder.NormalizeGlowStyleForIconShape(getValue(DB_GLOW_STYLE, defaults.glowStyle), self:GetIconShape()) end
 
@@ -3795,6 +3801,8 @@ function Reminder:ApplyIconShape(frame, texture, shape)
 		textures = { texture },
 		maskKey = "_eqolClassBuffReminderMask",
 		textureMaskKey = "_eqolClassBuffReminderTextureMask",
+		textureTexCoordKey = "_eqolClassBuffReminderTexCoord",
+		iconZoom = self:GetIconZoom(),
 	})
 end
 
@@ -7111,6 +7119,18 @@ function editModeSettingsBuilders.buildLayout()
 					root:CreateRadio(option.label, function() return Reminder:GetIconShape() == option.value end, function() editModeSetIconShape(option.value) end)
 				end
 			end,
+		},
+		{
+			name = L["Icon zoom"] or "Icon zoom",
+			kind = SettingType.Slider,
+			parentId = "anchorSize",
+			default = defaults.iconZoom or 0,
+			minValue = 0,
+			maxValue = 35,
+			valueStep = 1,
+			get = function() return Reminder:GetIconZoom() end,
+			set = function(_, value) editModeSetNumber(Reminder.DB_ICON_ZOOM, value, 0, 35, defaults.iconZoom or 0) end,
+			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 		},
 		{
 			name = L["Icon gap"] or "Icon gap",

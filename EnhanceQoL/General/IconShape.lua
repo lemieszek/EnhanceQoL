@@ -24,6 +24,9 @@ IconShape.STAR_MASK_TEXTURE = "Interface\\AddOns\\EnhanceQoL\\Assets\\StarShape.
 IconShape.DIAMOND_MASK_TEXTURE = "Interface\\AddOns\\EnhanceQoL\\Assets\\diamond_mask.tga"
 IconShape.DEFAULT_SWIPE_TEXTURE = "Interface\\Buttons\\WHITE8X8"
 IconShape.SQUARE_TEX_COORDS = { 0.07, 0.93, 0.07, 0.93 }
+IconShape.ICON_ZOOM_MIN = 0
+IconShape.ICON_ZOOM_MAX = 35
+IconShape.ICON_ZOOM_DEFAULT = 0
 
 function IconShape.Normalize(value, fallback)
 	local normalized = type(value) == "string" and strupper(value) or nil
@@ -471,15 +474,42 @@ function IconShape.ApplyTextureTexCoord(texture, coords, key)
 	texture:SetTexCoord(coords[1] or 0, coords[2] or 1, coords[3] or 0, coords[4] or 1)
 end
 
+function IconShape.NormalizeIconZoom(value, fallback)
+	local zoom = tonumber(value)
+	if zoom == nil then zoom = tonumber(fallback) or IconShape.ICON_ZOOM_DEFAULT end
+	if zoom < IconShape.ICON_ZOOM_MIN then zoom = IconShape.ICON_ZOOM_MIN end
+	if zoom > IconShape.ICON_ZOOM_MAX then zoom = IconShape.ICON_ZOOM_MAX end
+	return zoom
+end
+
+function IconShape.GetZoomTexCoords(zoom, baseInset)
+	zoom = IconShape.NormalizeIconZoom(zoom)
+	local inset = (tonumber(baseInset) or 0) + (zoom / 100)
+	if inset < 0 then inset = 0 end
+	if inset > 0.45 then inset = 0.45 end
+	return { inset, 1 - inset, inset, 1 - inset }
+end
+
+function IconShape.ApplyTextureZoom(texture, zoom, key, baseInset)
+	zoom = IconShape.NormalizeIconZoom(zoom)
+	baseInset = tonumber(baseInset) or 0
+	if zoom <= 0 and baseInset <= 0 then
+		IconShape.RestoreTextureTexCoord(texture, key)
+		return
+	end
+	IconShape.ApplyTextureTexCoord(texture, IconShape.GetZoomTexCoords(zoom, baseInset), key)
+end
+
 function IconShape.ApplyFrameShape(frame, shape, opts)
 	if not frame then return end
 	opts = opts or {}
 	shape = IconShape.Normalize(shape)
+	local iconZoom = IconShape.NormalizeIconZoom(opts.iconZoom)
 	if shape == IconShape.DEFAULT then
 		frame._eqolIconShape = IconShape.DEFAULT
 		for _, texture in ipairs(opts.textures or {}) do
 			IconShape.ClearTextureMask(texture, opts.textureMaskKey)
-			IconShape.RestoreTextureTexCoord(texture, opts.textureTexCoordKey)
+			IconShape.ApplyTextureZoom(texture, iconZoom, opts.textureTexCoordKey, 0)
 		end
 		IconShape.ApplyCooldownRegionMask(opts.cooldown, nil, opts.textureMaskKey)
 		frame._eqolGlowShape = nil
@@ -492,7 +522,11 @@ function IconShape.ApplyFrameShape(frame, shape, opts)
 		frame._eqolIconShape = IconShape.SQUARE
 		for _, texture in ipairs(opts.textures or {}) do
 			IconShape.ClearTextureMask(texture, opts.textureMaskKey)
-			IconShape.ApplyTextureTexCoord(texture, opts.squareTexCoords or IconShape.SQUARE_TEX_COORDS, opts.textureTexCoordKey)
+			if iconZoom > 0 then
+				IconShape.ApplyTextureZoom(texture, iconZoom, opts.textureTexCoordKey, 0.07)
+			else
+				IconShape.ApplyTextureTexCoord(texture, opts.squareTexCoords or IconShape.SQUARE_TEX_COORDS, opts.textureTexCoordKey)
+			end
 		end
 		IconShape.ApplyCooldownRegionMask(opts.cooldown, nil, opts.textureMaskKey)
 		frame._eqolGlowShape = nil
@@ -505,7 +539,7 @@ function IconShape.ApplyFrameShape(frame, shape, opts)
 	frame._eqolIconShape = shape
 	frame._eqolGlowShape = shape
 	for _, texture in ipairs(opts.textures or {}) do
-		IconShape.RestoreTextureTexCoord(texture, opts.textureTexCoordKey)
+		IconShape.ApplyTextureZoom(texture, iconZoom, opts.textureTexCoordKey, 0)
 		IconShape.ApplyTextureMask(texture, mask, opts.textureMaskKey)
 	end
 	IconShape.ApplyCooldownRegionMask(opts.cooldown, mask, opts.textureMaskKey)
