@@ -357,6 +357,30 @@ local function ensureConfigApp()
 		assetRoot = "Interface\\AddOns\\EnhanceQoL\\libs\\LibSettingsDesigner\\Assets\\",
 		density = "compact",
 		showDensityButton = false,
+		subnav = {
+			enabled = true,
+		},
+		topbar = {
+			titleActions = {
+				{
+					id = "reload-ui",
+					label = _G.RELOADUI or "Reload UI",
+					tooltip = function(app)
+						return app:GetReloadPendingReason()
+							or L["bReloadInterface"]
+							or L["tReloadInterface"]
+							or (_G.RELOADUI or "Reload UI")
+					end,
+					visible = function(app)
+						return app:IsReloadPending()
+					end,
+					pulse = true,
+					onClick = function()
+						if _G.ReloadUI then _G.ReloadUI() end
+					end,
+				},
+			},
+		},
 		getSize = function()
 			local size = addon.db and addon.db.configCenterSize
 			if type(size) == "table" then

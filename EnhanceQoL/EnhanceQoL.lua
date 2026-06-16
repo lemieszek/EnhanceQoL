@@ -6156,6 +6156,10 @@ addon.functions.OpenSettingsRoot = OpenSettingsRoot
 
 function addon.functions.checkReloadFrame()
 	if addon.variables.requireReload == false then return end
+	local reloadReason = L["bReloadInterface"] or L["tReloadInterface"] or (_G.RELOADUI or "Reload UI")
+	local configApp = addon.ConfigApp
+	if configApp and configApp.MarkReloadPending then configApp:MarkReloadPending(reloadReason) end
+	if addon.variables.reloadPopupDismissed and configApp and configApp.IsReloadPending and configApp:IsReloadPending() then return end
 	if _G["ReloadUIPopup"] and _G["ReloadUIPopup"]:IsShown() then return end
 
 	if _G["ReloadUIPopup"] then
@@ -6187,7 +6191,9 @@ function addon.functions.checkReloadFrame()
 	cancelButton:SetText(CANCEL)
 	cancelButton:SetScript("OnClick", function()
 		reloadFrame:Hide()
-		addon.variables.requireReload = false -- disable the prompt on cancel
+		addon.variables.requireReload = false -- Keep the requirement visible through the config-center reload button.
+		addon.variables.reloadPopupDismissed = true
+		if configApp and configApp.MarkReloadPending then configApp:MarkReloadPending(reloadReason) end
 	end)
 
 	reloadFrame:Show()
