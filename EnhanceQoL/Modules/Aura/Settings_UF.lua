@@ -9054,6 +9054,46 @@ local function registerEditModeFrames()
 	if addon.EditModeLib and addon.EditModeLib.internal and addon.EditModeLib.internal.RefreshSettingValues then addon.EditModeLib.internal:RefreshSettingValues() end
 end
 
+local function registerGlobalAuraIgnoreSettingsCenterPage()
+	local app = addon.ConfigApp
+	local editor = UF and UF.GlobalAuraIgnore
+	if not (app and editor and editor.RenderSettingsCenterTable) then return end
+	app:RegisterPage({
+		id = "suites.unitframes-global-aura-ignore",
+		category = "suites",
+		title = L["UFGlobalAuraIgnoreMatrixTitle"] or L["UFGlobalAuraIgnoreEditorTitle"] or "Global Aura Ignore",
+		description = L["UFGlobalAuraIgnoreMatrixDesc"] or "Configure ignored auras for Player, Target, Focus, Group and Raid unit frames.",
+		iconKey = "unitframes",
+		order = 500,
+		newTagID = "UFGlobalAuraIgnoreMatrix",
+		layout = "custom",
+		searchEntries = editor.GetSettingsCenterSearchEntries and editor.GetSettingsCenterSearchEntries() or nil,
+		getSettingCount = function()
+			if editor.GetSettingsCenterSettingCount then return editor.GetSettingsCenterSettingCount() end
+			return 0
+		end,
+		getCustomizedCount = function()
+			if editor.GetSettingsCenterCustomizedCount then return editor.GetSettingsCenterCustomizedCount() end
+			return 0
+		end,
+		getHeight = function()
+			if editor.GetSettingsCenterTableHeight then return editor.GetSettingsCenterTableHeight() end
+			return 1200
+		end,
+		render = function(parent, appInstance, page, state, focusID)
+			return editor.RenderSettingsCenterTable(parent, {
+				app = appInstance,
+				page = page,
+				state = state,
+				focusID = focusID,
+			})
+		end,
+		release = function(handle)
+			if handle and handle.Release then handle:Release() end
+		end,
+	})
+end
+
 local function registerSettingsUI()
 	if UF.SettingsRegistered then return end
 	if not (addon.functions and addon.functions.SettingsCreateCategory) then return end
@@ -9074,6 +9114,7 @@ local function registerSettingsUI()
 		})
 		addon.SettingsLayout.expEQoLUnitFrames = expandable
 	end
+	registerGlobalAuraIgnoreSettingsCenterPage()
 
 	addon.SettingsLayout.ufPlusCategory = cUF
 	addon.functions.SettingsCreateText(cUF, "|cff99e599" .. L["UFPlusHint"] .. "|r", { parentSection = expandable })

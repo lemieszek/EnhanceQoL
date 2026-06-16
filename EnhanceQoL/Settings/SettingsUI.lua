@@ -80,6 +80,7 @@ local pageIconKeysByStableID = {
 	CustomUnitFrames = "unitframes",
 	DataPanel = "data",
 	DamageMeter = "damagemeterprofile",
+	DefaultAuraContainers = "buff",
 	DialogsConfirmations = "dialogsconfirmations",
 	DurationText = "castbar",
 	DungeonsMythicPlus = "dungeons",
@@ -142,6 +143,7 @@ local pageDescriptionKeysByStableID = {
 	CooldownPanels = "configCenterPageCardDescCooldownPanels",
 	CustomUnitFrames = "configCenterPageCardDescUnitFrames",
 	DataPanel = "configCenterPageCardDescDataPanels",
+	DefaultAuraContainers = "configCenterPageCardDescDefaultAuraContainers",
 	DeathResurrect = "configCenterPageCardDescDeath",
 	DialogsConfirmations = "configCenterPageCardDescDialogsConfirmations",
 	DurationText = "configCenterPageCardDescDurationText",
@@ -737,6 +739,7 @@ local function createModernOnlySetting(key, cbData)
 		return nil, false
 	end
 	local function writeValue(value)
+		if cbData and cbData.storage == false then return false end
 		if not (cbData and cbData.var) then return false end
 		addon.db = addon.db or {}
 		if cbData.subvar then
@@ -753,13 +756,15 @@ local function createModernOnlySetting(key, cbData)
 	end
 	local function setValue(value)
 		if cbData and type(cbData.func) == "function" then
-			local ok = pcall(cbData.func, value)
-			if ok and didPersist(value) then return end
+			local ok, handled = pcall(cbData.func, value)
+			if ok and (handled == true or cbData.storage == false or didPersist(value)) then return end
+			if ok and handled == false then return end
 			if ok and not (cbData.get or cbData.var) then return end
 			writeValue(value)
 		elseif cbData and type(cbData.set) == "function" then
-			local ok = pcall(cbData.set, value, value)
-			if ok and didPersist(value) then return end
+			local ok, handled = pcall(cbData.set, value, value)
+			if ok and (handled == true or cbData.storage == false or didPersist(value)) then return end
+			if ok and handled == false then return end
 			if ok and not (cbData.get or cbData.var) then return end
 			writeValue(value)
 		else

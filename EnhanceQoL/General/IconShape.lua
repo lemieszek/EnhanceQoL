@@ -302,6 +302,7 @@ function IconShape.GetBorderOptions(localeTable, shape, opts)
 	end
 
 	local defaultOptions = opts.defaultOptions
+	if opts.includeNone then add(IconShape.BORDER.NONE, opts.noneLabel or _G.NONE or "None") end
 	if type(defaultOptions) == "table" then
 		for _, option in ipairs(defaultOptions) do
 			add(option.value, option.label)

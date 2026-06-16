@@ -226,6 +226,7 @@ local FAMILY_DATA = {
 	{ id = "evoker_pres_echo_reversion", classToken = "EVOKER", spec = "Preservation", spellIds = { 367364 }, fallbackName = "Echo Reversion" },
 	{ id = "evoker_pres_lifebind", classToken = "EVOKER", spec = "Preservation", spellIds = { 373267 }, fallbackName = "Lifebind" },
 	{ id = "evoker_pres_echo_dream_breath", classToken = "EVOKER", spec = "Preservation", spellIds = { 376788 }, fallbackName = "Echo Dream Breath" },
+	{ id = "evoker_pres_verdant_embrace", classToken = "EVOKER", spec = "Preservation", spellIds = { 409895 }, fallbackName = "Verdant Embrace" },
 	-- Augmentation Evoker
 	{ id = "evoker_aug_blistering_scales", classToken = "EVOKER", spec = "Augmentation", spellIds = { 360827 }, fallbackName = "Blistering Scales" },
 	{ id = "evoker_aug_ebon_might", classToken = "EVOKER", spec = "Augmentation", spellIds = { 395152, 395296 }, fallbackName = "Ebon Might" },
@@ -239,6 +240,7 @@ local FAMILY_DATA = {
 	{ id = "druid_lifebloom", classToken = "DRUID", spec = "Restoration", spellIds = { 33763 }, fallbackName = "Lifebloom" },
 	{ id = "druid_wild_growth", classToken = "DRUID", spec = "Restoration", spellIds = { 48438 }, fallbackName = "Wild Growth" },
 	{ id = "druid_germination", classToken = "DRUID", spec = "Restoration", spellIds = { 155777 }, fallbackName = "Germination" },
+	{ id = "druid_symbiotic_blooms", classToken = "DRUID", spec = "Restoration", spellIds = { 439530 }, fallbackName = "Symbiotic Blooms" },
 	-- Priest
 	{ id = "priest_pw_shield", classToken = "PRIEST", specs = { "Discipline", "Holy" }, spellIds = { 17 }, fallbackName = "Power Word: Shield" },
 	{ id = "priest_atonement", classToken = "PRIEST", spec = "Discipline", spellIds = { 194384 }, fallbackName = "Atonement" },

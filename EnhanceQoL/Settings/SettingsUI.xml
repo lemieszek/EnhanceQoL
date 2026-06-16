@@ -6,6 +6,9 @@
 	<Script file='CombatDungeon.lua'/>
 	<Script file='GearUpgrade.lua'/>
 	<Script file='ItemInventory.lua'/>
+	<!--@eqol-beta@-->
+	<Script file='DefaultAuraContainers.lua'/>
+	<!--@end-eqol-beta@-->
 	<Script file='Skinner.lua'/>
 	<Script file='Loot.lua'/>
 	<Script file='ChatFrame.lua'/>

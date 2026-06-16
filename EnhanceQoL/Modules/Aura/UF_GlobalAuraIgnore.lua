@@ -43,25 +43,71 @@ local UNIT_CONTEXT_LOOKUP = {
 	raid = true,
 }
 
-local DEFAULT_EDITOR_CONTEXT = "party"
-
 local DEFAULT_SPECIAL_DEBUFFS = {
+	challengeTime = true,
+	classUtility = false,
 	satedExhaustion = true,
 	deserter = true,
+	skyridingUtility = false,
 }
 
 local SPECIAL_DEBUFF_GROUPS = {
+	{
+		key = "challengeTime",
+		labelKey = "UFGlobalAuraIgnoreChallengeTime",
+		fallbackLabel = "Challenge/Instance Debuffs",
+		spellIds = { 206151, 308312, 1254550 },
+	},
+	{
+		key = "classUtility",
+		labelKey = "UFGlobalAuraIgnoreClassUtility",
+		fallbackLabel = "Class/Utility Auras",
+		spellIds = { 124255, 405189, 462742, 462757, 1217607 },
+		matrixGroups = {
+			{ classToken = "DEMONHUNTER", spellIds = { 1217607 } },
+			{ classToken = "DRUID", spellIds = { 405189 } },
+			{ classToken = "MONK", spellIds = { 124255 } },
+			{ classToken = "SHAMAN", spellIds = { 462742, 462757 } },
+		},
+	},
 	{
 		key = "satedExhaustion",
 		labelKey = "UFGlobalAuraIgnoreSatedExhaustion",
 		fallbackLabel = "Sated/Exhaustion Debuffs",
 		spellIds = { 57723, 57724, 80354, 95809, 160455, 264689, 390435 },
+		matrixRows = {
+			{
+				labelSpellId = 2825,
+				fallbackLabel = "Bloodlust",
+				iconSpellId = 2825,
+				spellIds = { 57723, 57724, 80354, 95809, 160455, 264689, 390435 },
+			},
+		},
 	},
 	{
 		key = "deserter",
 		labelKey = "UFGlobalAuraIgnoreDeserter",
 		fallbackLabel = "Deserter Debuffs",
 		spellIds = { 26013, 71041 },
+	},
+	{
+		key = "skyridingUtility",
+		labelKey = "UFGlobalAuraIgnoreSkyridingUtility",
+		fallbackLabel = "Skyriding/Ride Along Auras",
+		spellIds = { 369968, 377234, 388367, 404464, 404468, 418590, 427490, 447959, 447960 },
+		matrixRows = {
+			{ spellIds = { 369968 } },
+			{ spellIds = { 377234 } },
+			{ spellIds = { 388367 } },
+			{ spellIds = { 404464 } },
+			{ spellIds = { 404468 } },
+			{ spellIds = { 418590 } },
+			{
+				label = "Ride Along",
+				iconSpellId = 427490,
+				spellIds = { 427490, 447959, 447960 },
+			},
+		},
 	},
 }
 
@@ -76,9 +122,20 @@ for i = 1, #SPECIAL_DEBUFF_GROUPS do
 	SPECIAL_DEBUFF_SETS[group.key] = set
 end
 
-local editorFrame
 local familyEntryList
 local familyEntryById
+
+local MATRIX_FAMILY_COMBINES = {
+	evoker_pres_dream_breath = { "evoker_pres_dream_breath", "evoker_pres_echo_dream_breath" },
+	evoker_pres_reversion = { "evoker_pres_reversion", "evoker_pres_echo_reversion" },
+}
+
+local MATRIX_FAMILY_COMBINE_MEMBER = {}
+for primaryFamilyId, familyIds in pairs(MATRIX_FAMILY_COMBINES) do
+	for i = 1, #familyIds do
+		MATRIX_FAMILY_COMBINE_MEMBER[familyIds[i]] = primaryFamilyId
+	end
+end
 
 local function tr(key, fallback)
 	local value = L and L[key]
@@ -271,6 +328,7 @@ end
 local function createDefaultConfig()
 	local function createDefaultBucket()
 		return {
+			allowedSpells = {},
 			ignoredFamilies = {},
 			ignoredSpells = {},
 			specialDebuffs = createDefaultSpecialDebuffs(),
@@ -346,6 +404,7 @@ local function normalizeContextBucket(cfg, context, knownById)
 	cfg.byContext = type(cfg.byContext) == "table" and cfg.byContext or {}
 	local bucket = cfg.byContext[context]
 	if type(bucket) ~= "table" then bucket = {} end
+	bucket.allowedSpells = normalizeSpellSet(bucket.allowedSpells)
 	bucket.ignoredFamilies = normalizeFamilySet(bucket.ignoredFamilies, knownById)
 	bucket.ignoredSpells = normalizeSpellSet(bucket.ignoredSpells)
 	bucket.specialDebuffs = normalizeSpecialSet(bucket.specialDebuffs)
@@ -360,6 +419,7 @@ local function getContextBucket(cfg, context)
 	local bucket = cfg.byContext[context]
 	if type(bucket) ~= "table" then
 		bucket = {
+			allowedSpells = {},
 			ignoredFamilies = {},
 			ignoredSpells = {},
 			specialDebuffs = createDefaultSpecialDebuffs(),
@@ -367,6 +427,7 @@ local function getContextBucket(cfg, context)
 		cfg.byContext[context] = bucket
 		return bucket
 	end
+	if type(bucket.allowedSpells) ~= "table" then bucket.allowedSpells = {} end
 	if type(bucket.ignoredFamilies) ~= "table" then bucket.ignoredFamilies = {} end
 	if type(bucket.ignoredSpells) ~= "table" then bucket.ignoredSpells = {} end
 	if type(bucket.specialDebuffs) ~= "table" then
@@ -407,6 +468,7 @@ local function normalizeConfig(cfg)
 			for i = 1, #targetContexts do
 				local context = targetContexts[i]
 				local bucket = type(cfg.byContext[context]) == "table" and cfg.byContext[context] or {}
+				bucket.allowedSpells = type(bucket.allowedSpells) == "table" and bucket.allowedSpells or {}
 				bucket.ignoredFamilies = type(bucket.ignoredFamilies) == "table" and bucket.ignoredFamilies or {}
 				bucket.ignoredSpells = type(bucket.ignoredSpells) == "table" and bucket.ignoredSpells or {}
 				bucket.specialDebuffs = normalizeSpecialSet(bucket.specialDebuffs)
@@ -440,6 +502,21 @@ local function normalizeConfig(cfg)
 			end
 		end
 		cfg._eqolSpecialDefaultsV2 = true
+	end
+	if cfg._eqolSpecialDefaultsV3 ~= true then
+		for i = 1, #UNIT_CONTEXT_ORDER do
+			local bucket = getContextBucket(cfg, UNIT_CONTEXT_ORDER[i])
+			if bucket and type(bucket.specialDebuffs) == "table" then bucket.specialDebuffs.challengeTime = true end
+		end
+		cfg._eqolSpecialDefaultsV3 = true
+	end
+	if cfg._eqolSpecialDefaultsV4 ~= true then
+		for i = 1, #UNIT_CONTEXT_ORDER do
+			local context = UNIT_CONTEXT_ORDER[i]
+			local bucket = getContextBucket(cfg, context)
+			if context ~= "player" and bucket and type(bucket.specialDebuffs) == "table" then bucket.specialDebuffs.skyridingUtility = true end
+		end
+		cfg._eqolSpecialDefaultsV4 = true
 	end
 
 	-- Legacy fields: normalized into byContext above.
@@ -488,6 +565,7 @@ function GAI.ShouldIgnoreSpell(context, spellId, cfgOverride)
 	local bucket = getContextBucket(cfg, resolvedContext)
 	if not bucket then return false end
 
+	if bucket.allowedSpells and bucket.allowedSpells[spellId] == true then return false end
 	if bucket.ignoredSpells[spellId] == true then return true end
 
 	for i = 1, #SPECIAL_DEBUFF_GROUPS do
@@ -530,310 +608,13 @@ end
 
 GAI.RequestAuraRefresh = requestAuraRefresh
 
-local function createCheck(parent, text, width)
-	local check = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
-	if check.Text then
-		check.Text:SetText(text or "")
-		check.Text:SetTextColor(1, 1, 1, 1)
-		if width then
-			check.Text:SetWidth(width)
-			check.Text:SetJustifyH("LEFT")
-		end
+function GAI:ToggleEditor()
+	if addon.functions and addon.functions.OpenConfigCenter then
+		addon.functions.OpenConfigCenter("suites.unitframes-global-aura-ignore")
 	end
-	return check
-end
-
-local function applyBackdrop(frame)
-	if not frame then return end
-	frame:SetBackdrop({
-		bgFile = "Interface\\Buttons\\WHITE8x8",
-		edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-		tile = true,
-		tileSize = 32,
-		edgeSize = 24,
-		insets = { left = 6, right = 6, top = 6, bottom = 6 },
-	})
-	frame:SetBackdropColor(0, 0, 0, 1)
-end
-
-local function updateCheckEnabledVisual(check, enabled)
-	if not check then return end
-	if check.Text and check.Text.SetTextColor then
-		if enabled then
-			check.Text:SetTextColor(1, 1, 1, 1)
-		else
-			check.Text:SetTextColor(0.6, 0.6, 0.6, 1)
-		end
-	end
-	if check.SetAlpha then check:SetAlpha(enabled and 1 or 0.9) end
-end
-
-local function rebuildFamilyRows(frame)
-	if not frame or not frame.ScrollContent then return end
-
-	for i = 1, #(frame._dynamicRows or {}) do
-		local row = frame._dynamicRows[i]
-		if row and row.Hide then row:Hide() end
-	end
-	frame._dynamicRows = frame._dynamicRows or {}
-	wipeTable(frame._dynamicRows)
-	frame.FamilyRows = frame.FamilyRows or {}
-	wipeTable(frame.FamilyRows)
-
-	local entries = getFamilyEntries()
-	local anchorParent = frame.ScrollContent
-	local y = -6
-	local rowWidth = (frame.ScrollFrame and frame.ScrollFrame:GetWidth() or 500) - 30
-	if rowWidth < 120 then rowWidth = 120 end
-	local previousWasHeader = true
-
-	for i = 1, #entries do
-		local entry = entries[i]
-		if entry.isHeader then
-			if i > 1 and not previousWasHeader then y = y - 8 end
-			local header = anchorParent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-			header:SetPoint("TOPLEFT", anchorParent, "TOPLEFT", 6, y)
-			header:SetText(entry.label or "")
-			header:SetTextColor(1, 0.85, 0.2, 1)
-			tinsert(frame._dynamicRows, header)
-			y = y - 20
-			previousWasHeader = true
-		else
-			local check = createCheck(anchorParent, entry.label or "", rowWidth)
-			check:SetPoint("TOPLEFT", anchorParent, "TOPLEFT", 4, y)
-			check._familyId = entry.familyId
-			check._entry = entry
-			check:SetScript("OnClick", function(self)
-				local cfg = GAI.EnsureConfig()
-				local context = (frame and frame._selectedContext) or DEFAULT_EDITOR_CONTEXT
-				local bucket = getContextBucket(cfg, context)
-				if not bucket then return end
-				local familyId = tostring(self._familyId or "")
-				if familyId == "" then return end
-				if self:GetChecked() then
-					bucket.ignoredFamilies[familyId] = true
-				else
-					bucket.ignoredFamilies[familyId] = nil
-				end
-				normalizeConfig(cfg)
-				requestAuraRefresh()
-				GAI:RefreshEditor()
-			end)
-			check:SetScript("OnEnter", function(self)
-				if not GameTooltip then return end
-				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-				GameTooltip:AddLine(self._entry.label or "", 1, 0.82, 0)
-				GameTooltip:Show()
-			end)
-			check:SetScript("OnLeave", function()
-				if GameTooltip then GameTooltip:Hide() end
-			end)
-			tinsert(frame._dynamicRows, check)
-			tinsert(frame.FamilyRows, check)
-			y = y - 22
-			previousWasHeader = false
-		end
-	end
-
-	y = y - 8
-	local contentHeight = -y
-	if contentHeight < 1 then contentHeight = 1 end
-	frame.ScrollContent:SetHeight(contentHeight)
-end
-
-local function buildEditor()
-	if editorFrame then return editorFrame end
-
-	local frame = CreateFrame("Frame", "EQOL_UF_GlobalAuraIgnoreEditor", UIParent, "BackdropTemplate")
-	frame:SetSize(620, 650)
-	applyBackdrop(frame)
-	frame:SetMovable(true)
-	frame:EnableMouse(true)
-	frame:RegisterForDrag("LeftButton")
-	frame:SetScript("OnDragStart", frame.StartMoving)
-	frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-	frame:SetFrameStrata("TOOLTIP")
-	frame:SetClampedToScreen(true)
-	frame:SetPoint("CENTER")
-	frame:Hide()
-
-	local title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
-	title:SetPoint("TOPLEFT", 16, -16)
-	title:SetText(tr("UFGlobalAuraIgnoreEditorTitle", "Global Aura Ignore"))
-	frame.Title = title
-
-	local subtitle = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
-	subtitle:SetText(tr("UFGlobalAuraIgnoreEditorSubtitle", "Ignore selected auras per frame (Player/Target/Focus/Party/Raid)."))
-	subtitle:SetWidth(570)
-	subtitle:SetJustifyH("LEFT")
-	frame.Subtitle = subtitle
-
-	local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-	close:SetPoint("TOPRIGHT", -6, -6)
-	close:SetScript("OnClick", function() frame:Hide() end)
-	frame.CloseButton = close
-
-	local enabledCheck = createCheck(frame, tr("UFGlobalAuraIgnoreEditorEnabled", "Enable global aura ignore"), 420)
-	enabledCheck:SetPoint("TOPLEFT", subtitle, "BOTTOMLEFT", -4, -14)
-	enabledCheck:SetScript("OnClick", function(self)
-		local cfg = GAI.EnsureConfig()
-		cfg.enabled = self:GetChecked() == true
-		normalizeConfig(cfg)
-		requestAuraRefresh()
-		GAI:RefreshEditor()
-	end)
-	frame.EnabledCheck = enabledCheck
-
-	local contextLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-	contextLabel:SetPoint("TOPLEFT", enabledCheck, "BOTTOMLEFT", 4, -12)
-	contextLabel:SetText(tr("Frame", "Frame"))
-	frame.ContextLabel = contextLabel
-
-	frame.ContextButtons = {}
-	local previousContextButton
-	for i = 1, #UNIT_CONTEXT_ORDER do
-		local key = UNIT_CONTEXT_ORDER[i]
-		local button = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-		button:SetSize(88, 20)
-		button._contextKey = key
-		button._label = getUnitContextLabel(key)
-		button:SetText(button._label)
-		if i == 1 then
-			button:SetPoint("TOPLEFT", contextLabel, "BOTTOMLEFT", -2, -6)
-		else
-			button:SetPoint("LEFT", previousContextButton, "RIGHT", 6, 0)
-		end
-		button:SetScript("OnClick", function(self)
-			frame._selectedContext = self._contextKey
-			GAI:RefreshEditor()
-		end)
-		frame.ContextButtons[key] = button
-		previousContextButton = button
-	end
-	frame._selectedContext = frame._selectedContext or DEFAULT_EDITOR_CONTEXT
-
-	local specialLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-	specialLabel:SetPoint("TOPLEFT", contextLabel, "BOTTOMLEFT", 0, -34)
-	specialLabel:SetText(tr("UFGlobalAuraIgnoreEditorSpecial", "Special debuff categories"))
-	frame.SpecialLabel = specialLabel
-
-	frame.SpecialChecks = {}
-	local previousSpecial
-	for i = 1, #SPECIAL_DEBUFF_GROUPS do
-		local group = SPECIAL_DEBUFF_GROUPS[i]
-		local label = tr(group.labelKey, group.fallbackLabel)
-		local check = createCheck(frame, label, 570)
-		if i == 1 then
-			check:SetPoint("TOPLEFT", specialLabel, "BOTTOMLEFT", -4, -8)
-		else
-			check:SetPoint("TOPLEFT", previousSpecial, "BOTTOMLEFT", 0, -4)
-		end
-		check._groupKey = group.key
-		check:SetScript("OnClick", function(self)
-			local cfg = GAI.EnsureConfig()
-			local context = (frame and frame._selectedContext) or DEFAULT_EDITOR_CONTEXT
-			local bucket = getContextBucket(cfg, context)
-			if not bucket then return end
-			bucket.specialDebuffs[self._groupKey] = self:GetChecked() == true
-			normalizeConfig(cfg)
-			requestAuraRefresh()
-			GAI:RefreshEditor()
-		end)
-		frame.SpecialChecks[group.key] = check
-		previousSpecial = check
-	end
-
-	local listLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-	listLabel:SetPoint("TOPLEFT", previousSpecial, "BOTTOMLEFT", 4, -12)
-	listLabel:SetText(tr("UFGlobalAuraIgnoreEditorFamilies", "Healer buff spell families"))
-	frame.ListLabel = listLabel
-
-	local scrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
-	scrollFrame:SetPoint("TOPLEFT", listLabel, "BOTTOMLEFT", -4, -6)
-	scrollFrame:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -34, 20)
-	frame.ScrollFrame = scrollFrame
-
-	local scrollContent = CreateFrame("Frame", nil, scrollFrame)
-	scrollContent:SetSize(1, 1)
-	scrollFrame:SetScrollChild(scrollContent)
-	frame.ScrollContent = scrollContent
-	frame.FamilyRows = {}
-	frame._dynamicRows = {}
-
-	rebuildFamilyRows(frame)
-
-	frame:SetScript("OnShow", function() GAI:RefreshEditor() end)
-
-	editorFrame = frame
-	return frame
-end
-
-function GAI:RefreshEditor()
-	local frame = editorFrame
-	if not frame then return end
-	local cfg = GAI.EnsureConfig()
-	if not cfg then return end
-
-	if frame.EnabledCheck then frame.EnabledCheck:SetChecked(cfg.enabled == true) end
-
-	local selectedContext = frame._selectedContext
-	if not UNIT_CONTEXT_LOOKUP[selectedContext] then
-		selectedContext = DEFAULT_EDITOR_CONTEXT
-		frame._selectedContext = selectedContext
-	end
-	local bucket = getContextBucket(cfg, selectedContext)
-	if not bucket then return end
-
-	for i = 1, #UNIT_CONTEXT_ORDER do
-		local key = UNIT_CONTEXT_ORDER[i]
-		local button = frame.ContextButtons and frame.ContextButtons[key]
-		if button then
-			local isSelected = key == selectedContext
-			local label = button._label or getUnitContextLabel(key)
-			if isSelected then
-				button:SetText("[" .. label .. "]")
-			else
-				button:SetText(label)
-			end
-		end
-	end
-
-	for i = 1, #SPECIAL_DEBUFF_GROUPS do
-		local group = SPECIAL_DEBUFF_GROUPS[i]
-		local check = frame.SpecialChecks and frame.SpecialChecks[group.key]
-		if check then
-			check:SetChecked(bucket.specialDebuffs and bucket.specialDebuffs[group.key] == true)
-			updateCheckEnabledVisual(check, cfg.enabled == true)
-		end
-	end
-
-	if frame.FamilyRows then
-		for i = 1, #frame.FamilyRows do
-			local row = frame.FamilyRows[i]
-			if row and row._familyId then
-				row:SetChecked(bucket.ignoredFamilies and bucket.ignoredFamilies[row._familyId] == true)
-				updateCheckEnabledVisual(row, cfg.enabled == true)
-			end
-		end
-	end
-end
-
-function GAI:ToggleEditor(context)
-	local frame = buildEditor()
-	if not frame then return end
-	if frame:IsShown() then
-		frame:Hide()
-		return
-	end
-	local resolvedContext = GAI.ResolveContext(context)
-	if resolvedContext and UNIT_CONTEXT_LOOKUP[resolvedContext] then frame._selectedContext = resolvedContext end
-	frame:Show()
-	self:RefreshEditor()
 end
 
 function GAI:HideEditor()
-	if editorFrame and editorFrame:IsShown() then editorFrame:Hide() end
 end
 
 function GAI:GetSpecialDebuffGroups()
@@ -857,5 +638,536 @@ end
 function GAI:ResetFamilyCache()
 	familyEntryList = nil
 	familyEntryById = nil
-	if editorFrame then rebuildFamilyRows(editorFrame) end
+end
+
+local function getSpellTexture(spellId)
+	if spellId == nil then return nil end
+	if C_Spell and C_Spell.GetSpellTexture then
+		local texture = C_Spell.GetSpellTexture(spellId)
+		if texture then return texture end
+	end
+	if GetSpellTexture then return GetSpellTexture(spellId) end
+	return nil
+end
+
+local function getPrimarySpellId(rowData)
+	if not rowData then return nil end
+	if rowData.iconSpellId then return rowData.iconSpellId end
+	if rowData.labelSpellId then return rowData.labelSpellId end
+	if rowData.spellId then return rowData.spellId end
+	if type(rowData.spellIds) == "table" then return rowData.spellIds[1] end
+	return nil
+end
+
+local function buildSpellMatrixRow(rowData)
+	local spellIds = {}
+	local seen = {}
+	local rawSpellIds = rowData and rowData.spellIds
+	if type(rawSpellIds) == "table" then
+		for i = 1, #rawSpellIds do
+			local spellId = tonumber(rawSpellIds[i])
+			if spellId and spellId > 0 and not seen[spellId] then
+				seen[spellId] = true
+				spellIds[#spellIds + 1] = spellId
+			end
+		end
+	else
+		local spellId = tonumber(rowData and rowData.spellId)
+		if spellId and spellId > 0 then
+			seen[spellId] = true
+			spellIds[#spellIds + 1] = spellId
+		end
+	end
+	if #spellIds == 0 then return nil end
+	local primarySpellId = getPrimarySpellId(rowData) or spellIds[1]
+	local labelSpellId = rowData and rowData.labelSpellId
+	return {
+		kind = "spell",
+		spellId = spellIds[1],
+		spellIds = spellIds,
+		tooltipSpellId = primarySpellId,
+		label = (labelSpellId and getSpellName(labelSpellId)) or (rowData and rowData.label) or (rowData and rowData.fallbackLabel) or getSpellName(spellIds[1]) or ("#" .. tostring(spellIds[1])),
+		icon = getSpellTexture(primarySpellId) or getSpellTexture(spellIds[1]),
+	}
+end
+
+local function appendSpecialSpellRows(rows, group)
+	local grouped = {}
+	local order = {}
+	for i = 1, #(group.spellIds or {}) do
+		local spellId = tonumber(group.spellIds[i])
+		if spellId and spellId > 0 then
+			local label = getSpellName(spellId) or ("#" .. tostring(spellId))
+			if not grouped[label] then
+				grouped[label] = {
+					label = label,
+					spellIds = {},
+					iconSpellId = spellId,
+				}
+				order[#order + 1] = label
+			end
+			grouped[label].spellIds[#grouped[label].spellIds + 1] = spellId
+		end
+	end
+	sort(order, function(a, b) return tostring(a) < tostring(b) end)
+	for i = 1, #order do
+		local row = buildSpellMatrixRow(grouped[order[i]])
+		if row then rows[#rows + 1] = row end
+	end
+end
+
+local function appendSpellMatrixRows(rows, matrixRows)
+	local sortedRows = {}
+	for i = 1, #(matrixRows or {}) do
+		local row = buildSpellMatrixRow(matrixRows[i])
+		if row then sortedRows[#sortedRows + 1] = row end
+	end
+	sort(sortedRows, function(a, b) return tostring(a.label or "") < tostring(b.label or "") end)
+	for i = 1, #sortedRows do
+		rows[#rows + 1] = sortedRows[i]
+	end
+end
+
+local function appendSettingsCenterSection(sections, label, rows)
+	if not label or label == "" then return nil end
+	for i = 1, #sections do
+		if sections[i].label == label then
+			local targetRows = sections[i].rows or {}
+			for j = 1, #(rows or {}) do
+				targetRows[#targetRows + 1] = rows[j]
+			end
+			sections[i].rows = targetRows
+			return sections[i]
+		end
+	end
+	local section = {
+		label = label,
+		rows = rows or {},
+	}
+	sections[#sections + 1] = section
+	return section
+end
+
+local function appendSortedSettingsCenterSections(rows, sections)
+	sort(sections, function(a, b) return tostring(a.label or "") < tostring(b.label or "") end)
+	for i = 1, #sections do
+		local section = sections[i]
+		rows[#rows + 1] = {
+			isHeader = true,
+			label = section.label or "",
+		}
+		local sectionRows = section.rows or {}
+		sort(sectionRows, function(a, b) return tostring(a.label or "") < tostring(b.label or "") end)
+		for j = 1, #sectionRows do
+			rows[#rows + 1] = sectionRows[j]
+		end
+	end
+end
+
+local function buildSettingsCenterRows()
+	local rows = {}
+	local sections = {}
+	for i = 1, #SPECIAL_DEBUFF_GROUPS do
+		local group = SPECIAL_DEBUFF_GROUPS[i]
+		if type(group.matrixGroups) == "table" then
+			local matrixGroups = {}
+			for j = 1, #group.matrixGroups do
+				local matrixGroup = group.matrixGroups[j]
+				matrixGroups[#matrixGroups + 1] = {
+					label = matrixGroup.label or getClassLabel(matrixGroup.classToken),
+					rows = matrixGroup.matrixRows or { { spellIds = matrixGroup.spellIds } },
+				}
+			end
+			for j = 1, #matrixGroups do
+				local sectionRows = {}
+				appendSpellMatrixRows(sectionRows, matrixGroups[j].rows)
+				appendSettingsCenterSection(sections, matrixGroups[j].label, sectionRows)
+			end
+		else
+			local sectionRows = {}
+			if type(group.matrixRows) == "table" then
+				appendSpellMatrixRows(sectionRows, group.matrixRows)
+			else
+				appendSpecialSpellRows(sectionRows, group)
+			end
+			appendSettingsCenterSection(sections, tr(group.labelKey, group.fallbackLabel), sectionRows)
+		end
+	end
+
+	local entries = getFamilyEntries()
+	local _, byFamilyId = getFamilyEntries()
+	local activeSection
+	for i = 1, #entries do
+		local entry = entries[i]
+		if entry.isHeader then
+			activeSection = {
+				label = entry.label or "",
+				rows = {},
+			}
+			activeSection = appendSettingsCenterSection(sections, activeSection.label, activeSection.rows)
+		else
+			local combinePrimaryId = MATRIX_FAMILY_COMBINE_MEMBER[entry.familyId]
+			if combinePrimaryId and combinePrimaryId ~= entry.familyId then
+				-- Render combined Echo variants once on the primary family row.
+			else
+				local spellId = entry.spellIds and entry.spellIds[1]
+				local familyIds = MATRIX_FAMILY_COMBINES[entry.familyId]
+				local spellIds = entry.spellIds
+				if familyIds then
+					spellIds = {}
+					for j = 1, #familyIds do
+						local familyEntry = byFamilyId and byFamilyId[familyIds[j]]
+						local familySpellIds = familyEntry and familyEntry.spellIds
+						for k = 1, #(familySpellIds or {}) do
+							spellIds[#spellIds + 1] = familySpellIds[k]
+						end
+					end
+				end
+				local row = {
+					kind = "family",
+					familyId = entry.familyId,
+					familyIds = familyIds,
+					spellId = spellId,
+					spellIds = spellIds,
+					tooltipSpellId = spellId,
+					label = entry.label or getSpellName(spellId) or tostring(entry.familyId or ""),
+					icon = getSpellTexture(spellId),
+				}
+				if activeSection and activeSection.rows then activeSection.rows[#activeSection.rows + 1] = row end
+			end
+		end
+	end
+	appendSortedSettingsCenterSections(rows, sections)
+	return rows
+end
+
+function GAI.GetSettingsCenterTableHeight()
+	local rows = buildSettingsCenterRows()
+	local height = 80
+	for i = 1, #rows do
+		height = height + (rows[i].isHeader and 34 or 30)
+	end
+	return height + 18
+end
+
+local function getMatrixSettingRows()
+	local rows = buildSettingsCenterRows()
+	local settingRows = {}
+	for i = 1, #rows do
+		if not rows[i].isHeader then settingRows[#settingRows + 1] = rows[i] end
+	end
+	return settingRows
+end
+
+function GAI.GetSettingsCenterSettingCount()
+	return 1 + (#getMatrixSettingRows() * #UNIT_CONTEXT_ORDER)
+end
+
+function GAI.GetSettingsCenterSearchEntries()
+	local entries = {
+		{
+			id = "overview",
+			label = tr("UFGlobalAuraIgnoreMatrixTitle", "Aura Ignore Matrix"),
+			keywords = {
+				tr("UFGlobalAuraIgnoreEditorTitle", "Global Aura Ignore"),
+				tr("UFGlobalAuraIgnoreMatrixDesc", "Configure ignored auras for Player, Target, Focus, Group and Raid unit frames."),
+				"Aura Ignore",
+				"Global Aura Ignore",
+				"Unit Frames",
+			},
+		},
+	}
+	local activeHeader
+	local rows = buildSettingsCenterRows()
+	for i = 1, #rows do
+		local row = rows[i]
+		if row.isHeader then
+			activeHeader = row.label
+			entries[#entries + 1] = {
+				id = "header." .. tostring(i),
+				label = row.label or "",
+				keywords = {
+					tr("UFGlobalAuraIgnoreMatrixTitle", "Aura Ignore Matrix"),
+					tr("UFGlobalAuraIgnoreEditorTitle", "Global Aura Ignore"),
+					"Aura Ignore",
+					"Ignore",
+				},
+			}
+		else
+			local keywords = {
+				tr("UFGlobalAuraIgnoreMatrixTitle", "Aura Ignore Matrix"),
+				tr("UFGlobalAuraIgnoreEditorTitle", "Global Aura Ignore"),
+				activeHeader,
+				"Aura Ignore",
+				"Ignore",
+			}
+			if type(row.spellIds) == "table" then
+				for j = 1, #row.spellIds do
+					local spellId = tonumber(row.spellIds[j])
+					if spellId then
+						keywords[#keywords + 1] = tostring(spellId)
+						keywords[#keywords + 1] = getSpellName(spellId)
+					end
+				end
+			elseif row.spellId then
+				keywords[#keywords + 1] = tostring(row.spellId)
+				keywords[#keywords + 1] = getSpellName(row.spellId)
+			end
+			if type(row.familyIds) == "table" then
+				for j = 1, #row.familyIds do
+					keywords[#keywords + 1] = row.familyIds[j]
+				end
+			elseif row.familyId then
+				keywords[#keywords + 1] = row.familyId
+			end
+			entries[#entries + 1] = {
+				id = (row.kind or "row") .. "." .. tostring(row.familyId or row.spellId or i),
+				label = row.label or "",
+				keywords = keywords,
+				focusID = tostring(row.familyId or row.spellId or i),
+			}
+		end
+	end
+	return entries
+end
+
+local function isSpellIgnoredInBucket(bucket, spellId)
+	spellId = tonumber(spellId)
+	if not bucket or not spellId or spellId <= 0 then return false end
+	if bucket.allowedSpells and bucket.allowedSpells[spellId] == true then return false end
+	if bucket.ignoredSpells and bucket.ignoredSpells[spellId] == true then return true end
+	for i = 1, #SPECIAL_DEBUFF_GROUPS do
+		local group = SPECIAL_DEBUFF_GROUPS[i]
+		if bucket.specialDebuffs and bucket.specialDebuffs[group.key] == true and SPECIAL_DEBUFF_SETS[group.key] and SPECIAL_DEBUFF_SETS[group.key][spellId] == true then return true end
+	end
+	return false
+end
+
+local function getMatrixRowIgnored(row, context, cfg)
+	if not row then return false end
+	local bucket = getContextBucket(cfg, context)
+	if not bucket then return false end
+	if row.kind == "family" then
+		if type(row.familyIds) == "table" then
+			for i = 1, #row.familyIds do
+				if bucket.ignoredFamilies and bucket.ignoredFamilies[tostring(row.familyIds[i])] == true then return true end
+			end
+			return false
+		end
+		return row.familyId ~= nil and bucket.ignoredFamilies and bucket.ignoredFamilies[tostring(row.familyId)] == true
+	end
+	if type(row.spellIds) == "table" then
+		for i = 1, #row.spellIds do
+			if isSpellIgnoredInBucket(bucket, row.spellIds[i]) == true then return true end
+		end
+		return false
+	end
+	return row.spellId ~= nil and isSpellIgnoredInBucket(bucket, row.spellId) == true
+end
+
+function GAI.GetSettingsCenterCustomizedCount()
+	local cfg = GAI.EnsureConfig()
+	local defaults = normalizeConfig(createDefaultConfig())
+	local count = cfg.enabled == true and 1 or 0
+	local rows = getMatrixSettingRows()
+	for i = 1, #rows do
+		for j = 1, #UNIT_CONTEXT_ORDER do
+			local context = UNIT_CONTEXT_ORDER[j]
+			if getMatrixRowIgnored(rows[i], context, cfg) ~= getMatrixRowIgnored(rows[i], context, defaults) then count = count + 1 end
+		end
+	end
+	return count
+end
+
+local function setMatrixRowIgnored(row, context, ignored)
+	if not row or not UNIT_CONTEXT_LOOKUP[context] then return end
+	local cfg = GAI.EnsureConfig()
+	local bucket = getContextBucket(cfg, context)
+	if not bucket then return end
+	if row.kind == "family" then
+		local familyIds = type(row.familyIds) == "table" and row.familyIds or { row.familyId }
+		for i = 1, #familyIds do
+			local familyId = tostring(familyIds[i] or "")
+			if familyId ~= "" then
+				if ignored then
+					bucket.ignoredFamilies[familyId] = true
+				else
+					bucket.ignoredFamilies[familyId] = nil
+				end
+			end
+		end
+	elseif row.spellId then
+		local spellIds = type(row.spellIds) == "table" and row.spellIds or { row.spellId }
+		for i = 1, #spellIds do
+			local spellId = tonumber(spellIds[i])
+			if spellId and spellId > 0 then
+				if ignored then
+					bucket.allowedSpells[spellId] = nil
+					bucket.ignoredSpells[spellId] = true
+				else
+					bucket.ignoredSpells[spellId] = nil
+					bucket.allowedSpells[spellId] = true
+				end
+			end
+		end
+	end
+	normalizeConfig(cfg)
+	requestAuraRefresh()
+end
+
+local function updateSettingsCenterChecks(handle)
+	if not handle then return end
+	local cfg = GAI.EnsureConfig()
+	if handle.EnabledCheck then handle.EnabledCheck:SetChecked(cfg.enabled == true) end
+	for i = 1, #(handle.checks or {}) do
+		local check = handle.checks[i]
+		if check and check._matrixRow and check._matrixContext then
+			check:SetChecked(getMatrixRowIgnored(check._matrixRow, check._matrixContext, cfg))
+			check:SetAlpha(cfg.enabled == true and 1 or 0.7)
+		end
+	end
+end
+
+function GAI.RenderSettingsCenterTable(parent)
+	if not parent then return nil end
+	local handle = {
+		frames = {},
+		checks = {},
+	}
+	local rows = buildSettingsCenterRows()
+	local columnX = {
+		player = -150,
+		target = -120,
+		focus = -90,
+		party = -60,
+		raid = -30,
+	}
+	local headerLabels = {
+		player = "P",
+		target = "T",
+		focus = "F",
+		party = "G",
+		raid = "R",
+	}
+	local function track(frame)
+		handle.frames[#handle.frames + 1] = frame
+		return frame
+	end
+
+	local enabledCheck = track(CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate"))
+	enabledCheck:SetPoint("TOPLEFT", parent, "TOPLEFT", 2, -8)
+	if enabledCheck.Text then
+		enabledCheck.Text:SetText(tr("UFGlobalAuraIgnoreMatrixEnabled", "Enable global aura ignore"))
+		enabledCheck.Text:SetTextColor(1, 1, 1, 1)
+		enabledCheck.Text:SetWidth(420)
+		enabledCheck.Text:SetJustifyH("LEFT")
+	end
+	enabledCheck:SetScript("OnClick", function(self)
+		local cfg = GAI.EnsureConfig()
+		cfg.enabled = self:GetChecked() == true
+		normalizeConfig(cfg)
+		requestAuraRefresh()
+		updateSettingsCenterChecks(handle)
+	end)
+	handle.EnabledCheck = enabledCheck
+
+	local header = track(CreateFrame("Frame", nil, parent))
+	header:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -38)
+	header:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, -38)
+	header:SetHeight(26)
+	for i = 1, #UNIT_CONTEXT_ORDER do
+		local context = UNIT_CONTEXT_ORDER[i]
+		local label = track(header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"))
+		label:SetPoint("RIGHT", header, "RIGHT", columnX[context], 0)
+		label:SetText(headerLabels[context] or "")
+		label:SetWidth(24)
+		label:SetJustifyH("CENTER")
+	end
+
+	local previous = header
+	for i = 1, #rows do
+		local rowData = rows[i]
+		if rowData.isHeader then
+			local frame = track(CreateFrame("Frame", nil, parent))
+			frame:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, -6)
+			frame:SetPoint("TOPRIGHT", previous, "BOTTOMRIGHT", 0, -6)
+			frame:SetHeight(24)
+			local label = track(frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight"))
+			label:SetPoint("LEFT", frame, "LEFT", 6, 0)
+			label:SetPoint("RIGHT", frame, "RIGHT", -180, 0)
+			label:SetJustifyH("LEFT")
+			label:SetText(rowData.label or "")
+			label:SetTextColor(1, 0.85, 0.2, 1)
+			previous = frame
+		else
+			local frame = track(CreateFrame("Frame", nil, parent))
+			frame:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, -2)
+			frame:SetPoint("TOPRIGHT", previous, "BOTTOMRIGHT", 0, -2)
+			frame:SetHeight(28)
+			frame:EnableMouse(true)
+			frame:SetScript("OnEnter", function()
+				if not GameTooltip then return end
+				local spellId = tonumber(rowData.tooltipSpellId or rowData.spellId)
+				GameTooltip:SetOwner(frame, "ANCHOR_RIGHT")
+				if spellId and GameTooltip.SetSpellByID then
+					GameTooltip:SetSpellByID(spellId)
+				else
+					GameTooltip:AddLine(rowData.label or "", 1, 0.82, 0)
+				end
+				GameTooltip:Show()
+			end)
+			frame:SetScript("OnLeave", function()
+				if GameTooltip then GameTooltip:Hide() end
+			end)
+
+			local icon = track(frame:CreateTexture(nil, "ARTWORK"))
+			icon:SetSize(22, 22)
+			icon:SetPoint("LEFT", frame, "LEFT", 6, 0)
+			icon:SetTexture(rowData.icon or 134400)
+
+			local name = track(frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall"))
+			name:SetPoint("LEFT", icon, "RIGHT", 8, 0)
+			name:SetPoint("RIGHT", frame, "RIGHT", -180, 0)
+			name:SetJustifyH("LEFT")
+			name:SetText(rowData.label or "")
+
+			for j = 1, #UNIT_CONTEXT_ORDER do
+				local context = UNIT_CONTEXT_ORDER[j]
+				local check = track(CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate"))
+				check:SetSize(24, 24)
+				check:SetPoint("RIGHT", frame, "RIGHT", columnX[context], 0)
+				check._matrixRow = rowData
+				check._matrixContext = context
+				check:SetScript("OnClick", function(self)
+					setMatrixRowIgnored(self._matrixRow, self._matrixContext, self:GetChecked() == true)
+					updateSettingsCenterChecks(handle)
+				end)
+				check:SetScript("OnEnter", function(self)
+					if not GameTooltip then return end
+					GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+					GameTooltip:AddLine(rowData.label or "", 1, 0.82, 0)
+					GameTooltip:AddLine(string.format(tr("UFGlobalAuraIgnoreMatrixAppliesTo", "Applies to: %s"), getUnitContextLabel(self._matrixContext)), 1, 1, 1)
+					GameTooltip:Show()
+				end)
+				check:SetScript("OnLeave", function()
+					if GameTooltip then GameTooltip:Hide() end
+				end)
+				handle.checks[#handle.checks + 1] = check
+			end
+			previous = frame
+		end
+	end
+
+	function handle:Release()
+		for i = 1, #(self.frames or {}) do
+			local frame = self.frames[i]
+			if frame and frame.Hide then frame:Hide() end
+			if frame and frame.SetParent then frame:SetParent(nil) end
+		end
+		wipeTable(self.frames)
+		wipeTable(self.checks)
+	end
+
+	updateSettingsCenterChecks(handle)
+	return handle
 end

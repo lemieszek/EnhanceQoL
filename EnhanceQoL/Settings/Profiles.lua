@@ -442,12 +442,70 @@ local function buildSortedProfileList(orderTarget, excludeFunc, includeEmpty)
 end
 
 local function getActiveProfileName()
-	if not EnhanceQoLDB or not EnhanceQoLDB.profileKeys then return nil end
+	if not EnhanceQoLDB or type(EnhanceQoLDB.profileKeys) ~= "table" then return nil end
 	local guid = UnitGUID("player")
 	local profile = guid and EnhanceQoLDB.profileKeys[guid]
-	if profile and profile ~= "" then return profile end
-	if EnhanceQoLDB.profileGlobal and EnhanceQoLDB.profileGlobal ~= "" then return EnhanceQoLDB.profileGlobal end
+	if trimAddonProfileName(profile) and EnhanceQoLDB.profiles and type(EnhanceQoLDB.profiles[profile]) == "table" then return profile end
+	if trimAddonProfileName(EnhanceQoLDB.profileGlobal) and EnhanceQoLDB.profiles and type(EnhanceQoLDB.profiles[EnhanceQoLDB.profileGlobal]) == "table" then return EnhanceQoLDB.profileGlobal end
 	return nil
+end
+
+local function getValidProfileName(value)
+	local name = trimAddonProfileName(value)
+	if not name then return nil end
+	if type(EnhanceQoLDB) ~= "table" or type(EnhanceQoLDB.profiles) ~= "table" then return nil end
+	if type(EnhanceQoLDB.profiles[name]) ~= "table" then return nil end
+	return name
+end
+
+local function getFallbackProfileName()
+	return getValidProfileName(EnhanceQoLDB and EnhanceQoLDB.profileGlobal) or getValidProfileName("Default")
+end
+
+local function getSelectedActiveProfileName()
+	local guid = UnitGUID and UnitGUID("player")
+	local active = guid and type(EnhanceQoLDB) == "table" and type(EnhanceQoLDB.profileKeys) == "table" and EnhanceQoLDB.profileKeys[guid]
+	return getValidProfileName(active) or getFallbackProfileName() or "Default"
+end
+
+local function setActiveProfileName(value)
+	local name = getValidProfileName(value)
+	if not name then return false end
+	local guid = UnitGUID and UnitGUID("player")
+	if type(guid) ~= "string" or guid == "" then return false end
+	EnhanceQoLDB.profileKeys = type(EnhanceQoLDB.profileKeys) == "table" and EnhanceQoLDB.profileKeys or {}
+	EnhanceQoLDB.profileKeys[guid] = name
+	addon.variables.requireReload = true
+	addon.functions.checkReloadFrame()
+	return true
+end
+
+local function getSelectedGlobalProfileName()
+	return getValidProfileName(EnhanceQoLDB and EnhanceQoLDB.profileGlobal) or getValidProfileName("Default") or "Default"
+end
+
+local function setGlobalProfileName(value)
+	local name = getValidProfileName(value)
+	if not name then return false end
+	EnhanceQoLDB.profileGlobal = name
+	return true
+end
+
+local function isProfileInUse(profileName)
+	profileName = getValidProfileName(profileName)
+	if not profileName then return false end
+	if EnhanceQoLDB.profileGlobal == profileName then return true end
+	if type(EnhanceQoLDB.profileKeys) == "table" then
+		for _, assignedProfile in pairs(EnhanceQoLDB.profileKeys) do
+			if assignedProfile == profileName then return true end
+		end
+	end
+	return false
+end
+
+local function canDeleteProfile(profileName)
+	profileName = getValidProfileName(profileName)
+	return profileName ~= nil and not isProfileInUse(profileName)
 end
 
 local function getCurrentPlayerGUID()
@@ -1338,13 +1396,10 @@ local data = {
 	order = profileOrderActive,
 	text = L["Active profile"],
 	desc = L["ProfileActiveDesc"] or "Profile used by this character. This overrides the default profile.",
-	get = function() return EnhanceQoLDB.profileKeys[UnitGUID("player")] or EnhanceQoLDB.profileGlobal end,
-	set = function(value)
-		EnhanceQoLDB.profileKeys[UnitGUID("player")] = value
-		addon.variables.requireReload = true
-		addon.functions.checkReloadFrame()
-	end,
-	default = "",
+	get = getSelectedActiveProfileName,
+	set = setActiveProfileName,
+	default = "Default",
+	storage = false,
 	var = "profiledata",
 	parentSection = expandable,
 }
@@ -1357,9 +1412,10 @@ data = {
 	order = profileOrderGlobal,
 	text = L["Global profile"],
 	desc = L["ProfileDefaultDesc"] or "Profile used for new characters that do not have an active profile assigned yet.",
-	get = function() return EnhanceQoLDB.profileGlobal end,
-	set = function(value) EnhanceQoLDB.profileGlobal = value end,
-	default = "",
+	get = getSelectedGlobalProfileName,
+	set = setGlobalProfileName,
+	default = "Default",
+	storage = false,
 	var = "profilefirststart",
 	parentSection = expandable,
 }
@@ -1376,7 +1432,7 @@ addon.functions.SettingsCreateButton(profilesCategory, {
 
 data = {
 	listFunc = function()
-		local currentProfile = EnhanceQoLDB.profileKeys[UnitGUID("player")]
+		local currentProfile = getSelectedActiveProfileName()
 		return buildSortedProfileList(profileOrderCopy, function(name) return name == currentProfile end, true)
 	end,
 	order = profileOrderCopy,
@@ -1384,6 +1440,8 @@ data = {
 	get = function() return "" end,
 	set = function(value)
 		if value ~= "" then
+			local sourceProfile = getValidProfileName(value)
+			if not sourceProfile then return false end
 			StaticPopupDialogs["EQOL_COPY_PROFILE"] = StaticPopupDialogs["EQOL_COPY_PROFILE"]
 				or {
 					text = "",
@@ -1394,9 +1452,9 @@ data = {
 					hideOnEscape = true,
 					preferredIndex = 3,
 					OnAccept = function(self)
-						local source = self.data
-						if not source or source == "" then return end
-						local target = EnhanceQoLDB.profileKeys[UnitGUID("player")]
+						local source = getValidProfileName(self.data)
+						if not source then return end
+						local target = getSelectedActiveProfileName()
 						if not target then return end
 						local copied = sanitizeProfileData(EnhanceQoLDB.profiles[source])
 						normalizeProfileStorage(copied)
@@ -1405,10 +1463,13 @@ data = {
 					end,
 				}
 			StaticPopupDialogs["EQOL_COPY_PROFILE"].text = L["ProfileCopyDesc"]:format(value)
-			StaticPopup_Show("EQOL_COPY_PROFILE", nil, nil, value)
+			StaticPopup_Show("EQOL_COPY_PROFILE", nil, nil, sourceProfile)
+			return true
 		end
+		return false
 	end,
 	default = "",
+	storage = false,
 	var = "profilecopy",
 	parentSection = expandable,
 }
@@ -1417,15 +1478,15 @@ addon.functions.SettingsCreateDropdown(profilesCategory, data)
 
 data = {
 	listFunc = function()
-		local currentProfile = EnhanceQoLDB.profileKeys[UnitGUID("player")]
-		local globalProfile = EnhanceQoLDB.profileGlobal
-		return buildSortedProfileList(profileOrderDelete, function(name) return name == currentProfile or name == globalProfile end, true)
+		return buildSortedProfileList(profileOrderDelete, function(name) return not canDeleteProfile(name) end, true)
 	end,
 	order = profileOrderDelete,
 	text = L["Delete profile"],
 	get = function() return "" end,
 	set = function(value)
 		if value ~= "" then
+			local deleteProfile = getValidProfileName(value)
+			if not deleteProfile or not canDeleteProfile(deleteProfile) then return false end
 			StaticPopupDialogs["EQOL_DELETE_PROFILE"] = StaticPopupDialogs["EQOL_DELETE_PROFILE"]
 				or {
 					text = "",
@@ -1436,16 +1497,19 @@ data = {
 					hideOnEscape = true,
 					preferredIndex = 3,
 					OnAccept = function(self)
-						local profile = self.data
-						if profile and profile ~= "" then EnhanceQoLDB.profiles[profile] = nil end
+						local profile = getValidProfileName(self.data)
+						if canDeleteProfile(profile) then EnhanceQoLDB.profiles[profile] = nil end
 					end,
 				}
 			StaticPopupDialogs["EQOL_DELETE_PROFILE"].text = L["ProfileDeleteDesc"]:format(value)
-			StaticPopup_Show("EQOL_DELETE_PROFILE", nil, nil, value)
+			StaticPopup_Show("EQOL_DELETE_PROFILE", nil, nil, deleteProfile)
+			return true
 		end
+		return false
 	end,
 	desc = L["ProfileDeleteDesc2"],
 	default = "",
+	storage = false,
 	var = "profiledelete",
 	parentSection = expandable,
 }

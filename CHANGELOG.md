@@ -2,6 +2,13 @@
 
 <!--@eqol-beta@-->
 
+## [11.3.0-beta2] - 2026-06-16
+
+### ✨ Added
+
+- Unit Frames / Aura Ignore: Added the Aura Ignore Matrix to the EQoL Suites Settings Center, replacing the old popup with one searchable table for Player, Target, Focus, Group, and Raid rules, combined related aura rows, updated defaults, and newly tracked Verdant Embrace and Symbiotic Blooms.
+- EQoL Suite: Added beta custom buff and debuff containers with Edit Mode movement plus icon shape, zoom, border, size, spacing, and row controls.
+
 ## [11.3.0-beta1] - 2026-06-14
 
 ### ✨ Added
