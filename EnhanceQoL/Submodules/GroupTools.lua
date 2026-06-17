@@ -110,6 +110,8 @@ local DB = {
 
 	focusMarkerEnabled = "groupToolsFocusMarkerEnabled",
 	focusMarker = "groupToolsFocusMarkerIcon",
+	focusMarkerPreserveExisting = "groupToolsFocusMarkerPreserveExisting",
+	focusMarkerUseMouseover = "groupToolsFocusMarkerUseMouseover",
 	focusMarkerAnnounce = "groupToolsFocusMarkerAnnounce",
 	focusMarkerMessage = "groupToolsFocusMarkerMessage",
 }
@@ -1045,8 +1047,26 @@ function FocusMarker:GetMacroName()
 	return "EQOLFocusMarker"
 end
 
+function FocusMarker:ShouldPreserveExistingMarker()
+	return addon.db and addon.db[DB.focusMarkerPreserveExisting] == true
+end
+
+function FocusMarker:ShouldUseMouseover()
+	return not (addon.db and addon.db[DB.focusMarkerUseMouseover] == false)
+end
+
+function FocusMarker:GetMarkerArgument()
+	local marker = tostring(self:GetMarker())
+	if self:ShouldPreserveExistingMarker() then marker = "~" .. marker end
+	return marker
+end
+
 function FocusMarker:GetMacroBody()
-	return ("/focus [@mouseover,harm,nodead][]\n/tm [@mouseover,harm,nodead][] %d"):format(self:GetMarker())
+	local marker = self:GetMarkerArgument()
+	if self:ShouldUseMouseover() then
+		return ("/focus [@mouseover,harm,nodead][]\n/tm [@mouseover,harm,nodead][] %s"):format(marker)
+	end
+	return ("/focus\n/tm %s"):format(marker)
 end
 
 function FocusMarker:EnsureButton()
@@ -1246,6 +1266,10 @@ local function applyFocusSetting(field, value)
 		local marker = tonumber(value) or 5
 		if marker < 1 or marker > 8 then marker = 5 end
 		setDB(DB.focusMarker, marker)
+	elseif field == "preserveExisting" then
+		setDB(DB.focusMarkerPreserveExisting, value == true)
+	elseif field == "useMouseover" then
+		setDB(DB.focusMarkerUseMouseover, value ~= false)
 	elseif field == "announce" then
 		setDB(DB.focusMarkerAnnounce, value == true)
 	elseif field == "message" then
@@ -1587,6 +1611,8 @@ function GroupTools.functions.InitDB()
 
 	initDBValue(DB.focusMarkerEnabled, false)
 	initDBValue(DB.focusMarker, 5)
+	initDBValue(DB.focusMarkerPreserveExisting, false)
+	initDBValue(DB.focusMarkerUseMouseover, true)
 	initDBValue(DB.focusMarkerAnnounce, true)
 	initDBValue(DB.focusMarkerMessage, "")
 end
