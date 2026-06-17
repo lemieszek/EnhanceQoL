@@ -62,6 +62,8 @@ Api.GetAssistedCombatNextSpell = C_AssistedCombat and C_AssistedCombat.GetNextCa
 Api.GetAssistedCombatRotationSpells = C_AssistedCombat and C_AssistedCombat.GetRotationSpells
 Api.GetAtlasInfo = C_Texture and C_Texture.GetAtlasInfo
 Api.GetFilenameFromFileDataID = C_Texture and C_Texture.GetFilenameFromFileDataID
+Api.GetFileAssetID = addon.functions and addon.functions.GetFileAssetID
+Api.IsKnownFileAsset = addon.functions and addon.functions.IsKnownFileAsset
 Api.IsSpellKnown = function(spellId, includeOverrides)
 	if not spellId then return false end
 	if not C_SpellBook then return true end
@@ -466,12 +468,21 @@ function Helper.ResolveTextureInput(value)
 
 	local fileDataID = tonumber(input)
 	if fileDataID and fileDataID > 0 and math.floor(fileDataID) == fileDataID then
-		if Api.GetFilenameFromFileDataID then
+		if Api.IsKnownFileAsset and not Api.IsKnownFileAsset(fileDataID) then return nil end
+		if Api.GetFileAssetID then
+			local resolvedFileID = Api.GetFileAssetID(fileDataID)
+			if resolvedFileID then return "FILEID", resolvedFileID end
+		elseif Api.GetFilenameFromFileDataID then
 			local ok, filename = pcall(Api.GetFilenameFromFileDataID, fileDataID)
 			if ok and type(filename) == "string" and filename ~= "" then return "FILEID", fileDataID, filename end
 			return nil
 		end
 		return "FILEID", fileDataID
+	end
+
+	if Api.GetFileAssetID and (not Api.IsKnownFileAsset or Api.IsKnownFileAsset(input)) then
+		local resolvedFileID = Api.GetFileAssetID(input)
+		if resolvedFileID then return "FILEID", resolvedFileID end
 	end
 
 	if Api.GetAtlasInfo then

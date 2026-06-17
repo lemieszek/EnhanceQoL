@@ -353,12 +353,45 @@ local function isMediaPath(value)
 	return type(value) == "string" and (value:find("\\", 1, true) or value:find("/", 1, true)) ~= nil
 end
 
-local function isKnownFontAsset(value)
-	if type(value) ~= "string" or value == "" then return false end
+local function getUIFileAssetAPI() return _G.C_UIFileAsset end
+
+local function hasFileAssetValue(value)
+	if type(value) == "number" then return value > 0 end
+	return type(value) == "string" and value ~= ""
+end
+
+local function isKnownFileAsset(value)
+	if not hasFileAssetValue(value) then return false end
 	local fileAssetAPI = _G.C_UIFileAsset
 	if not (fileAssetAPI and fileAssetAPI.IsKnownFile) then return true end
 	local ok, known = pcall(fileAssetAPI.IsKnownFile, value)
 	return ok and known == true
+end
+
+local function isLooseFileAsset(value)
+	if not hasFileAssetValue(value) then return false end
+	local fileAssetAPI = getUIFileAssetAPI()
+	if not (fileAssetAPI and fileAssetAPI.IsLooseFile) then return false end
+	local ok, isLoose = pcall(fileAssetAPI.IsLooseFile, value)
+	return ok and isLoose == true
+end
+
+local function getFileAssetID(value)
+	if not hasFileAssetValue(value) then return nil end
+	local fileAssetAPI = getUIFileAssetAPI()
+	if not (fileAssetAPI and fileAssetAPI.GetFileID) then return type(value) == "number" and value or nil end
+	local ok, fileID = pcall(fileAssetAPI.GetFileID, value)
+	if not ok then return nil end
+	fileID = tonumber(fileID)
+	if not fileID or fileID <= 0 then return nil end
+	if math.floor(fileID) ~= fileID then return nil end
+	return fileID
+end
+
+local function shouldUseFileAsset(value, requireKnown)
+	if not hasFileAssetValue(value) then return false end
+	if requireKnown == false then return true end
+	return isKnownFileAsset(value)
 end
 
 local function isGlobalFontConfigValue(value) return normalizeMediaValue(value) == GLOBAL_FONT_CONFIG_KEY end
@@ -379,7 +412,13 @@ end
 
 function addon.functions.IsGlobalFontConfigValue(value) return isGlobalFontConfigValue(value) end
 
-function addon.functions.IsKnownFontAsset(value) return isKnownFontAsset(value) end
+function addon.functions.IsKnownFileAsset(value) return isKnownFileAsset(value) end
+
+function addon.functions.IsLooseFileAsset(value) return isLooseFileAsset(value) end
+
+function addon.functions.GetFileAssetID(value) return getFileAssetID(value) end
+
+function addon.functions.IsKnownFontAsset(value) return isKnownFileAsset(value) end
 
 function addon.functions.GetLocaleDefaultFontFace() return (addon.variables and addon.variables.defaultFont) or STANDARD_TEXT_FONT end
 
@@ -429,7 +468,11 @@ function addon.functions.ResolveLSMMedia(mediaType, configured, fallback, allowP
 		if lsm.IsValid and lsm:IsValid(mediaKind, configuredValue) then
 			local fetched = lsm.Fetch and lsm:Fetch(mediaKind, configuredValue, true)
 			if type(fetched) == "string" and fetched ~= "" then
-				if mediaKind ~= "font" or isKnownFontAsset(fetched) then return fetched end
+				if mediaKind == "font" then
+					if isKnownFileAsset(fetched) then return fetched end
+				elseif not isMediaPath(fetched) or shouldUseFileAsset(fetched, true) then
+					return fetched
+				end
 			end
 			return fallbackValue
 		end
@@ -437,18 +480,26 @@ function addon.functions.ResolveLSMMedia(mediaType, configured, fallback, allowP
 			local hash = lsm:HashTable(mediaKind) or {}
 			local byName = hash[configuredValue]
 			if type(byName) == "string" and byName ~= "" then
-				if mediaKind ~= "font" or isKnownFontAsset(byName) then return byName end
+				if mediaKind == "font" then
+					if isKnownFileAsset(byName) then return byName end
+				elseif not isMediaPath(byName) or shouldUseFileAsset(byName, true) then
+					return byName
+				end
 				return fallbackValue
 			end
 			for _, path in pairs(hash) do
 				if path == configuredValue then
-					if mediaKind ~= "font" or isKnownFontAsset(configuredValue) then return configuredValue end
+					if mediaKind == "font" then
+						if isKnownFileAsset(configuredValue) then return configuredValue end
+					elseif not isMediaPath(configuredValue) or shouldUseFileAsset(configuredValue, true) then
+						return configuredValue
+					end
 					return fallbackValue
 				end
 			end
 		end
 	end
-	if allowPath ~= false and mediaKind ~= "font" and isMediaPath(configuredValue) then return configuredValue end
+	if allowPath ~= false and mediaKind ~= "font" and isMediaPath(configuredValue) and shouldUseFileAsset(configuredValue, true) then return configuredValue end
 	return fallbackValue
 end
 
@@ -567,7 +618,7 @@ end
 
 local function setFontStringFont(fontString, fontFace, size, flags)
 	if not (fontString and fontString.SetFont and fontFace) then return false end
-	if not isKnownFontAsset(fontFace) then return false end
+	if not isKnownFileAsset(fontFace) then return false end
 	local ok, applied = pcall(fontString.SetFont, fontString, fontFace, size, flags)
 	return ok and applied ~= false
 end

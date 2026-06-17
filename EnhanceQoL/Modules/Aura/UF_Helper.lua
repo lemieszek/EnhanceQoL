@@ -395,6 +395,7 @@ end
 
 function H.isKnownFontAsset(fontFile)
 	if addon.functions and addon.functions.IsKnownFontAsset then return addon.functions.IsKnownFontAsset(fontFile) end
+	if addon.functions and addon.functions.IsKnownFileAsset then return addon.functions.IsKnownFileAsset(fontFile) end
 	if not H._looksLikeFontFile(fontFile) then return true end
 	local fileAssetAPI = _G.C_UIFileAsset
 	if not (fileAssetAPI and fileAssetAPI.IsKnownFile) then return true end
