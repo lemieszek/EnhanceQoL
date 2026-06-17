@@ -3480,6 +3480,11 @@ local function initMisc()
 	addon.functions.InitDBValue("hideAzeriteToast", false)
 	addon.functions.InitDBValue("hiddenLandingPages", {})
 	addon.functions.InitDBValue("enableLandingPageMenu", false)
+	addon.functions.InitDBValue("landingPageButtonCustomPosition", false)
+	addon.functions.InitDBValue("landingPageButtonAnchor", "BOTTOMLEFT")
+	addon.functions.InitDBValue("landingPageButtonOffsetX", -16)
+	addon.functions.InitDBValue("landingPageButtonOffsetY", -16)
+	addon.functions.InitDBValue("landingPageButtonScale", 1)
 	addon.functions.InitDBValue("hideMinimapButton", false)
 	addon.functions.InitDBValue("hideZoneText", false)
 	addon.functions.InitDBValue("instantCatalystEnabled", false)
@@ -3612,11 +3617,49 @@ local function initMisc()
 	addon.functions.updateRaidToolsHook()
 	addon.variables = addon.variables or {}
 
-	local function applySquareLandingPageButtonAnchor(button)
-		if not button or not addon.db or not addon.db["enableSquareMinimap"] then return end
+	local function clampNumber(value, minValue, maxValue, fallback)
+		value = tonumber(value) or fallback
+		if value < minValue then return minValue end
+		if value > maxValue then return maxValue end
+		return value
+	end
+
+	local function normalizeLandingPageButtonAnchor(anchor)
+		if anchor == "TOPLEFT" or anchor == "TOP" or anchor == "TOPRIGHT" or anchor == "LEFT" or anchor == "CENTER" or anchor == "RIGHT" or anchor == "BOTTOMLEFT" or anchor == "BOTTOM" or anchor == "BOTTOMRIGHT" then return anchor end
+		return "BOTTOMLEFT"
+	end
+
+	local function resetLandingPageButtonPlacement(button)
+		button:SetScale(1)
+		if button.ResetLandingPageIconOffset then
+			button:ClearAllPoints()
+			button:ResetLandingPageIconOffset()
+		end
+	end
+
+	local function applyLandingPageButtonPlacement(button)
+		if not button or not addon.db then return end
+
+		if addon.db["landingPageButtonCustomPosition"] == true then
+			local anchor = normalizeLandingPageButtonAnchor(addon.db["landingPageButtonAnchor"])
+			local offsetX = tonumber(addon.db["landingPageButtonOffsetX"]) or -16
+			local offsetY = tonumber(addon.db["landingPageButtonOffsetY"]) or -16
+			local scale = clampNumber(addon.db["landingPageButtonScale"], 0.5, 2, 1)
+			button:ClearAllPoints()
+			button:SetPoint(anchor, Minimap, anchor, offsetX, offsetY)
+			button:SetScale(scale)
+			return
+		end
+
+		if not addon.db["enableSquareMinimap"] then
+			resetLandingPageButtonPlacement(button)
+			return
+		end
+
 		local reverse = addon.variables and addon.variables.landingPageReverse
 		local id = reverse and reverse[button.title]
 		button:ClearAllPoints()
+		button:SetScale(1)
 		if id == 20 then
 			button:SetPoint("BOTTOMLEFT", Minimap, "BOTTOMLEFT", -25, -25)
 		else
@@ -3628,11 +3671,15 @@ local function initMisc()
 		local button = _G.ExpansionLandingPageMinimapButton
 		if not button then return end
 
-		applySquareLandingPageButtonAnchor(button)
+		applyLandingPageButtonPlacement(button)
 
 		local reverse = addon.variables and addon.variables.landingPageReverse
 		local id = reverse and reverse[button.title]
 		if addon.db and addon.db["hiddenLandingPages"] and id and addon.db["hiddenLandingPages"][id] then button:Hide() end
+	end
+
+	function addon.functions.applyLandingPageButtonPlacement()
+		refreshLandingPageButtonFix()
 	end
 
 	if ExpansionLandingPageMinimapButton and not addon.variables._eqolLandingPageButtonHooked then
@@ -3642,6 +3689,12 @@ local function initMisc()
 			if event ~= "COVENANT_CHOSEN" then return end
 			RunNextFrame(refreshLandingPageButtonFix)
 		end)
+		if ExpansionLandingPageMinimapButton.RefreshButton then
+			hooksecurefunc(ExpansionLandingPageMinimapButton, "RefreshButton", function() RunNextFrame(refreshLandingPageButtonFix) end)
+		end
+		if ExpansionLandingPageMinimapButton.UpdateIcon then
+			hooksecurefunc(ExpansionLandingPageMinimapButton, "UpdateIcon", function() RunNextFrame(refreshLandingPageButtonFix) end)
+		end
 		addon.variables._eqolLandingPageButtonHooked = true
 	end
 

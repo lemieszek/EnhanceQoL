@@ -5,6 +5,11 @@ addon.variables.NewVersionTableEQOL = {
 	-- 11.3.0-beta3 Focus Marker Macro
 	groupToolsFocusMarkerPreserveExisting = true,
 	groupToolsFocusMarkerUseMouseover = true,
+	landingPageButtonAnchor = true,
+	landingPageButtonCustomPosition = true,
+	landingPageButtonOffsetX = true,
+	landingPageButtonOffsetY = true,
+	landingPageButtonScale = true,
 
 	-- 11.2.0-beta1 Mythic+
 	mythicPlusTimerEnabled = true,

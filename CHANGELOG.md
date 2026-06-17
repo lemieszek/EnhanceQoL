@@ -7,6 +7,7 @@
 ### ✨ Added
 
 - Group Tools / Focus Marker: Added options to preserve existing target markers with `/tm ~N` and to create the focus marker macro with or without mouseover targeting.
+- Map & Minimap / Landing Page: Added Midnight/Omnium Folio support to the Landing Page hide list and added optional custom position, offset, and scale controls for the Landing Page minimap button.
 
 ### 🐛 Fixed
 

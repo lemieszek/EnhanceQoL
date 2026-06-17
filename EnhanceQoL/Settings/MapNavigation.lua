@@ -1836,6 +1836,87 @@ data = {
 		default = false,
 		parentSection = mapExpandable,
 	},
+	{
+		var = "landingPageButtonCustomPosition",
+		text = L["landingPageButtonCustomPosition"] or "Custom Landing Page button position",
+		desc = L["landingPageButtonCustomPositionDesc"] or "Allows the expansion landing page minimap button to be moved and scaled.",
+		func = function(key)
+			addon.db["landingPageButtonCustomPosition"] = key and true or false
+			if addon.functions.applyLandingPageButtonPlacement then addon.functions.applyLandingPageButtonPlacement() end
+		end,
+		default = false,
+		parent = true,
+		parentSection = mapExpandable,
+		children = {
+			{
+				var = "landingPageButtonAnchor",
+				text = L["Anchor"] or "Anchor",
+				list = squareMinimapStatsAnchorOptions,
+				order = squareMinimapStatsAnchorOrder,
+				get = function() return normalizeSquareMinimapAnchorSelection(addon.db and addon.db.landingPageButtonAnchor, nil, "BOTTOMLEFT") end,
+				set = function(value, maybeValue)
+					addon.db["landingPageButtonAnchor"] = normalizeSquareMinimapAnchorSelection(value, maybeValue, "BOTTOMLEFT")
+					if addon.functions.applyLandingPageButtonPlacement then addon.functions.applyLandingPageButtonPlacement() end
+				end,
+				default = "BOTTOMLEFT",
+				sType = "dropdown",
+				parent = true,
+				parentCheck = function() return isSettingEnabled("landingPageButtonCustomPosition") end,
+				parentSection = mapExpandable,
+			},
+			{
+				var = "landingPageButtonOffsetX",
+				text = L["Horizontal offset"] or "Horizontal offset",
+				get = function() return addon.db and addon.db.landingPageButtonOffsetX or -16 end,
+				set = function(value)
+					addon.db["landingPageButtonOffsetX"] = value
+					if addon.functions.applyLandingPageButtonPlacement then addon.functions.applyLandingPageButtonPlacement() end
+				end,
+				min = -220,
+				max = 220,
+				step = 1,
+				default = -16,
+				sType = "slider",
+				parent = true,
+				parentCheck = function() return isSettingEnabled("landingPageButtonCustomPosition") end,
+				parentSection = mapExpandable,
+			},
+			{
+				var = "landingPageButtonOffsetY",
+				text = L["Vertical offset"] or "Vertical offset",
+				get = function() return addon.db and addon.db.landingPageButtonOffsetY or -16 end,
+				set = function(value)
+					addon.db["landingPageButtonOffsetY"] = value
+					if addon.functions.applyLandingPageButtonPlacement then addon.functions.applyLandingPageButtonPlacement() end
+				end,
+				min = -220,
+				max = 220,
+				step = 1,
+				default = -16,
+				sType = "slider",
+				parent = true,
+				parentCheck = function() return isSettingEnabled("landingPageButtonCustomPosition") end,
+				parentSection = mapExpandable,
+			},
+			{
+				var = "landingPageButtonScale",
+				text = L["squareMinimapStatsTrackingButtonScale"] or L["Scale"] or "Scale",
+				get = function() return addon.db and addon.db.landingPageButtonScale or 1 end,
+				set = function(value)
+					addon.db["landingPageButtonScale"] = value
+					if addon.functions.applyLandingPageButtonPlacement then addon.functions.applyLandingPageButtonPlacement() end
+				end,
+				min = 0.5,
+				max = 2,
+				step = 0.05,
+				default = 1,
+				sType = "slider",
+				parent = true,
+				parentCheck = function() return isSettingEnabled("landingPageButtonCustomPosition") end,
+				parentSection = mapExpandable,
+			},
+		},
+	},
 }
 
 table.sort(data, function(a, b) return a.text < b.text end)
