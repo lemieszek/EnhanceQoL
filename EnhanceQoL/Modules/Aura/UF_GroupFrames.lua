@@ -12137,6 +12137,7 @@ end
 local function dispatchUnitHealth(btn, unit)
 	local st = getState(btn)
 	GF:UpdateHealthValue(btn, unit, st)
+	GF:UpdateStatusText(btn, unit, st)
 end
 local function dispatchUnitAbsorb(btn, unit)
 	local st = getState(btn)
