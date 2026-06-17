@@ -421,6 +421,27 @@ data = {
 				sType = "colorpicker",
 			},
 			{
+				var = "chatIMFontSize",
+				text = L["chatIMFontSize"],
+				parentCheck = function()
+					return addon.SettingsLayout.elements["enableChatIM"]
+						and addon.SettingsLayout.elements["enableChatIM"].setting
+						and addon.SettingsLayout.elements["enableChatIM"].setting:GetValue() == true
+				end,
+				get = function() return addon.db and addon.db.chatIMFontSize or 12 end,
+				set = function(value)
+					addon.db["chatIMFontSize"] = value
+					if addon.ChatIM and addon.ChatIM.ApplyFontSize then addon.ChatIM:ApplyFontSize() end
+				end,
+				min = 8,
+				max = 24,
+				step = 1,
+				parent = true,
+				default = 12,
+				modernDefault = function() return addon.dbDefaults and addon.dbDefaults.chatIMFontSize or 12 end,
+				sType = "slider",
+			},
+			{
 				var = "chatIMMaxHistory",
 				text = L["ChatIMHistoryLimit"],
 				parentCheck = function()

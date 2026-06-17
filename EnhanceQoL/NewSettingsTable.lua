@@ -1,7 +1,6 @@
 local addonName, addon = ...
 
 addon.variables.NewVersionTableEQOL = {
-	--@eqol-beta@
 	-- 11.3.0-beta3 Focus Marker Macro
 	groupToolsFocusMarkerPreserveExisting = true,
 	groupToolsFocusMarkerUseMouseover = true,
@@ -11,11 +10,15 @@ addon.variables.NewVersionTableEQOL = {
 	landingPageButtonOffsetY = true,
 	landingPageButtonScale = true,
 	durationText = true,
+	chatIMFontSize = true,
+	UFGlobalAuraIgnoreMatrix = true,
 
+	--@eqol-beta@
 	-- 11.2.0-beta1 Mythic+
 	mythicPlusTimerEnabled = true,
+
+	-- 11.3.0-beta3 Default Aura Containers
 	skinnerDefaultBuffIconsEnabled = true,
 	skinnerDefaultDebuffIconsEnabled = true,
-	UFGlobalAuraIgnoreMatrix = true,
 	--@end-eqol-beta@
 }

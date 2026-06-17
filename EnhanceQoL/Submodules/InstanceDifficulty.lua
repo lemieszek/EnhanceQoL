@@ -148,7 +148,7 @@ local function getShortLabel(difficultyID, difficultyName)
 		return "NM"
 	elseif difficultyID == 2 or difficultyID == 5 or difficultyID == 6 or difficultyID == 15 or difficultyID == 230 or hcNames[difficultyName] or difficultyID == 13 then
 		return "HC"
-	elseif difficultyID == 16 or difficultyID == 23 then
+	elseif difficultyID == 16 or difficultyID == 23 or difficultyID == 233 then
 		return "M"
 	elseif difficultyID == 8 then
 		local level = C_ChallengeMode.GetActiveKeystoneInfo()
@@ -183,7 +183,7 @@ function InstanceDifficulty:Update()
 		code = "NM"
 	elseif difficultyID == 2 or difficultyID == 5 or difficultyID == 6 or difficultyID == 15 or difficultyID == 230 or hcNames[difficultyName] then
 		code = "HC"
-	elseif difficultyID == 16 or difficultyID == 23 then
+	elseif difficultyID == 16 or difficultyID == 23 or difficultyID == 233 then
 		code = "M"
 	elseif difficultyID == 8 then
 		code = "MPLUS"

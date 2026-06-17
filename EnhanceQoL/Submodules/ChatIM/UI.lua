@@ -44,6 +44,9 @@ local ChatIM = addon.ChatIM
 ChatIM.maxHistoryLines = ChatIM.maxHistoryLines or (addon.db and addon.db["chatIMMaxHistory"]) or 250
 
 local MU = MenuUtil -- global ab 11.0+
+local CHAT_IM_DEFAULT_FONT_SIZE = 12
+local CHAT_IM_MIN_FONT_SIZE = 8
+local CHAT_IM_MAX_FONT_SIZE = 24
 
 local regionTable = { "US", "KR", "EU", "TW", "CN" }
 local regionKey = regionTable[GetCurrentRegion()] or "EU" -- or EU for PTR because that is region 90+
@@ -212,6 +215,37 @@ function ChatIM:SetMaxHistoryLines(val)
 				table.remove(lines, 1)
 			end
 		end
+	end
+end
+
+function ChatIM:GetFontSize()
+	local size = tonumber(addon.db and addon.db.chatIMFontSize) or CHAT_IM_DEFAULT_FONT_SIZE
+	if size < CHAT_IM_MIN_FONT_SIZE then return CHAT_IM_MIN_FONT_SIZE end
+	if size > CHAT_IM_MAX_FONT_SIZE then return CHAT_IM_MAX_FONT_SIZE end
+	return math.floor(size + 0.5)
+end
+
+function ChatIM:ApplyFontSizeToTab(tab)
+	if not tab then return end
+	local size = self:GetFontSize()
+	local font, flags
+	if ChatFontNormal and ChatFontNormal.GetFont then
+		local fontFile, _, fontFlags = ChatFontNormal:GetFont()
+		font = fontFile
+		flags = fontFlags
+	end
+	font = font or STANDARD_TEXT_FONT
+	if tab.msg and tab.msg.SetFont then tab.msg:SetFont(font, size, flags) end
+	if tab.edit then
+		if tab.edit.SetFont then tab.edit:SetFont(font, size, flags) end
+		if tab.edit.SetHeight then tab.edit:SetHeight(math.max(20, size + 8)) end
+	end
+end
+
+function ChatIM:ApplyFontSize()
+	if not self.tabs then return end
+	for _, tab in pairs(self.tabs) do
+		self:ApplyFontSizeToTab(tab)
 	end
 end
 
@@ -591,7 +625,6 @@ function ChatIM:CreateTab(sender, isBN, bnetID, battleTag)
 	local smf = CreateFrame("ScrollingMessageFrame", nil, ChatIM.storage)
 	-- we'll anchor later when the tab becomes active
 	smf:SetAllPoints(ChatIM.storage)
-	smf:SetFontObject(ChatFontNormal)
 	smf:SetJustifyH("LEFT")
 	smf:SetFading(false)
 	smf:SetMaxLines(ChatIM.maxHistoryLines)
@@ -720,8 +753,6 @@ function ChatIM:CreateTab(sender, isBN, bnetID, battleTag)
 	-- will be parented/anchored once the tab becomes active
 	local eb = CreateFrame("EditBox", nil, ChatIM.storage, "InputBoxTemplate")
 	eb:SetAutoFocus(false)
-	eb:SetHeight(20)
-	eb:SetFontObject(ChatFontNormal)
 	eb:SetScript("OnEditFocusGained", function() ChatIM:UpdateAlpha() end)
 	eb:SetScript("OnEditFocusLost", function()
 		C_Timer.After(5, function() ChatIM:UpdateAlpha() end)
@@ -747,6 +778,7 @@ function ChatIM:CreateTab(sender, isBN, bnetID, battleTag)
 	eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
 
 	self.tabs[sender].edit = eb
+	self:ApplyFontSizeToTab(self.tabs[sender])
 
 	table.insert(self.tabList, { text = displayName, value = sender })
 	self.tabGroup:SetTabs(self.tabList)

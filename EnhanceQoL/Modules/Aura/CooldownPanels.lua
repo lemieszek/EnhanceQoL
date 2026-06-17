@@ -22182,6 +22182,43 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				set = function(_, value) CooldownPanels:SetPanelEditorEnabled(panelId, value) end,
 			},
 			{
+				name = L["durationTextProfile"] or "Duration text profile",
+				kind = SettingType.Dropdown,
+				parentId = "cooldownPanelGeneral",
+				height = 140,
+				get = function()
+					local currentPanel = CooldownPanels:GetPanel(panelId)
+					local bars = CooldownPanels.Bars
+					return bars and bars.GetPanelDurationTextProfile and bars.GetPanelDurationTextProfile(currentPanel) or "MINIMAL"
+				end,
+				set = function(_, value)
+					local currentPanel = CooldownPanels:GetPanel(panelId)
+					local bars = CooldownPanels.Bars
+					if not (currentPanel and bars and bars.NormalizeDurationTextProfile) then return end
+					currentPanel.barDurationTextProfile = bars.NormalizeDurationTextProfile(value, "MINIMAL")
+					CooldownPanels:RefreshPanel(panelId)
+					CooldownPanels:RefreshEditor()
+				end,
+				generator = function(_, root)
+					local durationText = addon.DurationText
+					local options = durationText and durationText.GetProfileOptions and durationText:GetProfileOptions() or {}
+					for _, option in ipairs(options) do
+						root:CreateRadio(option.label, function()
+							local currentPanel = CooldownPanels:GetPanel(panelId)
+							local bars = CooldownPanels.Bars
+							return bars and bars.GetPanelDurationTextProfile and bars.GetPanelDurationTextProfile(currentPanel) == option.value or false
+						end, function()
+							local currentPanel = CooldownPanels:GetPanel(panelId)
+							local bars = CooldownPanels.Bars
+							if not (currentPanel and bars and bars.NormalizeDurationTextProfile) then return end
+							currentPanel.barDurationTextProfile = option.value
+							CooldownPanels:RefreshPanel(panelId)
+							CooldownPanels:RefreshEditor()
+						end)
+					end
+				end,
+			},
+			{
 				name = L["CooldownPanelSpecFilter"] or "Show only for spec",
 				kind = SettingType.MultiDropdown,
 				parentId = "cooldownPanelGeneral",

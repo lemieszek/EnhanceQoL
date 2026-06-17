@@ -2849,6 +2849,42 @@ registerEditModeBars = function()
 					end,
 					default = defaultStyle(),
 				}
+				settingsList[#settingsList + 1] = {
+					name = L["durationTextProfile"] or "Duration text profile",
+					kind = settingType.Dropdown,
+					height = 140,
+					field = "durationTextProfile",
+					parentId = "textsettings",
+					get = function()
+						local c = curSpecCfg()
+						local value = (c and c.durationTextProfile) or cfg.durationTextProfile
+						return addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(value) or (value or "MINIMAL")
+					end,
+					set = function(_, value)
+						local c = curSpecCfg()
+						if not c then return end
+						c.durationTextProfile = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(value) or value
+						queueRefresh()
+					end,
+					generator = function(_, root)
+						local options = addon.DurationText and addon.DurationText.GetProfileOptions and addon.DurationText:GetProfileOptions() or {}
+						for _, option in ipairs(options) do
+							root:CreateRadio(option.label, function()
+								local c = curSpecCfg()
+								local value = (c and c.durationTextProfile) or cfg.durationTextProfile
+								value = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(value) or (value or "MINIMAL")
+								return value == option.value
+							end, function()
+								local c = curSpecCfg()
+								if not c then return end
+								c.durationTextProfile = option.value
+								queueRefresh()
+							end)
+						end
+					end,
+					default = "MINIMAL",
+					isShown = currentEditorUsesDuration,
+				}
 
 				settingsList[#settingsList + 1] = {
 					name = L["Use short numbers"] or "Use short numbers",
@@ -3883,6 +3919,41 @@ registerEditModeBars = function()
 						isShown = function()
 							return currentEditorPowerType() ~= "RUNES"
 						end,
+					}
+					settingsList[#settingsList + 1] = {
+						name = L["durationTextProfile"] or "Duration text profile",
+						kind = settingType.Dropdown,
+						height = 140,
+						field = "powerTypeOverrideDurationTextProfile",
+						parentId = powerColorParentId,
+						get = function()
+							local value = readPowerConfigField("durationTextProfile", "MINIMAL")
+							return addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(value) or value
+						end,
+						set = function(_, value)
+							local c = currentPowerConfigTarget()
+							if not c then return end
+							c.durationTextProfile = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(value) or value
+							queueRefresh()
+						end,
+						generator = function(_, root)
+							local options = addon.DurationText and addon.DurationText.GetProfileOptions and addon.DurationText:GetProfileOptions() or {}
+							for _, option in ipairs(options) do
+								root:CreateRadio(option.label, function()
+									local value = readPowerConfigField("durationTextProfile", "MINIMAL")
+									value = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(value) or value
+									return value == option.value
+								end, function()
+									local c = currentPowerConfigTarget()
+									if not c then return end
+									c.durationTextProfile = option.value
+									queueRefresh()
+								end)
+							end
+						end,
+						default = "MINIMAL",
+						isEnabled = isPowerOverrideEditorEnabled,
+						isShown = currentEditorUsesDuration,
 					}
 
 					settingsList[#settingsList + 1] = {

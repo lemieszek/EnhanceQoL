@@ -6,7 +6,7 @@ externals:
     tag: latest
   EnhanceQoL/libs/LibSettingsDesigner:
     url: https://github.com/R41z0r/LibSettingsDesigner.git
-    branch: dev/topbar-actions-subnav
+    branch: main
     path: runtime/LibSettingsDesigner
 
 enable-nolib-creation: no

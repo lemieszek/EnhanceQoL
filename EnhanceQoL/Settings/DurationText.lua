@@ -11,14 +11,13 @@ end
 
 local function setDurationTextValue(key, value)
 	DurationText:InitDB()
-	addon.db.durationText[key] = value
-	if key ~= "preset" then addon.db.durationText.preset = "CUSTOM" end
+	DurationText:SetProfileValue(DurationText:GetEditProfileKey(), key, value)
 	invalidate()
 end
 
 local function getDurationTextValue(key)
 	DurationText:InitDB()
-	return addon.db.durationText[key]
+	return DurationText:GetProfileValue(DurationText:GetEditProfileKey(), key)
 end
 
 local function optionList(entries)
@@ -31,12 +30,6 @@ local function optionList(entries)
 	return options, order
 end
 
-local presetOptions, presetOrder = optionList({
-	{ value = "CUSTOM", text = L["durationTextPresetCustom"] },
-	{ value = "COMPACT", text = L["durationTextPresetCompact"] },
-	{ value = "PRECISE", text = L["durationTextPresetPrecise"] },
-	{ value = "MINIMAL", text = L["durationTextPresetMinimal"] },
-})
 local intervalOptions, intervalOrder = optionList({
 	{ value = "SECONDS", text = L["durationTextIntervalSeconds"] },
 	{ value = "MINUTES", text = L["durationTextIntervalMinutes"] },
@@ -53,65 +46,163 @@ local whitespaceOptions, whitespaceOrder = optionList({
 	{ value = "STRIP", text = L["durationTextWhitespaceStrip"] },
 	{ value = "STRIP_IGNORE_LOCALE", text = L["durationTextWhitespaceStripIgnoreLocale"] },
 })
+local formatStyleOptions, formatStyleOrder = optionList({
+	{ value = "NUMERIC", text = L["durationTextFormatStyleNumeric"] },
+	{ value = "UNITS", text = L["durationTextFormatStyleUnits"] },
+})
 
-local presets = {
-	COMPACT = {
-		abbreviation = "ONE_LETTER",
-		approximationSeconds = 0,
-		bindingUpdateInterval = 0.1,
-		canRoundUpIntervals = true,
-		canRoundUpLastUnit = false,
-		convertToLower = false,
-		desiredUnitCount = 1,
-		expiredText = "",
-		maxInterval = "DAYS",
-		millisecondsThreshold = 10,
-		minInterval = "SECONDS",
-		stripIntervalWhitespace = "PRESERVE",
-		zeroDurationText = "",
-	},
-	MINIMAL = {
-		abbreviation = "ONE_LETTER",
-		approximationSeconds = 0,
-		bindingUpdateInterval = 0.2,
-		canRoundUpIntervals = true,
-		canRoundUpLastUnit = false,
-		convertToLower = true,
-		desiredUnitCount = 1,
-		expiredText = "",
-		maxInterval = "DAYS",
-		millisecondsThreshold = 0,
-		minInterval = "SECONDS",
-		stripIntervalWhitespace = "STRIP",
-		zeroDurationText = "",
-	},
-	PRECISE = {
-		abbreviation = "NONE",
-		approximationSeconds = 0,
-		bindingUpdateInterval = 0.05,
-		canRoundUpIntervals = false,
-		canRoundUpLastUnit = false,
-		convertToLower = false,
-		desiredUnitCount = 2,
-		expiredText = "",
-		maxInterval = "DAYS",
-		millisecondsThreshold = 10,
-		minInterval = "SECONDS",
-		stripIntervalWhitespace = "PRESERVE",
-		zeroDurationText = "",
-	},
-}
-
-local function applyPreset(value)
+local function getProfileDropdownData()
 	DurationText:InitDB()
-	addon.db.durationText.preset = value
-	local preset = presets[value]
-	if preset then
-		for key, presetValue in pairs(preset) do
-			addon.db.durationText[key] = presetValue
+	return DurationText:GetProfileDropdownData()
+end
+
+local function getDeleteProfileDropdownData()
+	DurationText:InitDB()
+	local list, order = {}, {}
+	for _, option in ipairs(DurationText:GetProfileOptions()) do
+		if not DurationText:IsProfileProtected(option.value) then
+			list[option.value] = option.label
+			order[#order + 1] = option.value
 		end
 	end
+	return list, order
+end
+
+local function notifyDurationTextSettings()
+	if not (Settings and Settings.NotifyUpdate) then return end
+	Settings.NotifyUpdate("EQOL_durationTextEditProfile")
+	Settings.NotifyUpdate("EQOL_durationTextProfileCopy")
+	Settings.NotifyUpdate("EQOL_durationTextProfileDelete")
+	Settings.NotifyUpdate("EQOL_durationText")
+end
+
+local function refreshConfigCenterDurationTextSettings(rebuild)
+	local frame = addon.ConfigCenterFrame
+	local state = frame and frame._LibSettingsDesignerState
+	if not (frame and frame.IsShown and frame:IsShown() and state) then return end
+	if rebuild and state.RenderContent then
+		state:RenderContent()
+		return
+	end
+	local designer = addon.LibSettingsDesigner and addon.LibSettingsDesigner.UI
+	if designer and designer.RefreshVisibleRows then designer.RefreshVisibleRows(state) end
+end
+
+local function refreshDurationTextSettings(rebuild)
 	invalidate()
+	notifyDurationTextSettings()
+	refreshConfigCenterDurationTextSettings(rebuild)
+	local timer = _G.C_Timer
+	if timer and timer.After then
+		timer.After(0, function()
+			notifyDurationTextSettings()
+			refreshConfigCenterDurationTextSettings(rebuild)
+		end)
+	end
+end
+
+local function printDurationTextProfileError(reason)
+	local text = reason == "EXISTS" and (L["durationTextProfileErrorExists"] or "A duration text profile with that name already exists.")
+		or reason == "INVALID_NAME" and (L["durationTextProfileErrorInvalidName"] or "Enter a profile name.")
+		or reason == "LAST_PROFILE" and (L["durationTextProfileErrorLastProfile"] or "The last duration text profile cannot be deleted.")
+		or reason == "PROTECTED_PROFILE" and (L["durationTextProfileErrorProtected"] or "Built-in duration text profiles cannot be deleted.")
+		or (L["durationTextProfileErrorGeneric"] or "Duration text profile action failed.")
+	print("|cff00ff98Enhance QoL|r: " .. text)
+end
+
+local function formatUsageSummary(usages)
+	if type(usages) ~= "table" or (usages.count or 0) <= 0 then return L["durationTextProfileDeleteNoUsage"] or "It is not currently used by any configured module." end
+	local lines = {
+		(L["durationTextProfileDeleteUsageHeader"] or "Used by %d setting(s):"):format(usages.count or 0),
+	}
+	local order = usages.order
+	local byLabel = usages.byLabel
+	if type(order) == "table" and type(byLabel) == "table" then
+		for i = 1, #order do
+			local label = order[i]
+			local count = tonumber(byLabel[label]) or 0
+			local text = L[label] or label
+			lines[#lines + 1] = count > 1 and ("- " .. tostring(text) .. " (" .. count .. ")") or ("- " .. tostring(text))
+		end
+	else
+		for i = 1, #usages do
+			lines[#lines + 1] = "- " .. tostring(usages[i])
+		end
+	end
+	return table.concat(lines, "\n")
+end
+
+local function showCreateProfileDialog(sourceProfileKey)
+	StaticPopupDialogs["EQOL_DURATION_TEXT_PROFILE_CREATE"] = StaticPopupDialogs["EQOL_DURATION_TEXT_PROFILE_CREATE"]
+		or {
+			text = L["durationTextProfileCreatePrompt"] or "Enter a name for the new duration text profile.",
+			hasEditBox = true,
+			button1 = OKAY,
+			button2 = CANCEL,
+			timeout = 0,
+			whileDead = true,
+			hideOnEscape = true,
+			preferredIndex = 3,
+			OnShow = function(self)
+				local editBox = self.editBox or self.GetEditBox and self:GetEditBox()
+				if editBox then
+					editBox:SetText("")
+					editBox:SetFocus()
+					editBox:HighlightText()
+				end
+			end,
+			EditBoxOnEnterPressed = function(editBox)
+				local parent = editBox:GetParent()
+				if parent and parent.button1 then parent.button1:Click() end
+			end,
+			OnAccept = function(self)
+				local editBox = self.editBox or self.GetEditBox and self:GetEditBox()
+				local ok, result = DurationText:CreateProfile(editBox and editBox:GetText() or "", self.data)
+				if not ok then
+					printDurationTextProfileError(result)
+					return
+				end
+				DurationText:SetEditProfileKey(result)
+				refreshDurationTextSettings(true)
+			end,
+		}
+	StaticPopup_Show("EQOL_DURATION_TEXT_PROFILE_CREATE", nil, nil, sourceProfileKey)
+end
+
+local function showDeleteProfileDialog(profileKey)
+	DurationText:InitDB()
+	profileKey = DurationText:GetProfileKey(profileKey)
+	local replacementKey = DurationText:GetReplacementProfileKey(profileKey)
+	if not replacementKey then
+		printDurationTextProfileError("LAST_PROFILE")
+		return
+	end
+	local usage = DurationText:GetProfileUsage(profileKey)
+	local profileLabel = DurationText:GetProfileLabel(profileKey)
+	local replacementLabel = DurationText:GetProfileLabel(replacementKey)
+	StaticPopupDialogs["EQOL_DURATION_TEXT_PROFILE_DELETE"] = StaticPopupDialogs["EQOL_DURATION_TEXT_PROFILE_DELETE"]
+		or {
+			text = "",
+			button1 = DELETE,
+			button2 = CANCEL,
+			timeout = 0,
+			whileDead = true,
+			hideOnEscape = true,
+			preferredIndex = 3,
+			OnAccept = function(self)
+				local data = self.data
+				local ok, reason = DurationText:DeleteProfile(data and data.profileKey, data and data.replacementKey)
+				if not ok then
+					printDurationTextProfileError(reason)
+					return
+				end
+				refreshDurationTextSettings(true)
+			end,
+		}
+	StaticPopupDialogs["EQOL_DURATION_TEXT_PROFILE_DELETE"].text = (L["durationTextProfileDeleteConfirm"] or 'Delete duration text profile "%s"? References will be moved to "%s".'):format(profileLabel, replacementLabel)
+		.. "\n\n"
+		.. formatUsageSummary(usage)
+	StaticPopup_Show("EQOL_DURATION_TEXT_PROFILE_DELETE", nil, nil, { profileKey = profileKey, replacementKey = replacementKey })
 end
 
 local expandable = addon.functions.SettingsCreateExpandableSection(category, {
@@ -127,19 +218,61 @@ local expandable = addon.functions.SettingsCreateExpandableSection(category, {
 })
 addon.SettingsLayout.durationTextSection = expandable
 
-addon.functions.SettingsCreateHeadline(category, L["durationTextPreset"], { parentSection = expandable, order = 10 })
+addon.functions.SettingsCreateHeadline(category, L["durationTextProfile"], { parentSection = expandable, order = 10 })
 
 addon.functions.SettingsCreateDropdown(category, {
-	var = "durationText",
-	subvar = "preset",
-	text = L["durationTextPreset"],
-	desc = L["durationTextPresetDesc"],
-	list = presetOptions,
-	listOrder = presetOrder,
+	var = "durationTextEditProfile",
+	text = L["durationTextProfile"],
+	desc = L["durationTextProfileDesc"],
+	listFunc = getProfileDropdownData,
 	order = 10,
-	default = DurationText.defaults.preset,
-	get = function() return getDurationTextValue("preset") end,
-	func = applyPreset,
+	default = DurationText.defaultProfileKey,
+	storage = false,
+	get = function() return DurationText:GetEditProfileKey() end,
+	func = function(value)
+		DurationText:SetEditProfileKey(value)
+		refreshDurationTextSettings()
+	end,
+	parentSection = expandable,
+})
+
+addon.functions.SettingsCreateButton(category, {
+	var = "durationTextProfileCreate",
+	text = L["durationTextProfileCreate"],
+	desc = L["durationTextProfileCreateDesc"],
+	buttonText = ADD,
+	order = 11,
+	func = function() showCreateProfileDialog(nil) end,
+	parentSection = expandable,
+})
+
+addon.functions.SettingsCreateDropdown(category, {
+	var = "durationTextProfileCopy",
+	text = L["durationTextProfileCopy"],
+	desc = L["durationTextProfileCopyDesc"],
+	listFunc = getProfileDropdownData,
+	order = 12,
+	default = "",
+	storage = false,
+	get = function() return "" end,
+	func = function(value)
+		if value and value ~= "" then showCreateProfileDialog(value) end
+	end,
+	parentSection = expandable,
+})
+
+addon.functions.SettingsCreateDropdown(category, {
+	var = "durationTextProfileDelete",
+	text = L["durationTextProfileDelete"],
+	desc = L["durationTextProfileDeleteDesc"],
+	listFunc = getDeleteProfileDropdownData,
+	order = 13,
+	default = "",
+	storage = false,
+	get = function() return "" end,
+	func = function(value)
+		if value and value ~= "" then showDeleteProfileDialog(value) end
+	end,
 	parentSection = expandable,
 })
 
@@ -189,6 +322,20 @@ addon.functions.SettingsCreateSlider(category, {
 	get = function() return getDurationTextValue("bindingUpdateInterval") end,
 	func = function(value) setDurationTextValue("bindingUpdateInterval", value) end,
 	order = 40,
+	parentSection = expandable,
+})
+
+addon.functions.SettingsCreateDropdown(category, {
+	var = "durationText",
+	subvar = "formatStyle",
+	text = L["durationTextFormatStyle"],
+	desc = L["durationTextFormatStyleDesc"],
+	list = formatStyleOptions,
+	listOrder = formatStyleOrder,
+	order = 45,
+	default = DurationText.defaults.formatStyle,
+	get = function() return getDurationTextValue("formatStyle") end,
+	func = function(value) setDurationTextValue("formatStyle", value) end,
 	parentSection = expandable,
 })
 
@@ -335,10 +482,8 @@ addon.functions.SettingsCreateButton(category, {
 	order = 150,
 	func = function()
 		DurationText:InitDB()
-		for key, value in pairs(DurationText.defaults) do
-			addon.db.durationText[key] = value
-		end
-		invalidate()
+		DurationText:ResetProfile(DurationText:GetEditProfileKey())
+		refreshDurationTextSettings()
 	end,
 	parentSection = expandable,
 })

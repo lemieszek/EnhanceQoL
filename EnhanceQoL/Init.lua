@@ -660,8 +660,9 @@ addon.variables.landingPageType = {
 	[30] = { title = DRAGONFLIGHT_LANDING_PAGE_TITLE, checkbox = EXPANSION_NAME9 },
 	[40] = { title = WAR_WITHIN_LANDING_PAGE_TITLE, checkbox = EXPANSION_NAME10 },
 }
-if MIDNIGHT_LANDING_PAGE_TITLE then
-	addon.variables.landingPageType[50] = { title = MIDNIGHT_LANDING_PAGE_TITLE, checkbox = EXPANSION_NAME11 or MIDNIGHT_LANDING_PAGE_TITLE }
+local midnightLandingPageTitle = _G.MIDNIGHT_LANDING_PAGE_TITLE
+if midnightLandingPageTitle then
+	addon.variables.landingPageType[50] = { title = midnightLandingPageTitle, checkbox = _G.EXPANSION_NAME11 or midnightLandingPageTitle }
 end
 addon.variables.landingPageReverse = {} -- Used for onShow Method of LandingPage
 for id, data in pairs(addon.variables.landingPageType) do

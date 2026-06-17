@@ -2,46 +2,40 @@
 
 <!--@eqol-beta@-->
 
-## [11.3.0-beta3] - 2026-06-17
+## [11.4.0-beta1] - 2026-06-17
 
 ### ✨ Added
 
-- Group Tools / Focus Marker: Added options to preserve existing target markers with `/tm ~N` and to create the focus marker macro with or without mouseover targeting.
-- Map & Minimap / Landing Page: Added Midnight/Omnium Folio support to the Landing Page hide list and added optional custom position, offset, and scale controls for the Landing Page minimap button.
-
-### 🔄 Changed
-
-- Media: Switched shared media and custom texture validation to WoW's `C_UIFileAsset` APIs where available.
-- Duration Text: Enabled the shared DurationText system and moved supported duration value text to Blizzard duration text bindings, reducing custom OnUpdate work for cooldown bars and Ebon Might resource duration text.
-
-### 🐛 Fixed
-
-- Group Frames / Party & Raid: Fixed dead status text sometimes staying visible after a player was revived.
-
-## [11.3.0-beta2] - 2026-06-16
-
-### ✨ Added
-
-- Unit Frames / Aura Ignore: Added the Aura Ignore Matrix to the EQoL Suites Settings Center, replacing the old popup with one searchable table for Player, Target, Focus, Group, and Raid rules, combined related aura rows, updated defaults, and newly tracked Verdant Embrace and Symbiotic Blooms.
+- Mythic Plus / Timer: Added the Mythic+ Timer back as a beta feature for continued testing.
 - EQoL Suite: Added beta custom buff and debuff containers with Edit Mode movement plus icon shape, zoom, border, size, spacing, and row controls.
-- Settings Center: Added subnavigation and a Reload UI action in the title bar when changed settings require a reload.
 
-## [11.3.0-beta1] - 2026-06-14
+<!--@end-eqol-beta@-->
+
+---
+
+## [11.3.0] - 2026-06-17
 
 ### ✨ Added
 
 - Bags: Custom bag items that cannot be listed now darken while the Auction House is open.
 - Group Frames / Raid Frames: Added a Groups per row slider for grouped raid frames, allowing layouts such as 3-3-2 while keeping 8 as the default.
+- Group Tools / Focus Marker: Added options to preserve existing target markers with `/tm ~N` and to create the focus marker macro with or without mouseover targeting.
 - Icon Shapes: Added icon zoom controls for supported shape-enabled icon features, including Cooldown Panels, Unit Frame auras, Group Frame auras, reminders, and trackers.
-- Mythic Plus / Timer: Added the Mythic+ Timer back as a beta feature for continued testing.
-- Mythic Plus / Timer: Added a Total Time option to the timer display mode.
+- Instant Messenger: Added a font size option for the IM window.
+- Map & Minimap / Landing Page: Added Midnight/Omnium Folio support to the Landing Page hide list and added optional custom position, offset, and scale controls for the Landing Page minimap button.
+- Unit Frames / Aura Ignore: Added the Aura Ignore Matrix to the EQoL Suites Settings Center, replacing the old popup with one searchable table for Player, Target, Focus, Group, and Raid rules.
 
 ### 🔄 Changed
 
+- Duration Text: Added shared DurationText profiles and moved supported duration value text to Blizzard duration text bindings, reducing custom update work for cooldown bars and Ebon Might resource duration text.
 - Icon Shapes: Square icons now use a clean cropped square texture style.
-- Mythic Plus / Timer: Continued beta polish for layout, objective display, completed-run details, and best-time information.
+- Media: Switched shared media and custom texture validation to WoW's `C_UIFileAsset` APIs where available.
+- Settings Center: Added subnavigation and a Reload UI action in the title bar when changed settings require a reload.
 
-<!--@end-eqol-beta@-->
+### 🐛 Fixed
+
+- Combat Logging / Instance Difficulty: Fixed the new Mythic Flexible raid difficulty not being recognized as Mythic for automatic combat logging and difficulty displays.
+- Group Frames / Party & Raid: Fixed dead status text sometimes staying visible after a player was revived.
 
 ---
 

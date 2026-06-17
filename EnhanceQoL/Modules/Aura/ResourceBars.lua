@@ -1127,6 +1127,13 @@ function ResourceBars.ReleaseAuraDurationTextBinding(bar, clearText)
 	if addon.functions and addon.functions.ReleaseDurationTextBinding then addon.functions.ReleaseDurationTextBinding(bar, "auraDurationText", clearText == true) end
 end
 
+ResourceBars.NormalizeDurationTextProfile = function(value)
+	local durationText = addon.DurationText
+	if durationText and durationText.GetProfileKey then return durationText:GetProfileKey(value) end
+	if type(value) == "string" and value ~= "" then return value end
+	return "MINIMAL"
+end
+
 function ResourceBars.ClearAuraDurationFill(bar)
 	if not bar then return end
 	ResourceBars.ReleaseAuraDurationTextBinding(bar, true)
@@ -1178,6 +1185,7 @@ function ResourceBars.ApplyAuraDurationTextBinding(bar)
 	local pType = bar._rbType
 	local cfg = ResourceBars.GetRuntimeBarConfig(pType, bar) or bar._cfg or {}
 	local style = bar._style or cfg.textStyle or "CURRENT"
+	local profileKey = ResourceBars.NormalizeDurationTextProfile(cfg.durationTextProfile)
 	if style == "NONE" then
 		ResourceBars.ReleaseAuraDurationTextBinding(bar, true)
 		bar._auraDurationTextBindingActive = nil
@@ -1196,10 +1204,11 @@ function ResourceBars.ApplyAuraDurationTextBinding(bar)
 		owner = bar,
 		key = "auraDurationText",
 		clearText = true,
+		profileKey = profileKey,
 	}
 	if style == "CURMAX" or style == "CURRENT_MAX" then
-		local remainingComponent = addon.functions.CreateRemainingDurationTextComponent and addon.functions.CreateRemainingDurationTextComponent()
-		local totalComponent = addon.functions.CreateTotalDurationTextComponent and addon.functions.CreateTotalDurationTextComponent()
+		local remainingComponent = addon.functions.CreateRemainingDurationTextComponent and addon.functions.CreateRemainingDurationTextComponent(profileKey)
+		local totalComponent = addon.functions.CreateTotalDurationTextComponent and addon.functions.CreateTotalDurationTextComponent(profileKey)
 		if remainingComponent and totalComponent then
 			options.textFormat = "{} / {}"
 			options.components = { remainingComponent, totalComponent }

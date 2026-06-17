@@ -139,6 +139,7 @@ Bars.DEFAULTS = Bars.DEFAULTS
 		barValueSize = 11,
 		barValueStyle = Bars.GetGlobalFontStyleKey(),
 		barValueColor = { 1.00, 0.95, 0.75, 0.95 },
+		barDurationTextProfile = "MINIMAL",
 	}
 
 Bars.COLORS = Bars.COLORS
@@ -600,6 +601,19 @@ local function normalizeBarStackDividerThickness(value, fallback)
 end
 
 local function normalizeBarFontStyle(value, fallback) return Helper.NormalizeFontStyleChoice(value, fallback or Bars.GetGlobalFontStyleKey()) end
+Bars.NormalizeDurationTextProfile = function(value, fallback)
+	local durationText = addon.DurationText
+	if durationText and durationText.GetProfileKey then return durationText:GetProfileKey(value or fallback or Bars.DEFAULTS.barDurationTextProfile) end
+	if type(value) == "string" and value ~= "" then return value end
+	return fallback or Bars.DEFAULTS.barDurationTextProfile
+end
+Bars.GetPanelDurationTextProfile = function(panel)
+	return Bars.NormalizeDurationTextProfile(panel and panel.barDurationTextProfile, Bars.DEFAULTS.barDurationTextProfile)
+end
+Bars.GetEntryDurationTextProfile = function(entry, panel)
+	if entry and entry.barDurationTextProfile ~= nil then return Bars.NormalizeDurationTextProfile(entry.barDurationTextProfile, Bars.GetPanelDurationTextProfile(panel)) end
+	return Bars.GetPanelDurationTextProfile(panel)
+end
 
 Bars.MigrateLegacyBarFontStyleDefault = Bars.MigrateLegacyBarFontStyleDefault
 	or function(value)
@@ -987,6 +1001,7 @@ normalizeBarEntry = function(entry)
 	entry.barValueSize = normalizeBarFontSize(entry.barValueSize, Bars.DEFAULTS.barValueSize)
 	entry.barValueStyle = normalizeBarFontStyle(entry.barValueStyle, Bars.DEFAULTS.barValueStyle)
 	entry.barValueColor = Helper.NormalizeColor(entry.barValueColor, Bars.DEFAULTS.barValueColor)
+	if entry.barDurationTextProfile ~= nil then entry.barDurationTextProfile = Bars.NormalizeDurationTextProfile(entry.barDurationTextProfile, Bars.DEFAULTS.barDurationTextProfile) end
 	if shouldAutoEnableShowStacks(entry) then entry.showStacks = true end
 	if entry.displayMode == Bars.DISPLAY_MODE.BAR and not supportsBarMode(entry, entry.barMode) then
 		entry.barMode = Bars.BAR_MODE.COOLDOWN
@@ -2198,6 +2213,7 @@ Bars.ApplyValueDurationTextBinding = function(
 		owner = barFrame,
 		key = "valueDuration",
 		clearText = true,
+		profileKey = state.durationTextProfile,
 	})
 	if not ok then
 		return Bars.ApplyChargeDurationCountdown(
@@ -3117,12 +3133,13 @@ getChargeSegmentDescriptors = function(state, segmentCount)
 	return descriptors
 end
 
-Bars.GetBarStaticState = function(entry, mode, resolvedType, resolvedSpellId, label, staticVersion, staticGeneration, labelGeneration)
+Bars.GetBarStaticState = function(entry, panel, mode, resolvedType, resolvedSpellId, label, staticVersion, staticGeneration, labelGeneration)
 	if not entry then return nil end
 	staticVersion = staticVersion or entry._eqolBarsStaticVersion or 0
 	staticGeneration = staticGeneration or 0
 	labelGeneration = labelGeneration or 0
 	local mediaGeneration = addon.functions and addon.functions.GetLSMMediaVersion and addon.functions.GetLSMMediaVersion() or 0
+	local durationTextProfile = Bars.GetEntryDurationTextProfile(entry, panel)
 	local state = entry._eqolBarsStaticState
 	if
 		state
@@ -3134,6 +3151,7 @@ Bars.GetBarStaticState = function(entry, mode, resolvedType, resolvedSpellId, la
 		and state.resolvedType == resolvedType
 		and state.resolvedSpellId == resolvedSpellId
 		and state.label == label
+		and state.durationTextProfile == durationTextProfile
 	then
 		return state
 	end
@@ -3145,6 +3163,7 @@ Bars.GetBarStaticState = function(entry, mode, resolvedType, resolvedSpellId, la
 	state.labelGeneration = labelGeneration
 	state.mediaGeneration = mediaGeneration
 	state.mode = mode
+	state.durationTextProfile = durationTextProfile
 	state.resolvedType = resolvedType
 	state.resolvedSpellId = resolvedSpellId
 	state.label = label
@@ -3206,6 +3225,7 @@ Bars.GetBarStaticState = function(entry, mode, resolvedType, resolvedSpellId, la
 	state.valueSize = normalizeBarFontSize(entry.barValueSize, Bars.DEFAULTS.barValueSize)
 	state.valueStyle = normalizeBarFontStyle(entry.barValueStyle, Bars.DEFAULTS.barValueStyle)
 	state.valueColor = Bars.GetCachedEntryColor(entry, "barValueColor", Bars.DEFAULTS.barValueColor)
+	state.durationTextProfile = durationTextProfile
 	state.spellId = resolvedSpellId
 	return state
 end
@@ -3335,7 +3355,7 @@ buildBarState = function(panelId, entryId, entry, icon, preview, runtimeDataOver
 	local showValueText = mode ~= Bars.BAR_MODE.STACKS and getStoredBoolean(entry, "barShowValueText", Bars.DEFAULTS.barShowValueText)
 	local showChargeCount = mode == Bars.BAR_MODE.CHARGES and showValueText == true or false
 	if showChargeDuration then showValueText = true end
-	local staticState = Bars.GetBarStaticState(entry, mode, resolvedType, resolvedSpellId, label, staticVersion, staticGeneration, labelGeneration)
+	local staticState = Bars.GetBarStaticState(entry, panel, mode, resolvedType, resolvedSpellId, label, staticVersion, staticGeneration, labelGeneration)
 	local state = icon and icon._eqolBarsRuntimeState or nil
 	if not state then
 		state = {}
@@ -3414,6 +3434,7 @@ buildBarState = function(panelId, entryId, entry, icon, preview, runtimeDataOver
 	state.valueSize = staticState and staticState.valueSize or Bars.DEFAULTS.barValueSize
 	state.valueStyle = staticState and staticState.valueStyle or Bars.DEFAULTS.barValueStyle
 	state.valueColor = staticState and staticState.valueColor or Bars.DEFAULTS.barValueColor
+	state.durationTextProfile = staticState and staticState.durationTextProfile or Bars.DEFAULTS.barDurationTextProfile
 	state.spellId = staticState and staticState.spellId or resolvedSpellId
 	state.hideOnCooldown = hideOnCooldown == true
 	state.showOnCooldown = showOnCooldown == true
@@ -5758,6 +5779,39 @@ local function appendBarStandaloneTextSettings(settings, ctx)
 		set = function(_, value) setEntryBarBoolean(panelId, entryId, "barShowChargeDuration", value) end,
 	}
 	settings[#settings + 1] = {
+		name = L["durationTextProfile"] or "Duration text profile",
+		kind = SettingType.Dropdown,
+		parentId = "eqolCooldownPanelStandaloneBarCharges",
+		height = 140,
+		isShown = function()
+			local currentEntry = getStandaloneBarContextEntry(ctx)
+			return normalizeBarMode(currentEntry and currentEntry.barMode, Bars.DEFAULTS.barMode) == Bars.BAR_MODE.CHARGES
+		end,
+		disabled = function()
+			local currentEntry = getStandaloneBarContextEntry(ctx)
+			return not Bars.ShouldShowBarValueTextSettings(currentEntry)
+		end,
+		get = function()
+			local currentEntry = getStandaloneBarContextEntry(ctx)
+			return currentEntry and currentEntry.barDurationTextProfile ~= nil and Bars.NormalizeDurationTextProfile(currentEntry.barDurationTextProfile, Bars.DEFAULTS.barDurationTextProfile) or "PANEL_DEFAULT"
+		end,
+		set = function(_, value) setEntryBarField(panelId, entryId, "barDurationTextProfile", value == "PANEL_DEFAULT" and nil or Bars.NormalizeDurationTextProfile(value, Bars.DEFAULTS.barDurationTextProfile)) end,
+		generator = function(_, root)
+			root:CreateRadio(L["durationTextProfilePanelDefault"] or "Panel default", function()
+				local currentEntry = getStandaloneBarContextEntry(ctx)
+				return not currentEntry or currentEntry.barDurationTextProfile == nil
+			end, function() setEntryBarField(panelId, entryId, "barDurationTextProfile", nil) end)
+			local durationText = addon.DurationText
+			local options = durationText and durationText.GetProfileOptions and durationText:GetProfileOptions() or {}
+			for _, option in ipairs(options) do
+				root:CreateRadio(option.label, function()
+					local currentEntry = getStandaloneBarContextEntry(ctx)
+					return currentEntry and currentEntry.barDurationTextProfile ~= nil and Bars.NormalizeDurationTextProfile(currentEntry.barDurationTextProfile, Bars.DEFAULTS.barDurationTextProfile) == option.value or false
+				end, function() setEntryBarField(panelId, entryId, "barDurationTextProfile", option.value) end)
+			end
+		end,
+	}
+	settings[#settings + 1] = {
 		name = L["CooldownPanelBarShowValueText"] or "Show value",
 		kind = SettingType.Checkbox,
 		parentId = "eqolCooldownPanelStandaloneBarCooldown",
@@ -5770,6 +5824,39 @@ local function appendBarStandaloneTextSettings(settings, ctx)
 			return getStoredBoolean(currentEntry, "barShowValueText", Bars.DEFAULTS.barShowValueText)
 		end,
 		set = function(_, value) setEntryBarBoolean(panelId, entryId, "barShowValueText", value) end,
+	}
+	settings[#settings + 1] = {
+		name = L["durationTextProfile"] or "Duration text profile",
+		kind = SettingType.Dropdown,
+		parentId = "eqolCooldownPanelStandaloneBarCooldown",
+		height = 140,
+		isShown = function()
+			local currentEntry = getStandaloneBarContextEntry(ctx)
+			return normalizeBarMode(currentEntry and currentEntry.barMode, Bars.DEFAULTS.barMode) == Bars.BAR_MODE.COOLDOWN
+		end,
+		disabled = function()
+			local currentEntry = getStandaloneBarContextEntry(ctx)
+			return not Bars.ShouldShowBarValueTextSettings(currentEntry)
+		end,
+		get = function()
+			local currentEntry = getStandaloneBarContextEntry(ctx)
+			return currentEntry and currentEntry.barDurationTextProfile ~= nil and Bars.NormalizeDurationTextProfile(currentEntry.barDurationTextProfile, Bars.DEFAULTS.barDurationTextProfile) or "PANEL_DEFAULT"
+		end,
+		set = function(_, value) setEntryBarField(panelId, entryId, "barDurationTextProfile", value == "PANEL_DEFAULT" and nil or Bars.NormalizeDurationTextProfile(value, Bars.DEFAULTS.barDurationTextProfile)) end,
+		generator = function(_, root)
+			root:CreateRadio(L["durationTextProfilePanelDefault"] or "Panel default", function()
+				local currentEntry = getStandaloneBarContextEntry(ctx)
+				return not currentEntry or currentEntry.barDurationTextProfile == nil
+			end, function() setEntryBarField(panelId, entryId, "barDurationTextProfile", nil) end)
+			local durationText = addon.DurationText
+			local options = durationText and durationText.GetProfileOptions and durationText:GetProfileOptions() or {}
+			for _, option in ipairs(options) do
+				root:CreateRadio(option.label, function()
+					local currentEntry = getStandaloneBarContextEntry(ctx)
+					return currentEntry and currentEntry.barDurationTextProfile ~= nil and Bars.NormalizeDurationTextProfile(currentEntry.barDurationTextProfile, Bars.DEFAULTS.barDurationTextProfile) == option.value or false
+				end, function() setEntryBarField(panelId, entryId, "barDurationTextProfile", option.value) end)
+			end
+		end,
 	}
 	settings[#settings + 1] = {
 		name = L["CooldownPanelBarReverseFill"] or "Reverse fill direction",
