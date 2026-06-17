@@ -10,6 +10,7 @@ addon.variables.NewVersionTableEQOL = {
 	landingPageButtonOffsetX = true,
 	landingPageButtonOffsetY = true,
 	landingPageButtonScale = true,
+	durationText = true,
 
 	-- 11.2.0-beta1 Mythic+
 	mythicPlusTimerEnabled = true,

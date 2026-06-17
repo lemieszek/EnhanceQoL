@@ -12,6 +12,7 @@
 ### 🔄 Changed
 
 - Media: Switched shared media and custom texture validation to WoW's `C_UIFileAsset` APIs where available.
+- Duration Text: Enabled the shared DurationText system and moved supported duration value text to Blizzard duration text bindings, reducing custom OnUpdate work for cooldown bars and Ebon Might resource duration text.
 
 ### 🐛 Fixed
 

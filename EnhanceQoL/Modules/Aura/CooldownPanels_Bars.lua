@@ -2108,6 +2108,7 @@ end
 
 Bars.ClearChargeDurationCountdown = function(barFrame)
 	if not barFrame then return end
+	if addon.functions and addon.functions.ReleaseDurationTextBinding then addon.functions.ReleaseDurationTextBinding(barFrame, "valueDuration", true) end
 	local cooldown = barFrame._eqolChargeDurationCountdown
 	if not cooldown then return end
 	clearCooldownFrame(cooldown)
@@ -2116,6 +2117,107 @@ Bars.ClearChargeDurationCountdown = function(barFrame)
 		fontString:SetText("")
 		fontString:Hide()
 	end
+end
+
+Bars.ApplyValueDurationTextBinding = function(
+	barFrame,
+	state,
+	relativeFrame,
+	orientation,
+	textWidth,
+	fontPath,
+	fontSize,
+	fontStyle,
+	fontColor,
+	defaultFontPath,
+	defaultFontSize,
+	defaultFontStyle,
+	anchor,
+	offsetX,
+	offsetY
+)
+	if not (barFrame and state and state.chargeDurationTextObject and barFrame.value and addon.functions and addon.functions.BindDurationText) then
+		return Bars.ApplyChargeDurationCountdown(
+			barFrame,
+			state,
+			relativeFrame,
+			orientation,
+			fontPath,
+			fontSize,
+			fontStyle,
+			fontColor,
+			defaultFontPath,
+			defaultFontSize,
+			defaultFontStyle,
+			anchor,
+			offsetX,
+			offsetY
+		)
+	end
+
+	Bars.ClearChargeDurationCountdown(barFrame)
+	applyFontStringStyle(barFrame.value, fontPath, fontSize, fontStyle, fontColor, defaultFontPath, defaultFontSize, defaultFontStyle)
+	local resolvedAnchor = Bars.GetResolvedTextAnchor(anchor, orientation, "VALUE")
+	local point, relativePoint, justifyH = Bars.GetTextAnchorConfig(anchor, orientation, "VALUE")
+	local anchorFrame = relativeFrame or barFrame.textOverlay
+	local insetX = pixelSnap(offsetX or 0, barFrame and barFrame.textOverlay or barFrame)
+	local insetY = pixelSnap(offsetY or 0, barFrame and barFrame.textOverlay or barFrame)
+	local justifyV = "MIDDLE"
+	local textInset = 4
+	local anchorPoint = point
+	local anchorRelativePoint = relativePoint
+	local anchorOffsetX = insetX
+	local anchorOffsetY = insetY
+	if resolvedAnchor == Bars.TEXT_ANCHOR.LEFT then
+		anchorPoint = "LEFT"
+		anchorRelativePoint = "LEFT"
+		anchorOffsetX = textInset + insetX
+	elseif resolvedAnchor == Bars.TEXT_ANCHOR.RIGHT then
+		anchorPoint = "RIGHT"
+		anchorRelativePoint = "RIGHT"
+		anchorOffsetX = -textInset + insetX
+	elseif resolvedAnchor == Bars.TEXT_ANCHOR.TOP then
+		anchorOffsetY = insetY - textInset
+		justifyV = "TOP"
+	elseif resolvedAnchor == Bars.TEXT_ANCHOR.BOTTOM then
+		anchorOffsetY = insetY + textInset
+		justifyV = "BOTTOM"
+	end
+
+	if barFrame.value.SetWordWrap then barFrame.value:SetWordWrap(false) end
+	if barFrame.value.SetNonSpaceWrap then barFrame.value:SetNonSpaceWrap(false) end
+	if barFrame.value.SetMaxLines then barFrame.value:SetMaxLines(1) end
+	barFrame.value:SetWidth(pixelSnap(max(24, textWidth or 0), barFrame and barFrame.textOverlay or barFrame))
+	barFrame.value:ClearAllPoints()
+	barFrame.value:SetPoint(anchorPoint, anchorFrame, anchorRelativePoint, anchorOffsetX, anchorOffsetY)
+	barFrame.value:SetJustifyH(justifyH)
+	if barFrame.value.SetJustifyV then barFrame.value:SetJustifyV(justifyV) end
+	barFrame.value:Show()
+
+	local ok = addon.functions.BindDurationText(barFrame.value, state.chargeDurationTextObject, {
+		owner = barFrame,
+		key = "valueDuration",
+		clearText = true,
+	})
+	if not ok then
+		return Bars.ApplyChargeDurationCountdown(
+			barFrame,
+			state,
+			relativeFrame,
+			orientation,
+			fontPath,
+			fontSize,
+			fontStyle,
+			fontColor,
+			defaultFontPath,
+			defaultFontSize,
+			defaultFontStyle,
+			anchor,
+			offsetX,
+			offsetY
+		)
+	end
+	return true
 end
 
 Bars.ApplyChargeDurationCountdown = function(
@@ -2269,10 +2371,11 @@ local function hideEditorBarDragPreview(editor)
 	dragIcon._eqolBaseSlotSize = nil
 end
 
-Bars.ClearBarValueTextUpdater = function(barFrame)
+Bars.ClearBarValueTextUpdater = function(barFrame, preserveDurationBinding)
 	if not barFrame then return end
 	barFrame._eqolValueTextDynamic = nil
 	barFrame._eqolValueTextElapsed = nil
+	if preserveDurationBinding ~= true and addon.functions and addon.functions.ReleaseDurationTextBinding then addon.functions.ReleaseDurationTextBinding(barFrame, "valueDuration", true) end
 	if barFrame:GetScript("OnUpdate") then barFrame:SetScript("OnUpdate", nil) end
 end
 
@@ -2309,7 +2412,12 @@ Bars.ConfigureBarValueTextUpdater = function(barFrame, state)
 			)
 		)
 	if useDynamicText ~= true then
-		Bars.ClearBarValueTextUpdater(barFrame)
+		local preserveDurationBinding = state
+			and state.showValueText == true
+			and state.valueTextIsChargeDuration == true
+			and state.chargeDurationTextNative == true
+			and state.chargeDurationTextObject ~= nil
+		Bars.ClearBarValueTextUpdater(barFrame, preserveDurationBinding == true)
 		return
 	end
 
@@ -4401,12 +4509,12 @@ layoutBarFrame = function(barFrame, icon, span, layout, state)
 		and state.chargeDurationTextNative == true
 		and state.chargeDurationTextObject
 	then
-		barFrame.value:Hide()
-		Bars.ApplyChargeDurationCountdown(
+		Bars.ApplyValueDurationTextBinding(
 			barFrame,
 			state,
 			valueRelativeFrame,
 			orientation,
+			textWidth,
 			state.valueFont,
 			state.valueSize,
 			state.valueStyle,

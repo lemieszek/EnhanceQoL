@@ -134,7 +134,7 @@ local ResourcebarVars = {
 	RUNE_UPDATE_INTERVAL = 0.1,
 	ESSENCE_UPDATE_INTERVAL = 0.1,
 	REFRESH_DEBOUNCE = 0.05,
-	AURA_DURATION_UPDATE_INTERVAL = 0.1,
+	AURA_DURATION_COLOR_UPDATE_INTERVAL = 1,
 	REANCHOR_REFRESH = { reanchorOnly = true },
 	OOC_VISIBILITY_DRIVER = "[combat] show; hide",
 	MAELSTROM_WEAPON_MAX_STACKS = 10,
@@ -1122,11 +1122,21 @@ function ResourceBars.DeactivateAuraDurationTicker(bar)
 	bar._auraDurationAccum = nil
 end
 
+function ResourceBars.ReleaseAuraDurationTextBinding(bar, clearText)
+	if not bar then return end
+	if addon.functions and addon.functions.ReleaseDurationTextBinding then addon.functions.ReleaseDurationTextBinding(bar, "auraDurationText", clearText == true) end
+end
+
 function ResourceBars.ClearAuraDurationFill(bar)
 	if not bar then return end
+	ResourceBars.ReleaseAuraDurationTextBinding(bar, true)
 	bar._auraDurationObject = nil
 	bar._auraDurationKey = nil
 	bar._auraDurationVisualMax = nil
+	bar._auraDurationTimerKey = nil
+	bar._auraDurationTimerObject = nil
+	bar._auraDurationFillNative = nil
+	bar._auraDurationTextBindingActive = nil
 	if bar.SetToTargetValue then bar:SetToTargetValue() end
 end
 
@@ -1145,7 +1155,67 @@ function ResourceBars.ApplyAuraDurationFill(bar, durationObject, cacheKey, maxVa
 	bar._auraDurationObject = durationObject
 	bar._auraDurationKey = key
 	bar._auraDurationVisualMax = durationMax
-	ResourceBars.UpdateAuraDurationFillValue(bar)
+	if bar.SetTimerDuration then
+		if bar._auraDurationTimerKey ~= key or bar._auraDurationTimerObject ~= durationObject then
+			bar:SetTimerDuration(durationObject, Enum.StatusBarInterpolation.Immediate, Enum.StatusBarTimerDirection.RemainingTime)
+			bar._auraDurationTimerKey = key
+			bar._auraDurationTimerObject = durationObject
+		end
+		bar._auraDurationFillNative = true
+	else
+		bar._auraDurationFillNative = nil
+		ResourceBars.UpdateAuraDurationFillValue(bar)
+	end
+	return true
+end
+
+function ResourceBars.ApplyAuraDurationTextBinding(bar)
+	if not (bar and bar.text and bar._auraDurationObject and addon.functions and addon.functions.BindDurationText) then
+		ResourceBars.ReleaseAuraDurationTextBinding(bar, true)
+		if bar then bar._auraDurationTextBindingActive = nil end
+		return false
+	end
+	local pType = bar._rbType
+	local cfg = ResourceBars.GetRuntimeBarConfig(pType, bar) or bar._cfg or {}
+	local style = bar._style or cfg.textStyle or "CURRENT"
+	if style == "NONE" then
+		ResourceBars.ReleaseAuraDurationTextBinding(bar, true)
+		bar._auraDurationTextBindingActive = nil
+		if bar._textShown then
+			bar.text:Hide()
+			bar._textShown = false
+		end
+		return false
+	end
+	if style ~= "CURRENT" and style ~= "CURMAX" and style ~= "CURRENT_MAX" then
+		ResourceBars.ReleaseAuraDurationTextBinding(bar, true)
+		bar._auraDurationTextBindingActive = nil
+		return false
+	end
+	local options = {
+		owner = bar,
+		key = "auraDurationText",
+		clearText = true,
+	}
+	if style == "CURMAX" or style == "CURRENT_MAX" then
+		local remainingComponent = addon.functions.CreateRemainingDurationTextComponent and addon.functions.CreateRemainingDurationTextComponent()
+		local totalComponent = addon.functions.CreateTotalDurationTextComponent and addon.functions.CreateTotalDurationTextComponent()
+		if remainingComponent and totalComponent then
+			options.textFormat = "{} / {}"
+			options.components = { remainingComponent, totalComponent }
+		end
+	end
+	local ok = addon.functions.BindDurationText(bar.text, bar._auraDurationObject, options)
+	if not ok then
+		bar._auraDurationTextBindingActive = nil
+		return false
+	end
+	bar._auraDurationTextBindingActive = true
+	bar._lastText = nil
+	if not bar._textShown then
+		bar.text:Show()
+		bar._textShown = true
+	end
 	return true
 end
 
@@ -5853,10 +5923,10 @@ function updatePowerBar(type, runeSlot)
 				if not bar._auraDurationUpdater then
 					bar._auraDurationUpdater = function(self, elapsed)
 						self._auraDurationAccum = (self._auraDurationAccum or 0) + (elapsed or 0)
-						if self._auraDurationAccum < (RB.AURA_DURATION_UPDATE_INTERVAL or 0.1) then return end
+						if self._auraDurationAccum < (RB.AURA_DURATION_COLOR_UPDATE_INTERVAL or 1) then return end
 						self._auraDurationAccum = 0
-						ResourceBars.UpdateAuraDurationFillValue(self)
-						ResourceBars.UpdateAuraDurationText(self)
+						if self._auraDurationFillNative ~= true then ResourceBars.UpdateAuraDurationFillValue(self) end
+						if self._auraDurationTextBindingActive ~= true then ResourceBars.UpdateAuraDurationText(self) end
 						ResourceBars.UpdateAuraDurationThresholdColor(self)
 					end
 				end
@@ -5889,7 +5959,7 @@ function updatePowerBar(type, runeSlot)
 				end
 			else
 			if cfgDef.durationAsValue and durationObject then
-				ResourceBars.UpdateAuraDurationText(bar)
+				if not ResourceBars.ApplyAuraDurationTextBinding(bar) then ResourceBars.UpdateAuraDurationText(bar) end
 				ResourceBars.UpdateAuraDurationThresholdColor(bar)
 			else
 					local currentText = cfgDef.durationAsValue and ResourceBars.FormatDurationValue(stacks) or formatNumber(stacks, useShortNumbers)

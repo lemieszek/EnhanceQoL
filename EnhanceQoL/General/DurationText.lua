@@ -186,7 +186,7 @@ function DurationText:GetIntervalValue(key)
 end
 
 function DurationText:GetAbbreviationValue(key)
-	return getEnumValue(_G.Enum and _G.Enum.SecondsFormatterAbbrevation, key, ABBREVIATION_FALLBACK)
+	return getEnumValue(_G.Enum and _G.Enum.SecondsFormatterAbbreviation, key, ABBREVIATION_FALLBACK)
 end
 
 function DurationText:GetWhitespaceValue(key)
@@ -265,6 +265,16 @@ function DurationText:CreateFormatComponent(property, formatter)
 		property = resolvedProperty,
 		formatter = formatter,
 	}
+end
+
+function DurationText:CreateRemainingDurationComponent(config)
+	local formatter = self:GetSecondsFormatter(config)
+	return self:CreateFormatComponent("RemainingDuration", formatter)
+end
+
+function DurationText:CreateTotalDurationComponent(config)
+	local formatter = self:GetSecondsFormatter(config)
+	return self:CreateFormatComponent("TotalDuration", formatter)
 end
 
 function DurationText:GetBinding(owner, key)
@@ -383,6 +393,8 @@ end
 function addon.functions.IsDurationTextBindingSupported() return DurationText:IsDurationTextBindingSupported() end
 function addon.functions.GetDurationTextBindingProperty(property) return DurationText:GetDurationTextBindingProperty(property) end
 function addon.functions.CreateDurationTextBindingFormatComponent(property, formatter) return DurationText:CreateFormatComponent(property, formatter) end
+function addon.functions.CreateRemainingDurationTextComponent(config) return DurationText:CreateRemainingDurationComponent(config) end
+function addon.functions.CreateTotalDurationTextComponent(config) return DurationText:CreateTotalDurationComponent(config) end
 function addon.functions.GetDurationTextBinding(owner, key) return DurationText:GetBinding(owner, key) end
 function addon.functions.EnsureDurationTextBinding(owner, key) return DurationText:EnsureBinding(owner, key) end
 function addon.functions.ReleaseDurationTextBinding(owner, key, clearText) return DurationText:ReleaseBinding(owner, key, clearText) end

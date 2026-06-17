@@ -16,6 +16,7 @@
 	<Script file='VendorEconomy.lua'/>
 	<Script file='System.lua'/>
 	<Script file='UIOptions.lua'/>
+	<Script file='DurationText.lua'/>
 	<Script file='../Modules/Aura/Settings_Ressourcebars.lua'/>
 	<Script file='UIInput.lua'/>
 	<Script file='../Modules/Aura/Settings_CooldownPanels.lua'/>
