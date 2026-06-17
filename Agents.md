@@ -89,6 +89,7 @@
 
 - Lua chunks have a hard limit of 200 local variables. In large addon files, avoid adding new top-level locals casually.
 - Prefer a single module table such as `local UF = {}`, `local RB = {}`, or `local M = {}` for grouped functions, constants, and runtime state when a file is large or already near the local limit.
+- When Lua files change, run `luac -p` on the changed Lua files when `luac` is available. This catches syntax errors and local-limit regressions early before relying on in-game testing.
 - Store related values as table fields, such as `UF.constants`, `UF.state`, or `UF.helpers`, instead of many independent top-level locals.
 - Use local upvalues only for genuinely hot paths, imported APIs, or small scoped helpers where the benefit is clear.
 - Before adding several new locals to a large file, check whether the file already has local-limit warnings or history, and prefer table fields if in doubt.
