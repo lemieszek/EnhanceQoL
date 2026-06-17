@@ -1507,6 +1507,7 @@ L["damageMeterTooltipBarBackgroundUseClassColor"] = "Klassenfarbe fuer Balken-Hi
 L["damageMeterTooltipBarColor"] = "Balkenfarbe"
 L["damageMeterTooltipBarTexture"] = "Balkentextur"
 L["damageMeterTooltipBarUseClassColor"] = "Klassenfarbe verwenden"
+L["damageMeterTooltipBarWidthOffset"] = "Balkenbreiten-Versatz"
 L["damageMeterTooltipBorderColor"] = "Rahmenfarbe"
 L["damageMeterTooltipBorderOffset"] = "Rahmen-Offset"
 L["damageMeterTooltipBorderSize"] = "Rahmengröße"

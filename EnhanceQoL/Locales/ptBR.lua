@@ -1507,6 +1507,7 @@ L["damageMeterTooltipBarBackgroundUseClassColor"] = "Usar cor da classe no fundo
 L["damageMeterTooltipBarColor"] = "Cor da barra"
 L["damageMeterTooltipBarTexture"] = "Textura da barra"
 L["damageMeterTooltipBarUseClassColor"] = "Usar cor de classe"
+L["damageMeterTooltipBarWidthOffset"] = "Deslocamento de largura da barra"
 L["damageMeterTooltipBorderColor"] = "Cor da borda"
 L["damageMeterTooltipBorderOffset"] = "Deslocamento da borda"
 L["damageMeterTooltipBorderSize"] = "Tamanho da borda"

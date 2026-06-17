@@ -1507,6 +1507,7 @@ L["damageMeterTooltipBarBackgroundUseClassColor"] = "Use class color for bar bac
 L["damageMeterTooltipBarColor"] = "Bar color"
 L["damageMeterTooltipBarTexture"] = "Bar texture"
 L["damageMeterTooltipBarUseClassColor"] = "Use class color"
+L["damageMeterTooltipBarWidthOffset"] = "Bar width offset"
 L["damageMeterTooltipBorderColor"] = "Border color"
 L["damageMeterTooltipBorderOffset"] = "Border offset"
 L["damageMeterTooltipBorderSize"] = "Border size"

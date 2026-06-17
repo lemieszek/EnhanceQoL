@@ -6,6 +6,7 @@
 
 ### ✨ Added
 
+- Damage Meter: Added a tooltip bar width offset option so rounded bar textures can be extended or tightened without moving the tooltip text columns.
 - Mythic Plus / Timer: Added the Mythic+ Timer back as a beta feature for continued testing.
 - EQoL Suite: Added beta custom buff and debuff containers with Edit Mode movement plus icon shape, zoom, border, size, spacing, and row controls.
 

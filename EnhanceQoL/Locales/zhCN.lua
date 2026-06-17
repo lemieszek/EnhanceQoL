@@ -1507,6 +1507,7 @@ L["damageMeterTooltipBarBackgroundUseClassColor"] = "条背景使用职业颜色
 L["damageMeterTooltipBarColor"] = "条颜色"
 L["damageMeterTooltipBarTexture"] = "条材质"
 L["damageMeterTooltipBarUseClassColor"] = "使用职业颜色"
+L["damageMeterTooltipBarWidthOffset"] = "条宽度偏移"
 L["damageMeterTooltipBorderColor"] = "边框颜色"
 L["damageMeterTooltipBorderOffset"] = "边框偏移"
 L["damageMeterTooltipBorderSize"] = "边框大小"

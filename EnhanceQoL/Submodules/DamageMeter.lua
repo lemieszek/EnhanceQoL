@@ -306,6 +306,7 @@ local DEFAULT_WINDOW = {
 	tooltipBarBackgroundTexture = "",
 	tooltipBarBackgroundColor = { r = 0, g = 0, b = 0, a = 0.45 },
 	tooltipBarBackgroundUseClassColor = false,
+	tooltipBarWidthOffset = 0,
 	tooltipBarSpacing = 0,
 	tooltipBackdropUseClassColor = false,
 	tooltipRowBorderEnabled = false,
@@ -4374,6 +4375,7 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 	local barTexture = resolveMedia("statusbar", config.tooltipBarTexture, DEFAULT_TEXTURE)
 	local barBackgroundTexture = resolveMedia("statusbar", config.tooltipBarBackgroundTexture, "Interface\\Buttons\\WHITE8x8")
 	local shown = #rows
+	local tooltipBarWidthOffset = clampNumber(config.tooltipBarWidthOffset, -200, 200, DEFAULT_WINDOW.tooltipBarWidthOffset)
 	local tooltipBarSpacing = clampNumber(config.tooltipBarSpacing, -16, 16, DEFAULT_WINDOW.tooltipBarSpacing)
 	local tooltipHeight = 10
 	for rowIndex = 1, shown do
@@ -4447,17 +4449,19 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 			local barR, barG, barB, barA = getClassOrCustomColor(classFilename, config.tooltipBarColor, DEFAULT_WINDOW.tooltipBarColor, config.tooltipBarUseClassColor)
 			local barBgR, barBgG, barBgB, barBgA = getClassOrCustomColor(classFilename, config.tooltipBarBackgroundColor, DEFAULT_WINDOW.tooltipBarBackgroundColor, config.tooltipBarBackgroundUseClassColor)
 			local availableBarWidth = math.max(1, width - rightPadding - barStartX)
+			local visualBarWidth = math.max(1, availableBarWidth + tooltipBarWidthOffset)
+			local visualBarLeftOffset = -(tooltipBarWidthOffset / 2)
 			local barHeight = math.max(1, currentLineHeight - 3)
 			if showBars and not data.header and not data.spacer and data.barValue ~= nil then
 				line.barBG:SetTexture(barBackgroundTexture)
 				line.barBG:SetVertexColor(barBgR, barBgG, barBgB, barBgA)
-				line.barBG:SetPoint("LEFT", line.icon, "RIGHT", tooltipIconGap, 0)
-				line.barBG:SetSize(availableBarWidth, barHeight)
+				line.barBG:SetPoint("LEFT", line.icon, "RIGHT", tooltipIconGap + visualBarLeftOffset, 0)
+				line.barBG:SetSize(visualBarWidth, barHeight)
 				line.barBG:Show()
 				line.bar:SetStatusBarTexture(barTexture)
 				line.bar:SetStatusBarColor(barR, barG, barB, barA)
-				line.bar:SetPoint("LEFT", line.icon, "RIGHT", tooltipIconGap, 0)
-				line.bar:SetSize(availableBarWidth, barHeight)
+				line.bar:SetPoint("LEFT", line.icon, "RIGHT", tooltipIconGap + visualBarLeftOffset, 0)
+				line.bar:SetSize(visualBarWidth, barHeight)
 				line.bar:SetMinMaxValues(0, getTooltipBarMax(data.barMax))
 				line.bar:SetValue(getTooltipBarValue(data.barValue))
 				line.bar:Show()
@@ -4476,7 +4480,7 @@ function DamageMeter:ShowSourceTooltip(owner, index, source)
 			self:ApplyBorderFrame(line.rowBorder, showLineBorders and config.tooltipRowBorderEnabled == true, config.tooltipRowBorderTexture, clampNumber(config.tooltipRowBorderSize, 1, 32, DEFAULT_WINDOW.tooltipRowBorderSize), rbr, rbg, rbb, rba)
 
 			local barBorderOffset = clampNumber(config.tooltipBarBorderInset, 0, 24, DEFAULT_WINDOW.tooltipBarBorderInset)
-			local barBorderWidth = math.max(1, availableBarWidth + (barBorderOffset * 2))
+			local barBorderWidth = math.max(1, visualBarWidth + (barBorderOffset * 2))
 			local barBorderHeight = math.max(1, barHeight + (barBorderOffset * 2))
 			line.barBorder:ClearAllPoints()
 			line.barBorder:SetPoint("TOPLEFT", line.bar, "TOPLEFT", -barBorderOffset, barBorderOffset)
@@ -6820,6 +6824,7 @@ function DamageMeter:BuildWindowSettings(index)
 		dropdownSetting(L["damageMeterTooltipBarBackgroundTexture"] or "Tooltip bar background texture", function() return cfg().tooltipBarBackgroundTexture end, function(value) self:SetConfigValue(index, "tooltipBarBackgroundTexture", value) end, buildMediaOptions("statusbar", false), tooltipId, 260, tooltipEnabled),
 		checkboxSetting(L["damageMeterTooltipBarBackgroundUseClassColor"] or "Use class color for tooltip bar background", function() return cfg().tooltipBarBackgroundUseClassColor == true end, function(value) self:SetConfigValue(index, "tooltipBarBackgroundUseClassColor", value) end, tooltipId, tooltipEnabled),
 		colorSetting(L["damageMeterTooltipBarBackgroundColor"] or "Tooltip bar background color", function() return normalizeColor(cfg().tooltipBarBackgroundColor, DEFAULT_WINDOW.tooltipBarBackgroundColor) end, function(value) self:SetConfigValue(index, "tooltipBarBackgroundColor", normalizeColor(value, DEFAULT_WINDOW.tooltipBarBackgroundColor)) end, DEFAULT_WINDOW.tooltipBarBackgroundColor, tooltipId, function() return tooltipEnabled() and cfg().tooltipBarBackgroundUseClassColor ~= true end),
+		sliderSetting(L["damageMeterTooltipBarWidthOffset"] or "Bar width offset", function() return cfg().tooltipBarWidthOffset end, function(value) self:SetConfigValue(index, "tooltipBarWidthOffset", clampNumber(value, -200, 200, DEFAULT_WINDOW.tooltipBarWidthOffset)) end, -200, 200, 1, tooltipId, tooltipEnabled),
 		sliderSetting(L["damageMeterBarSpacing"] or "Bar spacing", function() return cfg().tooltipBarSpacing end, function(value) self:SetConfigValue(index, "tooltipBarSpacing", clampNumber(value, -16, 16, DEFAULT_WINDOW.tooltipBarSpacing)) end, -16, 16, 1, tooltipId, tooltipEnabled),
 		dividerSetting(tooltipId),
 		checkboxSetting(L["damageMeterRowBorder"] or "Row border", function() return cfg().tooltipRowBorderEnabled == true end, function(value)

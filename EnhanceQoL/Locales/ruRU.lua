@@ -1507,6 +1507,7 @@ L["damageMeterTooltipBarBackgroundUseClassColor"] = "Использовать ц
 L["damageMeterTooltipBarColor"] = "Цвет полосы"
 L["damageMeterTooltipBarTexture"] = "Текстура полосы"
 L["damageMeterTooltipBarUseClassColor"] = "Использовать цвет класса"
+L["damageMeterTooltipBarWidthOffset"] = "Смещение ширины полосы"
 L["damageMeterTooltipBorderColor"] = "Цвет рамки"
 L["damageMeterTooltipBorderOffset"] = "Смещение рамки"
 L["damageMeterTooltipBorderSize"] = "Размер рамки"

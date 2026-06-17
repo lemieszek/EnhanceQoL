@@ -1507,6 +1507,7 @@ L["damageMeterTooltipBarBackgroundUseClassColor"] = "막대 배경에 직업 색
 L["damageMeterTooltipBarColor"] = "막대 색상"
 L["damageMeterTooltipBarTexture"] = "막대 텍스처"
 L["damageMeterTooltipBarUseClassColor"] = "직업 색상 사용"
+L["damageMeterTooltipBarWidthOffset"] = "막대 너비 오프셋"
 L["damageMeterTooltipBorderColor"] = "테두리 색상"
 L["damageMeterTooltipBorderOffset"] = "테두리 오프셋"
 L["damageMeterTooltipBorderSize"] = "테두리 크기"
