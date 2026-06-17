@@ -2,6 +2,14 @@
 
 <!--@eqol-beta@-->
 
+## [11.4.0-beta2] - 2026-06-17
+
+### ✨ Added
+
+- Mythic Plus / Bloodlust Tracker: Added optional Bloodlust duration and active glow display while the lockout is freshly applied.
+
+---
+
 ## [11.4.0-beta1] - 2026-06-17
 
 ### ✨ Added
