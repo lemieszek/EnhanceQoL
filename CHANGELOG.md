@@ -2,6 +2,16 @@
 
 <!--@eqol-beta@-->
 
+## [11.3.0-beta3] - 2026-06-17
+
+### ✨ Added
+
+- Group Tools / Focus Marker: Added options to preserve existing target markers with `/tm ~N` and to create the focus marker macro with or without mouseover targeting.
+
+### 🐛 Fixed
+
+- Group Frames / Party & Raid: Fixed dead status text sometimes staying visible after a player was revived.
+
 ## [11.3.0-beta2] - 2026-06-16
 
 ### ✨ Added

@@ -68,6 +68,7 @@
 - For TOC, Markdown, and TXT files, non-matching gated blocks are removed by the script.
 - For Lua and XML files, non-matching gated blocks are commented out by the script to keep line numbers more stable for bug reports.
 - If the user asks to make or update a beta changelog, keep the beta section in `CHANGELOG.md` wrapped in `<!--@eqol-beta@-->` and `<!--@end-eqol-beta@-->`.
+- Do not edit or regenerate `EnhanceQoL/GeneratedChangelog.lua` during normal development. GitHub generates that file during packaging; local changelog work must update only `CHANGELOG.md`.
 - If the user asks to prepare a release changelog while a beta changelog should remain available, keep the beta-gated section separate and place the release section below it, outside the beta gate.
 - Do not merge beta-only changelog entries into a release section unless the user explicitly says those beta items are shipping in that release.
 - Alpha changelog entries may be technical and specific because they document early prerelease iteration.
