@@ -9202,6 +9202,7 @@ function GF:LayoutAuras(self)
 			style.countFontOutline = typeCfg.countFontOutline
 			style.cooldownFontSize = GF.ScaleContentValue(self, typeCfg.cooldownFontSize, cfg, 1)
 			style.cooldownFontOutline = typeCfg.cooldownFontOutline
+			style.durationTextProfile = typeCfg.durationTextProfile
 			if typeCfg.showStacks ~= nil then style.showStacks = typeCfg.showStacks end
 			style.countAnchor = typeCfg.countAnchor
 			style.countOffset = GF.ScaleOffset(typeCfg.countOffset, contentScale)
@@ -17225,6 +17226,26 @@ local function buildEditModeSettings(kind, editModeId)
 		if not (typeCfg and typeCfg.enabled == true) then return false end
 		if typeCfg.showCooldownText == nil then return def.showCooldownText ~= false end
 		return typeCfg.showCooldownText ~= false
+	end
+	local function normalizeDurationTextProfile(value, fallback)
+		local durationText = addon.DurationText
+		if durationText and durationText.GetProfileKey then return durationText:GetProfileKey(value or fallback) end
+		return type(value) == "string" and value ~= "" and value or fallback or "MINIMAL"
+	end
+	local function getAuraDurationTextProfile(typeKey)
+		local typeCfg, def = getAuraTypeConfig(typeKey)
+		return normalizeDurationTextProfile(typeCfg and typeCfg.durationTextProfile, def and def.durationTextProfile or "MINIMAL")
+	end
+	local function setAuraDurationTextProfile(typeKey, value, editModeField)
+		local cfg = getCfg(kind)
+		if not cfg then return end
+		local ac = ensureAuraConfig(cfg)
+		ac[typeKey].durationTextProfile = normalizeDurationTextProfile(value, "MINIMAL")
+		if EditMode and EditMode.SetValue and editModeField then EditMode:SetValue(editModeId, editModeField, ac[typeKey].durationTextProfile, nil, true) end
+		GF:ApplyHeaderAttributes(kind)
+	end
+	local function durationTextProfileOptions()
+		return addon.DurationText and addon.DurationText.GetProfileOptions and addon.DurationText:GetProfileOptions() or {}
 	end
 	local function isAuraStackTextEnabled(typeKey)
 		local typeCfg, def = getAuraTypeConfig(typeKey)
@@ -26593,6 +26614,21 @@ local function buildEditModeSettings(kind, editModeId)
 			end,
 		},
 		{
+			name = L["durationTextProfile"] or "Duration text profile",
+			kind = SettingType.Dropdown,
+			field = "buffDurationTextProfile",
+			parentId = "buffs",
+			height = 180,
+			get = function() return getAuraDurationTextProfile("buff") end,
+			set = function(_, value) setAuraDurationTextProfile("buff", value, "buffDurationTextProfile") end,
+			generator = function(_, root)
+				for _, option in ipairs(durationTextProfileOptions()) do
+					root:CreateRadio(option.label, function() return getAuraDurationTextProfile("buff") == option.value end, function() setAuraDurationTextProfile("buff", option.value, "buffDurationTextProfile") end)
+				end
+			end,
+			isEnabled = function() return isAuraCooldownTextEnabled("buff") end,
+		},
+		{
 			name = L["Cooldown text anchor"] or "Cooldown text anchor",
 			kind = SettingType.Dropdown,
 			field = "buffCooldownTextAnchor",
@@ -27401,6 +27437,21 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "debuffCooldownTextEnabled", ac.debuff.showCooldownText, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+		},
+		{
+			name = L["durationTextProfile"] or "Duration text profile",
+			kind = SettingType.Dropdown,
+			field = "debuffDurationTextProfile",
+			parentId = "debuffs",
+			height = 180,
+			get = function() return getAuraDurationTextProfile("debuff") end,
+			set = function(_, value) setAuraDurationTextProfile("debuff", value, "debuffDurationTextProfile") end,
+			generator = function(_, root)
+				for _, option in ipairs(durationTextProfileOptions()) do
+					root:CreateRadio(option.label, function() return getAuraDurationTextProfile("debuff") == option.value end, function() setAuraDurationTextProfile("debuff", option.value, "debuffDurationTextProfile") end)
+				end
+			end,
+			isEnabled = function() return isAuraCooldownTextEnabled("debuff") end,
 		},
 		{
 			name = L["Cooldown text anchor"] or "Cooldown text anchor",
@@ -28275,6 +28326,21 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "externalCooldownTextEnabled", ac.externals.showCooldownText, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+		},
+		{
+			name = L["durationTextProfile"] or "Duration text profile",
+			kind = SettingType.Dropdown,
+			field = "externalDurationTextProfile",
+			parentId = "externals",
+			height = 180,
+			get = function() return getAuraDurationTextProfile("externals") end,
+			set = function(_, value) setAuraDurationTextProfile("externals", value, "externalDurationTextProfile") end,
+			generator = function(_, root)
+				for _, option in ipairs(durationTextProfileOptions()) do
+					root:CreateRadio(option.label, function() return getAuraDurationTextProfile("externals") == option.value end, function() setAuraDurationTextProfile("externals", option.value, "externalDurationTextProfile") end)
+				end
+			end,
+			isEnabled = function() return isAuraCooldownTextEnabled("externals") end,
 		},
 		{
 			name = L["Cooldown text anchor"] or "Cooldown text anchor",
@@ -31129,6 +31195,7 @@ local function applyEditModeData(kind, data)
 	if data.buffCooldownTextSize ~= nil then ac.buff.cooldownFontSize = data.buffCooldownTextSize end
 	if data.buffCooldownTextFont ~= nil then ac.buff.cooldownFont = data.buffCooldownTextFont end
 	if data.buffCooldownTextOutline ~= nil then ac.buff.cooldownFontOutline = data.buffCooldownTextOutline end
+	if data.buffDurationTextProfile ~= nil then ac.buff.durationTextProfile = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(data.buffDurationTextProfile) or data.buffDurationTextProfile end
 	if data.buffStackTextEnabled ~= nil then ac.buff.showStacks = data.buffStackTextEnabled and true or false end
 	if data.buffStackAnchor ~= nil then ac.buff.countAnchor = data.buffStackAnchor end
 	if data.buffStackOffsetX ~= nil or data.buffStackOffsetY ~= nil then
@@ -31177,6 +31244,7 @@ local function applyEditModeData(kind, data)
 	if data.debuffCooldownTextSize ~= nil then ac.debuff.cooldownFontSize = data.debuffCooldownTextSize end
 	if data.debuffCooldownTextFont ~= nil then ac.debuff.cooldownFont = data.debuffCooldownTextFont end
 	if data.debuffCooldownTextOutline ~= nil then ac.debuff.cooldownFontOutline = data.debuffCooldownTextOutline end
+	if data.debuffDurationTextProfile ~= nil then ac.debuff.durationTextProfile = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(data.debuffDurationTextProfile) or data.debuffDurationTextProfile end
 	if data.debuffStackTextEnabled ~= nil then ac.debuff.showStacks = data.debuffStackTextEnabled and true or false end
 	if data.debuffStackAnchor ~= nil then ac.debuff.countAnchor = data.debuffStackAnchor end
 	if data.debuffStackOffsetX ~= nil or data.debuffStackOffsetY ~= nil then
@@ -31228,6 +31296,7 @@ local function applyEditModeData(kind, data)
 	if data.externalCooldownTextSize ~= nil then ac.externals.cooldownFontSize = data.externalCooldownTextSize end
 	if data.externalCooldownTextFont ~= nil then ac.externals.cooldownFont = data.externalCooldownTextFont end
 	if data.externalCooldownTextOutline ~= nil then ac.externals.cooldownFontOutline = data.externalCooldownTextOutline end
+	if data.externalDurationTextProfile ~= nil then ac.externals.durationTextProfile = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(data.externalDurationTextProfile) or data.externalDurationTextProfile end
 	if data.externalStackTextEnabled ~= nil then ac.externals.showStacks = data.externalStackTextEnabled and true or false end
 	if data.externalStackAnchor ~= nil then ac.externals.countAnchor = data.externalStackAnchor end
 	if data.externalStackOffsetX ~= nil or data.externalStackOffsetY ~= nil then
@@ -31991,6 +32060,7 @@ function GF:EnsureEditMode()
 				buffCooldownTextSize = ac.buff.cooldownFontSize or defBuff.cooldownFontSize or 12,
 				buffCooldownTextFont = ac.buff.cooldownFont or defBuff.cooldownFont or nil,
 				buffCooldownTextOutline = ac.buff.cooldownFontOutline or defBuff.cooldownFontOutline or "OUTLINE",
+				buffDurationTextProfile = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(ac.buff.durationTextProfile or defBuff.durationTextProfile) or (ac.buff.durationTextProfile or defBuff.durationTextProfile or "MINIMAL"),
 				buffStackTextEnabled = (ac.buff.showStacks ~= nil and ac.buff.showStacks ~= false) or (ac.buff.showStacks == nil and defBuff.showStacks ~= false),
 				buffStackAnchor = ac.buff.countAnchor or defBuff.countAnchor or "BOTTOMRIGHT",
 				buffStackOffsetX = (ac.buff.countOffset and ac.buff.countOffset.x) or (defBuff.countOffset and defBuff.countOffset.x) or -2,
@@ -32024,6 +32094,7 @@ function GF:EnsureEditMode()
 				debuffCooldownTextSize = ac.debuff.cooldownFontSize or defDebuff.cooldownFontSize or 12,
 				debuffCooldownTextFont = ac.debuff.cooldownFont or defDebuff.cooldownFont or nil,
 				debuffCooldownTextOutline = ac.debuff.cooldownFontOutline or defDebuff.cooldownFontOutline or "OUTLINE",
+				debuffDurationTextProfile = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(ac.debuff.durationTextProfile or defDebuff.durationTextProfile) or (ac.debuff.durationTextProfile or defDebuff.durationTextProfile or "MINIMAL"),
 				debuffStackTextEnabled = (ac.debuff.showStacks ~= nil and ac.debuff.showStacks ~= false) or (ac.debuff.showStacks == nil and defDebuff.showStacks ~= false),
 				debuffStackAnchor = ac.debuff.countAnchor or defDebuff.countAnchor or "BOTTOMRIGHT",
 				debuffStackOffsetX = (ac.debuff.countOffset and ac.debuff.countOffset.x) or (defDebuff.countOffset and defDebuff.countOffset.x) or -2,
@@ -32061,6 +32132,7 @@ function GF:EnsureEditMode()
 				externalCooldownTextSize = ac.externals.cooldownFontSize or defExt.cooldownFontSize or 12,
 				externalCooldownTextFont = ac.externals.cooldownFont or defExt.cooldownFont or nil,
 				externalCooldownTextOutline = ac.externals.cooldownFontOutline or defExt.cooldownFontOutline or "OUTLINE",
+				externalDurationTextProfile = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(ac.externals.durationTextProfile or defExt.durationTextProfile) or (ac.externals.durationTextProfile or defExt.durationTextProfile or "MINIMAL"),
 				externalStackTextEnabled = (ac.externals.showStacks ~= nil and ac.externals.showStacks ~= false) or (ac.externals.showStacks == nil and defExt.showStacks ~= false),
 				externalStackAnchor = ac.externals.countAnchor or defExt.countAnchor or "BOTTOMRIGHT",
 				externalStackOffsetX = (ac.externals.countOffset and ac.externals.countOffset.x) or (defExt.countOffset and defExt.countOffset.x) or -2,

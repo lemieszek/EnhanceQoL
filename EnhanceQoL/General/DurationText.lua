@@ -214,9 +214,13 @@ local function getUsageLabel(path, key)
 	if path:find("^cooldownPanels%.panels%.[^%.]+%.entries%.") then return "durationTextUsageCooldownPanelEntries" end
 	if path:find("^cooldownPanels%.panels%.") and key == "durationTextProfile" then return "durationTextUsageCooldownPanelDefaults" end
 	if path:find("^cooldownPanels%.panels%.") and key == "barDurationTextProfile" then return "durationTextUsageCooldownPanelDefaults" end
+	if key == "skinnerDefaultAuraDurationTextProfile" or key == "skinnerDefaultDebuffAuraDurationTextProfile" then return "durationTextUsageDefaultAuraContainers" end
+	if key == "mythicPlusBRTrackerDurationTextProfile" then return "durationTextUsageBRTracker" end
+	if key == "mythicPlusBloodlustTrackerDurationTextProfile" then return "durationTextUsageBloodlustTracker" end
 	if path:find("^personalResourceBarSettings") then return "durationTextUsageResourceBarsPersonal" end
 	if path:find("^globalResourceBarSettings") then return "durationTextUsageResourceBarsGlobal" end
 	if path:find("^sharedResourceBarSettings") then return "durationTextUsageResourceBarsShared" end
+	if path:find("%.auras%.") and key == "durationTextProfile" then return "durationTextUsageUnitFrameAuras" end
 	if key == "barDurationTextProfile" then return "durationTextUsageCooldownPanels" end
 	if key == "durationTextProfile" then return "durationTextUsageResourceBars" end
 	return path ~= "" and path or key
@@ -240,7 +244,16 @@ local function scanDurationTextProfileFields(root, profileKey, replacementKey, u
 		for key, value in pairs(tbl) do
 			if tbl == root and key == "durationText" then
 				-- The profile definitions themselves are not consumer references.
-			elseif (key == "barDurationTextProfile" or key == "durationTextProfile") and profileMatches(value, profileKey) then
+			elseif
+				(
+					key == "barDurationTextProfile"
+					or key == "durationTextProfile"
+					or key == "skinnerDefaultAuraDurationTextProfile"
+					or key == "skinnerDefaultDebuffAuraDurationTextProfile"
+					or key == "mythicPlusBRTrackerDurationTextProfile"
+					or key == "mythicPlusBloodlustTrackerDurationTextProfile"
+				) and profileMatches(value, profileKey)
+			then
 				addUsage(usages, getUsageLabel(path, key))
 				if replacementKey then
 					tbl[key] = replacementKey
@@ -529,6 +542,18 @@ function DurationText:RefreshConsumers()
 	if cooldownPanels and cooldownPanels.RefreshAllPanels then cooldownPanels:RefreshAllPanels(true) end
 	local resourceBars = aura and aura.ResourceBars or nil
 	if resourceBars and resourceBars.QueueRefresh then resourceBars.QueueRefresh(nil, { force = true, structural = true }) elseif resourceBars and resourceBars.Refresh then resourceBars.Refresh() end
+	local defaultAuras = addon.DefaultAuraContainers
+	if defaultAuras and defaultAuras.functions and defaultAuras.functions.RefreshDefaultAuraIconSkin then defaultAuras.functions.RefreshDefaultAuraIconSkin() end
+	local unitFrames = aura and aura.UF or nil
+	if unitFrames and unitFrames.Refresh then unitFrames.Refresh() end
+	local groupFrames = unitFrames and unitFrames.GroupFrames or nil
+	if groupFrames and groupFrames.RefreshChangedUnitButtons then groupFrames:RefreshChangedUnitButtons() end
+	local mythicPlus = addon.MythicPlus and addon.MythicPlus.functions
+	if mythicPlus then
+		if mythicPlus.createBRFrame then mythicPlus.createBRFrame() end
+		if mythicPlus.createBloodlustFrame then mythicPlus.createBloodlustFrame() end
+		if mythicPlus.refreshBloodlustTracker then mythicPlus.refreshBloodlustTracker(false) end
+	end
 end
 
 function DurationText:DeleteProfile(profileKey, replacementKey)

@@ -83,6 +83,7 @@ local DEFAULT_AURA_CONFIG_SUFFIXES = {
 	"DurationColor",
 	"DurationAnchor",
 	"DurationOffset",
+	"DurationTextProfile",
 	"CountEnabled",
 	"CountFontFace",
 	"CountFontOutline",
@@ -116,6 +117,12 @@ local DEFAULT_FONT = "Fonts\\FRIZQT__.TTF"
 local GLOBAL_FONT_KEY = "__EQOL_GLOBAL_FONT__"
 local GLOBAL_STYLE_KEY = "__EQOL_GLOBAL_FONT_STYLE__"
 local refreshDefaultAuraIconSkin
+
+local function normalizeDefaultAuraDurationTextProfile(value)
+	local durationText = addon.DurationText
+	if durationText and durationText.GetProfileKey then return durationText:GetProfileKey(value) end
+	return type(value) == "string" and value ~= "" and value or "MINIMAL"
+end
 
 local function normalizeAuraIconShape(value)
 	if addon.IconShape and addon.IconShape.Normalize then return addon.IconShape.Normalize(value, "DEFAULT") end
@@ -335,6 +342,15 @@ local function getDefaultAuraDrawSwipe(kind)
 	return getDefaultAuraDBValue(kind, "CooldownDrawSwipe") ~= false
 end
 
+local function getDefaultAuraDurationTextProfile(kind)
+	return normalizeDefaultAuraDurationTextProfile(getDefaultAuraDBValue(kind, "DurationTextProfile"))
+end
+
+local function applyDefaultAuraDurationTextProfile(button)
+	if not (button and button.Cooldown and addon.functions and addon.functions.ApplyDurationTextProfileToCooldownFrame) then return false end
+	return addon.functions.ApplyDurationTextProfileToCooldownFrame(button.Cooldown, getDefaultAuraDurationTextProfile(button.eqolDefaultAuraKind))
+end
+
 local function getDefaultAuraIconsPerRow(value, kind)
 	local perRow = tonumber(value)
 	if perRow == nil then perRow = tonumber(getDefaultAuraDBValue(kind, "IconsPerRow")) end
@@ -450,6 +466,7 @@ local function applyDefaultAuraTextStyle(button)
 		if button.Count and button.Count.SetParent then button.Count:SetParent(textLayer) end
 	end
 	local durationEnabled = getDefaultAuraDBValue(kind, "DurationEnabled") ~= false
+	applyDefaultAuraDurationTextProfile(button)
 	if button.Cooldown and button.Cooldown.SetHideCountdownNumbers then button.Cooldown:SetHideCountdownNumbers(not durationEnabled) end
 	local internalCooldownText = button.Cooldown and button.Cooldown.GetCountdownFontString and button.Cooldown:GetCountdownFontString()
 	if internalCooldownText then
@@ -619,7 +636,7 @@ local function applyDefaultAuraButtonStyle(button, force)
 	local borderKey = normalizeAuraBorder(getDefaultAuraDBValue(kind, "BorderTexture"), shape)
 	local color = resolveDefaultAuraBorderColor(button, kind)
 	local hasCustomBorder = not isNoAuraBorder(borderKey)
-	local styleKey = tostring(kind) .. ":" .. tostring(size) .. ":" .. tostring(shape) .. ":" .. tostring(zoom) .. ":" .. tostring(borderKey) .. ":" .. tostring(getDefaultAuraBorderSize(nil, kind)) .. ":" .. tostring(getDefaultAuraBorderOffset(nil, kind)) .. ":" .. tostring(getDefaultAuraDrawSwipe(kind)) .. ":" .. tostring(color.r) .. ":" .. tostring(color.g) .. ":" .. tostring(color.b) .. ":" .. tostring(color.a)
+	local styleKey = tostring(kind) .. ":" .. tostring(size) .. ":" .. tostring(shape) .. ":" .. tostring(zoom) .. ":" .. tostring(borderKey) .. ":" .. tostring(getDefaultAuraBorderSize(nil, kind)) .. ":" .. tostring(getDefaultAuraBorderOffset(nil, kind)) .. ":" .. tostring(getDefaultAuraDrawSwipe(kind)) .. ":" .. tostring(getDefaultAuraDurationTextProfile(kind)) .. ":" .. tostring(addon.DurationText and addon.DurationText.version or 0) .. ":" .. tostring(color.r) .. ":" .. tostring(color.g) .. ":" .. tostring(color.b) .. ":" .. tostring(color.a)
 	if not force and button.eqolDefaultAuraStyleKey == styleKey then return end
 	button.eqolDefaultAuraStyleKey = styleKey
 
@@ -1090,6 +1107,8 @@ local function applyDefaultAuraEditModeSetting(kind, field, value)
 		if type(offset) ~= "table" then offset = {} end
 		offset.y = getAuraTextOffset(nil, nil, tonumber(value) or -1)
 		setDefaultAuraDBValue(kind, "DurationOffset", offset)
+	elseif field == "durationTextProfile" then
+		setDefaultAuraDBValue(kind, "DurationTextProfile", normalizeDefaultAuraDurationTextProfile(value))
 	elseif field == "countEnabled" then
 		setDefaultAuraDBValue(kind, "CountEnabled", value == true)
 	elseif field == "countFont" then
@@ -1286,6 +1305,9 @@ local function createDefaultAuraEditModeSettings(kind)
 		},
 		{ name = L["Cooldown text"] or "Cooldown text", kind = SettingType.Collapsible, id = durationSectionId, defaultCollapsed = true },
 		checkbox(L["Show cooldown text"] or "Show cooldown text", durationEnabled, function(value) applyDefaultAuraEditModeSetting(kind, "durationEnabled", value) end, nil, durationSectionId),
+		dropdown(L["durationTextProfile"] or "Duration text profile", function() return getDefaultAuraDurationTextProfile(kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "durationTextProfile", value) end, function()
+			return addon.DurationText and addon.DurationText.GetProfileOptions and addon.DurationText:GetProfileOptions() or {}
+		end, 180, durationEnabled, durationSectionId),
 		dropdown(L["Font"] or "Font", function() return normalizeAuraFontKey(getDefaultAuraDBValue(kind, "DurationFontFace")) end, function(value) applyDefaultAuraEditModeSetting(kind, "durationFont", value) end, buildAuraFontOptions, 220, durationEnabled, durationSectionId),
 		dropdown(L["Font outline"] or "Font outline", function() return normalizeAuraFontStyle(getDefaultAuraDBValue(kind, "DurationFontOutline")) end, function(value) applyDefaultAuraEditModeSetting(kind, "durationOutline", value) end, buildAuraFontStyleOptions, 220, durationEnabled, durationSectionId),
 		slider(_G.FONT_SIZE or "Font size", function() return getAuraTextSize(nil, tonumber(getDefaultAuraDBValue(kind, "DurationFontSize")) or 10) end, function(value) applyDefaultAuraEditModeSetting(kind, "durationSize", value) end, 6, 64, 1, durationEnabled, durationSectionId),
@@ -1511,6 +1533,7 @@ function DAC.functions.InitDB()
 	})
 	init("skinnerDefaultAuraDurationAnchor", "BOTTOM")
 	init("skinnerDefaultAuraDurationOffset", { x = 0, y = -1 })
+	init("skinnerDefaultAuraDurationTextProfile", "MINIMAL")
 	init("skinnerDefaultAuraCountEnabled", true)
 	init("skinnerDefaultAuraCountFontFace", getGlobalFontKey())
 	init("skinnerDefaultAuraCountFontOutline", getGlobalStyleKey())

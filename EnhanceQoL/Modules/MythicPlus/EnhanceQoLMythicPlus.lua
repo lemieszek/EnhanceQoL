@@ -180,6 +180,25 @@ local function trackerAnchorUsesUIParent(target)
 	return target == nil or target == "" or target == "UIParent"
 end
 
+function addon.MythicPlus.functions.NormalizeTrackerDurationTextProfile(value)
+	local durationText = addon.DurationText
+	if durationText and durationText.GetProfileKey then return durationText:GetProfileKey(value) end
+	return type(value) == "string" and value ~= "" and value or "MINIMAL"
+end
+
+function addon.MythicPlus.functions.GetTrackerDurationTextProfile(settingKey)
+	return addon.MythicPlus.functions.NormalizeTrackerDurationTextProfile(addon.db and addon.db[settingKey])
+end
+
+function addon.MythicPlus.functions.ApplyTrackerDurationTextProfile(cooldown, settingKey)
+	if not (cooldown and addon.functions and addon.functions.ApplyDurationTextProfileToCooldownFrame) then return false end
+	return addon.functions.ApplyDurationTextProfileToCooldownFrame(cooldown, addon.MythicPlus.functions.GetTrackerDurationTextProfile(settingKey))
+end
+
+function addon.MythicPlus.functions.GetDurationTextProfileOptions()
+	return addon.DurationText and addon.DurationText.GetProfileOptions and addon.DurationText:GetProfileOptions() or {}
+end
+
 local function getTrackerAnchorDefaults(target)
 	if SharedAnchors and SharedAnchors.GetDefaultAnchorData then return SharedAnchors:GetDefaultAnchorData(target) end
 	return {
@@ -647,6 +666,7 @@ local function applyBRLiveCooldownTextStyle(deferIfMissing)
 	local db = addon.db or {}
 	local enabled = db["mythicPlusBRTrackerCooldownTextEnabled"] ~= false
 	local cooldown = brButton.cooldownFrame
+	addon.MythicPlus.functions.ApplyTrackerDurationTextProfile(cooldown, "mythicPlusBRTrackerDurationTextProfile")
 	if cooldown.SetHideCountdownNumbers then cooldown:SetHideCountdownNumbers(not enabled) end
 
 	local fontString = cooldown.GetCountdownFontString and cooldown:GetCountdownFontString()
@@ -666,6 +686,7 @@ local function applyBRLiveCooldownTextStyle(deferIfMissing)
 			brCooldownDeferredApplyPending = false
 			if not (brButton and brButton.cooldownFrame) then return end
 			local deferredCooldown = brButton.cooldownFrame
+			addon.MythicPlus.functions.ApplyTrackerDurationTextProfile(deferredCooldown, "mythicPlusBRTrackerDurationTextProfile")
 			if deferredCooldown.SetHideCountdownNumbers then deferredCooldown:SetHideCountdownNumbers(not (addon.db and addon.db["mythicPlusBRTrackerCooldownTextEnabled"] ~= false)) end
 			local deferredFontString = deferredCooldown.GetCountdownFontString and deferredCooldown:GetCountdownFontString()
 			if not deferredFontString then return end
@@ -1401,6 +1422,26 @@ local function ensureBRAnchor()
 						if addon.db then addon.db["mythicPlusBRTrackerCooldownTextEnabled"] = value == true end
 						applyBRCooldownVisualSettings()
 					end,
+				},
+				{
+					name = L["durationTextProfile"] or "Duration text profile",
+					kind = settingType.Dropdown,
+					parentId = "mythicPlusBRTrackerCooldown",
+					height = 180,
+					get = function() return addon.MythicPlus.functions.GetTrackerDurationTextProfile("mythicPlusBRTrackerDurationTextProfile") end,
+					set = function(_, value)
+						if addon.db then addon.db["mythicPlusBRTrackerDurationTextProfile"] = addon.MythicPlus.functions.NormalizeTrackerDurationTextProfile(value) end
+						applyBRCooldownVisualSettings()
+					end,
+					generator = function(_, root)
+						for _, option in ipairs(addon.MythicPlus.functions.GetDurationTextProfileOptions()) do
+							root:CreateRadio(option.label, function() return addon.MythicPlus.functions.GetTrackerDurationTextProfile("mythicPlusBRTrackerDurationTextProfile") == option.value end, function()
+								if addon.db then addon.db["mythicPlusBRTrackerDurationTextProfile"] = option.value end
+								applyBRCooldownVisualSettings()
+							end)
+						end
+					end,
+					isEnabled = function() return addon.db and addon.db["mythicPlusBRTrackerCooldownTextEnabled"] ~= false end,
 				},
 				{
 					name = L["Draw cooldown swipe"] or "Draw cooldown swipe",
@@ -2156,6 +2197,7 @@ end
 local function applyBloodlustLiveCooldownTextStyle(deferIfMissing)
 	if not (bloodlustButton and bloodlustButton.cooldownFrame) then return false end
 	local cooldown = bloodlustButton.cooldownFrame
+	addon.MythicPlus.functions.ApplyTrackerDurationTextProfile(cooldown, "mythicPlusBloodlustTrackerDurationTextProfile")
 	local fontString = cooldown.GetCountdownFontString and cooldown:GetCountdownFontString()
 	if fontString then
 		applyBloodlustCooldownTextStyle(fontString, cooldown, addon.db or {})
@@ -2168,6 +2210,7 @@ local function applyBloodlustLiveCooldownTextStyle(deferIfMissing)
 			bloodlustCooldownDeferredApplyPending = false
 			if not (bloodlustButton and bloodlustButton.cooldownFrame) then return end
 			local deferredCooldown = bloodlustButton.cooldownFrame
+			addon.MythicPlus.functions.ApplyTrackerDurationTextProfile(deferredCooldown, "mythicPlusBloodlustTrackerDurationTextProfile")
 			local deferredFontString = deferredCooldown.GetCountdownFontString and deferredCooldown:GetCountdownFontString()
 			if deferredFontString then applyBloodlustCooldownTextStyle(deferredFontString, deferredCooldown, addon.db or {}) end
 		end)
@@ -3044,6 +3087,27 @@ local function ensureBloodlustAnchor()
 					name = "",
 					kind = settingType.Divider,
 					parentId = "mythicPlusBloodlustTrackerCooldown",
+				},
+				{
+					name = L["durationTextProfile"] or "Duration text profile",
+					kind = settingType.Dropdown,
+					parentId = "mythicPlusBloodlustTrackerCooldown",
+					height = 180,
+					get = function() return addon.MythicPlus.functions.GetTrackerDurationTextProfile("mythicPlusBloodlustTrackerDurationTextProfile") end,
+					set = function(_, value)
+						if addon.db then addon.db["mythicPlusBloodlustTrackerDurationTextProfile"] = addon.MythicPlus.functions.NormalizeTrackerDurationTextProfile(value) end
+						applyBloodlustCooldownVisualSettings()
+						if addon.MythicPlus and addon.MythicPlus.functions and addon.MythicPlus.functions.refreshBloodlustTracker then addon.MythicPlus.functions.refreshBloodlustTracker(false) end
+					end,
+					generator = function(_, root)
+						for _, option in ipairs(addon.MythicPlus.functions.GetDurationTextProfileOptions()) do
+							root:CreateRadio(option.label, function() return addon.MythicPlus.functions.GetTrackerDurationTextProfile("mythicPlusBloodlustTrackerDurationTextProfile") == option.value end, function()
+								if addon.db then addon.db["mythicPlusBloodlustTrackerDurationTextProfile"] = option.value end
+								applyBloodlustCooldownVisualSettings()
+								if addon.MythicPlus and addon.MythicPlus.functions and addon.MythicPlus.functions.refreshBloodlustTracker then addon.MythicPlus.functions.refreshBloodlustTracker(false) end
+							end)
+						end
+					end,
 				},
 				{
 					name = L["Cooldown font"] or "Cooldown font",

@@ -9,6 +9,7 @@
 - Health Macro: Added an option to place `/stopcasting` before the generated health macro actions.
 - Map & Minimap / Waypoint: Added an optional enhanced in-world waypoint with destination label, clearer tracked icons, highlight toggle, and scale control.
 - Unit Frames / Boss Frames: Added left and right growth directions for horizontal boss frame layouts.
+- Duration Text: Added profile selection for buff/debuff containers, Unit Frame aura cooldowns, Group Frame aura cooldowns, and Mythic Plus Bloodlust/Battle Resurrection trackers.
 
 ### 🐛 Fixed
 

@@ -2335,7 +2335,21 @@ AuraUtil._LEGACY_AURA_SECTION_EXCLUDES = {
 	cooldownFontSize = true,
 	cooldownFontSizeBuff = true,
 	cooldownFontSizeDebuff = true,
+	durationTextProfile = true,
+	durationTextProfileBuff = true,
+	durationTextProfileDebuff = true,
 }
+
+function AuraUtil.NormalizeDurationTextProfile(value, fallback)
+	local durationText = addon.DurationText
+	if durationText and durationText.GetProfileKey then return durationText:GetProfileKey(value or fallback) end
+	return type(value) == "string" and value ~= "" and value or fallback or "MINIMAL"
+end
+
+function AuraUtil.ApplyDurationTextProfileToCooldownFrame(cooldown, profileKey)
+	if not (cooldown and addon.functions and addon.functions.ApplyDurationTextProfileToCooldownFrame) then return false end
+	return addon.functions.ApplyDurationTextProfileToCooldownFrame(cooldown, AuraUtil.NormalizeDurationTextProfile(profileKey, "MINIMAL"))
+end
 
 function AuraUtil.buildLegacyAuraSection(src, isDebuff)
 	local section = {}
@@ -2383,6 +2397,10 @@ function AuraUtil.buildLegacyAuraSection(src, isDebuff)
 	local cooldownFontSize = isDebuff and src.cooldownFontSizeDebuff or src.cooldownFontSizeBuff
 	if cooldownFontSize == nil then cooldownFontSize = src.cooldownFontSize end
 	if cooldownFontSize ~= nil then section.cooldownFontSize = cooldownFontSize end
+
+	local durationTextProfile = isDebuff and src.durationTextProfileDebuff or src.durationTextProfileBuff
+	if durationTextProfile == nil then durationTextProfile = src.durationTextProfile end
+	if durationTextProfile ~= nil then section.durationTextProfile = AuraUtil.NormalizeDurationTextProfile(durationTextProfile, "MINIMAL") end
 
 	local anchor = src.anchor
 	local growth = src.growth
@@ -4328,6 +4346,8 @@ function AuraUtil.getAuraButtonStyleKey(ac)
 		tostring(ac.cooldownFont),
 		tostring(ac.cooldownFontSize),
 		tostring(ac.cooldownFontOutline),
+		tostring(ac.durationTextProfile),
+		tostring(addon.DurationText and addon.DurationText.version or 0),
 		tostring(ac.iconShape),
 		tostring(ac.borderTexture),
 		tostring(ac.borderRenderMode),
@@ -4401,6 +4421,7 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 	btn.icon:SetTexture(aura.icon or "")
 	AuraUtil.ApplyIconShape(btn, ac and ac.iconShape, ac and ac.iconZoom)
 	btn.cd:Clear()
+	AuraUtil.ApplyDurationTextProfileToCooldownFrame(btn.cd, ac and ac.durationTextProfile)
 	local drawCooldownEdge = ac.showCooldownEdge ~= false
 	local drawCooldownSwipe = ac.showCooldownSwipe ~= false
 	local drawCooldownBling = ac.showCooldownBling ~= false

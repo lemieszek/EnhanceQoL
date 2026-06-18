@@ -99,6 +99,15 @@ local function syncEditModeSelectionStrata(frame)
 	if selection.GetFrameStrata and selection:GetFrameStrata() ~= targetStrata then selection:SetFrameStrata(targetStrata) end
 end
 
+local function normalizeDurationTextProfile(value)
+	if addon.DurationText and addon.DurationText.GetProfileKey then return addon.DurationText:GetProfileKey(value) end
+	return type(value) == "string" and value ~= "" and value or "MINIMAL"
+end
+
+local function durationTextProfileOptions()
+	return addon.DurationText and addon.DurationText.GetProfileOptions and addon.DurationText:GetProfileOptions() or {}
+end
+
 local textOptions = {
 	{ value = "PERCENT", label = L["Percent"] or "Percent" },
 	{ value = "CURMAX", label = L["Current/Max"] or "Current/Max" },
@@ -1077,6 +1086,20 @@ local function appendUnitAuraSettings(list, unit, def, refreshSelf)
 			refreshAuras()
 		end, auraDef.showCooldown ~= false, parentId)
 		list[#list].isEnabled = isSectionEnabled
+
+		list[#list + 1] = checkboxDropdown(
+			L["durationTextProfile"] or "Duration text profile",
+			durationTextProfileOptions,
+			function() return normalizeDurationTextProfile(getAuraSectionValue(sectionKey, { "durationTextProfile" }, auraDef.durationTextProfile or "MINIMAL")) end,
+			function(val)
+				setAuraSectionValue(sectionKey, { "durationTextProfile" }, normalizeDurationTextProfile(val))
+				refreshSelf()
+				refreshAuras()
+			end,
+			auraDef.durationTextProfile or "MINIMAL",
+			parentId
+		)
+		list[#list].isEnabled = function() return isSectionEnabled() and isShowCooldownText() end
 
 		list[#list + 1] = radioDropdown(
 			L["Cooldown text anchor"] or "Cooldown text anchor",

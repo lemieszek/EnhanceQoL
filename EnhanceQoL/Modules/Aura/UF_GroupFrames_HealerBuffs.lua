@@ -1935,6 +1935,7 @@ local function getAuraStyleForGroup(state, cfg, group)
 		or styleCache._cfgCooldownFont ~= ac.cooldownFont
 		or styleCache._cfgCooldownFontSize ~= cooldownFontSize
 		or styleCache._cfgCooldownFontOutline ~= ac.cooldownFontOutline
+		or styleCache._cfgDurationTextProfile ~= ac.durationTextProfile
 		or styleCache._cfgCountAnchor ~= ac.countAnchor
 		or styleCache._cfgCountOffsetX ~= countOffsetX
 		or styleCache._cfgCountOffsetY ~= countOffsetY
@@ -1956,6 +1957,7 @@ local function getAuraStyleForGroup(state, cfg, group)
 	styleCache._cfgCooldownOffsetX = cooldownOffsetX
 	styleCache._cfgCooldownOffsetY = cooldownOffsetY
 	styleCache._cfgCooldownFont = ac.cooldownFont
+	styleCache._cfgDurationTextProfile = ac.durationTextProfile
 	if group.cooldownTextSize ~= nil then
 		styleCache._cfgCooldownFontSize = group.cooldownTextSize
 	else
@@ -1986,6 +1988,7 @@ local function getAuraStyleForGroup(state, cfg, group)
 	styleCache.cooldownFont = ac.cooldownFont
 	styleCache.cooldownFontSize = cooldownFontSize
 	styleCache.cooldownFontOutline = ac.cooldownFontOutline
+	styleCache.durationTextProfile = ac.durationTextProfile
 	styleCache.countAnchor = ac.countAnchor
 	styleCache.countOffset = ac.countOffset
 	styleCache.countFont = ac.countFont
