@@ -10,6 +10,10 @@
 - Minimap / Button Sink: Added an option to hide the Button Sink toggle itself while still collecting minimap buttons.
 - Unit Frames / Group Frames: Added an optional custom background color for dead or ghost party and raid units.
 
+### 🐛 Fixed
+
+- Cooldown Panels / Keybinds: Fixed keybind text resolution so duplicated spells, macros, and secondary action bar slots no longer inherit unrelated main action bar bindings.
+
 ---
 
 ## [11.4.0-beta1] - 2026-06-17

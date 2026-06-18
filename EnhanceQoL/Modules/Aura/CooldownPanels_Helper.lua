@@ -2992,14 +2992,6 @@ local function getBindingTextForActionSlot(slot)
 	local map = getActionButtonSlotMap()
 	local text = map and getBindingTextForButton(map[slot])
 	if text then return text end
-	if GetBindingKey then
-		local buttons = NUM_ACTIONBAR_BUTTONS or 12
-		local index = ((slot - 1) % buttons) + 1
-		local key = GetBindingKey("ACTIONBUTTON" .. index)
-		text = key and GetBindingText and GetBindingText(key, 1)
-		text = normalizeBindingText(text)
-		return text
-	end
 	return nil
 end
 
@@ -3042,12 +3034,7 @@ end
 local function addSpellBindingLookup(lookup, spellId, keyText)
 	spellId = tonumber(spellId)
 	if not (lookup and lookup.spell and spellId and keyText) then return end
-	local current = lookup.spell[spellId]
-	if current == nil then
-		lookup.spell[spellId] = keyText
-	elseif current ~= keyText then
-		lookup.spell[spellId] = false
-	end
+	if lookup.spell[spellId] == nil then lookup.spell[spellId] = keyText end
 end
 
 local function getLookupSpellBindingText(lookup, spellId)
@@ -3072,18 +3059,23 @@ local function buildKeybindLookup()
 		macroName = {},
 	}
 	local getMacroItem = GetMacroItem
+	local getMacroSpell = Api.GetMacroSpell
+	local getActionText = Api.GetActionText or GetActionText
+
+	local function addMacroSpellBinding(macroRef, keyText)
+		if not (getMacroSpell and macroRef and keyText) then return end
+		local macroSpell = getMacroSpell(macroRef)
+		local macroSpellId = tonumber(macroSpell)
+		if macroSpellId then
+			addSpellBindingLookup(lookup, macroSpellId, keyText)
+			addSpellBindingLookup(lookup, getEffectiveSpellId(macroSpellId), keyText)
+		end
+	end
 
 	eachActionButton(function(button)
 		local slot = getButtonActionSlot(button)
 		if not slot then return end
 		local keyText = getBindingTextForButton(button)
-		if not keyText and GetBindingKey then
-			local buttons = NUM_ACTIONBAR_BUTTONS or 12
-			local index = ((slot - 1) % buttons) + 1
-			local key = GetBindingKey("ACTIONBUTTON" .. index)
-			keyText = key and GetBindingText and GetBindingText(key, 1)
-			keyText = normalizeBindingText(keyText)
-		end
 		if not (keyText and GetActionInfo) then return end
 		local actionType, actionId = GetActionInfo(slot)
 		if actionType == "spell" and actionId then
@@ -3100,13 +3092,10 @@ local function buildKeybindLookup()
 				local macroName = GetMacroInfo(actionId)
 				if type(macroName) == "string" and macroName ~= "" and not lookup.macroName[macroName] then lookup.macroName[macroName] = keyText end
 			end
-			if Api.GetMacroSpell then
-				local macroSpell = Api.GetMacroSpell(actionId)
-				local macroSpellId = tonumber(macroSpell)
-				if macroSpellId then
-					addSpellBindingLookup(lookup, macroSpellId, keyText)
-					addSpellBindingLookup(lookup, getEffectiveSpellId(macroSpellId), keyText)
-				end
+			addMacroSpellBinding(actionId, keyText)
+			if getActionText then
+				local macroName = getActionText(slot)
+				if type(macroName) == "string" and macroName ~= "" then addMacroSpellBinding(macroName, keyText) end
 			end
 			if getMacroItem then
 				local macroItem = getMacroItem(actionId)
