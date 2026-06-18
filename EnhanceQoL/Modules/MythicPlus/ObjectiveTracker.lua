@@ -30,7 +30,7 @@ local OBJECTIVE_TRACKER_SCOPE_GROUPS = {
 	{ key = "raidLfr", difficulties = { 7, 17, 151 } },
 	{ key = "raidNormal", difficulties = { 3, 4, 9, 14, 18, 220 } },
 	{ key = "raidHeroic", difficulties = { 5, 6, 15 } },
-	{ key = "raidMythic", difficulties = { 16 } },
+	{ key = "raidMythic", difficulties = { 16, 233 } },
 	{ key = "raidTimewalking", difficulties = { 33 } },
 	{ key = "scenarioDelve", difficulties = { 11, 12, 20, 30, 38, 39, 40, 147, 149, 152, 153, 167, 168, 169, 170, 171, 208 } },
 }

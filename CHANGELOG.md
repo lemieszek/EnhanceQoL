@@ -14,6 +14,14 @@
 
 ---
 
+## [11.3.1] - 2026-06-18
+
+### 🐛 Fixed
+
+- Raid Tracking: Recognized Mythic Flexible raids for Combat Resurrection, Bloodlust, Class Buff Reminder, Objective Tracker, and Auto Release difficulty checks.
+
+---
+
 ## [11.3.0] - 2026-06-17
 
 ### ✨ Added

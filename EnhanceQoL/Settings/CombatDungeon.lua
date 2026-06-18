@@ -3052,7 +3052,7 @@ local timeoutReleaseGroups = {
 		parentCheck = function() return rData.setting and rData.setting:GetValue() == true end,
 		element = rData.element,
 		parent = true,
-		difficulties = { 16 },
+		difficulties = { 16, 233 },
 	},
 	{
 		var = "timeoutRelease_dungeonNormal",
