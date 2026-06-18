@@ -1781,6 +1781,7 @@ local function ensureBRAnchor()
 				end
 			end,
 			settings = settings,
+			settingsMaxHeight = 700,
 			relativeTo = function() return resolveTrackerAnchorFrame(addon.db and addon.db["mythicPlusBRTrackerRelativeFrame"]) end,
 			allowDrag = function() return trackerAnchorUsesUIParent(addon.db and addon.db["mythicPlusBRTrackerRelativeFrame"]) end,
 			managePosition = false,
@@ -2210,6 +2211,7 @@ local function removeBloodlustFrame()
 	if bloodlustButton then
 		bloodlustCooldownDeferredApplyPending = false
 		stopBloodlustActiveGlow()
+		if addon.MythicPlus.functions.StopBloodlustGlowSample then addon.MythicPlus.functions.StopBloodlustGlowSample() end
 		bloodlustButton:Hide()
 		bloodlustButton:SetParent(nil)
 		bloodlustButton:SetScript("OnClick", nil)
@@ -3350,6 +3352,19 @@ local function ensureBloodlustAnchor()
 				end
 			end,
 			settings = settings,
+			settingsMaxHeight = 700,
+			buttons = {
+				{
+					text = L["Show sample"] or "Show sample",
+					layout = "compact",
+					click = function(button)
+						if addon.MythicPlus.functions.ToggleBloodlustGlowSample then addon.MythicPlus.functions.ToggleBloodlustGlowSample(button) end
+					end,
+				},
+			},
+			onExit = function()
+				if addon.MythicPlus.functions.StopBloodlustGlowSample then addon.MythicPlus.functions.StopBloodlustGlowSample() end
+			end,
 			relativeTo = function() return resolveTrackerAnchorFrame(addon.db and addon.db["mythicPlusBloodlustTrackerRelativeFrame"]) end,
 			allowDrag = function() return trackerAnchorUsesUIParent(addon.db and addon.db["mythicPlusBloodlustTrackerRelativeFrame"]) end,
 			managePosition = false,
@@ -3617,28 +3632,91 @@ local function scheduleBloodlustActiveDurationRefresh(remaining)
 	end)
 end
 
+function addon.MythicPlus.functions.BuildBloodlustGlowOptions(target)
+	if not (addon.db and target) then return nil, nil end
+	local style = addon.MythicPlus.functions.NormalizeBloodlustGlowStyleForIconShape(
+		addon.db["mythicPlusBloodlustTrackerActiveGlowStyle"],
+		addon.MythicPlus.variables.bloodlustActiveGlowDefaults.style
+	)
+	local color = addon.MythicPlus.functions.NormalizeBloodlustActiveGlowColor(addon.db["mythicPlusBloodlustTrackerActiveGlowColor"])
+	return style, {
+		color = color,
+		cooldown = target.cooldownFrame,
+		inset = addon.MythicPlus.functions.NormalizeBloodlustGlowInset(addon.db["mythicPlusBloodlustTrackerActiveGlowInset"]),
+		border = addon.db["mythicPlusBloodlustTrackerActiveGlowPixelBorder"] == true,
+		count = addon.MythicPlus.functions.NormalizeBloodlustGlowPixelCount(addon.db["mythicPlusBloodlustTrackerActiveGlowPixelCount"]),
+		frequency = addon.MythicPlus.functions.NormalizeBloodlustGlowPixelSpeed(addon.db["mythicPlusBloodlustTrackerActiveGlowPixelSpeed"]),
+		thickness = addon.MythicPlus.functions.NormalizeBloodlustGlowPixelThickness(addon.db["mythicPlusBloodlustTrackerActiveGlowPixelThickness"]),
+		shape = getBloodlustIconShape(),
+	}
+end
+
 local function setBloodlustActiveGlow(active)
 	local Glow = addon and addon.Glow
 	if not (Glow and Glow.Start and Glow.Stop and bloodlustButton) then return end
 	if active and addon.db and addon.db["mythicPlusBloodlustTrackerGlowOnActive"] == true then
-		local style = addon.MythicPlus.functions.NormalizeBloodlustGlowStyleForIconShape(
-			addon.db["mythicPlusBloodlustTrackerActiveGlowStyle"],
-			addon.MythicPlus.variables.bloodlustActiveGlowDefaults.style
-		)
-		local color = addon.MythicPlus.functions.NormalizeBloodlustActiveGlowColor(addon.db["mythicPlusBloodlustTrackerActiveGlowColor"])
-		Glow.Start(bloodlustButton, BLOODLUST_ACTIVE_GLOW_KEY, style, {
-			color = color,
-			cooldown = bloodlustButton.cooldownFrame,
-			inset = addon.MythicPlus.functions.NormalizeBloodlustGlowInset(addon.db["mythicPlusBloodlustTrackerActiveGlowInset"]),
-			border = addon.db["mythicPlusBloodlustTrackerActiveGlowPixelBorder"] == true,
-			count = addon.MythicPlus.functions.NormalizeBloodlustGlowPixelCount(addon.db["mythicPlusBloodlustTrackerActiveGlowPixelCount"]),
-			frequency = addon.MythicPlus.functions.NormalizeBloodlustGlowPixelSpeed(addon.db["mythicPlusBloodlustTrackerActiveGlowPixelSpeed"]),
-			thickness = addon.MythicPlus.functions.NormalizeBloodlustGlowPixelThickness(addon.db["mythicPlusBloodlustTrackerActiveGlowPixelThickness"]),
-			shape = getBloodlustIconShape(),
-		})
+		local style, opts = addon.MythicPlus.functions.BuildBloodlustGlowOptions(bloodlustButton)
+		if style and opts then Glow.Start(bloodlustButton, BLOODLUST_ACTIVE_GLOW_KEY, style, opts) end
 	else
 		Glow.Stop(bloodlustButton, BLOODLUST_ACTIVE_GLOW_KEY, true)
 	end
+end
+
+function addon.MythicPlus.functions.SetBloodlustSampleButtonText(button)
+	if not (button and button.SetText) then return end
+	local variables = addon.MythicPlus.variables
+	button:SetText(variables.bloodlustGlowSampleActive and (L["Hide sample"] or "Hide sample") or (L["Show sample"] or "Show sample"))
+end
+
+function addon.MythicPlus.functions.StartBloodlustGlowSample()
+	local Glow = addon and addon.Glow
+	if not (Glow and Glow.Start and Glow.Stop) then return false end
+
+	local variables = addon.MythicPlus.variables
+	local target = bloodlustButton
+	local targetWasHidden = false
+	if not (target and target.IsShown and target:IsShown()) then
+		target = ensureBloodlustAnchor()
+		targetWasHidden = target and target.IsShown and not target:IsShown()
+	end
+	if not target then return false end
+	if targetWasHidden and target.Show then target:Show() end
+
+	local style, opts = addon.MythicPlus.functions.BuildBloodlustGlowOptions(target)
+	if not (style and opts) then return false end
+
+	if variables.bloodlustGlowSampleTarget and variables.bloodlustGlowSampleTarget ~= target then Glow.Stop(variables.bloodlustGlowSampleTarget, "EQOL_BLOODLUST_SAMPLE", true) end
+	variables.bloodlustGlowSampleActive = true
+	variables.bloodlustGlowSampleTarget = target
+	variables.bloodlustGlowSampleTargetWasHidden = targetWasHidden == true
+	Glow.Stop(target, "EQOL_BLOODLUST_SAMPLE", true)
+	Glow.Start(target, "EQOL_BLOODLUST_SAMPLE", style, opts)
+	return true
+end
+
+function addon.MythicPlus.functions.StopBloodlustGlowSample()
+	local Glow = addon and addon.Glow
+	local variables = addon.MythicPlus.variables
+	local target = variables.bloodlustGlowSampleTarget
+	if Glow and Glow.Stop and target then Glow.Stop(target, "EQOL_BLOODLUST_SAMPLE", true) end
+	if variables.bloodlustGlowSampleTargetWasHidden and target and target.Hide then target:Hide() end
+	variables.bloodlustGlowSampleActive = false
+	variables.bloodlustGlowSampleTarget = nil
+	variables.bloodlustGlowSampleTargetWasHidden = false
+end
+
+function addon.MythicPlus.functions.RefreshBloodlustGlowSample()
+	if not addon.MythicPlus.variables.bloodlustGlowSampleActive then return end
+	addon.MythicPlus.functions.StartBloodlustGlowSample()
+end
+
+function addon.MythicPlus.functions.ToggleBloodlustGlowSample(button)
+	if addon.MythicPlus.variables.bloodlustGlowSampleActive then
+		addon.MythicPlus.functions.StopBloodlustGlowSample()
+	else
+		addon.MythicPlus.functions.StartBloodlustGlowSample()
+	end
+	addon.MythicPlus.functions.SetBloodlustSampleButtonText(button)
 end
 
 local function getBloodlustActiveWindow(lockoutStart)
@@ -3649,8 +3727,9 @@ local function getBloodlustActiveWindow(lockoutStart)
 	return false, nil
 end
 
-local function applyBloodlustCooldown(cooldown, startTime, duration, preferDurationObject)
+local function applyBloodlustCooldown(cooldown, startTime, duration, preferDurationObject, reverse)
 	if not cooldown then return end
+	if cooldown.SetReverse then cooldown:SetReverse(reverse == true) end
 	if not (startTime and duration and duration > 0) then
 		cooldown:Clear()
 		return
@@ -3696,7 +3775,7 @@ local function applyBloodlustAuraToFrame(aura)
 			bloodlustButton.icon:SetDesaturated(not showActiveVisual)
 			setBloodlustActiveGlow(isActiveWindow)
 			if showActiveDuration then
-				applyBloodlustCooldown(bloodlustButton.cooldownFrame, lockoutStart, BLOODLUST_ACTIVE_DURATION_SECONDS, true)
+				applyBloodlustCooldown(bloodlustButton.cooldownFrame, lockoutStart, BLOODLUST_ACTIVE_DURATION_SECONDS, true, true)
 				scheduleBloodlustActiveDurationRefresh(activeRemaining)
 			else
 				if showActiveVisual then
@@ -3704,13 +3783,13 @@ local function applyBloodlustAuraToFrame(aura)
 				else
 					cancelBloodlustActiveDurationRefresh()
 				end
-				applyBloodlustCooldown(bloodlustButton.cooldownFrame, lockoutStart, duration, false)
+				applyBloodlustCooldown(bloodlustButton.cooldownFrame, lockoutStart, duration, false, false)
 			end
 		else
 			bloodlustButton.icon:SetDesaturated(true)
 			setBloodlustActiveGlow(false)
 			cancelBloodlustActiveDurationRefresh()
-			bloodlustButton.cooldownFrame:Clear()
+			applyBloodlustCooldown(bloodlustButton.cooldownFrame, nil, nil, false, false)
 		end
 		if bloodlustButton.status then
 			bloodlustButton.status:SetText("")
@@ -3722,7 +3801,7 @@ local function applyBloodlustAuraToFrame(aura)
 		bloodlustButton.icon:SetDesaturated(false)
 		setBloodlustActiveGlow(false)
 		cancelBloodlustActiveDurationRefresh()
-		bloodlustButton.cooldownFrame:Clear()
+		applyBloodlustCooldown(bloodlustButton.cooldownFrame, nil, nil, false, false)
 		if bloodlustButton.status then
 			bloodlustButton.status:SetText(L["mythicPlusBloodlustTrackerReadyLabel"] or "READY")
 			bloodlustButton.status:SetTextColor(0.2, 1, 0.2)
@@ -3770,6 +3849,7 @@ refreshBloodlustTracker = function(playReadySound)
 	bloodlustStateActive = isActive
 	bloodlustStateInitialized = true
 	applyBloodlustAuraToFrame(aura)
+	if addon.MythicPlus.functions.RefreshBloodlustGlowSample then addon.MythicPlus.functions.RefreshBloodlustGlowSample() end
 	return true
 end
 
