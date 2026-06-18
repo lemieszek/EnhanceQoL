@@ -2423,6 +2423,21 @@ data = {
 				parentSection = buttonSinkSection,
 			},
 			{
+				var = "hideMinimapButtonBinToggle",
+				text = L["hideMinimapButtonBinToggle"],
+				desc = L["hideMinimapButtonBinToggleDesc"],
+				func = function(key)
+					addon.db["hideMinimapButtonBinToggle"] = key
+					addon.functions.toggleButtonSink()
+				end,
+				default = false,
+				sType = "checkbox",
+				parentCheck = isButtonSinkLauncherModeEnabled,
+				parent = true,
+				notify = "enableMinimapButtonBin",
+				parentSection = buttonSinkSection,
+			},
+			{
 				var = "useMinimapButtonBinMouseover",
 				text = L["useMinimapButtonBinMouseover"],
 				desc = L["useMinimapButtonBinMouseoverDesc"],

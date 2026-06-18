@@ -7,6 +7,7 @@
 ### ✨ Added
 
 - Mythic Plus / Bloodlust Tracker: Added optional Bloodlust duration and active glow display while the lockout is freshly applied.
+- Minimap / Button Sink: Added an option to hide the Button Sink toggle itself while still collecting minimap buttons.
 
 ---
 
