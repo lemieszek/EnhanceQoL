@@ -2,12 +2,12 @@
 
 <!--@eqol-beta@-->
 
-## [11.4.0-beta3] - 2026-06-18
+## [11.4.0-beta4] - 2026-06-18
 
 ### ✨ Added
 
 - Health Macro: Added an option to place `/stopcasting` before the generated health macro actions.
-- Map & Minimap / Waypoint: Added an optional enhanced in-world waypoint with destination label, clearer tracked icons, highlight toggle, and scale control.
+- Quest Tracker: Added optional text styling for the Blizzard quest tracker, including font, outline, size, normal colors, hover colors, and an option to hide the main tracker header.
 - Unit Frames / Boss Frames: Added left and right growth directions for horizontal boss frame layouts.
 - Duration Text: Added profile selection for buff/debuff containers, Unit Frame aura cooldowns, Group Frame aura cooldowns, and Mythic Plus Bloodlust/Battle Resurrection trackers.
 
@@ -16,6 +16,14 @@
 - Cooldown Panels: Fixed normal icon cooldown text using the active DurationText profile instead of the panel's selected profile.
 - Mythic Plus / Bloodlust Tracker: Fixed the active glow rendering behind the tracker border.
 - Unit Frames / Group Frames: Removed the obsolete Important debuff filter option that no longer exists in WoW 12.0.7.
+
+---
+
+## [11.4.0-beta3] - 2026-06-18
+
+### ✨ Added
+
+- Map & Minimap / Waypoint: Added an optional enhanced in-world waypoint with destination label, clearer tracked icons, highlight toggle, and scale control.
 
 ---
 

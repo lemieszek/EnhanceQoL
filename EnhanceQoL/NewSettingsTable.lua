@@ -9,6 +9,8 @@ addon.variables.NewVersionTableEQOL = {
 
 	-- 11.4.0-beta3
 	healthStopCasting = true,
+	questTrackerHideMainHeader = true,
+	questTrackerTextStyleEnabled = true,
 
 	-- 11.4.0-beta2
 	enhancedWaypoint = true,
