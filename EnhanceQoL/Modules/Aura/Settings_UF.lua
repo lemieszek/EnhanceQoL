@@ -2082,6 +2082,8 @@ local function appendBossLayoutSettings(list, unit, def, refreshSelf)
 	local growthOpts = {
 		{ value = "DOWN", label = DIRECTION_DOWN_LABEL },
 		{ value = "UP", label = DIRECTION_UP_LABEL },
+		{ value = "RIGHT", label = DIRECTION_RIGHT_LABEL },
+		{ value = "LEFT", label = DIRECTION_LEFT_LABEL },
 	}
 	list[#list + 1] = radioDropdown(L["Growth direction"] or "Growth direction", growthOpts, function() return (getValue(unit, { "growth" }, def.growth or "DOWN") or "DOWN"):upper() end, function(val)
 		setValue(unit, { "growth" }, (val or "DOWN"):upper())

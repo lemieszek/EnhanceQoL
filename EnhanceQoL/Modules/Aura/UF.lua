@@ -10340,7 +10340,10 @@ local function layoutBossFrames(cfg)
 	local last
 	local shown = 0
 	local maxWidth = 0
+	local totalWidth = 0
+	local maxHeight = 0
 	local frameHeight = 0
+	local horizontal = growth == "LEFT" or growth == "RIGHT"
 	local bossCount = UF.GetBossFrameCount(cfg)
 	for i = 1, bossCount do
 		local unit = "boss" .. i
@@ -10348,13 +10351,19 @@ local function layoutBossFrames(cfg)
 		if st and st.frame then
 			st.frame:ClearAllPoints()
 			if not last then
-				if growth == "UP" then
+				if growth == "LEFT" then
+					st.frame:SetPoint("TOPRIGHT", bossContainer, "TOPRIGHT", 0, 0)
+				elseif growth == "UP" then
 					st.frame:SetPoint("BOTTOMLEFT", bossContainer, "BOTTOMLEFT", 0, 0)
 				else
 					st.frame:SetPoint("TOPLEFT", bossContainer, "TOPLEFT", 0, 0)
 				end
 			else
-				if growth == "UP" then
+				if growth == "RIGHT" then
+					st.frame:SetPoint("TOPLEFT", last.frame, "TOPRIGHT", spacing, 0)
+				elseif growth == "LEFT" then
+					st.frame:SetPoint("TOPRIGHT", last.frame, "TOPLEFT", -spacing, 0)
+				elseif growth == "UP" then
 					st.frame:SetPoint("BOTTOMLEFT", last.frame, "TOPLEFT", 0, spacing)
 				else
 					st.frame:SetPoint("TOPLEFT", last.frame, "BOTTOMLEFT", 0, -spacing)
@@ -10362,15 +10371,26 @@ local function layoutBossFrames(cfg)
 			end
 			last = st
 			shown = shown + 1
-			maxWidth = math.max(maxWidth, st.frame:GetWidth() or 0)
-			frameHeight = st.frame:GetHeight() or frameHeight
+			local width = st.frame:GetWidth() or 0
+			local height = st.frame:GetHeight() or 0
+			maxWidth = math.max(maxWidth, width)
+			totalWidth = totalWidth + width
+			maxHeight = math.max(maxHeight, height)
+			frameHeight = height or frameHeight
 		end
 	end
 	if shown > 0 then
-		local totalHeight = frameHeight * shown + spacing * (shown - 1)
-		if totalHeight < frameHeight then totalHeight = frameHeight end
-		bossContainer:SetHeight(totalHeight)
-		bossContainer:SetWidth(maxWidth)
+		if horizontal then
+			totalWidth = totalWidth + spacing * (shown - 1)
+			if totalWidth < maxWidth then totalWidth = maxWidth end
+			bossContainer:SetWidth(totalWidth)
+			bossContainer:SetHeight(maxHeight)
+		else
+			local totalHeight = frameHeight * shown + spacing * (shown - 1)
+			if totalHeight < frameHeight then totalHeight = frameHeight end
+			bossContainer:SetHeight(totalHeight)
+			bossContainer:SetWidth(maxWidth)
+		end
 	end
 end
 
