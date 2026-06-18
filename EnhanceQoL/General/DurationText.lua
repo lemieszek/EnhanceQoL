@@ -212,6 +212,7 @@ local function getUsageLabel(path, key)
 	path = tostring(path or "")
 	key = tostring(key or "")
 	if path:find("^cooldownPanels%.panels%.[^%.]+%.entries%.") then return "durationTextUsageCooldownPanelEntries" end
+	if path:find("^cooldownPanels%.panels%.") and key == "durationTextProfile" then return "durationTextUsageCooldownPanelDefaults" end
 	if path:find("^cooldownPanels%.panels%.") and key == "barDurationTextProfile" then return "durationTextUsageCooldownPanelDefaults" end
 	if path:find("^personalResourceBarSettings") then return "durationTextUsageResourceBarsPersonal" end
 	if path:find("^globalResourceBarSettings") then return "durationTextUsageResourceBarsGlobal" end
@@ -609,18 +610,23 @@ function DurationText:CreateNumericFormatter(config)
 	if formatter.ClearBreakpoints then formatter:ClearBreakpoints() end
 	local decimalThreshold = tonumber(config.millisecondsThreshold) or self.defaults.millisecondsThreshold
 	local nearest = self:GetRoundingValue("NEAREST") or 0
+	local up = self:GetRoundingValue("UP") or nearest
+	local down = self:GetRoundingValue("DOWN") or nearest
+	local rounding = config.canRoundUpIntervals == true and up or down
 	local breakpoints = {}
 	if decimalThreshold and decimalThreshold > 0 then
 		breakpoints[#breakpoints + 1] = {
 			threshold = 0,
+			step = 0.1,
 			format = "%.1f",
-			rounding = nearest,
+			rounding = rounding,
 		}
 	end
 	breakpoints[#breakpoints + 1] = {
 		threshold = decimalThreshold and decimalThreshold > 0 and decimalThreshold or 0,
+		step = 1,
 		format = "%.0f",
-		rounding = nearest,
+		rounding = rounding,
 	}
 	if formatter.SetBreakpoints then
 		formatter:SetBreakpoints(breakpoints)
@@ -642,6 +648,16 @@ function DurationText:GetSecondsFormatter(config)
 		else
 			self.formatterCache[cacheKey] = self:CreateNumericFormatter(config) or self:CreateSecondsFormatter(config)
 		end
+	end
+	return self.formatterCache[cacheKey]
+end
+
+function DurationText:GetCooldownFrameFormatter(config)
+	config = config or self:GetGlobalConfig()
+	local cacheKey = "cooldown|" .. self:GetCacheKey(config)
+	self.formatterCache = self.formatterCache or {}
+	if not self.formatterCache[cacheKey] then
+		self.formatterCache[cacheKey] = self:CreateNumericFormatter(config)
 	end
 	return self.formatterCache[cacheKey]
 end
@@ -795,11 +811,16 @@ end
 function DurationText:ApplyToCooldownFrame(cooldownFrame, config)
 	if not cooldownFrame then return false end
 	config = self:GetEffectiveConfig(config)
-	local formatter = self:GetSecondsFormatter(config)
+	local formatter = self:GetCooldownFrameFormatter(config)
 	if formatter and cooldownFrame.SetCountdownFormatter then cooldownFrame:SetCountdownFormatter(formatter) end
 	if cooldownFrame.SetCountdownMillisecondsThreshold then cooldownFrame:SetCountdownMillisecondsThreshold(tonumber(config.millisecondsThreshold) or self.defaults.millisecondsThreshold) end
 	if cooldownFrame.SetCountdownAbbrevThreshold then cooldownFrame:SetCountdownAbbrevThreshold(tonumber(config.approximationSeconds) or self.defaults.approximationSeconds) end
 	return formatter ~= nil
+end
+
+function DurationText:ApplyProfileToCooldownFrame(cooldownFrame, profileKey)
+	local _, resolvedProfileKey = self:GetProfileConfig(profileKey)
+	return self:ApplyToCooldownFrame(cooldownFrame, resolvedProfileKey)
 end
 
 function addon.functions.IsDurationTextBindingSupported() return DurationText:IsDurationTextBindingSupported() end
@@ -825,3 +846,4 @@ function addon.functions.UpdateDurationTextBinding(owner, key) return DurationTe
 function addon.functions.GetDurationTextBindingState(owner, key) return DurationText:GetBindingState(owner, key) end
 function addon.functions.ConfigureDurationTextBinding(owner, key, fontString, durationObject, options) return DurationText:ConfigureBinding(owner, key, fontString, durationObject, options) end
 function addon.functions.BindDurationText(fontString, durationObject, options) return DurationText:BindFontString(fontString, durationObject, options) end
+function addon.functions.ApplyDurationTextProfileToCooldownFrame(cooldownFrame, profileKey) return DurationText:ApplyProfileToCooldownFrame(cooldownFrame, profileKey) end

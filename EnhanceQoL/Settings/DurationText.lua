@@ -90,6 +90,7 @@ end
 
 local function refreshDurationTextSettings(rebuild)
 	invalidate()
+	if DurationText and DurationText.RefreshConsumers then DurationText:RefreshConsumers() end
 	notifyDurationTextSettings()
 	refreshConfigCenterDurationTextSettings(rebuild)
 	local timer = _G.C_Timer

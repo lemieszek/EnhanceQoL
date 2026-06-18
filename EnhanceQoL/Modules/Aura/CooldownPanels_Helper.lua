@@ -246,6 +246,7 @@ Helper.PANEL_LAYOUT_DEFAULTS = {
 	cdmAuraOverlayEnabled = false,
 	cooldownTextColor = { 1, 1, 1, 1 },
 	cooldownTextStyle = globalFontStyleKey(),
+	durationTextProfile = "MINIMAL",
 	staticTextFont = "",
 	staticTextSize = 12,
 	staticTextStyle = globalFontStyleKey(),
@@ -2325,6 +2326,18 @@ function Helper.NormalizePanel(panel, defaults)
 	panel.layout.chargesColor = Helper.NormalizeColor(panel.layout.chargesColor, layoutDefaults.chargesColor or Helper.PANEL_LAYOUT_DEFAULTS.chargesColor or { 1, 1, 1, 1 })
 	panel.layout.chargesHideWhenZero = panel.layout.chargesHideWhenZero == true
 	panel.layout.cooldownTextColor = Helper.NormalizeColor(panel.layout.cooldownTextColor, layoutDefaults.cooldownTextColor or Helper.PANEL_LAYOUT_DEFAULTS.cooldownTextColor)
+	if
+		type(panel.barDurationTextProfile) == "string"
+		and panel.barDurationTextProfile ~= ""
+		and (type(panel.layout.durationTextProfile) ~= "string" or panel.layout.durationTextProfile == "" or panel.layout.durationTextProfile == Helper.PANEL_LAYOUT_DEFAULTS.durationTextProfile)
+	then
+		panel.layout.durationTextProfile = panel.barDurationTextProfile
+	elseif type(panel.layout.durationTextProfile) ~= "string" or panel.layout.durationTextProfile == "" then
+		panel.layout.durationTextProfile = type(panel.barDurationTextProfile) == "string" and panel.barDurationTextProfile
+			or layoutDefaults.durationTextProfile
+			or Helper.PANEL_LAYOUT_DEFAULTS.durationTextProfile
+			or "MINIMAL"
+	end
 	if panel.layout.cooldownTextFont ~= nil and type(panel.layout.cooldownTextFont) ~= "string" then panel.layout.cooldownTextFont = nil end
 	if panel.layout.cooldownTextSize ~= nil then panel.layout.cooldownTextSize = Helper.ClampInt(panel.layout.cooldownTextSize, 6, 64, 12) end
 	if panel.layout.cooldownTextStyle ~= nil then

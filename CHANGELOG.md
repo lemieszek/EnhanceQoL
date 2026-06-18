@@ -11,6 +11,7 @@
 
 ### 🐛 Fixed
 
+- Cooldown Panels: Fixed normal icon cooldown text using the active DurationText profile instead of the panel's selected profile.
 - Mythic Plus / Bloodlust Tracker: Fixed the active glow rendering behind the tracker border.
 
 ---

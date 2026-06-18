@@ -608,6 +608,7 @@ Bars.NormalizeDurationTextProfile = function(value, fallback)
 	return fallback or Bars.DEFAULTS.barDurationTextProfile
 end
 Bars.GetPanelDurationTextProfile = function(panel)
+	if panel and panel.layout and panel.layout.durationTextProfile ~= nil then return Bars.NormalizeDurationTextProfile(panel.layout.durationTextProfile, Bars.DEFAULTS.barDurationTextProfile) end
 	return Bars.NormalizeDurationTextProfile(panel and panel.barDurationTextProfile, Bars.DEFAULTS.barDurationTextProfile)
 end
 Bars.GetEntryDurationTextProfile = function(entry, panel)

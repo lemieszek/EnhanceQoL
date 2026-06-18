@@ -6475,6 +6475,30 @@ function CooldownPanels:GetFontDropdownValue(value)
 	return self:GetGlobalFontConfigKey()
 end
 
+function CooldownPanels:NormalizeDurationTextProfile(value, fallback)
+	local durationText = addon.DurationText
+	if durationText and durationText.GetProfileKey then return durationText:GetProfileKey(value or fallback or "MINIMAL") end
+	return type(value) == "string" and value ~= "" and value or fallback or "MINIMAL"
+end
+
+function CooldownPanels:GetPanelDurationTextProfile(panel)
+	if panel and panel.layout and panel.layout.durationTextProfile ~= nil then
+		return self:NormalizeDurationTextProfile(panel.layout.durationTextProfile, "MINIMAL")
+	end
+	if panel and panel.barDurationTextProfile ~= nil then return self:NormalizeDurationTextProfile(panel.barDurationTextProfile, "MINIMAL") end
+	return self:NormalizeDurationTextProfile(nil, "MINIMAL")
+end
+
+function CooldownPanels:GetLayoutDurationTextProfile(layout)
+	if layout and layout.durationTextProfile ~= nil then return self:NormalizeDurationTextProfile(layout.durationTextProfile, "MINIMAL") end
+	return self:NormalizeDurationTextProfile(nil, "MINIMAL")
+end
+
+function CooldownPanels:ApplyCooldownFrameDurationTextProfile(cooldownFrame, profileKey)
+	if not (cooldownFrame and addon.functions and addon.functions.ApplyDurationTextProfileToCooldownFrame) then return false end
+	return addon.functions.ApplyDurationTextProfileToCooldownFrame(cooldownFrame, self:NormalizeDurationTextProfile(profileKey, "MINIMAL"))
+end
+
 function CooldownPanels:ResolveEntryCooldownTextStyle(layout, entry, fallbackFontPath, fallbackFontSize, fallbackFontStyle)
 	local panelCache = CooldownPanels._styleCacheRoots.cooldownTextPanel[layout]
 	local globalFontStateVersion = addon.functions and addon.functions.GetGlobalFontStateVersion and addon.functions.GetGlobalFontStateVersion() or 0
@@ -6558,6 +6582,7 @@ function CooldownPanels:ApplyEntryCooldownTextStyle(icon, layout, entry)
 	if not (icon and icon.cooldown and icon.cooldown.GetCountdownFontString) then return end
 	local fontString = icon.cooldown:GetCountdownFontString()
 	if not fontString then return end
+	self:ApplyCooldownFrameDurationTextProfile(icon.cooldown, self:GetLayoutDurationTextProfile(layout))
 	if not icon.cooldown._eqolCooldownTextDefaults then
 		local fontPath, fontSize, fontStyle = fontString:GetFont()
 		icon.cooldown._eqolCooldownTextDefaults = {
@@ -6606,6 +6631,11 @@ function CooldownPanels:ApplyEntryCooldownTextStyle(icon, layout, entry)
 		fontString._eqolCooldownColorB = b
 		fontString._eqolCooldownColorA = a
 	end
+end
+
+function CooldownPanels:ApplyRuntimeCooldownDurationTextProfile(icon, layout)
+	if not (icon and icon.cooldown) then return false end
+	return self:ApplyCooldownFrameDurationTextProfile(icon.cooldown, self:GetLayoutDurationTextProfile(layout))
 end
 
 function CooldownPanels:ResolveEntryStackTextStyle(layout, entry, fallbackFontPath, fallbackFontSize, fallbackFontStyle)
@@ -8041,6 +8071,8 @@ function cdp.RUNTIME.HasCooldownTextStyleChange(snapshot, data, defaultFontPath,
 		or snapshot.layoutCooldownTextColor ~= (layout and layout.cooldownTextColor)
 		or snapshot.layoutCooldownTextX ~= (layout and layout.cooldownTextX)
 		or snapshot.layoutCooldownTextY ~= (layout and layout.cooldownTextY)
+		or snapshot.layoutDurationTextProfile ~= (layout and layout.durationTextProfile)
+		or snapshot.durationTextVersion ~= (addon.DurationText and addon.DurationText.version or 0)
 end
 
 function cdp.RUNTIME.WriteCooldownTextStyleSnapshot(snapshot, data, defaultFontPath, defaultFontSize, defaultFontStyle)
@@ -8064,6 +8096,8 @@ function cdp.RUNTIME.WriteCooldownTextStyleSnapshot(snapshot, data, defaultFontP
 	snapshot.layoutCooldownTextColor = layout and layout.cooldownTextColor or nil
 	snapshot.layoutCooldownTextX = layout and layout.cooldownTextX or nil
 	snapshot.layoutCooldownTextY = layout and layout.cooldownTextY or nil
+	snapshot.layoutDurationTextProfile = layout and layout.durationTextProfile or nil
+	snapshot.durationTextVersion = addon.DurationText and addon.DurationText.version or 0
 end
 
 function cdp.RUNTIME.HasStackTextStyleChange(snapshot, data, fallbackFontPath, fallbackFontSize, fallbackFontStyle)
@@ -22188,14 +22222,15 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				height = 140,
 				get = function()
 					local currentPanel = CooldownPanels:GetPanel(panelId)
-					local bars = CooldownPanels.Bars
-					return bars and bars.GetPanelDurationTextProfile and bars.GetPanelDurationTextProfile(currentPanel) or "MINIMAL"
+					return CooldownPanels:GetPanelDurationTextProfile(currentPanel)
 				end,
 				set = function(_, value)
 					local currentPanel = CooldownPanels:GetPanel(panelId)
-					local bars = CooldownPanels.Bars
-					if not (currentPanel and bars and bars.NormalizeDurationTextProfile) then return end
-					currentPanel.barDurationTextProfile = bars.NormalizeDurationTextProfile(value, "MINIMAL")
+					if not currentPanel then return end
+					currentPanel.layout = currentPanel.layout or Helper.CopyTableShallow(Helper.PANEL_LAYOUT_DEFAULTS)
+					local profileKey = CooldownPanels:NormalizeDurationTextProfile(value, "MINIMAL")
+					currentPanel.layout.durationTextProfile = profileKey
+					currentPanel.barDurationTextProfile = profileKey
 					CooldownPanels:RefreshPanel(panelId)
 					CooldownPanels:RefreshEditor()
 				end,
@@ -22205,13 +22240,14 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 					for _, option in ipairs(options) do
 						root:CreateRadio(option.label, function()
 							local currentPanel = CooldownPanels:GetPanel(panelId)
-							local bars = CooldownPanels.Bars
-							return bars and bars.GetPanelDurationTextProfile and bars.GetPanelDurationTextProfile(currentPanel) == option.value or false
+							return CooldownPanels:GetPanelDurationTextProfile(currentPanel) == option.value
 						end, function()
 							local currentPanel = CooldownPanels:GetPanel(panelId)
-							local bars = CooldownPanels.Bars
-							if not (currentPanel and bars and bars.NormalizeDurationTextProfile) then return end
-							currentPanel.barDurationTextProfile = option.value
+							if not currentPanel then return end
+							currentPanel.layout = currentPanel.layout or Helper.CopyTableShallow(Helper.PANEL_LAYOUT_DEFAULTS)
+							local profileKey = CooldownPanels:NormalizeDurationTextProfile(option.value, "MINIMAL")
+							currentPanel.layout.durationTextProfile = profileKey
+							currentPanel.barDurationTextProfile = profileKey
 							CooldownPanels:RefreshPanel(panelId)
 							CooldownPanels:RefreshEditor()
 						end)
@@ -24420,6 +24456,8 @@ function cdp.ENTRY.ApplyVisibleSpellRuntime(panelId, runtime, icon, data, resolv
 		icon.texture:SetVertexColor(1, 1, 1)
 	end
 
+	CooldownPanels:ApplyRuntimeCooldownDurationTextProfile(icon, data.layout)
+
 	local staticTextCooldown = false
 	if data.entry and data.entry.staticTextShowOnCooldown == true then staticTextCooldown = durationActive or (cooldownEnabledOk and isCooldownActive(cooldownStart, cooldownDuration)) end
 	applyStaticText(icon, data.layout, data.entry, staticFontPath, staticFontSize, staticFontStyle, staticTextCooldown)
@@ -24593,6 +24631,8 @@ function cdp.ENTRY.ApplyVisibleItemRuntime(panelId, runtime, icon, data, resolve
 	else
 		icon.texture:SetVertexColor(1, 1, 1)
 	end
+
+	CooldownPanels:ApplyRuntimeCooldownDurationTextProfile(icon, data.layout)
 
 	if data.showItemCount and data.itemCount ~= nil then
 		icon.count:SetText(data.itemCount)
