@@ -200,6 +200,64 @@ addon.functions.SettingsCreateHeadline(cMapNav, L["MapBasics"] or "Map Basics", 
 
 local data = {
 	{
+		var = "enhancedWaypoint",
+		text = L["enhancedWaypoint"],
+		desc = L["enhancedWaypointDesc"],
+		func = function(value)
+			addon.db["enhancedWaypoint"] = value == true
+			if value then
+				if addon.EnhancedWaypoint and addon.EnhancedWaypoint.SetEnabled then addon.EnhancedWaypoint:SetEnabled(true) end
+			else
+				addon.variables.requireReload = true
+				if addon.functions.checkReloadFrame then addon.functions.checkReloadFrame() end
+			end
+		end,
+		default = false,
+		parentSection = mapExpandable,
+		children = {
+			{
+				var = "enhancedWaypointGlow",
+				text = L["enhancedWaypointGlow"],
+				desc = L["enhancedWaypointGlowDesc"],
+				func = function(value)
+					addon.db["enhancedWaypointGlow"] = value == true
+					if addon.EnhancedWaypoint and addon.EnhancedWaypoint.Update then addon.EnhancedWaypoint:Update() end
+				end,
+				default = true,
+				sType = "checkbox",
+				parent = true,
+				parentCheck = function()
+					return addon.SettingsLayout.elements["enhancedWaypoint"]
+						and addon.SettingsLayout.elements["enhancedWaypoint"].setting
+						and addon.SettingsLayout.elements["enhancedWaypoint"].setting:GetValue() == true
+				end,
+				parentSection = mapExpandable,
+			},
+			{
+				var = "enhancedWaypointScale",
+				text = L["enhancedWaypointScale"],
+				desc = L["enhancedWaypointScaleDesc"],
+				get = function() return addon.db and addon.db.enhancedWaypointScale or 1 end,
+				set = function(value)
+					addon.db["enhancedWaypointScale"] = value
+					if addon.EnhancedWaypoint and addon.EnhancedWaypoint.QueueScaleApply then addon.EnhancedWaypoint:QueueScaleApply() end
+				end,
+				min = 0.6,
+				max = 2,
+				step = 0.05,
+				default = 1,
+				sType = "slider",
+				parent = true,
+				parentCheck = function()
+					return addon.SettingsLayout.elements["enhancedWaypoint"]
+						and addon.SettingsLayout.elements["enhancedWaypoint"].setting
+						and addon.SettingsLayout.elements["enhancedWaypoint"].setting:GetValue() == true
+				end,
+				parentSection = mapExpandable,
+			},
+		},
+	},
+	{
 		var = "enableWayCommand",
 		text = L["enableWayCommand"],
 		desc = L["enableWayCommandDesc"],

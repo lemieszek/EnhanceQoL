@@ -86,6 +86,7 @@ Submodules\Merchant.lua
 Submodules\HealthText.lua
 Submodules\Mailbox.lua
 Submodules\Mailbox.xml
+Submodules\EnhancedWaypoint.lua
 Modules\Aura\Init.lua
 Modules\Aura\ResourceBars.lua
 Modules\Aura\ResourceBarsHelpers.lua

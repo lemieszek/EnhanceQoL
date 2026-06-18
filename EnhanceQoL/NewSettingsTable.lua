@@ -8,6 +8,7 @@ addon.variables.NewVersionTableEQOL = {
 	skinnerDefaultDebuffIconsEnabled = true,
 
 	-- 11.4.0-beta2
+	enhancedWaypoint = true,
 	hideMinimapButtonBinToggle = true,
 	mythicPlusBloodlustTrackerGlowOnActive = true,
 	mythicPlusBloodlustTrackerShowActiveDuration = true,

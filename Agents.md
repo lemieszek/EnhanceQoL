@@ -83,17 +83,6 @@
 - Before creating or pushing any release, beta, or alpha tag at the user's request, run project Luacheck when Lua code changed and only tag after it passes or after explicitly reporting remaining failures to the user.
 - After changing packaging gates, verify `scripts/prepare_packager_gates.sh` with at least `bash -n`, and make sure the release workflow still runs Luacheck after the gate step.
 
-## Worktree Workflow
-
-- Use Git worktrees for parallel independent feature work, especially when multiple agents or developers may work in the repository at the same time.
-- Before editing, inspect the current branch and working tree state.
-- If the current checkout is dirty and the existing changes are not clearly part of the current task, do not edit those files in place. Create or use a task-specific worktree instead.
-- Name task worktrees under `.worktrees/<short-feature-slug>` and use matching branches such as `feature/<short-feature-slug>` or `dev/<version>-<topic>`.
-- Base new worktrees on the correct target line: `main` for patch-line fixes, the active `dev/<version>` branch for next-version features, or the current beta/version integration branch when the task explicitly targets beta integration.
-- Do not use a worktree as a substitute for integration. Before merging into a beta or version branch, update the feature branch against the latest target branch, resolve conflicts there, and run the relevant checks.
-- If two parallel tasks need to touch the same hotspot files, call that out before editing and prefer sequencing, rebasing, or a shared integration branch over blind parallel edits.
-- Remove or prune completed worktrees after their branch has been merged or intentionally abandoned.
-
 ## Secret Values
 
 - When handling Blizzard secret values, do not do Lua arithmetic, comparisons, `tonumber`, `min`, `max`, sorting, modulo, or similar numeric operations on the secret value.

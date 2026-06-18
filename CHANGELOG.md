@@ -2,6 +2,14 @@
 
 <!--@eqol-beta@-->
 
+## [11.4.0-beta3] - 2026-06-18
+
+### ✨ Added
+
+- Map & Minimap / Waypoint: Added an optional enhanced in-world waypoint with destination label, clearer tracked icons, highlight toggle, and scale control.
+
+---
+
 ## [11.4.0-beta2] - 2026-06-17
 
 ### ✨ Added
