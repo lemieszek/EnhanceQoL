@@ -70,6 +70,9 @@
 - If the user asks to make or update a beta changelog, keep the beta section in `CHANGELOG.md` wrapped in `<!--@eqol-beta@-->` and `<!--@end-eqol-beta@-->`.
 - Do not edit or regenerate `EnhanceQoL/GeneratedChangelog.lua` during normal development. GitHub generates that file during packaging; local changelog work must update only `CHANGELOG.md`.
 - If the user asks to prepare a release changelog while a beta changelog should remain available, keep the beta-gated section separate and place the release section below it, outside the beta gate.
+- Keep version lines separated in git. Use `main` for the currently shipped patch line, such as `11.3.x`, and create a named version branch from `main`, such as `dev/11.4.0`, for the next minor release work.
+- Do not force unfinished next-version features onto `main` just because a patch-line bug needs to ship. Put the bug fix on `main`, tag/push the patch release from there when requested, then cherry-pick the same fix into the active next-version branch and any active test branches that also need it.
+- Short-lived test or feature branches are still allowed for isolated work, but move or cherry-pick their accepted changes into the named version branch before preparing beta/release tags for that version.
 - Do not merge beta-only changelog entries into a release section unless the user explicitly says those beta items are shipping in that release.
 - Alpha changelog entries may be technical and specific because they document early prerelease iteration.
 - Beta changelog entries should be less technical than alpha entries because beta builds are installed by users. Keep beta notes user-facing while still specific enough for testers.
