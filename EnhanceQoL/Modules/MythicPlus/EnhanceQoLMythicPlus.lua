@@ -1781,6 +1781,7 @@ local function ensureBRAnchor()
 				end
 			end,
 			settings = settings,
+			settingsMaxHeight = 700,
 			relativeTo = function() return resolveTrackerAnchorFrame(addon.db and addon.db["mythicPlusBRTrackerRelativeFrame"]) end,
 			allowDrag = function() return trackerAnchorUsesUIParent(addon.db and addon.db["mythicPlusBRTrackerRelativeFrame"]) end,
 			managePosition = false,
@@ -3350,6 +3351,7 @@ local function ensureBloodlustAnchor()
 				end
 			end,
 			settings = settings,
+			settingsMaxHeight = 700,
 			relativeTo = function() return resolveTrackerAnchorFrame(addon.db and addon.db["mythicPlusBloodlustTrackerRelativeFrame"]) end,
 			allowDrag = function() return trackerAnchorUsesUIParent(addon.db and addon.db["mythicPlusBloodlustTrackerRelativeFrame"]) end,
 			managePosition = false,
