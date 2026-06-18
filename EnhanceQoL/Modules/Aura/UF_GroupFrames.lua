@@ -65,7 +65,6 @@ do
 end
 local GROUP_DEBUFF_FILTER_ALL = "ALL"
 local GROUP_DEBUFF_FILTER_CROWD_CONTROL = "CROWD_CONTROL"
-local GROUP_DEBUFF_FILTER_IMPORTANT = "IMPORTANT"
 local GROUP_DEBUFF_FILTER_RAID = "RAID"
 local GROUP_DEBUFF_FILTER_RAID_IN_COMBAT = "RAID_IN_COMBAT"
 GF.BLIZZARD_DISPEL_MODE_BY_ME = "BY_ME"
@@ -79,7 +78,6 @@ local groupDebuffFilterOptions = {
 	{ value = GROUP_DEBUFF_FILTER_RAID_IN_COMBAT, label = L["UFGroupDebuffFilterRaidInCombat"] or "Raid in combat" },
 	{ value = GROUP_DEBUFF_FILTER_CROWD_CONTROL, label = L["UFGroupDebuffFilterCrowdControl"] or "Crowd control" },
 	{ value = "DISPEL", label = L["UFGroupDebuffFilterDispel"] or "Dispellable" },
-	{ value = GROUP_DEBUFF_FILTER_IMPORTANT, label = L["UFGroupDebuffFilterImportant"] or "Important spells" },
 }
 GF.groupBuffFilterOptions = {
 	{ value = "RAID_IN_COMBAT", label = L["UFGroupBuffFilterRaidInCombat"] or "Healer buffs" },
@@ -554,7 +552,6 @@ local function getGroupDebuffMatchFilter(typeCfg)
 	if GFH.SelectionContains(selection, GROUP_DEBUFF_FILTER_RAID_IN_COMBAT) and AURA_FILTERS.harmfulRaidInCombat then filters[#filters + 1] = AURA_FILTERS.harmfulRaidInCombat end
 	if GFH.SelectionContains(selection, GROUP_DEBUFF_FILTER_CROWD_CONTROL) and AURA_FILTERS.harmfulCrowdControl then filters[#filters + 1] = AURA_FILTERS.harmfulCrowdControl end
 	if GFH.SelectionContains(selection, "DISPEL") and AURA_FILTERS.dispellable then filters[#filters + 1] = AURA_FILTERS.dispellable end
-	if GFH.SelectionContains(selection, GROUP_DEBUFF_FILTER_IMPORTANT) and AURA_FILTERS.harmfulImportant then filters[#filters + 1] = AURA_FILTERS.harmfulImportant end
 	if #filters == 0 then return nil end
 	return filters
 end

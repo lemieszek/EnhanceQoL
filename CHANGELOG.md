@@ -14,6 +14,7 @@
 
 - Cooldown Panels: Fixed normal icon cooldown text using the active DurationText profile instead of the panel's selected profile.
 - Mythic Plus / Bloodlust Tracker: Fixed the active glow rendering behind the tracker border.
+- Unit Frames / Group Frames: Removed the obsolete Important debuff filter option that no longer exists in WoW 12.0.7.
 
 ---
 
