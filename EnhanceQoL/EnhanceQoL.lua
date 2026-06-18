@@ -4478,6 +4478,7 @@ local function initUI()
 	addon.functions.InitDBValue("minimapButtonBinColumns", DEFAULT_BUTTON_SINK_COLUMNS)
 	addon.functions.InitDBValue("minimapButtonBinHideBackground", false)
 	addon.functions.InitDBValue("minimapButtonBinHideBorder", false)
+	addon.functions.InitDBValue("hideMinimapButtonBinToggle", false)
 	addon.functions.InitDBValue("enableLootspecQuickswitch", false)
 	addon.functions.InitDBValue("lootspec_quickswitch", {})
 	addon.functions.InitDBValue("minimapSinkHoleData", {})
@@ -5608,6 +5609,7 @@ local function initUI()
 			local useMinimapToggle = isButtonSinkMinimapToggleEnabled()
 			local useDetachedToggle = isButtonSinkDetachedToggleEnabled()
 			local useLauncherToggle = useMinimapToggle or useDetachedToggle
+			local hideLauncherToggle = addon.db["hideMinimapButtonBinToggle"] == true and useLauncherToggle
 
 			firstStartButtonSink(0)
 			C_Timer.After(2, function()
@@ -5647,7 +5649,7 @@ local function initUI()
 			addon.functions.LayoutButtons()
 
 			-- create ButtonSink Button
-			if useMinimapToggle then
+			if useMinimapToggle and not hideLauncherToggle then
 				local iconData = {
 					type = "launcher",
 					icon = "Interface\\AddOns\\" .. addonName .. "\\Icons\\SinkHole.tga" or "Interface\\ICONS\\INV_Misc_QuestionMark", -- irgendein Icon
@@ -5679,8 +5681,10 @@ local function initUI()
 				LDB:NewDataObject(addonName .. "_ButtonSinkMap", iconData)
 				LDBIcon:Register(addonName .. "_ButtonSinkMap", iconData, addon.db["buttonsink"])
 				buttonBag:Hide()
-			elseif useDetachedToggle then
+			elseif useDetachedToggle and not hideLauncherToggle then
 				addon.variables.buttonSinkDetachedToggle = createDetachedButtonSinkToggle()
+				buttonBag:Hide()
+			elseif hideLauncherToggle then
 				buttonBag:Hide()
 			else
 				buttonBag:Show()
