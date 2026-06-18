@@ -3646,6 +3646,7 @@ function addon.MythicPlus.functions.BuildBloodlustGlowOptions(target)
 		border = addon.db["mythicPlusBloodlustTrackerActiveGlowPixelBorder"] == true,
 		count = addon.MythicPlus.functions.NormalizeBloodlustGlowPixelCount(addon.db["mythicPlusBloodlustTrackerActiveGlowPixelCount"]),
 		frequency = addon.MythicPlus.functions.NormalizeBloodlustGlowPixelSpeed(addon.db["mythicPlusBloodlustTrackerActiveGlowPixelSpeed"]),
+		frameLevel = 6,
 		thickness = addon.MythicPlus.functions.NormalizeBloodlustGlowPixelThickness(addon.db["mythicPlusBloodlustTrackerActiveGlowPixelThickness"]),
 		shape = getBloodlustIconShape(),
 	}

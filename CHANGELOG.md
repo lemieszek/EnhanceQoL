@@ -8,6 +8,10 @@
 
 - Map & Minimap / Waypoint: Added an optional enhanced in-world waypoint with destination label, clearer tracked icons, highlight toggle, and scale control.
 
+### 🐛 Fixed
+
+- Mythic Plus / Bloodlust Tracker: Fixed the active glow rendering behind the tracker border.
+
 ---
 
 ## [11.4.0-beta2] - 2026-06-17
