@@ -200,6 +200,7 @@ TRACKING_CONTENT.difficulties = {
 		},
 		mythic = {
 			[((_G.DifficultyUtil and _G.DifficultyUtil.ID) or {}).PrimaryRaidMythic or 16] = true,
+			[233] = true,
 		},
 	},
 }

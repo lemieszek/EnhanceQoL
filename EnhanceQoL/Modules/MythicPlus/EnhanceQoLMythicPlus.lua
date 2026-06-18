@@ -803,7 +803,7 @@ local function removeBRFrame()
 	end
 end
 
-local function isRaidDifficulty(d) return d == 14 or d == 15 or d == 16 or d == 17 end
+local function isRaidDifficulty(d) return d == 14 or d == 15 or d == 16 or d == 17 or d == 233 end
 
 local function safeRegisterUnitEvent(frame, event, ...)
 	if not frame or not frame.RegisterUnitEvent or type(event) ~= "string" then return false end
