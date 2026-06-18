@@ -8,6 +8,7 @@
 
 - Mythic Plus / Bloodlust Tracker: Added optional Bloodlust duration and active glow display while the lockout is freshly applied.
 - Minimap / Button Sink: Added an option to hide the Button Sink toggle itself while still collecting minimap buttons.
+- Unit Frames / Group Frames: Added an optional custom background color for dead or ghost party and raid units.
 
 ---
 

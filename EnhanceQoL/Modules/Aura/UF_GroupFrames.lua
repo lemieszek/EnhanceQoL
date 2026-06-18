@@ -6363,6 +6363,45 @@ local function getState(self)
 	return st
 end
 
+function GF.ApplyHealthBackdrop(button, deadOrGhost)
+	if not button then return end
+	local st = getState(button)
+	if not (st and st.health) then return end
+	local kind = button._eqolGroupKind or "party"
+	local cfg = button._eqolCfg or getCfg(kind) or {}
+	local def = DEFAULTS[kind] or {}
+	local hc = cfg.health or {}
+	local defH = def.health or {}
+	if deadOrGhost == nil then
+		local unit = getUnit(button)
+		local isDead = unit and UnitIsDead and GFH.UnsecretBool(UnitIsDead(unit)) or nil
+		local isGhost = unit and UnitIsGhost and GFH.UnsecretBool(UnitIsGhost(unit)) or nil
+		deadOrGhost = (isDead == true) or (isGhost == true)
+	end
+	local bd = hc.backdrop or {}
+	local defBd = defH.backdrop or {}
+	local healthBackdropClampToFill = bd.clampToFill
+	if healthBackdropClampToFill == nil then healthBackdropClampToFill = defBd.clampToFill end
+	if healthBackdropClampToFill == nil then healthBackdropClampToFill = false end
+	local healthTexKey = getEffectiveBarTexture(cfg, hc)
+	local deadColorEnabled = bd.deadColorEnabled
+	if deadColorEnabled == nil then deadColorEnabled = defBd.deadColorEnabled end
+	if deadOrGhost == true and deadColorEnabled == true then
+		local effectiveBackdrop = {}
+		for key, value in pairs(defBd) do
+			effectiveBackdrop[key] = value
+		end
+		for key, value in pairs(bd) do
+			effectiveBackdrop[key] = value
+		end
+		effectiveBackdrop.enabled = true
+		effectiveBackdrop.color = bd.deadColor or defBd.deadColor or { 0.35, 0.05, 0.05, 0.85 }
+		applyBarBackdrop(st.health, { texture = hc.texture, backdrop = effectiveBackdrop }, { clampToFill = healthBackdropClampToFill == true, textureKey = healthTexKey })
+		return
+	end
+	applyBarBackdrop(st.health, hc, { clampToFill = healthBackdropClampToFill == true, textureKey = healthTexKey })
+end
+
 local function isTooltipModifierPressed(modifier)
 	local mod = tostring(modifier or "ALT"):upper()
 	if mod == "SHIFT" then return IsShiftKeyDown and IsShiftKeyDown() end
@@ -6658,10 +6697,7 @@ function GF:BuildButton(self)
 		st._lastHealthTexture = healthTexKey
 	end
 	stabilizeStatusBarTexture(st.health)
-	local healthBackdropClampToFill = (hc.backdrop and hc.backdrop.clampToFill)
-	if healthBackdropClampToFill == nil then healthBackdropClampToFill = defH.backdrop and defH.backdrop.clampToFill end
-	if healthBackdropClampToFill == nil then healthBackdropClampToFill = false end
-	applyBarBackdrop(st.health, hc, { clampToFill = healthBackdropClampToFill == true, textureKey = healthTexKey })
+	GF.ApplyHealthBackdrop(self)
 
 	if not st.incomingHeal then
 		st.incomingHeal = CreateFrame("StatusBar", nil, st.health, "BackdropTemplate")
@@ -6912,9 +6948,6 @@ function GF:LayoutButton(self)
 	local dbc = cfg.dataBar or {}
 	local defH = def.health or {}
 	local defDB = def.dataBar or {}
-	local healthBackdropClampToFill = (hc.backdrop and hc.backdrop.clampToFill)
-	if healthBackdropClampToFill == nil then healthBackdropClampToFill = defH.backdrop and defH.backdrop.clampToFill end
-	if healthBackdropClampToFill == nil then healthBackdropClampToFill = false end
 	local healthTexKey = getEffectiveBarTexture(cfg, hc)
 	local powerTexKey = getEffectiveBarTexture(cfg, pcfg)
 	local dataBarTexKey = dbc.texture or defDB.texture or "SOLID"
@@ -7104,7 +7137,7 @@ function GF:LayoutButton(self)
 	end
 	local tempMaxHealthLossEnabled = hc.tempMaxHealthLossEnabled
 	if tempMaxHealthLossEnabled == nil then tempMaxHealthLossEnabled = defH.tempMaxHealthLossEnabled ~= false end
-	applyBarBackdrop(st.health, hc, { clampToFill = healthBackdropClampToFill == true, textureKey = healthTexKey })
+	GF.ApplyHealthBackdrop(self)
 	applyBarBackdrop(st.power, pcfg, { textureKey = powerTexKey })
 	if st.dataBar and st.dataBar.SetStatusBarTexture and UFHelper and UFHelper.resolveTexture then
 		if st._lastDataBarTexture ~= dataBarTexKey then
@@ -11105,6 +11138,7 @@ function GF:UpdateHealthValue(self, unit, st)
 	if UnitExists and not UnitExists(unit) then
 		st.health:SetMinMaxValues(0, 1)
 		GF.SetStatusBarValue(st.health, 0, false, true)
+		GF.ApplyHealthBackdrop(self, false)
 		if st.incomingHeal then st.incomingHeal:Hide() end
 		if st.absorb then st.absorb:Hide() end
 		if st.absorb2 then st.absorb2:Hide() end
@@ -11168,6 +11202,7 @@ function GF:UpdateHealthValue(self, unit, st)
 	local isDead = unit and UnitIsDead and GFH.UnsecretBool(UnitIsDead(unit)) or nil
 	local isGhost = unit and UnitIsGhost and GFH.UnsecretBool(UnitIsGhost(unit)) or nil
 	local deadOrGhost = (isDead == true) or (isGhost == true)
+	GF.ApplyHealthBackdrop(self, deadOrGhost)
 	local suppressAuxHealthBars = (connected == false) or deadOrGhost
 	local smoothHealth = (hc.smoothFill ~= nil) and (hc.smoothFill == true) or (defH.smoothFill == true)
 	local maxForValueSecret = issecretvalue and issecretvalue(maxForValue)
@@ -21555,6 +21590,63 @@ local function buildEditModeSettings(kind, editModeId)
 			end,
 		},
 		{
+			name = L["Use dead background color"] or "Use dead background color",
+			kind = SettingType.Checkbox,
+			field = "healthDeadBackdropColorEnabled",
+			parentId = "health",
+			get = function()
+				local cfg = getCfg(kind)
+				local hc = cfg and cfg.health or {}
+				local def = DEFAULTS[kind] and DEFAULTS[kind].health or {}
+				local defBackdrop = def and def.backdrop or {}
+				local value = hc.backdrop and hc.backdrop.deadColorEnabled
+				if value == nil then value = defBackdrop.deadColorEnabled end
+				return value == true
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.health = cfg.health or {}
+				cfg.health.backdrop = cfg.health.backdrop or {}
+				cfg.health.backdrop.deadColorEnabled = value and true or false
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "healthDeadBackdropColorEnabled", cfg.health.backdrop.deadColorEnabled, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+		},
+		{
+			name = L["Dead background color"] or "Dead background color",
+			kind = SettingType.Color,
+			field = "healthDeadBackdropColor",
+			parentId = "health",
+			hasOpacity = true,
+			default = (DEFAULTS[kind] and DEFAULTS[kind].health and DEFAULTS[kind].health.backdrop and DEFAULTS[kind].health.backdrop.deadColor) or { 0.35, 0.05, 0.05, 0.85 },
+			get = function()
+				local cfg = getCfg(kind)
+				local hc = cfg and cfg.health or {}
+				local def = (DEFAULTS[kind] and DEFAULTS[kind].health and DEFAULTS[kind].health.backdrop and DEFAULTS[kind].health.backdrop.deadColor) or { 0.35, 0.05, 0.05, 0.85 }
+				local r, g, b, a = unpackColor(hc.backdrop and hc.backdrop.deadColor, def)
+				return { r = r, g = g, b = b, a = a }
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not (cfg and value) then return end
+				cfg.health = cfg.health or {}
+				cfg.health.backdrop = cfg.health.backdrop or {}
+				cfg.health.backdrop.deadColor = { value.r or 0.35, value.g or 0.05, value.b or 0.05, value.a or 0.85 }
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "healthDeadBackdropColor", cfg.health.backdrop.deadColor, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			isEnabled = function()
+				local cfg = getCfg(kind)
+				local hc = cfg and cfg.health or {}
+				local def = DEFAULTS[kind] and DEFAULTS[kind].health or {}
+				local defBackdrop = def and def.backdrop or {}
+				local value = hc.backdrop and hc.backdrop.deadColorEnabled
+				if value == nil then value = defBackdrop.deadColorEnabled end
+				return value == true
+			end,
+		},
+		{
 			name = L["Incoming heals"] or "Incoming heals",
 			kind = SettingType.Collapsible,
 			id = "incomingheal",
@@ -30389,6 +30481,16 @@ local function applyEditModeData(kind, data)
 		cfg.health.backdrop = cfg.health.backdrop or {}
 		cfg.health.backdrop.color = data.healthBackdropColor
 	end
+	if data.healthDeadBackdropColorEnabled ~= nil then
+		cfg.health = cfg.health or {}
+		cfg.health.backdrop = cfg.health.backdrop or {}
+		cfg.health.backdrop.deadColorEnabled = data.healthDeadBackdropColorEnabled and true or false
+	end
+	if data.healthDeadBackdropColor ~= nil then
+		cfg.health = cfg.health or {}
+		cfg.health.backdrop = cfg.health.backdrop or {}
+		cfg.health.backdrop.deadColor = data.healthDeadBackdropColor
+	end
 	if data.healthBackdropTexture ~= nil then
 		cfg.health = cfg.health or {}
 		cfg.health.backdrop = cfg.health.backdrop or {}
@@ -31568,6 +31670,8 @@ function GF:EnsureEditMode()
 				healthBackdropEnabled = (hcBackdrop.enabled ~= nil) and (hcBackdrop.enabled ~= false) or (defHBackdrop.enabled ~= false),
 				healthBackdropClampToFill = (hcBackdrop.clampToFill ~= nil) and (hcBackdrop.clampToFill == true) or ((hcBackdrop.clampToFill == nil) and (defHBackdrop.clampToFill == true)),
 				healthBackdropColor = hcBackdrop.color or defHBackdrop.color or { 0, 0, 0, 0.6 },
+				healthDeadBackdropColorEnabled = (hcBackdrop.deadColorEnabled ~= nil) and (hcBackdrop.deadColorEnabled == true) or ((hcBackdrop.deadColorEnabled == nil) and (defHBackdrop.deadColorEnabled == true)),
+				healthDeadBackdropColor = hcBackdrop.deadColor or defHBackdrop.deadColor or { 0.35, 0.05, 0.05, 0.85 },
 				healthBackdropTexture = hcBackdrop.texture or defHBackdrop.texture or "DEFAULT",
 				healthLeftX = (cfg.health and cfg.health.offsetLeft and cfg.health.offsetLeft.x) or 0,
 				healthLeftY = (cfg.health and cfg.health.offsetLeft and cfg.health.offsetLeft.y) or 0,
