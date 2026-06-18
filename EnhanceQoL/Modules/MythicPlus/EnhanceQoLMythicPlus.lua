@@ -3651,8 +3651,9 @@ local function getBloodlustActiveWindow(lockoutStart)
 	return false, nil
 end
 
-local function applyBloodlustCooldown(cooldown, startTime, duration, preferDurationObject)
+local function applyBloodlustCooldown(cooldown, startTime, duration, preferDurationObject, reverse)
 	if not cooldown then return end
+	if cooldown.SetReverse then cooldown:SetReverse(reverse == true) end
 	if not (startTime and duration and duration > 0) then
 		cooldown:Clear()
 		return
@@ -3698,7 +3699,7 @@ local function applyBloodlustAuraToFrame(aura)
 			bloodlustButton.icon:SetDesaturated(not showActiveVisual)
 			setBloodlustActiveGlow(isActiveWindow)
 			if showActiveDuration then
-				applyBloodlustCooldown(bloodlustButton.cooldownFrame, lockoutStart, BLOODLUST_ACTIVE_DURATION_SECONDS, true)
+				applyBloodlustCooldown(bloodlustButton.cooldownFrame, lockoutStart, BLOODLUST_ACTIVE_DURATION_SECONDS, true, true)
 				scheduleBloodlustActiveDurationRefresh(activeRemaining)
 			else
 				if showActiveVisual then
@@ -3706,13 +3707,13 @@ local function applyBloodlustAuraToFrame(aura)
 				else
 					cancelBloodlustActiveDurationRefresh()
 				end
-				applyBloodlustCooldown(bloodlustButton.cooldownFrame, lockoutStart, duration, false)
+				applyBloodlustCooldown(bloodlustButton.cooldownFrame, lockoutStart, duration, false, false)
 			end
 		else
 			bloodlustButton.icon:SetDesaturated(true)
 			setBloodlustActiveGlow(false)
 			cancelBloodlustActiveDurationRefresh()
-			bloodlustButton.cooldownFrame:Clear()
+			applyBloodlustCooldown(bloodlustButton.cooldownFrame, nil, nil, false, false)
 		end
 		if bloodlustButton.status then
 			bloodlustButton.status:SetText("")
@@ -3724,7 +3725,7 @@ local function applyBloodlustAuraToFrame(aura)
 		bloodlustButton.icon:SetDesaturated(false)
 		setBloodlustActiveGlow(false)
 		cancelBloodlustActiveDurationRefresh()
-		bloodlustButton.cooldownFrame:Clear()
+		applyBloodlustCooldown(bloodlustButton.cooldownFrame, nil, nil, false, false)
 		if bloodlustButton.status then
 			bloodlustButton.status:SetText(L["mythicPlusBloodlustTrackerReadyLabel"] or "READY")
 			bloodlustButton.status:SetTextColor(0.2, 1, 0.2)
