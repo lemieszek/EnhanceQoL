@@ -2155,6 +2155,8 @@ The macro uses any custom spells you know."
 L["healthMacroLimitReached"] = "Health Macro: Macro limit reached. Please free a slot."
 L["healthMacroTipReset"] = "Tip: To potentially reuse Demonic Healthstone in-combat, use Reset: 60s."
 L["healthMacroWillUse"] = "Will use (in order): %s"
+L["healthStopCasting"] = "Stop casting before using health macro"
+L["healthStopCastingDesc"] = "Adds /stopcasting before the health macro actions."
 L["HealthTextExplain2"] = "%s follows Blizzard 'Status Text'.\
 Any other mode shows your chosen format for Player, Target, and Boss frames."
 L["Hearthstone"] = "Hearthstone"

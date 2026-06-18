@@ -2155,6 +2155,8 @@ La macro usa tutti gli incantesimi personalizzati che conosci."
 L["healthMacroLimitReached"] = "Macro Salute: limite macro raggiunto. Libera uno slot."
 L["healthMacroTipReset"] = "Suggerimento: per poter riutilizzare la Pietra della salute demoniaca in combattimento, usa `reset=60`."
 L["healthMacroWillUse"] = "Userà (in ordine): %s"
+L["healthStopCasting"] = "Interrompi lancio prima di usare la macro salute"
+L["healthStopCastingDesc"] = "Aggiunge /stopcasting prima delle azioni della macro salute."
 L["HealthTextExplain2"] = "%s segue il \"Testo di stato\" di Blizzard.\
 Qualsiasi altra modalità mostra il formato scelto per i riquadri di Giocatore, Bersaglio e Boss."
 L["Hearthstone"] = "Pietra del Ritorno"

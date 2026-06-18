@@ -2155,6 +2155,8 @@ L["healthCustomSpellsHint"] = "在下拉選單中選擇法術會將其移除（�
 L["healthMacroLimitReached"] = "生命巨集：已達到巨集上限。請釋出一個欄位。"
 L["healthMacroTipReset"] = "提示：若要在戰鬥中可再次使用惡魔治療石，請使用 `reset=60`。"
 L["healthMacroWillUse"] = "將依序使用：%s"
+L["healthStopCasting"] = "使用生命值巨集前停止施法"
+L["healthStopCastingDesc"] = "在生命值巨集動作前加入 /stopcasting。"
 L["HealthTextExplain2"] = "%s 會遵循暴雪「狀態文字」。\
 其他模式會在玩家、目標與首領框架上顯示你選擇的格式。"
 L["Hearthstone"] = "爐石"

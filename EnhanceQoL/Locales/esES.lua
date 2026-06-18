@@ -2155,6 +2155,8 @@ La macro usa cualquier hechizo personalizado que conozcas."
 L["healthMacroLimitReached"] = "Macro de salud: se alcanzó el límite de macros. Libera un espacio."
 L["healthMacroTipReset"] = "Consejo: para poder reutilizar la Piedra de salud demoníaca en combate, usa `reset=60`."
 L["healthMacroWillUse"] = "Usará (en orden): %s"
+L["healthStopCasting"] = "Interrumpir lanzamiento antes de usar la macro de salud"
+L["healthStopCastingDesc"] = "Añade /stopcasting antes de las acciones de la macro de salud."
 L["HealthTextExplain2"] = "%s sigue el \"Texto de estado\" de Blizzard.\
 Cualquier otro modo muestra el formato elegido para los marcos de jugador, objetivo y jefe."
 L["Hearthstone"] = "Piedra de hogar"

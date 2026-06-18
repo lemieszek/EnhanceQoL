@@ -2155,6 +2155,8 @@ Das Makro nutzt alle benutzerdefinierten Zauber, die du kennst."
 L["healthMacroLimitReached"] = "Health-Makro: Makro-Limit erreicht. Bitte einen Slot freigeben."
 L["healthMacroTipReset"] = "Tipp: Damit der Dämonische Gesundheitsstein im Kampf ggf. erneut genutzt werden kann, verwende `reset=60`."
 L["healthMacroWillUse"] = "Wird verwenden (in Reihenfolge): %s"
+L["healthStopCasting"] = "Zauberwirken vor dem Gesundheitsmakro abbrechen"
+L["healthStopCastingDesc"] = "Fügt /stopcasting vor den Aktionen des Gesundheitsmakros ein."
 L["HealthTextExplain2"] = "%s folgt Blizzards \"Statusanzeige\".\
 Jeder andere Modus zeigt dein gewähltes Format für Spieler-, Ziel- und Bossrahmen."
 L["Hearthstone"] = "Ruhestein"

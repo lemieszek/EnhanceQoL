@@ -2155,6 +2155,8 @@ La macro utilise tous les sorts personnalisés que vous connaissez."
 L["healthMacroLimitReached"] = "Macro de soins : limite de macros atteinte. Libérez un emplacement."
 L["healthMacroTipReset"] = "Astuce : pour pouvoir réutiliser la pierre de soins démoniaque en combat, utilisez `reset=60`."
 L["healthMacroWillUse"] = "Utilisera (dans l’ordre) : %s"
+L["healthStopCasting"] = "Interrompre l'incantation avant d'utiliser la macro de soins"
+L["healthStopCastingDesc"] = "Ajoute /stopcasting avant les actions de la macro de soins."
 L["HealthTextExplain2"] = "%s suit le \"Texte d'état\" de Blizzard.\
 Tout autre mode affiche votre format choisi pour les cadres de joueur, de cible et de boss."
 L["Hearthstone"] = "Pierre de foyer"

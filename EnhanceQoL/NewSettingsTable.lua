@@ -7,6 +7,9 @@ addon.variables.NewVersionTableEQOL = {
 	skinnerDefaultBuffIconsEnabled = true,
 	skinnerDefaultDebuffIconsEnabled = true,
 
+	-- 11.4.0-beta3
+	healthStopCasting = true,
+
 	-- 11.4.0-beta2
 	enhancedWaypoint = true,
 	hideMinimapButtonBinToggle = true,

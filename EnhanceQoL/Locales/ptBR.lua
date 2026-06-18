@@ -2155,6 +2155,8 @@ A macro usa quaisquer feitiços personalizados que você conheça."
 L["healthMacroLimitReached"] = "Macro de Vida: limite de macros atingido. Libere um espaço."
 L["healthMacroTipReset"] = "Dica: para possivelmente reutilizar a Pedra de Vida demoníaca em combate, use `reset=60`."
 L["healthMacroWillUse"] = "Usará (nesta ordem): %s"
+L["healthStopCasting"] = "Interromper lançamento antes de usar a macro de vida"
+L["healthStopCastingDesc"] = "Adiciona /stopcasting antes das ações da macro de vida."
 L["HealthTextExplain2"] = "%s segue o \"Texto de status\" da Blizzard.\
 Qualquer outro modo mostra o formato escolhido para os quadros de Jogador, Alvo e Chefe."
 L["Hearthstone"] = "Pedra de Regresso"

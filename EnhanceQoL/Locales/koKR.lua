@@ -2155,6 +2155,8 @@ L["healthCustomSpellsHint"] = "드롭다운에서 주문을 선택하면 삭제�
 L["healthMacroLimitReached"] = "체력 매크로: 매크로 한도에 도달했습니다. 슬롯을 비워 주세요."
 L["healthMacroTipReset"] = "팁: 전투 중에 악마의 생명석을 다시 사용하려면 `reset=60`을 사용하세요."
 L["healthMacroWillUse"] = "다음 순서로 사용: %s"
+L["healthStopCasting"] = "체력 매크로 사용 전에 시전 중지"
+L["healthStopCastingDesc"] = "체력 매크로 동작 앞에 /stopcasting을 추가합니다."
 L["HealthTextExplain2"] = "%s은(는) 블리자드의 '상태 문자' 설정을 따릅니다.\
 다른 모드는 플레이어, 대상, 보스 프레임에 선택한 형식을 표시합니다."
 L["Hearthstone"] = "귀환석"

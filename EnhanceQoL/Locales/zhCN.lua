@@ -2155,6 +2155,8 @@ L["healthCustomSpellsHint"] = "在下拉菜单中选择法术会将其移除（�
 L["healthMacroLimitReached"] = "治疗宏：已达到宏数量上限。请释放一个槽位。"
 L["healthMacroTipReset"] = "提示：要在战斗中可能再次使用恶魔治疗石，请使用 `reset=60`。"
 L["healthMacroWillUse"] = "将按顺序使用：%s"
+L["healthStopCasting"] = "使用生命值宏前停止施法"
+L["healthStopCastingDesc"] = "在生命值宏动作前添加 /stopcasting。"
 L["HealthTextExplain2"] = "%s 遵循暴雪“状态文字”。\
 其他模式会在玩家、目标和首领框体上显示你选择的格式。"
 L["Hearthstone"] = "炉石"

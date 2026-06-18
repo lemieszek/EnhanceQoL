@@ -6,6 +6,7 @@
 
 ### ✨ Added
 
+- Health Macro: Added an option to place `/stopcasting` before the generated health macro actions.
 - Map & Minimap / Waypoint: Added an optional enhanced in-world waypoint with destination label, clearer tracked icons, highlight toggle, and scale control.
 
 ### 🐛 Fixed
