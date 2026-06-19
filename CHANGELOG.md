@@ -6,7 +6,7 @@
 
 ### ✨ Added
 
-- Mythic Plus: Added PTR support for the Midnight Season 2 dungeon rotation, including new challenge map IDs, portal spells, and tooltip labels.
+- Mythic Plus: Added PTR support for the Midnight Season 2 dungeon rotation, including new challenge map IDs, portal spells, tooltip labels, and the new Catalyst currency.
 
 ### 🐛 Fixed
 

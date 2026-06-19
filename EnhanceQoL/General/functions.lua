@@ -2321,6 +2321,9 @@ function addon.functions.catalystChecks()
 		addon.variables.catalystID = 3269
 	elseif mId == 17 then
 		addon.variables.catalystID = 3378
+	elseif mId == 18 then
+		-- Midnight Season 2 PTR
+		addon.variables.catalystID = 3465
 	end
 	addon.functions.createCatalystFrame()
 end
