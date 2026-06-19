@@ -2,6 +2,14 @@
 
 <!--@eqol-beta@-->
 
+## [11.4.0-beta6] - 2026-06-19
+
+### 🐛 Fixed
+
+- Group Frames / Raid Frames: Stabilized grouped raid layouts so group labels no longer jitter, and improved combat-safe raid joins for role, group, and custom raid sorting.
+
+---
+
 ## [11.4.0-beta5] - 2026-06-19
 
 ### ✨ Added
