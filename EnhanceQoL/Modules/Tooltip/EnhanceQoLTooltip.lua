@@ -457,6 +457,48 @@ local function FormatUnitName(unit)
 	return name
 end
 
+local function FormatTargetOfTargetName(unit)
+	if IsUnitIdentitySecret(unit) then return nil end
+	if SafeUnitIsUnit(unit, "player") then return "<YOU>" end
+	local name, realm = SafeUnitName(unit)
+	if not name then return nil end
+	local fullName = (realm and realm ~= "") and (name .. "-" .. realm) or name
+	local mode = addon.db and addon.db["TooltipTargetOfTargetRealmMode"] or "SHOW"
+	if mode == "HIDE" and Ambiguate then return Ambiguate(fullName, "short") or name end
+	if mode == "STAR" and Ambiguate then
+		local shortName = Ambiguate(fullName, "short") or name
+		if shortName ~= fullName then return shortName .. "-(*)" end
+		return shortName
+	end
+	return fullName
+end
+
+local function GetUnitReactionColor(unit)
+	if not UnitReaction then return nil end
+	local reaction = UnitReaction(unit, "player")
+	if isSecret(reaction) then return nil end
+	local factionColors = _G.FACTION_BAR_COLORS
+	local color = reaction and factionColors and factionColors[reaction]
+	if color then return color.r, color.g, color.b end
+	return nil
+end
+
+local function ColorTargetOfTargetName(unit, text)
+	if not text then return nil end
+	if not (addon.db and addon.db["TooltipTargetOfTargetColorMode"] == "UNIT") then return ColorText(text) end
+	if SafeUnitIsUnit(unit, "player") then return ColorTextRGB(text, 0, 1, 0.6) end
+	if UnitIsPlayer and UnitIsPlayer(unit) then
+		local _, class = UnitClass(unit)
+		if not isSecret(class) then
+			local r, g, b = GetClassColor(class)
+			return ColorTextRGB(text, r, g, b)
+		end
+	end
+	local r, g, b = GetUnitReactionColor(unit)
+	if r then return ColorTextRGB(text, r, g, b) end
+	return ColorText(text)
+end
+
 local function GetUnitMountInfo(unit)
 	if not unit or not UnitIsPlayer or not UnitIsPlayer(unit) then return nil end
 	if not (C_UnitAuras and C_UnitAuras.GetUnitAuras) then return nil end
@@ -1065,8 +1107,8 @@ local function checkAdditionalTooltip(tooltip)
 	if unit and addon.db["TooltipUnitShowTargetOfTarget"] then
 		local targetUnit = unit .. "target"
 		if UnitExists(targetUnit) then
-			local targetName = FormatUnitName(targetUnit)
-			if targetName then tooltip:AddDoubleLine(L["TooltipTargeting"] or "Targeting", ColorText(targetName)) end
+			local targetName = FormatTargetOfTargetName(targetUnit)
+			if targetName then tooltip:AddDoubleLine(L["TooltipTargeting"] or "Targeting", ColorTargetOfTargetName(targetUnit, targetName)) end
 		end
 	end
 

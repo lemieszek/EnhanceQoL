@@ -3985,11 +3985,18 @@ local function handleSelectionMouseDown(self)
 	selectSelection(self)
 end
 
+local function MouseIsOverCompat(region, topOffset, bottomOffset, leftOffset, rightOffset)
+	if not region then return false end
+	if _G.MouseIsOver then return _G.MouseIsOver(region, topOffset, bottomOffset, leftOffset, rightOffset) end
+	if region.IsMouseOver then return region:IsMouseOver(topOffset, bottomOffset, leftOffset, rightOffset) end
+	return false
+end
+
 -- hide overlap menu when clicking elsewhere (non-blocking)
 local function overlapGlobalMouseDown()
 	local menu = Internal.overlapMenu
 	if not (lib.isEditing and menu and menu:IsShown()) then return end
-	if MouseIsOver and MouseIsOver(menu, 4, 4, 4, 4) then return end
+	if MouseIsOverCompat(menu, 4, 4, 4, 4) then return end
 	local focus = GetMouseFoci and GetMouseFoci() or GetMouseFocus()
 	if focus and (focus == menu or (focus.IsDescendantOf and focus:IsDescendantOf(menu))) then return end
 	hideOverlapMenu()

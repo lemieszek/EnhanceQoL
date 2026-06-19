@@ -1129,7 +1129,7 @@ end
 
 ResourceBars.NormalizeDurationTextProfile = function(value)
 	local durationText = addon.DurationText
-	if durationText and durationText.GetProfileKey then return durationText:GetProfileKey(value) end
+	if durationText and durationText.GetProfileKey then return durationText:GetProfileKey(value or "MINIMAL") end
 	if type(value) == "string" and value ~= "" then return value end
 	return "MINIMAL"
 end

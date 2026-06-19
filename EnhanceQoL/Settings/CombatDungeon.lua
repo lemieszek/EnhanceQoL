@@ -2143,6 +2143,8 @@ end
 
 local lfgPoint, lfgRelativeTo, lfgRelativePoint, lfgXOfs, lfgYOfs
 
+-- TODO 12.1 cleanup: remove groupfinderMoveResetButton if Blizzard's default Group Finder layout no longer overlaps refresh/reset.
+-- Also add DB/profile cleanup for groupfinderMoveResetButton when removing this workaround.
 local function toggleLFGFilterPosition()
 	if LFGListFrame and LFGListFrame.SearchPanel and LFGListFrame.SearchPanel.FilterButton and LFGListFrame.SearchPanel.FilterButton.ResetButton then
 		if addon.db["groupfinderMoveResetButton"] then
@@ -2851,6 +2853,7 @@ data = {
 	{
 		text = L["groupfinderMoveResetButton"],
 		var = "groupfinderMoveResetButton",
+		-- TODO 12.1 cleanup: remove this setting after confirming Blizzard fixed the Group Finder refresh/reset overlap.
 		func = function(value)
 			addon.db["groupfinderMoveResetButton"] = value
 			toggleLFGFilterPosition()

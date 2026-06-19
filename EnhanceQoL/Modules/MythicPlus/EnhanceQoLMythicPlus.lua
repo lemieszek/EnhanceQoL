@@ -182,7 +182,7 @@ end
 
 function addon.MythicPlus.functions.NormalizeTrackerDurationTextProfile(value)
 	local durationText = addon.DurationText
-	if durationText and durationText.GetProfileKey then return durationText:GetProfileKey(value) end
+	if durationText and durationText.GetProfileKey then return durationText:GetProfileKey(value or "MINIMAL") end
 	return type(value) == "string" and value ~= "" and value or "MINIMAL"
 end
 

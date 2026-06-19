@@ -2342,13 +2342,13 @@ AuraUtil._LEGACY_AURA_SECTION_EXCLUDES = {
 
 function AuraUtil.NormalizeDurationTextProfile(value, fallback)
 	local durationText = addon.DurationText
-	if durationText and durationText.GetProfileKey then return durationText:GetProfileKey(value or fallback) end
+	if durationText and durationText.GetProfileKey then return durationText:GetProfileKey(value or fallback or "MINIMAL") end
 	return type(value) == "string" and value ~= "" and value or fallback or "MINIMAL"
 end
 
 function AuraUtil.ApplyDurationTextProfileToCooldownFrame(cooldown, profileKey)
 	if not (cooldown and addon.functions and addon.functions.ApplyDurationTextProfileToCooldownFrame) then return false end
-	return addon.functions.ApplyDurationTextProfileToCooldownFrame(cooldown, AuraUtil.NormalizeDurationTextProfile(profileKey, "MINIMAL"))
+	return addon.functions.ApplyDurationTextProfileToCooldownFrame(cooldown, AuraUtil.NormalizeDurationTextProfile(profileKey, "MINIMAL"), { preserveCooldownUnits = true })
 end
 
 function AuraUtil.buildLegacyAuraSection(src, isDebuff)

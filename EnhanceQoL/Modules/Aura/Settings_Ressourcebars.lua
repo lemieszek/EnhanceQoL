@@ -2858,12 +2858,12 @@ registerEditModeBars = function()
 					get = function()
 						local c = curSpecCfg()
 						local value = (c and c.durationTextProfile) or cfg.durationTextProfile
-						return addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(value) or (value or "MINIMAL")
+						return addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(value or "MINIMAL") or (value or "MINIMAL")
 					end,
 					set = function(_, value)
 						local c = curSpecCfg()
 						if not c then return end
-						c.durationTextProfile = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(value) or value
+						c.durationTextProfile = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(value or "MINIMAL") or value
 						queueRefresh()
 					end,
 					generator = function(_, root)
@@ -2872,7 +2872,7 @@ registerEditModeBars = function()
 							root:CreateRadio(option.label, function()
 								local c = curSpecCfg()
 								local value = (c and c.durationTextProfile) or cfg.durationTextProfile
-								value = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(value) or (value or "MINIMAL")
+								value = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(value or "MINIMAL") or (value or "MINIMAL")
 								return value == option.value
 							end, function()
 								local c = curSpecCfg()
@@ -3928,12 +3928,12 @@ registerEditModeBars = function()
 						parentId = powerColorParentId,
 						get = function()
 							local value = readPowerConfigField("durationTextProfile", "MINIMAL")
-							return addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(value) or value
+							return addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(value or "MINIMAL") or value
 						end,
 						set = function(_, value)
 							local c = currentPowerConfigTarget()
 							if not c then return end
-							c.durationTextProfile = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(value) or value
+							c.durationTextProfile = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(value or "MINIMAL") or value
 							queueRefresh()
 						end,
 						generator = function(_, root)
@@ -3941,7 +3941,7 @@ registerEditModeBars = function()
 							for _, option in ipairs(options) do
 								root:CreateRadio(option.label, function()
 									local value = readPowerConfigField("durationTextProfile", "MINIMAL")
-									value = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(value) or value
+									value = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(value or "MINIMAL") or value
 									return value == option.value
 								end, function()
 									local c = currentPowerConfigTarget()

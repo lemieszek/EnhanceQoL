@@ -17229,7 +17229,7 @@ local function buildEditModeSettings(kind, editModeId)
 	end
 	local function normalizeDurationTextProfile(value, fallback)
 		local durationText = addon.DurationText
-		if durationText and durationText.GetProfileKey then return durationText:GetProfileKey(value or fallback) end
+		if durationText and durationText.GetProfileKey then return durationText:GetProfileKey(value or fallback or "MINIMAL") end
 		return type(value) == "string" and value ~= "" and value or fallback or "MINIMAL"
 	end
 	local function getAuraDurationTextProfile(typeKey)
@@ -32060,7 +32060,7 @@ function GF:EnsureEditMode()
 				buffCooldownTextSize = ac.buff.cooldownFontSize or defBuff.cooldownFontSize or 12,
 				buffCooldownTextFont = ac.buff.cooldownFont or defBuff.cooldownFont or nil,
 				buffCooldownTextOutline = ac.buff.cooldownFontOutline or defBuff.cooldownFontOutline or "OUTLINE",
-				buffDurationTextProfile = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(ac.buff.durationTextProfile or defBuff.durationTextProfile) or (ac.buff.durationTextProfile or defBuff.durationTextProfile or "MINIMAL"),
+				buffDurationTextProfile = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(ac.buff.durationTextProfile or defBuff.durationTextProfile or "MINIMAL") or (ac.buff.durationTextProfile or defBuff.durationTextProfile or "MINIMAL"),
 				buffStackTextEnabled = (ac.buff.showStacks ~= nil and ac.buff.showStacks ~= false) or (ac.buff.showStacks == nil and defBuff.showStacks ~= false),
 				buffStackAnchor = ac.buff.countAnchor or defBuff.countAnchor or "BOTTOMRIGHT",
 				buffStackOffsetX = (ac.buff.countOffset and ac.buff.countOffset.x) or (defBuff.countOffset and defBuff.countOffset.x) or -2,
@@ -32094,7 +32094,7 @@ function GF:EnsureEditMode()
 				debuffCooldownTextSize = ac.debuff.cooldownFontSize or defDebuff.cooldownFontSize or 12,
 				debuffCooldownTextFont = ac.debuff.cooldownFont or defDebuff.cooldownFont or nil,
 				debuffCooldownTextOutline = ac.debuff.cooldownFontOutline or defDebuff.cooldownFontOutline or "OUTLINE",
-				debuffDurationTextProfile = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(ac.debuff.durationTextProfile or defDebuff.durationTextProfile) or (ac.debuff.durationTextProfile or defDebuff.durationTextProfile or "MINIMAL"),
+				debuffDurationTextProfile = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(ac.debuff.durationTextProfile or defDebuff.durationTextProfile or "MINIMAL") or (ac.debuff.durationTextProfile or defDebuff.durationTextProfile or "MINIMAL"),
 				debuffStackTextEnabled = (ac.debuff.showStacks ~= nil and ac.debuff.showStacks ~= false) or (ac.debuff.showStacks == nil and defDebuff.showStacks ~= false),
 				debuffStackAnchor = ac.debuff.countAnchor or defDebuff.countAnchor or "BOTTOMRIGHT",
 				debuffStackOffsetX = (ac.debuff.countOffset and ac.debuff.countOffset.x) or (defDebuff.countOffset and defDebuff.countOffset.x) or -2,
@@ -32132,7 +32132,7 @@ function GF:EnsureEditMode()
 				externalCooldownTextSize = ac.externals.cooldownFontSize or defExt.cooldownFontSize or 12,
 				externalCooldownTextFont = ac.externals.cooldownFont or defExt.cooldownFont or nil,
 				externalCooldownTextOutline = ac.externals.cooldownFontOutline or defExt.cooldownFontOutline or "OUTLINE",
-				externalDurationTextProfile = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(ac.externals.durationTextProfile or defExt.durationTextProfile) or (ac.externals.durationTextProfile or defExt.durationTextProfile or "MINIMAL"),
+				externalDurationTextProfile = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(ac.externals.durationTextProfile or defExt.durationTextProfile or "MINIMAL") or (ac.externals.durationTextProfile or defExt.durationTextProfile or "MINIMAL"),
 				externalStackTextEnabled = (ac.externals.showStacks ~= nil and ac.externals.showStacks ~= false) or (ac.externals.showStacks == nil and defExt.showStacks ~= false),
 				externalStackAnchor = ac.externals.countAnchor or defExt.countAnchor or "BOTTOMRIGHT",
 				externalStackOffsetX = (ac.externals.countOffset and ac.externals.countOffset.x) or (defExt.countOffset and defExt.countOffset.x) or -2,

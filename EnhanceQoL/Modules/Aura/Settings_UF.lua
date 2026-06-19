@@ -100,7 +100,7 @@ local function syncEditModeSelectionStrata(frame)
 end
 
 local function normalizeDurationTextProfile(value)
-	if addon.DurationText and addon.DurationText.GetProfileKey then return addon.DurationText:GetProfileKey(value) end
+	if addon.DurationText and addon.DurationText.GetProfileKey then return addon.DurationText:GetProfileKey(value or "MINIMAL") end
 	return type(value) == "string" and value ~= "" and value or "MINIMAL"
 end
 

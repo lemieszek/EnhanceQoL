@@ -34,6 +34,14 @@ local TooltipUtil = _G.TooltipUtil
 local GetTime = GetTime
 local GetActiveQuestID = _G.GetActiveQuestID
 
+local function MouseIsOver(region, topOffset, bottomOffset, leftOffset, rightOffset)
+	if not region then return false end
+	if _G.MouseIsOver then return _G.MouseIsOver(region, topOffset, bottomOffset, leftOffset, rightOffset) end
+	if region.IsMouseOver then return region:IsMouseOver(topOffset, bottomOffset, leftOffset, rightOffset) end
+	return false
+end
+addon.functions.MouseIsOver = MouseIsOver
+
 local AUTO_REPAIR_GUILD_BANK_CONTEXT_DEFAULTS = {
 	world = true,
 	party = true,
@@ -4591,6 +4599,7 @@ local function initUI()
 	addon.functions.InitDBValue("worldMapCoordinatesHideCursor", true)
 	if addon.EnhancedWaypoint and addon.EnhancedWaypoint.SetEnabled then addon.EnhancedWaypoint:SetEnabled(addon.db["enhancedWaypoint"] == true) end
 	addon.functions.InitDBValue("hiddenMinimapElements", addon.db["hiddenMinimapElements"] or {})
+	-- TODO 12.1 cleanup: remove persistAuctionHouseFilter if native Auction House filter persistence covers this workaround.
 	addon.functions.InitDBValue("persistAuctionHouseFilter", false)
 	addon.functions.InitDBValue("alwaysUserCurExpAuctionHouse", false)
 	addon.functions.InitDBValue("alwaysUserCurExpCraftingOrders", false)
@@ -7485,7 +7494,7 @@ local eventHandlers = {
 
 		addon.variables.screenHeight = GetScreenHeight()
 
-		if addon.db["enableMinimapButtonBin"] then addon.functions.toggleButtonSink() end
+		if addon.db["enableMinimapButtonBin"] and addon.functions.toggleButtonSink then addon.functions.toggleButtonSink() end
 		if addon.db["actionBarAnchorEnabled"] then RefreshAllActionBarAnchors() end
 		addon.variables.unitSpec = C_SpecializationInfo.GetSpecialization()
 		if addon.variables.unitSpec then
@@ -7624,6 +7633,7 @@ local eventHandlers = {
 		addon.variables.auctionHouseOpen = true
 		if addon.db["closeBagsOnAuctionHouse"] and not addon.functions.isRestrictedContent() then CloseAllBags() end
 		if addon.functions.RefreshAuctionHouseBagFade then addon.functions.RefreshAuctionHouseBagFade() end
+		-- TODO 12.1 cleanup: Blizzard persists Auction House filters natively; remove this restore hook after release verification.
 		if addon.db["persistAuctionHouseFilter"] then
 			if not AuctionHouseFrame.SearchBar.FilterButton.eqolHooked then
 				hooksecurefunc(AuctionHouseFrame.SearchBar.FilterButton, "Reset", function(self)
@@ -7654,6 +7664,7 @@ local eventHandlers = {
 	["AUCTION_HOUSE_CLOSED"] = function()
 		addon.variables.auctionHouseOpen = false
 		if addon.functions.RefreshAuctionHouseBagFade then addon.functions.RefreshAuctionHouseBagFade() end
+		-- TODO 12.1 cleanup: remove this saved filter cache once native Auction House persistence is confirmed on release.
 		if not addon.db["persistAuctionHouseFilter"] then return end
 		if AuctionHouseFrame.SearchBar.FilterButton.ClearFiltersButton:IsShown() then
 			addon.variables.safedAuctionFilters = AuctionHouseFrame.SearchBar.FilterButton.filters

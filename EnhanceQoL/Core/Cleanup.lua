@@ -90,6 +90,8 @@ local LEGACY_PROFILE_KEYS = {
 	"unitFrameTruncateNames",
 }
 
+-- TODO 12.1 cleanup: when removing native-replaced PTR workarounds, add their stored keys here
+-- or to a dedicated cleanup helper. Expected keys: persistAuctionHouseFilter, groupfinderMoveResetButton.
 local MULTIDROPDOWN_SCRATCH_PROFILE_KEYS = {
 	"bagDisplayOptions",
 	"bagItemLevelTargets",

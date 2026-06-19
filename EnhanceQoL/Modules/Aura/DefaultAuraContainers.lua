@@ -120,7 +120,7 @@ local refreshDefaultAuraIconSkin
 
 local function normalizeDefaultAuraDurationTextProfile(value)
 	local durationText = addon.DurationText
-	if durationText and durationText.GetProfileKey then return durationText:GetProfileKey(value) end
+	if durationText and durationText.GetProfileKey then return durationText:GetProfileKey(value or "MINIMAL") end
 	return type(value) == "string" and value ~= "" and value or "MINIMAL"
 end
 
@@ -348,7 +348,7 @@ end
 
 local function applyDefaultAuraDurationTextProfile(button)
 	if not (button and button.Cooldown and addon.functions and addon.functions.ApplyDurationTextProfileToCooldownFrame) then return false end
-	return addon.functions.ApplyDurationTextProfileToCooldownFrame(button.Cooldown, getDefaultAuraDurationTextProfile(button.eqolDefaultAuraKind))
+	return addon.functions.ApplyDurationTextProfileToCooldownFrame(button.Cooldown, getDefaultAuraDurationTextProfile(button.eqolDefaultAuraKind), { preserveCooldownUnits = true })
 end
 
 local function getDefaultAuraIconsPerRow(value, kind)

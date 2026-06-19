@@ -37,10 +37,14 @@ local questTrackerMainHeaderHiddenWatcher
 local objectiveTrackerMinimizeWatcher
 local objectiveTrackerMinimizeHooked
 local objectiveTrackerCollapseHooked
-local questTrackerTextStyleHooked
+local questTrackerTextStyleHooked = {}
 local questTrackerTextStyleWatcher
 local questTrackerTextStyleFontOrder = {}
 local questTrackerTextStyleRefreshing
+local QUEST_TRACKER_TEXT_STYLE_TRACKER_NAMES = {
+	"QuestObjectiveTracker",
+	"CampaignQuestObjectiveTracker",
+}
 local OBJECTIVE_TRACKER_MINIMIZE_ANCHORS = {
 	TOPLEFT = { point = "TOPLEFT", x = 1, y = 0 },
 	TOPRIGHT = { point = "TOPRIGHT", x = -1, y = 0 },
@@ -208,8 +212,15 @@ local function HandleQuestTrackerTextStyleBlock(block)
 	end
 end
 
+local function IsQuestTrackerTextStyleTracker(tracker)
+	for _, name in ipairs(QUEST_TRACKER_TEXT_STYLE_TRACKER_NAMES) do
+		if tracker == _G[name] then return true end
+	end
+	return false
+end
+
 local function HandleQuestTrackerTextStyleModule(tracker)
-	if tracker ~= _G.QuestObjectiveTracker then return end
+	if not IsQuestTrackerTextStyleTracker(tracker) then return end
 	local headerText = tracker and tracker.Header and tracker.Header.Text
 	if headerText then
 		ApplyQuestTrackerTextStyleFontString(headerText, "moduleHeader", nil)
@@ -219,20 +230,25 @@ end
 
 local function EnsureQuestTrackerTextStyleHooks()
 	if not IsQuestTrackerTextStyleEnabled() then return end
-	if questTrackerTextStyleHooked or not hooksecurefunc then return end
-	local tracker = _G.QuestObjectiveTracker
-	if not (tracker and type(tracker.Update) == "function" and type(tracker.AddBlock) == "function") then return end
-	questTrackerTextStyleHooked = true
-	hooksecurefunc(tracker, "Update", function(hookedTracker) HandleQuestTrackerTextStyleModule(hookedTracker) end)
-	hooksecurefunc(tracker, "AddBlock", function(_, block) HandleQuestTrackerTextStyleBlock(block) end)
+	if not hooksecurefunc then return end
+	for _, name in ipairs(QUEST_TRACKER_TEXT_STYLE_TRACKER_NAMES) do
+		local tracker = _G[name]
+		if not questTrackerTextStyleHooked[name] and tracker and type(tracker.Update) == "function" and type(tracker.AddBlock) == "function" then
+			questTrackerTextStyleHooked[name] = true
+			hooksecurefunc(tracker, "Update", function(hookedTracker) HandleQuestTrackerTextStyleModule(hookedTracker) end)
+			hooksecurefunc(tracker, "AddBlock", function(_, block) HandleQuestTrackerTextStyleBlock(block) end)
+		end
+	end
 end
 
 local function RefreshQuestTrackerTextStyle(skipLayoutUpdate)
 	if not IsQuestTrackerTextStyleEnabled() then return end
-	local tracker = _G.QuestObjectiveTracker
 	EnsureQuestTrackerTextStyleHooks()
-	if tracker and tracker.EnumerateActiveBlocks then tracker:EnumerateActiveBlocks(function(block) HandleQuestTrackerTextStyleBlock(block) end) end
-	HandleQuestTrackerTextStyleModule(tracker)
+	for _, name in ipairs(QUEST_TRACKER_TEXT_STYLE_TRACKER_NAMES) do
+		local tracker = _G[name]
+		if tracker and tracker.EnumerateActiveBlocks then tracker:EnumerateActiveBlocks(function(block) HandleQuestTrackerTextStyleBlock(block) end) end
+		HandleQuestTrackerTextStyleModule(tracker)
+	end
 	if not skipLayoutUpdate and not questTrackerTextStyleRefreshing and _G.ObjectiveTrackerManager and _G.ObjectiveTrackerManager.UpdateAll then
 		questTrackerTextStyleRefreshing = true
 		_G.ObjectiveTrackerManager:UpdateAll()

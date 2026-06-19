@@ -1,4 +1,4 @@
-## Interface: 120005, 120007
+## Interface: 120005, 120007, 120100
 ## Title: Enhance QoL Routes Journel
 ## Notes: Store and share MDT-compatible routes
 ## Notes-deDE: MDT-kompatible Routen speichern und teilen

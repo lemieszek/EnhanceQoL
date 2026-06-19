@@ -833,19 +833,25 @@ function DurationText:BindFontString(fontString, durationObject, options)
 	return self:ConfigureBinding(owner, options.key or "default", fontString, durationObject, options)
 end
 
-function DurationText:ApplyToCooldownFrame(cooldownFrame, config)
+function DurationText:ApplyToCooldownFrame(cooldownFrame, config, options)
 	if not cooldownFrame then return false end
+	options = options or EMPTY_TABLE
 	config = self:GetEffectiveConfig(config)
-	local formatter = self:GetCooldownFrameFormatter(config)
-	if formatter and cooldownFrame.SetCountdownFormatter then cooldownFrame:SetCountdownFormatter(formatter) end
+	local formatter
+	if options.preserveCooldownUnits == true then
+		if cooldownFrame.SetCountdownFormatter then cooldownFrame:SetCountdownFormatter(nil) end
+	else
+		formatter = self:GetCooldownFrameFormatter(config)
+		if formatter and cooldownFrame.SetCountdownFormatter then cooldownFrame:SetCountdownFormatter(formatter) end
+	end
 	if cooldownFrame.SetCountdownMillisecondsThreshold then cooldownFrame:SetCountdownMillisecondsThreshold(tonumber(config.millisecondsThreshold) or self.defaults.millisecondsThreshold) end
 	if cooldownFrame.SetCountdownAbbrevThreshold then cooldownFrame:SetCountdownAbbrevThreshold(tonumber(config.approximationSeconds) or self.defaults.approximationSeconds) end
-	return formatter ~= nil
+	return formatter ~= nil or options.preserveCooldownUnits == true
 end
 
-function DurationText:ApplyProfileToCooldownFrame(cooldownFrame, profileKey)
+function DurationText:ApplyProfileToCooldownFrame(cooldownFrame, profileKey, options)
 	local _, resolvedProfileKey = self:GetProfileConfig(profileKey)
-	return self:ApplyToCooldownFrame(cooldownFrame, resolvedProfileKey)
+	return self:ApplyToCooldownFrame(cooldownFrame, resolvedProfileKey, options)
 end
 
 function addon.functions.IsDurationTextBindingSupported() return DurationText:IsDurationTextBindingSupported() end
@@ -871,4 +877,4 @@ function addon.functions.UpdateDurationTextBinding(owner, key) return DurationTe
 function addon.functions.GetDurationTextBindingState(owner, key) return DurationText:GetBindingState(owner, key) end
 function addon.functions.ConfigureDurationTextBinding(owner, key, fontString, durationObject, options) return DurationText:ConfigureBinding(owner, key, fontString, durationObject, options) end
 function addon.functions.BindDurationText(fontString, durationObject, options) return DurationText:BindFontString(fontString, durationObject, options) end
-function addon.functions.ApplyDurationTextProfileToCooldownFrame(cooldownFrame, profileKey) return DurationText:ApplyProfileToCooldownFrame(cooldownFrame, profileKey) end
+function addon.functions.ApplyDurationTextProfileToCooldownFrame(cooldownFrame, profileKey, options) return DurationText:ApplyProfileToCooldownFrame(cooldownFrame, profileKey, options) end

@@ -455,6 +455,49 @@ data = {
 		default = false,
 		type = Settings.VarType.Boolean,
 		parentSection = expandable,
+		children = {
+			{
+				var = "TooltipTargetOfTargetRealmMode",
+				text = L["TooltipTargetOfTargetRealmMode"],
+				list = {
+					SHOW = L["TooltipTargetOfTargetRealmModeShow"],
+					HIDE = L["TooltipTargetOfTargetRealmModeHide"],
+					STAR = L["TooltipTargetOfTargetRealmModeStar"],
+				},
+				order = { "SHOW", "HIDE", "STAR" },
+				get = function() return addon.db["TooltipTargetOfTargetRealmMode"] or "SHOW" end,
+				set = function(value) addon.db["TooltipTargetOfTargetRealmMode"] = value ~= "SHOW" and value or nil end,
+				default = "SHOW",
+				parent = true,
+				parentCheck = function()
+					return addon.SettingsLayout.elements["TooltipUnitShowTargetOfTarget"]
+						and addon.SettingsLayout.elements["TooltipUnitShowTargetOfTarget"].setting
+						and addon.SettingsLayout.elements["TooltipUnitShowTargetOfTarget"].setting:GetValue() == true
+				end,
+				sType = "dropdown",
+				parentSection = expandable,
+			},
+			{
+				var = "TooltipTargetOfTargetColorMode",
+				text = L["TooltipTargetOfTargetColorMode"],
+				list = {
+					DEFAULT = L["TooltipTargetOfTargetColorModeDefault"],
+					UNIT = L["TooltipTargetOfTargetColorModeUnit"],
+				},
+				order = { "DEFAULT", "UNIT" },
+				get = function() return addon.db["TooltipTargetOfTargetColorMode"] or "DEFAULT" end,
+				set = function(value) addon.db["TooltipTargetOfTargetColorMode"] = value ~= "DEFAULT" and value or nil end,
+				default = "DEFAULT",
+				parent = true,
+				parentCheck = function()
+					return addon.SettingsLayout.elements["TooltipUnitShowTargetOfTarget"]
+						and addon.SettingsLayout.elements["TooltipUnitShowTargetOfTarget"].setting
+						and addon.SettingsLayout.elements["TooltipUnitShowTargetOfTarget"].setting:GetValue() == true
+				end,
+				sType = "dropdown",
+				parentSection = expandable,
+			},
+		},
 	},
 	{
 		var = "TooltipUnitShowMount",

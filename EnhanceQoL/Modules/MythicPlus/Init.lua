@@ -13,6 +13,7 @@ addon.MythicPlus.Buttons = addon.MythicPlus.Buttons or {}
 addon.MythicPlus.nrOfButtons = addon.MythicPlus.nrOfButtons or 0
 addon.MythicPlus.variables = addon.MythicPlus.variables or {}
 local L = LibStub("AceLocale-3.0"):GetLocale("EnhanceQoL")
+local MouseIsOver = addon.functions.MouseIsOver
 
 _G["BINDING_NAME_CLICK EQOLRandomHearthstoneButton:LeftButton"] = L["teleportsRandomHearthstoneBinding"] or "Random Hearthstone"
 
