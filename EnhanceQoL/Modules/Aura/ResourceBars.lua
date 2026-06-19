@@ -8411,7 +8411,7 @@ local function eventHandler(self, event, eventArg1, eventArg2)
 		return
 	elseif event == "CLIENT_SCENE_OPENED" then
 		local sceneType = unit
-		ResourceBars._clientSceneOpen = (sceneType == 1)
+		ResourceBars._clientSceneOpen = addon.functions and addon.functions.IsMinigameClientScene and addon.functions.IsMinigameClientScene(sceneType) or false
 		ResourceBars.ApplyVisibilityPreference(event)
 		return
 	elseif event == "CLIENT_SCENE_CLOSED" then

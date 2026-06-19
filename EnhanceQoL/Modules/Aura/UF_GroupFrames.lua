@@ -32774,7 +32774,7 @@ do
 			end
 		elseif event == "CLIENT_SCENE_OPENED" then
 			local sceneType = ...
-			GF._clientSceneActive = (sceneType == 1)
+			GF._clientSceneActive = addon.functions and addon.functions.IsMinigameClientScene and addon.functions.IsMinigameClientScene(sceneType) or false
 			if isFeatureEnabled() then GF:RefreshClientSceneVisibility() end
 		elseif event == "CLIENT_SCENE_CLOSED" then
 			GF._clientSceneActive = false

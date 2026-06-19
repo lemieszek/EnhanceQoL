@@ -39,7 +39,7 @@ DurationText.profileDefaults = {
 		convertToLower = true,
 		desiredUnitCount = 1,
 		expiredText = "",
-		formatStyle = "NUMERIC",
+		formatStyle = "UNITS",
 		maxInterval = "DAYS",
 		millisecondsThreshold = 0,
 		minInterval = "SECONDS",
@@ -838,7 +838,7 @@ function DurationText:ApplyToCooldownFrame(cooldownFrame, config, options)
 	options = options or EMPTY_TABLE
 	config = self:GetEffectiveConfig(config)
 	local formatter
-	if options.preserveCooldownUnits == true then
+	if options.preserveCooldownUnits == true or (options.preserveCooldownUnits ~= false and config.formatStyle ~= "NUMERIC") then
 		if cooldownFrame.SetCountdownFormatter then cooldownFrame:SetCountdownFormatter(nil) end
 	else
 		formatter = self:GetCooldownFrameFormatter(config)
@@ -846,12 +846,12 @@ function DurationText:ApplyToCooldownFrame(cooldownFrame, config, options)
 	end
 	if cooldownFrame.SetCountdownMillisecondsThreshold then cooldownFrame:SetCountdownMillisecondsThreshold(tonumber(config.millisecondsThreshold) or self.defaults.millisecondsThreshold) end
 	if cooldownFrame.SetCountdownAbbrevThreshold then cooldownFrame:SetCountdownAbbrevThreshold(tonumber(config.approximationSeconds) or self.defaults.approximationSeconds) end
-	return formatter ~= nil or options.preserveCooldownUnits == true
+	return formatter ~= nil or options.preserveCooldownUnits == true or config.formatStyle ~= "NUMERIC"
 end
 
 function DurationText:ApplyProfileToCooldownFrame(cooldownFrame, profileKey, options)
-	local _, resolvedProfileKey = self:GetProfileConfig(profileKey)
-	return self:ApplyToCooldownFrame(cooldownFrame, resolvedProfileKey, options)
+	local config = self:GetProfileConfig(profileKey)
+	return self:ApplyToCooldownFrame(cooldownFrame, config, options)
 end
 
 function addon.functions.IsDurationTextBindingSupported() return DurationText:IsDurationTextBindingSupported() end

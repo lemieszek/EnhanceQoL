@@ -7,6 +7,8 @@
 ### 🐛 Fixed
 
 - Group Frames / Raid Frames: Stabilized grouped raid layouts so group labels no longer jitter, and improved combat-safe raid joins for role, group, and custom raid sorting.
+- Duration Text: Restored the default Minimal profile to Blizzard-style minute/second cooldown text while still allowing Numeric profiles to show raw seconds across cooldown panels, trackers, and buff/debuff containers.
+- Mythic Plus / Timer: Kept the panel background height stable when objective text grows, so objectives no longer stretch the main timer area.
 
 ---
 

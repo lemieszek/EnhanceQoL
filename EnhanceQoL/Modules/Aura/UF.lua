@@ -2348,7 +2348,7 @@ end
 
 function AuraUtil.ApplyDurationTextProfileToCooldownFrame(cooldown, profileKey)
 	if not (cooldown and addon.functions and addon.functions.ApplyDurationTextProfileToCooldownFrame) then return false end
-	return addon.functions.ApplyDurationTextProfileToCooldownFrame(cooldown, AuraUtil.NormalizeDurationTextProfile(profileKey, "MINIMAL"), { preserveCooldownUnits = true })
+	return addon.functions.ApplyDurationTextProfileToCooldownFrame(cooldown, AuraUtil.NormalizeDurationTextProfile(profileKey, "MINIMAL"))
 end
 
 function AuraUtil.buildLegacyAuraSection(src, isDebuff)
@@ -12658,7 +12658,7 @@ onEvent = function(self, event, unit, ...)
 		UF.UpdateAllLeaderIndicators(true)
 	elseif event == "CLIENT_SCENE_OPENED" then
 		local sceneType = unit
-		UF._clientSceneActive = (sceneType == 1)
+		UF._clientSceneActive = addon.functions and addon.functions.IsMinigameClientScene and addon.functions.IsMinigameClientScene(sceneType) or false
 		UF.RefreshClientSceneVisibility()
 	elseif event == "CLIENT_SCENE_CLOSED" then
 		UF._clientSceneActive = false

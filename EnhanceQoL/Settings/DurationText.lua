@@ -11,7 +11,9 @@ end
 
 local function setDurationTextValue(key, value)
 	DurationText:InitDB()
+	local oldValue = DurationText:GetProfileValue(DurationText:GetEditProfileKey(), key)
 	DurationText:SetProfileValue(DurationText:GetEditProfileKey(), key, value)
+	if oldValue ~= value then addon.variables.requireReload = true end
 	invalidate()
 end
 

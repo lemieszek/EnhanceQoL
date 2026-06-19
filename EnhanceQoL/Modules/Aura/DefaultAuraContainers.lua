@@ -348,7 +348,7 @@ end
 
 local function applyDefaultAuraDurationTextProfile(button)
 	if not (button and button.Cooldown and addon.functions and addon.functions.ApplyDurationTextProfileToCooldownFrame) then return false end
-	return addon.functions.ApplyDurationTextProfileToCooldownFrame(button.Cooldown, getDefaultAuraDurationTextProfile(button.eqolDefaultAuraKind), { preserveCooldownUnits = true })
+	return addon.functions.ApplyDurationTextProfileToCooldownFrame(button.Cooldown, getDefaultAuraDurationTextProfile(button.eqolDefaultAuraKind))
 end
 
 local function getDefaultAuraIconsPerRow(value, kind)

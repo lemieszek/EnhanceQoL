@@ -2156,8 +2156,8 @@ function Timer:RenderPanel(state, timeLeft, twoChest, threeChest)
 	self:HidePanelElements()
 	if self:Get("layoutMode") ~= "PANEL" then return 0 end
 	local frame = self:EnsureFrame()
-	local objectiveHeight = self:Get("showObjectives") and self:RenderPanelObjectives(state) or 0
-	local panelHeight = math.max(clampNumber(self:Get("panelHeight"), 24, 300, defaults.panelHeight), objectiveHeight)
+	if self:Get("showObjectives") then self:RenderPanelObjectives(state) end
+	local panelHeight = clampNumber(self:Get("panelHeight"), 24, 300, defaults.panelHeight)
 	frame:SetSize(snapSize(clampNumber(self:Get("width"), 120, 800, defaults.width)), snapSize(panelHeight))
 	self:ApplyFrameStyle()
 	local best = self:GetBestTime(state)

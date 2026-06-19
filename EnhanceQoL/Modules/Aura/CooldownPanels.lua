@@ -26747,7 +26747,7 @@ function CooldownPanels.EnsureUpdateFrame()
 		if event == "CLIENT_SCENE_OPENED" then
 			local sceneType = ...
 			CooldownPanels.runtime = CooldownPanels.runtime or {}
-			CooldownPanels.runtime.clientSceneActive = (sceneType == 1)
+			CooldownPanels.runtime.clientSceneActive = addon.functions and addon.functions.IsMinigameClientScene and addon.functions.IsMinigameClientScene(sceneType) or false
 		elseif event == "CLIENT_SCENE_CLOSED" then
 			CooldownPanels.runtime = CooldownPanels.runtime or {}
 			CooldownPanels.runtime.clientSceneActive = false
