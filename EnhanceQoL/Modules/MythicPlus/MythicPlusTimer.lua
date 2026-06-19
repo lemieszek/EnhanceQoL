@@ -527,6 +527,17 @@ local function getActiveChallengeTimer()
 	return nil
 end
 
+local function createDurationObject()
+	local durationUtil = _G.C_DurationUtil
+	return durationUtil and durationUtil.CreateDuration and durationUtil.CreateDuration() or nil
+end
+
+local function getChallengeStartTime(timer, state)
+	if state and state.active and timer.timerBaseTime and timer.timerBaseElapsed then return timer.timerBaseTime - timer.timerBaseElapsed end
+	local now = GetTime and GetTime() or 0
+	return now - (tonumber(state and state.elapsed) or 0)
+end
+
 local function getActiveKeystoneInfo()
 	local level, affixes, mapID
 	if C_ChallengeMode and C_ChallengeMode.GetActiveKeystoneInfo then
@@ -1050,6 +1061,116 @@ function Timer:GetTimerDisplayText(state, timeLeft)
 	if mode == "TIME_LEFT_TOTAL" then return string.format("%s / %s", timeRemainingToText(timeLeft), secondsToText(total)) end
 	if mode == "ELAPSED_TOTAL" then return string.format("%s / %s", secondsToText(elapsed), secondsToText(total)) end
 	return timeRemainingToText(timeLeft)
+end
+
+function Timer:GetDurationTextConfig()
+	return {
+		useGlobal = false,
+		profileKey = "MINIMAL",
+		canRoundUpIntervals = false,
+		millisecondsThreshold = 0,
+		formatStyle = "NUMERIC",
+	}
+end
+
+function Timer:GetTimerDurationObject(key)
+	self.durationObjects = self.durationObjects or {}
+	local durationObject = self.durationObjects[key]
+	if not durationObject then
+		durationObject = createDurationObject()
+		self.durationObjects[key] = durationObject
+	end
+	return durationObject
+end
+
+function Timer:UpdateTimerDurationObject(key, startTime, duration)
+	startTime = tonumber(startTime)
+	duration = tonumber(duration)
+	if not (key and startTime and duration and duration > 0) then return nil end
+	local durationObject = self:GetTimerDurationObject(key)
+	if not (durationObject and durationObject.SetTimeFromStart) then return nil end
+	local signature = string.format("%.3f:%.3f", startTime, duration)
+	self.durationObjectSignatures = self.durationObjectSignatures or {}
+	if self.durationObjectSignatures[key] ~= signature then
+		durationObject:SetTimeFromStart(startTime, duration, 1)
+		self.durationObjectSignatures[key] = signature
+	end
+	return durationObject
+end
+
+function Timer:GetDurationTextComponents(mode)
+	local durationText = addon.DurationText
+	if not (durationText and durationText.CreateFormatComponent) then return nil end
+	local config = self:GetDurationTextConfig()
+	local formatter = durationText.GetSecondsFormatter and durationText:GetSecondsFormatter(config)
+	if not formatter then return nil end
+	if mode == "TIME_LEFT_TOTAL" then
+		return {
+			durationText:CreateFormatComponent("RemainingDuration", formatter),
+			durationText:CreateFormatComponent("TotalDuration", formatter),
+		}
+	end
+	if mode == "ELAPSED_TOTAL" then
+		return {
+			durationText:CreateFormatComponent("ElapsedDuration", formatter),
+			durationText:CreateFormatComponent("TotalDuration", formatter),
+		}
+	end
+	if mode == "REMAINING" then
+		return {
+			durationText:CreateFormatComponent("RemainingDuration", formatter),
+		}
+	end
+	return nil
+end
+
+function Timer:BindTimerText(fontString, key, durationObject, mode, textFormat)
+	if not (fontString and durationObject and addon.functions and addon.functions.BindDurationText) then return false end
+	local options = {
+		owner = self:EnsureFrame(),
+		key = key,
+		config = self:GetDurationTextConfig(),
+		expiredText = "",
+		zeroDurationText = "",
+		updateNow = true,
+	}
+	if mode == "TIME_LEFT_TOTAL" or mode == "ELAPSED_TOTAL" then
+		local components = self:GetDurationTextComponents(mode)
+		if components and components[1] and components[2] then
+			options.textFormat = "{} / {}"
+			options.components = components
+		end
+	elseif mode == "TOTAL" then
+		local components = self:GetDurationTextComponents("ELAPSED_TOTAL")
+		if components and components[2] then
+			options.textFormat = "{}"
+			options.components = { components[2] }
+		end
+	elseif textFormat then
+		local components = self:GetDurationTextComponents("REMAINING")
+		if components and components[1] then
+			options.textFormat = textFormat
+			options.components = components
+		end
+	end
+	local _, ok = addon.functions.BindDurationText(fontString, durationObject, options)
+	return ok == true
+end
+
+function Timer:ReleaseTimerTextBinding(key)
+	local durationText = addon.DurationText
+	if durationText and durationText.ReleaseBinding then durationText:ReleaseBinding(self:EnsureFrame(), key, false) end
+end
+
+function Timer:SetBoundTimerText(key, fallbackText, anchorKey, xKey, yKey, color, fontSize, justify, state, duration, mode, textFormat)
+	local text = self:SetPanelText(key, fallbackText, anchorKey, xKey, yKey, color, fontSize, justify)
+	if not (state and state.active) then return text end
+	local elapsed = tonumber(state.elapsed) or 0
+	duration = tonumber(duration) or 0
+	if duration <= 0 or elapsed >= duration then return text end
+	local durationObject = self:UpdateTimerDurationObject(key, getChallengeStartTime(self, state), duration)
+	if durationObject then self:BindTimerText(text, "panel-" .. key, durationObject, mode, textFormat) end
+	return text
 end
 
 local function normalizeDungeonAbbreviation(label, mapName)
@@ -1918,7 +2039,7 @@ function Timer:SetPanelEnemyBarText(percent)
 	bar.text:Show()
 end
 
-function Timer:SetPanelTimerBarTimeLeftText(timeLeft)
+function Timer:SetPanelTimerBarTimeLeftText(timeLeft, state)
 	local frame = self.frame
 	local bar = frame and frame.panelBars and frame.panelBars.timer
 	if not (bar and bar.timeLeftText) then return end
@@ -1933,6 +2054,8 @@ function Timer:SetPanelTimerBarTimeLeftText(timeLeft)
 	local color = normalizeColor(self:Get("panelTimerBarTimeLeftTextColor"), defaults.panelTimerBarTimeLeftTextColor)
 	local offsetX = pointOffset(self:Get("panelTimerBarTimeLeftTextOffsetX"), -200, 200, defaults.panelTimerBarTimeLeftTextOffsetX)
 	local offsetY = pointOffset(self:Get("panelTimerBarTimeLeftTextOffsetY"), -100, 100, defaults.panelTimerBarTimeLeftTextOffsetY)
+	local timeLimit = tonumber(state and state.timeLimit) or 0
+	local elapsed = tonumber(state and state.elapsed) or 0
 	bar.timeLeftText:ClearAllPoints()
 	applyFontString(bar.timeLeftText, font, fontSize, style)
 	bar.timeLeftText:SetText(secondsToText(math.max(0, tonumber(timeLeft) or 0)))
@@ -1943,6 +2066,10 @@ function Timer:SetPanelTimerBarTimeLeftText(timeLeft)
 	else
 		bar.timeLeftText:SetJustifyH("LEFT")
 		bar.timeLeftText:SetPoint("LEFT", bar, "LEFT", offsetX, offsetY)
+	end
+	if state and state.active and timeLimit > 0 and elapsed < timeLimit then
+		local durationObject = self:UpdateTimerDurationObject("panelBarTimeLeft", getChallengeStartTime(self, state), timeLimit)
+		if durationObject then self:BindTimerText(bar.timeLeftText, "panel-bar-time-left", durationObject, "REMAINING") end
 	end
 	bar.timeLeftText:Show()
 end
@@ -2007,11 +2134,16 @@ function Timer:UpdatePanelTimerBarChestMarkers(timeLimit, twoChest, threeChest)
 		local markerText = bar.chestMarkerTexts and bar.chestMarkerTexts[index]
 		if markerText then
 			if showTexts and remainingTimes[index] and remainingTimes[index] >= 0 then
+				local durationObjectKey = index == 1 and "panelBarChest3" or "panelBarChest2"
 				markerText:ClearAllPoints()
 				markerText:SetPoint("CENTER", bar, "LEFT", snapToPixel(positions[index]), textOffsetY)
 				applyFontString(markerText, font, fontSize, style)
 				markerText:SetText(secondsToText(remainingTimes[index]))
 				markerText:SetTextColor(textColor.r, textColor.g, textColor.b, textColor.a)
+				if self.lastState and self.lastState.active then
+					local durationObject = self:UpdateTimerDurationObject(durationObjectKey, getChallengeStartTime(self, self.lastState), index == 1 and threeChestTime or twoChestTime)
+					if durationObject then self:BindTimerText(markerText, "panel-bar-" .. durationObjectKey, durationObject, "REMAINING") end
+				end
 				markerText:Show()
 			else
 				markerText:Hide()
@@ -2035,11 +2167,55 @@ function Timer:RenderPanel(state, timeLeft, twoChest, threeChest)
 	local elapsed = tonumber(state.elapsed) or 0
 	if self:Get("showDungeon") then self:SetPanelText("dungeon", self:GetDungeonDisplayText(state), "dungeonAnchor", "dungeonOffsetX", "dungeonOffsetY", self:Get("dungeonColor"), self:Get("panelDungeonFontSize")) end
 	if self:Get("showKeyLevel") then self:SetPanelText("key", tostring(state.level or 0), "keyLevelAnchor", "keyLevelOffsetX", "keyLevelOffsetY", self:Get("dungeonColor"), self:Get("panelKeyLevelFontSize")) end
-	if self:Get("showTimer") then self:SetPanelText("timer", self:GetTimerDisplayText(state, timeLeft), "timerAnchor", "timerOffsetX", "timerOffsetY", timeLeft <= 0 and self:Get("timerExpiredColor") or self:Get("timerColor"), self:Get("panelTimerFontSize"), "CENTER") end
+	if self:Get("showTimer") then
+		self:SetBoundTimerText(
+			"timer",
+			self:GetTimerDisplayText(state, timeLeft),
+			"timerAnchor",
+			"timerOffsetX",
+			"timerOffsetY",
+			timeLeft <= 0 and self:Get("timerExpiredColor") or self:Get("timerColor"),
+			self:Get("panelTimerFontSize"),
+			"CENTER",
+			state,
+			state.timeLimit,
+			self:Get("timerDisplay")
+		)
+	end
 	if self:Get("showChestTimers") then
 		local hideChestLabels = self:Get("panelChestHideLabels") == true
-		if elapsed <= twoChest then self:SetPanelText("chest2", hideChestLabels and secondsToText(twoChest - elapsed) or ("+2\n" .. secondsToText(twoChest - elapsed)), "chest2Anchor", "chest2OffsetX", "chest2OffsetY", self:Get("chestColor"), self:Get("panelChestFontSize")) end
-		if elapsed <= threeChest then self:SetPanelText("chest3", hideChestLabels and secondsToText(threeChest - elapsed) or ("+3\n" .. secondsToText(threeChest - elapsed)), "chest3Anchor", "chest3OffsetX", "chest3OffsetY", self:Get("chestColor"), self:Get("panelChestFontSize")) end
+		if elapsed <= twoChest then
+			self:SetBoundTimerText(
+				"chest2",
+				hideChestLabels and secondsToText(twoChest - elapsed) or ("+2\n" .. secondsToText(twoChest - elapsed)),
+				"chest2Anchor",
+				"chest2OffsetX",
+				"chest2OffsetY",
+				self:Get("chestColor"),
+				self:Get("panelChestFontSize"),
+				nil,
+				state,
+				twoChest,
+				"REMAINING",
+				hideChestLabels and nil or "+2\n{}"
+			)
+		end
+		if elapsed <= threeChest then
+			self:SetBoundTimerText(
+				"chest3",
+				hideChestLabels and secondsToText(threeChest - elapsed) or ("+3\n" .. secondsToText(threeChest - elapsed)),
+				"chest3Anchor",
+				"chest3OffsetX",
+				"chest3OffsetY",
+				self:Get("chestColor"),
+				self:Get("panelChestFontSize"),
+				nil,
+				state,
+				threeChest,
+				"REMAINING",
+				hideChestLabels and nil or "+3\n{}"
+			)
+		end
 	end
 	if self:ShouldShowDeathDisplay(state) then
 		local deathText = self:SetPanelText("deaths", self:GetDeathDisplayText(state.deaths, self:Get("panelDeathIconSize"), state.timeLost), "deathsAnchor", "deathsOffsetX", "deathsOffsetY", self:Get("deathColor"), self:Get("panelDeathsFontSize"))
@@ -2059,7 +2235,7 @@ function Timer:RenderPanel(state, timeLeft, twoChest, threeChest)
 		local timerBarValue = self:Get("panelTimerBarFillUp") == true and math.min(state.timeLimit or 1, math.max(0, elapsed)) or math.max(0, timeLeft)
 		self:SetPanelBar("timer", timerBarValue, state.timeLimit or 1, "panelTimerBarAnchor", "panelTimerBarOffsetX", "panelTimerBarOffsetY", timeLeft <= 0 and self:Get("panelTimerBarExpiredColor") or self:Get("panelTimerBarColor"))
 		self:UpdatePanelTimerBarChestMarkers(state.timeLimit or 0, twoChest, threeChest)
-		self:SetPanelTimerBarTimeLeftText(timeLeft)
+		self:SetPanelTimerBarTimeLeftText(timeLeft, state)
 	end
 	if self:Get("showPanelEnemyBar") then
 		local bar = self:EnsurePanelBar("enemy")
@@ -2137,6 +2313,20 @@ function Timer:SetRow(index, data)
 	row.bar:SetStatusBarColor(color.r, color.g, color.b, color.a)
 	setTextColor(row.text, data.textColor or color)
 	setTextColor(row.value, data.valueColor or color)
+	local bindingKey = "row-" .. tostring(index)
+	local durationBinding = data.durationBinding
+	if durationBinding and durationBinding.state and durationBinding.state.active then
+		local elapsed = tonumber(durationBinding.state.elapsed) or 0
+		local duration = tonumber(durationBinding.duration) or 0
+		if duration > 0 and elapsed < duration then
+			local durationObject = self:UpdateTimerDurationObject(durationBinding.key, getChallengeStartTime(self, durationBinding.state), duration)
+			if durationObject then self:BindTimerText(row.value, bindingKey, durationObject, durationBinding.mode, durationBinding.textFormat) end
+		else
+			self:ReleaseTimerTextBinding(bindingKey)
+		end
+	else
+		self:ReleaseTimerTextBinding(bindingKey)
+	end
 	row:Show()
 end
 
@@ -2329,6 +2519,12 @@ function Timer:Refresh()
 			fontSize = self:Get("timerFontSize"),
 			max = state.timeLimit or 1,
 			value = math.max(0, timeLeft),
+			durationBinding = {
+				key = "rowTimer",
+				state = state,
+				duration = state.timeLimit,
+				mode = self:Get("timerDisplay"),
+			},
 		})
 	end
 	if self:Get("showChestTimers") then
@@ -2340,6 +2536,12 @@ function Timer:Refresh()
 				color = self:Get("chestColor"),
 				max = state.timeLimit or 1,
 				value = math.max(0, twoChest - elapsed),
+				durationBinding = {
+					key = "rowChest2",
+					state = state,
+					duration = twoChest,
+					mode = "REMAINING",
+				},
 			})
 		end
 		if elapsed <= threeChest then
@@ -2350,6 +2552,12 @@ function Timer:Refresh()
 				color = self:Get("chestColor"),
 				max = state.timeLimit or 1,
 				value = math.max(0, threeChest - elapsed),
+				durationBinding = {
+					key = "rowChest3",
+					state = state,
+					duration = threeChest,
+					mode = "REMAINING",
+				},
 			})
 		end
 	end
