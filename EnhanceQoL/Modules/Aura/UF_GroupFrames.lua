@@ -12445,6 +12445,22 @@ function GF.ClearSecureHeaderChildPoints(header)
 	end
 end
 
+function GF.PrecreateSecureHeaderChildren(header, maxFrames, leaveShown)
+	if not (header and header.GetAttribute and header.SetAttribute and header.Show) then return end
+	if InCombatLockdown and InCombatLockdown() then return end
+	maxFrames = floor((tonumber(maxFrames) or 0) + 0.5)
+	if maxFrames < 1 then return end
+	if header._eqolPrecreatedFrameCount and header._eqolPrecreatedFrameCount >= maxFrames then return end
+
+	local startingIndex = header:GetAttribute("startingIndex")
+	if startingIndex == nil then startingIndex = 1 end
+	header:Show()
+	header:SetAttribute("startingIndex", 1 - maxFrames)
+	header:SetAttribute("startingIndex", startingIndex)
+	header._eqolPrecreatedFrameCount = maxFrames
+	if not leaveShown and header.Hide then header:Hide() end
+end
+
 function GF.PrepareSecureHeaderLayoutChange(header, nextLayoutKey)
 	if not header or not nextLayoutKey then return end
 	if InCombatLockdown and InCombatLockdown() then
@@ -12585,6 +12601,24 @@ local function applyVisibility(header, kind, cfg)
 	end
 	local forceClientSceneHide = not inEdit and hideInClientScene and GF._clientSceneActive == true
 	if GFH and GFH.ApplyClientSceneAlphaToFrame then GFH.ApplyClientSceneAlphaToFrame(header, forceClientSceneHide) end
+	local useStaticSecureHeaderVisibility = isRaidLikeKind(kind)
+	if useStaticSecureHeaderVisibility then
+		if InCombatLockdown and InCombatLockdown() then return end
+		if UnregisterStateDriver then UnregisterStateDriver(header, "visibility") end
+		header._eqolVisibilityCond = nil
+
+		local shouldShow = cfg.enabled == true and not header._eqolForceHide and not header._eqolSpecialHide and not forceClientSceneHide
+		if header._eqolForceShow then shouldShow = true end
+		if arenaPartyActive then shouldShow = kind == "party" end
+		if shouldShow then
+			if header.Show then header:Show() end
+			if header.SetAttribute then header:SetAttribute("statehidden", nil) end
+		else
+			if header.Hide then header:Hide() end
+			if header.SetAttribute then header:SetAttribute("statehidden", true) end
+		end
+		return
+	end
 	if not RegisterStateDriver then return end
 	if InCombatLockdown and InCombatLockdown() then return end
 
@@ -14171,15 +14205,36 @@ local function applyRaidGroupHeaders(cfg, layout, groupSpecs, forceShow, forceHi
 		if header then
 			header._eqolFitScale = 1
 			if header.SetScale then header:SetScale(1) end
+			local function setAttr(key, value) GF:SetHeaderAttributeIfChanged(header, key, value) end
 			local groupState = activeGroups[i]
 			local spec = groupState and groupState.spec
 			local active = spec ~= nil
 			header._eqolForceShow = forceShow
 			header._eqolForceHide = forceHide
-			header._eqolSpecialHide = not active
+			header._eqolSpecialHide = nil
+			GF.PrepareSecureHeaderLayoutChange(
+				header,
+				GF.BuildSecureHeaderLayoutKey(layout.point, layout.xOffset, layout.yOffset, layout.columnSpacing, layout.columnAnchorPoint, 1, layout.unitsPerColumn)
+			)
+			setAttr("showParty", false)
+			setAttr("showRaid", true)
+			setAttr("showPlayer", true)
+			setAttr("showSolo", false)
+			setAttr("groupBy", nil)
+			setAttr("sortDir", cfg.sortDir or "ASC")
+			setAttr("unitsPerColumn", layout.unitsPerColumn)
+			setAttr("maxColumns", 1)
+			setAttr("minWidth", layout.minWidth)
+			setAttr("minHeight", layout.minHeight)
+			setAttr("xOffset", layout.xOffset)
+			setAttr("yOffset", layout.yOffset)
+			setAttr("columnSpacing", layout.columnSpacing)
+			setAttr("columnAnchorPoint", layout.columnAnchorPoint)
+			setAttr("template", "EQOLUFGroupUnitButtonTemplate")
+			setAttr("initialConfigFunction", layout.initConfigFunction)
+			setAttr("point", layout.point)
 
 			if active then
-				local function setAttr(key, value) GF:SetHeaderAttributeIfChanged(header, key, value) end
 				local specSortMethod = tostring(spec.sortMethod or "INDEX"):upper()
 				header._eqolDisplayGroup = tonumber(spec.group) or i
 				local specNameList
@@ -14206,20 +14261,6 @@ local function applyRaidGroupHeaders(cfg, layout, groupSpecs, forceShow, forceHi
 					GF.ClearSecureHeaderChildPoints(header)
 					header._eqolRaidGroupSortKey = groupSortKey
 				end
-				GF.PrepareSecureHeaderLayoutChange(
-					header,
-					GF.BuildSecureHeaderLayoutKey(layout.point, layout.xOffset, layout.yOffset, layout.columnSpacing, layout.columnAnchorPoint, 1, layout.unitsPerColumn)
-				)
-				setAttr("showParty", false)
-				setAttr("showRaid", true)
-				setAttr("showPlayer", true)
-				setAttr("showSolo", false)
-				setAttr("groupBy", nil)
-				setAttr("sortDir", cfg.sortDir or "ASC")
-				setAttr("unitsPerColumn", layout.unitsPerColumn)
-				setAttr("maxColumns", 1)
-				setAttr("minWidth", layout.minWidth)
-				setAttr("minHeight", layout.minHeight)
 
 				if specSortMethod == "NAMELIST" then
 					setAttr("groupFilter", nil)
@@ -14234,13 +14275,6 @@ local function applyRaidGroupHeaders(cfg, layout, groupSpecs, forceShow, forceHi
 					setAttr("sortMethod", specSortMethod)
 					setAttr("nameList", nil)
 				end
-				setAttr("xOffset", layout.xOffset)
-				setAttr("yOffset", layout.yOffset)
-				setAttr("columnSpacing", layout.columnSpacing)
-				setAttr("columnAnchorPoint", layout.columnAnchorPoint)
-				setAttr("template", "EQOLUFGroupUnitButtonTemplate")
-				setAttr("initialConfigFunction", layout.initConfigFunction)
-				setAttr("point", layout.point)
 
 				local unitGrowth = (GFH.NormalizeGrowthDirection and GFH.NormalizeGrowthDirection(layout.growth, "DOWN")) or "DOWN"
 				local defaultGroupGrowth = DEFAULTS and DEFAULTS.raid and DEFAULTS.raid.groupGrowth
@@ -14317,6 +14351,15 @@ local function applyRaidGroupHeaders(cfg, layout, groupSpecs, forceShow, forceHi
 					if proxy.SetFrameLevel and header.GetFrameLevel then proxy:SetFrameLevel(GF.ClampFrameLevel((header:GetFrameLevel() or 1) + 20)) end
 					proxy:Show()
 				end
+				GF.PrecreateSecureHeaderChildren(header, layout.unitsPerColumn or 5, false)
+			else
+				setAttr("groupFilter", tostring(i))
+				setAttr("roleFilter", nil)
+				setAttr("strictFiltering", false)
+				setAttr("sortMethod", "INDEX")
+				setAttr("nameList", nil)
+				GF.PrecreateSecureHeaderChildren(header, layout.unitsPerColumn or 5, false)
+				syncRaidGroupHeaderChildren(header, cfg, layout)
 			end
 
 			applyVisibility(header, "raid", cfg)
@@ -14342,7 +14385,6 @@ local function applyRaidGroupHeaders(cfg, layout, groupSpecs, forceShow, forceHi
 				header._eqolPendingLayout = true
 			end
 
-			if not active and header.Hide then header:Hide() end
 			if not active then
 				header._eqolDisplayGroup = nil
 				header._eqolRaidGroupSortKey = nil
@@ -14660,6 +14702,16 @@ function GF:ApplyHeaderAttributes(kind, options)
 		if kind == "party" then GF.HideGroupBorder("party") end
 	end
 
+	local precreateFrames
+	if kind == "party" then
+		precreateFrames = 5
+	elseif kind == "raid" and not useGroupHeaders then
+		precreateFrames = (raidRuntimeMaxColumns or raidMaxColumns or 1) * (raidUnitsPerColumn or 5)
+	elseif isSplitRoleKind(kind) then
+		precreateFrames = (raidMaxColumns or header:GetAttribute("maxColumns") or 1) * (raidUnitsPerColumn or header:GetAttribute("unitsPerColumn") or 1)
+	end
+	if precreateFrames then GF.PrecreateSecureHeaderChildren(header, precreateFrames, false) end
+
 	local forceHide = header._eqolForceHide
 	local forceShow = header._eqolForceShow
 	if kind == "raid" then
@@ -14672,9 +14724,13 @@ function GF:ApplyHeaderAttributes(kind, options)
 	applyVisibility(header, kind, cfg)
 	if kind == "party" then
 		local border = GF.groupBorders and GF.groupBorders.party
-		if border and RegisterStateDriver then
+		if border then
 			if UnregisterStateDriver then UnregisterStateDriver(border, "visibility") end
-			RegisterStateDriver(border, "visibility", header._eqolVisibilityCond or "hide")
+			if header._eqolVisibilityCond and RegisterStateDriver then
+				RegisterStateDriver(border, "visibility", header._eqolVisibilityCond)
+			elseif border.SetShown and header.IsShown then
+				border:SetShown(header:IsShown())
+			end
 		end
 	end
 
