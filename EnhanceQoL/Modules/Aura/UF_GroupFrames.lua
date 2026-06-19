@@ -14234,6 +14234,54 @@ local function applyRaidGroupHeaders(cfg, layout, groupSpecs, forceShow, forceHi
 			setAttr("initialConfigFunction", layout.initConfigFunction)
 			setAttr("point", layout.point)
 
+			local unitGrowth = (GFH.NormalizeGrowthDirection and GFH.NormalizeGrowthDirection(layout.growth, "DOWN")) or "DOWN"
+			local defaultGroupGrowth = DEFAULTS and DEFAULTS.raid and DEFAULTS.raid.groupGrowth
+			local groupGrowth
+			if GFH.ResolveGroupGrowthDirection then
+				groupGrowth = GFH.ResolveGroupGrowthDirection(layout.groupGrowth, unitGrowth, defaultGroupGrowth)
+			else
+				groupGrowth = (GFH.NormalizeGrowthDirection and GFH.NormalizeGrowthDirection(layout.groupGrowth, nil)) or ((unitGrowth == "RIGHT" or unitGrowth == "LEFT") and "DOWN" or "RIGHT")
+			end
+			local groupStartPoint = (GFH.GetGroupGrowthStartPoint and GFH.GetGroupGrowthStartPoint(groupGrowth)) or getGrowthStartPoint(groupGrowth)
+			local anchorRelativePoint = layout and layout.centerRelativePoint or groupStartPoint
+			local anchorOffsetX = tonumber(layout and layout.centerOffsetX) or 0
+			local anchorOffsetY = tonumber(layout and layout.centerOffsetY) or 0
+			local groupsPerRow = GF.NormalizeRaidGroupsPerRow(layout and layout.groupsPerRow, 8)
+			local visualIndex = (groupState and groupState.slot) or i
+			local groupSlot = (visualIndex - 1) % groupsPerRow
+			local groupLine = floor((visualIndex - 1) / groupsPerRow)
+			local groupSpacing = tonumber(layout.columnSpacing) or 0
+			local perHeaderW = tonumber((layout and layout.perHeaderW) or (layout and layout.w)) or 0
+			local perHeaderH = tonumber((layout and layout.perHeaderH) or (layout and layout.h)) or 0
+			local groupOffsetX, groupOffsetY = 0, 0
+			if groupGrowth == "LEFT" then
+				groupOffsetX = groupSlot * (perHeaderW + groupSpacing) * -1
+				groupOffsetY = groupLine * (perHeaderH + groupSpacing) * -1
+			elseif groupGrowth == "UP" then
+				groupOffsetY = groupSlot * (perHeaderH + groupSpacing)
+				groupOffsetX = groupLine * (perHeaderW + groupSpacing)
+			elseif groupGrowth == "RIGHT" then
+				groupOffsetX = groupSlot * (perHeaderW + groupSpacing)
+				groupOffsetY = groupLine * (perHeaderH + groupSpacing) * -1
+			else
+				groupOffsetY = groupSlot * (perHeaderH + groupSpacing) * -1
+				groupOffsetX = groupLine * (perHeaderW + groupSpacing)
+			end
+			local finalOffsetX = anchorOffsetX + groupOffsetX
+			local finalOffsetY = anchorOffsetY + groupOffsetY
+			local pointKey = table.concat({
+				tostring(groupStartPoint),
+				tostring(anchor),
+				tostring(anchorRelativePoint),
+				string.format("%.4f", finalOffsetX),
+				string.format("%.4f", finalOffsetY),
+			}, "|")
+			if header._eqolRaidGroupPointKey ~= pointKey then
+				header:ClearAllPoints()
+				header:SetPoint(groupStartPoint, anchor, anchorRelativePoint, finalOffsetX, finalOffsetY)
+				header._eqolRaidGroupPointKey = pointKey
+			end
+
 			if active then
 				local specSortMethod = tostring(spec.sortMethod or "INDEX"):upper()
 				header._eqolDisplayGroup = tonumber(spec.group) or i
@@ -14276,53 +14324,6 @@ local function applyRaidGroupHeaders(cfg, layout, groupSpecs, forceShow, forceHi
 					setAttr("nameList", nil)
 				end
 
-				local unitGrowth = (GFH.NormalizeGrowthDirection and GFH.NormalizeGrowthDirection(layout.growth, "DOWN")) or "DOWN"
-				local defaultGroupGrowth = DEFAULTS and DEFAULTS.raid and DEFAULTS.raid.groupGrowth
-				local groupGrowth
-				if GFH.ResolveGroupGrowthDirection then
-					groupGrowth = GFH.ResolveGroupGrowthDirection(layout.groupGrowth, unitGrowth, defaultGroupGrowth)
-				else
-					groupGrowth = (GFH.NormalizeGrowthDirection and GFH.NormalizeGrowthDirection(layout.groupGrowth, nil)) or ((unitGrowth == "RIGHT" or unitGrowth == "LEFT") and "DOWN" or "RIGHT")
-				end
-				local groupStartPoint = (GFH.GetGroupGrowthStartPoint and GFH.GetGroupGrowthStartPoint(groupGrowth)) or getGrowthStartPoint(groupGrowth)
-				local anchorRelativePoint = layout and layout.centerRelativePoint or groupStartPoint
-				local anchorOffsetX = tonumber(layout and layout.centerOffsetX) or 0
-				local anchorOffsetY = tonumber(layout and layout.centerOffsetY) or 0
-				local groupsPerRow = GF.NormalizeRaidGroupsPerRow(layout and layout.groupsPerRow, 8)
-				local visualIndex = (groupState and groupState.slot) or i
-				local groupSlot = (visualIndex - 1) % groupsPerRow
-				local groupLine = floor((visualIndex - 1) / groupsPerRow)
-				local groupSpacing = tonumber(layout.columnSpacing) or 0
-				local perHeaderW = tonumber((layout and layout.perHeaderW) or (layout and layout.w)) or 0
-				local perHeaderH = tonumber((layout and layout.perHeaderH) or (layout and layout.h)) or 0
-				local groupOffsetX, groupOffsetY = 0, 0
-				if groupGrowth == "LEFT" then
-					groupOffsetX = groupSlot * (perHeaderW + groupSpacing) * -1
-					groupOffsetY = groupLine * (perHeaderH + groupSpacing) * -1
-				elseif groupGrowth == "UP" then
-					groupOffsetY = groupSlot * (perHeaderH + groupSpacing)
-					groupOffsetX = groupLine * (perHeaderW + groupSpacing)
-				elseif groupGrowth == "RIGHT" then
-					groupOffsetX = groupSlot * (perHeaderW + groupSpacing)
-					groupOffsetY = groupLine * (perHeaderH + groupSpacing) * -1
-				else
-					groupOffsetY = groupSlot * (perHeaderH + groupSpacing) * -1
-					groupOffsetX = groupLine * (perHeaderW + groupSpacing)
-				end
-				local finalOffsetX = anchorOffsetX + groupOffsetX
-				local finalOffsetY = anchorOffsetY + groupOffsetY
-				local pointKey = table.concat({
-					tostring(groupStartPoint),
-					tostring(anchor),
-					tostring(anchorRelativePoint),
-					string.format("%.4f", finalOffsetX),
-					string.format("%.4f", finalOffsetY),
-				}, "|")
-				if header._eqolRaidGroupPointKey ~= pointKey then
-					header:ClearAllPoints()
-					header:SetPoint(groupStartPoint, anchor, anchorRelativePoint, finalOffsetX, finalOffsetY)
-					header._eqolRaidGroupPointKey = pointKey
-				end
 				local proxy = header._eqolGroupIndicatorProxy
 				local proxyParent = (header.GetParent and header:GetParent()) or anchor
 				if not proxy and CreateFrame then
