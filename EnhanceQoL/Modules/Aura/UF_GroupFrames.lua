@@ -2345,12 +2345,19 @@ local function applyGroupIndicatorAnchor(fs, anchor, offset, scale, parent)
 	end
 	local _, _, justify = resolveStatusTextAnchor(anchor)
 	local off = offset or {}
+	local key = table.concat({ tostring(point), tostring(parent), tostring(relPoint), tostring(off.x or 0), tostring(off.y or 0) }, "|")
+	if fs._eqolGroupIndicatorAnchorKey == key then
+		if justify and fs.SetJustifyH then fs:SetJustifyH(justify) end
+		return
+	end
+
 	fs:ClearAllPoints()
 	if Pixel and Pixel.SetPoint then
 		Pixel.SetPoint(fs, point, parent, relPoint, off.x or 0, off.y or 0)
 	else
 		fs:SetPoint(point, parent, relPoint, roundToPixel(off.x or 0, scale), roundToPixel(off.y or 0, scale))
 	end
+	fs._eqolGroupIndicatorAnchorKey = key
 	if justify and fs.SetJustifyH then fs:SetJustifyH(justify) end
 end
 
@@ -10664,6 +10671,66 @@ function GF.EnsureGroupIndicatorOverlay(container, target)
 	return overlay
 end
 
+function GF.UpdateGroupIndicatorForHeader(container, cfg, def, subgroup)
+	if not container then return end
+	if not (cfg and resolveGroupIndicatorEnabled(cfg, def) and isGroupIndicatorAvailable(cfg, def)) then
+		hideGroupIndicators(container)
+		return
+	end
+	subgroup = tonumber(subgroup)
+	if not subgroup then
+		hideGroupIndicators(container)
+		return
+	end
+
+	local anchorTarget = container._eqolGroupIndicatorProxy or container
+	local overlayParent = GF.EnsureGroupIndicatorOverlay(anchorTarget, anchorTarget)
+	if not overlayParent then
+		hideGroupIndicators(container)
+		return
+	end
+
+	local indicators = container._eqolGroupIndicators
+	if not indicators then
+		indicators = {}
+		container._eqolGroupIndicators = indicators
+	end
+
+	local fs = indicators[subgroup]
+	if not fs and overlayParent.CreateFontString then
+		fs = overlayParent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+		indicators[subgroup] = fs
+	end
+	if not fs then return end
+
+	if fs.GetParent and fs:GetParent() ~= overlayParent then fs:SetParent(overlayParent) end
+	if fs.SetDrawLayer then fs:SetDrawLayer("OVERLAY", 7) end
+
+	local style = resolveGroupIndicatorStyle(cfg, def, (cfg and cfg.health) or {})
+	local fontKey = table.concat({ tostring(style.font or ""), string.format("%.4f", tonumber(style.fontSize) or 12), tostring(style.fontOutline or "") }, "|")
+	if fs._eqolGroupIndicatorFontKey ~= fontKey then
+		if UFHelper and UFHelper.applyFont then UFHelper.applyFont(fs, style.font, style.fontSize or 12, style.fontOutline) end
+		fs._eqolGroupIndicatorFontKey = fontKey
+	end
+
+	local scale = GFH.GetEffectiveScale(anchorTarget)
+	if not scale or scale <= 0 then scale = (UIParent and UIParent.GetEffectiveScale and UIParent:GetEffectiveScale()) or 1 end
+	applyGroupIndicatorAnchor(fs, style.anchor, style.offset or {}, scale, anchorTarget)
+
+	local text = formatGroupNumber(subgroup, resolveGroupIndicatorFormat(cfg, def))
+	if fs:GetText() ~= text then fs:SetText(text) end
+	local r, g, b, a = unpackColor(style.color, GFH.COLOR_WHITE)
+	fs:SetTextColor(r, g, b, a)
+	fs:Show()
+
+	for group, other in pairs(indicators) do
+		if group ~= subgroup and other then
+			other:SetText("")
+			other:Hide()
+		end
+	end
+end
+
 local function updateGroupIndicatorsForFrames(container, frames, cfg, def, isPreview, fixedSubgroup)
 	if not container then return end
 	if not (cfg and resolveGroupIndicatorEnabled(cfg, def) and isGroupIndicatorAvailable(cfg, def)) then
@@ -12399,7 +12466,7 @@ local function nudgeHeaderLayout(header)
 	local layoutKey = GF.GetSecureHeaderLayoutKey(header)
 	header._eqolLastSecureLayoutKey = layoutKey
 	header._eqolPendingLayout = nil
-	if header._eqolKind == "raid" then queueGroupIndicatorRefresh(0, 4) end
+	if header._eqolKind == "raid" and not header._eqolGroupIndex then queueGroupIndicatorRefresh(0, 4) end
 end
 
 local getGrowthStartPoint = GFH.GetGrowthStartPoint
@@ -13689,13 +13756,12 @@ function GF:RefreshGroupIndicators()
 	local customSort = GFH and GFH.EnsureCustomSortConfig and GFH.EnsureCustomSortConfig(cfg)
 	local useGroupedHeaders = GF:IsRaidGroupedLayout(cfg) and (sortMethod ~= "NAMELIST" or (customSort and customSort.enabled == true))
 	if useGroupedHeaders and GF._raidGroupHeaders then
+		hideGroupIndicators(header)
 		for _, gh in ipairs(GF._raidGroupHeaders) do
 			if gh and not gh._eqolSpecialHide then
-				local frames = {}
-				forEachChild(gh, function(child)
-					if child then frames[#frames + 1] = child end
-				end)
-				updateGroupIndicatorsForFrames(gh, frames, cfg, def, false, gh._eqolDisplayGroup)
+				GF.UpdateGroupIndicatorForHeader(gh, cfg, def, gh._eqolDisplayGroup)
+			else
+				hideGroupIndicators(gh)
 			end
 		end
 	elseif header then
@@ -14082,11 +14148,22 @@ local function applyRaidGroupHeaders(cfg, layout, groupSpecs, forceShow, forceHi
 	if not (headers and anchor) then return end
 	local skipChildSync = options and options.skipChildSync == true
 	groupSpecs = groupSpecs or {}
-	local maxIndex = tonumber(maxGroups)
-	if maxIndex == nil then maxIndex = #groupSpecs end
+	local maxIndex = floor((tonumber(maxGroups) or #groupSpecs) + 0.5)
 	if maxIndex < 0 then maxIndex = 0 end
 	if maxIndex > 8 then maxIndex = 8 end
-	if maxIndex > #groupSpecs then maxIndex = #groupSpecs end
+	local activeGroups, activeCount = {}, 0
+	for specIndex = 1, #groupSpecs do
+		if activeCount >= maxIndex then break end
+		local spec = groupSpecs[specIndex]
+		local groupIndex = tonumber(spec and spec.group)
+		if groupIndex and groupIndex >= 1 and groupIndex <= 8 and not activeGroups[groupIndex] then
+			activeCount = activeCount + 1
+			activeGroups[groupIndex] = {
+				spec = spec,
+				slot = activeCount,
+			}
+		end
+	end
 	local groupScale = GF.NormalizeRaidAutoFitScale(layout and layout.fitScale or layout and layout.groupScale)
 
 	for i = 1, 8 do
@@ -14094,8 +14171,9 @@ local function applyRaidGroupHeaders(cfg, layout, groupSpecs, forceShow, forceHi
 		if header then
 			header._eqolFitScale = 1
 			if header.SetScale then header:SetScale(1) end
-			local spec = groupSpecs[i]
-			local active = (i <= maxIndex) and (spec ~= nil)
+			local groupState = activeGroups[i]
+			local spec = groupState and groupState.spec
+			local active = spec ~= nil
 			header._eqolForceShow = forceShow
 			header._eqolForceHide = forceHide
 			header._eqolSpecialHide = not active
@@ -14104,6 +14182,34 @@ local function applyRaidGroupHeaders(cfg, layout, groupSpecs, forceShow, forceHi
 				local function setAttr(key, value) GF:SetHeaderAttributeIfChanged(header, key, value) end
 				local specSortMethod = tostring(spec.sortMethod or "INDEX"):upper()
 				header._eqolDisplayGroup = tonumber(spec.group) or i
+				local specNameList
+				local specRoleFilter
+				local specStrictFiltering = false
+				if specSortMethod == "NAMELIST" then
+					specNameList = spec.nameList
+					if not specNameList or specNameList == "" then specNameList = EMPTY_NAMELIST_TOKEN end
+				else
+					specRoleFilter = cfg.roleFilter
+					if specRoleFilter == "" then specRoleFilter = nil end
+					if specSortMethod ~= "NAME" and specSortMethod ~= "INDEX" then specSortMethod = "INDEX" end
+					specStrictFiltering = cfg.strictFiltering == true
+				end
+				local groupSortKey = table.concat({
+					tostring(header._eqolDisplayGroup or ""),
+					tostring(specSortMethod or ""),
+					tostring(cfg.sortDir or "ASC"),
+					tostring(specNameList or ""),
+					tostring(specRoleFilter or ""),
+					tostring(specStrictFiltering),
+				}, "\031")
+				if header._eqolRaidGroupSortKey ~= groupSortKey then
+					GF.ClearSecureHeaderChildPoints(header)
+					header._eqolRaidGroupSortKey = groupSortKey
+				end
+				GF.PrepareSecureHeaderLayoutChange(
+					header,
+					GF.BuildSecureHeaderLayoutKey(layout.point, layout.xOffset, layout.yOffset, layout.columnSpacing, layout.columnAnchorPoint, 1, layout.unitsPerColumn)
+				)
 				setAttr("showParty", false)
 				setAttr("showRaid", true)
 				setAttr("showPlayer", true)
@@ -14116,37 +14222,26 @@ local function applyRaidGroupHeaders(cfg, layout, groupSpecs, forceShow, forceHi
 				setAttr("minHeight", layout.minHeight)
 
 				if specSortMethod == "NAMELIST" then
-					local nameList = spec.nameList
-					if not nameList or nameList == "" then nameList = EMPTY_NAMELIST_TOKEN end
 					setAttr("groupFilter", nil)
 					setAttr("roleFilter", nil)
 					setAttr("strictFiltering", false)
 					setAttr("sortMethod", "NAMELIST")
-					setAttr("nameList", nameList)
+					setAttr("nameList", specNameList)
 				else
-					local roleFilter = cfg.roleFilter
-					if roleFilter == "" then roleFilter = nil end
-					if specSortMethod ~= "NAME" and specSortMethod ~= "INDEX" then specSortMethod = "INDEX" end
 					setAttr("groupFilter", tostring(spec.group or i))
-					setAttr("roleFilter", roleFilter)
-					setAttr("strictFiltering", cfg.strictFiltering == true)
+					setAttr("roleFilter", specRoleFilter)
+					setAttr("strictFiltering", specStrictFiltering)
 					setAttr("sortMethod", specSortMethod)
 					setAttr("nameList", nil)
 				end
-
-				GF.PrepareSecureHeaderLayoutChange(
-					header,
-					GF.BuildSecureHeaderLayoutKey(layout.point, layout.xOffset, layout.yOffset, layout.columnSpacing, layout.columnAnchorPoint, 1, layout.unitsPerColumn)
-				)
-				setAttr("point", layout.point)
 				setAttr("xOffset", layout.xOffset)
 				setAttr("yOffset", layout.yOffset)
 				setAttr("columnSpacing", layout.columnSpacing)
 				setAttr("columnAnchorPoint", layout.columnAnchorPoint)
 				setAttr("template", "EQOLUFGroupUnitButtonTemplate")
 				setAttr("initialConfigFunction", layout.initConfigFunction)
+				setAttr("point", layout.point)
 
-				header:ClearAllPoints()
 				local unitGrowth = (GFH.NormalizeGrowthDirection and GFH.NormalizeGrowthDirection(layout.growth, "DOWN")) or "DOWN"
 				local defaultGroupGrowth = DEFAULTS and DEFAULTS.raid and DEFAULTS.raid.groupGrowth
 				local groupGrowth
@@ -14160,29 +14255,67 @@ local function applyRaidGroupHeaders(cfg, layout, groupSpecs, forceShow, forceHi
 				local anchorOffsetX = tonumber(layout and layout.centerOffsetX) or 0
 				local anchorOffsetY = tonumber(layout and layout.centerOffsetY) or 0
 				local groupsPerRow = GF.NormalizeRaidGroupsPerRow(layout and layout.groupsPerRow, 8)
-				local groupSlot = (i - 1) % groupsPerRow
-				local groupLine = floor((i - 1) / groupsPerRow)
-				local spacing = roundToPixel(layout.columnSpacing or 0, layout.scale)
-				local perHeaderW = roundToPixel((layout and layout.perHeaderW) or (layout and layout.w) or 0, layout and layout.scale)
-				local perHeaderH = roundToPixel((layout and layout.perHeaderH) or (layout and layout.h) or 0, layout and layout.scale)
+				local visualIndex = (groupState and groupState.slot) or i
+				local groupSlot = (visualIndex - 1) % groupsPerRow
+				local groupLine = floor((visualIndex - 1) / groupsPerRow)
+				local groupSpacing = tonumber(layout.columnSpacing) or 0
+				local perHeaderW = tonumber((layout and layout.perHeaderW) or (layout and layout.w)) or 0
+				local perHeaderH = tonumber((layout and layout.perHeaderH) or (layout and layout.h)) or 0
 				local groupOffsetX, groupOffsetY = 0, 0
 				if groupGrowth == "LEFT" then
-					groupOffsetX = roundToPixel(groupSlot * (perHeaderW + spacing) * -1, layout.scale)
-					groupOffsetY = roundToPixel(groupLine * (perHeaderH + spacing) * -1, layout.scale)
+					groupOffsetX = groupSlot * (perHeaderW + groupSpacing) * -1
+					groupOffsetY = groupLine * (perHeaderH + groupSpacing) * -1
 				elseif groupGrowth == "UP" then
-					groupOffsetY = roundToPixel(groupSlot * (perHeaderH + spacing), layout.scale)
-					groupOffsetX = roundToPixel(groupLine * (perHeaderW + spacing), layout.scale)
+					groupOffsetY = groupSlot * (perHeaderH + groupSpacing)
+					groupOffsetX = groupLine * (perHeaderW + groupSpacing)
 				elseif groupGrowth == "RIGHT" then
-					groupOffsetX = roundToPixel(groupSlot * (perHeaderW + spacing), layout.scale)
-					groupOffsetY = roundToPixel(groupLine * (perHeaderH + spacing) * -1, layout.scale)
+					groupOffsetX = groupSlot * (perHeaderW + groupSpacing)
+					groupOffsetY = groupLine * (perHeaderH + groupSpacing) * -1
 				else
-					groupOffsetY = roundToPixel(groupSlot * (perHeaderH + spacing) * -1, layout.scale)
-					groupOffsetX = roundToPixel(groupLine * (perHeaderW + spacing), layout.scale)
+					groupOffsetY = groupSlot * (perHeaderH + groupSpacing) * -1
+					groupOffsetX = groupLine * (perHeaderW + groupSpacing)
 				end
-				if Pixel and Pixel.SetPoint then
-					Pixel.SetPoint(header, groupStartPoint, anchor, anchorRelativePoint, anchorOffsetX + groupOffsetX, anchorOffsetY + groupOffsetY)
-				else
-					header:SetPoint(groupStartPoint, anchor, anchorRelativePoint, anchorOffsetX + groupOffsetX, anchorOffsetY + groupOffsetY)
+				local finalOffsetX = anchorOffsetX + groupOffsetX
+				local finalOffsetY = anchorOffsetY + groupOffsetY
+				local pointKey = table.concat({
+					tostring(groupStartPoint),
+					tostring(anchor),
+					tostring(anchorRelativePoint),
+					string.format("%.4f", finalOffsetX),
+					string.format("%.4f", finalOffsetY),
+				}, "|")
+				if header._eqolRaidGroupPointKey ~= pointKey then
+					header:ClearAllPoints()
+					header:SetPoint(groupStartPoint, anchor, anchorRelativePoint, finalOffsetX, finalOffsetY)
+					header._eqolRaidGroupPointKey = pointKey
+				end
+				local proxy = header._eqolGroupIndicatorProxy
+				local proxyParent = (header.GetParent and header:GetParent()) or anchor
+				if not proxy and CreateFrame then
+					proxy = CreateFrame("Frame", nil, proxyParent)
+					proxy:EnableMouse(false)
+					header._eqolGroupIndicatorProxy = proxy
+				end
+				if proxy then
+					if proxyParent and proxy.GetParent and proxy:GetParent() ~= proxyParent then proxy:SetParent(proxyParent) end
+					local proxyKey = table.concat({
+						tostring(groupStartPoint),
+						tostring(anchor),
+						tostring(anchorRelativePoint),
+						string.format("%.4f", finalOffsetX),
+						string.format("%.4f", finalOffsetY),
+						string.format("%.4f", perHeaderW),
+						string.format("%.4f", perHeaderH),
+						tostring(proxyParent),
+					}, "|")
+					if proxy._eqolRaidGroupPointKey ~= proxyKey then
+						proxy:ClearAllPoints()
+						proxy:SetSize(perHeaderW, perHeaderH)
+						proxy:SetPoint(groupStartPoint, anchor, anchorRelativePoint, finalOffsetX, finalOffsetY)
+						proxy._eqolRaidGroupPointKey = proxyKey
+					end
+					if proxy.SetFrameLevel and header.GetFrameLevel then proxy:SetFrameLevel(GF.ClampFrameLevel((header:GetFrameLevel() or 1) + 20)) end
+					proxy:Show()
 				end
 			end
 
@@ -14210,7 +14343,11 @@ local function applyRaidGroupHeaders(cfg, layout, groupSpecs, forceShow, forceHi
 			end
 
 			if not active and header.Hide then header:Hide() end
-			if not active then header._eqolDisplayGroup = nil end
+			if not active then
+				header._eqolDisplayGroup = nil
+				header._eqolRaidGroupSortKey = nil
+				if header._eqolGroupIndicatorProxy then header._eqolGroupIndicatorProxy:Hide() end
+			end
 		end
 	end
 end
@@ -14617,18 +14754,11 @@ function GF:ApplyHeaderAttributes(kind, options)
 				groupCenterOffsetX = groupCenterOffsetX + crossOffsetX
 				groupCenterOffsetY = groupCenterOffsetY + crossOffsetY
 			end
-			local groupInitConfigFunction = string.format(
-				[[
-		self:ClearAllPoints()
-		self:SetWidth(%s)
-		self:SetHeight(%s)
+			local groupInitConfigFunction = [[
 		self:SetAttribute('*type1','target')
 		self:SetAttribute('*type2','togglemenu')
 		RegisterUnitWatch(self)
-	]],
-				("%.3f"):format(groupRenderW),
-				("%.3f"):format(groupRenderH)
-			)
+	]]
 			local layout = {
 				scale = scale,
 				w = groupRenderW,
