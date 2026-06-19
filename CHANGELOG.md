@@ -4,12 +4,17 @@
 
 ## [11.4.0-beta5] - 2026-06-19
 
+### ✨ Added
+
+- Mythic Plus: Added PTR support for the Midnight Season 2 dungeon rotation, including new challenge map IDs, portal spells, and tooltip labels.
+
 ### 🐛 Fixed
 
 - Duration Text: Fixed newly supported cooldown consumers falling back to the active edited profile instead of their selected default profile.
 - Duration Text: Fixed Aura and Buff cooldowns displaying raw seconds for long durations after applying a duration text profile.
 - Quest Tracker: Fixed text styling not applying to the Campaign tracker block.
 - PTR Compatibility: Added WoW 12.1 TOC support and fixed mouseover checks after Blizzard removed the old global `MouseIsOver` helper.
+- Mythic Plus: Restored `/eqol cid` to list the current season's Mythic+ challenge map IDs.
 
 ---
 

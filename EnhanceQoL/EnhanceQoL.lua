@@ -6986,6 +6986,14 @@ function loadMain()
 				local name, id = C_ChallengeMode.GetMapUIInfo(i)
 				if name then print(name, id) end
 			end
+		elseif msg == "cid" then
+			if not (C_ChallengeMode and C_ChallengeMode.GetMapTable and C_ChallengeMode.GetMapUIInfo) then return end
+			local ids = C_ChallengeMode.GetMapTable() or {}
+			table.sort(ids)
+			for _, challengeMapID in ipairs(ids) do
+				local name = C_ChallengeMode.GetMapUIInfo(challengeMapID)
+				if name then print(challengeMapID, name) end
+			end
 		elseif msg == "rq" then
 			if addon.Query and addon.Query.frame then addon.Query.frame:Show() end
 		elseif msg:match("^hbp") then
