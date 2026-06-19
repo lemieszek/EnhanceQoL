@@ -10,6 +10,7 @@
 - Health Macro: Added the new PTR Concentrated Silvermoon Health Potions to the healing potion priority list.
 - Buff Food Macro: Added PTR support for the new Season 2 highest-secondary buff foods, including Hearty variants.
 - Cooldown Panels: Added PTR rank and duration support for Liquid Luster, Fleeting Liquid Luster, and Alluring Nostrum combat potions.
+- Cooldown Panels: Added PTR auto-duration support for new Season 2 trinkets with fixed on-use duration effects.
 
 ### 🐛 Fixed
 
