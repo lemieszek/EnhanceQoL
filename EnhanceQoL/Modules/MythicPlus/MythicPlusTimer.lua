@@ -489,9 +489,8 @@ local function buildStyleOptions()
 end
 
 local function secondsToText(seconds)
-	seconds = math.max(0, tonumber(seconds) or 0)
+	seconds = math.floor(math.max(0, tonumber(seconds) or 0))
 	if SecondsToClock then return SecondsToClock(seconds) end
-	seconds = math.floor(seconds)
 	local minutes = math.floor(seconds / 60)
 	return string.format("%d:%02d", minutes, seconds % 60)
 end
@@ -756,7 +755,7 @@ function Timer:ResolveRunState()
 	if active then
 		elapsed = (self.timerBaseElapsed or 0) + math.max(0, (GetTime and GetTime() or 0) - (self.timerBaseTime or 0))
 		local _, authoritativeElapsed = getActiveChallengeTimer()
-		if authoritativeElapsed and math.abs(authoritativeElapsed - elapsed) > 0.75 then
+		if authoritativeElapsed and math.abs(authoritativeElapsed - elapsed) > 2 then
 			self.timerBaseElapsed = authoritativeElapsed
 			self.timerBaseTime = GetTime and GetTime() or 0
 			elapsed = authoritativeElapsed
