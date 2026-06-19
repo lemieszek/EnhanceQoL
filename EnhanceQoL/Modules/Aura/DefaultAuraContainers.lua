@@ -958,6 +958,21 @@ local SAMPLE_AURA_ICONS = {
 	"Interface\\Icons\\Spell_Holy_Renew",
 	"Interface\\Icons\\Spell_Shadow_ShadowWordPain",
 	"Interface\\Icons\\Spell_Fire_FlameShock",
+	"Interface\\Icons\\Spell_Nature_Regeneration",
+	"Interface\\Icons\\Spell_Holy_PrayerOfMendingtga",
+	"Interface\\Icons\\Spell_Nature_ResistNature",
+	"Interface\\Icons\\Spell_Holy_SealOfSalvation",
+	"Interface\\Icons\\Spell_Magic_GreaterBlessingOfKings",
+	"Interface\\Icons\\Spell_Shadow_CurseOfSargeras",
+	"Interface\\Icons\\Spell_Shadow_CurseOfTounges",
+	"Interface\\Icons\\Spell_Shadow_AbominationExplosion",
+	"Interface\\Icons\\Spell_Frost_ChainsOfIce",
+	"Interface\\Icons\\Spell_Nature_StrangleVines",
+	"Interface\\Icons\\Ability_Creature_Cursed_02",
+	"Interface\\Icons\\Spell_Shadow_Possession",
+	"Interface\\Icons\\Spell_Shadow_PlagueCloud",
+	"Interface\\Icons\\Spell_Fire_Incinerate",
+	"Interface\\Icons\\Spell_Nature_CorrosiveBreath",
 }
 
 local function hideDefaultAuraSamples(kind)
@@ -987,7 +1002,9 @@ local function refreshDefaultAuraSamples(kind)
 	local size = getDefaultAuraIconSize(nil, kind)
 	local horizontalSpacing = getDefaultAuraHorizontalSpacing(nil, kind)
 	local perRow = getDefaultAuraIconsPerRow(nil, kind)
-	local count = math.min(5, perRow)
+	local verticalSpacing = getDefaultAuraVerticalSpacing(nil, kind)
+	local maxRows = getDefaultAuraMaxRows(nil, kind)
+	local count = perRow * maxRows
 	for i = 1, count do
 		local sample = samples[i]
 		if not sample then
@@ -1001,14 +1018,17 @@ local function refreshDefaultAuraSamples(kind)
 			samples[i] = sample
 		end
 		sample.eqolDefaultAuraKind = kind
-		sample.Icon:SetTexture(SAMPLE_AURA_ICONS[i] or "Interface\\Icons\\INV_Misc_QuestionMark")
-		sample.Count:SetText(i == 1 and "3" or "")
-		sample.Count:SetShown(getDefaultAuraDBValue(kind, "CountEnabled") ~= false and i == 1)
+		sample.Icon:SetTexture(SAMPLE_AURA_ICONS[((i - 1) % #SAMPLE_AURA_ICONS) + 1] or "Interface\\Icons\\INV_Misc_QuestionMark")
+		local showCount = getDefaultAuraDBValue(kind, "CountEnabled") ~= false and (i == 1 or i == 6 or i == 13)
+		sample.Count:SetText(showCount and tostring((i % 4) + 2) or "")
+		sample.Count:SetShown(showCount)
 		setDefaultAuraCooldownDuration(sample, GetTime() - i, 30 + i * 8)
 		sample:ClearAllPoints()
 		sample:SetSize(size, size)
-		if i == 1 then
-			sample:SetPoint("TOPRIGHT", anchor, "TOPRIGHT", 0, 0)
+		local column = (i - 1) % perRow
+		local row = math.floor((i - 1) / perRow)
+		if column == 0 then
+			sample:SetPoint("TOPRIGHT", anchor, "TOPRIGHT", 0, -row * (size + verticalSpacing))
 		else
 			sample:SetPoint("RIGHT", samples[i - 1], "LEFT", -horizontalSpacing, 0)
 		end
