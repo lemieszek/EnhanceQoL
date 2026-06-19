@@ -29,6 +29,14 @@ CooldownPanels.activeProcTriggerByItemID = {
 		name = "Heart of Ancient Hunger",
 		itemName = "Heart of Ancient Hunger",
 	},
+	[268292] = {
+        effectSpellID = 1284696,
+        triggerSpellID = 1284698,
+        duration = 12,
+        mode = "simple",
+        name = "Sporelord's Mycelium",
+        itemName = "Sporelord's Mycelial Insignia",
+    },
 	[249343] = {
 		effectSpellID = 1256896,
 		stackTriggerSpellID = 1266687,
