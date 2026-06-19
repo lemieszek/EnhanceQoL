@@ -1000,4 +1000,10 @@ CooldownPanels.autoCooldownDurationByItemID = {
 	[255613] = { duration = 15, name = "Galactic Gladiator's Badge of Ferocity" },
 	[255615] = { duration = 15, name = "Galactic Gladiator's Emblem" },
 	[267077] = { duration = 15, name = "Novice Combatant's Emblem" },
+	[271886] = { duration = 30, name = "Liquid Luster" },
+	[271887] = { duration = 30, name = "Liquid Luster" },
+	[271889] = { duration = 30, name = "Alluring Nostrum" },
+	[271890] = { duration = 30, name = "Alluring Nostrum" },
+	[274763] = { duration = 30, name = "Fleeting Liquid Luster" },
+	[274764] = { duration = 30, name = "Fleeting Liquid Luster" },
 }
