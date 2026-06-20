@@ -4374,6 +4374,30 @@ function AuraUtil.getAuraButtonStyleKey(ac)
 	return key
 end
 
+function AuraUtil.setAuraTooltipState(btn, style)
+	if not (btn and style) then return end
+	local show = style.showTooltip == true
+	btn._tooltipUseEditMode = style.tooltipUseEditMode == true
+	btn._tooltipAnchor = style.tooltipAnchor or "ANCHOR_BOTTOMRIGHT"
+	if btn._showTooltip ~= show then btn._showTooltip = show end
+	if btn.SetPropagateMouseClicks and btn._eqolAuraMouseClickPropagate ~= true then
+		btn:SetPropagateMouseClicks(true)
+		btn._eqolAuraMouseClickPropagate = true
+	end
+	if btn.SetMouseMotionEnabled and btn._eqolAuraMouseMotionEnabled ~= show then
+		btn:SetMouseMotionEnabled(show)
+		btn._eqolAuraMouseMotionEnabled = show
+	end
+	if btn.EnableMouse then
+		if btn._eqolAuraMouseEnabled ~= show then
+			btn:EnableMouse(show)
+			btn._eqolAuraMouseEnabled = show
+			if btn.SetMouseClickEnabled then btn:SetMouseClickEnabled(false) end
+		end
+	end
+	if not show and GameTooltip and GameTooltip.IsOwned and GameTooltip.Hide and GameTooltip:IsOwned(btn) then GameTooltip:Hide() end
+end
+
 function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulFilter, canShowPlayerDispel)
 	if not btn or not aura then return end
 	unitToken = unitToken or "target"
@@ -4395,6 +4419,7 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 	if not showBorder then
 		showBorder = borderKeyName ~= "" and borderKeyName ~= "DEFAULT" and borderKeyName ~= "NONE"
 	end
+	AuraUtil.setAuraTooltipState(btn, ac)
 	if canShowPlayerDispel == nil then canShowPlayerDispel = AuraUtil.CanUnitShowPlayerDispel(unitToken, aura.isSample) end
 	local canUseStaticSignature = not needsCooldown and not showStacks and not showBorder and not (ac and ac.blizzardDispelBorder == true) and not (ac and ac.showDR == true)
 	if
@@ -4417,7 +4442,6 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 	btn.auraInstanceID = aura.auraInstanceID
 	btn.unitToken = unitToken
 	btn.isDebuff = isDebuff
-	btn._showTooltip = ac.showTooltip ~= false
 	btn.icon:SetTexture(aura.icon or "")
 	AuraUtil.ApplyIconShape(btn, ac and ac.iconShape, ac and ac.iconZoom)
 	btn.cd:Clear()

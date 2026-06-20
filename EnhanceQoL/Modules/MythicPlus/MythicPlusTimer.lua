@@ -490,7 +490,6 @@ end
 
 local function secondsToText(seconds)
 	seconds = math.floor(math.max(0, tonumber(seconds) or 0))
-	if SecondsToClock then return SecondsToClock(seconds) end
 	local minutes = math.floor(seconds / 60)
 	return string.format("%d:%02d", minutes, seconds % 60)
 end
@@ -530,6 +529,48 @@ end
 local function createDurationObject()
 	local durationUtil = _G.C_DurationUtil
 	return durationUtil and durationUtil.CreateDuration and durationUtil.CreateDuration() or nil
+end
+
+local function getDurationTextBindingProperty(property)
+	local enum = _G.Enum and _G.Enum.DurationTextBindingProperty or nil
+	if enum and enum[property] ~= nil then return enum[property] end
+	if property == "RemainingDuration" then return 0 end
+	if property == "ElapsedDuration" then return 2 end
+	if property == "TotalDuration" then return 4 end
+	return nil
+end
+
+local function getNumericRoundingDown()
+	local enum = _G.Enum and _G.Enum.NumericRuleFormatRounding or nil
+	return enum and enum.Down or 2
+end
+
+local function createTimerNumericFormatter()
+	local stringUtil = _G.C_StringUtil
+	if not (stringUtil and stringUtil.CreateNumericRuleFormatter) then return nil end
+	local formatter = stringUtil.CreateNumericRuleFormatter()
+	if formatter.ClearBreakpoints then formatter:ClearBreakpoints() end
+	local down = getNumericRoundingDown()
+	local breakpoints = {
+		{
+			threshold = 0,
+			step = 1,
+			rounding = down,
+			format = "%d:%02d",
+			components = {
+				{ div = 60, step = 1, rounding = down },
+				{ mod = 60, step = 1, rounding = down },
+			},
+		},
+	}
+	if formatter.SetBreakpoints then
+		formatter:SetBreakpoints(breakpoints)
+	elseif formatter.AddBreakpoint then
+		for i = 1, #breakpoints do
+			formatter:AddBreakpoint(breakpoints[i])
+		end
+	end
+	return formatter
 end
 
 local function getChallengeStartTime(timer, state)
@@ -1063,16 +1104,6 @@ function Timer:GetTimerDisplayText(state, timeLeft)
 	return timeRemainingToText(timeLeft)
 end
 
-function Timer:GetDurationTextConfig()
-	return {
-		useGlobal = false,
-		profileKey = "MINIMAL",
-		canRoundUpIntervals = false,
-		millisecondsThreshold = 0,
-		formatStyle = "NUMERIC",
-	}
-end
-
 function Timer:GetTimerDurationObject(key)
 	self.durationObjects = self.durationObjects or {}
 	local durationObject = self.durationObjects[key]
@@ -1098,41 +1129,58 @@ function Timer:UpdateTimerDurationObject(key, startTime, duration)
 	return durationObject
 end
 
+function Timer:GetTimerNumericFormatter()
+	if not self.timerNumericFormatter then self.timerNumericFormatter = createTimerNumericFormatter() end
+	return self.timerNumericFormatter
+end
+
+function Timer:CreateTimerFormatComponent(property)
+	local resolvedProperty = getDurationTextBindingProperty(property)
+	local formatter = self:GetTimerNumericFormatter()
+	if resolvedProperty == nil or not formatter then return nil end
+	return {
+		property = resolvedProperty,
+		formatter = formatter,
+	}
+end
+
 function Timer:GetDurationTextComponents(mode)
-	local durationText = addon.DurationText
-	if not (durationText and durationText.CreateFormatComponent) then return nil end
-	local config = self:GetDurationTextConfig()
-	local formatter = durationText.GetSecondsFormatter and durationText:GetSecondsFormatter(config)
-	if not formatter then return nil end
 	if mode == "TIME_LEFT_TOTAL" then
 		return {
-			durationText:CreateFormatComponent("RemainingDuration", formatter),
-			durationText:CreateFormatComponent("TotalDuration", formatter),
+			self:CreateTimerFormatComponent("RemainingDuration"),
+			self:CreateTimerFormatComponent("TotalDuration"),
 		}
 	end
 	if mode == "ELAPSED_TOTAL" then
 		return {
-			durationText:CreateFormatComponent("ElapsedDuration", formatter),
-			durationText:CreateFormatComponent("TotalDuration", formatter),
+			self:CreateTimerFormatComponent("ElapsedDuration"),
+			self:CreateTimerFormatComponent("TotalDuration"),
 		}
 	end
-	if mode == "REMAINING" then
+	if mode == "TOTAL" then
 		return {
-			durationText:CreateFormatComponent("RemainingDuration", formatter),
+			self:CreateTimerFormatComponent("TotalDuration"),
 		}
 	end
-	return nil
+	return {
+		self:CreateTimerFormatComponent("RemainingDuration"),
+	}
 end
 
 function Timer:BindTimerText(fontString, key, durationObject, mode, textFormat)
 	if not (fontString and durationObject and addon.functions and addon.functions.BindDurationText) then return false end
+	local formatter = self:GetTimerNumericFormatter()
+	if not formatter then return false end
 	local options = {
 		owner = self:EnsureFrame(),
 		key = key,
-		config = self:GetDurationTextConfig(),
+		clearText = false,
 		expiredText = "",
+		formatter = formatter,
 		zeroDurationText = "",
 		updateNow = true,
+		-- M+ timer text is always m:ss; Duration Text profiles only apply to user-configurable cooldown displays.
+		useProfileConfig = false,
 	}
 	if mode == "TIME_LEFT_TOTAL" or mode == "ELAPSED_TOTAL" then
 		local components = self:GetDurationTextComponents(mode)
@@ -1141,10 +1189,10 @@ function Timer:BindTimerText(fontString, key, durationObject, mode, textFormat)
 			options.components = components
 		end
 	elseif mode == "TOTAL" then
-		local components = self:GetDurationTextComponents("ELAPSED_TOTAL")
-		if components and components[2] then
+		local components = self:GetDurationTextComponents("TOTAL")
+		if components and components[1] then
 			options.textFormat = "{}"
-			options.components = { components[2] }
+			options.components = components
 		end
 	elseif textFormat then
 		local components = self:GetDurationTextComponents("REMAINING")
@@ -1164,12 +1212,19 @@ end
 
 function Timer:SetBoundTimerText(key, fallbackText, anchorKey, xKey, yKey, color, fontSize, justify, state, duration, mode, textFormat)
 	local text = self:SetPanelText(key, fallbackText, anchorKey, xKey, yKey, color, fontSize, justify)
-	if not (state and state.active) then return text end
+	local bindingKey = "panel-" .. key
+	if not (state and state.active) then
+		self:ReleaseTimerTextBinding(bindingKey)
+		return text
+	end
 	local elapsed = tonumber(state.elapsed) or 0
 	duration = tonumber(duration) or 0
-	if duration <= 0 or elapsed >= duration then return text end
+	if duration <= 0 or elapsed >= duration then
+		self:ReleaseTimerTextBinding(bindingKey)
+		return text
+	end
 	local durationObject = self:UpdateTimerDurationObject(key, getChallengeStartTime(self, state), duration)
-	if durationObject then self:BindTimerText(text, "panel-" .. key, durationObject, mode, textFormat) end
+	if not (durationObject and self:BindTimerText(text, bindingKey, durationObject, mode, textFormat)) then self:ReleaseTimerTextBinding(bindingKey) end
 	return text
 end
 
@@ -2045,6 +2100,7 @@ function Timer:SetPanelTimerBarTimeLeftText(timeLeft, state)
 	if not (bar and bar.timeLeftText) then return end
 	if not self:Get("panelTimerBarTimeLeftText") then
 		bar.timeLeftText:Hide()
+		self:ReleaseTimerTextBinding("panel-bar-time-left")
 		return
 	end
 	local fillUp = self:Get("panelTimerBarFillUp") == true
@@ -2069,7 +2125,9 @@ function Timer:SetPanelTimerBarTimeLeftText(timeLeft, state)
 	end
 	if state and state.active and timeLimit > 0 and elapsed < timeLimit then
 		local durationObject = self:UpdateTimerDurationObject("panelBarTimeLeft", getChallengeStartTime(self, state), timeLimit)
-		if durationObject then self:BindTimerText(bar.timeLeftText, "panel-bar-time-left", durationObject, "REMAINING") end
+		if not (durationObject and self:BindTimerText(bar.timeLeftText, "panel-bar-time-left", durationObject, "REMAINING")) then self:ReleaseTimerTextBinding("panel-bar-time-left") end
+	else
+		self:ReleaseTimerTextBinding("panel-bar-time-left")
 	end
 	bar.timeLeftText:Show()
 end
@@ -2087,6 +2145,8 @@ function Timer:UpdatePanelTimerBarChestMarkers(timeLimit, twoChest, threeChest)
 		for _, markerText in ipairs(bar.chestMarkerTexts or {}) do
 			markerText:Hide()
 		end
+		Timer:ReleaseTimerTextBinding("panel-bar-panelBarChest3")
+		Timer:ReleaseTimerTextBinding("panel-bar-panelBarChest2")
 	end
 	if not showMarkers and not showTexts then
 		hideMarkerElements()
@@ -2140,15 +2200,18 @@ function Timer:UpdatePanelTimerBarChestMarkers(timeLimit, twoChest, threeChest)
 				applyFontString(markerText, font, fontSize, style)
 				markerText:SetText(secondsToText(remainingTimes[index]))
 				markerText:SetTextColor(textColor.r, textColor.g, textColor.b, textColor.a)
-				if self.lastState and self.lastState.active then
-					local durationObject = self:UpdateTimerDurationObject(durationObjectKey, getChallengeStartTime(self, self.lastState), index == 1 and threeChestTime or twoChestTime)
-					if durationObject then self:BindTimerText(markerText, "panel-bar-" .. durationObjectKey, durationObject, "REMAINING") end
+					if self.lastState and self.lastState.active then
+						local durationObject = self:UpdateTimerDurationObject(durationObjectKey, getChallengeStartTime(self, self.lastState), index == 1 and threeChestTime or twoChestTime)
+						if not (durationObject and self:BindTimerText(markerText, "panel-bar-" .. durationObjectKey, durationObject, "REMAINING")) then self:ReleaseTimerTextBinding("panel-bar-" .. durationObjectKey) end
+					else
+						self:ReleaseTimerTextBinding("panel-bar-" .. durationObjectKey)
+					end
+					markerText:Show()
+				else
+					markerText:Hide()
+					self:ReleaseTimerTextBinding("panel-bar-" .. (index == 1 and "panelBarChest3" or "panelBarChest2"))
 				end
-				markerText:Show()
-			else
-				markerText:Hide()
 			end
-		end
 	end
 end
 
@@ -2320,7 +2383,7 @@ function Timer:SetRow(index, data)
 		local duration = tonumber(durationBinding.duration) or 0
 		if duration > 0 and elapsed < duration then
 			local durationObject = self:UpdateTimerDurationObject(durationBinding.key, getChallengeStartTime(self, durationBinding.state), duration)
-			if durationObject then self:BindTimerText(row.value, bindingKey, durationObject, durationBinding.mode, durationBinding.textFormat) end
+			if not (durationObject and self:BindTimerText(row.value, bindingKey, durationObject, durationBinding.mode, durationBinding.textFormat)) then self:ReleaseTimerTextBinding(bindingKey) end
 		else
 			self:ReleaseTimerTextBinding(bindingKey)
 		end

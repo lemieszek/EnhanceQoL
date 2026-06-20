@@ -64,6 +64,7 @@ Track EnhanceQoL changes that need follow-up before or when WoW 12.1 ships. Remo
   - `Interface/AddOns/Blizzard_UnitFrame/Shared/CompactUnitFrame.xml`: compact unit frames now include `<Frame parentKey="pingIconFrame" inherits="UnitPingIconFrameTemplate">`.
   - `Interface/AddOns/Blizzard_UnitFrame/Shared/CompactUnitFrame.lua`: `DefaultCompactUnitFrameSetup` assigns `frame.pingIconFrame:SetGUIDMatch(...)` against `UnitGUID(frame.unit)`.
   - `Interface/AddOns/Blizzard_UnitFrame/Mainline/TargetFrame.xml`: target frames now include `parentKey="PingIconFrame"` anchored near the portrait.
+- Blizzard setting: `showPingsOnRaidFrames` controls native ping icons on frames marked as raid frames. On 12.1 PTR, `UnitPingIconFrameMixin` checks this CVar before showing pings when `self.isRaidFrame` is set.
 - Live status: Retail/live build `12.0.7.68235` does not contain `UnitPingIconFrameTemplate`, `pingIconFrame`, or target-frame `PingIconFrame`.
 - Why this matters: EnhanceQoL unit-frame work that repositions, scales, hides, skins, or mirrors Blizzard unit-frame children needs to preserve or intentionally integrate the native ping icon on 12.1+ clients.
 - EnhanceQoL areas to review:

@@ -2,12 +2,23 @@
 
 <!--@eqol-beta@-->
 
+## [11.4.0-beta7] - 2026-06-20
+
+### 🐛 Fixed
+
+- Duration Text: Simplified duration text profiles to decimal precision and fallback text, with fixed cooldown-style timing for supported binding-based displays.
+- Duration Text: Removed stale profile fields from storage so old beta settings no longer force seconds-only or unit-heavy cooldown text.
+- Unit Frames: Allowed custom aura tooltips to stay hoverable without blocking clicks on the underlying unit frame.
+
+---
+
 ## [11.4.0-beta6] - 2026-06-19
 
 ### 🐛 Fixed
 
 - Group Frames / Raid Frames: Stabilized grouped raid layouts so group labels no longer jitter, and improved combat-safe raid joins for role, group, and custom raid sorting.
-- Duration Text: Restored the default Minimal profile to Blizzard-style minute/second cooldown text while still allowing Numeric profiles to show raw seconds across cooldown panels, trackers, and buff/debuff containers.
+- Duration Text: Restored Blizzard-style cooldown text defaults and added a profile threshold for native cooldown abbreviation timing.
+- Duration Text: Migrated stale built-in Duration Text profiles once so affected users recover from seconds-only Minimal profile settings.
 - Mythic Plus / Timer: Kept the panel background height stable when objective text grows, so objectives no longer stretch the main timer area.
 
 ---
