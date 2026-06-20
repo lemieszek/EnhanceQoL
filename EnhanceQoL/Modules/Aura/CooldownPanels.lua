@@ -3591,6 +3591,12 @@ local function getEntryTypeLabel(entryType)
 	return entryType or ""
 end
 
+function CooldownPanels:GetEntryIcon(entry) return getEntryIcon(entry) end
+
+function CooldownPanels:GetEntryName(entry) return getEntryName(entry) end
+
+function CooldownPanels:GetEntryTypeLabel(entryType) return getEntryTypeLabel(entryType) end
+
 cdp.ENTRY.GetEntrySpellIDInfoText = function(entry)
 	if not entry or type(entry) ~= "table" then return nil end
 	local spellID = nil
@@ -5301,6 +5307,7 @@ function CooldownPanels:AddEntry(panelId, entryType, idValue, overrides)
 	end
 	self:RebuildSpellIndex()
 	self:RefreshPanel(panelId)
+	if self.BlizzardEditor and self.BlizzardEditor.RefreshPanel then self.BlizzardEditor:RefreshPanel(panelId) end
 	return entryId, entry
 end
 
@@ -5367,6 +5374,7 @@ function CooldownPanels:RemoveEntry(panelId, entryId)
 	Helper.InvalidateFixedLayoutCache(panel)
 	self:RebuildSpellIndex()
 	self:RefreshPanel(panelId)
+	if self.BlizzardEditor and self.BlizzardEditor.RefreshPanel then self.BlizzardEditor:RefreshPanel(panelId) end
 end
 
 function cdp.ENTRY.EnsureSpellEntryMeta(metaByPanel, panelId, entryId)
@@ -11901,6 +11909,10 @@ local function showSoundMenu(owner, panelId, entryId)
 		end
 	end)
 end
+
+function CooldownPanels:ShowAddEntryMenu(owner, panelId) return showSlotMenu(owner, panelId) end
+
+function CooldownPanels:ShowEntrySoundMenu(owner, panelId, entryId) return showSoundMenu(owner, panelId, entryId) end
 
 function CooldownPanels:GetLayoutEntryStandaloneMenuState(create)
 	CooldownPanels.runtime = CooldownPanels.runtime or {}

@@ -6,6 +6,9 @@
 	<Script file="CooldownPanels_ActiveProcTriggers.lua" />
 	<Script file="CooldownPanels.lua" />
 	<Script file="CooldownPanels_CDMAuras.lua" />
+	<Script file="CooldownPanels_BlizzardEditorConstants.lua" />
+	<Include file="CooldownPanels_BlizzardEditor.xml" />
+	<Script file="CooldownPanels_BlizzardEditor.lua" />
 	<Script file="UF_Helper.lua" />
 	<Script file="StandalonePrivateAuras.lua" />
 	<Script file="FocusInterruptTracker.lua" />
