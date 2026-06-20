@@ -2,6 +2,14 @@
 
 <!--@eqol-beta@-->
 
+## [11.4.0-beta8] - 2026-06-20
+
+### 🐛 Fixed
+
+- Cooldown Panels: Fixed ready sounds firing when custom activation-duration overlays end instead of waiting for the real tracked cooldown to become ready.
+
+---
+
 ## [11.4.0-beta7] - 2026-06-20
 
 ### 🐛 Fixed

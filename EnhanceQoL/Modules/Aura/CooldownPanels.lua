@@ -8803,6 +8803,7 @@ end
 local function shouldArmReadySoundOnCooldownDone(data)
 	if type(data) ~= "table" or data.soundReady ~= true or data.cooldownGCD == true then return false end
 	if data.spellAuraOverlayActive == true then return false end
+	if data.customCooldownDurationActive == true then return false end
 	if data.resolvedType == "SPELL" then
 		if data.chargesInfo and data.chargesInfo.maxCharges ~= nil then return false end
 		return CooldownPanels.IsSpellCooldownInfoActive(data.cooldownIsActive, data.cooldownEnabled, data.cooldownStart, data.cooldownDuration)
