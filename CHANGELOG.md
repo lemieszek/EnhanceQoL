@@ -7,6 +7,7 @@
 ### 🐛 Fixed
 
 - Cooldown Panels: Fixed ready sounds firing when custom activation-duration overlays end instead of waiting for the real tracked cooldown to become ready.
+- Quest Tracker: Kept completed objective text visibly muted when Quest Tracker text styling is enabled.
 
 ---
 

@@ -54,6 +54,7 @@ local OBJECTIVE_TRACKER_MINIMIZE_ANCHORS = {
 local QUEST_TRACKER_TEXT_STYLE_DEFAULTS = {
 	moduleHeaderColor = { r = 1, g = 210 / 255, b = 0, a = 1 },
 	moduleHeaderFontSize = 14,
+	objectiveCompleteColor = { r = 0.6, g = 0.6, b = 0.6, a = 1 },
 	objectiveColor = { r = 0.8, g = 0.8, b = 0.8, a = 1 },
 	objectiveFontSize = 12,
 	objectiveHoverColor = { r = 1, g = 1, b = 1, a = 1 },
@@ -63,6 +64,7 @@ local QUEST_TRACKER_TEXT_STYLE_DEFAULTS = {
 }
 local QUEST_TRACKER_TEXT_STYLE_COLOR_DEFAULTS = {
 	questTrackerTextStyleModuleHeaderColor = QUEST_TRACKER_TEXT_STYLE_DEFAULTS.moduleHeaderColor,
+	questTrackerTextStyleObjectiveCompleteColor = QUEST_TRACKER_TEXT_STYLE_DEFAULTS.objectiveCompleteColor,
 	questTrackerTextStyleObjectiveColor = QUEST_TRACKER_TEXT_STYLE_DEFAULTS.objectiveColor,
 	questTrackerTextStyleObjectiveHoverColor = QUEST_TRACKER_TEXT_STYLE_DEFAULTS.objectiveHoverColor,
 	questTrackerTextStyleQuestTitleColor = QUEST_TRACKER_TEXT_STYLE_DEFAULTS.questTitleColor,
@@ -134,6 +136,27 @@ local function GetQuestTrackerTextStyleSize(key)
 	return value
 end
 
+local function QuestTrackerTextStyleColorMatches(color, r, g, b)
+	if type(color) ~= "table" or r == nil or g == nil or b == nil then return false end
+	return math.abs((color.r or 0) - r) <= 0.002
+		and math.abs((color.g or 0) - g) <= 0.002
+		and math.abs((color.b or 0) - b) <= 0.002
+end
+
+local function UpdateQuestTrackerTextStyleCompleteFlag(fontString, r, g, b)
+	if not fontString or fontString._eqolQuestTrackerTextRole ~= "objective" then return end
+	local colors = _G.OBJECTIVE_TRACKER_COLOR
+	if not colors then return end
+	if QuestTrackerTextStyleColorMatches(colors.Complete, r, g, b) then
+		fontString._eqolQuestTrackerCompleteObjective = true
+	elseif QuestTrackerTextStyleColorMatches(colors.Normal, r, g, b)
+		or QuestTrackerTextStyleColorMatches(colors.NormalHighlight, r, g, b)
+		or QuestTrackerTextStyleColorMatches(colors.Failed, r, g, b)
+		or QuestTrackerTextStyleColorMatches(colors.FailedHighlight, r, g, b) then
+		fontString._eqolQuestTrackerCompleteObjective = nil
+	end
+end
+
 local function ApplyQuestTrackerTextStyleColor(fontString)
 	if not (fontString and fontString.SetTextColor) or fontString._eqolQuestTrackerApplyingColor then return end
 	if not IsQuestTrackerTextStyleEnabled() then return end
@@ -146,6 +169,8 @@ local function ApplyQuestTrackerTextStyleColor(fontString)
 		colorKey = "questTrackerTextStyleModuleHeaderColor"
 	elseif role == "title" then
 		colorKey = highlighted and "questTrackerTextStyleQuestTitleHoverColor" or "questTrackerTextStyleQuestTitleColor"
+	elseif fontString._eqolQuestTrackerCompleteObjective then
+		colorKey = "questTrackerTextStyleObjectiveCompleteColor"
 	else
 		colorKey = highlighted and "questTrackerTextStyleObjectiveHoverColor" or "questTrackerTextStyleObjectiveColor"
 	end
@@ -158,13 +183,25 @@ end
 local function HookQuestTrackerTextStyleColor(fontString)
 	if not (fontString and fontString.SetTextColor) or fontString._eqolQuestTrackerColorHooked or not hooksecurefunc then return end
 	fontString._eqolQuestTrackerColorHooked = true
-	hooksecurefunc(fontString, "SetTextColor", function(text) ApplyQuestTrackerTextStyleColor(text) end)
+	hooksecurefunc(fontString, "SetTextColor", function(text, r, g, b)
+		if text and not text._eqolQuestTrackerApplyingColor then UpdateQuestTrackerTextStyleCompleteFlag(text, r, g, b) end
+		ApplyQuestTrackerTextStyleColor(text)
+	end)
 end
 
-local function ApplyQuestTrackerTextStyleFontString(fontString, role, block)
+local function IsQuestTrackerTextStyleCompleteLine(line)
+	if not line then return false end
+	local completeStyle = _G.OBJECTIVE_TRACKER_COLOR and _G.OBJECTIVE_TRACKER_COLOR.Complete
+	if completeStyle and line.Text and line.Text.colorStyle == completeStyle then return true end
+	return _G.ObjectiveTrackerAnimLineState
+		and (line.state == _G.ObjectiveTrackerAnimLineState.Completed or line.state == _G.ObjectiveTrackerAnimLineState.Completing)
+end
+
+local function ApplyQuestTrackerTextStyleFontString(fontString, role, block, line)
 	if not fontString then return end
 	fontString._eqolQuestTrackerTextRole = role
 	fontString._eqolQuestTrackerBlock = block
+	fontString._eqolQuestTrackerCompleteObjective = role == "objective" and IsQuestTrackerTextStyleCompleteLine(line) or nil
 	HookQuestTrackerTextStyleColor(fontString)
 	if not IsQuestTrackerTextStyleEnabled() then
 		return
@@ -191,8 +228,8 @@ end
 
 local function HandleQuestTrackerTextStyleLine(block, line)
 	if not line then return end
-	if line.Text then ApplyQuestTrackerTextStyleFontString(line.Text, "objective", block) end
-	if line.Dash then ApplyQuestTrackerTextStyleFontString(line.Dash, "objective", block) end
+	if line.Text then ApplyQuestTrackerTextStyleFontString(line.Text, "objective", block, line) end
+	if line.Dash then ApplyQuestTrackerTextStyleFontString(line.Dash, "objective", block, line) end
 	if line.SetHeight and line.Text and line.Text.GetHeight then line:SetHeight(math.max(1, line.Text:GetHeight() or 1)) end
 end
 
