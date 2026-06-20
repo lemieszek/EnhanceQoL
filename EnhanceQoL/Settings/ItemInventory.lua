@@ -1402,8 +1402,8 @@ local function onInspect(arg1)
 	if nil == InspectFrame then return end
 	local unit = InspectFrame.unit
 	if nil == unit then return end
-
-	if UnitGUID(InspectFrame.unit) ~= arg1 then return end
+	if issecretvalue(unit) then return end
+	if UnitGUID(unit) ~= arg1 then return end
 
 	local pdElement = InspectPaperDollFrame
 	if not doneHook then
