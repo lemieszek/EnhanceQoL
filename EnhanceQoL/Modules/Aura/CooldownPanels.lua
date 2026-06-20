@@ -6187,7 +6187,7 @@ function CooldownPanels:HandleCursorDrop(panelId, targetSlot)
 	added = addedEntryId ~= nil
 	if added and targetSlot and requiresPostAddMove then self:MoveEntryToFixedSlot(panelId, addedEntryId, targetSlot) end
 	if added then Api.ClearCursor() end
-	return added
+	return added, addedEntryId
 end
 
 function CooldownPanels:SelectPanel(panelId)
@@ -6246,7 +6246,11 @@ function CooldownPanels:IsPanelLayoutEditActive(panelId)
 	panelId = normalizeId(panelId)
 	if not panelId then return false end
 	local editor = getEditor()
-	if not (editor and editor.frame and editor.frame:IsShown()) then return false end
+	local editorShown = editor and editor.frame and editor.frame:IsShown()
+	local blizzardEditor = self.BlizzardEditor
+	local blizzardFrame = blizzardEditor and blizzardEditor.frame or nil
+	local blizzardEditorShown = editor and editor._eqolBlizzardEditorLayoutEdit == true and blizzardFrame and blizzardFrame.IsShown and blizzardFrame:IsShown()
+	if not (editorShown or blizzardEditorShown) then return false end
 	if editor.layoutEditActive ~= true then return false end
 	if normalizeId(editor.selectedPanelId) ~= panelId then return false end
 	return self:IsPanelLayoutEditAvailable(panelId)
@@ -6254,7 +6258,11 @@ end
 
 function CooldownPanels:IsAnyPanelLayoutEditActive()
 	local editor = getEditor()
-	return editor and editor.frame and editor.frame:IsShown() and editor.layoutEditActive == true
+	if not (editor and editor.layoutEditActive == true) then return false end
+	if editor.frame and editor.frame:IsShown() then return true end
+	local blizzardEditor = self.BlizzardEditor
+	local blizzardFrame = blizzardEditor and blizzardEditor.frame or nil
+	return editor._eqolBlizzardEditorLayoutEdit == true and blizzardFrame and blizzardFrame.IsShown and blizzardFrame:IsShown() or false
 end
 
 function CooldownPanels:SetEditorLayoutEditEnabled(enabled)
@@ -6271,6 +6279,7 @@ function CooldownPanels:SetEditorLayoutEditEnabled(enabled)
 	end
 	local previousPanelId = normalizeId(editor._eqolLayoutPanelId)
 	editor.layoutEditActive = enabled
+	if not enabled then editor._eqolBlizzardEditorLayoutEdit = nil end
 	local nextPanelId = enabled and normalizeId(editor.selectedPanelId) or nil
 	editor._eqolLayoutPanelId = nextPanelId
 	if not enabled then
@@ -6295,7 +6304,7 @@ function CooldownPanels:SetEditorLayoutEditEnabled(enabled)
 	if nextPanelId and self:GetPanel(nextPanelId) then self:RefreshPanel(nextPanelId) end
 	self:UpdateCursorAnchorState()
 	self:RefreshEditor()
-	if enabled and nextPanelId then self:OpenLayoutPanelStandaloneMenu(nextPanelId) end
+	if enabled and nextPanelId and not editor._eqolSuppressLayoutPanelDialog then self:OpenLayoutPanelStandaloneMenu(nextPanelId) end
 end
 
 function CooldownPanels:PreparePanelForFixedLayoutEdit(panelId)
@@ -11972,14 +11981,15 @@ function CooldownPanels:RefreshLayoutEntryStandaloneMenu(rebuild)
 	local panelId = normalizeId(state.panelId)
 	local entryId = normalizeId(state.entryId)
 	local panel, entry = self:GetLayoutEntryStandaloneDialogEntry(panelId, entryId)
-	local editor = getEditor()
+	local allowOutsideLayoutEdit = state.allowOutsideLayoutEdit == true
+	local editor = not allowOutsideLayoutEdit and getEditor() or nil
 	local selectedPanelId = normalizeId(editor and editor.selectedPanelId)
 	local selectedEntryId = normalizeId(editor and editor.selectedEntryId)
-	if not panel or not entry or not self:IsPanelLayoutEditActive(panelId) or selectedPanelId ~= panelId or selectedEntryId ~= entryId then
+	if not panel or not entry or (not allowOutsideLayoutEdit and (not self:IsPanelLayoutEditActive(panelId) or selectedPanelId ~= panelId or selectedEntryId ~= entryId)) then
 		self:HideLayoutEntryStandaloneMenu(panelId)
 		return
 	end
-	if rebuild == true then self:OpenLayoutEntryStandaloneMenu(panelId, entryId, state.anchorFrame or state.dialog or state.hostFrame) end
+	if rebuild == true then self:OpenLayoutEntryStandaloneMenu(panelId, entryId, state.anchorFrame or state.dialog or state.hostFrame, allowOutsideLayoutEdit) end
 end
 
 function CooldownPanels:FocusLayoutEntryStandaloneSettingsGroup(panelId, entryId, targetGroupId)
@@ -11998,6 +12008,9 @@ function CooldownPanels:FocusEntryStaticTextStandaloneSettings(panelId)
 end
 
 function CooldownPanels:GetEditorStandaloneDialogAnchor()
+	local blizzardEditor = self.BlizzardEditor
+	local blizzardFrame = blizzardEditor and blizzardEditor.frame or nil
+	if blizzardFrame and blizzardFrame.IsShown and blizzardFrame:IsShown() then return blizzardFrame end
 	local editor = getEditor()
 	local frame = editor and editor.frame or nil
 	if frame and frame.IsShown and frame:IsShown() then return frame end
@@ -12018,10 +12031,19 @@ end
 
 function CooldownPanels:DockStandaloneDialogToEditor(dialog)
 	local frame = self:GetEditorStandaloneDialogAnchor()
-	if not (dialog and frame) then return end
+	if not dialog then return false end
+	if not frame then
+		if dialog.SetMovable then dialog:SetMovable(true) end
+		if dialog.RegisterForDrag then dialog:RegisterForDrag("LeftButton") end
+		return false
+	end
 	if dialog.SetClampedToScreen then dialog:SetClampedToScreen(false) end
+	if dialog.SetMovable then dialog:SetMovable(false) end
+	if dialog.RegisterForDrag then dialog:RegisterForDrag() end
+	if dialog.StopMovingOrSizing then dialog:StopMovingOrSizing() end
 	dialog:ClearAllPoints()
 	dialog:SetPoint("TOPLEFT", frame, "TOPRIGHT", 8, 0)
+	return true
 end
 
 function CooldownPanels:GetStandaloneDialogSpawnPosition(anchorFrame, fallbackFrame, offsetX, offsetY)
@@ -12063,19 +12085,24 @@ function CooldownPanels:GetStandaloneDialogSpawnPosition(anchorFrame, fallbackFr
 	}
 end
 
-function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFrame)
+function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFrame, allowOutsideLayoutEdit)
 	local lib = addon.EditModeLib
 	if not (lib and lib.ShowStandaloneSettingsDialog and SettingType) then return end
 	panelId = normalizeId(panelId)
 	entryId = normalizeId(entryId)
 	if not (panelId and entryId) then return end
-	if not self:IsPanelLayoutEditActive(panelId) then return end
+	allowOutsideLayoutEdit = allowOutsideLayoutEdit == true
+	if not allowOutsideLayoutEdit and not self:IsPanelLayoutEditActive(panelId) then return end
+	local editor = getEditor()
+	local suppressBlizzardEditorLayoutEnd = editor and editor._eqolBlizzardEditorLayoutEdit == true
+	if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = true end
 	self:HideLayoutPanelStandaloneMenu(panelId)
 	self:HideLayoutFixedGroupStandaloneMenu(panelId)
+	if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = nil end
 
 	local panel, entry = self:GetLayoutEntryStandaloneDialogEntry(panelId, entryId)
 	local runtime = getRuntime(panelId)
-	local hostFrame = runtime and runtime.frame or nil
+	local hostFrame = runtime and runtime.frame or (self.EnsurePanelFrame and self:EnsurePanelFrame(panelId)) or nil
 	if not (panel and entry and hostFrame) then return end
 	local spawnPosition = self:GetStandaloneDialogSpawnPosition(anchorFrame, hostFrame, 12, 0)
 	local defaultStaticFontPath, defaultStaticFontSize, defaultStaticFontStyle = Helper.GetCountFontDefaults(hostFrame)
@@ -15006,7 +15033,14 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		relativeTo = spawnPosition.relativeTo,
 		x = spawnPosition.x,
 		y = spawnPosition.y,
-		onHide = function() CooldownPanels:ClearLayoutEntryStandaloneMenuState() end,
+		onHide = function()
+			local state = CooldownPanels:GetLayoutEntryStandaloneMenuState(false)
+			local fromBlizzardEditor = state and state.blizzardEditorLayoutEdit == true
+			local editor = getEditor()
+			local suppressLayoutEnd = editor and editor._eqolSuppressBlizzardEditorLayoutEditEnd == true
+			CooldownPanels:ClearLayoutEntryStandaloneMenuState()
+			if fromBlizzardEditor and not suppressLayoutEnd and CooldownPanels.SetEditorLayoutEditEnabled then CooldownPanels:SetEditorLayoutEditEnabled(false) end
+		end,
 	})
 	if dialog then
 		self:DockStandaloneDialogToEditor(dialog)
@@ -15016,6 +15050,9 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		state.hostFrame = hostFrame
 		state.anchorFrame = anchorFrame
 		state.dialog = dialog
+		state.allowOutsideLayoutEdit = allowOutsideLayoutEdit
+		local editor = getEditor()
+		state.blizzardEditorLayoutEdit = editor and editor._eqolBlizzardEditorLayoutEdit == true or false
 	end
 end
 
@@ -15087,8 +15124,12 @@ function CooldownPanels:OpenLayoutPanelStandaloneMenu(panelId, anchorFrame)
 	if not (lib and lib.ShowStandaloneSettingsDialog and SettingType) then return end
 	panelId = normalizeId(panelId)
 	if not (panelId and self:IsLayoutPanelStandaloneMenuAvailable(panelId)) then return end
+	local editor = getEditor()
+	local suppressBlizzardEditorLayoutEnd = editor and editor._eqolBlizzardEditorLayoutEdit == true
+	if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = true end
 	self:HideLayoutEntryStandaloneMenu(panelId)
 	self:HideLayoutFixedGroupStandaloneMenu(panelId)
+	if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = nil end
 
 	self:PrepareLayoutPanelStandaloneSettings(panelId)
 	local registeredRuntime = getRuntime(panelId)
@@ -15109,7 +15150,14 @@ function CooldownPanels:OpenLayoutPanelStandaloneMenu(panelId, anchorFrame)
 		relativeTo = spawnPosition.relativeTo,
 		x = spawnPosition.x,
 		y = spawnPosition.y,
-		onHide = function() CooldownPanels:ClearLayoutPanelStandaloneMenuState() end,
+		onHide = function()
+			local state = CooldownPanels:GetLayoutPanelStandaloneMenuState(false)
+			local fromBlizzardEditor = state and state.blizzardEditorLayoutEdit == true
+			local editor = getEditor()
+			local suppressLayoutEnd = editor and editor._eqolSuppressBlizzardEditorLayoutEditEnd == true
+			CooldownPanels:ClearLayoutPanelStandaloneMenuState()
+			if fromBlizzardEditor and not suppressLayoutEnd and CooldownPanels.SetEditorLayoutEditEnabled then CooldownPanels:SetEditorLayoutEditEnabled(false) end
+		end,
 	})
 	if dialog then
 		self:DockStandaloneDialogToEditor(dialog)
@@ -15117,6 +15165,8 @@ function CooldownPanels:OpenLayoutPanelStandaloneMenu(panelId, anchorFrame)
 		state.panelId = panelId
 		state.hostFrame = registeredHostFrame
 		state.dialog = dialog
+		local editor = getEditor()
+		state.blizzardEditorLayoutEdit = editor and editor._eqolBlizzardEditorLayoutEdit == true or false
 	end
 end
 
@@ -16981,6 +17031,56 @@ local function ensureEditor()
 	return runtime.editor
 end
 
+function CooldownPanels:OpenBlizzardEditorEntrySettings(panelId, entryId, anchorFrame)
+	local editor = ensureEditor()
+	panelId = normalizeId(panelId)
+	entryId = normalizeId(entryId)
+	local panel = panelId and self:GetPanel(panelId) or nil
+	local entry = panel and panel.entries and panel.entries[entryId] or nil
+	if not (editor and panel and entry) then return false end
+	editor._eqolBlizzardEditorLayoutEdit = true
+	if self.SelectPanel then self:SelectPanel(panelId) end
+	editor._eqolSuppressLayoutPanelDialog = true
+	if self.SetEditorLayoutEditEnabled then self:SetEditorLayoutEditEnabled(true) end
+	editor._eqolSuppressLayoutPanelDialog = nil
+	if self.SelectEntry then self:SelectEntry(entryId) end
+	if self.OpenLayoutEntryStandaloneMenu then self:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFrame) end
+	return true
+end
+
+function CooldownPanels:OpenBlizzardEditorPanelSettings(panelId, anchorFrame)
+	local editor = ensureEditor()
+	panelId = normalizeId(panelId)
+	local panel = panelId and self:GetPanel(panelId) or nil
+	if not (editor and panel) then return false end
+	editor._eqolBlizzardEditorLayoutEdit = true
+	if self.SelectPanel then self:SelectPanel(panelId) end
+	if self.SetEditorLayoutEditEnabled then self:SetEditorLayoutEditEnabled(true) end
+	if self.OpenLayoutPanelStandaloneMenu then self:OpenLayoutPanelStandaloneMenu(panelId, anchorFrame) end
+	return true
+end
+
+function CooldownPanels:ShowDeletePanelPopup(panelId)
+	panelId = normalizeId(panelId)
+	local panel = panelId and self:GetPanel(panelId) or nil
+	if not panel then return false end
+	ensureDeletePopup()
+	StaticPopup_Show("EQOL_COOLDOWN_PANEL_DELETE", panel.name or nil, nil, { panelId = panelId })
+	return true
+end
+
+function CooldownPanels:ShowExportPanelPopup(panelId)
+	panelId = normalizeId(panelId)
+	if not (panelId and self:GetPanel(panelId)) then return false end
+	local code = self:ExportPanel(panelId)
+	if not code then
+		showErrorMessage(L["DataExportFailed"] or "Export failed.")
+		return false
+	end
+	cdp.EXPORT.ShowDialog(L["CooldownPanelExportPanel"] or "Export Panel", code)
+	return true
+end
+
 ensureDeletePopup = function()
 	if StaticPopupDialogs["EQOL_COOLDOWN_PANEL_DELETE"] then return end
 	StaticPopupDialogs["EQOL_COOLDOWN_PANEL_DELETE"] = {
@@ -16995,6 +17095,7 @@ ensureDeletePopup = function()
 			if not data or not data.panelId then return end
 			CooldownPanels:DeletePanel(data.panelId)
 			CooldownPanels:RefreshEditor()
+			if CooldownPanels.BlizzardEditor and CooldownPanels.BlizzardEditor.Refresh then CooldownPanels.BlizzardEditor:Refresh() end
 		end,
 	}
 end
@@ -17063,6 +17164,7 @@ function CooldownPanels.EnsureImportPanelPopup()
 				print("|cff00ff98Enhance QoL|r: " .. tostring(cdp.EXPORT.ImportErrorMessage(reason)))
 				return
 			end
+			if CooldownPanels.BlizzardEditor and CooldownPanels.BlizzardEditor.Refresh then CooldownPanels.BlizzardEditor:Refresh() end
 			print("|cff00ff98Enhance QoL|r: " .. (L["CooldownPanelImportSuccess"] or "Cooldown panel imported."))
 		end,
 	}
@@ -17108,6 +17210,7 @@ ensureImportCDMPopup = function()
 				)
 			end
 			CooldownPanels:RefreshEditor()
+			if CooldownPanels.BlizzardEditor and CooldownPanels.BlizzardEditor.Refresh then CooldownPanels.BlizzardEditor:Refresh() end
 		end,
 	}
 end

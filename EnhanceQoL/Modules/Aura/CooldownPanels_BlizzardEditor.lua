@@ -48,6 +48,10 @@ local function getPanel(panelId)
 	return root and root.panels and root.panels[normalizeId(panelId)] or nil
 end
 
+local function isFixedLayoutPanel(panel)
+	return panel and Helper.IsFixedLayout and Helper.IsFixedLayout(panel.layout) or false
+end
+
 local function getPanelIds(root)
 	if CooldownPanels.GetCachedPanelIds then return CooldownPanels.GetCachedPanelIds(root) end
 	return root and root.order or {}
@@ -229,19 +233,38 @@ local function setupFramePortrait(frame)
 	if portrait and portrait.SetTexture then portrait:SetTexture(icon) end
 end
 
+local function saveFramePosition(frame)
+	if not (frame and addon and addon.db) then return end
+	local point, _, _, x, y = frame:GetPoint()
+	if not (point and x and y) then return end
+	addon.db.cooldownPanelsBlizzardEditorPoint = point
+	addon.db.cooldownPanelsBlizzardEditorX = x
+	addon.db.cooldownPanelsBlizzardEditorY = y
+end
+
+local function resetFramePosition(frame)
+	if not (frame and UIParent) then return end
+	frame:ClearAllPoints()
+	frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 32, -72)
+	saveFramePosition(frame)
+end
+
 local function positionFrameForOpen(frame)
-	if not frame then return end
-	local native = _G.CooldownViewerSettings
-	if native and native.IsShown and native:IsShown() and native.GetRight and native:GetRight() then
-		frame:ClearAllPoints()
-		frame:SetPoint("TOPLEFT", native, "TOPRIGHT", 18, 0)
+	if not (frame and UIParent) then return end
+	frame:ClearAllPoints()
+	local point = addon and addon.db and addon.db.cooldownPanelsBlizzardEditorPoint or nil
+	local x = addon and addon.db and addon.db.cooldownPanelsBlizzardEditorX or nil
+	local y = addon and addon.db and addon.db.cooldownPanelsBlizzardEditorY or nil
+	if point and x and y then
+		frame:SetPoint(point, UIParent, point, x, y)
+	else
+		frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 32, -72)
+	end
+	if CooldownPanels.IsEditorFrameTooFarOffscreen and CooldownPanels:IsEditorFrameTooFarOffscreen(frame) then
+		resetFramePosition(frame)
 		return
 	end
-	if not frame._eqolBlizzardEditorPositioned then
-		frame:ClearAllPoints()
-		frame:SetPoint("CENTER")
-		frame._eqolBlizzardEditorPositioned = true
-	end
+	saveFramePosition(frame)
 end
 
 local function applyTooltip(owner, title, body)
@@ -252,6 +275,16 @@ local function applyTooltip(owner, title, body)
 		GameTooltip:Show()
 	end)
 	owner:SetScript("OnLeave", function() GameTooltip:Hide() end)
+end
+
+local function showAdvancedPanelTooltip(owner)
+	local panel = owner and owner:GetParent() and getPanel(owner:GetParent().panelId) or nil
+	if not isFixedLayoutPanel(panel) then return end
+	GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+	GameTooltip:SetText(string.format("%s %s", L["settingsCategoryModeAdvanced"] or "Advanced", _G.PANEL or "Panel"), 1, 0.82, 0)
+	GameTooltip:AddLine(L["CooldownPanelLayoutModeFixed"] or "Fixed slots", 1, 1, 1, true)
+	GameTooltip:AddLine(L["CooldownPanelAdvancedEditTooltip"] or "Edit this panel through Panel Edit. Right-click the header and choose Edit.", 0.85, 0.85, 0.85, true)
+	GameTooltip:Show()
 end
 
 local function getTooltip()
@@ -483,6 +516,12 @@ function Editor:MoveEntry(sourcePanelId, sourceEntryId, targetPanelId, beforeEnt
 	local sourcePanel = getPanel(sourcePanelId)
 	local targetPanel = getPanel(targetPanelId)
 	if not (sourcePanel and targetPanel and sourcePanel.entries and targetPanel.entries) then return end
+	if isFixedLayoutPanel(sourcePanel) or isFixedLayoutPanel(targetPanel) then
+		self.state.drag = nil
+		self:SetSourceTileDesaturated(false)
+		self:HideDraggedIcon()
+		return
+	end
 	local entry = sourcePanel.entries[sourceEntryId]
 	if not entry then return end
 	if sourcePanel == targetPanel and tostring(beforeEntryId) == tostring(sourceEntryId) then
@@ -514,11 +553,36 @@ function Editor:MoveEntry(sourcePanelId, sourceEntryId, targetPanelId, beforeEnt
 end
 
 function Editor:HandleExternalDrop(panelId)
-	if CooldownPanels.HandleCursorDrop and CooldownPanels:HandleCursorDrop(panelId) then
+	if not CooldownPanels.HandleCursorDrop then return false end
+	local added = CooldownPanels:HandleCursorDrop(panelId)
+	if added then
+		local frame = self.frame
+		if frame then clearReorderMarker(frame) end
+		self.state.reorderTarget = nil
 		self:Refresh()
 		return true
 	end
 	return false
+end
+
+function Editor:HandleExternalDropAtButton(button)
+	return button and button.panelId and self:HandleExternalDrop(button.panelId) or false
+end
+
+function Editor:UpdateExternalDropPulse(elapsed)
+	local frame = self.frame
+	if not frame or self.state.drag then return end
+	self.state.externalDropPulseElapsed = (self.state.externalDropPulseElapsed or 0) + (elapsed or 0)
+	if self.state.externalDropPulseElapsed < 0.08 then return end
+	self.state.externalDropPulseElapsed = 0
+	local cursorType = Api.GetCursorInfo and Api.GetCursorInfo() or nil
+	local pulse = cursorType and (0.18 + (math.sin((GetTime and GetTime() or 0) * 5) + 1) * 0.18) or 0
+	for categoryIndex = 1, (frame.categories and frame.categories.active or 0) do
+		local category = frame.categories[categoryIndex]
+		if category then
+			if category.addTile and category.addTile.dropGlow then category.addTile.dropGlow:SetAlpha(pulse) end
+		end
+	end
 end
 
 function Editor:CreateDraggedIcon()
@@ -563,21 +627,24 @@ function Editor:FindReorderTarget(cursorX, cursorY)
 	for categoryIndex = 1, (frame.categories.active or 0) do
 		local category = frame.categories[categoryIndex]
 		if category and category:IsShown() and category.container and category.container:IsShown() then
-			for tileIndex = 1, (category.tiles.active or 0) do
-				local tile = category.tiles[tileIndex]
-				if tile and tile:IsShown() and tile.entryId then
-					considerTile(category, tile, false)
+			local panel = getPanel(category.panelId)
+			if not isFixedLayoutPanel(panel) then
+				for tileIndex = 1, (category.tiles.active or 0) do
+					local tile = category.tiles[tileIndex]
+					if tile and tile:IsShown() and tile.entryId then
+						considerTile(category, tile, false)
+					end
 				end
+				considerTile(category, category.addTile, true)
 			end
-			considerTile(category, category.addTile, true)
 		end
 	end
 	return best
 end
 
-function Editor:UpdateReorderMarker()
+function Editor:UpdateReorderMarker(force)
 	local frame = self.frame
-	if not (frame and frame.ReorderMarker and self.state.drag) then return end
+	if not (frame and frame.ReorderMarker and (force == true or self.state.drag)) then return end
 	local cursorX, cursorY = getCursorPositionForFrame(frame)
 	local target = self:FindReorderTarget(cursorX, cursorY)
 	self.state.reorderTarget = nil
@@ -626,6 +693,7 @@ end
 
 function Editor:BeginDrag(button)
 	if not (button.panelId and button.entryId) then return end
+	if isFixedLayoutPanel(getPanel(button.panelId)) then return end
 	self:SetSourceTileDesaturated(false)
 	if PlaySound and SOUNDKIT and SOUNDKIT.UI_CURSOR_PICKUP_OBJECT then PlaySound(SOUNDKIT.UI_CURSOR_PICKUP_OBJECT) end
 	self.state.drag = {
@@ -635,8 +703,7 @@ function Editor:BeginDrag(button)
 	self.state.sourceTile = button
 	self:SetSourceTileDesaturated(true)
 	self:ShowDraggedIcon(button.icon:GetTexture())
-	local frame = self:GetFrame()
-	frame:SetScript("OnUpdate", function() Editor:UpdateReorderMarker() end)
+	self:GetFrame()
 end
 
 function Editor:EndDrag(defaultPanelId, defaultBeforeEntryId)
@@ -648,7 +715,6 @@ function Editor:EndDrag(defaultPanelId, defaultBeforeEntryId)
 	if targetPanelId then self:MoveEntry(drag.panelId, drag.entryId, targetPanelId, target and target.beforeEntryId or defaultBeforeEntryId) end
 	local frame = self.frame
 	if frame then
-		frame:SetScript("OnUpdate", nil)
 		clearReorderMarker(frame)
 	end
 	if not targetPanelId then
@@ -667,7 +733,6 @@ function Editor:CancelDrag()
 	self:SetSourceTileDesaturated(false)
 	self:HideDraggedIcon()
 	if frame then
-		frame:SetScript("OnUpdate", nil)
 		clearReorderMarker(frame)
 	end
 	return true
@@ -706,9 +771,7 @@ function Editor:CreateTile(parent, templateKind)
 		if CooldownPanels.SelectPanel then CooldownPanels:SelectPanel(selfButton.panelId) end
 	end)
 	button:SetScript("OnReceiveDrag", function(selfButton)
-		if not Editor:HandleExternalDrop(selfButton.panelId) then
-			Editor:EndDrag(selfButton.panelId, selfButton.entryId)
-		end
+		if Editor.state.drag then Editor:EndDrag(selfButton.panelId, selfButton.entryId) end
 	end)
 	button:SetScript("OnEnter", function(selfButton)
 		local panel = getPanel(selfButton.panelId)
@@ -731,6 +794,7 @@ function Editor:CreateCategory(parent)
 			return
 		end
 		local panelId = selfHeader:GetParent().panelId
+		if Editor:HandleExternalDrop(panelId) then return end
 		Editor.state.collapsed[panelId] = not Editor.state.collapsed[panelId]
 		Editor:Refresh()
 	end
@@ -743,6 +807,16 @@ function Editor:CreateCategory(parent)
 		category.header:SetTitleColor(false, NORMAL_FONT_COLOR)
 		category.header:SetTitleColor(true, NORMAL_FONT_COLOR)
 	end
+	category.header:SetScript("OnEnter", showAdvancedPanelTooltip)
+	category.header:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	category.advancedLabel = category.header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	category.advancedLabel:SetPoint("CENTER", category.header, "CENTER", 0, 0)
+	category.advancedLabel:SetWidth(130)
+	category.advancedLabel:SetJustifyH("CENTER")
+	category.advancedLabel:SetTextColor(1, 0.55, 0.15, 1)
+	if category.advancedLabel.SetMaxLines then category.advancedLabel:SetMaxLines(1) end
+	if category.advancedLabel.SetWordWrap then category.advancedLabel:SetWordWrap(false) end
+	category.advancedLabel:Hide()
 	category.header:SetScript("OnReceiveDrag", function(selfHeader)
 		local panelId = selfHeader:GetParent().panelId
 		if not Editor:HandleExternalDrop(panelId) then
@@ -753,21 +827,28 @@ function Editor:CreateCategory(parent)
 	category.dropCatcher = CreateFrame("Button", nil, category)
 	category.dropCatcher:RegisterForClicks("LeftButtonUp")
 	category.dropCatcher:SetScript("OnMouseUp", function(selfButton)
-		Editor:EndDrag(selfButton:GetParent().panelId)
+		local panelId = selfButton:GetParent().panelId
+		Editor:EndDrag(panelId)
 	end)
 	category.dropCatcher:SetScript("OnReceiveDrag", function(selfButton)
 		local panelId = selfButton:GetParent().panelId
-		if not Editor:HandleExternalDrop(panelId) then
-			Editor:EndDrag(panelId)
-		end
+		if Editor.state.drag then Editor:EndDrag(panelId) end
 	end)
 
 	category.tiles = {}
 	category.addTile = self:CreateTile(category.container, "GRID")
 	category.addTile:Hide()
+	category.addTile.dropGlow = category.addTile:CreateTexture(nil, "OVERLAY")
+	category.addTile.dropGlow:SetAllPoints(category.addTile)
+	category.addTile.dropGlow:SetColorTexture(0.1, 1, 0.25, 1)
+	category.addTile.dropGlow:SetBlendMode("ADD")
+	category.addTile.dropGlow:SetAlpha(0)
 	category.addTile:SetScript("OnDragStart", nil)
-	category.addTile:SetScript("OnReceiveDrag", nil)
+	category.addTile:SetScript("OnReceiveDrag", function(selfButton)
+		Editor:HandleExternalDropAtButton(selfButton)
+	end)
 	category.addTile:SetScript("OnMouseUp", function(selfButton)
+		if Editor:HandleExternalDropAtButton(selfButton) then return end
 		if Editor:EndDrag(selfButton.panelId) then return end
 		if CooldownPanels.ShowAddEntryMenu then CooldownPanels:ShowAddEntryMenu(selfButton, selfButton.panelId) end
 	end)
@@ -785,6 +866,15 @@ function Editor:LayoutCategory(category, panelId, panel, yOffset, filterText)
 		category.header:SetHeaderText(title)
 	elseif category.header.Name then
 		category.header.Name:SetText(title)
+	end
+	if category.advancedLabel then
+		local showAdvancedLabel = isFixedLayoutPanel(panel)
+		category.advancedLabel:SetText(string.format("%s %s", L["settingsCategoryModeAdvanced"] or "Advanced", _G.PANEL or "Panel"))
+		if showAdvancedLabel then
+			category.advancedLabel:Show()
+		else
+			category.advancedLabel:Hide()
+		end
 	end
 
 	local collapsed = self.state.collapsed[panelId] == true
@@ -906,9 +996,7 @@ function Editor:ShowEntryMenu(owner, panelId, entryId)
 		end
 		rootDescription:CreateDivider()
 		rootDescription:CreateButton(EDIT or (L["CooldownPanelEntry"] or "Entry"), function()
-			if CooldownPanels.SelectPanel then CooldownPanels:SelectPanel(panelId) end
-			if CooldownPanels.SelectEntry then CooldownPanels:SelectEntry(entryId) end
-			if CooldownPanels.OpenEditor then CooldownPanels:OpenEditor() end
+			if CooldownPanels.OpenBlizzardEditorEntrySettings then CooldownPanels:OpenBlizzardEditorEntrySettings(panelId, entryId, owner) end
 		end)
 		rootDescription:CreateButton(REMOVE or DELETE or (L["CooldownPanelRemoveEntry"] or "Remove entry"), function()
 			if CooldownPanels.RemoveEntry then CooldownPanels:RemoveEntry(panelId, entryId) end
@@ -919,15 +1007,18 @@ end
 
 function Editor:ShowPanelMenu(owner, panelId)
 	if not (owner and Api.MenuUtil and Api.MenuUtil.CreateContextMenu) then return end
+	local panel = getPanel(panelId)
 	Api.MenuUtil.CreateContextMenu(owner, function(_, rootDescription)
 		rootDescription:SetTag("MENU_EQOL_COOLDOWN_PANEL_BLIZZARD_PANEL")
-		rootDescription:CreateTitle(L["CooldownPanelAddSlot"] or "Add more")
-		rootDescription:CreateButton(L["CooldownPanelAddSlot"] or "Add more", function()
-			if CooldownPanels.ShowAddEntryMenu then CooldownPanels:ShowAddEntryMenu(owner, panelId) end
-		end)
+		rootDescription:CreateTitle(panel and panel.name or (L["CooldownPanelNewPanel"] or "New Panel"))
 		rootDescription:CreateButton(EDIT or (L["CooldownPanelPanelName"] or "Panel name"), function()
-			if CooldownPanels.SelectPanel then CooldownPanels:SelectPanel(panelId) end
-			if CooldownPanels.OpenEditor then CooldownPanels:OpenEditor() end
+			if CooldownPanels.OpenBlizzardEditorPanelSettings then CooldownPanels:OpenBlizzardEditorPanelSettings(panelId, owner) end
+		end)
+		rootDescription:CreateButton(L["CooldownPanelExportPanel"] or "Export Panel", function()
+			if CooldownPanels.ShowExportPanelPopup then CooldownPanels:ShowExportPanelPopup(panelId) end
+		end)
+		rootDescription:CreateButton(REMOVE or DELETE or (L["CooldownPanelDeletePanel"] or "Delete Panel"), function()
+			if CooldownPanels.ShowDeletePanelPopup then CooldownPanels:ShowDeletePanelPopup(panelId) end
 		end)
 	end)
 end
@@ -937,17 +1028,29 @@ function Editor:CreateFrame()
 	frame:SetFrameStrata("DIALOG")
 	frame:SetToplevel(true)
 	frame:SetMovable(true)
+	frame:SetClampedToScreen(true)
 	frame:EnableMouse(true)
 	frame:RegisterForDrag("LeftButton")
 	frame:SetScript("OnDragStart", frame.StartMoving)
-	frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+	frame:SetScript("OnDragStop", function(selfFrame)
+		selfFrame:StopMovingOrSizing()
+		saveFramePosition(selfFrame)
+	end)
 	frame:SetScript("OnHide", function(selfFrame)
 		Editor.state.drag = nil
 		Editor.state.reorderTarget = nil
 		Editor:SetSourceTileDesaturated(false)
-		selfFrame:SetScript("OnUpdate", nil)
 		if selfFrame.ReorderMarker then selfFrame.ReorderMarker:Hide() end
 		Editor:HideDraggedIcon()
+		if CooldownPanels.SetEditorLayoutEditEnabled then CooldownPanels:SetEditorLayoutEditEnabled(false) end
+		if CooldownPanels.HideLayoutEntryStandaloneMenu then CooldownPanels:HideLayoutEntryStandaloneMenu() end
+	end)
+	frame:SetScript("OnUpdate", function(_, elapsed)
+		if Editor.state.drag then
+			Editor:UpdateReorderMarker()
+		else
+			Editor:UpdateExternalDropPulse(elapsed)
+		end
 	end)
 	frame:SetScript("OnMouseUp", function(_, buttonName)
 		if buttonName == "RightButton" then Editor:CancelDrag() end

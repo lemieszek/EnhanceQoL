@@ -6723,9 +6723,9 @@ Bars.BuildStandaloneDialogButtons = function(panelId, entryId, existingButtons)
 end
 
 Bars._eqolOriginalOpenLayoutEntryStandaloneMenu = Bars._eqolOriginalOpenLayoutEntryStandaloneMenu or CooldownPanels.OpenLayoutEntryStandaloneMenu
-function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFrame)
+function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFrame, allowOutsideLayoutEdit)
 	local lib = addon.EditModeLib
-	if not (lib and lib.ShowStandaloneSettingsDialog) then return Bars._eqolOriginalOpenLayoutEntryStandaloneMenu(self, panelId, entryId, anchorFrame) end
+	if not (lib and lib.ShowStandaloneSettingsDialog) then return Bars._eqolOriginalOpenLayoutEntryStandaloneMenu(self, panelId, entryId, anchorFrame, allowOutsideLayoutEdit) end
 
 	local originalShowStandaloneSettingsDialog = lib.ShowStandaloneSettingsDialog
 	lib.ShowStandaloneSettingsDialog = function(editModeLib, frame, options)
@@ -6741,7 +6741,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		return originalShowStandaloneSettingsDialog(editModeLib, frame, resolvedOptions)
 	end
 
-	local ok, result = pcall(Bars._eqolOriginalOpenLayoutEntryStandaloneMenu, self, panelId, entryId, anchorFrame)
+	local ok, result = pcall(Bars._eqolOriginalOpenLayoutEntryStandaloneMenu, self, panelId, entryId, anchorFrame, allowOutsideLayoutEdit)
 	lib.ShowStandaloneSettingsDialog = originalShowStandaloneSettingsDialog
 	if not ok then error(result) end
 

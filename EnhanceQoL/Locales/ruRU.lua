@@ -901,6 +901,7 @@ L["CooldownPanelActivationOverlayColor"] = "Цвет наложения акти
 L["CooldownPanelActivationOverlayGlow"] = "Свечение во время активации"
 L["CooldownPanelActivationOverlayOnly"] = "Показывать только во время активации"
 L["CooldownPanelActivationOverlayReverse"] = "Обратная заливка активации"
+L["CooldownPanelAdvancedEditTooltip"] = "Edit this panel through Panel Edit. Right-click the header and choose Edit."
 L["CooldownPanelAddGroup"] = "Добавить группу"
 L["CooldownPanelAddItemID"] = "Добавить ID предмета"
 L["CooldownPanelAddRacial"] = "Расовая"

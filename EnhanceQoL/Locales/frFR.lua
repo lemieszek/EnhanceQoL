@@ -901,6 +901,7 @@ L["CooldownPanelActivationOverlayColor"] = "Couleur de superposition d'activatio
 L["CooldownPanelActivationOverlayGlow"] = "Surbrillance pendant l'activation"
 L["CooldownPanelActivationOverlayOnly"] = "Afficher uniquement pendant l'activation"
 L["CooldownPanelActivationOverlayReverse"] = "Inverser le balayage d'activation"
+L["CooldownPanelAdvancedEditTooltip"] = "Edit this panel through Panel Edit. Right-click the header and choose Edit."
 L["CooldownPanelAddGroup"] = "Ajouter un groupe"
 L["CooldownPanelAddItemID"] = "Ajouter l’ID d’objet"
 L["CooldownPanelAddRacial"] = "Racial"
