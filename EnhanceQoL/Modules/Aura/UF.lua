@@ -4380,10 +4380,6 @@ function AuraUtil.setAuraTooltipState(btn, style)
 	btn._tooltipUseEditMode = style.tooltipUseEditMode == true
 	btn._tooltipAnchor = style.tooltipAnchor or "ANCHOR_BOTTOMRIGHT"
 	if btn._showTooltip ~= show then btn._showTooltip = show end
-	if btn.SetPropagateMouseClicks and btn._eqolAuraMouseClickPropagate ~= true then
-		btn:SetPropagateMouseClicks(true)
-		btn._eqolAuraMouseClickPropagate = true
-	end
 	if btn.SetMouseMotionEnabled and btn._eqolAuraMouseMotionEnabled ~= show then
 		btn:SetMouseMotionEnabled(show)
 		btn._eqolAuraMouseMotionEnabled = show
