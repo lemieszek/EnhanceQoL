@@ -451,6 +451,233 @@ local function refreshSettingsUI()
 	if lib and lib.internal and lib.internal.RefreshSettingValues then lib.internal:RefreshSettingValues() end
 end
 
+local function resourcePowerLabel(pType)
+	if type(pType) ~= "string" or pType == "" then return nil end
+	return (ResourceBars.PowerLabels and ResourceBars.PowerLabels[pType]) or _G["POWER_TYPE_" .. pType] or _G[pType] or pType
+end
+
+local function resourceSlotLabel(slot)
+	slot = tostring(slot or ""):upper()
+	if slot == "MAIN" then return L["AutoEnableMain"] or "Main resource" end
+	if slot == "SECONDARY" then return L["AutoEnableSecondary"] or "Secondary resources" end
+	if slot == "TERTIARY" then return L["ResourceBarsTertiary"] or "Tertiary" end
+	return slot
+end
+
+local function assignmentText(assignment, slot)
+	if type(assignment) ~= "table" then return nil end
+	local pType = assignment[slot]
+	return pType and resourcePowerLabel(pType) or nil
+end
+
+local function druidAssignmentSummaryText(row, slot)
+	if not (row and row.isDruid and row.assignments and row.assignments.druidForms) then return nil end
+	local seen, values = {}, {}
+	for _, formKey in ipairs(ResourceBars.SHARED_VISIBILITY_DRUID_FORMS or {}) do
+		local form = row.assignments.druidForms[formKey]
+		local pType = type(form) == "table" and form[slot] or nil
+		local label = pType and resourcePowerLabel(pType) or nil
+		if label and not seen[label] then
+			seen[label] = true
+			values[#values + 1] = label
+		end
+	end
+	if #values == 0 then return nil end
+	return table.concat(values, " / ")
+end
+
+local function sharedVisibilityAssignmentText(row, slot)
+	return druidAssignmentSummaryText(row, slot) or assignmentText(row and row.assignments, slot)
+end
+
+local function druidFormSecondaryText(row, formKey)
+	local form = row and row.assignments and row.assignments.druidForms and row.assignments.druidForms[formKey]
+	if type(form) ~= "table" then return nil end
+	return assignmentText(form, "SECONDARY")
+end
+
+local function refreshResourceBarsAfterSharedVisibilityChange()
+	if ResourceBars and ResourceBars.InvalidateRuntimeConfigCaches then ResourceBars.InvalidateRuntimeConfigCaches() end
+	local spec = addon.variables and addon.variables.unitSpec
+	if ResourceBars and ResourceBars.QueueRefresh then ResourceBars.QueueRefresh(spec) end
+	if ResourceBars and ResourceBars.MaybeRefreshActive then ResourceBars.MaybeRefreshActive(spec) end
+	if ResourceBars and ResourceBars.Refresh then ResourceBars.Refresh() end
+	if ResourceBars and ResourceBars.ReanchorAll then ResourceBars.ReanchorAll() end
+end
+
+local function renderSharedVisibilityMatrix(parent)
+	if not parent then return nil end
+	local rows = (ResourceBars and ResourceBars.BuildSharedVisibilityRows and ResourceBars.BuildSharedVisibilityRows()) or {}
+	local handle = { frames = {}, checks = {} }
+	local slotColumns = {
+		MAIN = -242,
+		SECONDARY = -212,
+		TERTIARY = -182,
+	}
+	local formLabels = {
+		BEAR = L["ResourceBarsSharedVisibilityDruidBear"] or "Bear",
+		CAT = L["ResourceBarsSharedVisibilityDruidCat"] or "Cat",
+		MOONKIN = L["ResourceBarsSharedVisibilityDruidMoonkin"] or "Moonkin",
+		HUMANOID = L["ResourceBarsSharedVisibilityDruidHumanoid"] or "Humanoid",
+	}
+	local formKeys, formColumns = {}, {}
+	for _, formKey in ipairs(ResourceBars.SHARED_VISIBILITY_DRUID_FORMS or {}) do
+		for i = 1, #rows do
+			if rows[i].isDruid and druidFormSecondaryText(rows[i], formKey) then
+				formKeys[#formKeys + 1] = formKey
+				break
+			end
+		end
+	end
+	local formOffset = -24
+	for i = #formKeys, 1, -1 do
+		formColumns[formKeys[i]] = formOffset
+		formOffset = formOffset - 36
+	end
+	local function track(frame)
+		handle.frames[#handle.frames + 1] = frame
+		return frame
+	end
+	local function tooltip(owner, title, lines)
+		if not GameTooltip then return end
+		GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+		GameTooltip:AddLine(title or "", 1, 0.82, 0)
+		for i = 1, #(lines or {}) do
+			GameTooltip:AddLine(lines[i], 1, 1, 1)
+		end
+		GameTooltip:Show()
+	end
+	local title = track(parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight"))
+	title:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -2)
+	title:SetPoint("RIGHT", parent, "RIGHT", -8, 0)
+	title:SetJustifyH("LEFT")
+	title:SetText(L["ResourceBarsSharedVisibilityMatrix"] or "Shared resource visibility")
+
+	local header = track(CreateFrame("Frame", nil, parent))
+	header:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -28)
+	header:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, -28)
+	header:SetHeight(24)
+	local nameHeader = track(header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"))
+	nameHeader:SetPoint("LEFT", header, "LEFT", 6, 0)
+	nameHeader:SetPoint("RIGHT", header, "RIGHT", -270, 0)
+	nameHeader:SetJustifyH("LEFT")
+	nameHeader:SetText(L["ResourceBarsSharedVisibilitySpec"] or "Class / Specialization")
+	local slotHeaders = { MAIN = "M", SECONDARY = "S", TERTIARY = "T" }
+	for _, slot in ipairs(ResourceBars.SHARED_VISIBILITY_SLOTS or {}) do
+		local label = track(header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"))
+		label:SetPoint("RIGHT", header, "RIGHT", slotColumns[slot] or -180, 0)
+		label:SetWidth(24)
+		label:SetJustifyH("CENTER")
+		label:SetText(slotHeaders[slot] or slot)
+	end
+	for _, formKey in ipairs(formKeys) do
+		local label = track(header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"))
+		label:SetPoint("RIGHT", header, "RIGHT", formColumns[formKey] or -24, 0)
+		label:SetWidth(34)
+		label:SetJustifyH("CENTER")
+		label:SetText((formLabels[formKey] or formKey):sub(1, 1))
+	end
+
+	local previous = header
+	for i = 1, #rows do
+		local row = rows[i]
+		local frame = track(CreateFrame("Frame", nil, parent))
+		frame:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, -2)
+		frame:SetPoint("TOPRIGHT", previous, "BOTTOMRIGHT", 0, -2)
+		frame:SetHeight(24)
+		frame:EnableMouse(true)
+		frame:SetScript("OnEnter", function(self)
+			local lines = {}
+			for _, slot in ipairs(ResourceBars.SHARED_VISIBILITY_SLOTS or {}) do
+				local text = sharedVisibilityAssignmentText(row, slot)
+				if text then lines[#lines + 1] = resourceSlotLabel(slot) .. ": " .. text end
+			end
+			if row.isDruid then
+				for _, formKey in ipairs(ResourceBars.SHARED_VISIBILITY_DRUID_FORMS or {}) do
+					local text = druidFormSecondaryText(row, formKey)
+					if text then lines[#lines + 1] = formLabels[formKey] .. " " .. resourceSlotLabel("SECONDARY") .. ": " .. text end
+				end
+			end
+			tooltip(self, (row.className or "") .. " - " .. (row.specName or ""), lines)
+		end)
+		frame:SetScript("OnLeave", function()
+			if GameTooltip then GameTooltip:Hide() end
+		end)
+		local name = track(frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall"))
+		name:SetPoint("LEFT", frame, "LEFT", 6, 0)
+		name:SetPoint("RIGHT", frame, "RIGHT", -270, 0)
+		name:SetJustifyH("LEFT")
+		name:SetText((row.className or row.classTag or "") .. " - " .. (row.specName or tostring(row.specIndex or "")))
+
+		for _, slot in ipairs(ResourceBars.SHARED_VISIBILITY_SLOTS or {}) do
+			if row.isDruid and slot == "SECONDARY" then
+				-- Druid secondary visibility is controlled by the form-specific toggles.
+			elseif sharedVisibilityAssignmentText(row, slot) then
+				local check = track(CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate"))
+				check:SetSize(24, 24)
+				check:SetPoint("RIGHT", frame, "RIGHT", slotColumns[slot] or -180, 0)
+				check._classTag = row.classTag
+				check._specIndex = row.specIndex
+				check._visibilityKey = slot
+				check:SetChecked(ResourceBars.IsSharedVisibilityEnabled(row.classTag, row.specIndex, slot))
+				check:SetScript("OnClick", function(self)
+					ResourceBars.SetSharedVisibilityEnabled(self._classTag, self._specIndex, self._visibilityKey, self:GetChecked() == true)
+					refreshResourceBarsAfterSharedVisibilityChange()
+				end)
+				check:SetScript("OnEnter", function(self)
+					tooltip(self, resourceSlotLabel(slot), {
+						(row.className or "") .. " - " .. (row.specName or ""),
+						sharedVisibilityAssignmentText(row, slot) or "",
+					})
+				end)
+				check:SetScript("OnLeave", function()
+					if GameTooltip then GameTooltip:Hide() end
+				end)
+				handle.checks[#handle.checks + 1] = check
+			end
+		end
+		if row.isDruid then
+			for _, formKey in ipairs(formKeys) do
+				if druidFormSecondaryText(row, formKey) then
+					local check = track(CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate"))
+					check:SetSize(24, 24)
+					check:SetPoint("RIGHT", frame, "RIGHT", formColumns[formKey] or -24, 0)
+					check._classTag = row.classTag
+					check._specIndex = row.specIndex
+					check._visibilityKey = formKey
+					check:SetChecked(ResourceBars.IsSharedVisibilityEnabled(row.classTag, row.specIndex, formKey))
+					check:SetScript("OnClick", function(self)
+						ResourceBars.SetSharedVisibilityEnabled(self._classTag, self._specIndex, self._visibilityKey, self:GetChecked() == true)
+						refreshResourceBarsAfterSharedVisibilityChange()
+					end)
+					check:SetScript("OnEnter", function(self)
+						tooltip(self, formLabels[formKey], {
+							(row.className or "") .. " - " .. (row.specName or ""),
+							resourceSlotLabel("SECONDARY") .. ": " .. (druidFormSecondaryText(row, formKey) or _G.NONE or "None"),
+						})
+					end)
+					check:SetScript("OnLeave", function()
+						if GameTooltip then GameTooltip:Hide() end
+					end)
+					handle.checks[#handle.checks + 1] = check
+				end
+			end
+		end
+		previous = frame
+	end
+
+	function handle:Release()
+		for i = 1, #(self.frames or {}) do
+			local frame = self.frames[i]
+			if frame and frame.Hide then frame:Hide() end
+			if frame and frame.SetParent then frame:SetParent(nil) end
+		end
+		wipe(self.frames)
+		wipe(self.checks)
+	end
+	return handle
+end
+
 local DEFAULT_SETTINGS_MAX_HEIGHT = 720
 local DEFAULT_SETTINGS_SCREEN_MARGIN = 200
 local settingsMaxHeightWatcher
@@ -1078,6 +1305,14 @@ registerEditModeBars = function()
 			end
 		end
 		local buttons = {}
+		if sharedSlot and sharedSlot ~= "HEALTH" then
+			buttons[#buttons + 1] = {
+				text = L["ResourceBarsSharedVisibilityMatrix"] or "Shared resource visibility",
+				click = function()
+					if addon.functions and addon.functions.OpenConfigCenter then addon.functions.OpenConfigCenter("suites.resourcebars", "resourceBarsSharedVisibilityMatrix") end
+				end,
+			}
+		end
 		local function forceUIParentAnchor()
 			local a = ensureAnchorTable()
 			if not a then return end
@@ -5709,6 +5944,40 @@ local function buildSettings()
 		parentSection = expandable,
 		hiddenWhen = sharedModeHidden,
 	})
+
+	do
+		local app = addon.ConfigApp
+		local pageID = "suites.resourcebars"
+		if app and app.GetPage and app:GetPage(pageID) and app.RegisterControl then
+			app:RegisterControl(pageID, {
+				id = "resourceBarsSharedVisibilityMatrix",
+				type = "custom",
+				label = L["ResourceBarsSharedVisibilityMatrix"] or "Shared resource visibility",
+				description = L["ResourceBarsSharedVisibilityMatrixDesc"]
+					or "Choose which shared Main, Secondary and Tertiary resource slots are visible per class and specialization.",
+				rowHeight = 260,
+				getHeight = function()
+					local rows = (ResourceBars and ResourceBars.BuildSharedVisibilityRows and ResourceBars.BuildSharedVisibilityRows()) or {}
+					return 92 + (#rows * 26)
+				end,
+				render = function(parent)
+					return renderSharedVisibilityMatrix(parent)
+				end,
+				hiddenWhen = sharedModeHidden,
+				parentCheck = sharedModeParentCheck,
+				keywords = {
+					"Shared Resource Bars",
+					"Resource Bars",
+					"Main",
+					"Secondary",
+					"Tertiary",
+					"Druid",
+				},
+				order = 118,
+				newTagID = "ResourceBarsSharedVisibilityMatrix",
+			})
+		end
+	end
 
 	addon.functions.SettingsCreateButton(cat, {
 		var = "resourceBarsSharedAllClasses",

@@ -4,6 +4,10 @@
 
 ## [11.4.0-beta8] - 2026-06-20
 
+### ✨ Added
+
+- Resource Bars: Added a Shared Resource Bar visibility matrix for choosing which class, specialization, and Druid form secondary resources are shown, with a quick Edit Mode shortcut on shared bars.
+
 ### 🐛 Fixed
 
 - Cooldown Panels: Fixed ready sounds firing when custom activation-duration overlays end instead of waiting for the real tracked cooldown to become ready.
