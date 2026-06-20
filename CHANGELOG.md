@@ -7,6 +7,7 @@
 ### ✨ Added
 
 - Resource Bars: Added a Shared Resource Bar visibility matrix for choosing which class, specialization, and Druid form secondary resources are shown, with a quick Edit Mode shortcut on shared bars.
+- Mythic Plus / Teleports: Added the missing Midnight Lightveil teleport item to the teleport compendium.
 
 ### 🐛 Fixed
 
