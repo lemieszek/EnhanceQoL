@@ -3810,6 +3810,8 @@ end
 local function ensureBossContainer()
 	if bossContainer then return bossContainer end
 	bossContainer = CreateFrame("Frame", "EQOLUFBossContainer", UIParent, "BackdropTemplate")
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	if tonumber((select(4, GetBuildInfo()))) >= 120100 and type(bossContainer.SetRolesets) == "function" then bossContainer:SetRolesets("unitFrames") end
 	bossContainer:SetSize(220, 200)
 	bossContainer:SetClampedToScreen(true)
 	bossContainer:SetMovable(true)
@@ -5384,11 +5386,13 @@ local function applyVisibilityDriver(unit, enabled)
 	local NormalizeVisibilityConfig = addon.functions and addon.functions.NormalizeUnitFrameVisibilityConfig
 	local BuildVisibilityDriverExpression = addon.functions and addon.functions.BuildUnitFrameDriverExpression
 	local visibilityConfig = nil
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	local useRolesets = tonumber((select(4, GetBuildInfo()))) >= 120100
 	if enabled and not inEdit and NormalizeVisibilityConfig then visibilityConfig = NormalizeVisibilityConfig(nil, cfg and cfg.visibility, { skipSave = true, ignoreOverride = true }) end
 	local visibilityNeedsManualHandling = visibilityConfig and (visibilityConfig.MOUSEOVER or visibilityConfig.PLAYER_CASTING)
 	if isBossUnit(unit) and _G.RegisterUnitWatch and _G.UnregisterUnitWatch then
 		local hideInClientScene = UFHelper and UFHelper.shouldHideInClientScene and UFHelper.shouldHideInClientScene(cfg, def)
-		local forceClientSceneHide = enabled and not inEdit and hideInClientScene and UF._clientSceneActive == true
+		local forceClientSceneHide = enabled and not useRolesets and not inEdit and hideInClientScene and UF._clientSceneActive == true
 		if UFHelper and UFHelper.applyClientSceneAlphaOverride then UFHelper.applyClientSceneAlphaOverride(st, forceClientSceneHide) end
 		if InCombatLockdown and InCombatLockdown() then
 			if UF.ScheduleEqolVisibilityDriverAlphaRefresh then UF.ScheduleEqolVisibilityDriverAlphaRefresh() end
@@ -5415,7 +5419,7 @@ local function applyVisibilityDriver(unit, enabled)
 		return
 	end
 	local hideInClientScene = UFHelper and UFHelper.shouldHideInClientScene and UFHelper.shouldHideInClientScene(cfg, def)
-	local forceClientSceneHide = enabled and not inEdit and hideInClientScene and UF._clientSceneActive == true
+	local forceClientSceneHide = enabled and not useRolesets and not inEdit and hideInClientScene and UF._clientSceneActive == true
 	if UFHelper and UFHelper.applyClientSceneAlphaOverride then UFHelper.applyClientSceneAlphaOverride(st, forceClientSceneHide) end
 	if InCombatLockdown and InCombatLockdown() then
 		if UF.ScheduleEqolVisibilityDriverAlphaRefresh then UF.ScheduleEqolVisibilityDriverAlphaRefresh() end
@@ -5431,7 +5435,7 @@ local function applyVisibilityDriver(unit, enabled)
 	end
 	if not RegisterStateDriver and not _G.RegisterAttributeDriver then return end
 	local hideInVehicle = enabled and shouldHideInVehicle(cfg, def)
-	local hideInPetBattle = enabled and shouldHideInPetBattle(cfg, def)
+	local hideInPetBattle = enabled and not useRolesets and shouldHideInPetBattle(cfg, def)
 	local cond
 	local baseCond
 	local showPrefix
@@ -5572,8 +5576,10 @@ local function applyVisibilityRules(unit)
 	local inEdit = addon.EditModeLib and addon.EditModeLib.IsInEditMode and addon.EditModeLib:IsInEditMode()
 	local useConfig = (not inEdit and cfg and cfg.enabled) and normalizeVisibilityConfig(cfg.visibility) or nil
 	local manualConfig = useConfig
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	local useRolesets = tonumber((select(4, GetBuildInfo()))) >= 120100
 	local hideInClientScene = UFHelper and UFHelper.shouldHideInClientScene and UFHelper.shouldHideInClientScene(cfg, def)
-	local forceClientSceneHide = not inEdit and cfg and cfg.enabled and hideInClientScene and UF._clientSceneActive == true
+	local forceClientSceneHide = not useRolesets and not inEdit and cfg and cfg.enabled and hideInClientScene and UF._clientSceneActive == true
 	if unit ~= "boss" and manualConfig and not manualConfig.MOUSEOVER and not manualConfig.PLAYER_CASTING then
 		manualConfig = nil
 	end
@@ -9532,13 +9538,20 @@ local function ensureFrames(unit)
 	if st.frame then return end
 	local parent = UIParent
 	if isBossUnit(unit) then parent = ensureBossContainer() or UIParent end
-	st.frame = _G[info.frameName] or CreateFrame("Button", info.frameName, parent, "BackdropTemplate,SecureUnitButtonTemplate, PingableUnitFrameTemplate")
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	local usePingReceiver = tonumber((select(4, GetBuildInfo()))) >= 120100
+	local template = usePingReceiver and "BackdropTemplate,SecureUnitButtonTemplate" or "BackdropTemplate,SecureUnitButtonTemplate,PingableUnitFrameTemplate"
+	st.frame = _G[info.frameName] or CreateFrame("Button", info.frameName, parent, template)
 	_G.ClickCastFrames = _G.ClickCastFrames or {}
 	_G.ClickCastFrames[st.frame] = true
 	if st.frame.SetParent then st.frame:SetParent(parent) end
 	st.frame:SetAttribute("unit", info.unit)
 	st.frame:SetAttribute("*type1", "target")
 	st.frame:SetAttribute("*type2", "togglemenu")
+	if usePingReceiver then
+		st.frame:SetAttribute("ping-receiver", true)
+		if type(st.frame.SetRolesets) == "function" then st.frame:SetRolesets("unitFrames") end
+	end
 	st.frame:HookScript("OnEnter", function(self)
 		st._hovered = true
 		UFHelper.updateHighlight(st, unit, UNIT.PLAYER)

@@ -913,6 +913,8 @@ end
 local function createDefaultAuraHeader(kind, filter)
 	local name = kind == "buff" and "EnhanceQoLCustomBuffFrame" or "EnhanceQoLCustomDebuffFrame"
 	local header = _G[name] or CreateFrame("Frame", name, UIParent, "SecureAuraHeaderTemplate")
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	if tonumber((select(4, GetBuildInfo()))) >= 120100 and type(header.SetRolesets) == "function" then header:SetRolesets("buffs") end
 	header:SetClampedToScreen(true)
 	header:UnregisterEvent("UNIT_AURA")
 	header:RegisterUnitEvent("UNIT_AURA", "player", "vehicle")
@@ -932,6 +934,8 @@ local function ensureDefaultAuraAnchor(kind)
 	local key = isBuff and "defaultBuffAnchor" or "defaultDebuffAnchor"
 	local name = isBuff and "EnhanceQoLCustomBuffFrameAnchor" or "EnhanceQoLCustomDebuffFrameAnchor"
 	local anchor = DAC.variables[key] or _G[name] or CreateFrame("Frame", name, UIParent, "BackdropTemplate")
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	if tonumber((select(4, GetBuildInfo()))) >= 120100 and type(anchor.SetRolesets) == "function" then anchor:SetRolesets("buffs") end
 	DAC.variables[key] = anchor
 	anchor:SetSize(getDefaultAuraIconsPerRow(nil, kind) * getDefaultAuraIconSize(nil, kind) + (getDefaultAuraIconsPerRow(nil, kind) - 1) * getDefaultAuraHorizontalSpacing(nil, kind), getDefaultAuraMaxRows(nil, kind) * getDefaultAuraIconSize(nil, kind) + (getDefaultAuraMaxRows(nil, kind) - 1) * getDefaultAuraVerticalSpacing(nil, kind))
 	anchor:SetFrameStrata("MEDIUM")

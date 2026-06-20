@@ -739,7 +739,9 @@ function GF.EnsureGroupBorderFrame(kind, anchor)
 	GF.groupBorders = GF.groupBorders or {}
 	local border = GF.groupBorders[kind]
 	if not border then
-		local parent = anchor:GetParent() or _G.PetBattleFrameHider or UIParent
+		-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+		local usePingReceiver = tonumber((select(4, GetBuildInfo()))) >= 120100
+		local parent = anchor:GetParent() or (usePingReceiver and UIParent) or _G.PetBattleFrameHider or UIParent
 		border = CreateFrame("Frame", "EQOLUFPartyGroupBorder", parent, "BackdropTemplate")
 		border:EnableMouse(false)
 		border:Hide()
@@ -12029,6 +12031,8 @@ function GF:OpenUnitMenu(self)
 end
 
 function GF.UnitButton_OnLoad(self)
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	if tonumber((select(4, GetBuildInfo()))) >= 120100 and self and self.SetAttribute then self:SetAttribute("ping-receiver", true) end
 	local parent = self and self.GetParent and self:GetParent()
 	if parent and parent._eqolKind then
 		self._eqolGroupKind = parent._eqolKind
@@ -12589,6 +12593,8 @@ end
 local function applyVisibility(header, kind, cfg)
 	if not header or not cfg then return end
 	local def = DEFAULTS[kind]
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	local useRolesets = tonumber((select(4, GetBuildInfo()))) >= 120100
 	local hideInClientScene = GFH and GFH.ShouldHideInClientScene and GFH.ShouldHideInClientScene(cfg, def)
 	local inEdit = isEditModeActive and isEditModeActive()
 	local arenaPartyActive = false
@@ -12599,7 +12605,7 @@ local function applyVisibility(header, kind, cfg)
 			arenaPartyActive = (IsActiveBattlefieldArena and IsActiveBattlefieldArena()) and not (C_PvP and C_PvP.IsInBrawl and C_PvP.IsInBrawl())
 		end
 	end
-	local forceClientSceneHide = not inEdit and hideInClientScene and GF._clientSceneActive == true
+	local forceClientSceneHide = not useRolesets and not inEdit and hideInClientScene and GF._clientSceneActive == true
 	if GFH and GFH.ApplyClientSceneAlphaToFrame then GFH.ApplyClientSceneAlphaToFrame(header, forceClientSceneHide) end
 	local useStaticSecureHeaderVisibility = isRaidLikeKind(kind)
 	if useStaticSecureHeaderVisibility then
@@ -12655,13 +12661,16 @@ local function getRaidGroupHeaderKey(index) return "raidGroup" .. tostring(index
 
 function GF:EnsureRaidGroupHeaders()
 	GF._raidGroupHeaders = GF._raidGroupHeaders or {}
-	local parent = _G.PetBattleFrameHider or UIParent
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	local usePingReceiver = tonumber((select(4, GetBuildInfo()))) >= 120100
+	local parent = (usePingReceiver and UIParent) or _G.PetBattleFrameHider or UIParent
 	for i = 1, 8 do
 		local header = GF._raidGroupHeaders[i]
 		if not header then
 			header = CreateFrame("Frame", "EQOLUFRaidGroupHeader" .. i, parent, "SecureGroupHeaderTemplate")
 			header._eqolKind = "raid"
 			header._eqolGroupIndex = i
+			if usePingReceiver and type(header.SetRolesets) == "function" then header:SetRolesets("unitFrames") end
 			header:Hide()
 			GF._raidGroupHeaders[i] = header
 			GF.headers[getRaidGroupHeaderKey(i)] = header
@@ -12689,10 +12698,12 @@ function GF:EnsurePreviewFrames(kind)
 	local frames = GF._previewFrames[kind]
 	if not frames then frames = {} end
 	GF._previewFrames[kind] = frames
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	local template = (tonumber((select(4, GetBuildInfo()))) >= 120100) and "EQOLUFGroupUnitButtonReceiverTemplate" or "EQOLUFGroupUnitButtonTemplate"
 	for i = 1, #samples do
 		local btn = frames[i]
 		if not btn then
-			btn = CreateFrame("Button", nil, anchor, "EQOLUFGroupUnitButtonTemplate")
+			btn = CreateFrame("Button", nil, anchor, template)
 			frames[i] = btn
 		end
 		btn._eqolGroupKind = kind
@@ -13434,6 +13445,8 @@ end
 local function syncHeaderChild(child, kind, cfg, frameW, frameH, fitScale)
 	if not (child and cfg) then return end
 
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	if tonumber((select(4, GetBuildInfo()))) >= 120100 and child.SetAttribute then child:SetAttribute("ping-receiver", true) end
 	child._eqolGroupKind = kind
 	child._eqolUseSecureUnitAttribute = true
 	child._eqolCfg = cfg
@@ -14230,7 +14243,7 @@ local function applyRaidGroupHeaders(cfg, layout, groupSpecs, forceShow, forceHi
 			setAttr("yOffset", layout.yOffset)
 			setAttr("columnSpacing", layout.columnSpacing)
 			setAttr("columnAnchorPoint", layout.columnAnchorPoint)
-			setAttr("template", "EQOLUFGroupUnitButtonTemplate")
+			setAttr("template", layout.buttonTemplate or "EQOLUFGroupUnitButtonTemplate")
 			setAttr("initialConfigFunction", layout.initConfigFunction)
 			setAttr("point", layout.point)
 
@@ -14427,6 +14440,9 @@ function GF:ApplyHeaderAttributes(kind, options)
 	local raidFramesEnabled = db and db.raid and db.raid.enabled == true
 	local function setAttr(key, value) GF:SetHeaderAttributeIfChanged(header, key, value) end
 	local skipChildSync = options and options.skipChildSync == true
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	local usePingReceiver = tonumber((select(4, GetBuildInfo()))) >= 120100
+	local unitButtonTemplate = usePingReceiver and "EQOLUFGroupUnitButtonReceiverTemplate" or "EQOLUFGroupUnitButtonTemplate"
 
 	if kind == "party" then
 		local partySortState = GF.BuildPartyRuntimeSortState(cfg)
@@ -14547,7 +14563,7 @@ function GF:ApplyHeaderAttributes(kind, options)
 		layoutColumnSpacing = roundToPixel(columnSpacing, scale)
 		layoutColumnAnchorPoint = (kind == "raid" and not centerGrowthActive) and GF.GetRaidColumnAnchorPoint(growth, cfg.groupGrowth) or "LEFT"
 	end
-	setAttr("template", "EQOLUFGroupUnitButtonTemplate")
+	setAttr("template", unitButtonTemplate)
 
 	-- Pixel-perfect size: snap width/height to (even) screen pixels to avoid half-pixel centers -> text jitter.
 	local w = clampNumber(tonumber(cfg.width) or 100, 40, 600, 100)
@@ -14617,8 +14633,23 @@ function GF:ApplyHeaderAttributes(kind, options)
 	local initConfigKey = wStr .. "x" .. hStr
 	local initConfigFunction = header._eqolInitConfigFunction
 	if header._eqolInitConfigKey ~= initConfigKey then
-		initConfigFunction = string.format(
-			[[
+		if usePingReceiver then
+			initConfigFunction = string.format(
+				[[
+		self:ClearAllPoints()
+		self:SetWidth(%s)
+		self:SetHeight(%s)
+		self:SetAttribute('*type1','target')
+		self:SetAttribute('*type2','togglemenu')
+		self:SetAttribute('ping-receiver', true)
+		RegisterUnitWatch(self)
+	]],
+				wStr,
+				hStr
+			)
+		else
+			initConfigFunction = string.format(
+				[[
 		self:ClearAllPoints()
 		self:SetWidth(%s)
 		self:SetHeight(%s)
@@ -14626,9 +14657,10 @@ function GF:ApplyHeaderAttributes(kind, options)
 		self:SetAttribute('*type2','togglemenu')
 		RegisterUnitWatch(self)
 	]],
-			wStr,
-			hStr
-		)
+				wStr,
+				hStr
+			)
+		end
 		header._eqolInitConfigKey = initConfigKey
 		header._eqolInitConfigFunction = initConfigFunction
 	end
@@ -14811,11 +14843,21 @@ function GF:ApplyHeaderAttributes(kind, options)
 				groupCenterOffsetX = groupCenterOffsetX + crossOffsetX
 				groupCenterOffsetY = groupCenterOffsetY + crossOffsetY
 			end
-			local groupInitConfigFunction = [[
+			local groupInitConfigFunction
+			if usePingReceiver then
+				groupInitConfigFunction = [[
+		self:SetAttribute('*type1','target')
+		self:SetAttribute('*type2','togglemenu')
+		self:SetAttribute('ping-receiver', true)
+		RegisterUnitWatch(self)
+	]]
+			else
+				groupInitConfigFunction = [[
 		self:SetAttribute('*type1','target')
 		self:SetAttribute('*type2','togglemenu')
 		RegisterUnitWatch(self)
 	]]
+			end
 			local layout = {
 				scale = scale,
 				w = groupRenderW,
@@ -14840,6 +14882,7 @@ function GF:ApplyHeaderAttributes(kind, options)
 				centerOffsetX = groupCenterOffsetX,
 				centerOffsetY = groupCenterOffsetY,
 				initConfigFunction = groupInitConfigFunction,
+				buttonTemplate = unitButtonTemplate,
 			}
 
 			applyRaidGroupHeaders(cfg, layout, groupSpecs, forceShow, forceHide, runtimeGroupCount, options)
@@ -14883,7 +14926,9 @@ function GF:EnsureHeaders()
 	if not isFeatureEnabled() then return end
 	if GF.headers.party and GF.headers.raid and GF.headers.mt and GF.headers.ma and GF.anchors.party and GF.anchors.raid and GF.anchors.mt and GF.anchors.ma then return end
 
-	local parent = _G.PetBattleFrameHider or UIParent
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	local usePingReceiver = tonumber((select(4, GetBuildInfo()))) >= 120100
+	local parent = (usePingReceiver and UIParent) or _G.PetBattleFrameHider or UIParent
 
 	if not GF.anchors.party then ensureAnchor("party", parent) end
 	if not GF.anchors.raid then ensureAnchor("raid", parent) end
@@ -14893,6 +14938,7 @@ function GF:EnsureHeaders()
 	if not GF.headers.party then
 		GF.headers.party = CreateFrame("Frame", "EQOLUFPartyHeader", parent, "SecureGroupHeaderTemplate")
 		GF.headers.party._eqolKind = "party"
+		if usePingReceiver and type(GF.headers.party.SetRolesets) == "function" then GF.headers.party:SetRolesets("unitFrames") end
 		if GF.headers.party.SetClampedToScreen then GF.headers.party:SetClampedToScreen(true) end
 		GF.headers.party:Hide()
 	end
@@ -14900,6 +14946,7 @@ function GF:EnsureHeaders()
 	if not GF.headers.raid then
 		GF.headers.raid = CreateFrame("Frame", "EQOLUFRaidHeader", parent, "SecureGroupHeaderTemplate")
 		GF.headers.raid._eqolKind = "raid"
+		if usePingReceiver and type(GF.headers.raid.SetRolesets) == "function" then GF.headers.raid:SetRolesets("unitFrames") end
 		if GF.headers.raid.SetClampedToScreen then GF.headers.raid:SetClampedToScreen(true) end
 		GF.headers.raid:Hide()
 	end
@@ -14907,6 +14954,7 @@ function GF:EnsureHeaders()
 	if not GF.headers.mt then
 		GF.headers.mt = CreateFrame("Frame", "EQOLUFMTHeader", parent, "SecureGroupHeaderTemplate")
 		GF.headers.mt._eqolKind = "mt"
+		if usePingReceiver and type(GF.headers.mt.SetRolesets) == "function" then GF.headers.mt:SetRolesets("unitFrames") end
 		if GF.headers.mt.SetClampedToScreen then GF.headers.mt:SetClampedToScreen(true) end
 		GF.headers.mt:Hide()
 	end
@@ -14914,6 +14962,7 @@ function GF:EnsureHeaders()
 	if not GF.headers.ma then
 		GF.headers.ma = CreateFrame("Frame", "EQOLUFMAHeader", parent, "SecureGroupHeaderTemplate")
 		GF.headers.ma._eqolKind = "ma"
+		if usePingReceiver and type(GF.headers.ma.SetRolesets) == "function" then GF.headers.ma:SetRolesets("unitFrames") end
 		if GF.headers.ma.SetClampedToScreen then GF.headers.ma:SetClampedToScreen(true) end
 		GF.headers.ma:Hide()
 	end
@@ -30307,6 +30356,13 @@ local function buildEditModeSettings(kind, editModeId)
 					return true
 				end
 			end
+		end
+	end
+
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	if tonumber((select(4, GetBuildInfo()))) >= 120100 then
+		for i = #settings, 1, -1 do
+			if settings[i] and settings[i].field == "hideInClientScene" then table.remove(settings, i) end
 		end
 	end
 

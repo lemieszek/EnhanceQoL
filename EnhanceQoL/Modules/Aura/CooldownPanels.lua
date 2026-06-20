@@ -10040,6 +10040,8 @@ local function itemHasUseSpell(itemID) return CooldownPanels.GetItemUseSpellID a
 
 local function createPanelFrame(panelId, panel)
 	local frame = CreateFrame("Button", "EQOL_CooldownPanel" .. tostring(panelId), UIParent)
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	if tonumber((select(4, GetBuildInfo()))) >= 120100 and type(frame.SetRolesets) == "function" then frame:SetRolesets("cooldownViewers") end
 	frame:SetClampedToScreen(true)
 	frame:SetMovable(true)
 	frame:EnableMouse(false)

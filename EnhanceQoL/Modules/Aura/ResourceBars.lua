@@ -4943,8 +4943,14 @@ function ResourceBars.EnsureSharedSlotProxyFrame(slot)
 	local frameName = ResourceBars.GetSharedSlotFrameName and ResourceBars.GetSharedSlotFrameName(slot)
 	if not frameName then return nil end
 	local frame = ResourceBars.GetSharedSlotLiveFrame and ResourceBars.GetSharedSlotLiveFrame(slot) or _G[frameName]
-	if frame then return frame end
+	if frame then
+		-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+		if tonumber((select(4, GetBuildInfo()))) >= 120100 and type(frame.SetRolesets) == "function" then frame:SetRolesets("statusBars") end
+		return frame
+	end
 	frame = CreateFrame("StatusBar", frameName, UIParent, "BackdropTemplate")
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	if tonumber((select(4, GetBuildInfo()))) >= 120100 and type(frame.SetRolesets) == "function" then frame:SetRolesets("statusBars") end
 	frame:SetClampedToScreen(true)
 	frame:SetMovable(true)
 	frame:EnableMouse(false)
@@ -5056,6 +5062,9 @@ end
 function createHealthBar()
 	if mainFrame then
 		-- Ensure correct parent when re-enabling
+		-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+		if tonumber((select(4, GetBuildInfo()))) >= 120100 and type(mainFrame.SetRolesets) == "function" then mainFrame:SetRolesets("statusBars") end
+		if healthBar and tonumber((select(4, GetBuildInfo()))) >= 120100 and type(healthBar.SetRolesets) == "function" then healthBar:SetRolesets("statusBars") end
 		if mainFrame:GetParent() ~= UIParent then mainFrame:SetParent(UIParent) end
 		if healthBar and healthBar.GetParent and healthBar:GetParent() ~= UIParent then healthBar:SetParent(UIParent) end
 		if mainFrame.SetClampedToScreen then mainFrame:SetClampedToScreen(true) end
@@ -5073,9 +5082,12 @@ function createHealthBar()
 
 	-- Reuse existing named frames if they still exist from a previous enable
 	mainFrame = _G["EQOLResourceFrame"] or CreateFrame("frame", "EQOLResourceFrame", UIParent)
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	if tonumber((select(4, GetBuildInfo()))) >= 120100 and type(mainFrame.SetRolesets) == "function" then mainFrame:SetRolesets("statusBars") end
 	if mainFrame:GetParent() ~= UIParent then mainFrame:SetParent(UIParent) end
 	if mainFrame.SetClampedToScreen then mainFrame:SetClampedToScreen(true) end
 	healthBar = _G["EQOLHealthBar"] or CreateFrame("StatusBar", "EQOLHealthBar", UIParent, "BackdropTemplate")
+	if tonumber((select(4, GetBuildInfo()))) >= 120100 and type(healthBar.SetRolesets) == "function" then healthBar:SetRolesets("statusBars") end
 	if healthBar:GetParent() ~= UIParent then healthBar:SetParent(UIParent) end
 	healthBar._rbType = "HEALTH"
 	healthBar._rbSharedSlot = ResourceBars.SpecUsesSharedMode and ResourceBars.SpecUsesSharedMode(addon.variables.unitSpec) and "HEALTH" or nil
@@ -7223,6 +7235,8 @@ local function createPowerBar(type, anchor, sharedSlot)
 	end
 	local bar = existingBar
 	if not bar then bar = CreateFrame("StatusBar", sharedFrameName or ("EQOL" .. type .. "Bar"), UIParent, "BackdropTemplate") end
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	if tonumber((select(4, GetBuildInfo()))) >= 120100 and _G.type(bar.SetRolesets) == "function" then bar:SetRolesets("statusBars") end
 	if not existingBar or not existingBar._rbInitialized then ResourceBars.RequestStructuralLayoutRefresh(true) end
 	-- Ensure a valid parent when reusing frames after disable
 	if bar:GetParent() ~= UIParent then bar:SetParent(UIParent) end
