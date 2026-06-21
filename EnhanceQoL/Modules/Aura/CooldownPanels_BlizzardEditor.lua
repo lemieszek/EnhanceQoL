@@ -29,6 +29,8 @@ Editor.ADDON_ICON = "Interface\\AddOns\\EnhanceQoL\\Icons\\Icon.tga"
 Editor.state = {
 	collapsed = {},
 	specView = "ALL",
+	classView = nil,
+	classLocked = false,
 }
 
 local function normalizeId(value)
@@ -71,7 +73,7 @@ local function panelMatchesSpecView(panel)
 	local hasFilter = panelHasSpecFilter(panel)
 	if view == "CLASS" then
 		if not hasFilter then return true end
-		for _, option in ipairs(Editor:GetClassSpecOptions()) do
+		for _, option in ipairs(Editor:GetClassSpecOptions(Editor.state.classView)) do
 			if panel.specFilter and panel.specFilter[option.value] == true then return true end
 		end
 		return false
@@ -103,48 +105,129 @@ local function getSpecName(specId)
 end
 
 local function getPlayerClassName()
-	local className, classFile = "", nil
-	if UnitClass then className, classFile = UnitClass("player") end
-	return className or "", classFile
+	local className, classFile, classID = "", nil, nil
+	if UnitClass then className, classFile, classID = UnitClass("player") end
+	return className or "", classFile, classID
 end
 
-local function getClassColorText(text)
-	local _, classFile = getPlayerClassName()
+local function getPlayerClassID()
+	local _, _, classID = getPlayerClassName()
+	return classID
+end
+
+local function getClassInfoByClassID(classID)
+	classID = tonumber(classID)
+	if not classID then return nil end
+	if C_CreatureInfo and C_CreatureInfo.GetClassInfo then
+		local classInfo = C_CreatureInfo.GetClassInfo(classID)
+		if classInfo then return classInfo.className, classInfo.classFile, classID end
+	end
+	if GetNumClasses and GetClassInfo then
+		for index = 1, GetNumClasses() do
+			local className, classFile, currentClassID = GetClassInfo(index)
+			if currentClassID == classID then return className, classFile, classID end
+		end
+	end
+	local playerClassName, playerClassFile, playerClassID = getPlayerClassName()
+	if playerClassID == classID then return playerClassName, playerClassFile, classID end
+	return nil
+end
+
+local function getClassFileByClassID(classID)
+	local _, classFile = getClassInfoByClassID(classID)
+	return classFile
+end
+
+local function getSelectedClassID()
+	return tonumber(Editor.state.classView) or getPlayerClassID()
+end
+
+local function getClassColorTextByClassID(classID, text)
+	local _, classFile = getClassInfoByClassID(classID)
 	local color = classFile and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFile]
 	return color and color.WrapTextInColorCode and color:WrapTextInColorCode(text) or text
 end
 
-function Editor:GetClassSpecOptions()
+function Editor:GetClassOptions()
 	local options = {}
-	local className = getPlayerClassName()
-	if GetNumSpecializations and GetSpecializationInfo then
-		for index = 1, GetNumSpecializations() do
-			local specId, specName = GetSpecializationInfo(index)
-			if specId then options[#options + 1] = { value = specId, label = string.format("%s - %s", className, specName or getSpecName(specId)) } end
+	if GetNumClasses and GetClassInfo then
+		for index = 1, GetNumClasses() do
+			local className, classFile, classID = GetClassInfo(index)
+			if classID and className then options[#options + 1] = { value = classID, label = className, classFile = classFile } end
 		end
-	else
+	end
+	if #options == 0 then
+		local className, classFile, classID = getPlayerClassName()
+		if classID then options[#options + 1] = { value = classID, label = className, classFile = classFile } end
+	end
+	return options
+end
+
+function Editor:GetClassSpecOptions(classID)
+	local options = {}
+	classID = tonumber(classID) or getPlayerClassID()
+	local className = getClassInfoByClassID(classID) or getPlayerClassName()
+	if C_SpecializationInfo and C_SpecializationInfo.GetNumSpecializationsForClassID and GetSpecializationInfoForClassID then
+		local sex = UnitSex and UnitSex("player") or nil
+		for index = 1, C_SpecializationInfo.GetNumSpecializationsForClassID(classID) do
+			local specId, specName, _, specIcon = GetSpecializationInfoForClassID(classID, index, sex)
+			if specId then options[#options + 1] = { value = specId, classID = classID, label = string.format("%s - %s", className, specName or getSpecName(specId)), specName = specName or getSpecName(specId), icon = specIcon } end
+		end
+	elseif classID == getPlayerClassID() and GetNumSpecializations and GetSpecializationInfo then
 		local currentSpecId = getCurrentSpecId()
-		if currentSpecId then options[#options + 1] = { value = currentSpecId, label = string.format("%s - %s", className, getSpecName(currentSpecId)) } end
+		for index = 1, GetNumSpecializations() do
+			local specId, specName, _, specIcon = GetSpecializationInfo(index)
+			if specId then options[#options + 1] = { value = specId, classID = classID, label = string.format("%s - %s", className, specName or getSpecName(specId)), specName = specName or getSpecName(specId), icon = specIcon } end
+		end
+		if #options == 0 and currentSpecId then options[#options + 1] = { value = currentSpecId, classID = classID, label = string.format("%s - %s", className, getSpecName(currentSpecId)), specName = getSpecName(currentSpecId) } end
 	end
 	return options
 end
 
 local function getSpecViewLabel()
-	local className = getPlayerClassName()
-	if Editor.state.specView == "CLASS" then return string.format("%s - %s", ALL or "All", className) end
-	if Editor.state.specView == "ALL" then return L["VisibilityAllCooldownPanels"] or "All Cooldown Panels" end
-	for _, option in ipairs(Editor:GetClassSpecOptions()) do
+	if Editor.state.specView == "ALL" then return ALL_CLASSES or (L["VisibilityAllCooldownPanels"] or "All Cooldown Panels") end
+	local classID = getSelectedClassID()
+	local className = getClassInfoByClassID(classID) or getPlayerClassName()
+	if Editor.state.specView == "CLASS" then return getClassColorTextByClassID(classID, className) end
+	for _, option in ipairs(Editor:GetClassSpecOptions(classID)) do
 		if tostring(option.value) == tostring(Editor.state.specView) then return option.label end
 	end
-	return L["VisibilityAllCooldownPanels"] or "All Cooldown Panels"
+	return className or (L["VisibilityAllCooldownPanels"] or "All Cooldown Panels")
 end
 
 local function isSpecViewSelected(value)
 	return tostring(value) == tostring(Editor.state.specView)
 end
 
-local function setSpecView(value)
-	Editor.state.specView = value
+local function isClassViewSelected(value)
+	value = tonumber(value) or value
+	if value == "ALL" then return Editor.state.specView == "ALL" end
+	return Editor.state.specView ~= "ALL" and tonumber(Editor.state.classView) == tonumber(value)
+end
+
+local function isSpecSpecificView(value)
+	return value ~= "ALL" and value ~= "CLASS" and tonumber(value) ~= nil
+end
+
+local function setClassView(value)
+	if value == "ALL" then
+		Editor.state.specView = "ALL"
+		Editor.state.classView = nil
+		Editor.state.classLocked = false
+	else
+		local classID = tonumber(value)
+		Editor.state.specView = "CLASS"
+		Editor.state.classView = classID
+		Editor.state.classLocked = classID ~= getPlayerClassID()
+	end
+	Editor:Refresh()
+end
+
+local function setClassSpecView(classID, specID)
+	classID = tonumber(classID)
+	Editor.state.classView = classID
+	Editor.state.specView = tonumber(specID) or "CLASS"
+	Editor.state.classLocked = classID ~= getPlayerClassID()
 	Editor:Refresh()
 end
 
@@ -152,7 +235,28 @@ function Editor:EnsureInitialSpecView()
 	if self.state.didInitializeSpecView then return end
 	self.state.didInitializeSpecView = true
 	local currentSpecId = getCurrentSpecId()
+	self.state.classView = getPlayerClassID()
 	if currentSpecId then self.state.specView = currentSpecId end
+end
+
+function Editor:UpdateSpecDropdown()
+	local frame = self.frame
+	if not (frame and frame.specDropdown) then return end
+	if frame.specDropdown.SetDefaultText then frame.specDropdown:SetDefaultText(getSpecViewLabel()) end
+	if frame.specDropdown.GenerateMenu then frame.specDropdown:GenerateMenu() end
+end
+
+function Editor:SyncSpecViewToCurrentSpec()
+	if self.state.classLocked then return false end
+	if not isSpecSpecificView(self.state.specView) then return false end
+	local currentSpecId = getCurrentSpecId()
+	if not currentSpecId or tostring(self.state.specView) == tostring(currentSpecId) then return false end
+	self.state.classView = getPlayerClassID()
+	self.state.specView = currentSpecId
+	if self.frame and self.frame:IsShown() then
+		self:Refresh()
+	end
+	return true
 end
 
 function Editor:CreatePanelFromDropdown()
@@ -193,6 +297,40 @@ local function getEntryTypeLabel(entry)
 	return entry and entry.type or ""
 end
 
+local function getEntryTooltipIdentityLine(entry)
+	if not entry then return nil end
+	local typeLabel = getEntryTypeLabel(entry)
+	local entryType = entry.type and tostring(entry.type):upper() or ""
+	local primaryId = nil
+	local extraId = nil
+	if entryType == "SPELL" then
+		primaryId = entry.spellID
+	elseif entryType == "ITEM" then
+		primaryId = entry.itemID
+	elseif entryType == "SLOT" then
+		primaryId = entry.slotID
+	elseif entryType == "CDM_AURA" then
+		primaryId = entry.cooldownID
+		if entry.spellID then extraId = string.format("%s ID: %s", _G.SPELL or "Spell", tostring(entry.spellID)) end
+	elseif entryType == "STANCE" then
+		local stanceDef = CooldownPanels.GetStanceDefinition and CooldownPanels:GetStanceDefinition(entry) or nil
+		primaryId = entry.spellID or (stanceDef and stanceDef.spellID)
+		typeLabel = string.format("%s %s", typeLabel ~= "" and typeLabel or (_G.STANCE or "Stance"), _G.SPELL or "Spell")
+	elseif entryType == "MACRO" then
+		primaryId = entry.macroID or entry.macroName
+		local macro = CooldownPanels.ResolveMacroEntry and CooldownPanels.ResolveMacroEntry(entry) or nil
+		if macro and macro.kind == "SPELL" and macro.spellID then
+			extraId = string.format("%s ID: %s", _G.SPELL or "Spell", tostring(macro.spellID))
+		elseif macro and macro.kind == "ITEM" and macro.itemID then
+			extraId = string.format("%s ID: %s", _G.ITEM or "Item", tostring(macro.itemID))
+		end
+	end
+	if not primaryId or primaryId == "" then return nil end
+	local line = string.format("%s ID: %s", typeLabel ~= "" and typeLabel or entryType, tostring(primaryId))
+	if extraId then line = string.format("%s  |  %s", line, extraId) end
+	return line
+end
+
 local function isEntryBarDisplayMode(entry)
 	local bars = CooldownPanels.Bars
 	if bars and bars.IsBarDisplayModeValue then return bars.IsBarDisplayModeValue(entry and entry.displayMode) end
@@ -218,19 +356,67 @@ local function getCurrentSpecIcon()
 	return Editor.ADDON_ICON
 end
 
-local function setupFramePortrait(frame)
-	if _G.ButtonFrameTemplate_ShowPortrait then _G.ButtonFrameTemplate_ShowPortrait(frame) end
-	local icon = getCurrentSpecIcon()
+local function getSelectedSpecIcon()
+	if not isSpecSpecificView(Editor.state.specView) then return nil end
+	for _, option in ipairs(Editor:GetClassSpecOptions(getSelectedClassID())) do
+		if tostring(option.value) == tostring(Editor.state.specView) and option.icon then return option.icon end
+	end
+	return getCurrentSpecIcon()
+end
+
+local function setPortraitTexture(frame, texture)
+	if frame.SetPortraitTexCoord then frame:SetPortraitTexCoord(0, 1, 0, 1) end
 	if frame.SetPortraitToTexture then
-		frame:SetPortraitToTexture(icon)
+		frame:SetPortraitToTexture(texture)
 		return
 	end
 	if frame.SetPortraitTextureRaw then
-		frame:SetPortraitTextureRaw(icon)
+		frame:SetPortraitTextureRaw(texture)
 		return
 	end
 	local portrait = frame.PortraitContainer and frame.PortraitContainer.portrait
-	if portrait and portrait.SetTexture then portrait:SetTexture(icon) end
+	if portrait and portrait.SetTexture then
+		portrait:SetTexCoord(0, 1, 0, 1)
+		portrait:SetTexture(texture)
+	end
+end
+
+local function setPortraitToClass(frame, classID)
+	local classFile = getClassFileByClassID(classID)
+	if not classFile then
+		setPortraitTexture(frame, Editor.ADDON_ICON)
+		return
+	end
+	if frame.SetPortraitToClassIcon then
+		frame:SetPortraitToClassIcon(classFile)
+		return
+	end
+	local coords = CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[string.upper(classFile)]
+	if frame.SetPortraitTextureRaw and frame.SetPortraitTexCoord and coords then
+		frame:SetPortraitTextureRaw("Interface/TargetingFrame/UI-Classes-Circles")
+		frame:SetPortraitTexCoord(unpack(coords))
+		return
+	end
+	local portrait = frame.PortraitContainer and frame.PortraitContainer.portrait
+	if portrait and coords then
+		portrait:SetTexture("Interface/TargetingFrame/UI-Classes-Circles")
+		portrait:SetTexCoord(unpack(coords))
+		return
+	end
+	setPortraitTexture(frame, Editor.ADDON_ICON)
+end
+
+local function setupFramePortrait(frame)
+	if _G.ButtonFrameTemplate_ShowPortrait then _G.ButtonFrameTemplate_ShowPortrait(frame) end
+	if Editor.state.specView == "ALL" then
+		setPortraitTexture(frame, Editor.ADDON_ICON)
+		return
+	end
+	if Editor.state.specView == "CLASS" then
+		setPortraitToClass(frame, getSelectedClassID())
+		return
+	end
+	setPortraitTexture(frame, getSelectedSpecIcon() or Editor.ADDON_ICON)
 end
 
 local function saveFramePosition(frame)
@@ -314,6 +500,11 @@ local function showEntryTooltip(owner, entry)
 		tooltip:SetItemByID(entry.itemID)
 	else
 		tooltip:SetText(getEntryName(entry))
+	end
+	local identityLine = getEntryTooltipIdentityLine(entry)
+	if identityLine then
+		tooltip:AddLine(" ")
+		tooltip:AddLine(identityLine, 0.65, 0.65, 0.65, true)
 	end
 	tooltip:Show()
 end
@@ -1045,7 +1236,17 @@ function Editor:CreateFrame()
 		selfFrame:StopMovingOrSizing()
 		saveFramePosition(selfFrame)
 	end)
+	frame:SetScript("OnShow", function(selfFrame)
+		if selfFrame.RegisterUnitEvent then
+			selfFrame:RegisterUnitEvent("PLAYER_SPECIALIZATION_CHANGED", "player")
+		else
+			selfFrame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
+		end
+		selfFrame:RegisterEvent("ACTIVE_PLAYER_SPECIALIZATION_CHANGED")
+	end)
 	frame:SetScript("OnHide", function(selfFrame)
+		selfFrame:UnregisterEvent("PLAYER_SPECIALIZATION_CHANGED")
+		selfFrame:UnregisterEvent("ACTIVE_PLAYER_SPECIALIZATION_CHANGED")
 		Editor.state.drag = nil
 		Editor.state.reorderTarget = nil
 		Editor:SetSourceTileDesaturated(false)
@@ -1063,6 +1264,14 @@ function Editor:CreateFrame()
 	end)
 	frame:SetScript("OnMouseUp", function(_, buttonName)
 		if buttonName == "RightButton" then Editor:CancelDrag() end
+	end)
+	frame:SetScript("OnEvent", function(selfFrame, eventName, unitTarget)
+		if eventName == "PLAYER_SPECIALIZATION_CHANGED" and unitTarget and unitTarget ~= "player" then return end
+		local didSync = Editor:SyncSpecViewToCurrentSpec()
+		if not didSync then
+			setupFramePortrait(selfFrame)
+			Editor:UpdateSpecDropdown()
+		end
 	end)
 	setupFramePortrait(frame)
 	if frame.TitleContainer and frame.TitleContainer.TitleText then
@@ -1084,6 +1293,14 @@ function Editor:CreateFrame()
 	frame.gear:SetupMenu(function(_, rootDescription)
 		rootDescription:SetTag("MENU_EQOL_COOLDOWN_PANEL_BLIZZARD_VIEW")
 		rootDescription:CreateTitle(SETTINGS or "Settings")
+		local addPanelText = GREEN_FONT_COLOR and GREEN_FONT_COLOR:WrapTextInColorCode(L["Add Panel"] or "Add Panel") or (L["Add Panel"] or "Add Panel")
+		local addPanelIcon = CreateAtlasMarkup and CreateAtlasMarkup("communities-icon-addgroupplus", 16, 16, 0, -1) or "+"
+		rootDescription:CreateButton(addPanelIcon .. " " .. addPanelText, function()
+			Editor:CreatePanelFromDropdown()
+		end)
+		rootDescription:CreateButton(L["CooldownPanelImportPanel"] or "Import Panel", function()
+			Editor:ShowImportPanelPopup()
+		end)
 	end)
 
 	frame.scroll = frame.CooldownScroll
@@ -1094,22 +1311,24 @@ function Editor:CreateFrame()
 	frame.specDropdown:SetWidth(220)
 	frame.specDropdown:SetupMenu(function(_, rootDescription)
 		rootDescription:SetTag("MENU_EQOL_COOLDOWN_PANEL_BLIZZARD_SPEC_VIEW")
-		local className = getPlayerClassName()
-		rootDescription:CreateTitle(getClassColorText(string.format("%s %s", className, _G.SPECIFIC or "Specific")))
-		for _, option in ipairs(Editor:GetClassSpecOptions()) do
-			rootDescription:CreateRadio(option.label, isSpecViewSelected, setSpecView, option.value)
+		local classMenu = rootDescription:CreateButton(CLASS or "Class")
+		classMenu:CreateRadio(ALL_CLASSES or (L["VisibilityAllCooldownPanels"] or "All Cooldown Panels"), isClassViewSelected, setClassView, "ALL")
+		for _, option in ipairs(Editor:GetClassOptions()) do
+			classMenu:CreateRadio(option.label, isClassViewSelected, setClassView, option.value)
 		end
-		rootDescription:CreateRadio(string.format("%s - %s", ALL or "All", className), isSpecViewSelected, setSpecView, "CLASS")
-		rootDescription:CreateDivider()
-		rootDescription:CreateRadio(L["VisibilityAllCooldownPanels"] or "All Cooldown Panels", isSpecViewSelected, setSpecView, "ALL")
-		rootDescription:CreateDivider()
-		local addPanelText = GREEN_FONT_COLOR and GREEN_FONT_COLOR:WrapTextInColorCode(L["Add Panel"] or "Add Panel") or (L["Add Panel"] or "Add Panel")
-		local addPanelIcon = CreateAtlasMarkup and CreateAtlasMarkup("communities-icon-addgroupplus", 16, 16, 0, -1) or "+"
-		rootDescription:CreateButton(addPanelIcon .. " " .. addPanelText, function()
-			Editor:CreatePanelFromDropdown()
-		end)
-		rootDescription:CreateButton(L["CooldownPanelImportPanel"] or "Import Panel", function()
-			Editor:ShowImportPanelPopup()
+
+		local classID = getSelectedClassID()
+		local className = getClassInfoByClassID(classID) or getPlayerClassName()
+		rootDescription:CreateTitle(getClassColorTextByClassID(classID, className))
+		for _, option in ipairs(Editor:GetClassSpecOptions(classID)) do
+			rootDescription:CreateRadio(option.specName or option.label, isSpecViewSelected, function(specID)
+				setClassSpecView(classID, specID)
+			end, option.value)
+		end
+		rootDescription:CreateRadio(ALL_SPECS or string.format("%s %s", ALL or "All", _G.SPECIALIZATIONS or "Specializations"), function()
+			return Editor.state.specView == "CLASS" and tonumber(Editor.state.classView) == tonumber(classID)
+		end, function()
+			setClassSpecView(classID, "CLASS")
 		end)
 	end)
 	if frame.specDropdown.SetDefaultText then frame.specDropdown:SetDefaultText(getSpecViewLabel()) end
@@ -1176,6 +1395,7 @@ function Editor:Open()
 	positionFrameForOpen(frame)
 	frame:Show()
 	if frame.Raise then frame:Raise() end
+	self:SyncSpecViewToCurrentSpec()
 	self:Refresh()
 	return frame
 end

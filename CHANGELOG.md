@@ -9,6 +9,14 @@
 - Resource Bars: Added a Shared Resource Bar visibility matrix for choosing which class, specialization, and Druid form secondary resources are shown, with a quick Edit Mode shortcut on shared bars.
 - Mythic Plus / Teleports: Added the missing Midnight Lightveil teleport item to the teleport compendium.
 
+### 🔄 Changed
+
+- Cooldown Panels: Reworked the panel editor into a Blizzard Cooldown Settings style view with collapsible panels, native-feeling drag and drop, right-click actions, panel import/export actions, and a cleaner class/specialization filter dropdown.
+- Cooldown Panels: Moved Add Panel and Import Panel actions into the editor settings menu so the lower dropdown is used only for class and specialization filtering.
+- Cooldown Panels: Improved the editor portrait and filter behavior so selected specs show their spec icon, class-wide views show the class icon, and open editor windows follow specialization changes unless a class-wide or all-panels view is selected.
+- Cooldown Panels: Improved editor tooltips with entry type and ID details so spells, items, slots, tracked auras, macros, and stance entries are easier to identify while editing.
+- Cooldown Panels: Cleaned up Layout Edit settings organization, labels, and tooltips so panel, entry, bar, and fixed-group options are grouped by purpose instead of internal implementation terms.
+
 ### 🐛 Fixed
 
 - Cooldown Panels: Fixed ready sounds firing when custom activation-duration overlays end instead of waiting for the real tracked cooldown to become ready.
