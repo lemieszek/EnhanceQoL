@@ -14,6 +14,10 @@
 - Cooldown Panels: Added an in-window help tooltip for the new panel editor with guidance for tracked auras.
 - Cooldown Panels: Updated the new panel editor's add-entry tile to use Blizzard's empty cooldown slot artwork.
 - Cooldown Panels: Shortened the Advanced panel marker, expanded its tooltip, and truncates long panel names in the editor overview without changing saved panel names.
+- Cooldown Panels: Added optional per-panel synchronization with Blizzard Cooldown Manager Essential or Utility cooldown lists.
+- Cooldown Panels: Marks synchronized panels directly in the new editor header and shows the linked Cooldown Manager source in the tooltip.
+- Cooldown Panels: Limits automatic Cooldown Manager sync refreshes to the open Blizzard Cooldown Settings window plus explicit login and specialization changes.
+- Cooldown Panels: New panels now enable supported spell aura overlays, charge cooldown swipes, and hidden empty charge counters by default.
 
 ---
 

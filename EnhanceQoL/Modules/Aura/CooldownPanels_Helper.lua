@@ -2647,6 +2647,9 @@ function Helper.CreatePanel(name, defaults)
 	if layout.keybindFontStyle == nil or layout.keybindFontStyle == "" then layout.keybindFontStyle = globalStyle end
 	if layout.cooldownTextStyle == nil or layout.cooldownTextStyle == "" then layout.cooldownTextStyle = globalStyle end
 	if layout.staticTextStyle == nil or layout.staticTextStyle == "" then layout.staticTextStyle = globalStyle end
+	layout.showChargesCooldown = true
+	layout.chargesHideWhenZero = true
+	layout.cdmAuraOverlayEnabled = true
 	layout.fixedGroups = {}
 	return {
 			name = (type(name) == "string" and name ~= "" and name) or L["cooldownPanelDefaultName"],

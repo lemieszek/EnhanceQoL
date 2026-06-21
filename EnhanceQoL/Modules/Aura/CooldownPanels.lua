@@ -11441,6 +11441,16 @@ end
 
 cdp.CDM = cdp.CDM or {}
 
+function cdp.CDM.IsSyncSource(sourceKind)
+	sourceKind = type(sourceKind) == "string" and sourceKind:upper() or nil
+	return sourceKind == "ESSENTIAL" or sourceKind == "UTILITY"
+end
+
+function cdp.CDM.IsSettingsFrameShown()
+	local settings = _G.CooldownViewerSettings
+	return settings and settings.IsShown and settings:IsShown() == true
+end
+
 function cdp.CDM.GetSpellIdsFromDataProvider(sourceKind)
 	local settings = _G.CooldownViewerSettings
 	local dataProvider = settings and settings.GetDataProvider and settings:GetDataProvider() or nil
@@ -11463,18 +11473,45 @@ function cdp.CDM.GetSpellIdsFromDataProvider(sourceKind)
 	return spellIds
 end
 
+function cdp.CDM.GetSpellIdsFromSource(sourceKind)
+	sourceKind = cdp.CDM.IsSyncSource(sourceKind) and sourceKind:upper() or "ESSENTIAL"
+	local spellIds = cdp.CDM.GetSpellIdsFromDataProvider(sourceKind)
+	local sourceLabel = getCooldownManagerSourceLabel(sourceKind)
+	if spellIds then return spellIds, sourceLabel end
+
+	local layoutChildren, fallbackLabel, sourceErr = getCooldownManagerLayoutChildren(sourceKind)
+	sourceLabel = fallbackLabel or sourceLabel
+	if sourceErr then return nil, sourceLabel, sourceErr end
+
+	spellIds = {}
+	local function collect(child)
+		local spellId = getSpellIdFromCooldownManagerChild(child)
+		if spellId then spellIds[#spellIds + 1] = spellId end
+	end
+	if #layoutChildren > 0 then
+		for i = 1, #layoutChildren do
+			collect(layoutChildren[i])
+		end
+	else
+		local numericKeys = {}
+		for key in pairs(layoutChildren) do
+			if type(key) == "number" then numericKeys[#numericKeys + 1] = key end
+		end
+		table.sort(numericKeys)
+		for _, key in ipairs(numericKeys) do
+			collect(layoutChildren[key])
+		end
+	end
+	if #spellIds == 0 then return nil, sourceLabel, "SOURCE_NOT_FOUND" end
+	return spellIds, sourceLabel
+end
+
 local function importCooldownManagerSpells(panelId, sourceKind)
 	panelId = normalizeId(panelId)
 	local panel = CooldownPanels:GetPanel(panelId)
 	if not panel then return nil, "PANEL_NOT_FOUND" end
-	local spellIds = cdp.CDM.GetSpellIdsFromDataProvider(sourceKind)
-	local layoutChildren, sourceLabel, sourceErr
-	if not spellIds then
-		layoutChildren, sourceLabel, sourceErr = getCooldownManagerLayoutChildren(sourceKind)
-		if sourceErr then return nil, sourceErr, sourceLabel end
-	else
-		sourceLabel = getCooldownManagerSourceLabel(sourceKind)
-	end
+	local spellIds, sourceLabel, sourceErr = cdp.CDM.GetSpellIdsFromSource(sourceKind)
+	if sourceErr then return nil, sourceErr, sourceLabel end
 	local root = ensureRoot()
 	if not root then return nil, "NO_DB" end
 	panel.entries = panel.entries or {}
@@ -11519,26 +11556,9 @@ local function importCooldownManagerSpells(panelId, sourceKind)
 	end
 
 	local stats = { added = 0, duplicates = 0, invalid = 0, seen = 0 }
-	if spellIds then
-		for i = 1, #spellIds do
-			stats.seen = stats.seen + 1
-			importChild({ spellID = spellIds[i] }, stats)
-		end
-	elseif #layoutChildren > 0 then
-		for i = 1, #layoutChildren do
-			stats.seen = stats.seen + 1
-			importChild(layoutChildren[i], stats)
-		end
-	else
-		local numericKeys = {}
-		for key in pairs(layoutChildren) do
-			if type(key) == "number" then numericKeys[#numericKeys + 1] = key end
-		end
-		table.sort(numericKeys)
-		for _, key in ipairs(numericKeys) do
-			stats.seen = stats.seen + 1
-			importChild(layoutChildren[key], stats)
-		end
+	for i = 1, #spellIds do
+		stats.seen = stats.seen + 1
+		importChild({ spellID = spellIds[i] }, stats)
 	end
 
 	if stats.added > 0 then
@@ -11548,6 +11568,160 @@ local function importCooldownManagerSpells(panelId, sourceKind)
 	end
 	stats.sourceLabel = sourceLabel
 	return stats
+end
+
+function CooldownPanels:GetCooldownManagerSourceLabel(sourceKind)
+	return getCooldownManagerSourceLabel(sourceKind)
+end
+
+function CooldownPanels:GetPanelCooldownManagerSyncSource(panelId)
+	local panel = self:GetPanel(panelId)
+	local sourceKind = type(panel and panel.cdmSyncSource) == "string" and panel.cdmSyncSource:upper() or nil
+	return cdp.CDM.IsSyncSource(sourceKind) and sourceKind or nil
+end
+
+function CooldownPanels:SetPanelCooldownManagerSyncSource(panelId, sourceKind)
+	panelId = normalizeId(panelId)
+	local panel = self:GetPanel(panelId)
+	if not panel then return false end
+	sourceKind = cdp.CDM.IsSyncSource(sourceKind) and sourceKind:upper() or nil
+	if panel.cdmSyncSource == sourceKind then return false end
+	panel.cdmSyncSource = sourceKind
+	if sourceKind then
+		self:EnsureCooldownManagerSyncListener()
+		self:SyncPanelWithCooldownManager(panelId, sourceKind)
+	end
+	if self.BlizzardEditor and self.BlizzardEditor.RefreshPanel then self.BlizzardEditor:RefreshPanel(panelId) end
+	return true
+end
+
+function CooldownPanels:SyncPanelWithCooldownManager(panelId, sourceKind)
+	panelId = normalizeId(panelId)
+	sourceKind = cdp.CDM.IsSyncSource(sourceKind) and sourceKind:upper() or nil
+	local panel = panelId and self:GetPanel(panelId) or nil
+	if not (panel and sourceKind) then return nil, "PANEL_NOT_FOUND" end
+	local spellIds, sourceLabel, sourceErr = cdp.CDM.GetSpellIdsFromSource(sourceKind)
+	if sourceErr then return nil, sourceErr, sourceLabel end
+	local root = ensureRoot()
+	if not root then return nil, "NO_DB", sourceLabel end
+	panel.entries = panel.entries or {}
+	panel.order = panel.order or {}
+
+	local wantedBySpellId = {}
+	local wantedOrder = {}
+	local stats = { added = 0, removed = 0, invalid = 0, seen = 0, sourceLabel = sourceLabel }
+	for i = 1, #spellIds do
+		stats.seen = stats.seen + 1
+		local spellId = tonumber(spellIds[i])
+		local baseSpellId = spellId and (getBaseSpellId(spellId) or spellId) or nil
+		if not (baseSpellId and spellExistsSafe(baseSpellId)) then
+			stats.invalid = stats.invalid + 1
+		else
+			local resolvedSpellId = self:NormalizePersistentSpellID(spellId, { allowTalentChoiceCanonical = true }) or baseSpellId
+			local canonicalSpellID = self:NormalizePersistentSpellID(resolvedSpellId, { allowTalentChoiceCanonical = true }) or resolvedSpellId
+			if not wantedBySpellId[canonicalSpellID] then
+				wantedBySpellId[canonicalSpellID] = resolvedSpellId
+				wantedOrder[#wantedOrder + 1] = canonicalSpellID
+			end
+		end
+	end
+
+	local existingBySpellId = {}
+	local otherOrder = {}
+	local runtime = self.runtime
+	for _, entryId in ipairs(panel.order) do
+		local entry = panel.entries[entryId]
+		if entry and entry.type == "SPELL" and entry.spellID then
+			local canonicalSpellID = self:NormalizePersistentSpellID(entry.spellID, { allowTalentChoiceCanonical = true }) or tonumber(entry.spellID)
+			if canonicalSpellID then existingBySpellId[canonicalSpellID] = entryId end
+		elseif entry then
+			otherOrder[#otherOrder + 1] = entryId
+		end
+	end
+	for entryId, entry in pairs(panel.entries) do
+		if entry and entry.type == "SPELL" and entry.spellID then
+			local canonicalSpellID = self:NormalizePersistentSpellID(entry.spellID, { allowTalentChoiceCanonical = true }) or tonumber(entry.spellID)
+			if canonicalSpellID and not wantedBySpellId[canonicalSpellID] then
+				panel.entries[entryId] = nil
+				if runtime and runtime.actionDisplayCounts then runtime.actionDisplayCounts[Helper.GetEntryKey(panelId, entryId)] = nil end
+				self:ClearEntryCustomCooldownDuration(panelId, entryId, true)
+				stats.removed = stats.removed + 1
+			end
+		end
+	end
+	for _, canonicalSpellID in ipairs(wantedOrder) do
+		if not existingBySpellId[canonicalSpellID] then
+			if self:GetFixedEntryAddError(panel, nil) then
+				stats.invalid = stats.invalid + 1
+			else
+				local entryId = Helper.GetNextNumericId(panel.entries)
+				local entry = Helper.CreateEntry("SPELL", wantedBySpellId[canonicalSpellID], root.defaults)
+				entry.id = entryId
+				panel.entries[entryId] = entry
+				existingBySpellId[canonicalSpellID] = entryId
+				stats.added = stats.added + 1
+			end
+		end
+	end
+
+	local nextOrder = {}
+	for _, canonicalSpellID in ipairs(wantedOrder) do
+		local entryId = existingBySpellId[canonicalSpellID]
+		if entryId and panel.entries[entryId] then nextOrder[#nextOrder + 1] = entryId end
+	end
+	for _, entryId in ipairs(otherOrder) do
+		if panel.entries[entryId] then nextOrder[#nextOrder + 1] = entryId end
+	end
+	panel.order = nextOrder
+	Helper.SyncOrder(panel.order, panel.entries)
+	Helper.InvalidateFixedLayoutCache(panel)
+	if stats.added > 0 or stats.removed > 0 then self:RebuildSpellIndex() end
+	self:RefreshPanel(panelId)
+	if self.BlizzardEditor and self.BlizzardEditor.RefreshPanel then self.BlizzardEditor:RefreshPanel(panelId) end
+	return stats
+end
+
+function CooldownPanels:SyncCooldownManagerPanels(reason)
+	local root = ensureRoot()
+	if not (root and root.panels) then return false end
+	local synced = false
+	for panelId, panel in pairs(root.panels) do
+		local sourceKind = type(panel and panel.cdmSyncSource) == "string" and panel.cdmSyncSource:upper() or nil
+		if cdp.CDM.IsSyncSource(sourceKind) then
+			self:SyncPanelWithCooldownManager(panelId, sourceKind)
+			synced = true
+		end
+	end
+	return synced
+end
+
+function CooldownPanels:RequestCooldownManagerSync(reason)
+	self.runtime = self.runtime or {}
+	local runtime = self.runtime
+	if runtime.cdmSyncPending then return end
+	runtime.cdmSyncPending = true
+	local function run()
+		runtime.cdmSyncPending = nil
+		CooldownPanels:SyncCooldownManagerPanels(reason)
+	end
+	if C_Timer and C_Timer.After then
+		C_Timer.After(0.2, run)
+	else
+		run()
+	end
+end
+
+function CooldownPanels:EnsureCooldownManagerSyncListener()
+	self.runtime = self.runtime or {}
+	local runtime = self.runtime
+	if runtime.cdmSyncListenerRegistered then return end
+	if EventRegistry and EventRegistry.RegisterCallback then
+		EventRegistry:RegisterCallback("CooldownViewerSettings.OnDataChanged", function()
+			if not cdp.CDM.IsSettingsFrameShown() then return end
+			CooldownPanels:RequestCooldownManagerSync("CooldownViewerSettings.OnDataChanged")
+		end, self)
+		runtime.cdmSyncListenerRegistered = true
+	end
 end
 
 local function showImportCDMMenu(owner, panelId)
@@ -26341,6 +26515,7 @@ function CooldownPanels.EnsureUpdateFrame()
 		if event == "PLAYER_LOGIN" then
 			CooldownPanels.runtime = CooldownPanels.runtime or {}
 			CooldownPanels.runtime.cdmAuraQuickSetupLoginReady = true
+			CooldownPanels:EnsureCooldownManagerSyncListener()
 			local anchorHelper = CooldownPanels.AnchorHelper
 			if anchorHelper and anchorHelper.HandlePlayerLogin then anchorHelper:HandlePlayerLogin() end
 			CooldownPanels:InvalidateTalentChoiceSpellVariantGroups()
@@ -26349,6 +26524,7 @@ function CooldownPanels.EnsureUpdateFrame()
 			Keybinds.RequestRefresh("Event:PLAYER_LOGIN", false)
 			if CooldownPanels.refreshAssistedHighlightCVarState then CooldownPanels.refreshAssistedHighlightCVarState("Event:PLAYER_LOGIN", true) end
 			refreshPanelsForCharges()
+			CooldownPanels:RequestCooldownManagerSync("Event:PLAYER_LOGIN")
 			scheduleSpecAwareRebuild(event, false)
 			return
 		end
@@ -26538,6 +26714,7 @@ function CooldownPanels.EnsureUpdateFrame()
 			if unit and unit ~= "player" then return end
 			CooldownPanels:InvalidateTalentChoiceSpellVariantGroups()
 			CooldownPanels:InvalidateSpellQueryCaches()
+			CooldownPanels:RequestCooldownManagerSync("Event:" .. event)
 			scheduleSpecAwareRebuild(event, true)
 			return
 		end
@@ -26545,6 +26722,7 @@ function CooldownPanels.EnsureUpdateFrame()
 			CooldownPanels:InvalidateTalentChoiceSpellVariantGroups()
 			CooldownPanels:InvalidateSpellQueryCaches()
 			if CooldownPanels.runtime then CooldownPanels.runtime.iconCache = nil end
+			if event == "ACTIVE_PLAYER_SPECIALIZATION_CHANGED" then CooldownPanels:RequestCooldownManagerSync("Event:" .. event) end
 			scheduleSpecAwareRebuild(event, true)
 			return
 		end
