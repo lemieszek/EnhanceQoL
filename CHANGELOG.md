@@ -2,6 +2,14 @@
 
 <!--@eqol-beta@-->
 
+## [11.4.0-beta9] - 2026-06-21
+
+### 🔄 Changed
+
+- Cooldown Panels: Added Enable and Disable actions to the new panel editor context menu and visibly marks disabled panels with a muted header, Disabled label, and dimmed entries.
+
+---
+
 ## [11.4.0-beta8] - 2026-06-20
 
 ### ✨ Added

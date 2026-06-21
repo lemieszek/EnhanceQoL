@@ -345,6 +345,14 @@ local function setFrameText(frame, text)
 	end
 end
 
+local function setRegionAlpha(region, alpha)
+	if region and region.SetAlpha then region:SetAlpha(alpha) end
+end
+
+local function setTextureDesaturated(texture, desaturated)
+	if texture and texture.SetDesaturated then texture:SetDesaturated(desaturated == true) end
+end
+
 local function getCurrentSpecIcon()
 	if GetSpecialization and GetSpecializationInfo then
 		local specIndex = GetSpecialization()
@@ -1008,6 +1016,14 @@ function Editor:CreateCategory(parent)
 	if category.advancedLabel.SetMaxLines then category.advancedLabel:SetMaxLines(1) end
 	if category.advancedLabel.SetWordWrap then category.advancedLabel:SetWordWrap(false) end
 	category.advancedLabel:Hide()
+	category.disabledLabel = category.header:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	category.disabledLabel:SetPoint("CENTER", category.header, "CENTER", 0, 0)
+	category.disabledLabel:SetWidth(130)
+	category.disabledLabel:SetJustifyH("CENTER")
+	category.disabledLabel:SetText(_G.DISABLED or "Disabled")
+	if category.disabledLabel.SetMaxLines then category.disabledLabel:SetMaxLines(1) end
+	if category.disabledLabel.SetWordWrap then category.disabledLabel:SetWordWrap(false) end
+	category.disabledLabel:Hide()
 	category.header:SetScript("OnReceiveDrag", function(selfHeader)
 		local panelId = selfHeader:GetParent().panelId
 		if not Editor:HandleExternalDrop(panelId) then
@@ -1058,8 +1074,17 @@ function Editor:LayoutCategory(category, panelId, panel, yOffset, filterText)
 	elseif category.header.Name then
 		category.header.Name:SetText(title)
 	end
+	local isDisabled = panel.enabled == false
+	local disabledColor = _G.DISABLED_FONT_COLOR or _G.GRAY_FONT_COLOR or NORMAL_FONT_COLOR
+	if category.header.SetTitleColor then
+		category.header:SetTitleColor(false, isDisabled and disabledColor or NORMAL_FONT_COLOR)
+		category.header:SetTitleColor(true, isDisabled and disabledColor or NORMAL_FONT_COLOR)
+	elseif category.header.Name and category.header.Name.SetTextColor then
+		local color = isDisabled and disabledColor or NORMAL_FONT_COLOR
+		category.header.Name:SetTextColor(color:GetRGB())
+	end
 	if category.advancedLabel then
-		local showAdvancedLabel = isFixedLayoutPanel(panel)
+		local showAdvancedLabel = not isDisabled and isFixedLayoutPanel(panel)
 		category.advancedLabel:SetText(string.format("%s %s", L["settingsCategoryModeAdvanced"] or "Advanced", _G.PANEL or "Panel"))
 		if showAdvancedLabel then
 			category.advancedLabel:Show()
@@ -1067,6 +1092,7 @@ function Editor:LayoutCategory(category, panelId, panel, yOffset, filterText)
 			category.advancedLabel:Hide()
 		end
 	end
+	if category.disabledLabel then category.disabledLabel:SetShown(isDisabled) end
 
 	local collapsed = self.state.collapsed[panelId] == true
 	if category.header.UpdateCollapsedState then category.header:UpdateCollapsedState(collapsed) end
@@ -1118,10 +1144,13 @@ function Editor:LayoutCategory(category, panelId, panel, yOffset, filterText)
 			tile.panelId = panelId
 			tile.entryId = data.id
 			tile.icon:SetTexture(getEntryIcon(data.entry))
+			setTextureDesaturated(tile.icon, isDisabled)
+			tile:SetAlpha(isDisabled and 0.45 or 1)
 			if tile.Bar and tile.Bar.Name then
 				tile.Bar.Name:SetText(getEntryName(data.entry))
+				setRegionAlpha(tile.Bar.Name, isDisabled and 0.65 or 1)
 				if tile.Bar.FillTexture then
-					tile.Bar.FillTexture:SetAlpha(1)
+					tile.Bar.FillTexture:SetAlpha(isDisabled and 0.35 or 1)
 					if _G.COOLDOWN_BAR_DEFAULT_COLOR then tile.Bar.FillTexture:SetVertexColor(_G.COOLDOWN_BAR_DEFAULT_COLOR:GetRGB()) end
 				end
 			end
@@ -1138,6 +1167,8 @@ function Editor:LayoutCategory(category, panelId, panel, yOffset, filterText)
 		addTile.entryId = nil
 		addTile:SetPoint("TOPLEFT", category.container, "TOPLEFT", cursorX + gridColumn * (self.TILE_SIZE + self.TILE_SPACING), -cursorY)
 		addTile.icon:SetAtlas("communities-icon-addgroupplus", true)
+		setTextureDesaturated(addTile.icon, isDisabled)
+		addTile:SetAlpha(isDisabled and 0.35 or 1)
 		if addTile.AlertTypesOverlay then addTile.AlertTypesOverlay:Hide() end
 		addTile:Show()
 		maxBottom = math.max(maxBottom, cursorY + self.TILE_SIZE)
@@ -1203,6 +1234,17 @@ function Editor:ShowPanelMenu(owner, panelId)
 	Api.MenuUtil.CreateContextMenu(owner, function(_, rootDescription)
 		rootDescription:SetTag("MENU_EQOL_COOLDOWN_PANEL_BLIZZARD_PANEL")
 		rootDescription:CreateTitle(panel and panel.name or (L["CooldownPanelNewPanel"] or "New Panel"))
+		local isEnabled = not (panel and panel.enabled == false)
+		rootDescription:CreateButton(isEnabled and (_G.DISABLE or "Disable") or (_G.ENABLE or "Enable"), function()
+			if CooldownPanels.SetPanelEditorEnabled then
+				CooldownPanels:SetPanelEditorEnabled(panelId, not isEnabled)
+			else
+				local currentPanel = getPanel(panelId)
+				if currentPanel then currentPanel.enabled = not isEnabled end
+			end
+			Editor:Refresh()
+		end)
+		rootDescription:CreateDivider()
 		rootDescription:CreateButton(EDIT or (L["CooldownPanelPanelName"] or "Panel name"), function()
 			if CooldownPanels.OpenBlizzardEditorPanelSettings then CooldownPanels:OpenBlizzardEditorPanelSettings(panelId, owner) end
 		end)
