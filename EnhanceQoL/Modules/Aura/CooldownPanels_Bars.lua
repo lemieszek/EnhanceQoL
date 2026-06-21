@@ -5151,10 +5151,28 @@ local function appendBarStandaloneAppearanceSettings(settings, ctx)
 	local SettingType = ctx.SettingType
 
 	settings[#settings + 1] = {
-		name = L["CooldownPanelBars"] or "Bars",
+		name = L["Display"] or "Display",
 		kind = SettingType.Collapsible,
 		id = "eqolCooldownPanelStandaloneBar",
 		defaultCollapsed = false,
+	}
+	settings[#settings + 1] = {
+		name = L["Layout"] or "Layout",
+		kind = SettingType.Collapsible,
+		id = "eqolCooldownPanelStandaloneBarLayout",
+		defaultCollapsed = true,
+	}
+	settings[#settings + 1] = {
+		name = L["Icon"] or "Icon",
+		kind = SettingType.Collapsible,
+		id = "eqolCooldownPanelStandaloneBarIcon",
+		defaultCollapsed = true,
+	}
+	settings[#settings + 1] = {
+		name = L["CooldownPanelFillHeader"] or "Fill",
+		kind = SettingType.Collapsible,
+		id = "eqolCooldownPanelStandaloneBarFill",
+		defaultCollapsed = true,
 	}
 	settings[#settings + 1] = {
 		name = L["Mode"] or "Mode",
@@ -5186,7 +5204,7 @@ local function appendBarStandaloneAppearanceSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["Bar width"] or "Bar width",
 		kind = SettingType.Slider,
-		parentId = "eqolCooldownPanelStandaloneBar",
+		parentId = "eqolCooldownPanelStandaloneBarLayout",
 		minValue = BAR_WIDTH_MIN,
 		maxValue = BAR_WIDTH_MAX,
 		valueStep = 1,
@@ -5207,7 +5225,7 @@ local function appendBarStandaloneAppearanceSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["Bar height"] or "Bar height",
 		kind = SettingType.Slider,
-		parentId = "eqolCooldownPanelStandaloneBar",
+		parentId = "eqolCooldownPanelStandaloneBarLayout",
 		minValue = BAR_HEIGHT_MIN,
 		maxValue = BAR_HEIGHT_MAX,
 		valueStep = 1,
@@ -5222,7 +5240,7 @@ local function appendBarStandaloneAppearanceSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["CooldownPanelBarOrientation"] or "Bar orientation",
 		kind = SettingType.Dropdown,
-		parentId = "eqolCooldownPanelStandaloneBar",
+		parentId = "eqolCooldownPanelStandaloneBarLayout",
 		height = 120,
 		get = function()
 			local currentEntry = getStandaloneBarContextEntry(ctx)
@@ -5244,7 +5262,7 @@ local function appendBarStandaloneAppearanceSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["CooldownPanelBarOffsetX"] or "Bar X",
 		kind = SettingType.Slider,
-		parentId = "eqolCooldownPanelStandaloneBar",
+		parentId = "eqolCooldownPanelStandaloneBarLayout",
 		minValue = BAR_OFFSET_MIN,
 		maxValue = BAR_OFFSET_MAX,
 		valueStep = 1,
@@ -5259,7 +5277,7 @@ local function appendBarStandaloneAppearanceSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["CooldownPanelBarOffsetY"] or "Bar Y",
 		kind = SettingType.Slider,
-		parentId = "eqolCooldownPanelStandaloneBar",
+		parentId = "eqolCooldownPanelStandaloneBarLayout",
 		minValue = BAR_OFFSET_MIN,
 		maxValue = BAR_OFFSET_MAX,
 		valueStep = 1,
@@ -5274,7 +5292,7 @@ local function appendBarStandaloneAppearanceSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["Bar texture"] or "Bar texture",
 		kind = SettingType.Dropdown,
-		parentId = "eqolCooldownPanelStandaloneBar",
+		parentId = "eqolCooldownPanelStandaloneBarFill",
 		height = BAR_TEXTURE_MENU_HEIGHT,
 		get = function()
 			local currentEntry = getStandaloneBarContextEntry(ctx)
@@ -5293,7 +5311,7 @@ local function appendBarStandaloneAppearanceSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["Bar color"] or "Bar color",
 		kind = SettingType.Color,
-		parentId = "eqolCooldownPanelStandaloneBar",
+		parentId = "eqolCooldownPanelStandaloneBarFill",
 		hasOpacity = true,
 		get = function()
 			local currentEntry = getStandaloneBarContextEntry(ctx)
@@ -5309,7 +5327,7 @@ local function appendBarStandaloneAppearanceSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["CooldownPanelBarProcGlowColor"] or "Proc glow color",
 		kind = SettingType.Color,
-		parentId = "eqolCooldownPanelStandaloneBar",
+		parentId = "eqolCooldownPanelStandaloneBarFill",
 		hasOpacity = true,
 		get = function()
 			local currentEntry = getStandaloneBarContextEntry(ctx)
@@ -5321,7 +5339,7 @@ local function appendBarStandaloneAppearanceSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["Background color"] or "Background color",
 		kind = SettingType.Color,
-		parentId = "eqolCooldownPanelStandaloneBar",
+		parentId = "eqolCooldownPanelStandaloneBarFill",
 		hasOpacity = true,
 		get = function()
 			local currentEntry = getStandaloneBarContextEntry(ctx)
@@ -5345,7 +5363,8 @@ local function appendBarStandaloneAppearanceSettings(settings, ctx)
 		set = function(_, value) setEntryBarBoolean(panelId, entryId, "barChargesSegmented", value) end,
 	}
 	settings[#settings + 1] = {
-		name = L["Separated offset"] or L["CooldownPanelBarChargesGap"] or "Separated offset",
+		name = L["CooldownPanelSegmentSpacing"] or "Segment spacing",
+		tooltip = L["CooldownPanelSegmentSpacingTooltip"],
 		kind = SettingType.Slider,
 		parentId = "eqolCooldownPanelStandaloneBarCharges",
 		minValue = BAR_CHARGES_GAP_MIN,
@@ -5472,6 +5491,17 @@ Bars.AppendBarStandaloneDetailHeaders = function(settings, ctx)
 		id = "eqolCooldownPanelStandaloneBarLabel",
 		defaultCollapsed = true,
 	}
+	settings[#settings + 1] = {
+		name = L["CooldownPanelValueTextHeader"] or "Value Text",
+		tooltip = L["CooldownPanelValueTextHeaderTooltip"],
+		kind = SettingType.Collapsible,
+		id = "eqolCooldownPanelStandaloneBarValueText",
+		defaultCollapsed = true,
+		isShown = function()
+			local currentEntry = getStandaloneBarContextEntry(ctx)
+			return Bars.ShouldShowBarValueTextSettings(currentEntry)
+		end,
+	}
 end
 
 Bars.AppendBarStandaloneBorderSettings = function(settings, ctx)
@@ -5586,7 +5616,7 @@ local function appendBarStandaloneTextSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["Show icon"] or "Show icon",
 		kind = SettingType.Checkbox,
-		parentId = "eqolCooldownPanelStandaloneBar",
+		parentId = "eqolCooldownPanelStandaloneBarIcon",
 		get = function()
 			local currentEntry = getStandaloneBarContextEntry(ctx)
 			return getStoredBoolean(currentEntry, "barShowIcon", Bars.DEFAULTS.barShowIcon)
@@ -5596,7 +5626,7 @@ local function appendBarStandaloneTextSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["Icon size"] or (L["Icon size"] or "Icon size"),
 		kind = SettingType.Slider,
-		parentId = "eqolCooldownPanelStandaloneBar",
+		parentId = "eqolCooldownPanelStandaloneBarIcon",
 		minValue = BAR_ICON_SIZE_MIN,
 		maxValue = BAR_ICON_SIZE_MAX,
 		valueStep = 1,
@@ -5617,7 +5647,7 @@ local function appendBarStandaloneTextSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["CooldownPanelBarIconPosition"] or "Icon position",
 		kind = SettingType.Dropdown,
-		parentId = "eqolCooldownPanelStandaloneBar",
+		parentId = "eqolCooldownPanelStandaloneBarIcon",
 		height = 120,
 		disabled = function()
 			local currentEntry = getStandaloneBarContextEntry(ctx)
@@ -5645,7 +5675,7 @@ local function appendBarStandaloneTextSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["Icon X"] or "Icon X",
 		kind = SettingType.Slider,
-		parentId = "eqolCooldownPanelStandaloneBar",
+		parentId = "eqolCooldownPanelStandaloneBarIcon",
 		minValue = -(Helper.OFFSET_RANGE or 500),
 		maxValue = Helper.OFFSET_RANGE or 500,
 		valueStep = 1,
@@ -5664,7 +5694,7 @@ local function appendBarStandaloneTextSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["Icon Y"] or "Icon Y",
 		kind = SettingType.Slider,
-		parentId = "eqolCooldownPanelStandaloneBar",
+		parentId = "eqolCooldownPanelStandaloneBarIcon",
 		minValue = -(Helper.OFFSET_RANGE or 500),
 		maxValue = Helper.OFFSET_RANGE or 500,
 		valueStep = 1,
@@ -5936,7 +5966,8 @@ local function appendBarStandaloneTextSettings(settings, ctx)
 		set = function(_, value) setEntryBarBoolean(panelId, entryId, "barStacksSegmented", value) end,
 	}
 	settings[#settings + 1] = {
-		name = L["Separated offset"] or "Separated offset",
+		name = L["CooldownPanelSegmentSpacing"] or "Segment spacing",
+		tooltip = L["CooldownPanelSegmentSpacingTooltip"],
 		kind = SettingType.Slider,
 		parentId = "eqolCooldownPanelStandaloneBarStacks",
 		minValue = BAR_CHARGES_GAP_MIN,
@@ -6118,7 +6149,7 @@ local function appendBarStandaloneTextSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["CooldownPanelBarValueAnchor"] or "Value anchor",
 		kind = SettingType.Dropdown,
-		parentId = "eqolCooldownPanelStandaloneBarCharges",
+		parentId = "eqolCooldownPanelStandaloneBarValueText",
 		height = 160,
 		isShown = function()
 			local currentEntry = getStandaloneBarContextEntry(ctx)
@@ -6145,7 +6176,7 @@ local function appendBarStandaloneTextSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["CooldownPanelBarValueAnchor"] or "Value anchor",
 		kind = SettingType.Dropdown,
-		parentId = "eqolCooldownPanelStandaloneBarCooldown",
+		parentId = "eqolCooldownPanelStandaloneBarValueText",
 		height = 160,
 		isShown = function()
 			local currentEntry = getStandaloneBarContextEntry(ctx)
@@ -6172,7 +6203,7 @@ local function appendBarStandaloneTextSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["CooldownPanelBarValueOffsetX"] or "Value X",
 		kind = SettingType.Slider,
-		parentId = "eqolCooldownPanelStandaloneBarCharges",
+		parentId = "eqolCooldownPanelStandaloneBarValueText",
 		minValue = BAR_OFFSET_MIN,
 		maxValue = BAR_OFFSET_MAX,
 		valueStep = 1,
@@ -6195,7 +6226,7 @@ local function appendBarStandaloneTextSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["CooldownPanelBarValueOffsetX"] or "Value X",
 		kind = SettingType.Slider,
-		parentId = "eqolCooldownPanelStandaloneBarCooldown",
+		parentId = "eqolCooldownPanelStandaloneBarValueText",
 		minValue = BAR_OFFSET_MIN,
 		maxValue = BAR_OFFSET_MAX,
 		valueStep = 1,
@@ -6218,7 +6249,7 @@ local function appendBarStandaloneTextSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["CooldownPanelBarValueOffsetY"] or "Value Y",
 		kind = SettingType.Slider,
-		parentId = "eqolCooldownPanelStandaloneBarCharges",
+		parentId = "eqolCooldownPanelStandaloneBarValueText",
 		minValue = BAR_OFFSET_MIN,
 		maxValue = BAR_OFFSET_MAX,
 		valueStep = 1,
@@ -6241,7 +6272,7 @@ local function appendBarStandaloneTextSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["CooldownPanelBarValueOffsetY"] or "Value Y",
 		kind = SettingType.Slider,
-		parentId = "eqolCooldownPanelStandaloneBarCooldown",
+		parentId = "eqolCooldownPanelStandaloneBarValueText",
 		minValue = BAR_OFFSET_MIN,
 		maxValue = BAR_OFFSET_MAX,
 		valueStep = 1,
@@ -6345,7 +6376,7 @@ local function appendBarStandaloneTextSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["CooldownPanelBarValueFont"] or "Value font",
 		kind = SettingType.Dropdown,
-		parentId = "eqolCooldownPanelStandaloneBarCharges",
+		parentId = "eqolCooldownPanelStandaloneBarValueText",
 		height = 220,
 		isShown = function()
 			local currentEntry = getStandaloneBarContextEntry(ctx)
@@ -6372,7 +6403,7 @@ local function appendBarStandaloneTextSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["CooldownPanelBarValueFont"] or "Value font",
 		kind = SettingType.Dropdown,
-		parentId = "eqolCooldownPanelStandaloneBarCooldown",
+		parentId = "eqolCooldownPanelStandaloneBarValueText",
 		height = 220,
 		isShown = function()
 			local currentEntry = getStandaloneBarContextEntry(ctx)
@@ -6399,7 +6430,7 @@ local function appendBarStandaloneTextSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["CooldownPanelBarValueStyle"] or "Value style",
 		kind = SettingType.Dropdown,
-		parentId = "eqolCooldownPanelStandaloneBarCharges",
+		parentId = "eqolCooldownPanelStandaloneBarValueText",
 		height = 120,
 		isShown = function()
 			local currentEntry = getStandaloneBarContextEntry(ctx)
@@ -6426,7 +6457,7 @@ local function appendBarStandaloneTextSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["CooldownPanelBarValueStyle"] or "Value style",
 		kind = SettingType.Dropdown,
-		parentId = "eqolCooldownPanelStandaloneBarCooldown",
+		parentId = "eqolCooldownPanelStandaloneBarValueText",
 		height = 120,
 		isShown = function()
 			local currentEntry = getStandaloneBarContextEntry(ctx)
@@ -6453,7 +6484,7 @@ local function appendBarStandaloneTextSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["CooldownPanelBarValueSize"] or "Value size",
 		kind = SettingType.Slider,
-		parentId = "eqolCooldownPanelStandaloneBarCharges",
+		parentId = "eqolCooldownPanelStandaloneBarValueText",
 		minValue = BAR_FONT_SIZE_MIN,
 		maxValue = BAR_FONT_SIZE_MAX,
 		valueStep = 1,
@@ -6476,7 +6507,7 @@ local function appendBarStandaloneTextSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["CooldownPanelBarValueSize"] or "Value size",
 		kind = SettingType.Slider,
-		parentId = "eqolCooldownPanelStandaloneBarCooldown",
+		parentId = "eqolCooldownPanelStandaloneBarValueText",
 		minValue = BAR_FONT_SIZE_MIN,
 		maxValue = BAR_FONT_SIZE_MAX,
 		valueStep = 1,
@@ -6499,7 +6530,7 @@ local function appendBarStandaloneTextSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["CooldownPanelBarValueColor"] or "Value color",
 		kind = SettingType.Color,
-		parentId = "eqolCooldownPanelStandaloneBarCharges",
+		parentId = "eqolCooldownPanelStandaloneBarValueText",
 		hasOpacity = true,
 		isShown = function()
 			local currentEntry = getStandaloneBarContextEntry(ctx)
@@ -6519,7 +6550,7 @@ local function appendBarStandaloneTextSettings(settings, ctx)
 	settings[#settings + 1] = {
 		name = L["CooldownPanelBarValueColor"] or "Value color",
 		kind = SettingType.Color,
-		parentId = "eqolCooldownPanelStandaloneBarCooldown",
+		parentId = "eqolCooldownPanelStandaloneBarValueText",
 		hasOpacity = true,
 		isShown = function()
 			local currentEntry = getStandaloneBarContextEntry(ctx)
@@ -6663,28 +6694,25 @@ Bars.BuildBarStandaloneSettings = function(panelId, entryId)
 	appendBarStandaloneTextSettings(textSettings, ctx)
 	appendBarStandaloneVisibilitySettings(visibilitySettings, ctx)
 
-	Bars.AppendStandaloneSettingsById(settings, appearanceSettings, "eqolCooldownPanelStandaloneBar")
-	Bars.AppendStandaloneSettingsByParent(settings, appearanceSettings, "eqolCooldownPanelStandaloneBar")
-	Bars.AppendStandaloneSettingsByParent(settings, textSettings, "eqolCooldownPanelStandaloneBar")
-
-	Bars.AppendStandaloneSettingsById(settings, borderSettings, "eqolCooldownPanelStandaloneBarBorder")
-	Bars.AppendStandaloneSettingsByParent(settings, borderSettings, "eqolCooldownPanelStandaloneBarBorder")
-
-	Bars.AppendStandaloneSettingsById(settings, detailSettings, "eqolCooldownPanelStandaloneBarCharges")
-	Bars.AppendStandaloneSettingsByParent(settings, appearanceSettings, "eqolCooldownPanelStandaloneBarCharges")
-	Bars.AppendStandaloneSettingsByParent(settings, textSettings, "eqolCooldownPanelStandaloneBarCharges")
-
-	Bars.AppendStandaloneSettingsById(settings, detailSettings, "eqolCooldownPanelStandaloneBarCooldown")
-	Bars.AppendStandaloneSettingsByParent(settings, textSettings, "eqolCooldownPanelStandaloneBarCooldown")
-
-	Bars.AppendStandaloneSettingsById(settings, detailSettings, Bars.STANDALONE_STACKS_SECTION_ID)
-	Bars.AppendStandaloneSettingsByParent(settings, textSettings, Bars.STANDALONE_STACKS_SECTION_ID)
-
-	Bars.AppendStandaloneSettingsById(settings, detailSettings, "eqolCooldownPanelStandaloneBarLabel")
-	Bars.AppendStandaloneSettingsByParent(settings, textSettings, "eqolCooldownPanelStandaloneBarLabel")
-
-	for _, setting in ipairs(visibilitySettings) do
-		settings[#settings + 1] = setting
+	for _, collection in ipairs({ appearanceSettings, borderSettings, detailSettings, textSettings, visibilitySettings }) do
+		for _, setting in ipairs(collection) do
+			settings[#settings + 1] = setting
+		end
+	end
+	if CooldownPanels.NormalizeStandaloneSettingsOrder then
+		settings = CooldownPanels:NormalizeStandaloneSettingsOrder(settings, {
+			"eqolCooldownPanelStandaloneBar",
+			"eqolCooldownPanelStandaloneBarLayout",
+			"eqolCooldownPanelStandaloneBarIcon",
+			"eqolCooldownPanelStandaloneBarFill",
+			"eqolCooldownPanelStandaloneBarBorder",
+			"eqolCooldownPanelStandaloneBarVisibility",
+			"eqolCooldownPanelStandaloneBarCooldown",
+			"eqolCooldownPanelStandaloneBarCharges",
+			Bars.STANDALONE_STACKS_SECTION_ID,
+			"eqolCooldownPanelStandaloneBarValueText",
+			"eqolCooldownPanelStandaloneBarLabel",
+		})
 	end
 	return settings
 end

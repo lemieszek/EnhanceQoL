@@ -998,6 +998,7 @@ function Editor:ShowEntryMenu(owner, panelId, entryId)
 		rootDescription:CreateButton(EDIT or (L["CooldownPanelEntry"] or "Entry"), function()
 			if CooldownPanels.OpenBlizzardEditorEntrySettings then CooldownPanels:OpenBlizzardEditorEntrySettings(panelId, entryId, owner) end
 		end)
+		rootDescription:CreateDivider()
 		rootDescription:CreateButton(REMOVE or DELETE or (L["CooldownPanelRemoveEntry"] or "Remove entry"), function()
 			if CooldownPanels.RemoveEntry then CooldownPanels:RemoveEntry(panelId, entryId) end
 			Editor:Refresh()
@@ -1014,9 +1015,17 @@ function Editor:ShowPanelMenu(owner, panelId)
 		rootDescription:CreateButton(EDIT or (L["CooldownPanelPanelName"] or "Panel name"), function()
 			if CooldownPanels.OpenBlizzardEditorPanelSettings then CooldownPanels:OpenBlizzardEditorPanelSettings(panelId, owner) end
 		end)
+		rootDescription:CreateButton(L["CooldownPanelDuplicate"] or "Duplicate", function()
+			local duplicatedPanelId = CooldownPanels.DuplicatePanel and CooldownPanels:DuplicatePanel(panelId) or nil
+			if duplicatedPanelId then
+				if CooldownPanels.SelectPanel then CooldownPanels:SelectPanel(duplicatedPanelId) end
+				Editor:Refresh()
+			end
+		end)
 		rootDescription:CreateButton(L["CooldownPanelExportPanel"] or "Export Panel", function()
 			if CooldownPanels.ShowExportPanelPopup then CooldownPanels:ShowExportPanelPopup(panelId) end
 		end)
+		rootDescription:CreateDivider()
 		rootDescription:CreateButton(REMOVE or DELETE or (L["CooldownPanelDeletePanel"] or "Delete Panel"), function()
 			if CooldownPanels.ShowDeletePanelPopup then CooldownPanels:ShowDeletePanelPopup(panelId) end
 		end)
@@ -1075,9 +1084,6 @@ function Editor:CreateFrame()
 	frame.gear:SetupMenu(function(_, rootDescription)
 		rootDescription:SetTag("MENU_EQOL_COOLDOWN_PANEL_BLIZZARD_VIEW")
 		rootDescription:CreateTitle(SETTINGS or "Settings")
-		rootDescription:CreateButton(L["CooldownPanelLayoutEdit"] or "Layout edit", function()
-			if CooldownPanels.OpenEditor then CooldownPanels:OpenEditor() end
-		end)
 	end)
 
 	frame.scroll = frame.CooldownScroll
@@ -1186,14 +1192,3 @@ end
 function CooldownPanels:OpenBlizzardEditor() return Editor:Open() end
 
 function CooldownPanels:ToggleBlizzardEditor() return Editor:Toggle() end
-
-local function registerSlashCommand()
-	if not SlashCmdList then return end
-	SLASH_EQOLCPBLIZZARD1 = "/ecd2"
-	SlashCmdList.EQOLCPBLIZZARD = function()
-		local panels = addon.Aura and addon.Aura.CooldownPanels
-		if panels and panels.ToggleBlizzardEditor then panels:ToggleBlizzardEditor() end
-	end
-end
-
-registerSlashCommand()

@@ -30,9 +30,12 @@ local function withCooldownPanels(action)
 end
 
 local function openEditorExclusively(panels)
-	if not (panels and panels.OpenEditor) then return end
-	local editorFrame = panels:OpenEditor()
-	if addon.functions.HideConfigCenterUntilFrameHidden then
+	if not panels then return end
+	local editorFrame
+	if panels.OpenBlizzardEditor then
+		editorFrame = panels:OpenBlizzardEditor()
+	end
+	if editorFrame and addon.functions.HideConfigCenterUntilFrameHidden then
 		addon.functions.HideConfigCenterUntilFrameHidden(editorFrame)
 	end
 end

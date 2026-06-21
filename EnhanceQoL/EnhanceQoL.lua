@@ -6395,7 +6395,10 @@ local function CreateUI()
 
 		DoDevider()
 		root:CreateButton(L["CooldownPanelEditor"] or "Cooldown Panel Editor", function()
-			if addon.Aura and addon.Aura.CooldownPanels and addon.Aura.CooldownPanels.OpenEditor then addon.Aura.CooldownPanels:OpenEditor() end
+			local panels = addon.Aura and addon.Aura.CooldownPanels
+			if panels and panels.OpenBlizzardEditor then
+				panels:OpenBlizzardEditor()
+			end
 		end)
 	end
 
