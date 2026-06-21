@@ -1257,6 +1257,9 @@ function Editor:ShowPanelMenu(owner, panelId)
 				Editor:Refresh()
 			end
 		end)
+		rootDescription:CreateButton(L["CooldownPanelImportCDM"] or "Import CDM", function()
+			if CooldownPanels.ShowImportCDMMenu then CooldownPanels:ShowImportCDMMenu(owner, panelId) end
+		end)
 		rootDescription:CreateButton(L["CooldownPanelExportPanel"] or "Export Panel", function()
 			if CooldownPanels.ShowExportPanelPopup then CooldownPanels:ShowExportPanelPopup(panelId) end
 		end)

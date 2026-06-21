@@ -7,6 +7,9 @@
 ### 🔄 Changed
 
 - Cooldown Panels: Added Enable and Disable actions to the new panel editor context menu and visibly marks disabled panels with a muted header, Disabled label, and dimmed entries.
+- Cooldown Panels: Added the existing Cooldown Manager import action to each panel's context menu in the new editor.
+- Cooldown Panels: Removed obsolete group wording from the panel import dialog.
+- Cooldown Panels: Made Cooldown Manager spell imports work even when Blizzard's cooldown viewer frames are hidden.
 
 ---
 

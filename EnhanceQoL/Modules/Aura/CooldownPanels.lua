@@ -11438,12 +11438,42 @@ local function getCooldownManagerLayoutChildren(sourceKind)
 	return nil, sourceLabel, "SOURCE_NOT_FOUND"
 end
 
+cdp.CDM = cdp.CDM or {}
+
+function cdp.CDM.GetSpellIdsFromDataProvider(sourceKind)
+	local settings = _G.CooldownViewerSettings
+	local dataProvider = settings and settings.GetDataProvider and settings:GetDataProvider() or nil
+	if not (dataProvider and dataProvider.GetOrderedCooldownIDsForCategory and dataProvider.GetCooldownInfoForID) then return nil end
+	local category
+	if sourceKind == "UTILITY" then
+		category = Enum and Enum.CooldownViewerCategory and Enum.CooldownViewerCategory.Utility
+	else
+		category = Enum and Enum.CooldownViewerCategory and Enum.CooldownViewerCategory.Essential
+	end
+	if not category then return nil end
+	local cooldownIDs = dataProvider:GetOrderedCooldownIDsForCategory(category)
+	if type(cooldownIDs) ~= "table" or #cooldownIDs == 0 then return nil end
+	local spellIds = {}
+	for i = 1, #cooldownIDs do
+		local cooldownInfo = dataProvider:GetCooldownInfoForID(cooldownIDs[i])
+		local spellId = cooldownInfo and (cooldownInfo.linkedSpellID or cooldownInfo.overrideTooltipSpellID or cooldownInfo.overrideSpellID or cooldownInfo.spellID) or nil
+		if spellId then spellIds[#spellIds + 1] = spellId end
+	end
+	return spellIds
+end
+
 local function importCooldownManagerSpells(panelId, sourceKind)
 	panelId = normalizeId(panelId)
 	local panel = CooldownPanels:GetPanel(panelId)
 	if not panel then return nil, "PANEL_NOT_FOUND" end
-	local layoutChildren, sourceLabel, sourceErr = getCooldownManagerLayoutChildren(sourceKind)
-	if sourceErr then return nil, sourceErr, sourceLabel end
+	local spellIds = cdp.CDM.GetSpellIdsFromDataProvider(sourceKind)
+	local layoutChildren, sourceLabel, sourceErr
+	if not spellIds then
+		layoutChildren, sourceLabel, sourceErr = getCooldownManagerLayoutChildren(sourceKind)
+		if sourceErr then return nil, sourceErr, sourceLabel end
+	else
+		sourceLabel = getCooldownManagerSourceLabel(sourceKind)
+	end
 	local root = ensureRoot()
 	if not root then return nil, "NO_DB" end
 	panel.entries = panel.entries or {}
@@ -11488,7 +11518,12 @@ local function importCooldownManagerSpells(panelId, sourceKind)
 	end
 
 	local stats = { added = 0, duplicates = 0, invalid = 0, seen = 0 }
-	if #layoutChildren > 0 then
+	if spellIds then
+		for i = 1, #spellIds do
+			stats.seen = stats.seen + 1
+			importChild({ spellID = spellIds[i] }, stats)
+		end
+	elseif #layoutChildren > 0 then
 		for i = 1, #layoutChildren do
 			stats.seen = stats.seen + 1
 			importChild(layoutChildren[i], stats)
@@ -11651,6 +11686,8 @@ local function showSoundMenu(owner, panelId, entryId)
 end
 
 function CooldownPanels:ShowAddEntryMenu(owner, panelId) return showSlotMenu(owner, panelId) end
+
+function CooldownPanels:ShowImportCDMMenu(owner, panelId) return showImportCDMMenu(owner, panelId) end
 
 function CooldownPanels:ShowEntrySoundMenu(owner, panelId, entryId) return showSoundMenu(owner, panelId, entryId) end
 
@@ -16970,7 +17007,7 @@ end
 function CooldownPanels.EnsureImportPanelPopup()
 	if StaticPopupDialogs["EQOL_COOLDOWN_PANEL_IMPORT"] then return end
 	StaticPopupDialogs["EQOL_COOLDOWN_PANEL_IMPORT"] = {
-		text = L["CooldownPanelImportConfirm"] or "Import a cooldown panel or group?",
+		text = L["CooldownPanelImportConfirm"] or "Import a cooldown panel?",
 		button1 = L["Import"] or OKAY,
 		button2 = CANCEL,
 		hasEditBox = true,
