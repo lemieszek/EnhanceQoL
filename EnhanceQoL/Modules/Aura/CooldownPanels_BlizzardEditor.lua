@@ -25,6 +25,8 @@ Editor.BAR_ITEM_WIDTH = 317
 Editor.BAR_ITEM_HEIGHT = 38
 Editor.BAR_ITEM_SPACING = 10
 Editor.CONTENT_WIDTH = 344
+Editor.PANEL_HEADER_NAME_MAX_CHARS = 20
+Editor.PANEL_HEADER_NAME_WIDTH = 150
 Editor.ADDON_ICON = "Interface\\AddOns\\EnhanceQoL\\Icons\\Icon.tga"
 Editor.state = {
 	collapsed = {},
@@ -282,6 +284,20 @@ local function getFrameTitle()
 	return "EQOL " .. tostring(_G.COOLDOWN_VIEWER_SETTINGS_TITLE or "Cooldown Settings")
 end
 
+local function getAdvancedPanelLabel()
+	return L["settingsCategoryModeAdvanced"] or "Advanced"
+end
+
+local function truncatePanelHeaderText(text)
+	text = tostring(text or "")
+	local maxChars = Editor.PANEL_HEADER_NAME_MAX_CHARS
+	if not maxChars or maxChars <= 3 then return text end
+	local length = _G.strlenutf8 and _G.strlenutf8(text) or #text
+	if length <= maxChars then return text end
+	if _G.strsubutf8 then return _G.strsubutf8(text, 1, maxChars - 3) .. "..." end
+	return text:sub(1, maxChars - 3) .. "..."
+end
+
 local function getEntryIcon(entry)
 	if CooldownPanels.GetEntryIcon then return CooldownPanels:GetEntryIcon(entry) end
 	return Helper.PREVIEW_ICON or 134400
@@ -427,6 +443,30 @@ local function setupFramePortrait(frame)
 	setPortraitTexture(frame, getSelectedSpecIcon() or Editor.ADDON_ICON)
 end
 
+local function createEditorHelpButton(frame)
+	local helpButton = CreateFrame("Button", nil, frame)
+	helpButton:SetSize(28, 28)
+	helpButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -10, 1)
+	helpButton:SetNormalTexture("Interface\\common\\help-i")
+	helpButton:SetHighlightTexture("Interface\\common\\help-i")
+	if helpButton:GetHighlightTexture() then helpButton:GetHighlightTexture():SetAlpha(0.7) end
+	helpButton:SetScript("OnEnter", function(button)
+		if not GameTooltip then return end
+		GameTooltip:SetOwner(button, "ANCHOR_LEFT", -6, 0)
+		GameTooltip:ClearLines()
+		GameTooltip:AddLine(L["CooldownPanelEditorHelpTitle"] or (HELP_LABEL or "Help"), 1, 0.82, 0)
+		GameTooltip:AddLine(L["CooldownPanelEditorHelpIntro"] or "", 1, 1, 1, true)
+		GameTooltip:AddLine(" ", 1, 1, 1, true)
+		
+		GameTooltip:AddLine(L["CooldownPanelEditorHelpAuras"] or "", 1, 1, 1, true)
+		GameTooltip:Show()
+	end)
+	helpButton:SetScript("OnLeave", function()
+		if GameTooltip then GameTooltip:Hide() end
+	end)
+	return helpButton
+end
+
 local function saveFramePosition(frame)
 	if not (frame and addon and addon.db) then return end
 	local point, _, _, x, y = frame:GetPoint()
@@ -475,7 +515,7 @@ local function showAdvancedPanelTooltip(owner)
 	local panel = owner and owner:GetParent() and getPanel(owner:GetParent().panelId) or nil
 	if not isFixedLayoutPanel(panel) then return end
 	GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
-	GameTooltip:SetText(string.format("%s %s", L["settingsCategoryModeAdvanced"] or "Advanced", _G.PANEL or "Panel"), 1, 0.82, 0)
+	GameTooltip:SetText(getAdvancedPanelLabel(), 1, 0.82, 0)
 	GameTooltip:AddLine(L["CooldownPanelLayoutModeFixed"] or "Fixed slots", 1, 1, 1, true)
 	GameTooltip:AddLine(L["CooldownPanelAdvancedEditTooltip"] or "Edit this panel through Panel Edit. Right-click the header and choose Edit.", 0.85, 0.85, 0.85, true)
 	GameTooltip:Show()
@@ -596,6 +636,7 @@ end
 local function updateAlertTypesOverlay(tile, entry)
 	if not tile then return end
 	local alerts = {}
+	if entry and tostring(entry.type or ""):upper() == "CDM_AURA" then alerts[#alerts + 1] = "AURA" end
 	if entry and entry.soundReady == true then alerts[#alerts + 1] = Enum and Enum.CooldownViewerAlertType and Enum.CooldownViewerAlertType.Sound or "SOUND" end
 	if entry and entry.glowReady == true then alerts[#alerts + 1] = Enum and Enum.CooldownViewerAlertType and Enum.CooldownViewerAlertType.Visual or "VISUAL" end
 
@@ -628,19 +669,29 @@ local function updateAlertTypesOverlay(tile, entry)
 		local icon = overlay.icons[index]
 		if not icon then
 			icon = overlay:CreateTexture(nil, "ARTWORK")
-			icon:SetSize(overlay:GetHeight() - 2, overlay:GetHeight() - 2)
 			overlay.icons[index] = icon
 		end
-		local getTypeAtlas = _G.CooldownViewerAlert_GetTypeAtlas
-		local atlas = getTypeAtlas and getTypeAtlas(alertType)
-		if not atlas then atlas = alertType == "SOUND" and "common-icon-sound" or "common-icon-visual" end
+		local atlas
+		if alertType == "AURA" then
+			atlas = "icon_trackedbuffs"
+		else
+			local getTypeAtlas = _G.CooldownViewerAlert_GetTypeAtlas
+			atlas = getTypeAtlas and getTypeAtlas(alertType)
+			if not atlas then atlas = alertType == "SOUND" and "common-icon-sound" or "common-icon-visual" end
+		end
+		local iconSize = alertType == "AURA" and overlay:GetHeight() or overlay:GetHeight() - 2
+		icon:SetSize(iconSize, iconSize)
+		icon.eqolOverlayWidth = iconSize
 		icon:SetAtlas(atlas)
 		icon:Show()
 		overlay.visibleIcons[#overlay.visibleIcons + 1] = icon
 	end
 
-	local iconWidth = overlay:GetHeight() - 2
-	local totalIconsWidth = (#overlay.visibleIcons * iconWidth) + ((#overlay.visibleIcons - 1) * 2)
+	local totalIconsWidth = math.max(0, (#overlay.visibleIcons - 1) * 2)
+	for _, icon in ipairs(overlay.visibleIcons) do
+		totalIconsWidth = totalIconsWidth + (icon.eqolOverlayWidth or overlay:GetHeight() - 2)
+	end
+	overlay:SetWidth(math.max(34, totalIconsWidth + 4))
 	local firstIconOffset = (overlay:GetWidth() - totalIconsWidth) / 2
 	local previous
 	for index, icon in ipairs(overlay.visibleIcons) do
@@ -1006,11 +1057,17 @@ function Editor:CreateCategory(parent)
 		category.header:SetTitleColor(false, NORMAL_FONT_COLOR)
 		category.header:SetTitleColor(true, NORMAL_FONT_COLOR)
 	end
+	if category.header.Name then
+		category.header.Name:SetWidth(self.PANEL_HEADER_NAME_WIDTH)
+		category.header.Name:SetJustifyH("LEFT")
+		if category.header.Name.SetMaxLines then category.header.Name:SetMaxLines(1) end
+		if category.header.Name.SetWordWrap then category.header.Name:SetWordWrap(false) end
+	end
 	category.header:SetScript("OnEnter", showAdvancedPanelTooltip)
 	category.header:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	category.advancedLabel = category.header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	category.advancedLabel:SetPoint("CENTER", category.header, "CENTER", 0, 0)
-	category.advancedLabel:SetWidth(130)
+	category.advancedLabel:SetWidth(90)
 	category.advancedLabel:SetJustifyH("CENTER")
 	category.advancedLabel:SetTextColor(1, 0.55, 0.15, 1)
 	if category.advancedLabel.SetMaxLines then category.advancedLabel:SetMaxLines(1) end
@@ -1068,7 +1125,8 @@ function Editor:LayoutCategory(category, panelId, panel, yOffset, filterText)
 	category:SetPoint("TOPLEFT", category:GetParent(), "TOPLEFT", 0, -yOffset)
 	category.header:GetParent().panelId = panelId
 	category.container:SetShown(false)
-	local title = panel.name or (L["CooldownPanelNewPanel"] or "New Panel")
+	local rawTitle = panel.name or (L["CooldownPanelNewPanel"] or "New Panel")
+	local title = truncatePanelHeaderText(rawTitle)
 	if category.header.SetHeaderText then
 		category.header:SetHeaderText(title)
 	elseif category.header.Name then
@@ -1087,7 +1145,7 @@ function Editor:LayoutCategory(category, panelId, panel, yOffset, filterText)
 	end
 	if category.advancedLabel then
 		local showAdvancedLabel = not isDisabled and isFixedLayoutPanel(panel)
-		category.advancedLabel:SetText(string.format("%s %s", L["settingsCategoryModeAdvanced"] or "Advanced", _G.PANEL or "Panel"))
+		category.advancedLabel:SetText(getAdvancedPanelLabel())
 		if showAdvancedLabel then
 			category.advancedLabel:Show()
 		else
@@ -1168,7 +1226,7 @@ function Editor:LayoutCategory(category, panelId, panel, yOffset, filterText)
 		addTile.panelId = panelId
 		addTile.entryId = nil
 		addTile:SetPoint("TOPLEFT", category.container, "TOPLEFT", cursorX + gridColumn * (self.TILE_SIZE + self.TILE_SPACING), -cursorY)
-		addTile.icon:SetAtlas("communities-icon-addgroupplus", true)
+		addTile.icon:SetAtlas("cdm-empty", true)
 		setTextureDesaturated(addTile.icon, isDisabled)
 		addTile:SetAlpha(isDisabled and 0.35 or 1)
 		if addTile.AlertTypesOverlay then addTile.AlertTypesOverlay:Hide() end
@@ -1327,6 +1385,7 @@ function Editor:CreateFrame()
 		frame.TitleText:SetText(getFrameTitle())
 	end
 
+	frame.helpButton = frame.helpButton or createEditorHelpButton(frame)
 	frame.searchBox = frame.SearchBox
 	if frame.searchBox.Instructions then frame.searchBox.Instructions:SetText(_G.COOLDOWN_VIEWER_SETTINGS_SEARCH_INSTRUCTIONS or SEARCH) end
 	frame.searchBox:SetScript("OnTextChanged", function(selfBox)

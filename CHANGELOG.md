@@ -10,6 +10,10 @@
 - Cooldown Panels: Added the existing Cooldown Manager import action to each panel's context menu in the new editor.
 - Cooldown Panels: Removed obsolete group wording from the panel import dialog.
 - Cooldown Panels: Made Cooldown Manager spell imports work even when Blizzard's cooldown viewer frames are hidden.
+- Cooldown Panels: Added tracked-aura markers to the editor icon overlay row alongside sound and glow indicators.
+- Cooldown Panels: Added an in-window help tooltip for the new panel editor with guidance for tracked auras.
+- Cooldown Panels: Updated the new panel editor's add-entry tile to use Blizzard's empty cooldown slot artwork.
+- Cooldown Panels: Shortened the Advanced panel marker, expanded its tooltip, and truncates long panel names in the editor overview without changing saved panel names.
 
 ---
 

@@ -3849,6 +3849,7 @@ function CooldownPanels:SetPanelEditorName(panelId, value)
 	refreshStandaloneSettings()
 	CooldownPanels:RefreshPanel(panelId)
 	CooldownPanels:RefreshEditor()
+	if self.BlizzardEditor and self.BlizzardEditor.RefreshPanel then self.BlizzardEditor:RefreshPanel(panelId) end
 end
 
 function CooldownPanels:SetPanelEditorEnabled(panelId, enabled)
@@ -16566,14 +16567,8 @@ local function ensureEditor()
 
 	local function commitPanelNameChange(self)
 		local panelId = editor.selectedPanelId
-		local panel = panelId and CooldownPanels:GetPanel(panelId)
 		local text = self:GetText()
-		if panel and text and text ~= "" and text ~= panel.name then
-			panel.name = text
-			CooldownPanels.MarkRelativeFrameEntriesDirty()
-			refreshStandaloneSettings()
-			CooldownPanels:RefreshPanel(panelId)
-		end
+		CooldownPanels:SetPanelEditorName(panelId, text)
 	end
 
 	panelNameBox:SetScript("OnEnterPressed", function(self)
