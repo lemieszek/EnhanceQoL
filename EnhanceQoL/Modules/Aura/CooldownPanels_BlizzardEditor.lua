@@ -1079,7 +1079,9 @@ function Editor:LayoutCategory(category, panelId, panel, yOffset, filterText)
 	if category.header.SetTitleColor then
 		category.header:SetTitleColor(false, isDisabled and disabledColor or NORMAL_FONT_COLOR)
 		category.header:SetTitleColor(true, isDisabled and disabledColor or NORMAL_FONT_COLOR)
-	elseif category.header.Name and category.header.Name.SetTextColor then
+		if category.header.CheckHighlightTitle then category.header:CheckHighlightTitle(nil) end
+	end
+	if category.header.Name and category.header.Name.SetTextColor then
 		local color = isDisabled and disabledColor or NORMAL_FONT_COLOR
 		category.header.Name:SetTextColor(color:GetRGB())
 	end
