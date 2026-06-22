@@ -1351,7 +1351,9 @@ function Editor:ShowPanelMenu(owner, panelId)
 			if CooldownPanels.SetPanelCooldownManagerSyncSource then CooldownPanels:SetPanelCooldownManagerSyncSource(panelId, nil) end
 			Editor:RefreshPanel(panelId)
 		end)
-		for _, sourceKind in ipairs({ "ESSENTIAL", "UTILITY" }) do
+		local syncSources = { "ESSENTIAL", "UTILITY" }
+		if CooldownPanels.CDMAuras and CooldownPanels.CDMAuras.SyncEntries then syncSources[#syncSources + 1] = "BUFF_ICON" end
+		for _, sourceKind in ipairs(syncSources) do
 			syncMenu:CreateRadio(CooldownPanels.GetCooldownManagerSourceLabel and CooldownPanels:GetCooldownManagerSourceLabel(sourceKind) or sourceKind, function(value)
 				return CooldownPanels.GetPanelCooldownManagerSyncSource and CooldownPanels:GetPanelCooldownManagerSyncSource(panelId) == value
 			end, function(value)

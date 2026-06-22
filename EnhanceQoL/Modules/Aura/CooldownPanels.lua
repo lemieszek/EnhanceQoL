@@ -11443,7 +11443,7 @@ cdp.CDM = cdp.CDM or {}
 
 function cdp.CDM.IsSyncSource(sourceKind)
 	sourceKind = type(sourceKind) == "string" and sourceKind:upper() or nil
-	return sourceKind == "ESSENTIAL" or sourceKind == "UTILITY"
+	return sourceKind == "ESSENTIAL" or sourceKind == "UTILITY" or sourceKind == "BUFF_ICON"
 end
 
 function cdp.CDM.IsSettingsFrameShown()
@@ -11600,6 +11600,11 @@ function CooldownPanels:SyncPanelWithCooldownManager(panelId, sourceKind)
 	sourceKind = cdp.CDM.IsSyncSource(sourceKind) and sourceKind:upper() or nil
 	local panel = panelId and self:GetPanel(panelId) or nil
 	if not (panel and sourceKind) then return nil, "PANEL_NOT_FOUND" end
+	if sourceKind == "BUFF_ICON" then
+		local cdmAuras = self.CDMAuras
+		if cdmAuras and cdmAuras.SyncEntries then return cdmAuras:SyncEntries(panelId, sourceKind) end
+		return nil, "SOURCE_NOT_FOUND", getCooldownManagerSourceLabel(sourceKind)
+	end
 	local spellIds, sourceLabel, sourceErr = cdp.CDM.GetSpellIdsFromSource(sourceKind)
 	if sourceErr then return nil, sourceErr, sourceLabel end
 	local root = ensureRoot()

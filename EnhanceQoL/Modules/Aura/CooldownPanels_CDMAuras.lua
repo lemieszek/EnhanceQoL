@@ -1965,6 +1965,21 @@ function CDMAuras:GetImportSourceLabel(sourceKind)
 	return nil
 end
 
+function cdm.GetTrackedBuffCooldownIDsFromDataProvider()
+	local settings = _G.CooldownViewerSettings
+	local dataProvider = settings and settings.GetDataProvider and settings:GetDataProvider() or nil
+	local trackedBuffCategory = Enum and Enum.CooldownViewerCategory and Enum.CooldownViewerCategory.TrackedBuff or nil
+	if not (dataProvider and dataProvider.GetOrderedCooldownIDsForCategory and trackedBuffCategory) then return nil end
+	local ok, cooldownIDs = pcall(dataProvider.GetOrderedCooldownIDsForCategory, dataProvider, trackedBuffCategory)
+	if not ok or type(cooldownIDs) ~= "table" then return nil end
+	return cooldownIDs
+end
+
+function cdm.GetScanInfoByCooldownID(byCooldownID, cooldownID)
+	if type(byCooldownID) ~= "table" then return nil end
+	return byCooldownID[cooldownID] or byCooldownID[tonumber(cooldownID)] or byCooldownID[tostring(cooldownID)]
+end
+
 function CDMAuras:ImportEntries(panelId, sourceKind)
 	local sourceType = getImportSourceType(sourceKind)
 	local sourceLabel = self:GetImportSourceLabel(sourceKind)
@@ -2031,6 +2046,116 @@ function CDMAuras:ImportEntries(panelId, sourceKind)
 		if CooldownPanels.RefreshPanel then CooldownPanels:RefreshPanel(panelId) end
 	end
 
+	return stats
+end
+
+function CDMAuras:SyncEntries(panelId, sourceKind)
+	local sourceType = getImportSourceType(sourceKind)
+	local sourceLabel = self:GetImportSourceLabel(sourceKind)
+	if sourceType ~= SOURCE_ICON then return nil, "SOURCE_NOT_FOUND", sourceLabel end
+
+	local viewerName = ICON_VIEWER
+
+	local panel = CooldownPanels.GetPanel and CooldownPanels:GetPanel(panelId) or nil
+	if not panel then return nil, "PANEL_NOT_FOUND", sourceLabel end
+	local root = CooldownPanels.GetRoot and CooldownPanels:GetRoot() or nil
+	if not root then return nil, "NO_DB", sourceLabel end
+
+	panel.entries = panel.entries or {}
+	panel.order = panel.order or {}
+
+	local wantedByCooldownID = {}
+	local wantedOrder = {}
+	local stats = { added = 0, removed = 0, invalid = 0, seen = 0, sourceLabel = sourceLabel }
+	local cooldownIDs = cdm.GetTrackedBuffCooldownIDsFromDataProvider()
+	if type(cooldownIDs) ~= "table" then return nil, "SOURCE_NOT_FOUND", sourceLabel end
+	local _, byCooldownID = self:ScanTrackedBuffs(true)
+
+	for _, cooldownID in ipairs(cooldownIDs) do
+		stats.seen = stats.seen + 1
+		local info = cdm.GetScanInfoByCooldownID(byCooldownID, cooldownID)
+		if not (info and isValidCooldownID(info.cooldownID)) then
+			stats.invalid = stats.invalid + 1
+		else
+			local cooldownKey = tostring(info.cooldownID)
+			if not wantedByCooldownID[cooldownKey] then
+				wantedByCooldownID[cooldownKey] = {
+					cooldownID = info.cooldownID,
+					spellID = info.spellID,
+					buffName = info.buffName,
+					iconTextureID = info.iconTextureID,
+					sourceType = sourceType,
+					sourceViewer = viewerName,
+				}
+				wantedOrder[#wantedOrder + 1] = cooldownKey
+			end
+		end
+	end
+
+	local existingByCooldownID = {}
+	local otherOrder = {}
+	local runtime = CooldownPanels.runtime
+	for _, entryId in ipairs(panel.order) do
+		local entry = panel.entries[entryId]
+		if entry and entry.type == ENTRY_TYPE and isValidCooldownID(entry.cooldownID) then
+			existingByCooldownID[tostring(entry.cooldownID)] = entryId
+		elseif entry then
+			otherOrder[#otherOrder + 1] = entryId
+		end
+	end
+	for entryId, entry in pairs(panel.entries) do
+		if entry and entry.type == ENTRY_TYPE and isValidCooldownID(entry.cooldownID) then
+			local cooldownKey = tostring(entry.cooldownID)
+			if not wantedByCooldownID[cooldownKey] then
+				panel.entries[entryId] = nil
+				if runtime and runtime.actionDisplayCounts then runtime.actionDisplayCounts[Helper.GetEntryKey(panelId, entryId)] = nil end
+				if CooldownPanels.ClearEntryCustomCooldownDuration then CooldownPanels:ClearEntryCustomCooldownDuration(panelId, entryId, true) end
+				stats.removed = stats.removed + 1
+			end
+		end
+	end
+	for _, cooldownKey in ipairs(wantedOrder) do
+		local entryId = existingByCooldownID[cooldownKey]
+		local entryInfo = wantedByCooldownID[cooldownKey]
+		if entryId and panel.entries[entryId] then
+			local entry = panel.entries[entryId]
+			entry.spellID = entryInfo.spellID
+			entry.buffName = entryInfo.buffName
+			entry.iconTextureID = entryInfo.iconTextureID
+			entry.sourceType = entryInfo.sourceType
+			entry.sourceViewer = entryInfo.sourceViewer
+		elseif CooldownPanels.GetFixedEntryAddError and CooldownPanels:GetFixedEntryAddError(panel, nil) then
+			stats.invalid = stats.invalid + 1
+		else
+			entryId = Helper.GetNextNumericId(panel.entries)
+			local entry = Helper.CreateEntry(ENTRY_TYPE, entryInfo, root.defaults)
+			if entry and entry.cooldownID then
+				entry.id = entryId
+				panel.entries[entryId] = entry
+				existingByCooldownID[cooldownKey] = entryId
+				stats.added = stats.added + 1
+			else
+				stats.invalid = stats.invalid + 1
+			end
+		end
+	end
+
+	local nextOrder = {}
+	for _, cooldownKey in ipairs(wantedOrder) do
+		local entryId = existingByCooldownID[cooldownKey]
+		if entryId and panel.entries[entryId] then nextOrder[#nextOrder + 1] = entryId end
+	end
+	for _, entryId in ipairs(otherOrder) do
+		if panel.entries[entryId] then nextOrder[#nextOrder + 1] = entryId end
+	end
+	panel.order = nextOrder
+	Helper.SyncOrder(panel.order, panel.entries)
+	Helper.InvalidateFixedLayoutCache(panel)
+	if stats.added > 0 or stats.removed > 0 then
+		if CooldownPanels.RebuildSpellIndex then CooldownPanels:RebuildSpellIndex() end
+	end
+	if CooldownPanels.RefreshPanel then CooldownPanels:RefreshPanel(panelId) end
+	if CooldownPanels.BlizzardEditor and CooldownPanels.BlizzardEditor.RefreshPanel then CooldownPanels.BlizzardEditor:RefreshPanel(panelId) end
 	return stats
 end
 
