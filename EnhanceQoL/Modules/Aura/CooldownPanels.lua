@@ -933,6 +933,8 @@ function CooldownPanels:InvalidateTalentChoiceSpellVariantGroups()
 	runtime.talentChoiceVariantContext = nil
 	runtime.talentChoiceSpellVariantGroupsLoadedByConfig = nil
 	runtime.activeTalentChoiceGroupsForSpellCache = nil
+	runtime.spellAliasIDsCache = nil
+	runtime.runtimeCanonicalSpellVariantCache = nil
 	self.spellVariantGroupByID = self.staticSpellVariantGroupByID
 end
 
@@ -1011,11 +1013,7 @@ function cdp.RUNTIME.ResolveTrackedSpellID(owner, spellId)
 	return effectiveSpellID, resolvedSpellID, storedBaseSpellID, variantGroup
 end
 
-function cdp.RUNTIME.GetSpellAliasIDs(owner, spellId, outIds, seenIds, options)
-	local ids = outIds or {}
-	local seen = seenIds or {}
-	local includeTalentChoice = type(options) ~= "table" or options.includeTalentChoice ~= false
-
+function cdp.RUNTIME.CollectSpellAliasIDs(owner, spellId, ids, seen, includeTalentChoice)
 	local function addID(id)
 		local numericID = tonumber(id)
 		if not numericID or seen[numericID] then return end
@@ -1059,6 +1057,44 @@ function cdp.RUNTIME.GetSpellAliasIDs(owner, spellId, outIds, seenIds, options)
 	return ids, seen
 end
 
+function cdp.RUNTIME.BuildSpellAliasIDs(owner, spellId, includeTalentChoice)
+	local ids, seen = {}, {}
+	return cdp.RUNTIME.CollectSpellAliasIDs(owner, spellId, ids, seen, includeTalentChoice)
+end
+
+function cdp.RUNTIME.GetCachedSpellAliasIDs(owner, spellId, includeTalentChoice)
+	local numericID = tonumber(spellId)
+	if not numericID then
+		owner._emptySpellAliasIDs = owner._emptySpellAliasIDs or {}
+		return owner._emptySpellAliasIDs
+	end
+	owner.runtime = owner.runtime or {}
+	local runtime = owner.runtime
+	local cacheRoot = runtime.spellAliasIDsCache
+	if not cacheRoot then
+		cacheRoot = {}
+		runtime.spellAliasIDsCache = cacheRoot
+	end
+	local cacheKey = includeTalentChoice ~= false and "dynamic" or "static"
+	local generation = includeTalentChoice ~= false and (runtime.talentChoiceVariantGeneration or 0) or 0
+	local cache = cacheRoot[cacheKey]
+	if not cache or cache.generation ~= generation then
+		cache = { generation = generation }
+		cacheRoot[cacheKey] = cache
+	end
+	local cached = cache[numericID]
+	if cached then return cached end
+	cached = cdp.RUNTIME.BuildSpellAliasIDs(owner, numericID, includeTalentChoice)
+	cache[numericID] = cached
+	return cached
+end
+
+function cdp.RUNTIME.GetSpellAliasIDs(owner, spellId, outIds, seenIds, options)
+	local includeTalentChoice = type(options) ~= "table" or options.includeTalentChoice ~= false
+	if not outIds and not seenIds then return cdp.RUNTIME.GetCachedSpellAliasIDs(owner, spellId, includeTalentChoice) end
+	return cdp.RUNTIME.CollectSpellAliasIDs(owner, spellId, outIds or {}, seenIds or {}, includeTalentChoice)
+end
+
 function cdp.RUNTIME.AreSpellVariantsEquivalent(owner, firstSpellId, secondSpellId)
 	local firstID = tonumber(firstSpellId)
 	local secondID = tonumber(secondSpellId)
@@ -1097,16 +1133,32 @@ end
 function CooldownPanels:GetRuntimeCanonicalSpellVariantID(spellId)
 	local numericID = tonumber(spellId)
 	if not numericID then return nil, false, nil end
+	self.runtime = self.runtime or {}
+	local runtime = self.runtime
+	local generation = runtime.talentChoiceVariantGeneration or 0
+	local cache = runtime.runtimeCanonicalSpellVariantCache
+	if not cache or cache.generation ~= generation then
+		cache = { generation = generation }
+		runtime.runtimeCanonicalSpellVariantCache = cache
+	end
+	local cached = cache[numericID]
+	if cached ~= nil then
+		if cached == false then return nil, false, nil end
+		return cached.canonicalID, cached.changed, cached.group
+	end
 	local baseSpellID = getBaseSpellId(numericID) or numericID
 	local dynamicGroups = self:GetActiveTalentChoiceGroupsForSpell(numericID)
 	if type(dynamicGroups) == "table" then
 		local group = dynamicGroups[1]
 		if group then
 			local canonicalID = tonumber(group.canonicalID) or baseSpellID
+			cache[numericID] = { canonicalID = canonicalID, changed = canonicalID ~= baseSpellID, group = group }
 			return canonicalID, canonicalID ~= baseSpellID, group
 		end
 	end
-	return self:GetStaticCanonicalSpellVariantID(numericID)
+	local canonicalID, changed, group = self:GetStaticCanonicalSpellVariantID(numericID)
+	cache[numericID] = canonicalID and { canonicalID = canonicalID, changed = changed, group = group } or false
+	return canonicalID, changed, group
 end
 
 function CooldownPanels:GetCanonicalSpellVariantID(spellId, options)
@@ -1195,7 +1247,7 @@ local function setPowerInsufficient(runtime, spellId, isUsable, insufficientPowe
 	local powerValue = (insufficientPower == true) and true or nil
 	local unusableValue = (not usable and insufficientPower ~= true) and true or nil
 	local changed = false
-	local ids = CooldownPanels:GetSpellAliasIDs(spellId, {}, {})
+	local ids = CooldownPanels:GetSpellAliasIDs(spellId)
 	for i = 1, #ids do
 		local id = ids[i]
 		if runtime.powerInsufficient[id] ~= powerValue then
@@ -9597,6 +9649,10 @@ end
 function CooldownPanels:InvalidateSpellQueryCaches(kind, spellId)
 	local runtime = self.runtime
 	if not runtime then return end
+	if kind == nil and spellId == nil then
+		runtime.spellAliasIDsCache = nil
+		runtime.runtimeCanonicalSpellVariantCache = nil
+	end
 	if kind == "duration" or kind == nil then
 		if spellId ~= nil then
 			runtime.spellCooldownDurationCache = runtime.spellCooldownDurationCache or {}
@@ -9641,7 +9697,7 @@ end
 function CooldownPanels:InvalidateSpellCooldownCachesForAliases(spellId)
 	local id = tonumber(spellId)
 	if not (id and self.runtime) then return false end
-	local ids = self:GetSpellAliasIDs(id, {}, {})
+	local ids = self:GetSpellAliasIDs(id)
 	if not ids or #ids == 0 then return false end
 	for i = 1, #ids do
 		local aliasId = ids[i]
@@ -25770,7 +25826,7 @@ local function clearReadyGlowForSpell(spellId)
 	local index = CooldownPanels.runtime and CooldownPanels.runtime.spellIndex
 	if not index then return false end
 	local panels
-	local aliasIDs = CooldownPanels:GetSpellAliasIDs(id, {}, {})
+	local aliasIDs = CooldownPanels:GetSpellAliasIDs(id)
 	for i = 1, #aliasIDs do
 		local aliasPanels = index[aliasIDs[i]]
 		if aliasPanels then
@@ -25885,7 +25941,7 @@ setOverlayGlowForSpell = function(spellId, enabled)
 	runtime.overlayGlowSpells = runtime.overlayGlowSpells or {}
 	local overlayGlowSpells = runtime.overlayGlowSpells
 	if Api.IsSpellOverlayed then
-		local aliasIds = CooldownPanels:GetSpellAliasIDs(id, {}, {})
+		local aliasIds = CooldownPanels:GetSpellAliasIDs(id)
 		local wasEnabled = false
 		for i = 1, #aliasIds do
 			local aliasId = aliasIds[i]
