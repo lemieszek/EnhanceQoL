@@ -6457,6 +6457,86 @@ function GF.EnsureHealPredictionCalculator(st)
 	return calc
 end
 
+function GF:UpdateDataBarText(self, unit, st, cur, maxv, calc, secretHealth, missingValue, percentVal, levelText)
+	unit = unit or getUnit(self)
+	st = st or getState(self)
+	if not (unit and st) then return end
+
+	local kind = self._eqolGroupKind or "party"
+	local cfg = self._eqolCfg or getCfg(kind)
+	local dbc = cfg and cfg.dataBar or EMPTY
+	local defDB = (DEFAULTS[kind] and DEFAULTS[kind].dataBar) or EMPTY
+	if dbc.enabled ~= true then
+		GF.ClearDataBarText(st)
+		return
+	end
+	if not (st.dataBar and st.dataBar:IsShown()) then
+		GF.ClearDataBarText(st)
+		return
+	end
+
+	local dbLeft = dbc.textLeft or defDB.textLeft or "NONE"
+	local dbCenter = dbc.textCenter or defDB.textCenter or "NONE"
+	local dbRight = dbc.textRight or defDB.textRight or "NONE"
+	if dbLeft == "NONE" and dbCenter == "NONE" and dbRight == "NONE" then
+		GF.ClearDataBarText(st)
+		return
+	end
+
+	if UnitExists and not UnitExists(unit) then
+		GF.ClearDataBarText(st)
+		return
+	end
+
+	local function modeNeedsHealth(mode)
+		return mode ~= "NONE" and mode ~= "NAME" and mode ~= "LEVEL"
+	end
+	local needsHealthValues = modeNeedsHealth(dbLeft) or modeNeedsHealth(dbCenter) or modeNeedsHealth(dbRight)
+	if cur == nil and needsHealthValues then
+		calc = calc or GF.EnsureHealPredictionCalculator(st)
+		if calc and UnitGetDetailedHealPrediction then UnitGetDetailedHealPrediction(unit, "player", calc) end
+		cur = calc and calc.GetCurrentHealth and calc:GetCurrentHealth() or (UnitHealth and UnitHealth(unit))
+	end
+	if maxv == nil and needsHealthValues then maxv = calc and calc.GetMaximumHealth and calc:GetMaximumHealth() or (UnitHealthMax and UnitHealthMax(unit)) end
+	if needsHealthValues and cur == nil then cur = 0 end
+	if needsHealthValues and maxv == nil then maxv = 1 end
+	if secretHealth == nil and needsHealthValues then secretHealth = issecretvalue and (issecretvalue(cur) or issecretvalue(maxv)) end
+	if secretHealth and not (addon.variables and addon.variables.isMidnight) then
+		GF.ClearDataBarText(st)
+		return
+	end
+
+	local dbDelimiter = (UFHelper and UFHelper.getTextDelimiter and UFHelper.getTextDelimiter(dbc, defDB)) or (dbc.textDelimiter or defDB.textDelimiter or " ")
+	local dbDelimiter2 = (UFHelper and UFHelper.getTextDelimiterSecondary and UFHelper.getTextDelimiterSecondary(dbc, defDB, dbDelimiter))
+		or (dbc.textDelimiterSecondary or defDB.textDelimiterSecondary or dbDelimiter)
+	local dbDelimiter3 = (UFHelper and UFHelper.getTextDelimiterTertiary and UFHelper.getTextDelimiterTertiary(dbc, defDB, dbDelimiter, dbDelimiter2))
+		or (dbc.textDelimiterTertiary or defDB.textDelimiterTertiary or dbDelimiter2)
+	local dbUseShort = dbc.useShortNumbers ~= false
+	local dbHidePercentSymbol = dbc.hidePercentSymbol == true
+	local dbPercentVal = percentVal
+	if UFHelper and dbPercentVal == nil and (UFHelper.textModeUsesPercent(dbLeft) or UFHelper.textModeUsesPercent(dbCenter) or UFHelper.textModeUsesPercent(dbRight)) then
+		dbPercentVal = getHealthPercent(unit, cur, maxv, calc)
+	end
+	local dbLevelText = levelText
+	if UFHelper and UFHelper.textModeUsesLevel and dbLevelText == nil then
+		if UFHelper.textModeUsesLevel(dbLeft) or UFHelper.textModeUsesLevel(dbCenter) or UFHelper.textModeUsesLevel(dbRight) then dbLevelText = getSafeLevelText(unit, false) end
+	end
+	local dbNameText
+	if dbLeft == "NAME" or dbCenter == "NAME" or dbRight == "NAME" then
+		dbNameText = (UnitName and UnitName(unit)) or ""
+		if isEditModeActive() and self._eqolPreview and st._previewName then dbNameText = st._previewName end
+	end
+	local dbMissingValue = missingValue
+	if dbMissingValue == nil and (GFH.TextModeUsesDeficit(dbLeft) or GFH.TextModeUsesDeficit(dbCenter) or GFH.TextModeUsesDeficit(dbRight)) then
+		if UnitHealthMissing then dbMissingValue = UnitHealthMissing(unit) end
+		if dbMissingValue == nil and not secretHealth and type(cur) == "number" and type(maxv) == "number" then dbMissingValue = maxv - cur end
+	end
+	local dbRoundPercent = dbc.roundPercent == true
+	setTextSlot(st, st.dataBarTextLeft, "_lastDataBarTextLeft", dbLeft, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue, dbRoundPercent, dbNameText)
+	setTextSlot(st, st.dataBarTextCenter, "_lastDataBarTextCenter", dbCenter, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue, dbRoundPercent, dbNameText)
+	setTextSlot(st, st.dataBarTextRight, "_lastDataBarTextRight", dbRight, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue, dbRoundPercent, dbNameText)
+end
+
 local function updateButtonConfig(self, cfg)
 	if not self then return end
 	cfg = cfg or self._eqolCfg or getCfg(self._eqolGroupKind or "party")
@@ -10401,12 +10481,14 @@ function GF:UpdateName(self)
 		if fs.SetText then fs:SetText("") end
 		if fs.SetShown then fs:SetShown(false) end
 		st._lastName = nil
+		GF:UpdateDataBarText(self, unit, st)
 		return
 	end
 	if fs.SetShown then fs:SetShown(true) end
 	if UnitExists and not UnitExists(unit) then
 		fs:SetText("")
 		st._lastName = nil
+		GF:UpdateDataBarText(self, unit, st)
 		return
 	end
 	local name = UnitName and UnitName(unit) or ""
@@ -10453,6 +10535,7 @@ function GF:UpdateName(self)
 		st._lastNameR, st._lastNameG, st._lastNameB, st._lastNameA = r, g, b, a
 		if fs.SetTextColor then fs:SetTextColor(r, g, b, a) end
 	end
+	GF:UpdateDataBarText(self, unit, st)
 end
 
 local function shouldShowLevel(scfg, unit)
@@ -10514,6 +10597,7 @@ function GF:UpdateLevel(self)
 		st._lastLevelR, st._lastLevelG, st._lastLevelB, st._lastLevelA = r, g, b, a
 		st.levelText:SetTextColor(r, g, b, a)
 	end
+	GF:UpdateDataBarText(self, unit, st, nil, nil, nil, nil, nil, nil, levelText)
 end
 
 function GF:UpdateStatusText(self)
@@ -11612,39 +11696,7 @@ function GF:UpdateHealthValue(self, unit, st)
 					roundPercent
 				)
 				setTextSlot(st, st.healthTextRight, "_lastHealthTextRight", rightMode, cur, maxv, useShort, percentVal, delimiter, delimiter2, delimiter3, hidePercentSymbol, levelText, missingValue, roundPercent)
-				if dbc.enabled == true and st.dataBar and st.dataBar:IsShown() then
-					local dbDelimiter = (UFHelper and UFHelper.getTextDelimiter and UFHelper.getTextDelimiter(dbc, defDB)) or (dbc.textDelimiter or defDB.textDelimiter or " ")
-					local dbDelimiter2 = (UFHelper and UFHelper.getTextDelimiterSecondary and UFHelper.getTextDelimiterSecondary(dbc, defDB, dbDelimiter))
-						or (dbc.textDelimiterSecondary or defDB.textDelimiterSecondary or dbDelimiter)
-					local dbDelimiter3 = (UFHelper and UFHelper.getTextDelimiterTertiary and UFHelper.getTextDelimiterTertiary(dbc, defDB, dbDelimiter, dbDelimiter2))
-						or (dbc.textDelimiterTertiary or defDB.textDelimiterTertiary or dbDelimiter2)
-					local dbUseShort = dbc.useShortNumbers ~= false
-					local dbHidePercentSymbol = dbc.hidePercentSymbol == true
-					local dbPercentVal = percentVal
-					if UFHelper and dbPercentVal == nil and (UFHelper.textModeUsesPercent(dbLeft) or UFHelper.textModeUsesPercent(dbCenter) or UFHelper.textModeUsesPercent(dbRight)) then
-						dbPercentVal = getHealthPercent(unit, cur, maxv, calc)
-					end
-					local dbLevelText = levelText
-					if UFHelper and UFHelper.textModeUsesLevel and dbLevelText == nil then
-						if UFHelper.textModeUsesLevel(dbLeft) or UFHelper.textModeUsesLevel(dbCenter) or UFHelper.textModeUsesLevel(dbRight) then dbLevelText = getSafeLevelText(unit, false) end
-					end
-					local dbNameText
-					if dbLeft == "NAME" or dbCenter == "NAME" or dbRight == "NAME" then
-						dbNameText = (UnitName and UnitName(unit)) or ""
-						if isEditModeActive() and self._eqolPreview and st._previewName then dbNameText = st._previewName end
-					end
-					local dbMissingValue = missingValue
-					if dbMissingValue == nil and (GFH.TextModeUsesDeficit(dbLeft) or GFH.TextModeUsesDeficit(dbCenter) or GFH.TextModeUsesDeficit(dbRight)) then
-						if UnitHealthMissing then dbMissingValue = UnitHealthMissing(unit) end
-						if dbMissingValue == nil and not secretHealth and type(cur) == "number" and type(maxv) == "number" then dbMissingValue = maxv - cur end
-					end
-					local dbRoundPercent = dbc.roundPercent == true
-					setTextSlot(st, st.dataBarTextLeft, "_lastDataBarTextLeft", dbLeft, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue, dbRoundPercent, dbNameText)
-					setTextSlot(st, st.dataBarTextCenter, "_lastDataBarTextCenter", dbCenter, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue, dbRoundPercent, dbNameText)
-					setTextSlot(st, st.dataBarTextRight, "_lastDataBarTextRight", dbRight, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue, dbRoundPercent, dbNameText)
-				else
-					GF.ClearDataBarText(st)
-				end
+				GF:UpdateDataBarText(self, unit, st, cur, maxv, calc, secretHealth, missingValue, percentVal, levelText)
 			end
 		end
 	elseif st.healthTextLeft or st.healthTextCenter or st.healthTextRight then
