@@ -9769,6 +9769,7 @@ local function getItemCooldownInfo(itemID, slotID)
 end
 
 function CooldownPanels:GetItemUseSpellID(itemID)
+	itemID = tonumber(itemID)
 	if not itemID then return nil end
 	self.runtime = self.runtime or {}
 	local runtime = self.runtime
@@ -9778,7 +9779,13 @@ function CooldownPanels:GetItemUseSpellID(itemID)
 	if not Api.GetItemSpell then return nil end
 	local _, spellId = Api.GetItemSpell(itemID)
 	spellId = tonumber(spellId)
-	if spellId then runtime.itemUseSpellCache[itemID] = spellId end
+	if spellId then
+		runtime.itemUseSpellCache[itemID] = spellId
+	elseif C_Item and C_Item.IsItemDataCachedByID and C_Item.IsItemDataCachedByID(itemID) then
+		runtime.itemUseSpellCache[itemID] = false
+	elseif C_Item and C_Item.RequestLoadItemDataByID then
+		C_Item.RequestLoadItemDataByID(itemID)
+	end
 	return spellId
 end
 
