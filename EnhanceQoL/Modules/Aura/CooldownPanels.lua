@@ -7677,12 +7677,39 @@ function cdp.RUNTIME.GetFixedContextSignature(fixedContext)
 	return tonumber(fixedContext.dynamicLocalIndex) or 0, tonumber(fixedContext.dynamicCount) or 0
 end
 
+function cdp.RUNTIME.GetTableField(tbl, key)
+	if type(tbl) ~= "table" then return nil end
+	return tbl[key]
+end
+
 function cdp.RUNTIME.HasPlacementChange(icon, snapshot, data, fixedLayoutCache, fixedGridColumns, slotColumn, slotRow, layoutEditActive)
 	if not (icon and snapshot and data) then return true end
 	if icon._eqolVisualSize == nil or icon._eqolVisualAnchor == nil or icon._eqolVisualOffsetX == nil or icon._eqolVisualOffsetY == nil then return true end
 	local entry = data.entry
 	local layout = data.layout
 	local fixedLocalIndex, fixedCount = cdp.RUNTIME.GetFixedContextSignature(data.fixedContext)
+	local entryIconSizeUseGlobal, entryIconSize, entryIconSizeSeparate, entryIconWidth, entryIconHeight, entryIconOffsetX, entryIconOffsetY, entryFixedGroupId
+	if entry then
+		entryIconSizeUseGlobal = entry.iconSizeUseGlobal
+		entryIconSize = entry.iconSize
+		entryIconSizeSeparate = entry.iconSizeSeparate
+		entryIconWidth = entry.iconWidth
+		entryIconHeight = entry.iconHeight
+		entryIconOffsetX = entry.iconOffsetX
+		entryIconOffsetY = entry.iconOffsetY
+		entryFixedGroupId = entry.fixedGroupId
+	end
+	local layoutIconOffsetX, layoutIconOffsetY, layoutIconSizeSeparate, layoutIconWidth, layoutIconHeight, layoutIconShape, layoutIconZoom, layoutSpacing
+	if layout then
+		layoutIconOffsetX = layout.iconOffsetX
+		layoutIconOffsetY = layout.iconOffsetY
+		layoutIconSizeSeparate = layout.iconSizeSeparate
+		layoutIconWidth = layout.iconWidth
+		layoutIconHeight = layout.iconHeight
+		layoutIconShape = layout.iconShape
+		layoutIconZoom = layout.iconZoom
+		layoutSpacing = layout.spacing
+	end
 	return snapshot.entryId ~= data.entryId
 		or snapshot.baseSlotSize ~= icon._eqolBaseSlotSize
 		or snapshot.fixedLayoutCache ~= fixedLayoutCache
@@ -7690,22 +7717,22 @@ function cdp.RUNTIME.HasPlacementChange(icon, snapshot, data, fixedLayoutCache, 
 		or snapshot.slotColumn ~= slotColumn
 		or snapshot.slotRow ~= slotRow
 		or snapshot.layoutEditActive ~= (layoutEditActive == true)
-		or snapshot.entryIconSizeUseGlobal ~= (entry and entry.iconSizeUseGlobal)
-		or snapshot.entryIconSize ~= (entry and entry.iconSize)
-		or snapshot.entryIconSizeSeparate ~= (entry and entry.iconSizeSeparate)
-		or snapshot.entryIconWidth ~= (entry and entry.iconWidth)
-		or snapshot.entryIconHeight ~= (entry and entry.iconHeight)
-		or snapshot.entryIconOffsetX ~= (entry and entry.iconOffsetX)
-		or snapshot.entryIconOffsetY ~= (entry and entry.iconOffsetY)
-		or snapshot.entryFixedGroupId ~= (entry and entry.fixedGroupId)
-		or snapshot.layoutIconOffsetX ~= (layout and layout.iconOffsetX)
-		or snapshot.layoutIconOffsetY ~= (layout and layout.iconOffsetY)
-		or snapshot.layoutIconSizeSeparate ~= (layout and layout.iconSizeSeparate)
-		or snapshot.layoutIconWidth ~= (layout and layout.iconWidth)
-		or snapshot.layoutIconHeight ~= (layout and layout.iconHeight)
-		or snapshot.layoutIconShape ~= (layout and layout.iconShape)
-		or snapshot.layoutIconZoom ~= (layout and layout.iconZoom)
-		or snapshot.layoutSpacing ~= (layout and layout.spacing)
+		or snapshot.entryIconSizeUseGlobal ~= entryIconSizeUseGlobal
+		or snapshot.entryIconSize ~= entryIconSize
+		or snapshot.entryIconSizeSeparate ~= entryIconSizeSeparate
+		or snapshot.entryIconWidth ~= entryIconWidth
+		or snapshot.entryIconHeight ~= entryIconHeight
+		or snapshot.entryIconOffsetX ~= entryIconOffsetX
+		or snapshot.entryIconOffsetY ~= entryIconOffsetY
+		or snapshot.entryFixedGroupId ~= entryFixedGroupId
+		or snapshot.layoutIconOffsetX ~= layoutIconOffsetX
+		or snapshot.layoutIconOffsetY ~= layoutIconOffsetY
+		or snapshot.layoutIconSizeSeparate ~= layoutIconSizeSeparate
+		or snapshot.layoutIconWidth ~= layoutIconWidth
+		or snapshot.layoutIconHeight ~= layoutIconHeight
+		or snapshot.layoutIconShape ~= layoutIconShape
+		or snapshot.layoutIconZoom ~= layoutIconZoom
+		or snapshot.layoutSpacing ~= layoutSpacing
 		or snapshot.fixedLocalIndex ~= fixedLocalIndex
 		or snapshot.fixedCount ~= fixedCount
 end
@@ -7722,22 +7749,22 @@ function cdp.RUNTIME.WritePlacementSnapshot(icon, snapshot, data, fixedLayoutCac
 	snapshot.slotColumn = slotColumn
 	snapshot.slotRow = slotRow
 	snapshot.layoutEditActive = layoutEditActive == true
-	snapshot.entryIconSizeUseGlobal = entry and entry.iconSizeUseGlobal or nil
-	snapshot.entryIconSize = entry and entry.iconSize or nil
-	snapshot.entryIconSizeSeparate = entry and entry.iconSizeSeparate or nil
-	snapshot.entryIconWidth = entry and entry.iconWidth or nil
-	snapshot.entryIconHeight = entry and entry.iconHeight or nil
-	snapshot.entryIconOffsetX = entry and entry.iconOffsetX or nil
-	snapshot.entryIconOffsetY = entry and entry.iconOffsetY or nil
-	snapshot.entryFixedGroupId = entry and entry.fixedGroupId or nil
-	snapshot.layoutIconOffsetX = layout and layout.iconOffsetX or nil
-	snapshot.layoutIconOffsetY = layout and layout.iconOffsetY or nil
-	snapshot.layoutIconSizeSeparate = layout and layout.iconSizeSeparate or nil
-	snapshot.layoutIconWidth = layout and layout.iconWidth or nil
-	snapshot.layoutIconHeight = layout and layout.iconHeight or nil
-	snapshot.layoutIconShape = layout and layout.iconShape or nil
-	snapshot.layoutIconZoom = layout and layout.iconZoom or nil
-	snapshot.layoutSpacing = layout and layout.spacing or nil
+	snapshot.entryIconSizeUseGlobal = cdp.RUNTIME.GetTableField(entry, "iconSizeUseGlobal")
+	snapshot.entryIconSize = cdp.RUNTIME.GetTableField(entry, "iconSize")
+	snapshot.entryIconSizeSeparate = cdp.RUNTIME.GetTableField(entry, "iconSizeSeparate")
+	snapshot.entryIconWidth = cdp.RUNTIME.GetTableField(entry, "iconWidth")
+	snapshot.entryIconHeight = cdp.RUNTIME.GetTableField(entry, "iconHeight")
+	snapshot.entryIconOffsetX = cdp.RUNTIME.GetTableField(entry, "iconOffsetX")
+	snapshot.entryIconOffsetY = cdp.RUNTIME.GetTableField(entry, "iconOffsetY")
+	snapshot.entryFixedGroupId = cdp.RUNTIME.GetTableField(entry, "fixedGroupId")
+	snapshot.layoutIconOffsetX = cdp.RUNTIME.GetTableField(layout, "iconOffsetX")
+	snapshot.layoutIconOffsetY = cdp.RUNTIME.GetTableField(layout, "iconOffsetY")
+	snapshot.layoutIconSizeSeparate = cdp.RUNTIME.GetTableField(layout, "iconSizeSeparate")
+	snapshot.layoutIconWidth = cdp.RUNTIME.GetTableField(layout, "iconWidth")
+	snapshot.layoutIconHeight = cdp.RUNTIME.GetTableField(layout, "iconHeight")
+	snapshot.layoutIconShape = cdp.RUNTIME.GetTableField(layout, "iconShape")
+	snapshot.layoutIconZoom = cdp.RUNTIME.GetTableField(layout, "iconZoom")
+	snapshot.layoutSpacing = cdp.RUNTIME.GetTableField(layout, "spacing")
 	snapshot.fixedLocalIndex = fixedLocalIndex
 	snapshot.fixedCount = fixedCount
 end
