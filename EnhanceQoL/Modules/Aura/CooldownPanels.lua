@@ -933,6 +933,8 @@ function CooldownPanels:InvalidateTalentChoiceSpellVariantGroups()
 	runtime.talentChoiceVariantContext = nil
 	runtime.talentChoiceSpellVariantGroupsLoadedByConfig = nil
 	runtime.activeTalentChoiceGroupsForSpellCache = nil
+	runtime.spellAliasIDsCache = nil
+	runtime.runtimeCanonicalSpellVariantCache = nil
 	self.spellVariantGroupByID = self.staticSpellVariantGroupByID
 end
 
@@ -1011,11 +1013,7 @@ function cdp.RUNTIME.ResolveTrackedSpellID(owner, spellId)
 	return effectiveSpellID, resolvedSpellID, storedBaseSpellID, variantGroup
 end
 
-function cdp.RUNTIME.GetSpellAliasIDs(owner, spellId, outIds, seenIds, options)
-	local ids = outIds or {}
-	local seen = seenIds or {}
-	local includeTalentChoice = type(options) ~= "table" or options.includeTalentChoice ~= false
-
+function cdp.RUNTIME.CollectSpellAliasIDs(owner, spellId, ids, seen, includeTalentChoice)
 	local function addID(id)
 		local numericID = tonumber(id)
 		if not numericID or seen[numericID] then return end
@@ -1059,6 +1057,44 @@ function cdp.RUNTIME.GetSpellAliasIDs(owner, spellId, outIds, seenIds, options)
 	return ids, seen
 end
 
+function cdp.RUNTIME.BuildSpellAliasIDs(owner, spellId, includeTalentChoice)
+	local ids, seen = {}, {}
+	return cdp.RUNTIME.CollectSpellAliasIDs(owner, spellId, ids, seen, includeTalentChoice)
+end
+
+function cdp.RUNTIME.GetCachedSpellAliasIDs(owner, spellId, includeTalentChoice)
+	local numericID = tonumber(spellId)
+	if not numericID then
+		owner._emptySpellAliasIDs = owner._emptySpellAliasIDs or {}
+		return owner._emptySpellAliasIDs
+	end
+	owner.runtime = owner.runtime or {}
+	local runtime = owner.runtime
+	local cacheRoot = runtime.spellAliasIDsCache
+	if not cacheRoot then
+		cacheRoot = {}
+		runtime.spellAliasIDsCache = cacheRoot
+	end
+	local cacheKey = includeTalentChoice ~= false and "dynamic" or "static"
+	local generation = includeTalentChoice ~= false and (runtime.talentChoiceVariantGeneration or 0) or 0
+	local cache = cacheRoot[cacheKey]
+	if not cache or cache.generation ~= generation then
+		cache = { generation = generation }
+		cacheRoot[cacheKey] = cache
+	end
+	local cached = cache[numericID]
+	if cached then return cached end
+	cached = cdp.RUNTIME.BuildSpellAliasIDs(owner, numericID, includeTalentChoice)
+	cache[numericID] = cached
+	return cached
+end
+
+function cdp.RUNTIME.GetSpellAliasIDs(owner, spellId, outIds, seenIds, options)
+	local includeTalentChoice = type(options) ~= "table" or options.includeTalentChoice ~= false
+	if not outIds and not seenIds then return cdp.RUNTIME.GetCachedSpellAliasIDs(owner, spellId, includeTalentChoice) end
+	return cdp.RUNTIME.CollectSpellAliasIDs(owner, spellId, outIds or {}, seenIds or {}, includeTalentChoice)
+end
+
 function cdp.RUNTIME.AreSpellVariantsEquivalent(owner, firstSpellId, secondSpellId)
 	local firstID = tonumber(firstSpellId)
 	local secondID = tonumber(secondSpellId)
@@ -1097,16 +1133,32 @@ end
 function CooldownPanels:GetRuntimeCanonicalSpellVariantID(spellId)
 	local numericID = tonumber(spellId)
 	if not numericID then return nil, false, nil end
+	self.runtime = self.runtime or {}
+	local runtime = self.runtime
+	local generation = runtime.talentChoiceVariantGeneration or 0
+	local cache = runtime.runtimeCanonicalSpellVariantCache
+	if not cache or cache.generation ~= generation then
+		cache = { generation = generation }
+		runtime.runtimeCanonicalSpellVariantCache = cache
+	end
+	local cached = cache[numericID]
+	if cached ~= nil then
+		if cached == false then return nil, false, nil end
+		return cached.canonicalID, cached.changed, cached.group
+	end
 	local baseSpellID = getBaseSpellId(numericID) or numericID
 	local dynamicGroups = self:GetActiveTalentChoiceGroupsForSpell(numericID)
 	if type(dynamicGroups) == "table" then
 		local group = dynamicGroups[1]
 		if group then
 			local canonicalID = tonumber(group.canonicalID) or baseSpellID
+			cache[numericID] = { canonicalID = canonicalID, changed = canonicalID ~= baseSpellID, group = group }
 			return canonicalID, canonicalID ~= baseSpellID, group
 		end
 	end
-	return self:GetStaticCanonicalSpellVariantID(numericID)
+	local canonicalID, changed, group = self:GetStaticCanonicalSpellVariantID(numericID)
+	cache[numericID] = canonicalID and { canonicalID = canonicalID, changed = changed, group = group } or false
+	return canonicalID, changed, group
 end
 
 function CooldownPanels:GetCanonicalSpellVariantID(spellId, options)
@@ -1195,7 +1247,7 @@ local function setPowerInsufficient(runtime, spellId, isUsable, insufficientPowe
 	local powerValue = (insufficientPower == true) and true or nil
 	local unusableValue = (not usable and insufficientPower ~= true) and true or nil
 	local changed = false
-	local ids = CooldownPanels:GetSpellAliasIDs(spellId, {}, {})
+	local ids = CooldownPanels:GetSpellAliasIDs(spellId)
 	for i = 1, #ids do
 		local id = ids[i]
 		if runtime.powerInsufficient[id] ~= powerValue then
@@ -1779,10 +1831,14 @@ CooldownPanels._styleCacheRoots = CooldownPanels._styleCacheRoots
 		pandemicGlowEntry = setmetatable({}, { __mode = "k" }),
 		procGlowPanel = setmetatable({}, { __mode = "k" }),
 		procGlowEntry = setmetatable({}, { __mode = "k" }),
+		activationOverlayEntry = setmetatable({}, { __mode = "k" }),
+		otherAuraGlowEntry = setmetatable({}, { __mode = "k" }),
 		glowPixelOptions = setmetatable({}, { __mode = "k" }),
 		glowPixelEntry = setmetatable({}, { __mode = "k" }),
 		iconLayoutEntry = setmetatable({}, { __mode = "k" }),
 	}
+CooldownPanels._styleCacheRoots.activationOverlayEntry = CooldownPanels._styleCacheRoots.activationOverlayEntry or setmetatable({}, { __mode = "k" })
+CooldownPanels._styleCacheRoots.otherAuraGlowEntry = CooldownPanels._styleCacheRoots.otherAuraGlowEntry or setmetatable({}, { __mode = "k" })
 CooldownPanels._styleCacheRoots.glowPixelOptions = CooldownPanels._styleCacheRoots.glowPixelOptions or setmetatable({}, { __mode = "k" })
 CooldownPanels._styleCacheRoots.glowPixelEntry = CooldownPanels._styleCacheRoots.glowPixelEntry or setmetatable({}, { __mode = "k" })
 CooldownPanels.POWER_USABLE_REFRESH_DELAY = CooldownPanels.POWER_USABLE_REFRESH_DELAY or 0.05
@@ -1794,6 +1850,37 @@ function CooldownPanels.FillCachedColor(cache, r, g, b, a)
 	cache[3] = b or 1
 	cache[4] = a or 1
 	return cache
+end
+
+function CooldownPanels.ResolveCachedEntryColor(cacheRootName, entry, color, fallbackColor)
+	if not entry then return fallbackColor or Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT end
+	local roots = CooldownPanels._styleCacheRoots
+	local root = roots and roots[cacheRootName]
+	if not root then return Helper.NormalizeColor(color, fallbackColor) end
+	local cache = root[entry]
+	local fallbackR = fallbackColor and fallbackColor[1] or nil
+	local fallbackG = fallbackColor and fallbackColor[2] or nil
+	local fallbackB = fallbackColor and fallbackColor[3] or nil
+	local fallbackA = fallbackColor and fallbackColor[4] or nil
+	if
+		not cache
+		or cache.srcColor ~= color
+		or cache.fallbackR ~= fallbackR
+		or cache.fallbackG ~= fallbackG
+		or cache.fallbackB ~= fallbackB
+		or cache.fallbackA ~= fallbackA
+	then
+		cache = cache or {}
+		cache.srcColor = color
+		cache.fallbackR = fallbackR
+		cache.fallbackG = fallbackG
+		cache.fallbackB = fallbackB
+		cache.fallbackA = fallbackA
+		local r, g, b, a = Helper.ResolveColor(color, fallbackColor)
+		cache.color = CooldownPanels.FillCachedColor(cache.color, r, g, b, a)
+		root[entry] = cache
+	end
+	return cache.color
 end
 
 local function clearRuntimeLayoutShapeCache(runtime)
@@ -7677,12 +7764,39 @@ function cdp.RUNTIME.GetFixedContextSignature(fixedContext)
 	return tonumber(fixedContext.dynamicLocalIndex) or 0, tonumber(fixedContext.dynamicCount) or 0
 end
 
+function cdp.RUNTIME.GetTableField(tbl, key)
+	if type(tbl) ~= "table" then return nil end
+	return tbl[key]
+end
+
 function cdp.RUNTIME.HasPlacementChange(icon, snapshot, data, fixedLayoutCache, fixedGridColumns, slotColumn, slotRow, layoutEditActive)
 	if not (icon and snapshot and data) then return true end
 	if icon._eqolVisualSize == nil or icon._eqolVisualAnchor == nil or icon._eqolVisualOffsetX == nil or icon._eqolVisualOffsetY == nil then return true end
 	local entry = data.entry
 	local layout = data.layout
 	local fixedLocalIndex, fixedCount = cdp.RUNTIME.GetFixedContextSignature(data.fixedContext)
+	local entryIconSizeUseGlobal, entryIconSize, entryIconSizeSeparate, entryIconWidth, entryIconHeight, entryIconOffsetX, entryIconOffsetY, entryFixedGroupId
+	if entry then
+		entryIconSizeUseGlobal = entry.iconSizeUseGlobal
+		entryIconSize = entry.iconSize
+		entryIconSizeSeparate = entry.iconSizeSeparate
+		entryIconWidth = entry.iconWidth
+		entryIconHeight = entry.iconHeight
+		entryIconOffsetX = entry.iconOffsetX
+		entryIconOffsetY = entry.iconOffsetY
+		entryFixedGroupId = entry.fixedGroupId
+	end
+	local layoutIconOffsetX, layoutIconOffsetY, layoutIconSizeSeparate, layoutIconWidth, layoutIconHeight, layoutIconShape, layoutIconZoom, layoutSpacing
+	if layout then
+		layoutIconOffsetX = layout.iconOffsetX
+		layoutIconOffsetY = layout.iconOffsetY
+		layoutIconSizeSeparate = layout.iconSizeSeparate
+		layoutIconWidth = layout.iconWidth
+		layoutIconHeight = layout.iconHeight
+		layoutIconShape = layout.iconShape
+		layoutIconZoom = layout.iconZoom
+		layoutSpacing = layout.spacing
+	end
 	return snapshot.entryId ~= data.entryId
 		or snapshot.baseSlotSize ~= icon._eqolBaseSlotSize
 		or snapshot.fixedLayoutCache ~= fixedLayoutCache
@@ -7690,22 +7804,22 @@ function cdp.RUNTIME.HasPlacementChange(icon, snapshot, data, fixedLayoutCache, 
 		or snapshot.slotColumn ~= slotColumn
 		or snapshot.slotRow ~= slotRow
 		or snapshot.layoutEditActive ~= (layoutEditActive == true)
-		or snapshot.entryIconSizeUseGlobal ~= (entry and entry.iconSizeUseGlobal)
-		or snapshot.entryIconSize ~= (entry and entry.iconSize)
-		or snapshot.entryIconSizeSeparate ~= (entry and entry.iconSizeSeparate)
-		or snapshot.entryIconWidth ~= (entry and entry.iconWidth)
-		or snapshot.entryIconHeight ~= (entry and entry.iconHeight)
-		or snapshot.entryIconOffsetX ~= (entry and entry.iconOffsetX)
-		or snapshot.entryIconOffsetY ~= (entry and entry.iconOffsetY)
-		or snapshot.entryFixedGroupId ~= (entry and entry.fixedGroupId)
-		or snapshot.layoutIconOffsetX ~= (layout and layout.iconOffsetX)
-		or snapshot.layoutIconOffsetY ~= (layout and layout.iconOffsetY)
-		or snapshot.layoutIconSizeSeparate ~= (layout and layout.iconSizeSeparate)
-		or snapshot.layoutIconWidth ~= (layout and layout.iconWidth)
-		or snapshot.layoutIconHeight ~= (layout and layout.iconHeight)
-		or snapshot.layoutIconShape ~= (layout and layout.iconShape)
-		or snapshot.layoutIconZoom ~= (layout and layout.iconZoom)
-		or snapshot.layoutSpacing ~= (layout and layout.spacing)
+		or snapshot.entryIconSizeUseGlobal ~= entryIconSizeUseGlobal
+		or snapshot.entryIconSize ~= entryIconSize
+		or snapshot.entryIconSizeSeparate ~= entryIconSizeSeparate
+		or snapshot.entryIconWidth ~= entryIconWidth
+		or snapshot.entryIconHeight ~= entryIconHeight
+		or snapshot.entryIconOffsetX ~= entryIconOffsetX
+		or snapshot.entryIconOffsetY ~= entryIconOffsetY
+		or snapshot.entryFixedGroupId ~= entryFixedGroupId
+		or snapshot.layoutIconOffsetX ~= layoutIconOffsetX
+		or snapshot.layoutIconOffsetY ~= layoutIconOffsetY
+		or snapshot.layoutIconSizeSeparate ~= layoutIconSizeSeparate
+		or snapshot.layoutIconWidth ~= layoutIconWidth
+		or snapshot.layoutIconHeight ~= layoutIconHeight
+		or snapshot.layoutIconShape ~= layoutIconShape
+		or snapshot.layoutIconZoom ~= layoutIconZoom
+		or snapshot.layoutSpacing ~= layoutSpacing
 		or snapshot.fixedLocalIndex ~= fixedLocalIndex
 		or snapshot.fixedCount ~= fixedCount
 end
@@ -7722,22 +7836,22 @@ function cdp.RUNTIME.WritePlacementSnapshot(icon, snapshot, data, fixedLayoutCac
 	snapshot.slotColumn = slotColumn
 	snapshot.slotRow = slotRow
 	snapshot.layoutEditActive = layoutEditActive == true
-	snapshot.entryIconSizeUseGlobal = entry and entry.iconSizeUseGlobal or nil
-	snapshot.entryIconSize = entry and entry.iconSize or nil
-	snapshot.entryIconSizeSeparate = entry and entry.iconSizeSeparate or nil
-	snapshot.entryIconWidth = entry and entry.iconWidth or nil
-	snapshot.entryIconHeight = entry and entry.iconHeight or nil
-	snapshot.entryIconOffsetX = entry and entry.iconOffsetX or nil
-	snapshot.entryIconOffsetY = entry and entry.iconOffsetY or nil
-	snapshot.entryFixedGroupId = entry and entry.fixedGroupId or nil
-	snapshot.layoutIconOffsetX = layout and layout.iconOffsetX or nil
-	snapshot.layoutIconOffsetY = layout and layout.iconOffsetY or nil
-	snapshot.layoutIconSizeSeparate = layout and layout.iconSizeSeparate or nil
-	snapshot.layoutIconWidth = layout and layout.iconWidth or nil
-	snapshot.layoutIconHeight = layout and layout.iconHeight or nil
-	snapshot.layoutIconShape = layout and layout.iconShape or nil
-	snapshot.layoutIconZoom = layout and layout.iconZoom or nil
-	snapshot.layoutSpacing = layout and layout.spacing or nil
+	snapshot.entryIconSizeUseGlobal = cdp.RUNTIME.GetTableField(entry, "iconSizeUseGlobal")
+	snapshot.entryIconSize = cdp.RUNTIME.GetTableField(entry, "iconSize")
+	snapshot.entryIconSizeSeparate = cdp.RUNTIME.GetTableField(entry, "iconSizeSeparate")
+	snapshot.entryIconWidth = cdp.RUNTIME.GetTableField(entry, "iconWidth")
+	snapshot.entryIconHeight = cdp.RUNTIME.GetTableField(entry, "iconHeight")
+	snapshot.entryIconOffsetX = cdp.RUNTIME.GetTableField(entry, "iconOffsetX")
+	snapshot.entryIconOffsetY = cdp.RUNTIME.GetTableField(entry, "iconOffsetY")
+	snapshot.entryFixedGroupId = cdp.RUNTIME.GetTableField(entry, "fixedGroupId")
+	snapshot.layoutIconOffsetX = cdp.RUNTIME.GetTableField(layout, "iconOffsetX")
+	snapshot.layoutIconOffsetY = cdp.RUNTIME.GetTableField(layout, "iconOffsetY")
+	snapshot.layoutIconSizeSeparate = cdp.RUNTIME.GetTableField(layout, "iconSizeSeparate")
+	snapshot.layoutIconWidth = cdp.RUNTIME.GetTableField(layout, "iconWidth")
+	snapshot.layoutIconHeight = cdp.RUNTIME.GetTableField(layout, "iconHeight")
+	snapshot.layoutIconShape = cdp.RUNTIME.GetTableField(layout, "iconShape")
+	snapshot.layoutIconZoom = cdp.RUNTIME.GetTableField(layout, "iconZoom")
+	snapshot.layoutSpacing = cdp.RUNTIME.GetTableField(layout, "spacing")
 	snapshot.fixedLocalIndex = fixedLocalIndex
 	snapshot.fixedCount = fixedCount
 end
@@ -9049,7 +9163,7 @@ function CooldownPanels:ApplyActivationOverlayVisualState(data, entry)
 	local active = data.customCooldownDurationActive == true or data.spellAuraOverlayActive == true
 	data.activationOverlayActive = active
 	data.activationOverlayReverse = entry and entry.activationOverlayReverse ~= false or true
-	data.activationOverlayColor = Helper.NormalizeColor(entry and entry.activationOverlayColor, Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT)
+	data.activationOverlayColor = CooldownPanels.ResolveCachedEntryColor("activationOverlayEntry", entry, entry and entry.activationOverlayColor, Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT)
 	data.activationOverlayOnly = entry and entry.activationOverlayOnly == true or false
 	data.activationOverlayGlow = entry and entry.activationOverlayGlow == true or false
 	data.cooldownReverse = data.resolvedType == "CDM_AURA" or (active == true and data.activationOverlayReverse ~= false)
@@ -9570,6 +9684,10 @@ end
 function CooldownPanels:InvalidateSpellQueryCaches(kind, spellId)
 	local runtime = self.runtime
 	if not runtime then return end
+	if kind == nil and spellId == nil then
+		runtime.spellAliasIDsCache = nil
+		runtime.runtimeCanonicalSpellVariantCache = nil
+	end
 	if kind == "duration" or kind == nil then
 		if spellId ~= nil then
 			runtime.spellCooldownDurationCache = runtime.spellCooldownDurationCache or {}
@@ -9614,7 +9732,7 @@ end
 function CooldownPanels:InvalidateSpellCooldownCachesForAliases(spellId)
 	local id = tonumber(spellId)
 	if not (id and self.runtime) then return false end
-	local ids = self:GetSpellAliasIDs(id, {}, {})
+	local ids = self:GetSpellAliasIDs(id)
 	if not ids or #ids == 0 then return false end
 	for i = 1, #ids do
 		local aliasId = ids[i]
@@ -9742,6 +9860,7 @@ local function getItemCooldownInfo(itemID, slotID)
 end
 
 function CooldownPanels:GetItemUseSpellID(itemID)
+	itemID = tonumber(itemID)
 	if not itemID then return nil end
 	self.runtime = self.runtime or {}
 	local runtime = self.runtime
@@ -9751,7 +9870,13 @@ function CooldownPanels:GetItemUseSpellID(itemID)
 	if not Api.GetItemSpell then return nil end
 	local _, spellId = Api.GetItemSpell(itemID)
 	spellId = tonumber(spellId)
-	if spellId then runtime.itemUseSpellCache[itemID] = spellId end
+	if spellId then
+		runtime.itemUseSpellCache[itemID] = spellId
+	elseif C_Item and C_Item.IsItemDataCachedByID and C_Item.IsItemDataCachedByID(itemID) then
+		runtime.itemUseSpellCache[itemID] = false
+	elseif C_Item and C_Item.RequestLoadItemDataByID then
+		C_Item.RequestLoadItemDataByID(itemID)
+	end
 	return spellId
 end
 
@@ -10316,7 +10441,7 @@ end
 
 function cdp.ENTRY.GetCooldownSwipeColor(data)
 	if data and data.activationOverlayActive == true then
-		local color = Helper.NormalizeColor(data.activationOverlayColor, Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT)
+		local color = data.activationOverlayColor or Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT
 		return color[1], color[2], color[3], color[4]
 	end
 	if data and data.resolvedType == "CDM_AURA" then return 0, 0, 0, 0.7 end
@@ -20137,7 +20262,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				if resolvedType == "CDM_AURA" then
 					pandemicGlowColor, pandemicGlowStyle, pandemicGlowInset = CooldownPanels:ResolveEntryPandemicGlowVisual(entryLayout, entry)
 				end
-				local otherAuraGlowColor = resolvedType == "CDM_AURA" and Helper.NormalizeColor(entry.glowOtherAuraColor, glowColor) or glowColor
+				local otherAuraGlowColor = resolvedType == "CDM_AURA" and CooldownPanels.ResolveCachedEntryColor("otherAuraGlowEntry", entry, entry.glowOtherAuraColor, glowColor) or glowColor
 				local soundReady = false
 				local soundName = normalizeSoundName(nil)
 				local previewSound = false
@@ -25736,7 +25861,7 @@ local function clearReadyGlowForSpell(spellId)
 	local index = CooldownPanels.runtime and CooldownPanels.runtime.spellIndex
 	if not index then return false end
 	local panels
-	local aliasIDs = CooldownPanels:GetSpellAliasIDs(id, {}, {})
+	local aliasIDs = CooldownPanels:GetSpellAliasIDs(id)
 	for i = 1, #aliasIDs do
 		local aliasPanels = index[aliasIDs[i]]
 		if aliasPanels then
@@ -25851,7 +25976,7 @@ setOverlayGlowForSpell = function(spellId, enabled)
 	runtime.overlayGlowSpells = runtime.overlayGlowSpells or {}
 	local overlayGlowSpells = runtime.overlayGlowSpells
 	if Api.IsSpellOverlayed then
-		local aliasIds = CooldownPanels:GetSpellAliasIDs(id, {}, {})
+		local aliasIds = CooldownPanels:GetSpellAliasIDs(id)
 		local wasEnabled = false
 		for i = 1, #aliasIds do
 			local aliasId = aliasIds[i]

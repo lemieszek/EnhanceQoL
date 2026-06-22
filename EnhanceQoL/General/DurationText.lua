@@ -341,6 +341,9 @@ end
 function DurationText:InitDB()
 	addon.db = addon.db or {}
 	addon.dbDefaults = addon.dbDefaults or {}
+	local existingDB = addon.db.durationText
+	if self.initializedDB == existingDB and type(existingDB) == "table" and type(existingDB.profiles) == "table" and type(addon.dbDefaults.durationText) == "table" then return end
+
 	addon.dbDefaults.durationText = createProfileStore(self.profileDefaults)
 	if type(addon.db.durationText) ~= "table" or type(addon.db.durationText.profiles) ~= "table" then addon.db.durationText = createProfileStore(self.profileDefaults) end
 
@@ -385,6 +388,7 @@ function DurationText:InitDB()
 	if db[BUILTIN_COOLDOWN_STYLE_MIGRATION_FLAG] ~= true then
 		if migrateBuiltinDurationTextCooldownStyle(db) then self:Invalidate() end
 	end
+	self.initializedDB = db
 end
 
 function DurationText:Invalidate()

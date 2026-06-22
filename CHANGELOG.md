@@ -19,6 +19,7 @@
 - Cooldown Panels: Limits automatic Cooldown Manager sync refreshes to the open Blizzard Cooldown Settings window plus explicit login and specialization changes.
 - Cooldown Panels: Buff Icon synchronization now follows Blizzard's visible Tracked Buffs list and ignores Cooldown Manager entries placed under Not Displayed.
 - Cooldown Panels: New panels now enable supported spell aura overlays, charge cooldown swipes, and hidden empty charge counters by default.
+- Cooldown Panels: Reduced runtime work for icon updates by caching stable placement, spell alias, item use spell, and activation overlay color lookups.
 
 ---
 
