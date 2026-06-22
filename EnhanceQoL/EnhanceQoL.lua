@@ -6869,9 +6869,7 @@ local function setAllHooks()
 		if addon.Aura.functions.InitUnitFrames then addon.Aura.functions.InitUnitFrames() end
 		if addon.Aura.functions.InitStandalonePrivateAuras then addon.Aura.functions.InitStandalonePrivateAuras() end
 	end
-	--@eqol-beta@
 	if addon.DefaultAuraContainers and addon.DefaultAuraContainers.functions and addon.DefaultAuraContainers.functions.InitDB then addon.DefaultAuraContainers.functions.InitDB() end
-	--@end-eqol-beta@
 	if addon.Drinks and addon.Drinks.functions then
 		if addon.Drinks.functions.InitDrinkMacro then addon.Drinks.functions.InitDrinkMacro() end
 		if addon.Drinks.functions.InitFoodReminder then addon.Drinks.functions.InitFoodReminder() end

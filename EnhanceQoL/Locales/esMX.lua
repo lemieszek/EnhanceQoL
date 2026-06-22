@@ -2670,7 +2670,6 @@ L["MovementSpeedInfo"] = "Mostrar %s en la ventana del personaje"
 L["MoverQuestDialog"] = "Diálogo NPC (misión)"
 L["MoverResetHint"] = "Consejo: mantén el modificador de escala y haz clic derecho en un asa de movimiento para restablecer la escala y la posición a los valores predeterminados.\
 El restablecimiento siempre usa el modificador de escala, incluso si el escalado está desactivado."
---@eqol-beta@
 L["mythicPlusTimerBarHeight"] = "Height"
 L["mythicPlusTimerBarOffsetX"] = "Desplazamiento X"
 L["mythicPlusTimerBarOffsetY"] = "Desplazamiento Y"
@@ -2798,7 +2797,6 @@ L["mythicPlusTimerTimerOffsetX"] = "Desplazamiento X"
 L["mythicPlusTimerTimerOffsetY"] = "Desplazamiento Y"
 L["mythicPlusTimerValueOffsetX"] = "Desplazamiento X del valor"
 L["mythicPlusTimerValueOffsetY"] = "Desplazamiento Y del valor"
---@end-eqol-beta@
 L["noChatOnPullTimerDesc"] = "Configura la duración y el origen de los temporizadores."
 L["persistSignUpNoteDesc"] = "Configura ayudas para grupos y buscador."
 L["portalHideMissingDesc"] = "Configura la automatización y ayudas de misiones."
@@ -2895,7 +2893,6 @@ L["mythicPlusEnableObjectiveTracker"] = "Automatizar el seguimiento de objetivos
 L["mythicPlusEnableObjectiveTrackerDesc"] = "Al comenzar una Mítica+, oculta o pliega automáticamente todos los bloques del rastreador de objetivos."
 L["mythicPlusShowChestTimers"] = "Mostrar temporizadores de cofres de Mítico+"
 L["mythicPlusShowChestTimersDesc"] = "Muestra los temporizadores de mejora +2/+3 junto al temporizador de mazmorra."
---@eqol-beta@
 L["mythicPlusTimerAffixColor"] = "Color de afijo"
 L["mythicPlusTimerAffixDisplay"] = "Visualización de afijos"
 L["mythicPlusTimerAffixDisplayIcon"] = "Icon"
@@ -2986,7 +2983,6 @@ L["mythicPlusTimerTooltip"] = "Mostrar tooltip"
 L["mythicPlusTimerUnknownDungeon"] = "Mazmorra Mítica+"
 L["mythicPlusTimerUpdateRate"] = "Frecuencia de actualización"
 L["mythicPlusTimerWidth"] = "Width"
---@end-eqol-beta@
 L["MythicScorePartsLabel"] = "Detalles de Míticas+ a mostrar"
 L["Name"] = "Nombre"
 L["Name anchor"] = "Ancla del nombre"

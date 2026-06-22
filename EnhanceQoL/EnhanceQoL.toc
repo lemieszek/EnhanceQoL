@@ -92,9 +92,7 @@ Modules\Aura\ResourceBars.lua
 Modules\Aura\ResourceBarsHelpers.lua
 Modules\Aura\ExperienceBar.lua
 Modules\Aura\TotalAbsorbTracker.lua
-#@eqol-beta@
 Modules\Aura\DefaultAuraContainers.lua
-#@end-eqol-beta@
 Modules\Skinner\Init.lua
 
 # Bags

@@ -2679,7 +2679,6 @@ if cChar and sectionDungeon then
 		parentSection = damageMeterSection,
 	})
 
-	--@eqol-beta@
 	local mythicPlusTimerSection = addon.SettingsLayout.suitesMythicPlusTimerSection
 	if not mythicPlusTimerSection then
 		mythicPlusTimerSection = addon.functions.SettingsCreateExpandableSection(cChar, {
@@ -2711,7 +2710,6 @@ if cChar and sectionDungeon then
 		end,
 		parentSection = mythicPlusTimerSection,
 	})
-	--@end-eqol-beta@
 
 	-- Objective Tracker
 	local objEnable = addon.functions.SettingsCreateCheckbox(cChar, {

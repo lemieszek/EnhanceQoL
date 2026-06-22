@@ -2670,7 +2670,6 @@ L["MovementSpeedInfo"] = "Показывать %s в окне персонажа
 L["MoverQuestDialog"] = "Диалог НИП (Задание)"
 L["MoverResetHint"] = "Подсказка: удерживайте модификатор масштаба и нажмите правой кнопкой по ручке перемещения, чтобы сбросить масштаб и положение к значениям по умолчанию.\
 Сброс всегда использует модификатор масштаба, даже если масштабирование отключено."
---@eqol-beta@
 L["mythicPlusTimerBarHeight"] = "Height"
 L["mythicPlusTimerBarOffsetX"] = "Смещение X"
 L["mythicPlusTimerBarOffsetY"] = "Смещение Y"
@@ -2798,7 +2797,6 @@ L["mythicPlusTimerTimerOffsetX"] = "Смещение X"
 L["mythicPlusTimerTimerOffsetY"] = "Смещение Y"
 L["mythicPlusTimerValueOffsetX"] = "Value X offset"
 L["mythicPlusTimerValueOffsetY"] = "Value Y offset"
---@end-eqol-beta@
 L["noChatOnPullTimerDesc"] = "Настраивает длительность и источник таймеров."
 L["persistSignUpNoteDesc"] = "Настраивает помощники группы и поиска группы."
 L["portalHideMissingDesc"] = "Настраивает автоматизацию и помощники заданий."
@@ -2895,7 +2893,6 @@ L["mythicPlusEnableObjectiveTracker"] = "Автоматическое управ
 L["mythicPlusEnableObjectiveTrackerDesc"] = "При начале ключа Мифик+ автоматически скрывает или сворачивает все блоки трекера целей."
 L["mythicPlusShowChestTimers"] = "Показывать таймеры сундуков Эпохальный+"
 L["mythicPlusShowChestTimersDesc"] = "Отображать таймеры улучшения +2/+3 рядом с таймером подземелья."
---@eqol-beta@
 L["mythicPlusTimerAffixColor"] = "Affix color"
 L["mythicPlusTimerAffixDisplay"] = "Affix display"
 L["mythicPlusTimerAffixDisplayIcon"] = "Icon"
@@ -2986,7 +2983,6 @@ L["mythicPlusTimerTooltip"] = "Показывать подсказку"
 L["mythicPlusTimerUnknownDungeon"] = "Эпохальное+ подземелье"
 L["mythicPlusTimerUpdateRate"] = "Частота обновления"
 L["mythicPlusTimerWidth"] = "Width"
---@end-eqol-beta@
 L["MythicScorePartsLabel"] = "Какие детали Mythic+ показывать"
 L["Name"] = "Имя"
 L["Name anchor"] = "Якорь имени"
