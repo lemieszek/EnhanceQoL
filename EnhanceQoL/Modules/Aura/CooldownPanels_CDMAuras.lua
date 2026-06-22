@@ -867,6 +867,7 @@ end
 
 local function collectFrame(scan, frame, sourceType, viewerName, seenFrames)
 	if not frame or seenFrames[frame] then return end
+
 	local cooldownID = getCooldownIDFromFrame(frame, sourceType)
 	if not cooldownID then return end
 	seenFrames[frame] = true
@@ -904,12 +905,14 @@ local function collectFrame(scan, frame, sourceType, viewerName, seenFrames)
 
 local function collectFramesFromContainer(scan, container, sourceType, viewerName, seenFrames)
 	if not container then return end
-	if container.GetChildren then
-		local children, childCount = captureValues(getRuntime().scratchChildren, container:GetChildren())
-		for i = 1, childCount do
-			collectFrame(scan, children[i], sourceType, viewerName, seenFrames)
-		end
-	end
+
+	-- ?Because of the removal of the over container hooks, Getchildren is always nil as we are already in oldGridSettings
+	-- if container.GetChildren then
+	-- 	local children, childCount = captureValues(getRuntime().scratchChildren, container:GetChildren())
+	-- 	for i = 1, childCount do
+	-- 		collectFrame(scan, children[i], sourceType, viewerName, seenFrames)
+	-- 	end
+	-- end
 
 	local layoutChildren = container.layoutChildren
 	if type(layoutChildren) == "table" then
@@ -934,11 +937,16 @@ end
 local function collectViewer(scan, viewerName, sourceType, seenFrames)
 	local viewer = _G[viewerName]
 	if not viewer then return end
-	collectFramesFromContainer(scan, viewer, sourceType, viewerName, seenFrames)
+	-- ?is always nil when it comes to layoutChildren subcall which means it is unneded load
+	-- collectFramesFromContainer(scan, viewer, sourceType, viewerName, seenFrames)
+
+	-- !Mainly used for aura detection
 	collectFramesFromContainer(scan, viewer.oldGridSettings, sourceType, viewerName, seenFrames)
-	collectFramesFromContainer(scan, viewer.gridSettings, sourceType, viewerName, seenFrames)
-	collectFramesFromContainer(scan, viewer.currentGridSettings, sourceType, viewerName, seenFrames)
-	collectFramesFromContainer(scan, viewer.settings, sourceType, viewerName, seenFrames)
+
+	-- ?Was never called in tracing - testing without those hooks
+	-- collectFramesFromContainer(scan, viewer.gridSettings, sourceType, viewerName, seenFrames)
+	-- collectFramesFromContainer(scan, viewer.currentGridSettings, sourceType, viewerName, seenFrames)
+	-- collectFramesFromContainer(scan, viewer.settings, sourceType, viewerName, seenFrames)
 end
 
 local function sortTrackedBuffs(a, b)
@@ -989,7 +997,7 @@ function CDMAuras:ScanTrackedBuffs(force, mode)
 	if seedScanFromCategorySet(scan, trackedBarCategory, SOURCE_BAR) then scan.hasAuthoritativeSeed = true end
 
 	collectViewer(scan, ICON_VIEWER, SOURCE_ICON, seenFrames)
-	collectViewer(scan, BAR_VIEWER, SOURCE_BAR, seenFrames)
+	-- collectViewer(scan, BAR_VIEWER, SOURCE_BAR, seenFrames)
 
 	for cooldownID, info in pairs(scan.byCooldownID) do
 		if not seenInfo[info] then
