@@ -4,6 +4,7 @@ Date: 2026-06-22
 Branch: `dev/cdm-aura-o1-rebind`
 Checkpoint commit: `b2fbe580 Optimize CDM aura refresh paths`
 Local checkpoint tag: `checkpoint-cdm-aura-gated-perf`
+Squashed 11.4 commit: `82d64541 Optimize cooldown panel runtime performance`
 
 ## Purpose
 
