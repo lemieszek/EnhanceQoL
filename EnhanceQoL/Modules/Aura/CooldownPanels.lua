@@ -1831,10 +1831,14 @@ CooldownPanels._styleCacheRoots = CooldownPanels._styleCacheRoots
 		pandemicGlowEntry = setmetatable({}, { __mode = "k" }),
 		procGlowPanel = setmetatable({}, { __mode = "k" }),
 		procGlowEntry = setmetatable({}, { __mode = "k" }),
+		activationOverlayEntry = setmetatable({}, { __mode = "k" }),
+		otherAuraGlowEntry = setmetatable({}, { __mode = "k" }),
 		glowPixelOptions = setmetatable({}, { __mode = "k" }),
 		glowPixelEntry = setmetatable({}, { __mode = "k" }),
 		iconLayoutEntry = setmetatable({}, { __mode = "k" }),
 	}
+CooldownPanels._styleCacheRoots.activationOverlayEntry = CooldownPanels._styleCacheRoots.activationOverlayEntry or setmetatable({}, { __mode = "k" })
+CooldownPanels._styleCacheRoots.otherAuraGlowEntry = CooldownPanels._styleCacheRoots.otherAuraGlowEntry or setmetatable({}, { __mode = "k" })
 CooldownPanels._styleCacheRoots.glowPixelOptions = CooldownPanels._styleCacheRoots.glowPixelOptions or setmetatable({}, { __mode = "k" })
 CooldownPanels._styleCacheRoots.glowPixelEntry = CooldownPanels._styleCacheRoots.glowPixelEntry or setmetatable({}, { __mode = "k" })
 CooldownPanels.POWER_USABLE_REFRESH_DELAY = CooldownPanels.POWER_USABLE_REFRESH_DELAY or 0.05
@@ -1846,6 +1850,37 @@ function CooldownPanels.FillCachedColor(cache, r, g, b, a)
 	cache[3] = b or 1
 	cache[4] = a or 1
 	return cache
+end
+
+function CooldownPanels.ResolveCachedEntryColor(cacheRootName, entry, color, fallbackColor)
+	if not entry then return fallbackColor or Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT end
+	local roots = CooldownPanels._styleCacheRoots
+	local root = roots and roots[cacheRootName]
+	if not root then return Helper.NormalizeColor(color, fallbackColor) end
+	local cache = root[entry]
+	local fallbackR = fallbackColor and fallbackColor[1] or nil
+	local fallbackG = fallbackColor and fallbackColor[2] or nil
+	local fallbackB = fallbackColor and fallbackColor[3] or nil
+	local fallbackA = fallbackColor and fallbackColor[4] or nil
+	if
+		not cache
+		or cache.srcColor ~= color
+		or cache.fallbackR ~= fallbackR
+		or cache.fallbackG ~= fallbackG
+		or cache.fallbackB ~= fallbackB
+		or cache.fallbackA ~= fallbackA
+	then
+		cache = cache or {}
+		cache.srcColor = color
+		cache.fallbackR = fallbackR
+		cache.fallbackG = fallbackG
+		cache.fallbackB = fallbackB
+		cache.fallbackA = fallbackA
+		local r, g, b, a = Helper.ResolveColor(color, fallbackColor)
+		cache.color = CooldownPanels.FillCachedColor(cache.color, r, g, b, a)
+		root[entry] = cache
+	end
+	return cache.color
 end
 
 local function clearRuntimeLayoutShapeCache(runtime)
@@ -9128,7 +9163,7 @@ function CooldownPanels:ApplyActivationOverlayVisualState(data, entry)
 	local active = data.customCooldownDurationActive == true or data.spellAuraOverlayActive == true
 	data.activationOverlayActive = active
 	data.activationOverlayReverse = entry and entry.activationOverlayReverse ~= false or true
-	data.activationOverlayColor = Helper.NormalizeColor(entry and entry.activationOverlayColor, Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT)
+	data.activationOverlayColor = CooldownPanels.ResolveCachedEntryColor("activationOverlayEntry", entry, entry and entry.activationOverlayColor, Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT)
 	data.activationOverlayOnly = entry and entry.activationOverlayOnly == true or false
 	data.activationOverlayGlow = entry and entry.activationOverlayGlow == true or false
 	data.cooldownReverse = data.resolvedType == "CDM_AURA" or (active == true and data.activationOverlayReverse ~= false)
@@ -10406,7 +10441,7 @@ end
 
 function cdp.ENTRY.GetCooldownSwipeColor(data)
 	if data and data.activationOverlayActive == true then
-		local color = Helper.NormalizeColor(data.activationOverlayColor, Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT)
+		local color = data.activationOverlayColor or Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT
 		return color[1], color[2], color[3], color[4]
 	end
 	if data and data.resolvedType == "CDM_AURA" then return 0, 0, 0, 0.7 end
@@ -20227,7 +20262,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				if resolvedType == "CDM_AURA" then
 					pandemicGlowColor, pandemicGlowStyle, pandemicGlowInset = CooldownPanels:ResolveEntryPandemicGlowVisual(entryLayout, entry)
 				end
-				local otherAuraGlowColor = resolvedType == "CDM_AURA" and Helper.NormalizeColor(entry.glowOtherAuraColor, glowColor) or glowColor
+				local otherAuraGlowColor = resolvedType == "CDM_AURA" and CooldownPanels.ResolveCachedEntryColor("otherAuraGlowEntry", entry, entry.glowOtherAuraColor, glowColor) or glowColor
 				local soundReady = false
 				local soundName = normalizeSoundName(nil)
 				local previewSound = false
