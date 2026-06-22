@@ -722,6 +722,9 @@ addon.Sounds.soundFiles = {
 	},
 	["interface"] = {
 		["general"] = {
+			["bnetNotificationToast"] = {
+				567402, -- Battle.net notification toast
+			},
 			["changeTab"] = {
 				567422,
 				567507,

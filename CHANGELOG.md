@@ -2,6 +2,15 @@
 
 <!--@eqol-beta@-->
 
+## [11.4.0-beta10] - 2026-06-22
+
+### 🐛 Fixed
+
+- Cooldown Panels: Fixed Layout Edit closing when clicking entries, empty fixed slots, or fixed-slot subgroups while editing a panel from the new cooldown editor.
+- Unit Frames: Fixed Druid primary power filtering so the Player Frame follows the current form resource instead of forcing the specialization's main resource.
+
+---
+
 ## [11.4.0-beta9] - 2026-06-21
 
 ### 🔄 Changed

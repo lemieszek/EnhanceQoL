@@ -457,6 +457,24 @@ local function positionAuraFontString(fontString, owner, prefix, defaultPoint, d
 	if fontString.SetDrawLayer then fontString:SetDrawLayer("OVERLAY", 7) end
 end
 
+local function buildDefaultAuraTextStyleKey(kind, prefix, fallbackColor)
+	local color = normalizeAuraTextColor(getDefaultAuraDBValue(kind, prefix .. "Color"), fallbackColor)
+	local offset = getDefaultAuraDBValue(kind, prefix .. "Offset")
+	return table.concat({
+		tostring(getDefaultAuraDBValue(kind, prefix .. "Enabled") ~= false),
+		tostring(normalizeAuraFontKey(getDefaultAuraDBValue(kind, prefix .. "FontFace"))),
+		tostring(normalizeAuraFontStyle(getDefaultAuraDBValue(kind, prefix .. "FontOutline"))),
+		tostring(getAuraTextSize(nil, tonumber(getDefaultAuraDBValue(kind, prefix .. "FontSize")) or (prefix == "Duration" and 10 or 12))),
+		tostring(color.r),
+		tostring(color.g),
+		tostring(color.b),
+		tostring(color.a),
+		tostring(normalizeAuraAnchorPoint(getDefaultAuraDBValue(kind, prefix .. "Anchor"), prefix == "Duration" and "BOTTOM" or "TOPRIGHT")),
+		tostring(getAuraTextOffset(nil, "x", type(offset) == "table" and offset.x or (prefix == "Duration" and 0 or -1))),
+		tostring(getAuraTextOffset(nil, "y", type(offset) == "table" and offset.y or -1)),
+	}, ":")
+end
+
 local function applyDefaultAuraTextStyle(button)
 	if not button then return end
 	local kind = button.eqolDefaultAuraKind
@@ -635,8 +653,13 @@ local function applyDefaultAuraButtonStyle(button, force)
 	local zoom = normalizeAuraIconZoom(getDefaultAuraDBValue(kind, "IconZoom"))
 	local borderKey = normalizeAuraBorder(getDefaultAuraDBValue(kind, "BorderTexture"), shape)
 	local color = resolveDefaultAuraBorderColor(button, kind)
+	local iconDarkMode = getDefaultAuraDBValue(kind, "IconDarkMode") == true
+	local iconDarkness = normalizeAuraIconDarkness(getDefaultAuraDBValue(kind, "IconDarkness"))
+	local iconDesaturate = getDefaultAuraDBValue(kind, "IconDesaturate") == true
 	local hasCustomBorder = not isNoAuraBorder(borderKey)
-	local styleKey = tostring(kind) .. ":" .. tostring(size) .. ":" .. tostring(shape) .. ":" .. tostring(zoom) .. ":" .. tostring(borderKey) .. ":" .. tostring(getDefaultAuraBorderSize(nil, kind)) .. ":" .. tostring(getDefaultAuraBorderOffset(nil, kind)) .. ":" .. tostring(getDefaultAuraDrawSwipe(kind)) .. ":" .. tostring(getDefaultAuraDurationTextProfile(kind)) .. ":" .. tostring(addon.DurationText and addon.DurationText.version or 0) .. ":" .. tostring(color.r) .. ":" .. tostring(color.g) .. ":" .. tostring(color.b) .. ":" .. tostring(color.a)
+	local durationTextKey = buildDefaultAuraTextStyleKey(kind, "Duration", DEFAULT_AURA_DURATION_COLOR)
+	local countTextKey = buildDefaultAuraTextStyleKey(kind, "Count", DEFAULT_AURA_COUNT_COLOR)
+	local styleKey = tostring(kind) .. ":" .. tostring(size) .. ":" .. tostring(shape) .. ":" .. tostring(zoom) .. ":" .. tostring(borderKey) .. ":" .. tostring(getDefaultAuraBorderSize(nil, kind)) .. ":" .. tostring(getDefaultAuraBorderOffset(nil, kind)) .. ":" .. tostring(getDefaultAuraDrawSwipe(kind)) .. ":" .. tostring(getDefaultAuraDurationTextProfile(kind)) .. ":" .. tostring(addon.DurationText and addon.DurationText.version or 0) .. ":" .. tostring(color[1]) .. ":" .. tostring(color[2]) .. ":" .. tostring(color[3]) .. ":" .. tostring(color[4]) .. ":" .. tostring(iconDarkMode) .. ":" .. tostring(iconDarkness) .. ":" .. tostring(iconDesaturate) .. ":" .. durationTextKey .. ":" .. countTextKey
 	if not force and button.eqolDefaultAuraStyleKey == styleKey then return end
 	button.eqolDefaultAuraStyleKey = styleKey
 
@@ -1036,7 +1059,7 @@ local function refreshDefaultAuraSamples(kind)
 		else
 			sample:SetPoint("RIGHT", samples[i - 1], "LEFT", -horizontalSpacing, 0)
 		end
-		applyDefaultAuraButtonStyle(sample)
+		applyDefaultAuraButtonStyle(sample, true)
 		sample:Show()
 	end
 	for i = count + 1, #samples do samples[i]:Hide() end
@@ -1388,10 +1411,12 @@ local function registerDefaultAuraHeaderEditMode(kind, header, anchor)
 		end,
 		onApply = function()
 			attachDefaultAuraHeaderToAnchor(header, anchor)
+			applyDefaultAuraHeaderButtonStyles(header, true)
 			updateDefaultAuraHeaderButtons(header)
 		end,
 		onPositionChanged = function()
 			attachDefaultAuraHeaderToAnchor(header, anchor)
+			applyDefaultAuraHeaderButtonStyles(header, true)
 			updateDefaultAuraHeaderButtons(header)
 		end,
 		settings = createDefaultAuraEditModeSettings(kind),

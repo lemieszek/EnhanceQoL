@@ -203,6 +203,76 @@ local function getRuntimePassCacheTable(field)
 	return cache, runtime
 end
 
+local function bumpPerfCounter(runtime, name, amount)
+	if cdm.perfCountersEnabled ~= true then return end
+	runtime = runtime or getRuntime()
+	local counters = runtime.cdmAuraPerfCounters
+	if type(counters) ~= "table" then
+		counters = {}
+		runtime.cdmAuraPerfCounters = counters
+		runtime.cdmAuraPerfCountersStartedAt = GetTime and GetTime() or nil
+	end
+	counters[name] = (tonumber(counters[name]) or 0) + (tonumber(amount) or 1)
+end
+
+function CDMAuras:SetPerformanceCountersEnabled(enabled, reset)
+	local runtime = getRuntime()
+	cdm.perfCountersEnabled = enabled == true
+	runtime.cdmAuraPerfCountersEnabled = cdm.perfCountersEnabled
+	if reset ~= false then
+		runtime.cdmAuraPerfCounters = {}
+		runtime.cdmAuraPerfCountersStartedAt = GetTime and GetTime() or nil
+	end
+	return cdm.perfCountersEnabled == true
+end
+
+function CDMAuras:ResetPerformanceCounters()
+	local runtime = getRuntime()
+	runtime.cdmAuraPerfCounters = {}
+	runtime.cdmAuraPerfCountersStartedAt = GetTime and GetTime() or nil
+end
+
+function CDMAuras:GetPerformanceReport()
+	local runtime = getRuntime()
+	local counters = runtime.cdmAuraPerfCounters or {}
+	local keys = {}
+	for key in pairs(counters) do
+		keys[#keys + 1] = key
+	end
+	table.sort(keys)
+
+	local startedAt = tonumber(runtime.cdmAuraPerfCountersStartedAt)
+	local elapsed = startedAt and GetTime and math.max(0, GetTime() - startedAt) or nil
+	local lines = {
+		"EQOL CDM Aura Performance Report",
+		"enabled: " .. tostring(cdm.perfCountersEnabled == true),
+	}
+	if elapsed then lines[#lines + 1] = ("windowSeconds: %.3f"):format(elapsed) end
+	lines[#lines + 1] = ""
+	if #keys == 0 then
+		lines[#lines + 1] = "No counters recorded."
+	else
+		for _, key in ipairs(keys) do
+			lines[#lines + 1] = key .. ": " .. tostring(counters[key])
+		end
+	end
+	return table.concat(lines, "\n")
+end
+
+function CDMAuras:PrintPerformanceReport()
+	print(self:GetPerformanceReport())
+end
+
+function CDMAuras:ShowPerformanceReport()
+	local report = self:GetPerformanceReport()
+	local uf = addon.Aura and addon.Aura.UF
+	if uf and uf.ShowDebugCopyBox then
+		uf.ShowDebugCopyBox(report)
+	else
+		print(report)
+	end
+end
+
 local function getEntryKey(panelId, entryId) return Helper.GetEntryKey(panelId, entryId) end
 
 local function requestPanelRefresh(panelId)
@@ -873,11 +943,15 @@ end
 
 local function seedScanFromCategorySet(scan, category, sourceType)
 	if not (scan and category and C_CooldownViewer and C_CooldownViewer.GetCooldownViewerCategorySet) then return false end
+	if cdm.perfCountersEnabled == true then bumpPerfCounter(nil, "seedScanFromCategorySetCalls") end
 	local ok, cooldownIDs = pcall(C_CooldownViewer.GetCooldownViewerCategorySet, category, true)
 	if not ok or type(cooldownIDs) ~= "table" then return false end
+	if cdm.perfCountersEnabled == true then bumpPerfCounter(nil, "seedScanFromCategorySetCooldownIDs", #cooldownIDs) end
 	local seeded = false
+	local validCooldownIDs = 0
 	for _, cooldownID in ipairs(cooldownIDs) do
 		if isValidCooldownID(cooldownID) then
+			validCooldownIDs = validCooldownIDs + 1
 			seeded = true
 			local info = ensureScanInfo(scan, cooldownID)
 			info.availableSources[sourceType] = true
@@ -887,6 +961,7 @@ local function seedScanFromCategorySet(scan, category, sourceType)
 			end
 		end
 	end
+	if cdm.perfCountersEnabled == true then bumpPerfCounter(nil, "seedScanFromCategorySetValidCooldownIDs", validCooldownIDs) end
 	return seeded
 end
 
@@ -992,9 +1067,15 @@ end
 function CDMAuras:ScanTrackedBuffs(force, mode)
 	local runtime = getRuntime()
 	local runtimeMode = mode == "runtime"
+	local scanCounterPrefix = runtimeMode and "scanRuntime" or "scanFull"
+	if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, scanCounterPrefix .. (force and "ForcedCalls" or "NormalCalls")) end
 	if not force and runtime.scan and runtime.scan.list and runtime.scan.byCooldownID then
-		if runtimeMode or runtime.scan.fullDerived == true then return runtime.scan.list, runtime.scan.byCooldownID, runtime.scan.bySpellID, runtime.scan.byCooldownKey end
+		if runtimeMode or runtime.scan.fullDerived == true then
+			if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, scanCounterPrefix .. "CacheHits") end
+			return runtime.scan.list, runtime.scan.byCooldownID, runtime.scan.bySpellID, runtime.scan.byCooldownKey
+		end
 	end
+	if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, scanCounterPrefix .. "Builds") end
 
 	local scan = runtime.scan or {}
 	scan.list = scan.list or {}
@@ -1629,18 +1710,38 @@ local function getFrameAuraUnit(frame)
 	return nil
 end
 
+local function storeFrameAuraPassCache(runtime, passCache, frame, auraData, auraUnit, auraInstanceID)
+	if not (runtime and passCache and frame) then return end
+	runtime.frameAuraPassRecordByFrame = cdm.EnsureWeakKeyTable(runtime.frameAuraPassRecordByFrame)
+	local cached = runtime.frameAuraPassRecordByFrame[frame]
+	if not cached then
+		cached = {}
+		runtime.frameAuraPassRecordByFrame[frame] = cached
+	end
+	cached.auraData = auraData
+	cached.auraUnit = auraUnit
+	cached.auraInstanceID = auraInstanceID
+	passCache[frame] = cached
+end
+
 local function getFrameAuraData(frame)
-	local passCache = frame and getRuntimePassCacheTable("runtimePassFrameAuraData") or nil
+	local passCache
+	local runtime
+	if frame then passCache, runtime = getRuntimePassCacheTable("runtimePassFrameAuraData") end
 	if passCache then
 		local cached = passCache[frame]
 		if cached then
 			local currentAuraInstanceID = frame and hasAuraInstanceID(frame.auraInstanceID) and frame.auraInstanceID or nil
 			local canReuseCachedNil = cached.auraData ~= nil or currentAuraInstanceID == nil or cached.auraInstanceID == currentAuraInstanceID
-			if canReuseCachedNil then return cached.auraData, cached.auraUnit, cached.auraInstanceID end
+			if canReuseCachedNil then
+				if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, "frameAuraDataPassHits") end
+				return cached.auraData, cached.auraUnit, cached.auraInstanceID
+			end
 		end
 	end
 	if not frame then return nil, nil, nil end
-	local runtime = getRuntime()
+	runtime = runtime or getRuntime()
+	if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, "frameAuraDataComputes") end
 	local auraUnit = getFrameAuraUnit(frame)
 	local auraInstanceID = hasAuraInstanceID(frame.auraInstanceID) and frame.auraInstanceID or nil
 	local frameEpoch = cdm.GetFrameEpoch(runtime, frame)
@@ -1655,17 +1756,16 @@ local function getFrameAuraData(frame)
 	then
 		local canReuseCachedNil = persistentCache.auraData ~= nil or auraInstanceID == nil
 		if canReuseCachedNil then
-			if passCache then
-				passCache[frame] = passCache[frame] or {}
-				passCache[frame].auraData = persistentCache.auraData
-				passCache[frame].auraUnit = persistentCache.auraUnit
-				passCache[frame].auraInstanceID = persistentCache.auraInstanceID
-			end
+			if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, "frameAuraDataPersistentHits") end
+			storeFrameAuraPassCache(runtime, passCache, frame, persistentCache.auraData, persistentCache.auraUnit, persistentCache.auraInstanceID)
 			return persistentCache.auraData, persistentCache.auraUnit, persistentCache.auraInstanceID
 		end
 	end
 	local auraData = nil
-	if auraUnit and auraInstanceID then auraData = getAuraDataByAuraInstanceIDCached(auraUnit, auraInstanceID) end
+	if auraUnit and auraInstanceID then
+		if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, "frameAuraDataAuraLookups") end
+		auraData = getAuraDataByAuraInstanceIDCached(auraUnit, auraInstanceID)
+	end
 	runtime.frameAuraSnapshotByFrame = cdm.EnsureWeakKeyTable(runtime.frameAuraSnapshotByFrame)
 	local snapshot = runtime.frameAuraSnapshotByFrame[frame]
 	if not snapshot then
@@ -1677,12 +1777,7 @@ local function getFrameAuraData(frame)
 	snapshot.auraInstanceID = auraInstanceID
 	snapshot.frameEpoch = frameEpoch
 	snapshot.unitAuraEpoch = unitAuraEpoch
-	if passCache then
-		passCache[frame] = passCache[frame] or {}
-		passCache[frame].auraData = auraData
-		passCache[frame].auraUnit = auraUnit
-		passCache[frame].auraInstanceID = auraInstanceID
-	end
+	storeFrameAuraPassCache(runtime, passCache, frame, auraData, auraUnit, auraInstanceID)
 	if auraData then return auraData, auraUnit, auraInstanceID end
 	return nil, auraUnit, auraInstanceID
 end
@@ -2311,6 +2406,7 @@ function CDMAuras:BuildRuntimeData(panelId, entryId, entry, entryLayout, alwaysS
 	if not (entry and entry.type == ENTRY_TYPE) then return nil end
 
 	local runtime = getRuntime()
+	if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, "buildRuntimeDataCalls") end
 	local key = getEntryKey(panelId, entryId)
 	local state = runtime.entryStates[key]
 	if not state then
@@ -2347,30 +2443,35 @@ function CDMAuras:BuildRuntimeData(panelId, entryId, entry, entryLayout, alwaysS
 		and cachedScanInfo ~= nil
 	then
 		scanInfo = cachedScanInfo ~= NO_SCAN_INFO and cachedScanInfo or nil
+		if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, scanInfo and "buildRuntimeDataScanInfoHits" or "buildRuntimeDataNoScanInfoHits") end
 		resolvedCooldownID = state.cachedResolvedCooldownID
 	else
-			local scan, byCooldownID, _, byCooldownKey = self:ScanTrackedBuffs(false, "runtime")
-			scanInfo, resolvedCooldownID = resolveRuntimeEntryScanInfo(entry, scan, byCooldownID, byCooldownKey)
+		if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, "buildRuntimeDataScanInfoMisses") end
+		local scan, byCooldownID, _, byCooldownKey = self:ScanTrackedBuffs(false, "runtime")
+		scanInfo, resolvedCooldownID = resolveRuntimeEntryScanInfo(entry, scan, byCooldownID, byCooldownKey)
 		local expectedCooldownID = isValidCooldownID(resolvedCooldownID) and resolvedCooldownID or entry.cooldownID
 		local staleFrameScanInfo = scanInfoHasOnlyMismatchedFrames(scanInfo, entry.sourceType, expectedCooldownID)
+		if staleFrameScanInfo and cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, "buildRuntimeDataStaleFrameScanInfo") end
 		if not scanInfo or staleFrameScanInfo then
 			local rescanEpoch = runtime.scanEpoch or scanEpoch
-				local rescanned
-				local rescannedByCooldownKey
-				if runtime.forcedRescanEpoch == rescanEpoch then
-					local _, rescannedByCooldownID, _rescannedBySpellID, rescannedCooldownLookup = self:ScanTrackedBuffs(false, "runtime")
-					rescanned = rescannedByCooldownID
-					rescannedByCooldownKey = rescannedCooldownLookup
-				else
-					-- A negative first lookup can happen before Cooldown Viewer data or frames are ready.
-					-- Clear cached viewer info too so the forced rescan can recover once Blizzard finishes initialization.
-					self:InvalidateScan(true, "BuildRuntimeData:ForcedRescan")
-					local _, rescannedByCooldownID, rescannedBySpellLookup, rescannedCooldownLookup = self:ScanTrackedBuffs(true, "runtime")
-					rescanned = rescannedByCooldownID
-					rescannedByCooldownKey = rescannedCooldownLookup
-					runtime.forcedRescanEpoch = runtime.scanEpoch or rescanEpoch
-				end
-				scanInfo, resolvedCooldownID = resolveRuntimeEntryScanInfo(entry, runtime.scan, rescanned, rescannedByCooldownKey)
+			local rescanned
+			local rescannedByCooldownKey
+			if runtime.forcedRescanEpoch == rescanEpoch then
+				if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, "buildRuntimeDataForcedRescanReused") end
+				local _, rescannedByCooldownID, _rescannedBySpellID, rescannedCooldownLookup = self:ScanTrackedBuffs(false, "runtime")
+				rescanned = rescannedByCooldownID
+				rescannedByCooldownKey = rescannedCooldownLookup
+			else
+				if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, "buildRuntimeDataForcedRescans") end
+				-- A negative first lookup can happen before Cooldown Viewer data or frames are ready.
+				-- Clear cached viewer info too so the forced rescan can recover once Blizzard finishes initialization.
+				self:InvalidateScan(true, "BuildRuntimeData:ForcedRescan")
+				local _, rescannedByCooldownID, rescannedBySpellLookup, rescannedCooldownLookup = self:ScanTrackedBuffs(true, "runtime")
+				rescanned = rescannedByCooldownID
+				rescannedByCooldownKey = rescannedCooldownLookup
+				runtime.forcedRescanEpoch = runtime.scanEpoch or rescanEpoch
+			end
+			scanInfo, resolvedCooldownID = resolveRuntimeEntryScanInfo(entry, runtime.scan, rescanned, rescannedByCooldownKey)
 			expectedCooldownID = isValidCooldownID(resolvedCooldownID) and resolvedCooldownID or entry.cooldownID
 			if scanInfoHasOnlyMismatchedFrames(scanInfo, entry.sourceType, expectedCooldownID) then scanInfo = nil end
 		end
@@ -2417,30 +2518,32 @@ function CDMAuras:BuildRuntimeData(panelId, entryId, entry, entryLayout, alwaysS
 		local runtimePass = runtime.runtimePass
 		if not chosenFrameLooksActive or not chosenFrameMatchesTrackedSpell then
 			local rescannedByCooldownID
-				local rescannedByCooldownKey
-				if runtimePass and runtime.reacquireRescanPass == runtimePass then
-					local _, latestByCooldownID, _latestBySpellID, latestByCooldownKey = self:ScanTrackedBuffs(false, "runtime")
-					rescannedByCooldownID = latestByCooldownID
-					rescannedByCooldownKey = latestByCooldownKey
-				else
-					self:InvalidateScan(false, "BuildRuntimeData:Reacquire")
-					local _, latestByCooldownID, _latestBySpellID, latestByCooldownKey = self:ScanTrackedBuffs(true, "runtime")
-					rescannedByCooldownID = latestByCooldownID
-					rescannedByCooldownKey = latestByCooldownKey
-					if runtimePass then runtime.reacquireRescanPass = runtimePass end
-				end
-				scanInfo, resolvedCooldownID = resolveRuntimeEntryScanInfo(entry, runtime.scan, rescannedByCooldownID, rescannedByCooldownKey)
-				if not isValidCooldownID(resolvedCooldownID) then resolvedCooldownID = entry.cooldownID end
+			local rescannedByCooldownKey
+			if runtimePass and runtime.reacquireRescanPass == runtimePass then
+				if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, "buildRuntimeDataReacquireRescanReused") end
+				local _, latestByCooldownID, _latestBySpellID, latestByCooldownKey = self:ScanTrackedBuffs(false, "runtime")
+				rescannedByCooldownID = latestByCooldownID
+				rescannedByCooldownKey = latestByCooldownKey
+			else
+				if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, "buildRuntimeDataReacquireRescans") end
+				self:InvalidateScan(false, "BuildRuntimeData:Reacquire")
+				local _, latestByCooldownID, _latestBySpellID, latestByCooldownKey = self:ScanTrackedBuffs(true, "runtime")
+				rescannedByCooldownID = latestByCooldownID
+				rescannedByCooldownKey = latestByCooldownKey
+				if runtimePass then runtime.reacquireRescanPass = runtimePass end
+			end
+			scanInfo, resolvedCooldownID = resolveRuntimeEntryScanInfo(entry, runtime.scan, rescannedByCooldownID, rescannedByCooldownKey)
+			if not isValidCooldownID(resolvedCooldownID) then resolvedCooldownID = entry.cooldownID end
 			state.cachedScanEpoch = runtime.scanEpoch or 0
 			state.cachedScanCooldownID = entry.cooldownID
 			state.cachedScanSpellID = entry.spellID
 			state.cachedScanSourceType = entry.sourceType
 			state.cachedScanInfo = scanInfo or NO_SCAN_INFO
 			state.cachedResolvedCooldownID = resolvedCooldownID
-				local reacquiredChosenFrame, reacquiredChosenSource, _, reacquiredFallbackFrame = selectScanInfoFrame(scanInfo, preferredSource, resolvedCooldownID)
-				chosenFrame, chosenSource, fallbackFrame = reacquiredChosenFrame, reacquiredChosenSource, reacquiredFallbackFrame
-				if scanInfo then ensureScanInfoDerived(scanInfo, resolvedCooldownID, chosenFrame or fallbackFrame, false, true) end
-				trackedUnit = getEntryTrackedUnit(scanInfo, state, chosenFrame or fallbackFrame, resolvedCooldownID or entry.cooldownID, preferredSource)
+			local reacquiredChosenFrame, reacquiredChosenSource, _, reacquiredFallbackFrame = selectScanInfoFrame(scanInfo, preferredSource, resolvedCooldownID)
+			chosenFrame, chosenSource, fallbackFrame = reacquiredChosenFrame, reacquiredChosenSource, reacquiredFallbackFrame
+			if scanInfo then ensureScanInfoDerived(scanInfo, resolvedCooldownID, chosenFrame or fallbackFrame, false, true) end
+			trackedUnit = getEntryTrackedUnit(scanInfo, state, chosenFrame or fallbackFrame, resolvedCooldownID or entry.cooldownID, preferredSource)
 			if runtimePass then state.frameReacquirePass = runtimePass end
 		end
 	end

@@ -2119,11 +2119,6 @@ end
 
 local function getEffectivePlayerPrimaryPowerToken(powerToken, powerEnum)
 	local normalized = normalizePrimaryPowerToken(powerEnum, powerToken)
-	if addon.variables and addon.variables.unitClass == "DRUID" then
-		local specMain = H.GetSpecMainPowerToken and H.GetSpecMainPowerToken("DRUID", addon.variables.unitSpec)
-		specMain = normalizePrimaryPowerToken(nil, specMain)
-		if specMain and specMain ~= "MANA" then normalized = specMain end
-	end
 	return normalized
 end
 

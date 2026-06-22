@@ -370,6 +370,7 @@ L["blockPartyInvites"] = "Блокировать приглашения в гр�
 L["blockPartyInvitesDesc"] = "Автоматически отклоняет приглашения в группу."
 L["blockPetBattleRequests"] = "Блокировать запросы на битву питомцев"
 L["blockPetBattleRequestsDesc"] = "Автоматически отклоняет запросы на битву питомцев."
+L["bnetNotificationToast"] = "Звук уведомления Battle.net"
 L["bloodlust"] = "Звуки Кровожадности/Героизма"
 L["BloodlustAvailable"] = "Жажда крови доступна"
 L["Border"] = "Рамка"

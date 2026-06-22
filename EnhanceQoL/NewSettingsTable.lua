@@ -11,6 +11,7 @@ addon.variables.NewVersionTableEQOL = {
 	healthStopCasting = true,
 	questTrackerHideMainHeader = true,
 	questTrackerTextStyleEnabled = true,
+	sounds_interface_general_bnetNotificationToast = true,
 
 	-- 11.4.0-beta2
 	enhancedWaypoint = true,

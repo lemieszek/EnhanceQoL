@@ -12145,8 +12145,8 @@ function CooldownPanels:DockStandaloneDialogToEditor(dialog)
 		return false
 	end
 	if dialog.SetClampedToScreen then dialog:SetClampedToScreen(false) end
-	if dialog.SetMovable then dialog:SetMovable(false) end
-	if dialog.RegisterForDrag then dialog:RegisterForDrag() end
+	if dialog.SetMovable then dialog:SetMovable(true) end
+	if dialog.RegisterForDrag then dialog:RegisterForDrag("LeftButton") end
 	if dialog.StopMovingOrSizing then dialog:StopMovingOrSizing() end
 	dialog:ClearAllPoints()
 	dialog:SetPoint("TOPLEFT", frame, "TOPRIGHT", 8, 0)
@@ -12205,12 +12205,14 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 	if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = true end
 	self:HideLayoutPanelStandaloneMenu(panelId)
 	self:HideLayoutFixedGroupStandaloneMenu(panelId)
-	if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = nil end
 
 	local panel, entry = self:GetLayoutEntryStandaloneDialogEntry(panelId, entryId)
 	local runtime = getRuntime(panelId)
 	local hostFrame = runtime and runtime.frame or (self.EnsurePanelFrame and self:EnsurePanelFrame(panelId)) or nil
-	if not (panel and entry and hostFrame) then return end
+	if not (panel and entry and hostFrame) then
+		if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = nil end
+		return
+	end
 	local spawnPosition = self:GetStandaloneDialogSpawnPosition(anchorFrame, hostFrame, 12, 0)
 	local defaultStaticFontPath, defaultStaticFontSize, defaultStaticFontStyle = Helper.GetCountFontDefaults(hostFrame)
 	local defaultCooldownFontPath, defaultCooldownFontSize, defaultCooldownFontStyle = self:GetCooldownFontDefaults(hostFrame)
@@ -15205,6 +15207,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			if fromBlizzardEditor and not suppressLayoutEnd and CooldownPanels.SetEditorLayoutEditEnabled then CooldownPanels:SetEditorLayoutEditEnabled(false) end
 		end,
 	})
+	if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = nil end
 	if dialog then
 		self:DockStandaloneDialogToEditor(dialog)
 		local state = self:GetLayoutEntryStandaloneMenuState()
@@ -15292,14 +15295,16 @@ function CooldownPanels:OpenLayoutPanelStandaloneMenu(panelId, anchorFrame)
 	if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = true end
 	self:HideLayoutEntryStandaloneMenu(panelId)
 	self:HideLayoutFixedGroupStandaloneMenu(panelId)
-	if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = nil end
 
 	self:PrepareLayoutPanelStandaloneSettings(panelId)
 	local registeredRuntime = getRuntime(panelId)
 	local registeredPanel = self:GetPanel(panelId)
 	local registeredHostFrame = registeredRuntime and registeredRuntime.frame or nil
 	local registeredSettings = registeredRuntime and registeredRuntime.layoutPanelSettings or nil
-	if not (registeredPanel and registeredHostFrame and registeredSettings) then return end
+	if not (registeredPanel and registeredHostFrame and registeredSettings) then
+		if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = nil end
+		return
+	end
 
 	local spawnPosition = self:GetStandaloneDialogSpawnPosition(anchorFrame, registeredHostFrame, 12, 0)
 	local dialog = lib:ShowStandaloneSettingsDialog(registeredHostFrame, {
@@ -15322,6 +15327,7 @@ function CooldownPanels:OpenLayoutPanelStandaloneMenu(panelId, anchorFrame)
 			if fromBlizzardEditor and not suppressLayoutEnd and CooldownPanels.SetEditorLayoutEditEnabled then CooldownPanels:SetEditorLayoutEditEnabled(false) end
 		end,
 	})
+	if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = nil end
 	if dialog then
 		self:DockStandaloneDialogToEditor(dialog)
 		local state = self:GetLayoutPanelStandaloneMenuState()
@@ -15993,6 +15999,9 @@ function CooldownPanels:OpenLayoutFixedGroupStandaloneMenu(panelId, groupId, anc
 	panelId = normalizeId(panelId)
 	groupId = Helper.NormalizeFixedGroupId(groupId)
 	if not self:IsLayoutFixedGroupStandaloneMenuAvailable(panelId, groupId) then return end
+	local editor = getEditor()
+	local suppressBlizzardEditorLayoutEnd = editor and editor._eqolBlizzardEditorLayoutEdit == true
+	if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = true end
 	self:HideLayoutEntryStandaloneMenu(panelId)
 	self:HideLayoutPanelStandaloneMenu(panelId)
 	self:HideLayoutFixedGroupStandaloneMenu(panelId)
@@ -16002,7 +16011,10 @@ function CooldownPanels:OpenLayoutFixedGroupStandaloneMenu(panelId, groupId, anc
 	local runtime = getRuntime(panelId)
 	local hostFrame = runtime and runtime.frame or nil
 	local settings = self:BuildLayoutFixedGroupStandaloneSettings(panelId, groupId)
-	if not (group and hostFrame and settings) then return end
+	if not (group and hostFrame and settings) then
+		if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = nil end
+		return
+	end
 
 	local spawnPosition = self:GetStandaloneDialogSpawnPosition(anchorFrame, hostFrame, 12, 0)
 	local buttons = {
@@ -16030,8 +16042,16 @@ function CooldownPanels:OpenLayoutFixedGroupStandaloneMenu(panelId, groupId, anc
 		relativeTo = spawnPosition.relativeTo,
 		x = spawnPosition.x,
 		y = spawnPosition.y,
-		onHide = function() CooldownPanels:ClearLayoutFixedGroupStandaloneMenuState() end,
+		onHide = function()
+			local state = CooldownPanels:GetLayoutFixedGroupStandaloneMenuState(false)
+			local fromBlizzardEditor = state and state.blizzardEditorLayoutEdit == true
+			local currentEditor = getEditor()
+			local suppressLayoutEnd = currentEditor and currentEditor._eqolSuppressBlizzardEditorLayoutEditEnd == true
+			CooldownPanels:ClearLayoutFixedGroupStandaloneMenuState()
+			if fromBlizzardEditor and not suppressLayoutEnd and CooldownPanels.SetEditorLayoutEditEnabled then CooldownPanels:SetEditorLayoutEditEnabled(false) end
+		end,
 	})
+	if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = nil end
 	if dialog then
 		self:DockStandaloneDialogToEditor(dialog)
 		local state = self:GetLayoutFixedGroupStandaloneMenuState()
@@ -16039,6 +16059,7 @@ function CooldownPanels:OpenLayoutFixedGroupStandaloneMenu(panelId, groupId, anc
 		state.groupId = groupId
 		state.hostFrame = hostFrame
 		state.dialog = dialog
+		state.blizzardEditorLayoutEdit = editor and editor._eqolBlizzardEditorLayoutEdit == true or false
 		self:ScheduleLayoutFixedGroupStandaloneMenuRefresh(panelId, groupId)
 	end
 end
@@ -17623,59 +17644,6 @@ function CooldownPanels:ShowFixedGroupIconSizePopup(panelId, groupId)
 	if not (panelId and groupId) then return end
 	self:EnsureFixedGroupIconSizePopup()
 	StaticPopup_Show("EQOL_COOLDOWN_PANEL_FIXED_GROUP_ICON_SIZE", nil, nil, { panelId = panelId, groupId = groupId })
-end
-
-function CooldownPanels:ShowFixedGroupMenu(owner, panelId, groupId)
-	panelId = normalizeId(panelId)
-	groupId = Helper.NormalizeFixedGroupId(groupId)
-	if not (owner and panelId and groupId and Api.MenuUtil and Api.MenuUtil.CreateContextMenu) then return end
-	local panel = self:GetPanel(panelId)
-	local group = panel and CooldownPanels.GetFixedGroupById(panel, groupId) or nil
-	if not group then return end
-	local groupName = CooldownPanels.GetFixedGroupName(group)
-	Api.MenuUtil.CreateContextMenu(owner, function(_, rootDescription)
-		rootDescription:CreateTitle(CooldownPanels.GetFixedGroupDisplayLabel(group))
-		rootDescription:CreateDivider()
-		local modeMenu = rootDescription:CreateButton(L["Mode"] or "Mode")
-		modeMenu:CreateRadio(L["CooldownPanelDynamic"] or "Dynamic", function() return not CooldownPanels.IsFixedGroupStatic(group) end, function()
-			if CooldownPanels:SetFixedGroupMode(panelId, groupId, "DYNAMIC") then
-				CooldownPanels:RefreshPanel(panelId)
-				CooldownPanels:RefreshEditor()
-			end
-		end)
-		modeMenu:CreateRadio(L["CooldownPanelStatic"] or "Static", function() return CooldownPanels.IsFixedGroupStatic(group) end, function()
-			local changed, reason = CooldownPanels:SetFixedGroupMode(panelId, groupId, "STATIC")
-			if changed then
-				CooldownPanels:RefreshPanel(panelId)
-				CooldownPanels:RefreshEditor()
-			elseif reason == "GROUP_FULL" then
-				showErrorMessage(L["CooldownPanelFixedGroupFull"] or "Fixed group is full.")
-			end
-		end)
-		local sizeMenu = rootDescription:CreateButton(L["Icon size"] or "Icon size")
-		sizeMenu:CreateRadio(L["CooldownPanelUsePanelSize"] or "Use panel size", function() return Helper.NormalizeFixedGroupIconSize(group.iconSize) == nil and group.iconSizeSeparate ~= true end, function()
-			if CooldownPanels:SetFixedGroupIconSize(panelId, groupId, nil) then
-				CooldownPanels:RefreshPanel(panelId)
-				CooldownPanels:RefreshEditor()
-			end
-		end)
-		for _, preset in ipairs({ 24, 30, 36, 42, 48, 56 }) do
-			local size = preset
-			sizeMenu:CreateRadio(tostring(size), function() return Helper.NormalizeFixedGroupIconSize(group.iconSize) == size and group.iconSizeSeparate ~= true end, function()
-				if CooldownPanels:SetFixedGroupIconSize(panelId, groupId, size) then
-					CooldownPanels:RefreshPanel(panelId)
-					CooldownPanels:RefreshEditor()
-				end
-			end)
-		end
-		sizeMenu:CreateButton(CUSTOM or "Custom", function() CooldownPanels:ShowFixedGroupIconSizePopup(panelId, groupId) end)
-		rootDescription:CreateDivider()
-		rootDescription:CreateButton(L["CooldownPanelRename"] or "Rename", function() CooldownPanels:ShowFixedGroupRenamePopup(panelId, groupId) end)
-		rootDescription:CreateButton(DELETE or "Delete", function()
-			CooldownPanels:EnsureFixedGroupDeletePopup()
-			StaticPopup_Show("EQOL_COOLDOWN_PANEL_FIXED_GROUP_DELETE", groupName, nil, { panelId = panelId, groupId = groupId })
-		end)
-	end)
 end
 
 function CooldownPanels:ShowEditorGroupMenu(owner, groupId)
@@ -19264,11 +19232,7 @@ function CooldownPanels:ConfigureLayoutEditPanelIcon(panelId, icon, entryId, slo
 			local currentPanel = CooldownPanels:GetPanel(panelId)
 			local group = currentPanel and CooldownPanels.GetFixedGroupAtCell(currentPanel, currentColumn, currentRow) or nil
 			if group then
-				if IsControlKeyDown and IsControlKeyDown() then
-					CooldownPanels:ShowFixedGroupMenu(handle or icon, panelId, group.id)
-				else
-					CooldownPanels:OpenLayoutFixedGroupStandaloneMenu(panelId, group.id, handle or icon)
-				end
+				CooldownPanels:OpenLayoutFixedGroupStandaloneMenu(panelId, group.id, handle or icon)
 				return
 			end
 			return
@@ -19289,14 +19253,17 @@ function CooldownPanels:ConfigureLayoutEditPanelIcon(panelId, icon, entryId, slo
 		local selectedCandidate = cursorCandidates and cursorCandidates[1] or nil
 		local targetEntryId = selectedCandidate and selectedCandidate.entryId or currentEntryId
 		local targetAnchor = selectedCandidate and (selectedCandidate.anchorFrame or selectedCandidate.icon) or (handle or icon)
-		if targetEntryId then
-			CooldownPanels:SelectEntry(targetEntryId)
-			CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, targetEntryId, targetAnchor)
-		else
-			CooldownPanels:HideLayoutEntryStandaloneMenu(panelId)
-			CooldownPanels:RefreshEditor()
-		end
-	end)
+			if targetEntryId then
+				CooldownPanels:SelectEntry(targetEntryId)
+				CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, targetEntryId, targetAnchor)
+			else
+				local suppressBlizzardEditorLayoutEnd = editor and editor._eqolBlizzardEditorLayoutEdit == true
+				if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = true end
+				CooldownPanels:HideLayoutEntryStandaloneMenu(panelId)
+				if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = nil end
+				CooldownPanels:RefreshEditor()
+			end
+		end)
 	if slotAnchorHandle then
 		slotAnchorHandle:SetScript("OnEnter", CooldownPanels.LayoutSlotAnchorHandleOnEnter)
 		slotAnchorHandle:SetScript("OnLeave", CooldownPanels.LayoutSlotAnchorHandleOnLeave)
@@ -20428,10 +20395,18 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				data.liveGlowAllowed = entryLayout.hideGlowOutOfCombat ~= true or playerInCombat == true
 				data.entry = entry
 				data.entryId = entryId
-				data.fixedContext = fixedGroupDynamicRuntimeIndex and {
-					dynamicLocalIndex = fixedGroupDynamicRuntimeIndex,
-					dynamicCount = fixedGroupDynamicRuntimeIndex,
-				} or nil
+				local fixedContext = data.fixedContext
+				if fixedGroupDynamicRuntimeIndex then
+					if not fixedContext then
+						fixedContext = {}
+						data.fixedContext = fixedContext
+					end
+					fixedContext.dynamicLocalIndex = fixedGroupDynamicRuntimeIndex
+					fixedContext.dynamicCount = fixedGroupDynamicRuntimeIndex
+				elseif fixedContext then
+					fixedContext.dynamicLocalIndex = nil
+					fixedContext.dynamicCount = nil
+				end
 				data.hideOnCooldown = entryHideOnCooldown == true
 				data.showOnCooldown = entryShowOnCooldown == true
 				data.resolvedType = resolvedType
@@ -20559,9 +20534,13 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 						centerList = {}
 						fixedCenterGroupVisibleData[fixedGroup.id] = centerList
 					end
-					data.fixedContext = {
-						dynamicLocalIndex = fixedGroupVisibleCounts[fixedGroup.id] or #centerList + 1,
-					}
+					local centerFixedContext = data.fixedContext
+					if not centerFixedContext then
+						centerFixedContext = {}
+						data.fixedContext = centerFixedContext
+					end
+					centerFixedContext.dynamicLocalIndex = fixedGroupVisibleCounts[fixedGroup.id] or #centerList + 1
+					centerFixedContext.dynamicCount = nil
 					centerList[#centerList + 1] = data
 				end
 			end
