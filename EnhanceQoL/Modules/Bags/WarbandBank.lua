@@ -1,4 +1,4 @@
--- luacheck: globals ACCOUNT_BANK_TITLE ACCOUNT_BANK_DEPOSIT_BUTTON_LABEL CHARACTER_BANK_DEPOSIT_BUTTON_LABEL C_Bank C_Cursor ItemUtil ScrollFrameTemplate_OnMouseWheel BANK_DEPOSIT_INCLUDE_REAGENTS_CHECKBOX_LABEL ClearItemButtonOverlay SetItemButtonQuality SetItemButtonTextureVertexColor ItemButtonUtil PanelTemplates_TabResize ITEM_SEARCHBAR_LIST BagSearch_OnHide BagSearch_OnTextChanged BagSearch_OnChar BankPanelIncludeReagentsCheckboxMixin BankPanelPurchaseTabButtonMixin UIPanelScrollFrame_OnLoad COPPER_PER_GOLD COPPER_PER_SILVER WHITE_FONT_COLOR COSTS PVP_ITEM_LEVEL_TOOLTIP
+-- luacheck: globals ACCOUNT_BANK_TITLE ACCOUNT_BANK_DEPOSIT_BUTTON_LABEL CHARACTER_BANK_DEPOSIT_BUTTON_LABEL C_Bank C_Cursor C_Timer ItemUtil ScrollFrameTemplate_OnMouseWheel BANK_DEPOSIT_INCLUDE_REAGENTS_CHECKBOX_LABEL ClearItemButtonOverlay SetItemButtonQuality SetItemButtonTextureVertexColor ItemButtonUtil PanelTemplates_TabResize ITEM_SEARCHBAR_LIST BagSearch_OnHide BagSearch_OnTextChanged BagSearch_OnChar BankPanelIncludeReagentsCheckboxMixin BankPanelPurchaseTabButtonMixin UIPanelScrollFrame_OnLoad COPPER_PER_GOLD COPPER_PER_SILVER WHITE_FONT_COLOR COSTS PVP_ITEM_LEVEL_TOOLTIP
 local addonName, addon = ...
 addon = addon or {}
 _G[addonName] = addon
@@ -687,6 +687,236 @@ local function autoDepositItemsIntoContextBank(context)
 	else
 		C_Bank.AutoDepositItemsIntoBank(bankType)
 	end
+end
+
+state.canDepositItemLocationIntoBank = state.canDepositItemLocationIntoBank or function(bankType, itemLocation)
+	if bankType == nil or not itemLocation or not C_Bank or not C_Bank.IsItemAllowedInBankType then
+		return false
+	end
+
+	return C_Bank.IsItemAllowedInBankType(bankType, itemLocation) == true
+end
+
+state.getDepositItemLocation = state.getDepositItemLocation or function(bagID, slotID)
+	if type(bagID) ~= "number" or type(slotID) ~= "number" then
+		return nil
+	end
+	if not C_Item or not C_Item.DoesItemExist or not ItemLocation then
+		return nil
+	end
+
+	local itemLocation = ItemLocation:CreateFromBagAndSlot(bagID, slotID)
+	if not itemLocation or not itemLocation:IsValid() or not C_Item.DoesItemExist(itemLocation) then
+		return nil
+	end
+
+	return itemLocation
+end
+
+state.CATEGORY_TRANSFER_QUEUE_DELAY = state.CATEGORY_TRANSFER_QUEUE_DELAY or 0.12
+state.CATEGORY_TRANSFER_QUEUE_LOCKED_DELAY = state.CATEGORY_TRANSFER_QUEUE_LOCKED_DELAY or 0.2
+state.CATEGORY_TRANSFER_QUEUE_MAX_RETRIES = state.CATEGORY_TRANSFER_QUEUE_MAX_RETRIES or 20
+
+state.finishCategoryTransferQueue = state.finishCategoryTransferQueue or function(queue)
+	state.categoryTransferQueue = nil
+	if queue and queue.movedCount and queue.movedCount > 0 then
+		if scheduleUpdate then
+			scheduleUpdate(true, true, true, queue.reason or "CategoryTransfer")
+		end
+		if Bags.functions and Bags.functions.RequestLayoutUpdate then
+			Bags.functions.RequestLayoutUpdate(true, true)
+		end
+	end
+end
+
+state.scheduleCategoryTransferQueue = state.scheduleCategoryTransferQueue or function(delay)
+	if state.categoryTransferQueueTimerActive then
+		return
+	end
+
+	if C_Timer and C_Timer.After then
+		state.categoryTransferQueueTimerActive = true
+		C_Timer.After(delay or state.CATEGORY_TRANSFER_QUEUE_DELAY, function()
+			state.categoryTransferQueueTimerActive = false
+			if state.processCategoryTransferQueue then
+				state.processCategoryTransferQueue()
+			end
+		end)
+	elseif state.processCategoryTransferQueue then
+		state.processCategoryTransferQueue()
+	end
+end
+
+state.getCategoryTransferSlotAction = state.getCategoryTransferSlotAction or function(queue, slotRef)
+	local bagID = slotRef and slotRef.bagID
+	local slotID = slotRef and slotRef.slotID
+	if type(bagID) ~= "number" or type(slotID) ~= "number" or not C_Container or not C_Container.GetContainerItemInfo then
+		return nil
+	end
+
+	local info = C_Container.GetContainerItemInfo(bagID, slotID)
+	if not (info and info.iconFileID) then
+		return nil
+	end
+	if info.isLocked then
+		return "locked"
+	end
+
+	if queue.kind == "deposit" then
+		local itemLocation = state.getDepositItemLocation(bagID, slotID)
+		if itemLocation and state.canDepositItemLocationIntoBank(queue.bankType, itemLocation) then
+			return "deposit", bagID, slotID
+		end
+	elseif queue.kind == "withdraw" then
+		return "withdraw", bagID, slotID
+	end
+
+	return nil
+end
+
+state.processCategoryTransferQueue = state.processCategoryTransferQueue or function()
+	local queue = state.categoryTransferQueue
+	if not queue or type(queue.slots) ~= "table" or not C_Container or not C_Container.UseContainerItem then
+		state.finishCategoryTransferQueue(queue)
+		return
+	end
+
+	local sawLockedSlot = false
+	local index = 1
+	while index <= #queue.slots do
+		local action, bagID, slotID = state.getCategoryTransferSlotAction(queue, queue.slots[index])
+		if action == "locked" then
+			sawLockedSlot = true
+			index = index + 1
+		elseif action == "deposit" then
+			C_Container.UseContainerItem(bagID, slotID, nil, queue.bankType, false)
+			table.remove(queue.slots, index)
+			queue.movedCount = (queue.movedCount or 0) + 1
+			queue.retryCount = 0
+			state.scheduleCategoryTransferQueue(state.CATEGORY_TRANSFER_QUEUE_DELAY)
+			return
+		elseif action == "withdraw" then
+			C_Container.UseContainerItem(bagID, slotID)
+			table.remove(queue.slots, index)
+			queue.movedCount = (queue.movedCount or 0) + 1
+			queue.retryCount = 0
+			state.scheduleCategoryTransferQueue(state.CATEGORY_TRANSFER_QUEUE_DELAY)
+			return
+		else
+			table.remove(queue.slots, index)
+		end
+	end
+
+	if sawLockedSlot and (queue.retryCount or 0) < state.CATEGORY_TRANSFER_QUEUE_MAX_RETRIES then
+		queue.retryCount = (queue.retryCount or 0) + 1
+		state.scheduleCategoryTransferQueue(state.CATEGORY_TRANSFER_QUEUE_LOCKED_DELAY)
+		return
+	end
+
+	state.finishCategoryTransferQueue(queue)
+end
+
+state.startCategoryTransferQueue = state.startCategoryTransferQueue or function(kind, bankType, slots, reason)
+	if kind ~= "deposit" and kind ~= "withdraw" then
+		return false
+	end
+	if type(slots) ~= "table" or #slots == 0 or not C_Container or not C_Container.UseContainerItem then
+		return false
+	end
+	if kind == "deposit" and bankType == nil then
+		return false
+	end
+
+	state.categoryTransferQueue = {
+		kind = kind,
+		bankType = bankType,
+		slots = slots,
+		reason = reason,
+		movedCount = 0,
+		retryCount = 0,
+	}
+	state.processCategoryTransferQueue()
+	return true
+end
+
+state.depositBagSlotsIntoBank = state.depositBagSlotsIntoBank or function(bankType, slots)
+	if bankType == nil or type(slots) ~= "table" or not C_Container or not C_Container.UseContainerItem then
+		return 0
+	end
+
+	return state.startCategoryTransferQueue("deposit", bankType, slots, "CategoryDeposit") and #slots or 0
+end
+
+if StaticPopupDialogs and not StaticPopupDialogs.EQOL_BAGS_ACCOUNT_BANK_CATEGORY_DEPOSIT_NO_REFUND_CONFIRM then
+	StaticPopupDialogs.EQOL_BAGS_ACCOUNT_BANK_CATEGORY_DEPOSIT_NO_REFUND_CONFIRM = {
+		text = END_REFUND,
+		button1 = OKAY,
+		button2 = CANCEL,
+		OnAccept = function(_, data)
+			if not data or data.bankType ~= ACCOUNT_BANK_TYPE then
+				return
+			end
+			if not C_Bank or not C_Bank.CanUseBank or not C_Bank.CanUseBank(ACCOUNT_BANK_TYPE) then
+				return
+			end
+
+			state.depositBagSlotsIntoBank(data.bankType, data.slots)
+		end,
+		timeout = 0,
+		exclusive = 1,
+		hideOnEscape = 1,
+	}
+end
+
+function addon.DepositBagSlotsIntoCustomBank(slots)
+	if type(slots) ~= "table" or #slots == 0 or not (state.frame and state.frame:IsShown() and getVisibleContext()) then
+		return false
+	end
+	if (SpellCanTargetItem and SpellCanTargetItem()) or (SpellCanTargetItemID and SpellCanTargetItemID()) then
+		return false
+	end
+
+	local context = getVisibleContext()
+	local bankType = getBankTypeForContext(context)
+	if bankType == nil then
+		return false
+	end
+
+	if PlaySound and SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION then
+		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION)
+	end
+
+	local depositableSlots = {}
+	local containsRefundableAccountBankItem = false
+	for _, slotRef in ipairs(slots) do
+		local bagID = slotRef and slotRef.bagID
+		local slotID = slotRef and slotRef.slotID
+		local itemLocation = state.getDepositItemLocation(bagID, slotID)
+		if itemLocation and state.canDepositItemLocationIntoBank(bankType, itemLocation) then
+			depositableSlots[#depositableSlots + 1] = {
+				bagID = bagID,
+				slotID = slotID,
+			}
+			if bankType == ACCOUNT_BANK_TYPE and C_Item and C_Item.CanBeRefunded and C_Item.CanBeRefunded(itemLocation) then
+				containsRefundableAccountBankItem = true
+			end
+		end
+	end
+
+	if #depositableSlots == 0 then
+		return false
+	end
+
+	if containsRefundableAccountBankItem and StaticPopup_Show then
+		StaticPopup_Show("EQOL_BAGS_ACCOUNT_BANK_CATEGORY_DEPOSIT_NO_REFUND_CONFIRM", nil, nil, {
+			bankType = bankType,
+			slots = depositableSlots,
+		})
+	else
+		state.depositBagSlotsIntoBank(bankType, depositableSlots)
+	end
+
+	return true
 end
 
 local function getCursorItemLocation()
@@ -3040,6 +3270,130 @@ local function buildLayoutData(context)
 	return layoutData
 end
 
+state.addBankCategoryWithdrawSlot = state.addBankCategoryWithdrawSlot or function(slots, seen, context, bagID, slotID, mapping)
+	if not context or type(bagID) ~= "number" or type(slotID) ~= "number" then
+		return
+	end
+	if mapping and mapping.freeSlotGroup then
+		return
+	end
+
+	local inContext = false
+	for _, contextBagID in ipairs(context.bagIDs or {}) do
+		if contextBagID == bagID then
+			inContext = true
+			break
+		end
+	end
+	if not inContext then
+		return
+	end
+
+	local info = (mapping and mapping.itemInfo) or (C_Container and C_Container.GetContainerItemInfo and C_Container.GetContainerItemInfo(bagID, slotID)) or nil
+	if not (info and info.iconFileID) or info.isLocked then
+		return
+	end
+
+	local seenBag = seen[bagID]
+	if not seenBag then
+		seenBag = {}
+		seen[bagID] = seenBag
+	end
+	if seenBag[slotID] then
+		return
+	end
+
+	seenBag[slotID] = true
+	slots[#slots + 1] = {
+		bagID = bagID,
+		slotID = slotID,
+	}
+end
+
+state.collectBankCategoryWithdrawSectionIDs = state.collectBankCategoryWithdrawSectionIDs or function(sectionID)
+	local sectionIDs = {}
+	if not sectionID or sectionID == FREE_SLOTS_SECTION_ID then
+		return sectionIDs
+	end
+
+	local layoutData = state.layoutData
+	if layoutData and layoutData.sectionMap and layoutData.sectionMap[sectionID] then
+		sectionIDs[sectionID] = true
+		return sectionIDs
+	end
+
+	if layoutData and layoutData.sectionDefinitions then
+		for _, definition in ipairs(layoutData.sectionDefinitions) do
+			if definition.groupCollapseID == sectionID then
+				sectionIDs[definition.id] = true
+			end
+		end
+	end
+
+	return sectionIDs
+end
+
+state.collectBankCategoryWithdrawSlots = state.collectBankCategoryWithdrawSlots or function(sectionID)
+	local layoutData = state.layoutData
+	local context = getVisibleContext()
+	if not (layoutData and layoutData.sectionMap and context) then
+		return nil
+	end
+
+	local withdrawSectionIDs = state.collectBankCategoryWithdrawSectionIDs(sectionID)
+	if not next(withdrawSectionIDs) then
+		return nil
+	end
+
+	local slots = {}
+	local seen = {}
+	for withdrawSectionID in pairs(withdrawSectionIDs) do
+		local section = layoutData.sectionMap[withdrawSectionID]
+		for _, mappingIndex in ipairs(section and section.slotIndices or {}) do
+			local mapping = state.slotMappings[mappingIndex]
+			if mapping then
+				state.addBankCategoryWithdrawSlot(slots, seen, context, mapping.bagID, mapping.slotID, mapping)
+			end
+		end
+	end
+
+	for _, bagID in ipairs(context.bagIDs or {}) do
+		local slotCount = C_Container.GetContainerNumSlots(bagID) or 0
+		local categoryBucket = state.slotCategoryCache and state.slotCategoryCache[bagID] or nil
+		for slotID = 1, slotCount do
+			local entry = categoryBucket and categoryBucket[slotID] or nil
+			if entry and withdrawSectionIDs[entry.sectionID] then
+				state.addBankCategoryWithdrawSlot(slots, seen, context, bagID, slotID)
+			elseif withdrawSectionIDs[NEW_ITEMS_SECTION_ID] and isOpenSessionNewItem(bagID, slotID, C_Container.GetContainerItemInfo(bagID, slotID)) then
+				state.addBankCategoryWithdrawSlot(slots, seen, context, bagID, slotID)
+			end
+		end
+	end
+
+	return slots
+end
+
+state.withdrawBankSlotsToBags = state.withdrawBankSlotsToBags or function(slots)
+	if type(slots) ~= "table" or #slots == 0 or not C_Container or not C_Container.UseContainerItem then
+		return false
+	end
+
+	if PlaySound and SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION then
+		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION)
+	end
+
+	return state.startCategoryTransferQueue("withdraw", nil, slots, "CategoryWithdraw")
+end
+
+state.withdrawBankCategoryToBags = state.withdrawBankCategoryToBags or function(sectionID)
+	local slots = state.collectBankCategoryWithdrawSlots(sectionID)
+	if not slots or #slots == 0 then
+		return false
+	end
+
+	return state.withdrawBankSlotsToBags(slots)
+end
+
 local function configureSectionHeader(header, options)
 	if not header or not options then
 		return
@@ -3083,7 +3437,7 @@ local function acquireSectionHeader(index)
 
 	header = CreateFrame("Button", nil, state.content)
 	header:SetHeight(SECTION_HEADER_HEIGHT)
-	header:RegisterForClicks("LeftButtonUp")
+	header:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 	header:EnableMouseWheel(true)
 	header:SetScript("OnMouseWheel", function(_, delta)
 		handleScrollWheel(delta)
@@ -3112,8 +3466,12 @@ local function acquireSectionHeader(index)
 	text:SetWordWrap(false)
 	header.Text = text
 
-	header:SetScript("OnClick", function(self)
+	header:SetScript("OnClick", function(self, mouseButton)
 		if receiveCursorItemIntoVisibleBank() then
+			return
+		end
+
+		if mouseButton == "RightButton" and not IsModifiedClick() and state.withdrawBankCategoryToBags(self.sectionID) then
 			return
 		end
 
@@ -4105,12 +4463,20 @@ function addon.PreClickHandleCustomBankTransfer(mouseButton, bagID, slotID)
 	end
 
 	local bankType = getBankTypeForContext(context)
-	if bankType ~= ACCOUNT_BANK_TYPE then
+	if bankType == nil then
 		return false
 	end
 
-	if not C_Bank or not C_Bank.IsItemAllowedInBankType or not C_Bank.IsItemAllowedInBankType(bankType, itemLocation) then
+	if not state.canDepositItemLocationIntoBank(bankType, itemLocation) then
 		return false
+	end
+
+	if bankType == ACCOUNT_BANK_TYPE and C_Item and C_Item.CanBeRefunded and C_Item.CanBeRefunded(itemLocation) and StaticPopup_Show and Item and C_Item.GetItemGUID and C_Item.GetItemGUID(itemLocation) then
+		StaticPopup_Show("ACCOUNT_BANK_DEPOSIT_NO_REFUND_CONFIRM", nil, nil, {
+			itemToDeposit = Item:CreateFromItemGUID(C_Item.GetItemGUID(itemLocation)),
+			targetItemLocation = nil,
+		})
+		return true
 	end
 
 	C_Container.UseContainerItem(bagID, slotID, nil, bankType, false)
@@ -4900,6 +5266,9 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 	elseif event == "BAG_UPDATE" then
 		state.markBankBagDirty(...)
 	elseif event == "BAG_UPDATE_DELAYED" then
+		if state.categoryTransferQueue then
+			state.scheduleCategoryTransferQueue(0)
+		end
 		local perf = state.getPerfBucket()
 		perf.dirtyBagDelayedEvents = (perf.dirtyBagDelayedEvents or 0) + 1
 		local context = getVisibleContext()
@@ -4952,6 +5321,9 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
 		addon.UpdateWarbandGold()
 		scheduleUpdate(true, false, false, "ACCOUNT_MONEY")
 	elseif event == "ITEM_LOCK_CHANGED" or event == "BAG_UPDATE_COOLDOWN" then
+		if state.categoryTransferQueue then
+			state.scheduleCategoryTransferQueue(0)
+		end
 		if event == "BAG_UPDATE_COOLDOWN" then
 			state.forceDynamicRefresh = true
 		end

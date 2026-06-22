@@ -5550,6 +5550,7 @@ function CooldownPanels:RebuildSpellIndex()
 	elseif cdmAuras and cdmAuras.UpdateEventRegistration then
 		cdmAuras:UpdateEventRegistration()
 	end
+	if self.HasCooldownManagerSyncPanels and self:HasCooldownManagerSyncPanels() then self:EnsureCooldownManagerSyncListener() end
 	if self.UpdateEventRegistration then self:UpdateEventRegistration() end
 	if self.CheckCDMAuraQuickSetup then self:CheckCDMAuraQuickSetup("RebuildSpellIndex") end
 	return index
@@ -11565,10 +11566,23 @@ local function getCooldownManagerLayoutChildren(sourceKind)
 end
 
 cdp.CDM = cdp.CDM or {}
+cdp.CDM.LOGIN_SYNC_RETRY_DELAYS = cdp.CDM.LOGIN_SYNC_RETRY_DELAYS or { 0.2, 1, 2, 4, 8 }
 
 function cdp.CDM.IsSyncSource(sourceKind)
 	sourceKind = type(sourceKind) == "string" and sourceKind:upper() or nil
 	return sourceKind == "ESSENTIAL" or sourceKind == "UTILITY" or sourceKind == "BUFF_ICON"
+end
+
+function cdp.CDM.IsGraceSyncReason(reason)
+	if type(reason) ~= "string" then return false end
+	return reason:find("PLAYER_LOGIN", 1, true)
+		or reason:find("PLAYER_ENTERING_WORLD", 1, true)
+		or reason:find("COOLDOWN_VIEWER_DATA_LOADED", 1, true)
+		or reason:find("ADDON_LOADED:Blizzard_CooldownViewer", 1, true)
+		or reason:find("PLAYER_TALENT_UPDATE", 1, true)
+		or reason:find("ACTIVE_TALENT_GROUP_CHANGED", 1, true)
+		or reason:find("TRAIT_CONFIG_UPDATED", 1, true)
+		or reason:find("TRAIT_CONFIG_LIST_UPDATED", 1, true)
 end
 
 function cdp.CDM.IsSettingsFrameShown()
@@ -11705,6 +11719,16 @@ function CooldownPanels:GetPanelCooldownManagerSyncSource(panelId)
 	return cdp.CDM.IsSyncSource(sourceKind) and sourceKind or nil
 end
 
+function CooldownPanels:HasCooldownManagerSyncPanels()
+	local root = ensureRoot()
+	if not (root and root.panels) then return false end
+	for _, panel in pairs(root.panels) do
+		local sourceKind = type(panel and panel.cdmSyncSource) == "string" and panel.cdmSyncSource:upper() or nil
+		if panel and panel.enabled ~= false and cdp.CDM.IsSyncSource(sourceKind) then return true end
+	end
+	return false
+end
+
 function CooldownPanels:SetPanelCooldownManagerSyncSource(panelId, sourceKind)
 	panelId = normalizeId(panelId)
 	local panel = self:GetPanel(panelId)
@@ -11815,27 +11839,53 @@ function CooldownPanels:SyncCooldownManagerPanels(reason)
 	local root = ensureRoot()
 	if not (root and root.panels) then return false end
 	local synced = false
+	local sourceMissing = false
 	for panelId, panel in pairs(root.panels) do
 		local sourceKind = type(panel and panel.cdmSyncSource) == "string" and panel.cdmSyncSource:upper() or nil
 		if cdp.CDM.IsSyncSource(sourceKind) then
-			self:SyncPanelWithCooldownManager(panelId, sourceKind)
+			local _, err = self:SyncPanelWithCooldownManager(panelId, sourceKind)
+			if err == "SOURCE_NOT_FOUND" then sourceMissing = true end
 			synced = true
 		end
 	end
-	return synced
+	return synced, sourceMissing
 end
 
-function CooldownPanels:RequestCooldownManagerSync(reason)
+function CooldownPanels:RequestCooldownManagerSync(reason, attempt, graceGeneration)
 	self.runtime = self.runtime or {}
 	local runtime = self.runtime
-	if runtime.cdmSyncPending then return end
+	local useGrace = cdp.CDM.IsGraceSyncReason(reason)
+	attempt = tonumber(attempt) or 1
+	if runtime.cdmSyncPending then
+		runtime.cdmSyncRerunReason = reason or runtime.cdmSyncRerunReason or "CooldownManagerSyncQueued"
+		return
+	end
+	if useGrace then
+		if not graceGeneration then
+			runtime.cdmSyncGraceGeneration = (runtime.cdmSyncGraceGeneration or 0) + 1
+			graceGeneration = runtime.cdmSyncGraceGeneration
+		end
+	else
+		runtime.cdmSyncGraceGeneration = (runtime.cdmSyncGraceGeneration or 0) + 1
+	end
 	runtime.cdmSyncPending = true
 	local function run()
 		runtime.cdmSyncPending = nil
-		CooldownPanels:SyncCooldownManagerPanels(reason)
+		if useGrace and runtime.cdmSyncGraceGeneration ~= graceGeneration then return end
+		local _, sourceMissing = CooldownPanels:SyncCooldownManagerPanels(reason)
+		local retryDelays = cdp.CDM.LOGIN_SYNC_RETRY_DELAYS
+		if useGrace and sourceMissing and type(retryDelays) == "table" and attempt < #retryDelays then
+			CooldownPanels:RequestCooldownManagerSync(reason, attempt + 1, graceGeneration)
+		elseif runtime.cdmSyncRerunReason then
+			local rerunReason = runtime.cdmSyncRerunReason
+			runtime.cdmSyncRerunReason = nil
+			CooldownPanels:RequestCooldownManagerSync(rerunReason)
+		end
 	end
 	if C_Timer and C_Timer.After then
-		C_Timer.After(0.2, run)
+		local retryDelays = cdp.CDM.LOGIN_SYNC_RETRY_DELAYS
+		local delay = (useGrace and type(retryDelays) == "table" and retryDelays[attempt]) or 0.2
+		C_Timer.After(delay, run)
 	else
 		run()
 	end
@@ -11846,10 +11896,12 @@ function CooldownPanels:EnsureCooldownManagerSyncListener()
 	local runtime = self.runtime
 	if runtime.cdmSyncListenerRegistered then return end
 	if EventRegistry and EventRegistry.RegisterCallback then
-		EventRegistry:RegisterCallback("CooldownViewerSettings.OnDataChanged", function()
+		local function onCooldownViewerSettingsChanged()
 			if not cdp.CDM.IsSettingsFrameShown() then return end
 			CooldownPanels:RequestCooldownManagerSync("CooldownViewerSettings.OnDataChanged")
-		end, self)
+		end
+		EventRegistry:RegisterCallback("CooldownViewerSettings.OnDataChanged", onCooldownViewerSettingsChanged, self)
+		EventRegistry:RegisterCallback("CooldownViewerSettings.OnPendingChanges", onCooldownViewerSettingsChanged, self)
 		runtime.cdmSyncListenerRegistered = true
 	end
 end
@@ -26145,6 +26197,7 @@ CooldownPanels.UPDATE_FRAME_EVENTS = {
 	"PLAYER_ENTERING_WORLD",
 	"PLAYER_LOGIN",
 	"ADDON_LOADED",
+	"COOLDOWN_VIEWER_DATA_LOADED",
 	"CVAR_UPDATE",
 	"SPELL_UPDATE_COOLDOWN",
 	"SPELL_UPDATE_ICON",
@@ -26185,6 +26238,7 @@ CooldownPanels.UPDATE_FRAME_PASSIVE_EVENTS = {
 	"PLAYER_ENTERING_WORLD",
 	"PLAYER_LOGIN",
 	"ADDON_LOADED",
+	"COOLDOWN_VIEWER_DATA_LOADED",
 	"SPELLS_CHANGED",
 	"ACTIVE_PLAYER_SPECIALIZATION_CHANGED",
 	"ACTIVE_TALENT_GROUP_CHANGED",
@@ -26204,7 +26258,10 @@ local function hasConfiguredEnabledPanels()
 	if not root or not root.panels then return false end
 	local classSpecs = getPlayerClassSpecMap()
 	for _, panel in pairs(root.panels) do
-		if panel and panel.enabled ~= false and panelHasRuntimeEntries(panel) and panelMatchesPlayerClass(panel, classSpecs) then return true end
+		if panel and panel.enabled ~= false and panelMatchesPlayerClass(panel, classSpecs) then
+			local syncSource = type(panel.cdmSyncSource) == "string" and panel.cdmSyncSource:upper() or nil
+			if panelHasRuntimeEntries(panel) or cdp.CDM.IsSyncSource(syncSource) then return true end
+		end
 	end
 	return false
 end
@@ -26581,6 +26638,7 @@ end
 
 function CooldownPanels:UpdateEventRegistration()
 	local frame = self.runtime and self.runtime.updateFrame
+	if self.HasCooldownManagerSyncPanels and self:HasCooldownManagerSyncPanels() then self:EnsureCooldownManagerSyncListener() end
 	if not frame then return end
 	CooldownPanels.SetUpdateFrameEnabled(frame, getUpdateFrameRegistrationMode())
 end
@@ -26619,6 +26677,7 @@ function CooldownPanels.EnsureUpdateFrame()
 				if Keybinds.InvalidateButtonList then Keybinds.InvalidateButtonList() end
 				Keybinds.RequestRefresh("Event:ADDON_LOADED:" .. name)
 			end
+			if name == "Blizzard_CooldownViewer" then CooldownPanels:RequestCooldownManagerSync("Event:ADDON_LOADED:Blizzard_CooldownViewer") end
 			return
 		end
 		if event == "PLAYER_LOGIN" then
@@ -26635,6 +26694,11 @@ function CooldownPanels.EnsureUpdateFrame()
 			refreshPanelsForCharges()
 			CooldownPanels:RequestCooldownManagerSync("Event:PLAYER_LOGIN")
 			scheduleSpecAwareRebuild(event, false)
+			return
+		end
+		if event == "COOLDOWN_VIEWER_DATA_LOADED" then
+			CooldownPanels:EnsureCooldownManagerSyncListener()
+			CooldownPanels:RequestCooldownManagerSync("Event:COOLDOWN_VIEWER_DATA_LOADED")
 			return
 		end
 		if event == "CVAR_UPDATE" then
@@ -26831,7 +26895,7 @@ function CooldownPanels.EnsureUpdateFrame()
 			CooldownPanels:InvalidateTalentChoiceSpellVariantGroups()
 			CooldownPanels:InvalidateSpellQueryCaches()
 			if CooldownPanels.runtime then CooldownPanels.runtime.iconCache = nil end
-			if event == "ACTIVE_PLAYER_SPECIALIZATION_CHANGED" then CooldownPanels:RequestCooldownManagerSync("Event:" .. event) end
+			CooldownPanels:RequestCooldownManagerSync("Event:" .. event)
 			scheduleSpecAwareRebuild(event, true)
 			return
 		end
@@ -26899,6 +26963,7 @@ function CooldownPanels.EnsureUpdateFrame()
 			CooldownPanels:InvalidateTalentChoiceSpellVariantGroups()
 			CooldownPanels:InvalidateSpellQueryCaches()
 			updateItemCountCache()
+			CooldownPanels:RequestCooldownManagerSync("Event:PLAYER_ENTERING_WORLD")
 			scheduleSpecAwareRebuild(event)
 			return
 		end

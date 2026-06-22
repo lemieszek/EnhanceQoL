@@ -8,6 +8,11 @@
 
 - Cooldown Panels: Fixed Layout Edit closing when clicking entries, empty fixed slots, or fixed-slot subgroups while editing a panel from the new cooldown editor.
 - Unit Frames: Fixed Druid primary power filtering so the Player Frame follows the current form resource instead of forcing the specialization's main resource.
+- Cooldown Panels: Fixed synced panels sometimes missing their Cooldown Manager data after login by retrying briefly while Blizzard's cooldown data is still loading.
+- Cooldown Panels: Fixed empty synced panels not listening for Cooldown Manager updates on characters where the panel had not been populated yet.
+- Cooldown Panels: Fixed live Cooldown Manager changes being ignored when they happened while another sync pass was already queued.
+- Cooldown Panels: Fixed existing synced panels not always registering their live Cooldown Manager change listener after loading from saved settings.
+- Cooldown Panels: Fixed synced panels not refreshing reliably after talent changes while Blizzard's Cooldown Manager rebuilds its cooldown list.
 
 ---
 
