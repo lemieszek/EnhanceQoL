@@ -6249,7 +6249,7 @@ GF.anchors = GF.anchors or {}
 GF._pendingRefresh = GF._pendingRefresh or false
 GF._pendingHeaderKinds = GF._pendingHeaderKinds or {}
 GF._pendingSortKinds = GF._pendingSortKinds or {}
-GF._lightHeaderRefreshOptions = GF._lightHeaderRefreshOptions or { skipChildSync = true }
+GF._lightHeaderRefreshOptions = GF._lightHeaderRefreshOptions or { skipChildSync = true, skipUnchangedUnitUpdate = true }
 GF._pendingDisable = GF._pendingDisable or false
 GF._clientSceneActive = GF._clientSceneActive or false
 GF._postRosterHeaderApplyPending = GF._postRosterHeaderApplyPending or false
@@ -13498,8 +13498,9 @@ local function forEachChild(header, fn)
 	end
 end
 
-local function syncHeaderChild(child, kind, cfg, frameW, frameH, fitScale)
+local function syncHeaderChild(child, kind, cfg, frameW, frameH, fitScale, options)
 	if not (child and cfg) then return end
+	local skipUnchangedUnitUpdate = options and options.skipUnchangedUnitUpdate == true
 
 	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
 	if tonumber((select(4, GetBuildInfo()))) >= 120100 and child.SetAttribute then child:SetAttribute("ping-receiver", true) end
@@ -13529,9 +13530,27 @@ local function syncHeaderChild(child, kind, cfg, frameW, frameH, fitScale)
 			end
 		end
 	end
+	local st = child._eqolUFState
+	local unit = getUnit(child)
+	local guid
+	if skipUnchangedUnitUpdate and unit and unit ~= "" then
+		guid = UnitGUID and UnitGUID(unit) or nil
+		if issecretvalue and issecretvalue(guid) then guid = nil end
+	end
+	local cachedGuid = st and st._guid or nil
+	if issecretvalue and issecretvalue(cachedGuid) then
+		cachedGuid = nil
+		if st then st._guid = nil end
+	end
+	local unitUnchanged = skipUnchangedUnitUpdate and guid ~= nil and st and child.unit == unit and st._unitToken == unit and cachedGuid == guid
+	if unitUnchanged then
+		if child.unit then GF:UnitButton_RegisterUnitEvents(child, child.unit) end
+		return
+	end
+
 	GF:LayoutAuras(child)
 	if child.unit then GF:UnitButton_RegisterUnitEvents(child, child.unit) end
-	if child._eqolUFState then
+	if st then
 		GF:CacheUnitStatic(child)
 		GF:LayoutButton(child)
 		GF:UpdateAll(child)
@@ -14234,8 +14253,8 @@ function GF:RefreshCustomSortNameList(kind)
 	end
 end
 
-local function syncRaidGroupHeaderChildren(header, cfg, layout)
-	forEachChild(header, function(child) syncHeaderChild(child, "raid", cfg, layout and layout.w, layout and layout.h, layout and layout.fitScale) end)
+local function syncRaidGroupHeaderChildren(header, cfg, layout, options)
+	forEachChild(header, function(child) syncHeaderChild(child, "raid", cfg, layout and layout.w, layout and layout.h, layout and layout.fitScale, options) end)
 end
 
 function GF.UpdateHeaderChildLayoutKey(header, key)
@@ -14429,7 +14448,6 @@ local function applyRaidGroupHeaders(cfg, layout, groupSpecs, forceShow, forceHi
 				setAttr("sortMethod", "INDEX")
 				setAttr("nameList", nil)
 				GF.PrecreateSecureHeaderChildren(header, layout.unitsPerColumn or 5, false)
-				syncRaidGroupHeaderChildren(header, cfg, layout)
 			end
 
 			applyVisibility(header, "raid", cfg)
@@ -14447,7 +14465,7 @@ local function applyRaidGroupHeaders(cfg, layout, groupSpecs, forceShow, forceHi
 				)
 			end
 			local layoutChanged = GF.UpdateHeaderChildLayoutKey(header, childLayoutKey)
-			if active and (not skipChildSync or layoutChanged) then syncRaidGroupHeaderChildren(header, cfg, layout) end
+			if active and (not skipChildSync or layoutChanged) then syncRaidGroupHeaderChildren(header, cfg, layout, options) end
 
 			if header.IsShown and header:IsShown() then
 				nudgeHeaderLayout(header)
@@ -14735,7 +14753,7 @@ function GF:ApplyHeaderAttributes(kind, options)
 	)
 	local layoutChanged = GF.UpdateHeaderChildLayoutKey(header, headerChildLayoutKey)
 	if not skipChildSync or layoutChanged then
-		forEachChild(header, function(child) syncHeaderChild(child, kind, cfg, renderW, renderH, (kind == "raid" and not useGroupHeaders) and raidViewportScale or 1) end)
+		forEachChild(header, function(child) syncHeaderChild(child, kind, cfg, renderW, renderH, (kind == "raid" and not useGroupHeaders) and raidViewportScale or 1, options) end)
 	end
 
 	local anchor = GF.anchors and GF.anchors[kind]
