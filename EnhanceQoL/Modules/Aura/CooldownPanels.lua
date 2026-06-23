@@ -15712,6 +15712,21 @@ function CooldownPanels:BuildLayoutFixedGroupStandaloneSettings(panelId, groupId
 				end
 			end,
 		},
+		{
+			name = L["Spacing"] or "Spacing",
+			kind = SettingType.Slider,
+			parentId = "cooldownPanelStandaloneFixedGroupLayout",
+			minValue = 0,
+			maxValue = Helper.SPACING_RANGE or 200,
+			valueStep = 1,
+			allowInput = true,
+			get = function()
+				local layout = getLayout()
+				return Helper.ClampInt(layout and layout.spacing, 0, Helper.SPACING_RANGE or 200, Helper.PANEL_LAYOUT_DEFAULTS.spacing)
+			end,
+			set = function(_, value) setOverride("spacing", value) end,
+			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
+		},
 			{
 				name = L["Icon"] or "Icon",
 				kind = SettingType.Collapsible,
@@ -15846,21 +15861,6 @@ function CooldownPanels:BuildLayoutFixedGroupStandaloneSettings(panelId, groupId
 			set = function(_, value)
 				if CooldownPanels:SetFixedGroupIconDimension(panelId, groupId, "iconHeight", value) then refreshLivePreview() end
 			end,
-			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
-		},
-			{
-				name = L["Spacing"] or "Spacing",
-				kind = SettingType.Slider,
-				parentId = "cooldownPanelStandaloneFixedGroupLayout",
-			minValue = 0,
-			maxValue = Helper.SPACING_RANGE or 200,
-			valueStep = 1,
-			allowInput = true,
-			get = function()
-				local layout = getLayout()
-				return Helper.ClampInt(layout and layout.spacing, 0, Helper.SPACING_RANGE or 200, Helper.PANEL_LAYOUT_DEFAULTS.spacing)
-			end,
-			set = function(_, value) setOverride("spacing", value) end,
 			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 		},
 		{
