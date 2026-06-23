@@ -10759,7 +10759,7 @@ end
 
 function GF.UpdateGroupIndicatorForHeader(container, cfg, def, subgroup)
 	if not container then return end
-	if not (cfg and resolveGroupIndicatorEnabled(cfg, def) and isGroupIndicatorAvailable(cfg, def)) then
+	if not (cfg and cfg.enabled == true and resolveGroupIndicatorEnabled(cfg, def) and isGroupIndicatorAvailable(cfg, def)) then
 		hideGroupIndicators(container)
 		return
 	end
@@ -10819,7 +10819,7 @@ end
 
 local function updateGroupIndicatorsForFrames(container, frames, cfg, def, isPreview, fixedSubgroup)
 	if not container then return end
-	if not (cfg and resolveGroupIndicatorEnabled(cfg, def) and isGroupIndicatorAvailable(cfg, def)) then
+	if not (cfg and cfg.enabled == true and resolveGroupIndicatorEnabled(cfg, def) and isGroupIndicatorAvailable(cfg, def)) then
 		hideGroupIndicators(container)
 		return
 	end
@@ -12440,6 +12440,8 @@ end
 
 local function queueGroupIndicatorRefresh(delay, repeats)
 	if not isFeatureEnabled() then return end
+	local cfg = getCfg("raid")
+	if not (cfg and cfg.enabled == true) then return end
 	cancelQueuedGroupIndicatorRefresh()
 	local wait = tonumber(delay) or 0
 	local remaining = tonumber(repeats) or 1
@@ -12448,6 +12450,8 @@ local function queueGroupIndicatorRefresh(delay, repeats)
 	local function run()
 		GF._groupIndicatorRefreshTimer = nil
 		if not isFeatureEnabled() then return end
+		local raidCfg = getCfg("raid")
+		if not (raidCfg and raidCfg.enabled == true) then return end
 		if InCombatLockdown and InCombatLockdown() then
 			GF._pendingRefresh = true
 			return
@@ -13848,7 +13852,7 @@ end
 function GF:RefreshGroupIndicators()
 	if not isFeatureEnabled() then return end
 	local cfg = getCfg("raid")
-	if not cfg then return end
+	if not (cfg and cfg.enabled == true) then return end
 	local def = DEFAULTS.raid or {}
 	local header = GF.headers and GF.headers.raid
 	local sortMethod = resolveSortMethod(cfg)

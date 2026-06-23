@@ -23,7 +23,7 @@
 
 - Class Buff Reminder: Fixed missing-buff icon growth and Edit Mode preview alignment when the reminder anchor is not centered.
 - Cooldown Panels: Fixed keybind resolution, ready sound timing, Cooldown Manager import/sync reliability, tracked aura handling, and fixed-layout editor behavior.
-- Unit Frames: Fixed custom aura tooltip interaction and Druid player power filtering by current form.
+- Group Frames / Raid Frames: Fixed raid group indicators appearing while EQOL raid frames are disabled.
 - PTR Compatibility: Added WoW 12.1 TOC support and updated removed mouseover helper usage.
 
 ---
