@@ -11951,6 +11951,8 @@ function CooldownPanels:SyncPanelWithCooldownManager(panelId, sourceKind)
 							stats.updated = stats.updated + 1
 						end
 					end
+				else
+					otherOrder[#otherOrder + 1] = entryId
 				end
 			end
 		elseif entry then
@@ -11961,12 +11963,15 @@ function CooldownPanels:SyncPanelWithCooldownManager(panelId, sourceKind)
 		if entry and entry.type == "SPELL" and entry.spellID then
 			local canonicalSpellID = self:NormalizePersistentSpellID(entry.spellID, { allowTalentChoiceCanonical = true }) or tonumber(entry.spellID)
 			if canonicalSpellID and not wantedBySpellId[canonicalSpellID] then
-				local removalSpecKey = entry.cdmSyncSpecKey or previousSpecKey or currentSpecKey
-				cdp.CDM.SaveEntryOverride(panel, sourceKind, canonicalSpellID, entry, removalSpecKey)
-				panel.entries[entryId] = nil
-				if runtime and runtime.actionDisplayCounts then runtime.actionDisplayCounts[Helper.GetEntryKey(panelId, entryId)] = nil end
-				self:ClearEntryCustomCooldownDuration(panelId, entryId, true)
-				stats.removed = stats.removed + 1
+				local syncManaged = entry.cdmSyncManaged == true and (entry.cdmSyncSource == nil or entry.cdmSyncSource == sourceKind)
+				if syncManaged then
+					local removalSpecKey = entry.cdmSyncSpecKey or previousSpecKey or currentSpecKey
+					cdp.CDM.SaveEntryOverride(panel, sourceKind, canonicalSpellID, entry, removalSpecKey)
+					panel.entries[entryId] = nil
+					if runtime and runtime.actionDisplayCounts then runtime.actionDisplayCounts[Helper.GetEntryKey(panelId, entryId)] = nil end
+					self:ClearEntryCustomCooldownDuration(panelId, entryId, true)
+					stats.removed = stats.removed + 1
+				end
 			end
 		end
 	end
