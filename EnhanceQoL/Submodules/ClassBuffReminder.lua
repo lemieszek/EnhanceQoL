@@ -5323,17 +5323,22 @@ function Reminder:RenderSelfMissingIcons(missingEntries)
 			else
 				x = centeredOffset
 			end
+			iconFrame:SetPoint("CENTER", container, "CENTER", x, y)
 		elseif direction == GROWTH_LEFT then
 			x = (width / 2) - (scaledIconSize / 2) - ((i - 1) * step)
+			iconFrame:SetPoint("LEFT", container, "LEFT", -x, y)
 		elseif direction == GROWTH_UP then
 			y = -(height / 2) + (scaledIconSize / 2) + ((i - 1) * step)
+			iconFrame:SetPoint("TOP", container, "TOP", x, y)
 		elseif direction == GROWTH_DOWN then
 			y = (height / 2) - (scaledIconSize / 2) - ((i - 1) * step)
+			iconFrame:SetPoint("BOTTOM", container, "BOTTOM", x, -y)
 		else
 			x = -(width / 2) + (scaledIconSize / 2) + ((i - 1) * step)
+			iconFrame:SetPoint("RIGHT", container, "RIGHT", x, y)
 		end
 
-		iconFrame:SetPoint("CENTER", container, "CENTER", x, y)
+		-- iconFrame:SetPoint("CENTER", container, "CENTER", x, y)
 		if iconFrame.icon then iconFrame.icon:SetTexture(texture) end
 		iconFrame._eqolVisualSize = scaledIconSize
 		iconFrame._eqolBaseSlotSize = scaledIconSize
@@ -5364,7 +5369,7 @@ function Reminder:RenderSelfMissingIcons(missingEntries)
 	if frame.iconHolder then frame.iconHolder:Hide() end
 	if frame.border then frame.border:Hide() end
 	container:Show()
-	frame:SetSize(width + 2, height + 2)
+	frame:SetSize(scaledIconSize + 2, scaledIconSize + 2)
 	return true
 end
 
@@ -5513,6 +5518,7 @@ function Reminder:ApplySamplePreview(iconSize, scale, iconGap)
 	local spacing = iconGap
 	if type(spacing) ~= "number" then spacing = math.floor((6 * (scale or 1)) + 0.5) end
 	if spacing < 0 then spacing = 0 end
+	local step = iconSize + spacing
 	local count = math.min(SAMPLE_ICON_COUNT, #frame.sampleIcons)
 	local iconShape = self:GetIconShape()
 	local borderEnabled = self:IsBorderEnabled()
@@ -5535,7 +5541,7 @@ function Reminder:ApplySamplePreview(iconSize, scale, iconGap)
 		sample:Show()
 
 		if growFromCenter then
-			local centeredOffset = centeredAxisOffset(i, count, spacing)
+			local centeredOffset = centeredAxisOffset(i, count, step)
 			if direction == GROWTH_UP or direction == GROWTH_DOWN then
 				sample:SetPoint("CENTER", frame, "CENTER", 0, centeredOffset)
 			else
