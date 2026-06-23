@@ -250,6 +250,12 @@ local function ensureStatusBarTexturePath(bar, texturePath)
 	if not needsReset and tex and alpha ~= nil and alpha <= 0 then needsReset = true end
 	if not needsReset then return false end
 	bar:SetStatusBarTexture(texturePath)
+	tex = bar.GetStatusBarTexture and bar:GetStatusBarTexture()
+	if tex then
+		if tex.SetHorizTile then tex:SetHorizTile(false) end
+		if tex.SetVertTile then tex:SetVertTile(false) end
+		if tex.SetTexCoord then tex:SetTexCoord(0, 1, 0, 1) end
+	end
 	bar._rb_tex = texturePath
 	return true
 end
@@ -858,6 +864,7 @@ function ResourceBars.LayoutDiscreteSegments(bar, cfg, count, texturePath, separ
 		if not sb then
 			sb = CreateFrame("StatusBar", nameBase .. "Seg" .. i, inner)
 			sb:SetMinMaxValues(0, 1)
+			if sb.SetClipsChildren then sb:SetClipsChildren(true) end
 			segments[i] = sb
 		end
 		if sb:GetParent() ~= inner then sb:SetParent(inner) end
@@ -868,6 +875,9 @@ function ResourceBars.LayoutDiscreteSegments(bar, cfg, count, texturePath, separ
 		if not sb._rbSegmentBg then
 			sb._rbSegmentBg = sb:CreateTexture(nil, "BACKGROUND")
 			sb._rbSegmentBg:SetAllPoints(sb)
+			if sb._rbSegmentBg.SetHorizTile then sb._rbSegmentBg:SetHorizTile(false) end
+			if sb._rbSegmentBg.SetVertTile then sb._rbSegmentBg:SetVertTile(false) end
+			if sb._rbSegmentBg.SetTexCoord then sb._rbSegmentBg:SetTexCoord(0, 1, 0, 1) end
 		end
 		if segmentBgVisible then
 			if sb._rbSegmentBgPath ~= segmentBgPath then
