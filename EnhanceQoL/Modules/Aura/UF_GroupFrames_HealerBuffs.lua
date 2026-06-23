@@ -242,9 +242,9 @@ local FAMILY_DATA = {
 	{ id = "druid_germination", classToken = "DRUID", spec = "Restoration", spellIds = { 155777 }, fallbackName = "Germination" },
 	{ id = "druid_symbiotic_blooms", classToken = "DRUID", spec = "Restoration", spellIds = { 439530 }, fallbackName = "Symbiotic Blooms" },
 	-- Priest
-	{ id = "priest_pw_shield", classToken = "PRIEST", specs = { "Discipline", "Holy" }, spellIds = { 17 }, fallbackName = "Power Word: Shield" },
+	{ id = "priest_pw_shield", classToken = "PRIEST", specs = { "Discipline", "Holy" }, spellIds = { 17, 1300008 }, fallbackName = "Power Word: Shield" },
 	{ id = "priest_atonement", classToken = "PRIEST", spec = "Discipline", spellIds = { 194384 }, fallbackName = "Atonement" },
-	{ id = "priest_void_shield", classToken = "PRIEST", spec = "Discipline", spellIds = { 1253593 }, fallbackName = "Void Shield" },
+	{ id = "priest_void_shield", classToken = "PRIEST", spec = "Discipline", spellIds = { 1253593, 1300009 }, fallbackName = "Void Shield" },
 	{ id = "priest_renew", classToken = "PRIEST", specs = { "Discipline", "Holy" }, spellIds = { 139 }, fallbackName = "Renew" },
 	{ id = "priest_prayer_of_mending", classToken = "PRIEST", specs = { "Discipline", "Holy" }, spellIds = { 41635 }, fallbackName = "Prayer of Mending" },
 	{ id = "priest_echo_of_light", classToken = "PRIEST", spec = "Holy", spellIds = { 77489 }, fallbackName = "Echo of Light" },
@@ -1238,6 +1238,7 @@ end
 
 local function clearHiddenAuraButton(btn)
 	if not btn then return end
+	if AuraUtil and AuraUtil.setAuraTooltipState then AuraUtil.setAuraTooltipState(btn, EMPTY) end
 	btn._showTooltip = false
 	btn._hbTooltipShown = false
 	btn._tooltipUseEditMode = nil
@@ -1263,24 +1264,6 @@ local function hideButtons(buttons, startIndex)
 	for i = startIndex, #buttons do
 		clearHiddenAuraButton(buttons[i])
 	end
-end
-
-local function setAuraTooltipState(btn, show)
-	if not btn then return end
-	btn._showTooltip = show == true
-	if btn.SetMouseClickEnabled and btn._hbMouseClickEnabled ~= (show == true) then
-		btn:SetMouseClickEnabled(show == true)
-		btn._hbMouseClickEnabled = show == true
-	end
-	if btn.SetMouseMotionEnabled and btn._hbMouseMotionEnabled ~= (show == true) then
-		btn:SetMouseMotionEnabled(show == true)
-		btn._hbMouseMotionEnabled = show == true
-	end
-	if btn.EnableMouse and btn._hbMouseEnabled ~= (show == true) then
-		btn:EnableMouse(show == true)
-		btn._hbMouseEnabled = show == true
-	end
-	if show ~= true and GameTooltip and GameTooltip.IsOwned and GameTooltip.Hide and GameTooltip:IsOwned(btn) then GameTooltip:Hide() end
 end
 
 local function calcGridSize(shown, perRow, size, spacing, primary)
@@ -2586,7 +2569,7 @@ local function renderIconStyleForGroup(btn, st, state, compiled, cfg, group, cha
 				button._hbVisualGeneration = compiled.generation
 			end
 			if button._hbTooltipShown ~= false then
-				setAuraTooltipState(button, false)
+				AuraUtil.setAuraTooltipState(button, EMPTY)
 				button._hbTooltipShown = false
 			end
 		else
@@ -2597,9 +2580,9 @@ local function renderIconStyleForGroup(btn, st, state, compiled, cfg, group, cha
 				button._hbVisualGeneration = compiled.generation
 			end
 			setButtonIconDesaturated(button, HB.ShouldDesaturateRuleIcon(group, rule))
-			local showTooltip = style.showTooltip == true and (auraInstanceId and auraInstanceId > 0)
+			local showTooltip = style.showTooltip == true
 			if button._hbTooltipShown ~= showTooltip then
-				setAuraTooltipState(button, showTooltip)
+				AuraUtil.setAuraTooltipState(button, style)
 				button._hbTooltipShown = showTooltip
 			end
 		end
