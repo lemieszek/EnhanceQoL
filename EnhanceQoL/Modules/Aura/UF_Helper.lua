@@ -58,7 +58,6 @@ local FILTER_HARMFUL_PLAYER = "HARMFUL|PLAYER|INCLUDE_NAME_PLATE_ONLY"
 local FILTER_HARMFUL_RAID = "HARMFUL|INCLUDE_NAME_PLATE_ONLY|RAID"
 local FILTER_HARMFUL_RAID_IN_COMBAT = "HARMFUL|INCLUDE_NAME_PLATE_ONLY|RAID_IN_COMBAT"
 local FILTER_HARMFUL_DISPELLABLE = "HARMFUL|INCLUDE_NAME_PLATE_ONLY|RAID_PLAYER_DISPELLABLE"
-local FILTER_HARMFUL_IMPORTANT = "HARMFUL|INCLUDE_NAME_PLATE_ONLY|IMPORTANT"
 local FILTER_HARMFUL_CROWD_CONTROL = "HARMFUL|INCLUDE_NAME_PLATE_ONLY|CROWD_CONTROL"
 local FILTER_BIG_DEFENSIVE = "HELPFUL|BIG_DEFENSIVE"
 
@@ -120,7 +119,6 @@ function H.IsAuraFilteredIn(unit, aura, filter)
 	if filter == FILTER_HELPFUL_GROUP_RAID or filter == FILTER_HELPFUL_GROUP_RAID_IN_COMBAT then return isGroupHelpfulAura(unit, aura, filter) end
 	if filter == FILTER_HARMFUL_RAID or filter == FILTER_HARMFUL_RAID_IN_COMBAT then return H.IsHarmfulAura(aura, true) and H.IsRaidAura(aura) and isApiMatch(unit, aura, filter) end
 	if filter == FILTER_HARMFUL_DISPELLABLE then return H.IsHarmfulAura(aura, true) and isApiMatch(unit, aura, filter) end
-	if filter == FILTER_HARMFUL_IMPORTANT then return H.IsHarmfulAura(aura, true) and isApiMatch(unit, aura, filter) end
 	if filter == FILTER_HARMFUL_CROWD_CONTROL then return H.IsHarmfulAura(aura, true) and isApiMatch(unit, aura, filter) end
 	if filter == FILTER_BIG_DEFENSIVE then return H.IsHelpfulAura(aura, false) and isApiMatch(unit, aura, filter) end
 
@@ -2121,11 +2119,6 @@ end
 
 local function getEffectivePlayerPrimaryPowerToken(powerToken, powerEnum)
 	local normalized = normalizePrimaryPowerToken(powerEnum, powerToken)
-	if addon.variables and addon.variables.unitClass == "DRUID" then
-		local specMain = H.GetSpecMainPowerToken and H.GetSpecMainPowerToken("DRUID", addon.variables.unitSpec)
-		specMain = normalizePrimaryPowerToken(nil, specMain)
-		if specMain and specMain ~= "MANA" then normalized = specMain end
-	end
 	return normalized
 end
 

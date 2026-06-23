@@ -246,6 +246,7 @@ Helper.PANEL_LAYOUT_DEFAULTS = {
 	cdmAuraOverlayEnabled = false,
 	cooldownTextColor = { 1, 1, 1, 1 },
 	cooldownTextStyle = globalFontStyleKey(),
+	durationTextProfile = "MINIMAL",
 	staticTextFont = "",
 	staticTextSize = 12,
 	staticTextStyle = globalFontStyleKey(),
@@ -2325,6 +2326,18 @@ function Helper.NormalizePanel(panel, defaults)
 	panel.layout.chargesColor = Helper.NormalizeColor(panel.layout.chargesColor, layoutDefaults.chargesColor or Helper.PANEL_LAYOUT_DEFAULTS.chargesColor or { 1, 1, 1, 1 })
 	panel.layout.chargesHideWhenZero = panel.layout.chargesHideWhenZero == true
 	panel.layout.cooldownTextColor = Helper.NormalizeColor(panel.layout.cooldownTextColor, layoutDefaults.cooldownTextColor or Helper.PANEL_LAYOUT_DEFAULTS.cooldownTextColor)
+	if
+		type(panel.barDurationTextProfile) == "string"
+		and panel.barDurationTextProfile ~= ""
+		and (type(panel.layout.durationTextProfile) ~= "string" or panel.layout.durationTextProfile == "" or panel.layout.durationTextProfile == Helper.PANEL_LAYOUT_DEFAULTS.durationTextProfile)
+	then
+		panel.layout.durationTextProfile = panel.barDurationTextProfile
+	elseif type(panel.layout.durationTextProfile) ~= "string" or panel.layout.durationTextProfile == "" then
+		panel.layout.durationTextProfile = type(panel.barDurationTextProfile) == "string" and panel.barDurationTextProfile
+			or layoutDefaults.durationTextProfile
+			or Helper.PANEL_LAYOUT_DEFAULTS.durationTextProfile
+			or "MINIMAL"
+	end
 	if panel.layout.cooldownTextFont ~= nil and type(panel.layout.cooldownTextFont) ~= "string" then panel.layout.cooldownTextFont = nil end
 	if panel.layout.cooldownTextSize ~= nil then panel.layout.cooldownTextSize = Helper.ClampInt(panel.layout.cooldownTextSize, 6, 64, 12) end
 	if panel.layout.cooldownTextStyle ~= nil then
@@ -2634,6 +2647,9 @@ function Helper.CreatePanel(name, defaults)
 	if layout.keybindFontStyle == nil or layout.keybindFontStyle == "" then layout.keybindFontStyle = globalStyle end
 	if layout.cooldownTextStyle == nil or layout.cooldownTextStyle == "" then layout.cooldownTextStyle = globalStyle end
 	if layout.staticTextStyle == nil or layout.staticTextStyle == "" then layout.staticTextStyle = globalStyle end
+	layout.showChargesCooldown = true
+	layout.chargesHideWhenZero = true
+	layout.cdmAuraOverlayEnabled = true
 	layout.fixedGroups = {}
 	return {
 			name = (type(name) == "string" and name ~= "" and name) or L["cooldownPanelDefaultName"],
@@ -2992,14 +3008,6 @@ local function getBindingTextForActionSlot(slot)
 	local map = getActionButtonSlotMap()
 	local text = map and getBindingTextForButton(map[slot])
 	if text then return text end
-	if GetBindingKey then
-		local buttons = NUM_ACTIONBAR_BUTTONS or 12
-		local index = ((slot - 1) % buttons) + 1
-		local key = GetBindingKey("ACTIONBUTTON" .. index)
-		text = key and GetBindingText and GetBindingText(key, 1)
-		text = normalizeBindingText(text)
-		return text
-	end
 	return nil
 end
 
@@ -3042,12 +3050,7 @@ end
 local function addSpellBindingLookup(lookup, spellId, keyText)
 	spellId = tonumber(spellId)
 	if not (lookup and lookup.spell and spellId and keyText) then return end
-	local current = lookup.spell[spellId]
-	if current == nil then
-		lookup.spell[spellId] = keyText
-	elseif current ~= keyText then
-		lookup.spell[spellId] = false
-	end
+	if lookup.spell[spellId] == nil then lookup.spell[spellId] = keyText end
 end
 
 local function getLookupSpellBindingText(lookup, spellId)
@@ -3072,18 +3075,23 @@ local function buildKeybindLookup()
 		macroName = {},
 	}
 	local getMacroItem = GetMacroItem
+	local getMacroSpell = Api.GetMacroSpell
+	local getActionText = Api.GetActionText or GetActionText
+
+	local function addMacroSpellBinding(macroRef, keyText)
+		if not (getMacroSpell and macroRef and keyText) then return end
+		local macroSpell = getMacroSpell(macroRef)
+		local macroSpellId = tonumber(macroSpell)
+		if macroSpellId then
+			addSpellBindingLookup(lookup, macroSpellId, keyText)
+			addSpellBindingLookup(lookup, getEffectiveSpellId(macroSpellId), keyText)
+		end
+	end
 
 	eachActionButton(function(button)
 		local slot = getButtonActionSlot(button)
 		if not slot then return end
 		local keyText = getBindingTextForButton(button)
-		if not keyText and GetBindingKey then
-			local buttons = NUM_ACTIONBAR_BUTTONS or 12
-			local index = ((slot - 1) % buttons) + 1
-			local key = GetBindingKey("ACTIONBUTTON" .. index)
-			keyText = key and GetBindingText and GetBindingText(key, 1)
-			keyText = normalizeBindingText(keyText)
-		end
 		if not (keyText and GetActionInfo) then return end
 		local actionType, actionId = GetActionInfo(slot)
 		if actionType == "spell" and actionId then
@@ -3100,13 +3108,10 @@ local function buildKeybindLookup()
 				local macroName = GetMacroInfo(actionId)
 				if type(macroName) == "string" and macroName ~= "" and not lookup.macroName[macroName] then lookup.macroName[macroName] = keyText end
 			end
-			if Api.GetMacroSpell then
-				local macroSpell = Api.GetMacroSpell(actionId)
-				local macroSpellId = tonumber(macroSpell)
-				if macroSpellId then
-					addSpellBindingLookup(lookup, macroSpellId, keyText)
-					addSpellBindingLookup(lookup, getEffectiveSpellId(macroSpellId), keyText)
-				end
+			addMacroSpellBinding(actionId, keyText)
+			if getActionText then
+				local macroName = getActionText(slot)
+				if type(macroName) == "string" and macroName ~= "" then addMacroSpellBinding(macroName, keyText) end
 			end
 			if getMacroItem then
 				local macroItem = getMacroItem(actionId)

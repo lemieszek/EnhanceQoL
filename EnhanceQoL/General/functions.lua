@@ -11,6 +11,13 @@ local GetBagItem = C_TooltipInfo.GetBagItem
 local IsEquippableItemFn = C_Item.IsEquippableItem
 addon.functions = addon.functions or {}
 
+function addon.functions.IsMinigameClientScene(sceneType)
+	if Enum and Enum.ClientSceneType and Enum.ClientSceneType.MinigameSceneType ~= nil then
+		return sceneType == Enum.ClientSceneType.MinigameSceneType
+	end
+	return sceneType == 1
+end
+
 local UnitHealth, UnitHealthMax = UnitHealth, UnitHealthMax
 local UnitPower, UnitPowerMax = UnitPower, UnitPowerMax
 local UnitHealthPercent = UnitHealthPercent
@@ -2321,6 +2328,9 @@ function addon.functions.catalystChecks()
 		addon.variables.catalystID = 3269
 	elseif mId == 17 then
 		addon.variables.catalystID = 3378
+	elseif mId == 18 then
+		-- Midnight Season 2 PTR
+		addon.variables.catalystID = 3465
 	end
 	addon.functions.createCatalystFrame()
 end

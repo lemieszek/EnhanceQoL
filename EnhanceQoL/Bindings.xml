@@ -53,8 +53,11 @@
     <Binding name="EQOL_TOGGLE_COOLDOWN_PANELS"
              category="Enhance QoL"
              >
-        if EnhanceQoL and EnhanceQoL.Aura and EnhanceQoL.Aura.CooldownPanels and EnhanceQoL.Aura.CooldownPanels.ToggleEditor then
-            EnhanceQoL.Aura.CooldownPanels:ToggleEditor()
+        if EnhanceQoL and EnhanceQoL.Aura and EnhanceQoL.Aura.CooldownPanels then
+            local panels = EnhanceQoL.Aura.CooldownPanels
+            if panels.ToggleBlizzardEditor then
+                panels:ToggleBlizzardEditor()
+            end
         end
     </Binding>
 

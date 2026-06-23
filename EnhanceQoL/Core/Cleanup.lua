@@ -90,6 +90,8 @@ local LEGACY_PROFILE_KEYS = {
 	"unitFrameTruncateNames",
 }
 
+-- TODO 12.1 cleanup: when removing native-replaced PTR workarounds, add their stored keys here
+-- or to a dedicated cleanup helper. Expected keys: persistAuctionHouseFilter, groupfinderMoveResetButton.
 local MULTIDROPDOWN_SCRATCH_PROFILE_KEYS = {
 	"bagDisplayOptions",
 	"bagItemLevelTargets",
@@ -146,6 +148,21 @@ local MIGRATED_DATAPANEL_STREAM_OPTION_POSITION_KEYS = {
 	talent = true,
 	time = true,
 	volume = true,
+}
+
+local REMOVED_DURATION_TEXT_PROFILE_KEYS = {
+	"abbreviation",
+	"approximationSeconds",
+	"bindingUpdateInterval",
+	"canRoundUpIntervals",
+	"canRoundUpLastUnit",
+	"convertToLower",
+	"countdownAbbrevThreshold",
+	"desiredUnitCount",
+	"formatStyle",
+	"maxInterval",
+	"minInterval",
+	"stripIntervalWhitespace",
 }
 
 local function cleanupListedProfileKeys(profile, keys)
@@ -303,6 +320,18 @@ local function cleanupCooldownPanelsStorageProfile(profile)
 	if type(helper) == "table" and type(helper.PruneRootForStorage) == "function" then helper.PruneRootForStorage(root) end
 end
 
+local function cleanupDurationTextStorageProfile(profile)
+	if type(profile) ~= "table" then return end
+	local root = profile.durationText
+	local profiles = type(root) == "table" and root.profiles or nil
+	if type(profiles) ~= "table" then return end
+	for _, durationProfile in pairs(profiles) do
+		if type(durationProfile) == "table" then
+			cleanupListedProfileKeys(durationProfile, REMOVED_DURATION_TEXT_PROFILE_KEYS)
+		end
+	end
+end
+
 function addon.functions.CleanupCombatMeterSettings()
 	local db = _G.EnhanceQoLDB
 	if type(db) == "table" and type(db.profiles) == "table" then
@@ -403,10 +432,30 @@ function addon.functions.CleanupCooldownPanelsStorage()
 	if addon.db and addon.db ~= db then prune(addon.db) end
 end
 
+function addon.functions.CleanupDurationTextStorage()
+	local db = _G.EnhanceQoLDB
+	local seen = {}
+	local function cleanup(profile)
+		if type(profile) ~= "table" or seen[profile] then return end
+		seen[profile] = true
+		cleanupDurationTextStorageProfile(profile)
+	end
+	if type(db) == "table" then
+		cleanup(db)
+		if type(db.profiles) == "table" then
+			for _, profile in pairs(db.profiles) do
+				cleanup(profile)
+			end
+		end
+	end
+	if addon.db and addon.db ~= db then cleanup(addon.db) end
+end
+
 function addon.functions.CleanupOldStuff()
 	addon.functions.CleanupCombatMeterSettings()
 	addon.functions.CleanupBuffTrackerSettings()
 	addon.functions.CleanupDebugArtifacts()
+	addon.functions.CleanupDurationTextStorage()
 	addon.functions.CleanupLegacyProfileStorage()
 	addon.functions.CleanupResourceBarStorage()
 	addon.functions.CleanupTransientProfileCaches()

@@ -74,11 +74,15 @@ function ResourceBars.ShouldHideInVehicle(cfg) return resolveVisibilityFlag(cfg,
 
 function ResourceBars.ShouldHideInPetBattle(cfg) return resolveVisibilityFlag(cfg, "hidePetBattle", "resourceBarsHidePetBattle", false) end
 
+function ResourceBars.ShouldHideWhenEmpty(cfg) return resolveVisibilityFlag(cfg, "hideWhenEmpty", "resourceBarsHideWhenEmpty", false) end
+
 local function updateManagedFrameAlpha(frame)
 	if not (frame and frame.SetAlpha) then return end
 	local shouldHide = frame._rbClientSceneAlphaHidden == true or frame._rbRuntimeForcedAlphaHidden == true
 	if shouldHide then
 		if frame.GetAlpha and frame:GetAlpha() ~= 0 then frame:SetAlpha(0) end
+	elseif frame._rbEmptyAlphaActive == true then
+		frame:SetAlpha(frame._rbEmptyAlphaValue)
 	else
 		if frame.GetAlpha and frame:GetAlpha() == 0 then frame:SetAlpha(1) end
 	end
@@ -100,6 +104,19 @@ function ResourceBars.ApplyRuntimeForceHiddenAlphaToFrame(frame, forceHide)
 		frame._rbRuntimeForcedAlphaHidden = true
 	elseif frame._rbRuntimeForcedAlphaHidden then
 		frame._rbRuntimeForcedAlphaHidden = nil
+	end
+	updateManagedFrameAlpha(frame)
+end
+
+function ResourceBars.ApplyHideWhenEmptyAlphaToFrame(frame, cfg, rawValue)
+	if not (frame and frame.SetAlpha) then return end
+	local editModeActive = addon.EditMode and addon.EditMode.IsInEditMode and addon.EditMode:IsInEditMode()
+	if rawValue ~= nil and not editModeActive and ResourceBars.ShouldHideWhenEmpty and ResourceBars.ShouldHideWhenEmpty(cfg) then
+		frame._rbEmptyAlphaActive = true
+		frame._rbEmptyAlphaValue = rawValue
+	else
+		frame._rbEmptyAlphaActive = nil
+		frame._rbEmptyAlphaValue = nil
 	end
 	updateManagedFrameAlpha(frame)
 end
@@ -250,6 +267,12 @@ local function ensureStatusBarTexturePath(bar, texturePath)
 	if not needsReset and tex and alpha ~= nil and alpha <= 0 then needsReset = true end
 	if not needsReset then return false end
 	bar:SetStatusBarTexture(texturePath)
+	tex = bar.GetStatusBarTexture and bar:GetStatusBarTexture()
+	if tex then
+		if tex.SetHorizTile then tex:SetHorizTile(false) end
+		if tex.SetVertTile then tex:SetVertTile(false) end
+		if tex.SetTexCoord then tex:SetTexCoord(0, 1, 0, 1) end
+	end
 	bar._rb_tex = texturePath
 	return true
 end
@@ -858,6 +881,7 @@ function ResourceBars.LayoutDiscreteSegments(bar, cfg, count, texturePath, separ
 		if not sb then
 			sb = CreateFrame("StatusBar", nameBase .. "Seg" .. i, inner)
 			sb:SetMinMaxValues(0, 1)
+			if sb.SetClipsChildren then sb:SetClipsChildren(true) end
 			segments[i] = sb
 		end
 		if sb:GetParent() ~= inner then sb:SetParent(inner) end
@@ -868,6 +892,9 @@ function ResourceBars.LayoutDiscreteSegments(bar, cfg, count, texturePath, separ
 		if not sb._rbSegmentBg then
 			sb._rbSegmentBg = sb:CreateTexture(nil, "BACKGROUND")
 			sb._rbSegmentBg:SetAllPoints(sb)
+			if sb._rbSegmentBg.SetHorizTile then sb._rbSegmentBg:SetHorizTile(false) end
+			if sb._rbSegmentBg.SetVertTile then sb._rbSegmentBg:SetVertTile(false) end
+			if sb._rbSegmentBg.SetTexCoord then sb._rbSegmentBg:SetTexCoord(0, 1, 0, 1) end
 		end
 		if segmentBgVisible then
 			if sb._rbSegmentBgPath ~= segmentBgPath then

@@ -4,9 +4,38 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WOW_ROOT="/Applications/World of Warcraft"
 VERSION="$(git -C "$ROOT_DIR" describe --tags --always 2>/dev/null || echo "dev")"
+COMMON_GIT_DIR="$(git -C "$ROOT_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+PRIMARY_REPO_ROOT=""
+if [[ -n "$COMMON_GIT_DIR" ]]; then
+	PRIMARY_REPO_ROOT="$(cd "$(dirname "$COMMON_GIT_DIR")" && pwd)"
+fi
 
 declare -a TARGET_DIRS=()
 declare -a TARGET_LABELS=()
+
+resolve_libsettingsdesigner_source() {
+	local candidate
+	local candidates=(
+		"$PRIMARY_REPO_ROOT/../LibSettingsDesigner/runtime/LibSettingsDesigner"
+		"$ROOT_DIR/../LibSettingsDesigner/runtime/LibSettingsDesigner"
+		"$ROOT_DIR/EnhanceQoL/libs/LibSettingsDesigner"
+	)
+
+	for candidate in "${candidates[@]}"; do
+		if [[ -f "$candidate/LibSettingsDesigner.xml" ]]; then
+			printf '%s\n' "$candidate"
+			return 0
+		fi
+	done
+
+	return 1
+}
+
+LIB_SETTINGS_DESIGNER_SOURCE="$(resolve_libsettingsdesigner_source || true)"
+if [[ -z "$LIB_SETTINGS_DESIGNER_SOURCE" ]]; then
+	echo "LibSettingsDesigner runtime nicht gefunden. Erwartet: ../LibSettingsDesigner/runtime/LibSettingsDesigner"
+	exit 1
+fi
 
 detect_target() {
 	local flavor="$1"
@@ -45,6 +74,10 @@ deploy_to() {
 	cp -r "$ROOT_DIR/EnhanceQoLQuery/"* "$query_dir/"
 	cp -r "$ROOT_DIR/EnhanceQoLRoutesJournel/"* "$routes_journel_dir/"
 	cp -r "$ROOT_DIR/EnhanceQoLSharedMedia/"* "$sharedmedia_dir/"
+
+	rm -rf "$addon_dir/libs/LibSettingsDesigner"
+	mkdir -p "$addon_dir/libs/LibSettingsDesigner"
+	cp -R "$LIB_SETTINGS_DESIGNER_SOURCE"/. "$addon_dir/libs/LibSettingsDesigner/"
 
 	sed -i '' "s/@project-version@/$VERSION/" "$addon_dir/EnhanceQoL.toc"
 	sed -i '' "s/@project-version@/$VERSION/" "$query_dir/EnhanceQoLQuery.toc"

@@ -34,10 +34,10 @@ Timer.defaults = Timer.defaults
 	or {
 		enabled = false,
 		showDungeon = true,
-		dungeonDisplay = "SHORT_LEVEL",
-		showAffixes = false,
+		dungeonDisplay = "NAME_LEVEL",
+		showAffixes = true,
 		showAffixIcons = false,
-		affixDisplay = "TEXT",
+		affixDisplay = "ICON",
 		showTimer = true,
 		timerDisplay = "TIME_LEFT",
 		showChestTimers = false,
@@ -49,81 +49,81 @@ Timer.defaults = Timer.defaults
 		hideNonBossObjectives = false,
 		showEnemyForces = true,
 		showObjectiveBars = true,
-		showObjectiveTimes = true,
+		showObjectiveTimes = false,
 		showObjectiveBestTimes = true,
 		showOnlyInMythicPlus = true,
 		visibility = "runOrEditMode",
 		updateRate = 0.2,
 		tooltip = true,
 		layoutMode = "PANEL",
-		panelHeight = 142,
+		panelHeight = 106,
 		showKeyLevel = false,
-		showBestTime = true,
+		showBestTime = false,
 		showBestDelta = true,
 		showEnemyPercent = false,
 		showPanelTimerBar = true,
 		showPanelEnemyBar = true,
-		dungeonAnchor = "TOPLEFT",
-		dungeonOffsetX = 5,
-		dungeonOffsetY = -3,
+		dungeonAnchor = "TOP",
+		dungeonOffsetX = 0,
+		dungeonOffsetY = 23,
 		keyLevelAnchor = "TOPLEFT",
 		keyLevelOffsetX = 12,
 		keyLevelOffsetY = -12,
-		timerAnchor = "TOPRIGHT",
-		timerOffsetX = -5,
-		timerOffsetY = 0,
+		timerAnchor = "LEFT",
+		timerOffsetX = 25,
+		timerOffsetY = 1,
 		chest2Anchor = "TOPLEFT",
 		chest2OffsetX = 115,
 		chest2OffsetY = -38,
 		chest3Anchor = "TOPLEFT",
 		chest3OffsetX = 175,
 		chest3OffsetY = -38,
-		deathsAnchor = "BOTTOMRIGHT",
-		deathsOffsetX = -5,
-		deathsOffsetY = 5,
+		deathsAnchor = "TOPLEFT",
+		deathsOffsetX = 25,
+		deathsOffsetY = -21,
 		enemyPercentAnchor = "TOPLEFT",
 		enemyPercentOffsetX = 218,
 		enemyPercentOffsetY = -42,
 		bestTimeAnchor = "BOTTOMLEFT",
-		bestTimeOffsetX = 5,
+		bestTimeOffsetX = 7,
 		bestTimeOffsetY = 5,
-		bestTimeColor = { r = 0.55, g = 0.55, b = 0.55, a = 1 },
-		panelAffixesAnchor = "TOPLEFT",
-		panelAffixesOffsetX = 12,
-		panelAffixesOffsetY = -24,
-		panelAffixesFontSize = 12,
+		bestTimeColor = { r = 1, g = 1, b = 1, a = 1 },
+		panelAffixesAnchor = "TOPRIGHT",
+		panelAffixesOffsetX = -20,
+		panelAffixesOffsetY = -20,
+		panelAffixesFontSize = 18,
 		panelAffixIconSize = 16,
-		panelDungeonFontSize = 28,
+		panelDungeonFontSize = 20,
 		panelKeyLevelFontSize = 26,
-		panelTimerFontSize = 28,
+		panelTimerFontSize = 20,
 		panelChestFontSize = 12,
 		panelChestHideLabels = true,
-		panelDeathsFontSize = 12,
-		panelDeathIconSize = 16,
+		panelDeathsFontSize = 16,
+		panelDeathIconSize = 12,
 		panelEnemyPercentFontSize = 12,
 		panelBestTimeFontSize = 12,
-		panelObjectivesAnchor = "TOPLEFT",
+		panelObjectivesAnchor = "BOTTOM",
 		panelObjectivesGrowth = "DOWN",
 		panelObjectivesOffsetX = 0,
-		panelObjectivesOffsetY = -85,
+		panelObjectivesOffsetY = -23,
 		panelObjectivesWidth = 240,
 		panelObjectivesFontFace = GLOBAL_FONT_KEY,
 		panelObjectivesFontOutline = GLOBAL_STYLE_KEY,
-		panelObjectivesFontSize = 12,
-		panelObjectivesSpacing = 2,
-		panelObjectivesColumnSpacing = 6,
+		panelObjectivesFontSize = 13,
+		panelObjectivesSpacing = 0,
+		panelObjectivesColumnSpacing = 0,
 		panelObjectivesInvertColumns = false,
 		panelBarWidth = 220,
 		panelBarHeight = 8,
-		panelTimerBarWidth = 290,
-		panelTimerBarHeight = 12,
-		panelTimerBarColor = { r = 0.15, g = 1, b = 0.25, a = 1 },
+		panelTimerBarWidth = 218,
+		panelTimerBarHeight = 13,
+		panelTimerBarColor = { r = 0.02352941408753395, g = 0.4274510145187378, b = 1, a = 1 },
 		panelTimerBarExpiredColor = { r = 1, g = 0.12, b = 0.12, a = 1 },
-		panelTimerBarTexture = "EQOL: Astral",
-		panelTimerBarBackgroundTexture = "",
-		panelTimerBarBackgroundColor = { r = 0, g = 0, b = 0, a = 0.45 },
-		panelTimerBarBorderEnabled = true,
-		panelTimerBarBorderTexture = "EQOL: Midnight 12px",
+		panelTimerBarTexture = "",
+		panelTimerBarBackgroundTexture = "Solid",
+		panelTimerBarBackgroundColor = { r = 0, g = 0, b = 0, a = 0.835936963558197 },
+		panelTimerBarBorderEnabled = false,
+		panelTimerBarBorderTexture = "None",
 		panelTimerBarBorderColor = { r = 0.0470588281750679, g = 0.95686280727386475, b = 1, a = 1 },
 		panelTimerBarBorderSize = 5,
 		panelTimerBarBorderOffset = 1,
@@ -136,42 +136,42 @@ Timer.defaults = Timer.defaults
 		panelTimerBarChestTimeText = true,
 		panelTimerBarChestTimeTextOffsetY = 14,
 		panelTimerBarChestTimeTextFontSize = 14,
-		panelTimerBarChestTimeTextColor = { r = 0.55, g = 0.85, b = 1, a = 1 },
+		panelTimerBarChestTimeTextColor = { r = 1, g = 0.6627451181411743, b = 0.03529411926865578, a = 1 },
 		panelTimerBarTimeLeftText = false,
-		panelTimerBarTimeLeftTextOffsetX = 0,
+		panelTimerBarTimeLeftTextOffsetX = 9,
 		panelTimerBarTimeLeftTextOffsetY = 14,
 		panelTimerBarTimeLeftTextFontSize = 14,
-		panelTimerBarTimeLeftTextColor = { r = 1, g = 1, b = 1, a = 1 },
-		panelTimerBarFillUp = false,
-		panelTimerBarAnchor = "TOP",
+		panelTimerBarTimeLeftTextColor = { r = 0.2156862914562225, g = 1, b = 0.9568628072738647, a = 1 },
+		panelTimerBarFillUp = true,
+		panelTimerBarAnchor = "BOTTOM",
 		panelTimerBarOffsetX = 0,
-		panelTimerBarOffsetY = -52,
-		panelEnemyBarWidth = 290,
-		panelEnemyBarHeight = 12,
-		panelEnemyBarColor = { r = 0.95, g = 0.55, b = 0.15, a = 1 },
+		panelTimerBarOffsetY = 16,
+		panelEnemyBarWidth = 249,
+		panelEnemyBarHeight = 14,
+		panelEnemyBarColor = { r = 0.9490196704864502, g = 0.2039215862751007, b = 0.062745101749897, a = 1 },
 		panelEnemyBarTexture = "Blizzard Raid Bar",
-		panelEnemyBarBackgroundTexture = "",
-		panelEnemyBarBackgroundColor = { r = 0, g = 0, b = 0, a = 0.45 },
+		panelEnemyBarBackgroundTexture = "Solid",
+		panelEnemyBarBackgroundColor = { r = 0, g = 0, b = 0, a = 0.7656245827674866 },
 		panelEnemyBarBorderEnabled = true,
-		panelEnemyBarBorderTexture = "EQOL: Midnight 12px",
-		panelEnemyBarBorderColor = { r = 0.3254902064800263, g = 0.94117653369903564, b = 1, a = 1 },
-		panelEnemyBarBorderSize = 5,
-		panelEnemyBarBorderOffset = 1,
+		panelEnemyBarBorderTexture = "EQOL: Midnight white 12px",
+		panelEnemyBarBorderColor = { r = 0.6000000238418579, g = 0.4117647409439087, b = 0.2352941334247589, a = 1 },
+		panelEnemyBarBorderSize = 9,
+		panelEnemyBarBorderOffset = 2,
 		panelEnemyBarBorderSeparateOffset = false,
 		panelEnemyBarBorderOffsetX = 0,
 		panelEnemyBarBorderOffsetY = 0,
-		panelEnemyBarAnchor = "TOP",
+		panelEnemyBarAnchor = "BOTTOM",
 		panelEnemyBarOffsetX = 0,
-		panelEnemyBarOffsetY = -70,
+		panelEnemyBarOffsetY = -15,
 		panelEnemyBarTextEnabled = true,
 		panelEnemyBarTextAlign = "RIGHT",
 		panelEnemyBarTextOffsetY = 0,
-		panelEnemyBarTextFontSize = 11,
+		panelEnemyBarTextFontSize = 13,
 		panelEnemyBarTextColor = { r = 1, g = 1, b = 1, a = 1 },
-		width = 308,
+		width = 261,
 		rowHeight = 18,
 		rowSpacing = 3,
-		growth = "DOWN",
+		growth = "UP",
 		align = "LEFT",
 		iconOffsetX = 0,
 		iconOffsetY = 0,
@@ -213,23 +213,23 @@ Timer.defaults = Timer.defaults
 		objectiveBestDeltaSlowerColor = { r = 1, g = 0.25, b = 0.2, a = 1 },
 		enemyForcesColor = { r = 0.95, g = 0.55, b = 0.15, a = 1 },
 		backdropEnabled = true,
-		backdropUseCustomTexture = false,
-		backdropCustomTexture = "",
+		backdropUseCustomTexture = true,
+		backdropCustomTexture = "ChallengeMode-Timer",
 		backdropTexture = "EQOL: Astral",
-		backdropColor = { r = 0.62352943420410156, g = 0.74901962280273438, b = 1, a = 0.550000011920929 },
+		backdropColor = { r = 0.9568628072738647, g = 0.9686275124549866, b = 1, a = 1 },
 		backdropAnchor = "CENTER",
 		backdropOffsetX = 0,
 		backdropOffsetY = 0,
 		backdropSizeOffsetX = 0,
 		backdropSizeOffsetY = 0,
-		headerBarEnabled = false,
+		headerBarEnabled = true,
 		headerBarUseCustomTexture = true,
 		headerBarCustomTexture = "ui-damagemeters-header-bar",
 		headerBarTexture = "TWEBA Blizzard",
 		headerBarColor = { r = 1, g = 1, b = 1, a = 1 },
 		headerBarAnchor = "TOP",
 		headerBarOffsetX = 0,
-		headerBarOffsetY = 6,
+		headerBarOffsetY = -1,
 		headerBarSizeOffsetX = 9,
 		headerBarSizeOffsetY = 0,
 		footerBarEnabled = false,
@@ -489,9 +489,7 @@ local function buildStyleOptions()
 end
 
 local function secondsToText(seconds)
-	seconds = math.max(0, tonumber(seconds) or 0)
-	if SecondsToClock then return SecondsToClock(seconds) end
-	seconds = math.floor(seconds)
+	seconds = math.floor(math.max(0, tonumber(seconds) or 0))
 	local minutes = math.floor(seconds / 60)
 	return string.format("%d:%02d", minutes, seconds % 60)
 end
@@ -526,6 +524,59 @@ local function getActiveChallengeTimer()
 		if ok and timerType == Enum.WorldElapsedTimerTypes.ChallengeMode then return timerID, tonumber(elapsedTime) or 0 end
 	end
 	return nil
+end
+
+local function createDurationObject()
+	local durationUtil = _G.C_DurationUtil
+	return durationUtil and durationUtil.CreateDuration and durationUtil.CreateDuration() or nil
+end
+
+local function getDurationTextBindingProperty(property)
+	local enum = _G.Enum and _G.Enum.DurationTextBindingProperty or nil
+	if enum and enum[property] ~= nil then return enum[property] end
+	if property == "RemainingDuration" then return 0 end
+	if property == "ElapsedDuration" then return 2 end
+	if property == "TotalDuration" then return 4 end
+	return nil
+end
+
+local function getNumericRoundingDown()
+	local enum = _G.Enum and _G.Enum.NumericRuleFormatRounding or nil
+	return enum and enum.Down or 2
+end
+
+local function createTimerNumericFormatter()
+	local stringUtil = _G.C_StringUtil
+	if not (stringUtil and stringUtil.CreateNumericRuleFormatter) then return nil end
+	local formatter = stringUtil.CreateNumericRuleFormatter()
+	if formatter.ClearBreakpoints then formatter:ClearBreakpoints() end
+	local down = getNumericRoundingDown()
+	local breakpoints = {
+		{
+			threshold = 0,
+			step = 1,
+			rounding = down,
+			format = "%d:%02d",
+			components = {
+				{ div = 60, step = 1, rounding = down },
+				{ mod = 60, step = 1, rounding = down },
+			},
+		},
+	}
+	if formatter.SetBreakpoints then
+		formatter:SetBreakpoints(breakpoints)
+	elseif formatter.AddBreakpoint then
+		for i = 1, #breakpoints do
+			formatter:AddBreakpoint(breakpoints[i])
+		end
+	end
+	return formatter
+end
+
+local function getChallengeStartTime(timer, state)
+	if state and state.active and timer.timerBaseTime and timer.timerBaseElapsed then return timer.timerBaseTime - timer.timerBaseElapsed end
+	local now = GetTime and GetTime() or 0
+	return now - (tonumber(state and state.elapsed) or 0)
 end
 
 local function getActiveKeystoneInfo()
@@ -756,7 +807,7 @@ function Timer:ResolveRunState()
 	if active then
 		elapsed = (self.timerBaseElapsed or 0) + math.max(0, (GetTime and GetTime() or 0) - (self.timerBaseTime or 0))
 		local _, authoritativeElapsed = getActiveChallengeTimer()
-		if authoritativeElapsed and math.abs(authoritativeElapsed - elapsed) > 0.75 then
+		if authoritativeElapsed and math.abs(authoritativeElapsed - elapsed) > 2 then
 			self.timerBaseElapsed = authoritativeElapsed
 			self.timerBaseTime = GetTime and GetTime() or 0
 			elapsed = authoritativeElapsed
@@ -1051,6 +1102,130 @@ function Timer:GetTimerDisplayText(state, timeLeft)
 	if mode == "TIME_LEFT_TOTAL" then return string.format("%s / %s", timeRemainingToText(timeLeft), secondsToText(total)) end
 	if mode == "ELAPSED_TOTAL" then return string.format("%s / %s", secondsToText(elapsed), secondsToText(total)) end
 	return timeRemainingToText(timeLeft)
+end
+
+function Timer:GetTimerDurationObject(key)
+	self.durationObjects = self.durationObjects or {}
+	local durationObject = self.durationObjects[key]
+	if not durationObject then
+		durationObject = createDurationObject()
+		self.durationObjects[key] = durationObject
+	end
+	return durationObject
+end
+
+function Timer:UpdateTimerDurationObject(key, startTime, duration)
+	startTime = tonumber(startTime)
+	duration = tonumber(duration)
+	if not (key and startTime and duration and duration > 0) then return nil end
+	local durationObject = self:GetTimerDurationObject(key)
+	if not (durationObject and durationObject.SetTimeFromStart) then return nil end
+	local signature = string.format("%.3f:%.3f", startTime, duration)
+	self.durationObjectSignatures = self.durationObjectSignatures or {}
+	if self.durationObjectSignatures[key] ~= signature then
+		durationObject:SetTimeFromStart(startTime, duration, 1)
+		self.durationObjectSignatures[key] = signature
+	end
+	return durationObject
+end
+
+function Timer:GetTimerNumericFormatter()
+	if not self.timerNumericFormatter then self.timerNumericFormatter = createTimerNumericFormatter() end
+	return self.timerNumericFormatter
+end
+
+function Timer:CreateTimerFormatComponent(property)
+	local resolvedProperty = getDurationTextBindingProperty(property)
+	local formatter = self:GetTimerNumericFormatter()
+	if resolvedProperty == nil or not formatter then return nil end
+	return {
+		property = resolvedProperty,
+		formatter = formatter,
+	}
+end
+
+function Timer:GetDurationTextComponents(mode)
+	if mode == "TIME_LEFT_TOTAL" then
+		return {
+			self:CreateTimerFormatComponent("RemainingDuration"),
+			self:CreateTimerFormatComponent("TotalDuration"),
+		}
+	end
+	if mode == "ELAPSED_TOTAL" then
+		return {
+			self:CreateTimerFormatComponent("ElapsedDuration"),
+			self:CreateTimerFormatComponent("TotalDuration"),
+		}
+	end
+	if mode == "TOTAL" then
+		return {
+			self:CreateTimerFormatComponent("TotalDuration"),
+		}
+	end
+	return {
+		self:CreateTimerFormatComponent("RemainingDuration"),
+	}
+end
+
+function Timer:BindTimerText(fontString, key, durationObject, mode, textFormat)
+	if not (fontString and durationObject and addon.functions and addon.functions.BindDurationText) then return false end
+	local formatter = self:GetTimerNumericFormatter()
+	if not formatter then return false end
+	local options = {
+		owner = self:EnsureFrame(),
+		key = key,
+		clearText = false,
+		expiredText = "",
+		formatter = formatter,
+		zeroDurationText = "",
+		updateNow = true,
+		-- M+ timer text is always m:ss; Duration Text profiles only apply to user-configurable cooldown displays.
+		useProfileConfig = false,
+	}
+	if mode == "TIME_LEFT_TOTAL" or mode == "ELAPSED_TOTAL" then
+		local components = self:GetDurationTextComponents(mode)
+		if components and components[1] and components[2] then
+			options.textFormat = "{} / {}"
+			options.components = components
+		end
+	elseif mode == "TOTAL" then
+		local components = self:GetDurationTextComponents("TOTAL")
+		if components and components[1] then
+			options.textFormat = "{}"
+			options.components = components
+		end
+	elseif textFormat then
+		local components = self:GetDurationTextComponents("REMAINING")
+		if components and components[1] then
+			options.textFormat = textFormat
+			options.components = components
+		end
+	end
+	local _, ok = addon.functions.BindDurationText(fontString, durationObject, options)
+	return ok == true
+end
+
+function Timer:ReleaseTimerTextBinding(key)
+	local durationText = addon.DurationText
+	if durationText and durationText.ReleaseBinding then durationText:ReleaseBinding(self:EnsureFrame(), key, false) end
+end
+
+function Timer:SetBoundTimerText(key, fallbackText, anchorKey, xKey, yKey, color, fontSize, justify, state, duration, mode, textFormat)
+	local text = self:SetPanelText(key, fallbackText, anchorKey, xKey, yKey, color, fontSize, justify)
+	local bindingKey = "panel-" .. key
+	if not (state and state.active) then
+		self:ReleaseTimerTextBinding(bindingKey)
+		return text
+	end
+	local elapsed = tonumber(state.elapsed) or 0
+	duration = tonumber(duration) or 0
+	if duration <= 0 or elapsed >= duration then
+		self:ReleaseTimerTextBinding(bindingKey)
+		return text
+	end
+	local durationObject = self:UpdateTimerDurationObject(key, getChallengeStartTime(self, state), duration)
+	if not (durationObject and self:BindTimerText(text, bindingKey, durationObject, mode, textFormat)) then self:ReleaseTimerTextBinding(bindingKey) end
+	return text
 end
 
 local function normalizeDungeonAbbreviation(label, mapName)
@@ -1919,12 +2094,13 @@ function Timer:SetPanelEnemyBarText(percent)
 	bar.text:Show()
 end
 
-function Timer:SetPanelTimerBarTimeLeftText(timeLeft)
+function Timer:SetPanelTimerBarTimeLeftText(timeLeft, state)
 	local frame = self.frame
 	local bar = frame and frame.panelBars and frame.panelBars.timer
 	if not (bar and bar.timeLeftText) then return end
 	if not self:Get("panelTimerBarTimeLeftText") then
 		bar.timeLeftText:Hide()
+		self:ReleaseTimerTextBinding("panel-bar-time-left")
 		return
 	end
 	local fillUp = self:Get("panelTimerBarFillUp") == true
@@ -1934,6 +2110,8 @@ function Timer:SetPanelTimerBarTimeLeftText(timeLeft)
 	local color = normalizeColor(self:Get("panelTimerBarTimeLeftTextColor"), defaults.panelTimerBarTimeLeftTextColor)
 	local offsetX = pointOffset(self:Get("panelTimerBarTimeLeftTextOffsetX"), -200, 200, defaults.panelTimerBarTimeLeftTextOffsetX)
 	local offsetY = pointOffset(self:Get("panelTimerBarTimeLeftTextOffsetY"), -100, 100, defaults.panelTimerBarTimeLeftTextOffsetY)
+	local timeLimit = tonumber(state and state.timeLimit) or 0
+	local elapsed = tonumber(state and state.elapsed) or 0
 	bar.timeLeftText:ClearAllPoints()
 	applyFontString(bar.timeLeftText, font, fontSize, style)
 	bar.timeLeftText:SetText(secondsToText(math.max(0, tonumber(timeLeft) or 0)))
@@ -1944,6 +2122,12 @@ function Timer:SetPanelTimerBarTimeLeftText(timeLeft)
 	else
 		bar.timeLeftText:SetJustifyH("LEFT")
 		bar.timeLeftText:SetPoint("LEFT", bar, "LEFT", offsetX, offsetY)
+	end
+	if state and state.active and timeLimit > 0 and elapsed < timeLimit then
+		local durationObject = self:UpdateTimerDurationObject("panelBarTimeLeft", getChallengeStartTime(self, state), timeLimit)
+		if not (durationObject and self:BindTimerText(bar.timeLeftText, "panel-bar-time-left", durationObject, "REMAINING")) then self:ReleaseTimerTextBinding("panel-bar-time-left") end
+	else
+		self:ReleaseTimerTextBinding("panel-bar-time-left")
 	end
 	bar.timeLeftText:Show()
 end
@@ -1961,6 +2145,8 @@ function Timer:UpdatePanelTimerBarChestMarkers(timeLimit, twoChest, threeChest)
 		for _, markerText in ipairs(bar.chestMarkerTexts or {}) do
 			markerText:Hide()
 		end
+		Timer:ReleaseTimerTextBinding("panel-bar-panelBarChest3")
+		Timer:ReleaseTimerTextBinding("panel-bar-panelBarChest2")
 	end
 	if not showMarkers and not showTexts then
 		hideMarkerElements()
@@ -2008,16 +2194,24 @@ function Timer:UpdatePanelTimerBarChestMarkers(timeLimit, twoChest, threeChest)
 		local markerText = bar.chestMarkerTexts and bar.chestMarkerTexts[index]
 		if markerText then
 			if showTexts and remainingTimes[index] and remainingTimes[index] >= 0 then
+				local durationObjectKey = index == 1 and "panelBarChest3" or "panelBarChest2"
 				markerText:ClearAllPoints()
 				markerText:SetPoint("CENTER", bar, "LEFT", snapToPixel(positions[index]), textOffsetY)
 				applyFontString(markerText, font, fontSize, style)
 				markerText:SetText(secondsToText(remainingTimes[index]))
 				markerText:SetTextColor(textColor.r, textColor.g, textColor.b, textColor.a)
-				markerText:Show()
-			else
-				markerText:Hide()
+					if self.lastState and self.lastState.active then
+						local durationObject = self:UpdateTimerDurationObject(durationObjectKey, getChallengeStartTime(self, self.lastState), index == 1 and threeChestTime or twoChestTime)
+						if not (durationObject and self:BindTimerText(markerText, "panel-bar-" .. durationObjectKey, durationObject, "REMAINING")) then self:ReleaseTimerTextBinding("panel-bar-" .. durationObjectKey) end
+					else
+						self:ReleaseTimerTextBinding("panel-bar-" .. durationObjectKey)
+					end
+					markerText:Show()
+				else
+					markerText:Hide()
+					self:ReleaseTimerTextBinding("panel-bar-" .. (index == 1 and "panelBarChest3" or "panelBarChest2"))
+				end
 			end
-		end
 	end
 end
 
@@ -2025,8 +2219,8 @@ function Timer:RenderPanel(state, timeLeft, twoChest, threeChest)
 	self:HidePanelElements()
 	if self:Get("layoutMode") ~= "PANEL" then return 0 end
 	local frame = self:EnsureFrame()
-	local objectiveHeight = self:Get("showObjectives") and self:RenderPanelObjectives(state) or 0
-	local panelHeight = math.max(clampNumber(self:Get("panelHeight"), 24, 300, defaults.panelHeight), objectiveHeight)
+	if self:Get("showObjectives") then self:RenderPanelObjectives(state) end
+	local panelHeight = clampNumber(self:Get("panelHeight"), 24, 300, defaults.panelHeight)
 	frame:SetSize(snapSize(clampNumber(self:Get("width"), 120, 800, defaults.width)), snapSize(panelHeight))
 	self:ApplyFrameStyle()
 	local best = self:GetBestTime(state)
@@ -2036,11 +2230,55 @@ function Timer:RenderPanel(state, timeLeft, twoChest, threeChest)
 	local elapsed = tonumber(state.elapsed) or 0
 	if self:Get("showDungeon") then self:SetPanelText("dungeon", self:GetDungeonDisplayText(state), "dungeonAnchor", "dungeonOffsetX", "dungeonOffsetY", self:Get("dungeonColor"), self:Get("panelDungeonFontSize")) end
 	if self:Get("showKeyLevel") then self:SetPanelText("key", tostring(state.level or 0), "keyLevelAnchor", "keyLevelOffsetX", "keyLevelOffsetY", self:Get("dungeonColor"), self:Get("panelKeyLevelFontSize")) end
-	if self:Get("showTimer") then self:SetPanelText("timer", self:GetTimerDisplayText(state, timeLeft), "timerAnchor", "timerOffsetX", "timerOffsetY", timeLeft <= 0 and self:Get("timerExpiredColor") or self:Get("timerColor"), self:Get("panelTimerFontSize"), "CENTER") end
+	if self:Get("showTimer") then
+		self:SetBoundTimerText(
+			"timer",
+			self:GetTimerDisplayText(state, timeLeft),
+			"timerAnchor",
+			"timerOffsetX",
+			"timerOffsetY",
+			timeLeft <= 0 and self:Get("timerExpiredColor") or self:Get("timerColor"),
+			self:Get("panelTimerFontSize"),
+			"CENTER",
+			state,
+			state.timeLimit,
+			self:Get("timerDisplay")
+		)
+	end
 	if self:Get("showChestTimers") then
 		local hideChestLabels = self:Get("panelChestHideLabels") == true
-		if elapsed <= twoChest then self:SetPanelText("chest2", hideChestLabels and secondsToText(twoChest - elapsed) or ("+2\n" .. secondsToText(twoChest - elapsed)), "chest2Anchor", "chest2OffsetX", "chest2OffsetY", self:Get("chestColor"), self:Get("panelChestFontSize")) end
-		if elapsed <= threeChest then self:SetPanelText("chest3", hideChestLabels and secondsToText(threeChest - elapsed) or ("+3\n" .. secondsToText(threeChest - elapsed)), "chest3Anchor", "chest3OffsetX", "chest3OffsetY", self:Get("chestColor"), self:Get("panelChestFontSize")) end
+		if elapsed <= twoChest then
+			self:SetBoundTimerText(
+				"chest2",
+				hideChestLabels and secondsToText(twoChest - elapsed) or ("+2\n" .. secondsToText(twoChest - elapsed)),
+				"chest2Anchor",
+				"chest2OffsetX",
+				"chest2OffsetY",
+				self:Get("chestColor"),
+				self:Get("panelChestFontSize"),
+				nil,
+				state,
+				twoChest,
+				"REMAINING",
+				hideChestLabels and nil or "+2\n{}"
+			)
+		end
+		if elapsed <= threeChest then
+			self:SetBoundTimerText(
+				"chest3",
+				hideChestLabels and secondsToText(threeChest - elapsed) or ("+3\n" .. secondsToText(threeChest - elapsed)),
+				"chest3Anchor",
+				"chest3OffsetX",
+				"chest3OffsetY",
+				self:Get("chestColor"),
+				self:Get("panelChestFontSize"),
+				nil,
+				state,
+				threeChest,
+				"REMAINING",
+				hideChestLabels and nil or "+3\n{}"
+			)
+		end
 	end
 	if self:ShouldShowDeathDisplay(state) then
 		local deathText = self:SetPanelText("deaths", self:GetDeathDisplayText(state.deaths, self:Get("panelDeathIconSize"), state.timeLost), "deathsAnchor", "deathsOffsetX", "deathsOffsetY", self:Get("deathColor"), self:Get("panelDeathsFontSize"))
@@ -2060,7 +2298,7 @@ function Timer:RenderPanel(state, timeLeft, twoChest, threeChest)
 		local timerBarValue = self:Get("panelTimerBarFillUp") == true and math.min(state.timeLimit or 1, math.max(0, elapsed)) or math.max(0, timeLeft)
 		self:SetPanelBar("timer", timerBarValue, state.timeLimit or 1, "panelTimerBarAnchor", "panelTimerBarOffsetX", "panelTimerBarOffsetY", timeLeft <= 0 and self:Get("panelTimerBarExpiredColor") or self:Get("panelTimerBarColor"))
 		self:UpdatePanelTimerBarChestMarkers(state.timeLimit or 0, twoChest, threeChest)
-		self:SetPanelTimerBarTimeLeftText(timeLeft)
+		self:SetPanelTimerBarTimeLeftText(timeLeft, state)
 	end
 	if self:Get("showPanelEnemyBar") then
 		local bar = self:EnsurePanelBar("enemy")
@@ -2138,6 +2376,20 @@ function Timer:SetRow(index, data)
 	row.bar:SetStatusBarColor(color.r, color.g, color.b, color.a)
 	setTextColor(row.text, data.textColor or color)
 	setTextColor(row.value, data.valueColor or color)
+	local bindingKey = "row-" .. tostring(index)
+	local durationBinding = data.durationBinding
+	if durationBinding and durationBinding.state and durationBinding.state.active then
+		local elapsed = tonumber(durationBinding.state.elapsed) or 0
+		local duration = tonumber(durationBinding.duration) or 0
+		if duration > 0 and elapsed < duration then
+			local durationObject = self:UpdateTimerDurationObject(durationBinding.key, getChallengeStartTime(self, durationBinding.state), duration)
+			if not (durationObject and self:BindTimerText(row.value, bindingKey, durationObject, durationBinding.mode, durationBinding.textFormat)) then self:ReleaseTimerTextBinding(bindingKey) end
+		else
+			self:ReleaseTimerTextBinding(bindingKey)
+		end
+	else
+		self:ReleaseTimerTextBinding(bindingKey)
+	end
 	row:Show()
 end
 
@@ -2330,6 +2582,12 @@ function Timer:Refresh()
 			fontSize = self:Get("timerFontSize"),
 			max = state.timeLimit or 1,
 			value = math.max(0, timeLeft),
+			durationBinding = {
+				key = "rowTimer",
+				state = state,
+				duration = state.timeLimit,
+				mode = self:Get("timerDisplay"),
+			},
 		})
 	end
 	if self:Get("showChestTimers") then
@@ -2341,6 +2599,12 @@ function Timer:Refresh()
 				color = self:Get("chestColor"),
 				max = state.timeLimit or 1,
 				value = math.max(0, twoChest - elapsed),
+				durationBinding = {
+					key = "rowChest2",
+					state = state,
+					duration = twoChest,
+					mode = "REMAINING",
+				},
 			})
 		end
 		if elapsed <= threeChest then
@@ -2351,6 +2615,12 @@ function Timer:Refresh()
 				color = self:Get("chestColor"),
 				max = state.timeLimit or 1,
 				value = math.max(0, threeChest - elapsed),
+				durationBinding = {
+					key = "rowChest3",
+					state = state,
+					duration = threeChest,
+					mode = "REMAINING",
+				},
 			})
 		end
 	end

@@ -34,6 +34,14 @@ local TooltipUtil = _G.TooltipUtil
 local GetTime = GetTime
 local GetActiveQuestID = _G.GetActiveQuestID
 
+local function MouseIsOver(region, topOffset, bottomOffset, leftOffset, rightOffset)
+	if not region then return false end
+	if _G.MouseIsOver then return _G.MouseIsOver(region, topOffset, bottomOffset, leftOffset, rightOffset) end
+	if region.IsMouseOver then return region:IsMouseOver(topOffset, bottomOffset, leftOffset, rightOffset) end
+	return false
+end
+addon.functions.MouseIsOver = MouseIsOver
+
 local AUTO_REPAIR_GUILD_BANK_CONTEXT_DEFAULTS = {
 	world = true,
 	party = true,
@@ -4478,6 +4486,7 @@ local function initUI()
 	addon.functions.InitDBValue("minimapButtonBinColumns", DEFAULT_BUTTON_SINK_COLUMNS)
 	addon.functions.InitDBValue("minimapButtonBinHideBackground", false)
 	addon.functions.InitDBValue("minimapButtonBinHideBorder", false)
+	addon.functions.InitDBValue("hideMinimapButtonBinToggle", false)
 	addon.functions.InitDBValue("enableLootspecQuickswitch", false)
 	addon.functions.InitDBValue("lootspec_quickswitch", {})
 	addon.functions.InitDBValue("minimapSinkHoleData", {})
@@ -4578,6 +4587,9 @@ local function initUI()
 	addon.functions.InitDBValue("squareMinimapStatsTrackingButtonOffsetY", -3)
 	addon.functions.InitDBValue("squareMinimapStatsTrackingButtonShowBackground", true)
 	addon.functions.InitDBValue("squareMinimapStatsTrackingButtonScale", 1.0)
+	addon.functions.InitDBValue("enhancedWaypoint", false)
+	addon.functions.InitDBValue("enhancedWaypointGlow", true)
+	addon.functions.InitDBValue("enhancedWaypointScale", 1.0)
 	addon.functions.InitDBValue("minimapButtonsMouseover", false)
 	addon.functions.InitDBValue("unclampMinimapCluster", false)
 	addon.functions.InitDBValue("enableMinimapClusterScale", false)
@@ -4585,7 +4597,9 @@ local function initUI()
 	addon.functions.InitDBValue("showWorldMapCoordinates", false)
 	addon.functions.InitDBValue("worldMapCoordinatesUpdateInterval", 0.1)
 	addon.functions.InitDBValue("worldMapCoordinatesHideCursor", true)
+	if addon.EnhancedWaypoint and addon.EnhancedWaypoint.SetEnabled then addon.EnhancedWaypoint:SetEnabled(addon.db["enhancedWaypoint"] == true) end
 	addon.functions.InitDBValue("hiddenMinimapElements", addon.db["hiddenMinimapElements"] or {})
+	-- TODO 12.1 cleanup: remove persistAuctionHouseFilter if native Auction House filter persistence covers this workaround.
 	addon.functions.InitDBValue("persistAuctionHouseFilter", false)
 	addon.functions.InitDBValue("alwaysUserCurExpAuctionHouse", false)
 	addon.functions.InitDBValue("alwaysUserCurExpCraftingOrders", false)
@@ -5608,6 +5622,7 @@ local function initUI()
 			local useMinimapToggle = isButtonSinkMinimapToggleEnabled()
 			local useDetachedToggle = isButtonSinkDetachedToggleEnabled()
 			local useLauncherToggle = useMinimapToggle or useDetachedToggle
+			local hideLauncherToggle = addon.db["hideMinimapButtonBinToggle"] == true and useLauncherToggle
 
 			firstStartButtonSink(0)
 			C_Timer.After(2, function()
@@ -5647,7 +5662,7 @@ local function initUI()
 			addon.functions.LayoutButtons()
 
 			-- create ButtonSink Button
-			if useMinimapToggle then
+			if useMinimapToggle and not hideLauncherToggle then
 				local iconData = {
 					type = "launcher",
 					icon = "Interface\\AddOns\\" .. addonName .. "\\Icons\\SinkHole.tga" or "Interface\\ICONS\\INV_Misc_QuestionMark", -- irgendein Icon
@@ -5679,8 +5694,10 @@ local function initUI()
 				LDB:NewDataObject(addonName .. "_ButtonSinkMap", iconData)
 				LDBIcon:Register(addonName .. "_ButtonSinkMap", iconData, addon.db["buttonsink"])
 				buttonBag:Hide()
-			elseif useDetachedToggle then
+			elseif useDetachedToggle and not hideLauncherToggle then
 				addon.variables.buttonSinkDetachedToggle = createDetachedButtonSinkToggle()
+				buttonBag:Hide()
+			elseif hideLauncherToggle then
 				buttonBag:Hide()
 			else
 				buttonBag:Show()
@@ -6378,7 +6395,10 @@ local function CreateUI()
 
 		DoDevider()
 		root:CreateButton(L["CooldownPanelEditor"] or "Cooldown Panel Editor", function()
-			if addon.Aura and addon.Aura.CooldownPanels and addon.Aura.CooldownPanels.OpenEditor then addon.Aura.CooldownPanels:OpenEditor() end
+			local panels = addon.Aura and addon.Aura.CooldownPanels
+			if panels and panels.OpenBlizzardEditor then
+				panels:OpenBlizzardEditor()
+			end
 		end)
 	end
 
@@ -6849,9 +6869,7 @@ local function setAllHooks()
 		if addon.Aura.functions.InitUnitFrames then addon.Aura.functions.InitUnitFrames() end
 		if addon.Aura.functions.InitStandalonePrivateAuras then addon.Aura.functions.InitStandalonePrivateAuras() end
 	end
-	--@eqol-beta@
 	if addon.DefaultAuraContainers and addon.DefaultAuraContainers.functions and addon.DefaultAuraContainers.functions.InitDB then addon.DefaultAuraContainers.functions.InitDB() end
-	--@end-eqol-beta@
 	if addon.Drinks and addon.Drinks.functions then
 		if addon.Drinks.functions.InitDrinkMacro then addon.Drinks.functions.InitDrinkMacro() end
 		if addon.Drinks.functions.InitFoodReminder then addon.Drinks.functions.InitFoodReminder() end
@@ -6968,6 +6986,14 @@ function loadMain()
 			for i = 1, 600, 1 do
 				local name, id = C_ChallengeMode.GetMapUIInfo(i)
 				if name then print(name, id) end
+			end
+		elseif msg == "cid" then
+			if not (C_ChallengeMode and C_ChallengeMode.GetMapTable and C_ChallengeMode.GetMapUIInfo) then return end
+			local ids = C_ChallengeMode.GetMapTable() or {}
+			table.sort(ids)
+			for _, challengeMapID in ipairs(ids) do
+				local name = C_ChallengeMode.GetMapUIInfo(challengeMapID)
+				if name then print(challengeMapID, name) end
 			end
 		elseif msg == "rq" then
 			if addon.Query and addon.Query.frame then addon.Query.frame:Show() end
@@ -7477,7 +7503,7 @@ local eventHandlers = {
 
 		addon.variables.screenHeight = GetScreenHeight()
 
-		if addon.db["enableMinimapButtonBin"] then addon.functions.toggleButtonSink() end
+		if addon.db["enableMinimapButtonBin"] and addon.functions.toggleButtonSink then addon.functions.toggleButtonSink() end
 		if addon.db["actionBarAnchorEnabled"] then RefreshAllActionBarAnchors() end
 		addon.variables.unitSpec = C_SpecializationInfo.GetSpecialization()
 		if addon.variables.unitSpec then
@@ -7616,6 +7642,7 @@ local eventHandlers = {
 		addon.variables.auctionHouseOpen = true
 		if addon.db["closeBagsOnAuctionHouse"] and not addon.functions.isRestrictedContent() then CloseAllBags() end
 		if addon.functions.RefreshAuctionHouseBagFade then addon.functions.RefreshAuctionHouseBagFade() end
+		-- TODO 12.1 cleanup: Blizzard persists Auction House filters natively; remove this restore hook after release verification.
 		if addon.db["persistAuctionHouseFilter"] then
 			if not AuctionHouseFrame.SearchBar.FilterButton.eqolHooked then
 				hooksecurefunc(AuctionHouseFrame.SearchBar.FilterButton, "Reset", function(self)
@@ -7646,6 +7673,7 @@ local eventHandlers = {
 	["AUCTION_HOUSE_CLOSED"] = function()
 		addon.variables.auctionHouseOpen = false
 		if addon.functions.RefreshAuctionHouseBagFade then addon.functions.RefreshAuctionHouseBagFade() end
+		-- TODO 12.1 cleanup: remove this saved filter cache once native Auction House persistence is confirmed on release.
 		if not addon.db["persistAuctionHouseFilter"] then return end
 		if AuctionHouseFrame.SearchBar.FilterButton.ClearFiltersButton:IsShown() then
 			addon.variables.safedAuctionFilters = AuctionHouseFrame.SearchBar.FilterButton.filters

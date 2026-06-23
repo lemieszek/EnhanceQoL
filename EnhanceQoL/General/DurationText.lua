@@ -6,21 +6,14 @@ addon.functions = addon.functions or {}
 local DurationText = addon.DurationText
 local EMPTY_TABLE = {}
 local DEFAULT_PROFILE_KEY = "MINIMAL"
+local BUILTIN_COOLDOWN_STYLE_MIGRATION_FLAG = "builtinCooldownStyleMigrationV1"
+local BINDING_UPDATE_INTERVAL = 0.1
+local MIN_INTERVAL = "SECONDS"
+local MAX_INTERVAL = "DAYS"
 
 DurationText.defaults = {
-	abbreviation = "ONE_LETTER",
-	approximationSeconds = 0,
-	bindingUpdateInterval = 0.1,
-	canRoundUpIntervals = true,
-	canRoundUpLastUnit = false,
-	convertToLower = false,
-	desiredUnitCount = 1,
 	expiredText = "",
-	formatStyle = "NUMERIC",
-	maxInterval = "DAYS",
-	millisecondsThreshold = 10,
-	minInterval = "SECONDS",
-	stripIntervalWhitespace = "PRESERVE",
+	millisecondsThreshold = 0,
 	zeroDurationText = "",
 }
 DurationText.defaultProfileKey = DEFAULT_PROFILE_KEY
@@ -31,35 +24,13 @@ DurationText.protectedProfileKeys = {
 }
 DurationText.profileDefaults = {
 	MINIMAL = {
-		abbreviation = "ONE_LETTER",
-		approximationSeconds = 0,
-		bindingUpdateInterval = 0.2,
-		canRoundUpIntervals = true,
-		canRoundUpLastUnit = false,
-		convertToLower = true,
-		desiredUnitCount = 1,
 		expiredText = "",
-		formatStyle = "NUMERIC",
-		maxInterval = "DAYS",
 		millisecondsThreshold = 0,
-		minInterval = "SECONDS",
-		stripIntervalWhitespace = "STRIP",
 		zeroDurationText = "",
 	},
 	PRECISE = {
-		abbreviation = "NONE",
-		approximationSeconds = 0,
-		bindingUpdateInterval = 0.05,
-		canRoundUpIntervals = false,
-		canRoundUpLastUnit = false,
-		convertToLower = false,
-		desiredUnitCount = 2,
 		expiredText = "",
-		formatStyle = "UNITS",
-		maxInterval = "DAYS",
-		millisecondsThreshold = 10,
-		minInterval = "SECONDS",
-		stripIntervalWhitespace = "PRESERVE",
+		millisecondsThreshold = 6,
 		zeroDurationText = "",
 	},
 }
@@ -212,10 +183,15 @@ local function getUsageLabel(path, key)
 	path = tostring(path or "")
 	key = tostring(key or "")
 	if path:find("^cooldownPanels%.panels%.[^%.]+%.entries%.") then return "durationTextUsageCooldownPanelEntries" end
+	if path:find("^cooldownPanels%.panels%.") and key == "durationTextProfile" then return "durationTextUsageCooldownPanelDefaults" end
 	if path:find("^cooldownPanels%.panels%.") and key == "barDurationTextProfile" then return "durationTextUsageCooldownPanelDefaults" end
+	if key == "skinnerDefaultAuraDurationTextProfile" or key == "skinnerDefaultDebuffAuraDurationTextProfile" then return "durationTextUsageDefaultAuraContainers" end
+	if key == "mythicPlusBRTrackerDurationTextProfile" then return "durationTextUsageBRTracker" end
+	if key == "mythicPlusBloodlustTrackerDurationTextProfile" then return "durationTextUsageBloodlustTracker" end
 	if path:find("^personalResourceBarSettings") then return "durationTextUsageResourceBarsPersonal" end
 	if path:find("^globalResourceBarSettings") then return "durationTextUsageResourceBarsGlobal" end
 	if path:find("^sharedResourceBarSettings") then return "durationTextUsageResourceBarsShared" end
+	if path:find("%.auras%.") and key == "durationTextProfile" then return "durationTextUsageUnitFrameAuras" end
 	if key == "barDurationTextProfile" then return "durationTextUsageCooldownPanels" end
 	if key == "durationTextProfile" then return "durationTextUsageResourceBars" end
 	return path ~= "" and path or key
@@ -239,7 +215,16 @@ local function scanDurationTextProfileFields(root, profileKey, replacementKey, u
 		for key, value in pairs(tbl) do
 			if tbl == root and key == "durationText" then
 				-- The profile definitions themselves are not consumer references.
-			elseif (key == "barDurationTextProfile" or key == "durationTextProfile") and profileMatches(value, profileKey) then
+			elseif
+				(
+					key == "barDurationTextProfile"
+					or key == "durationTextProfile"
+					or key == "skinnerDefaultAuraDurationTextProfile"
+					or key == "skinnerDefaultDebuffAuraDurationTextProfile"
+					or key == "mythicPlusBRTrackerDurationTextProfile"
+					or key == "mythicPlusBloodlustTrackerDurationTextProfile"
+				) and profileMatches(value, profileKey)
+			then
 				addUsage(usages, getUsageLabel(path, key))
 				if replacementKey then
 					tbl[key] = replacementKey
@@ -252,6 +237,24 @@ local function scanDurationTextProfileFields(root, profileKey, replacementKey, u
 		end
 	end
 	walk(root, "")
+	return changed
+end
+
+local function migrateBuiltinDurationTextCooldownStyle(db)
+	local changed = false
+	for _, key in ipairs(DurationText.profileOrder) do
+		local profile = db.profiles and db.profiles[key] or nil
+		local defaults = DurationText.profileDefaults[key]
+		if type(profile) == "table" and defaults then
+			for _, field in ipairs({ "millisecondsThreshold" }) do
+				if profile[field] ~= defaults[field] then
+					profile[field] = defaults[field]
+					changed = true
+				end
+			end
+		end
+	end
+	db[BUILTIN_COOLDOWN_STYLE_MIGRATION_FLAG] = true
 	return changed
 end
 
@@ -338,6 +341,9 @@ end
 function DurationText:InitDB()
 	addon.db = addon.db or {}
 	addon.dbDefaults = addon.dbDefaults or {}
+	local existingDB = addon.db.durationText
+	if self.initializedDB == existingDB and type(existingDB) == "table" and type(existingDB.profiles) == "table" and type(addon.dbDefaults.durationText) == "table" then return end
+
 	addon.dbDefaults.durationText = createProfileStore(self.profileDefaults)
 	if type(addon.db.durationText) ~= "table" or type(addon.db.durationText.profiles) ~= "table" then addon.db.durationText = createProfileStore(self.profileDefaults) end
 
@@ -379,6 +385,10 @@ function DurationText:InitDB()
 	if not db.profiles[db.activeProfile] then db.activeProfile = DEFAULT_PROFILE_KEY end
 	if not db.profiles[db.activeProfile] then db.activeProfile = getFirstProfileKey(db) end
 	if not db.profiles[db.editProfile] then db.editProfile = db.activeProfile or getFirstProfileKey(db) end
+	if db[BUILTIN_COOLDOWN_STYLE_MIGRATION_FLAG] ~= true then
+		if migrateBuiltinDurationTextCooldownStyle(db) then self:Invalidate() end
+	end
+	self.initializedDB = db
 end
 
 function DurationText:Invalidate()
@@ -528,6 +538,18 @@ function DurationText:RefreshConsumers()
 	if cooldownPanels and cooldownPanels.RefreshAllPanels then cooldownPanels:RefreshAllPanels(true) end
 	local resourceBars = aura and aura.ResourceBars or nil
 	if resourceBars and resourceBars.QueueRefresh then resourceBars.QueueRefresh(nil, { force = true, structural = true }) elseif resourceBars and resourceBars.Refresh then resourceBars.Refresh() end
+	local defaultAuras = addon.DefaultAuraContainers
+	if defaultAuras and defaultAuras.functions and defaultAuras.functions.RefreshDefaultAuraIconSkin then defaultAuras.functions.RefreshDefaultAuraIconSkin() end
+	local unitFrames = aura and aura.UF or nil
+	if unitFrames and unitFrames.Refresh then unitFrames.Refresh() end
+	local groupFrames = unitFrames and unitFrames.GroupFrames or nil
+	if groupFrames and groupFrames.RefreshChangedUnitButtons then groupFrames:RefreshChangedUnitButtons() end
+	local mythicPlus = addon.MythicPlus and addon.MythicPlus.functions
+	if mythicPlus then
+		if mythicPlus.createBRFrame then mythicPlus.createBRFrame() end
+		if mythicPlus.createBloodlustFrame then mythicPlus.createBloodlustFrame() end
+		if mythicPlus.refreshBloodlustTracker then mythicPlus.refreshBloodlustTracker(false) end
+	end
 end
 
 function DurationText:DeleteProfile(profileKey, replacementKey)
@@ -568,17 +590,7 @@ end
 function DurationText:GetCacheKey(config)
 	config = config or self:GetGlobalConfig()
 	return table.concat({
-		tostring(config.abbreviation),
-		tostring(config.approximationSeconds),
-		tostring(config.canRoundUpIntervals),
-		tostring(config.canRoundUpLastUnit),
-		tostring(config.convertToLower),
-		tostring(config.desiredUnitCount),
-		tostring(config.formatStyle),
-		tostring(config.maxInterval),
 		tostring(config.millisecondsThreshold),
-		tostring(config.minInterval),
-		tostring(config.stripIntervalWhitespace),
 	}, "|")
 end
 
@@ -588,39 +600,52 @@ function DurationText:CreateSecondsFormatter(config)
 	config = config or self:GetGlobalConfig()
 	local formatter = api.CreateSecondsFormatter()
 	if formatter.Reset then formatter:Reset() end
-	if formatter.SetDefaultAbbreviation then formatter:SetDefaultAbbreviation(self:GetAbbreviationValue(config.abbreviation) or self:GetAbbreviationValue(self.defaults.abbreviation)) end
+	if formatter.SetDefaultAbbreviation then formatter:SetDefaultAbbreviation(self:GetAbbreviationValue("ONE_LETTER")) end
 	if formatter.SetMillisecondsThreshold then formatter:SetMillisecondsThreshold(tonumber(config.millisecondsThreshold) or self.defaults.millisecondsThreshold) end
-	if formatter.SetApproximationSeconds then formatter:SetApproximationSeconds(tonumber(config.approximationSeconds) or self.defaults.approximationSeconds) end
-	if formatter.SetDesiredUnitCount then formatter:SetDesiredUnitCount(tonumber(config.desiredUnitCount) or self.defaults.desiredUnitCount) end
-	if formatter.SetMinInterval then formatter:SetMinInterval(self:GetIntervalValue(config.minInterval) or self:GetIntervalValue(self.defaults.minInterval)) end
-	if formatter.SetMaxInterval then formatter:SetMaxInterval(self:GetIntervalValue(config.maxInterval) or self:GetIntervalValue(self.defaults.maxInterval)) end
-	if formatter.SetCanRoundUpIntervals then formatter:SetCanRoundUpIntervals(config.canRoundUpIntervals == true) end
-	if formatter.SetCanRoundUpLastUnit then formatter:SetCanRoundUpLastUnit(config.canRoundUpLastUnit == true) end
-	if formatter.SetConvertToLower then formatter:SetConvertToLower(config.convertToLower == true) end
-	if formatter.SetStripIntervalWhitespace then formatter:SetStripIntervalWhitespace(self:GetWhitespaceValue(config.stripIntervalWhitespace) or self:GetWhitespaceValue(self.defaults.stripIntervalWhitespace)) end
+	if formatter.SetApproximationSeconds then formatter:SetApproximationSeconds(0) end
+	if formatter.SetDesiredUnitCount then formatter:SetDesiredUnitCount(1) end
+	if formatter.SetMinInterval then formatter:SetMinInterval(self:GetIntervalValue(MIN_INTERVAL)) end
+	if formatter.SetMaxInterval then formatter:SetMaxInterval(self:GetIntervalValue(MAX_INTERVAL)) end
+	if formatter.SetCanRoundUpIntervals then formatter:SetCanRoundUpIntervals(true) end
+	if formatter.SetCanRoundUpLastUnit then formatter:SetCanRoundUpLastUnit(false) end
+	if formatter.SetConvertToLower then formatter:SetConvertToLower(true) end
+	if formatter.SetStripIntervalWhitespace then formatter:SetStripIntervalWhitespace(self:GetWhitespaceValue("STRIP")) end
 	return formatter
 end
 
-function DurationText:CreateNumericFormatter(config)
+function DurationText:CreateBindingFormatter(config)
 	local api = getNumericRuleFormatterAPI()
-	if not api then return nil end
+	if not api then return self:CreateSecondsFormatter(config) end
 	config = config or self:GetGlobalConfig()
 	local formatter = api.CreateNumericRuleFormatter()
 	if formatter.ClearBreakpoints then formatter:ClearBreakpoints() end
 	local decimalThreshold = tonumber(config.millisecondsThreshold) or self.defaults.millisecondsThreshold
-	local nearest = self:GetRoundingValue("NEAREST") or 0
+	local down = self:GetRoundingValue("DOWN") or 2
+	local nearest = self:GetRoundingValue("NEAREST") or down
 	local breakpoints = {}
 	if decimalThreshold and decimalThreshold > 0 then
 		breakpoints[#breakpoints + 1] = {
 			threshold = 0,
+			step = 0.1,
 			format = "%.1f",
 			rounding = nearest,
 		}
 	end
 	breakpoints[#breakpoints + 1] = {
 		threshold = decimalThreshold and decimalThreshold > 0 and decimalThreshold or 0,
+		step = 1,
 		format = "%.0f",
-		rounding = nearest,
+		rounding = down,
+	}
+	breakpoints[#breakpoints + 1] = {
+		threshold = 60,
+		step = 1,
+		rounding = down,
+		format = "%d:%02d",
+		components = {
+			{ div = 60, step = 1, rounding = down },
+			{ mod = 60, step = 1, rounding = down },
+		},
 	}
 	if formatter.SetBreakpoints then
 		formatter:SetBreakpoints(breakpoints)
@@ -636,12 +661,16 @@ function DurationText:GetSecondsFormatter(config)
 	config = config or self:GetGlobalConfig()
 	local cacheKey = self:GetCacheKey(config)
 	self.formatterCache = self.formatterCache or {}
+	if not self.formatterCache[cacheKey] then self.formatterCache[cacheKey] = self:CreateSecondsFormatter(config) end
+	return self.formatterCache[cacheKey]
+end
+
+function DurationText:GetBindingFormatter(config)
+	config = config or self:GetGlobalConfig()
+	local cacheKey = "binding|" .. self:GetCacheKey(config)
+	self.formatterCache = self.formatterCache or {}
 	if not self.formatterCache[cacheKey] then
-		if config.formatStyle == "UNITS" then
-			self.formatterCache[cacheKey] = self:CreateSecondsFormatter(config)
-		else
-			self.formatterCache[cacheKey] = self:CreateNumericFormatter(config) or self:CreateSecondsFormatter(config)
-		end
+		self.formatterCache[cacheKey] = self:CreateBindingFormatter(config)
 	end
 	return self.formatterCache[cacheKey]
 end
@@ -679,13 +708,13 @@ end
 
 function DurationText:CreateRemainingDurationComponent(config)
 	config = self:GetEffectiveConfig(config)
-	local formatter = self:GetSecondsFormatter(config)
+	local formatter = self:GetBindingFormatter(config)
 	return self:CreateFormatComponent("RemainingDuration", formatter)
 end
 
 function DurationText:CreateTotalDurationComponent(config)
 	config = self:GetEffectiveConfig(config)
-	local formatter = self:GetSecondsFormatter(config)
+	local formatter = self:GetBindingFormatter(config)
 	return self:CreateFormatComponent("TotalDuration", formatter)
 end
 
@@ -764,15 +793,16 @@ function DurationText:ConfigureBinding(owner, key, fontString, durationObject, o
 		return nil, false
 	end
 
-	local config = self:GetEffectiveConfig(options.config or options.profileKey)
-	local formatter = options.formatter or self:GetSecondsFormatter(config)
+	local useProfileConfig = options.useProfileConfig ~= false
+	local config = useProfileConfig and self:GetEffectiveConfig(options.config or options.profileKey) or EMPTY_TABLE
+	local formatter = options.formatter or (useProfileConfig and self:GetBindingFormatter(config)) or nil
 	local binding = self:EnsureBinding(owner, key)
 	if not binding then return nil, false end
 	if options.reset == true and binding.SetToDefaults then binding:SetToDefaults() end
 	if binding.SetFontString then binding:SetFontString(fontString) end
 	if binding.SetDuration then binding:SetDuration(durationObject) end
 	if binding.SetTimeModifier then binding:SetTimeModifier(options.timeModifier or (_G.Enum and _G.Enum.DurationTimeModifier and _G.Enum.DurationTimeModifier.RealTime or 0)) end
-	if binding.SetUpdateInterval then binding:SetUpdateInterval(options.updateInterval or tonumber(config.bindingUpdateInterval) or self.defaults.bindingUpdateInterval) end
+	if binding.SetUpdateInterval then binding:SetUpdateInterval(options.updateInterval or BINDING_UPDATE_INTERVAL) end
 	if binding.SetZeroDurationText then binding:SetZeroDurationText(options.zeroDurationText ~= nil and options.zeroDurationText or config.zeroDurationText) end
 	if binding.SetExpiredText then binding:SetExpiredText(options.expiredText ~= nil and options.expiredText or config.expiredText) end
 	if options.textFormat ~= nil and options.components ~= nil and binding.SetTextFormat then
@@ -792,14 +822,19 @@ function DurationText:BindFontString(fontString, durationObject, options)
 	return self:ConfigureBinding(owner, options.key or "default", fontString, durationObject, options)
 end
 
-function DurationText:ApplyToCooldownFrame(cooldownFrame, config)
+function DurationText:ApplyToCooldownFrame(cooldownFrame, config, options)
 	if not cooldownFrame then return false end
+	options = options or EMPTY_TABLE
 	config = self:GetEffectiveConfig(config)
-	local formatter = self:GetSecondsFormatter(config)
-	if formatter and cooldownFrame.SetCountdownFormatter then cooldownFrame:SetCountdownFormatter(formatter) end
-	if cooldownFrame.SetCountdownMillisecondsThreshold then cooldownFrame:SetCountdownMillisecondsThreshold(tonumber(config.millisecondsThreshold) or self.defaults.millisecondsThreshold) end
-	if cooldownFrame.SetCountdownAbbrevThreshold then cooldownFrame:SetCountdownAbbrevThreshold(tonumber(config.approximationSeconds) or self.defaults.approximationSeconds) end
-	return formatter ~= nil
+	if cooldownFrame.SetCountdownFormatter then cooldownFrame:SetCountdownFormatter(nil) end
+	local millisecondsThreshold = tonumber(config.millisecondsThreshold) or 0
+	if cooldownFrame.SetCountdownMillisecondsThreshold then cooldownFrame:SetCountdownMillisecondsThreshold(millisecondsThreshold) end
+	return true
+end
+
+function DurationText:ApplyProfileToCooldownFrame(cooldownFrame, profileKey, options)
+	local config = self:GetProfileConfig(profileKey)
+	return self:ApplyToCooldownFrame(cooldownFrame, config, options)
 end
 
 function addon.functions.IsDurationTextBindingSupported() return DurationText:IsDurationTextBindingSupported() end
@@ -825,3 +860,4 @@ function addon.functions.UpdateDurationTextBinding(owner, key) return DurationTe
 function addon.functions.GetDurationTextBindingState(owner, key) return DurationText:GetBindingState(owner, key) end
 function addon.functions.ConfigureDurationTextBinding(owner, key, fontString, durationObject, options) return DurationText:ConfigureBinding(owner, key, fontString, durationObject, options) end
 function addon.functions.BindDurationText(fontString, durationObject, options) return DurationText:BindFontString(fontString, durationObject, options) end
+function addon.functions.ApplyDurationTextProfileToCooldownFrame(cooldownFrame, profileKey, options) return DurationText:ApplyProfileToCooldownFrame(cooldownFrame, profileKey, options) end

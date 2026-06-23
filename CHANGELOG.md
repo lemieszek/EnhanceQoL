@@ -1,16 +1,32 @@
 # Changelog
 
-<!--@eqol-beta@-->
-
-## [11.4.0-beta1] - 2026-06-17
+## [11.4.0] - 2026-06-22
 
 ### ✨ Added
 
-- Damage Meter: Added a tooltip bar width offset option so rounded bar textures can be extended or tightened without moving the tooltip text columns.
-- Mythic Plus / Timer: Added the Mythic+ Timer back as a beta feature for continued testing.
-- EQoL Suite: Added beta custom buff and debuff containers with Edit Mode movement plus icon shape, zoom, border, size, spacing, and row controls.
+- Cooldown Panels: Added a new Blizzard-style cooldown panel editor with class and specialization filtering, drag-and-drop editing, panel import/export actions, tracked-aura indicators, and optional synchronization with Blizzard's Cooldown Manager.
+- Mythic Plus: Added the redesigned Mythic+ Timer with configurable layout, objective display, death tracking, chest timers, Edit Mode support, and preview settings.
+- Mythic Plus: Added Midnight Season 2 dungeon, teleport, currency, health potion, buff food, trinket, and combat potion support.
+- Quest Tracker: Added optional Blizzard quest tracker text styling with font, outline, size, color, hover color, and header visibility controls.
+- Map & Minimap: Added an enhanced in-world waypoint display with destination label, tracked icon handling, highlight toggle, and scale control.
+- Resource Bars: Added a Shared Resource Bar visibility matrix for class, specialization, and Druid form resources, plus a Hide when empty visibility option for individual bars.
+- EQoL Suite: Added custom buff and debuff containers with Edit Mode movement, icon shape, zoom, border, size, spacing, row, frame strata, and frame level controls.
 
-<!--@end-eqol-beta@-->
+### 🔄 Changed
+
+- Cooldown Panels: Reorganized panel, entry, bar, and fixed-group settings with clearer labels, tooltips, defaults, and runtime performance improvements.
+- Duration Text: Expanded shared Duration Text profile support to more cooldown and aura displays while restoring Blizzard-style cooldown timing defaults.
+- Group Frames / Raid Frames: Improved grouped raid layout stability and combat-safe raid joins for role, group, and custom sorting.
+- Mythic Plus: Improved Bloodlust tracker display with optional active duration and glow behavior.
+
+### 🐛 Fixed
+
+- Class Buff Reminder: Fixed missing-buff icon growth and Edit Mode preview alignment when the reminder anchor is not centered.
+- Cooldown Panels: Fixed keybind resolution, ready sound timing, Cooldown Manager import/sync reliability, tracked aura handling, fixed-layout editor behavior, and rectangular icon previews/live icons using separate width and height.
+- Group Frames / Raid Frames: Fixed raid group indicators appearing while EQOL raid frames are disabled.
+- Resource Bars: Fixed separator segment fill bleeding by one pixel on some UI scales.
+- Unit Frames: Fixed custom aura tooltip interaction, healer buff indicator click-through behavior, and Druid player power filtering by current form.
+- PTR Compatibility: Added WoW 12.1 TOC support and updated removed mouseover helper usage.
 
 ---
 

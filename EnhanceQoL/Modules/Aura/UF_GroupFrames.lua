@@ -65,7 +65,6 @@ do
 end
 local GROUP_DEBUFF_FILTER_ALL = "ALL"
 local GROUP_DEBUFF_FILTER_CROWD_CONTROL = "CROWD_CONTROL"
-local GROUP_DEBUFF_FILTER_IMPORTANT = "IMPORTANT"
 local GROUP_DEBUFF_FILTER_RAID = "RAID"
 local GROUP_DEBUFF_FILTER_RAID_IN_COMBAT = "RAID_IN_COMBAT"
 GF.BLIZZARD_DISPEL_MODE_BY_ME = "BY_ME"
@@ -79,7 +78,6 @@ local groupDebuffFilterOptions = {
 	{ value = GROUP_DEBUFF_FILTER_RAID_IN_COMBAT, label = L["UFGroupDebuffFilterRaidInCombat"] or "Raid in combat" },
 	{ value = GROUP_DEBUFF_FILTER_CROWD_CONTROL, label = L["UFGroupDebuffFilterCrowdControl"] or "Crowd control" },
 	{ value = "DISPEL", label = L["UFGroupDebuffFilterDispel"] or "Dispellable" },
-	{ value = GROUP_DEBUFF_FILTER_IMPORTANT, label = L["UFGroupDebuffFilterImportant"] or "Important spells" },
 }
 GF.groupBuffFilterOptions = {
 	{ value = "RAID_IN_COMBAT", label = L["UFGroupBuffFilterRaidInCombat"] or "Healer buffs" },
@@ -554,7 +552,6 @@ local function getGroupDebuffMatchFilter(typeCfg)
 	if GFH.SelectionContains(selection, GROUP_DEBUFF_FILTER_RAID_IN_COMBAT) and AURA_FILTERS.harmfulRaidInCombat then filters[#filters + 1] = AURA_FILTERS.harmfulRaidInCombat end
 	if GFH.SelectionContains(selection, GROUP_DEBUFF_FILTER_CROWD_CONTROL) and AURA_FILTERS.harmfulCrowdControl then filters[#filters + 1] = AURA_FILTERS.harmfulCrowdControl end
 	if GFH.SelectionContains(selection, "DISPEL") and AURA_FILTERS.dispellable then filters[#filters + 1] = AURA_FILTERS.dispellable end
-	if GFH.SelectionContains(selection, GROUP_DEBUFF_FILTER_IMPORTANT) and AURA_FILTERS.harmfulImportant then filters[#filters + 1] = AURA_FILTERS.harmfulImportant end
 	if #filters == 0 then return nil end
 	return filters
 end
@@ -742,7 +739,9 @@ function GF.EnsureGroupBorderFrame(kind, anchor)
 	GF.groupBorders = GF.groupBorders or {}
 	local border = GF.groupBorders[kind]
 	if not border then
-		local parent = anchor:GetParent() or _G.PetBattleFrameHider or UIParent
+		-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+		local usePingReceiver = tonumber((select(4, GetBuildInfo()))) >= 120100
+		local parent = anchor:GetParent() or (usePingReceiver and UIParent) or _G.PetBattleFrameHider or UIParent
 		border = CreateFrame("Frame", "EQOLUFPartyGroupBorder", parent, "BackdropTemplate")
 		border:EnableMouse(false)
 		border:Hide()
@@ -2348,12 +2347,19 @@ local function applyGroupIndicatorAnchor(fs, anchor, offset, scale, parent)
 	end
 	local _, _, justify = resolveStatusTextAnchor(anchor)
 	local off = offset or {}
+	local key = table.concat({ tostring(point), tostring(parent), tostring(relPoint), tostring(off.x or 0), tostring(off.y or 0) }, "|")
+	if fs._eqolGroupIndicatorAnchorKey == key then
+		if justify and fs.SetJustifyH then fs:SetJustifyH(justify) end
+		return
+	end
+
 	fs:ClearAllPoints()
 	if Pixel and Pixel.SetPoint then
 		Pixel.SetPoint(fs, point, parent, relPoint, off.x or 0, off.y or 0)
 	else
 		fs:SetPoint(point, parent, relPoint, roundToPixel(off.x or 0, scale), roundToPixel(off.y or 0, scale))
 	end
+	fs._eqolGroupIndicatorAnchorKey = key
 	if justify and fs.SetJustifyH then fs:SetJustifyH(justify) end
 end
 
@@ -6243,7 +6249,7 @@ GF.anchors = GF.anchors or {}
 GF._pendingRefresh = GF._pendingRefresh or false
 GF._pendingHeaderKinds = GF._pendingHeaderKinds or {}
 GF._pendingSortKinds = GF._pendingSortKinds or {}
-GF._lightHeaderRefreshOptions = GF._lightHeaderRefreshOptions or { skipChildSync = true }
+GF._lightHeaderRefreshOptions = GF._lightHeaderRefreshOptions or { skipChildSync = true, skipUnchangedUnitUpdate = true }
 GF._pendingDisable = GF._pendingDisable or false
 GF._clientSceneActive = GF._clientSceneActive or false
 GF._postRosterHeaderApplyPending = GF._postRosterHeaderApplyPending or false
@@ -6363,6 +6369,45 @@ local function getState(self)
 	return st
 end
 
+function GF.ApplyHealthBackdrop(button, deadOrGhost)
+	if not button then return end
+	local st = getState(button)
+	if not (st and st.health) then return end
+	local kind = button._eqolGroupKind or "party"
+	local cfg = button._eqolCfg or getCfg(kind) or {}
+	local def = DEFAULTS[kind] or {}
+	local hc = cfg.health or {}
+	local defH = def.health or {}
+	if deadOrGhost == nil then
+		local unit = getUnit(button)
+		local isDead = unit and UnitIsDead and GFH.UnsecretBool(UnitIsDead(unit)) or nil
+		local isGhost = unit and UnitIsGhost and GFH.UnsecretBool(UnitIsGhost(unit)) or nil
+		deadOrGhost = (isDead == true) or (isGhost == true)
+	end
+	local bd = hc.backdrop or {}
+	local defBd = defH.backdrop or {}
+	local healthBackdropClampToFill = bd.clampToFill
+	if healthBackdropClampToFill == nil then healthBackdropClampToFill = defBd.clampToFill end
+	if healthBackdropClampToFill == nil then healthBackdropClampToFill = false end
+	local healthTexKey = getEffectiveBarTexture(cfg, hc)
+	local deadColorEnabled = bd.deadColorEnabled
+	if deadColorEnabled == nil then deadColorEnabled = defBd.deadColorEnabled end
+	if deadOrGhost == true and deadColorEnabled == true then
+		local effectiveBackdrop = {}
+		for key, value in pairs(defBd) do
+			effectiveBackdrop[key] = value
+		end
+		for key, value in pairs(bd) do
+			effectiveBackdrop[key] = value
+		end
+		effectiveBackdrop.enabled = true
+		effectiveBackdrop.color = bd.deadColor or defBd.deadColor or { 0.35, 0.05, 0.05, 0.85 }
+		applyBarBackdrop(st.health, { texture = hc.texture, backdrop = effectiveBackdrop }, { clampToFill = healthBackdropClampToFill == true, textureKey = healthTexKey })
+		return
+	end
+	applyBarBackdrop(st.health, hc, { clampToFill = healthBackdropClampToFill == true, textureKey = healthTexKey })
+end
+
 local function isTooltipModifierPressed(modifier)
 	local mod = tostring(modifier or "ALT"):upper()
 	if mod == "SHIFT" then return IsShiftKeyDown and IsShiftKeyDown() end
@@ -6410,6 +6455,86 @@ function GF.EnsureHealPredictionCalculator(st)
 	if calc.SetIncomingHealOverflowPercent then calc:SetIncomingHealOverflowPercent(1) end
 	st._healPredictionCalc = calc
 	return calc
+end
+
+function GF:UpdateDataBarText(self, unit, st, cur, maxv, calc, secretHealth, missingValue, percentVal, levelText)
+	unit = unit or getUnit(self)
+	st = st or getState(self)
+	if not (unit and st) then return end
+
+	local kind = self._eqolGroupKind or "party"
+	local cfg = self._eqolCfg or getCfg(kind)
+	local dbc = cfg and cfg.dataBar or EMPTY
+	local defDB = (DEFAULTS[kind] and DEFAULTS[kind].dataBar) or EMPTY
+	if dbc.enabled ~= true then
+		GF.ClearDataBarText(st)
+		return
+	end
+	if not (st.dataBar and st.dataBar:IsShown()) then
+		GF.ClearDataBarText(st)
+		return
+	end
+
+	local dbLeft = dbc.textLeft or defDB.textLeft or "NONE"
+	local dbCenter = dbc.textCenter or defDB.textCenter or "NONE"
+	local dbRight = dbc.textRight or defDB.textRight or "NONE"
+	if dbLeft == "NONE" and dbCenter == "NONE" and dbRight == "NONE" then
+		GF.ClearDataBarText(st)
+		return
+	end
+
+	if UnitExists and not UnitExists(unit) then
+		GF.ClearDataBarText(st)
+		return
+	end
+
+	local function modeNeedsHealth(mode)
+		return mode ~= "NONE" and mode ~= "NAME" and mode ~= "LEVEL"
+	end
+	local needsHealthValues = modeNeedsHealth(dbLeft) or modeNeedsHealth(dbCenter) or modeNeedsHealth(dbRight)
+	if cur == nil and needsHealthValues then
+		calc = calc or GF.EnsureHealPredictionCalculator(st)
+		if calc and UnitGetDetailedHealPrediction then UnitGetDetailedHealPrediction(unit, "player", calc) end
+		cur = calc and calc.GetCurrentHealth and calc:GetCurrentHealth() or (UnitHealth and UnitHealth(unit))
+	end
+	if maxv == nil and needsHealthValues then maxv = calc and calc.GetMaximumHealth and calc:GetMaximumHealth() or (UnitHealthMax and UnitHealthMax(unit)) end
+	if needsHealthValues and cur == nil then cur = 0 end
+	if needsHealthValues and maxv == nil then maxv = 1 end
+	if secretHealth == nil and needsHealthValues then secretHealth = issecretvalue and (issecretvalue(cur) or issecretvalue(maxv)) end
+	if secretHealth and not (addon.variables and addon.variables.isMidnight) then
+		GF.ClearDataBarText(st)
+		return
+	end
+
+	local dbDelimiter = (UFHelper and UFHelper.getTextDelimiter and UFHelper.getTextDelimiter(dbc, defDB)) or (dbc.textDelimiter or defDB.textDelimiter or " ")
+	local dbDelimiter2 = (UFHelper and UFHelper.getTextDelimiterSecondary and UFHelper.getTextDelimiterSecondary(dbc, defDB, dbDelimiter))
+		or (dbc.textDelimiterSecondary or defDB.textDelimiterSecondary or dbDelimiter)
+	local dbDelimiter3 = (UFHelper and UFHelper.getTextDelimiterTertiary and UFHelper.getTextDelimiterTertiary(dbc, defDB, dbDelimiter, dbDelimiter2))
+		or (dbc.textDelimiterTertiary or defDB.textDelimiterTertiary or dbDelimiter2)
+	local dbUseShort = dbc.useShortNumbers ~= false
+	local dbHidePercentSymbol = dbc.hidePercentSymbol == true
+	local dbPercentVal = percentVal
+	if UFHelper and dbPercentVal == nil and (UFHelper.textModeUsesPercent(dbLeft) or UFHelper.textModeUsesPercent(dbCenter) or UFHelper.textModeUsesPercent(dbRight)) then
+		dbPercentVal = getHealthPercent(unit, cur, maxv, calc)
+	end
+	local dbLevelText = levelText
+	if UFHelper and UFHelper.textModeUsesLevel and dbLevelText == nil then
+		if UFHelper.textModeUsesLevel(dbLeft) or UFHelper.textModeUsesLevel(dbCenter) or UFHelper.textModeUsesLevel(dbRight) then dbLevelText = getSafeLevelText(unit, false) end
+	end
+	local dbNameText
+	if dbLeft == "NAME" or dbCenter == "NAME" or dbRight == "NAME" then
+		dbNameText = (UnitName and UnitName(unit)) or ""
+		if isEditModeActive() and self._eqolPreview and st._previewName then dbNameText = st._previewName end
+	end
+	local dbMissingValue = missingValue
+	if dbMissingValue == nil and (GFH.TextModeUsesDeficit(dbLeft) or GFH.TextModeUsesDeficit(dbCenter) or GFH.TextModeUsesDeficit(dbRight)) then
+		if UnitHealthMissing then dbMissingValue = UnitHealthMissing(unit) end
+		if dbMissingValue == nil and not secretHealth and type(cur) == "number" and type(maxv) == "number" then dbMissingValue = maxv - cur end
+	end
+	local dbRoundPercent = dbc.roundPercent == true
+	setTextSlot(st, st.dataBarTextLeft, "_lastDataBarTextLeft", dbLeft, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue, dbRoundPercent, dbNameText)
+	setTextSlot(st, st.dataBarTextCenter, "_lastDataBarTextCenter", dbCenter, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue, dbRoundPercent, dbNameText)
+	setTextSlot(st, st.dataBarTextRight, "_lastDataBarTextRight", dbRight, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue, dbRoundPercent, dbNameText)
 end
 
 local function updateButtonConfig(self, cfg)
@@ -6658,10 +6783,7 @@ function GF:BuildButton(self)
 		st._lastHealthTexture = healthTexKey
 	end
 	stabilizeStatusBarTexture(st.health)
-	local healthBackdropClampToFill = (hc.backdrop and hc.backdrop.clampToFill)
-	if healthBackdropClampToFill == nil then healthBackdropClampToFill = defH.backdrop and defH.backdrop.clampToFill end
-	if healthBackdropClampToFill == nil then healthBackdropClampToFill = false end
-	applyBarBackdrop(st.health, hc, { clampToFill = healthBackdropClampToFill == true, textureKey = healthTexKey })
+	GF.ApplyHealthBackdrop(self)
 
 	if not st.incomingHeal then
 		st.incomingHeal = CreateFrame("StatusBar", nil, st.health, "BackdropTemplate")
@@ -6912,9 +7034,6 @@ function GF:LayoutButton(self)
 	local dbc = cfg.dataBar or {}
 	local defH = def.health or {}
 	local defDB = def.dataBar or {}
-	local healthBackdropClampToFill = (hc.backdrop and hc.backdrop.clampToFill)
-	if healthBackdropClampToFill == nil then healthBackdropClampToFill = defH.backdrop and defH.backdrop.clampToFill end
-	if healthBackdropClampToFill == nil then healthBackdropClampToFill = false end
 	local healthTexKey = getEffectiveBarTexture(cfg, hc)
 	local powerTexKey = getEffectiveBarTexture(cfg, pcfg)
 	local dataBarTexKey = dbc.texture or defDB.texture or "SOLID"
@@ -7104,7 +7223,7 @@ function GF:LayoutButton(self)
 	end
 	local tempMaxHealthLossEnabled = hc.tempMaxHealthLossEnabled
 	if tempMaxHealthLossEnabled == nil then tempMaxHealthLossEnabled = defH.tempMaxHealthLossEnabled ~= false end
-	applyBarBackdrop(st.health, hc, { clampToFill = healthBackdropClampToFill == true, textureKey = healthTexKey })
+	GF.ApplyHealthBackdrop(self)
 	applyBarBackdrop(st.power, pcfg, { textureKey = powerTexKey })
 	if st.dataBar and st.dataBar.SetStatusBarTexture and UFHelper and UFHelper.resolveTexture then
 		if st._lastDataBarTexture ~= dataBarTexKey then
@@ -9172,6 +9291,7 @@ function GF:LayoutAuras(self)
 			style.countFontOutline = typeCfg.countFontOutline
 			style.cooldownFontSize = GF.ScaleContentValue(self, typeCfg.cooldownFontSize, cfg, 1)
 			style.cooldownFontOutline = typeCfg.cooldownFontOutline
+			style.durationTextProfile = typeCfg.durationTextProfile
 			if typeCfg.showStacks ~= nil then style.showStacks = typeCfg.showStacks end
 			style.countAnchor = typeCfg.countAnchor
 			style.countOffset = GF.ScaleOffset(typeCfg.countOffset, contentScale)
@@ -10361,12 +10481,14 @@ function GF:UpdateName(self)
 		if fs.SetText then fs:SetText("") end
 		if fs.SetShown then fs:SetShown(false) end
 		st._lastName = nil
+		GF:UpdateDataBarText(self, unit, st)
 		return
 	end
 	if fs.SetShown then fs:SetShown(true) end
 	if UnitExists and not UnitExists(unit) then
 		fs:SetText("")
 		st._lastName = nil
+		GF:UpdateDataBarText(self, unit, st)
 		return
 	end
 	local name = UnitName and UnitName(unit) or ""
@@ -10413,6 +10535,7 @@ function GF:UpdateName(self)
 		st._lastNameR, st._lastNameG, st._lastNameB, st._lastNameA = r, g, b, a
 		if fs.SetTextColor then fs:SetTextColor(r, g, b, a) end
 	end
+	GF:UpdateDataBarText(self, unit, st)
 end
 
 local function shouldShowLevel(scfg, unit)
@@ -10474,6 +10597,7 @@ function GF:UpdateLevel(self)
 		st._lastLevelR, st._lastLevelG, st._lastLevelB, st._lastLevelA = r, g, b, a
 		st.levelText:SetTextColor(r, g, b, a)
 	end
+	GF:UpdateDataBarText(self, unit, st, nil, nil, nil, nil, nil, nil, levelText)
 end
 
 function GF:UpdateStatusText(self)
@@ -10633,9 +10757,69 @@ function GF.EnsureGroupIndicatorOverlay(container, target)
 	return overlay
 end
 
+function GF.UpdateGroupIndicatorForHeader(container, cfg, def, subgroup)
+	if not container then return end
+	if not (cfg and cfg.enabled == true and resolveGroupIndicatorEnabled(cfg, def) and isGroupIndicatorAvailable(cfg, def)) then
+		hideGroupIndicators(container)
+		return
+	end
+	subgroup = tonumber(subgroup)
+	if not subgroup then
+		hideGroupIndicators(container)
+		return
+	end
+
+	local anchorTarget = container._eqolGroupIndicatorProxy or container
+	local overlayParent = GF.EnsureGroupIndicatorOverlay(anchorTarget, anchorTarget)
+	if not overlayParent then
+		hideGroupIndicators(container)
+		return
+	end
+
+	local indicators = container._eqolGroupIndicators
+	if not indicators then
+		indicators = {}
+		container._eqolGroupIndicators = indicators
+	end
+
+	local fs = indicators[subgroup]
+	if not fs and overlayParent.CreateFontString then
+		fs = overlayParent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+		indicators[subgroup] = fs
+	end
+	if not fs then return end
+
+	if fs.GetParent and fs:GetParent() ~= overlayParent then fs:SetParent(overlayParent) end
+	if fs.SetDrawLayer then fs:SetDrawLayer("OVERLAY", 7) end
+
+	local style = resolveGroupIndicatorStyle(cfg, def, (cfg and cfg.health) or {})
+	local fontKey = table.concat({ tostring(style.font or ""), string.format("%.4f", tonumber(style.fontSize) or 12), tostring(style.fontOutline or "") }, "|")
+	if fs._eqolGroupIndicatorFontKey ~= fontKey then
+		if UFHelper and UFHelper.applyFont then UFHelper.applyFont(fs, style.font, style.fontSize or 12, style.fontOutline) end
+		fs._eqolGroupIndicatorFontKey = fontKey
+	end
+
+	local scale = GFH.GetEffectiveScale(anchorTarget)
+	if not scale or scale <= 0 then scale = (UIParent and UIParent.GetEffectiveScale and UIParent:GetEffectiveScale()) or 1 end
+	applyGroupIndicatorAnchor(fs, style.anchor, style.offset or {}, scale, anchorTarget)
+
+	local text = formatGroupNumber(subgroup, resolveGroupIndicatorFormat(cfg, def))
+	if fs:GetText() ~= text then fs:SetText(text) end
+	local r, g, b, a = unpackColor(style.color, GFH.COLOR_WHITE)
+	fs:SetTextColor(r, g, b, a)
+	fs:Show()
+
+	for group, other in pairs(indicators) do
+		if group ~= subgroup and other then
+			other:SetText("")
+			other:Hide()
+		end
+	end
+end
+
 local function updateGroupIndicatorsForFrames(container, frames, cfg, def, isPreview, fixedSubgroup)
 	if not container then return end
-	if not (cfg and resolveGroupIndicatorEnabled(cfg, def) and isGroupIndicatorAvailable(cfg, def)) then
+	if not (cfg and cfg.enabled == true and resolveGroupIndicatorEnabled(cfg, def) and isGroupIndicatorAvailable(cfg, def)) then
 		hideGroupIndicators(container)
 		return
 	end
@@ -11105,6 +11289,7 @@ function GF:UpdateHealthValue(self, unit, st)
 	if UnitExists and not UnitExists(unit) then
 		st.health:SetMinMaxValues(0, 1)
 		GF.SetStatusBarValue(st.health, 0, false, true)
+		GF.ApplyHealthBackdrop(self, false)
 		if st.incomingHeal then st.incomingHeal:Hide() end
 		if st.absorb then st.absorb:Hide() end
 		if st.absorb2 then st.absorb2:Hide() end
@@ -11168,6 +11353,7 @@ function GF:UpdateHealthValue(self, unit, st)
 	local isDead = unit and UnitIsDead and GFH.UnsecretBool(UnitIsDead(unit)) or nil
 	local isGhost = unit and UnitIsGhost and GFH.UnsecretBool(UnitIsGhost(unit)) or nil
 	local deadOrGhost = (isDead == true) or (isGhost == true)
+	GF.ApplyHealthBackdrop(self, deadOrGhost)
 	local suppressAuxHealthBars = (connected == false) or deadOrGhost
 	local smoothHealth = (hc.smoothFill ~= nil) and (hc.smoothFill == true) or (defH.smoothFill == true)
 	local maxForValueSecret = issecretvalue and issecretvalue(maxForValue)
@@ -11510,39 +11696,7 @@ function GF:UpdateHealthValue(self, unit, st)
 					roundPercent
 				)
 				setTextSlot(st, st.healthTextRight, "_lastHealthTextRight", rightMode, cur, maxv, useShort, percentVal, delimiter, delimiter2, delimiter3, hidePercentSymbol, levelText, missingValue, roundPercent)
-				if dbc.enabled == true and st.dataBar and st.dataBar:IsShown() then
-					local dbDelimiter = (UFHelper and UFHelper.getTextDelimiter and UFHelper.getTextDelimiter(dbc, defDB)) or (dbc.textDelimiter or defDB.textDelimiter or " ")
-					local dbDelimiter2 = (UFHelper and UFHelper.getTextDelimiterSecondary and UFHelper.getTextDelimiterSecondary(dbc, defDB, dbDelimiter))
-						or (dbc.textDelimiterSecondary or defDB.textDelimiterSecondary or dbDelimiter)
-					local dbDelimiter3 = (UFHelper and UFHelper.getTextDelimiterTertiary and UFHelper.getTextDelimiterTertiary(dbc, defDB, dbDelimiter, dbDelimiter2))
-						or (dbc.textDelimiterTertiary or defDB.textDelimiterTertiary or dbDelimiter2)
-					local dbUseShort = dbc.useShortNumbers ~= false
-					local dbHidePercentSymbol = dbc.hidePercentSymbol == true
-					local dbPercentVal = percentVal
-					if UFHelper and dbPercentVal == nil and (UFHelper.textModeUsesPercent(dbLeft) or UFHelper.textModeUsesPercent(dbCenter) or UFHelper.textModeUsesPercent(dbRight)) then
-						dbPercentVal = getHealthPercent(unit, cur, maxv, calc)
-					end
-					local dbLevelText = levelText
-					if UFHelper and UFHelper.textModeUsesLevel and dbLevelText == nil then
-						if UFHelper.textModeUsesLevel(dbLeft) or UFHelper.textModeUsesLevel(dbCenter) or UFHelper.textModeUsesLevel(dbRight) then dbLevelText = getSafeLevelText(unit, false) end
-					end
-					local dbNameText
-					if dbLeft == "NAME" or dbCenter == "NAME" or dbRight == "NAME" then
-						dbNameText = (UnitName and UnitName(unit)) or ""
-						if isEditModeActive() and self._eqolPreview and st._previewName then dbNameText = st._previewName end
-					end
-					local dbMissingValue = missingValue
-					if dbMissingValue == nil and (GFH.TextModeUsesDeficit(dbLeft) or GFH.TextModeUsesDeficit(dbCenter) or GFH.TextModeUsesDeficit(dbRight)) then
-						if UnitHealthMissing then dbMissingValue = UnitHealthMissing(unit) end
-						if dbMissingValue == nil and not secretHealth and type(cur) == "number" and type(maxv) == "number" then dbMissingValue = maxv - cur end
-					end
-					local dbRoundPercent = dbc.roundPercent == true
-					setTextSlot(st, st.dataBarTextLeft, "_lastDataBarTextLeft", dbLeft, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue, dbRoundPercent, dbNameText)
-					setTextSlot(st, st.dataBarTextCenter, "_lastDataBarTextCenter", dbCenter, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue, dbRoundPercent, dbNameText)
-					setTextSlot(st, st.dataBarTextRight, "_lastDataBarTextRight", dbRight, cur, maxv, dbUseShort, dbPercentVal, dbDelimiter, dbDelimiter2, dbDelimiter3, dbHidePercentSymbol, dbLevelText, dbMissingValue, dbRoundPercent, dbNameText)
-				else
-					GF.ClearDataBarText(st)
-				end
+				GF:UpdateDataBarText(self, unit, st, cur, maxv, calc, secretHealth, missingValue, percentVal, levelText)
 			end
 		end
 	elseif st.healthTextLeft or st.healthTextCenter or st.healthTextRight then
@@ -11929,6 +12083,8 @@ function GF:OpenUnitMenu(self)
 end
 
 function GF.UnitButton_OnLoad(self)
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	if tonumber((select(4, GetBuildInfo()))) >= 120100 and self and self.SetAttribute then self:SetAttribute("ping-receiver", true) end
 	local parent = self and self.GetParent and self:GetParent()
 	if parent and parent._eqolKind then
 		self._eqolGroupKind = parent._eqolKind
@@ -12284,6 +12440,8 @@ end
 
 local function queueGroupIndicatorRefresh(delay, repeats)
 	if not isFeatureEnabled() then return end
+	local cfg = getCfg("raid")
+	if not (cfg and cfg.enabled == true) then return end
 	cancelQueuedGroupIndicatorRefresh()
 	local wait = tonumber(delay) or 0
 	local remaining = tonumber(repeats) or 1
@@ -12292,6 +12450,8 @@ local function queueGroupIndicatorRefresh(delay, repeats)
 	local function run()
 		GF._groupIndicatorRefreshTimer = nil
 		if not isFeatureEnabled() then return end
+		local raidCfg = getCfg("raid")
+		if not (raidCfg and raidCfg.enabled == true) then return end
 		if InCombatLockdown and InCombatLockdown() then
 			GF._pendingRefresh = true
 			return
@@ -12345,6 +12505,22 @@ function GF.ClearSecureHeaderChildPoints(header)
 	end
 end
 
+function GF.PrecreateSecureHeaderChildren(header, maxFrames, leaveShown)
+	if not (header and header.GetAttribute and header.SetAttribute and header.Show) then return end
+	if InCombatLockdown and InCombatLockdown() then return end
+	maxFrames = floor((tonumber(maxFrames) or 0) + 0.5)
+	if maxFrames < 1 then return end
+	if header._eqolPrecreatedFrameCount and header._eqolPrecreatedFrameCount >= maxFrames then return end
+
+	local startingIndex = header:GetAttribute("startingIndex")
+	if startingIndex == nil then startingIndex = 1 end
+	header:Show()
+	header:SetAttribute("startingIndex", 1 - maxFrames)
+	header:SetAttribute("startingIndex", startingIndex)
+	header._eqolPrecreatedFrameCount = maxFrames
+	if not leaveShown and header.Hide then header:Hide() end
+end
+
 function GF.PrepareSecureHeaderLayoutChange(header, nextLayoutKey)
 	if not header or not nextLayoutKey then return end
 	if InCombatLockdown and InCombatLockdown() then
@@ -12366,7 +12542,7 @@ local function nudgeHeaderLayout(header)
 	local layoutKey = GF.GetSecureHeaderLayoutKey(header)
 	header._eqolLastSecureLayoutKey = layoutKey
 	header._eqolPendingLayout = nil
-	if header._eqolKind == "raid" then queueGroupIndicatorRefresh(0, 4) end
+	if header._eqolKind == "raid" and not header._eqolGroupIndex then queueGroupIndicatorRefresh(0, 4) end
 end
 
 local getGrowthStartPoint = GFH.GetGrowthStartPoint
@@ -12473,6 +12649,8 @@ end
 local function applyVisibility(header, kind, cfg)
 	if not header or not cfg then return end
 	local def = DEFAULTS[kind]
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	local useRolesets = tonumber((select(4, GetBuildInfo()))) >= 120100
 	local hideInClientScene = GFH and GFH.ShouldHideInClientScene and GFH.ShouldHideInClientScene(cfg, def)
 	local inEdit = isEditModeActive and isEditModeActive()
 	local arenaPartyActive = false
@@ -12483,8 +12661,26 @@ local function applyVisibility(header, kind, cfg)
 			arenaPartyActive = (IsActiveBattlefieldArena and IsActiveBattlefieldArena()) and not (C_PvP and C_PvP.IsInBrawl and C_PvP.IsInBrawl())
 		end
 	end
-	local forceClientSceneHide = not inEdit and hideInClientScene and GF._clientSceneActive == true
+	local forceClientSceneHide = not useRolesets and not inEdit and hideInClientScene and GF._clientSceneActive == true
 	if GFH and GFH.ApplyClientSceneAlphaToFrame then GFH.ApplyClientSceneAlphaToFrame(header, forceClientSceneHide) end
+	local useStaticSecureHeaderVisibility = isRaidLikeKind(kind)
+	if useStaticSecureHeaderVisibility then
+		if InCombatLockdown and InCombatLockdown() then return end
+		if UnregisterStateDriver then UnregisterStateDriver(header, "visibility") end
+		header._eqolVisibilityCond = nil
+
+		local shouldShow = cfg.enabled == true and not header._eqolForceHide and not header._eqolSpecialHide and not forceClientSceneHide
+		if header._eqolForceShow then shouldShow = true end
+		if arenaPartyActive then shouldShow = kind == "party" end
+		if shouldShow then
+			if header.Show then header:Show() end
+			if header.SetAttribute then header:SetAttribute("statehidden", nil) end
+		else
+			if header.Hide then header:Hide() end
+			if header.SetAttribute then header:SetAttribute("statehidden", true) end
+		end
+		return
+	end
 	if not RegisterStateDriver then return end
 	if InCombatLockdown and InCombatLockdown() then return end
 
@@ -12521,13 +12717,16 @@ local function getRaidGroupHeaderKey(index) return "raidGroup" .. tostring(index
 
 function GF:EnsureRaidGroupHeaders()
 	GF._raidGroupHeaders = GF._raidGroupHeaders or {}
-	local parent = _G.PetBattleFrameHider or UIParent
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	local usePingReceiver = tonumber((select(4, GetBuildInfo()))) >= 120100
+	local parent = (usePingReceiver and UIParent) or _G.PetBattleFrameHider or UIParent
 	for i = 1, 8 do
 		local header = GF._raidGroupHeaders[i]
 		if not header then
 			header = CreateFrame("Frame", "EQOLUFRaidGroupHeader" .. i, parent, "SecureGroupHeaderTemplate")
 			header._eqolKind = "raid"
 			header._eqolGroupIndex = i
+			if usePingReceiver and type(header.SetRolesets) == "function" then header:SetRolesets("unitFrames") end
 			header:Hide()
 			GF._raidGroupHeaders[i] = header
 			GF.headers[getRaidGroupHeaderKey(i)] = header
@@ -12555,10 +12754,12 @@ function GF:EnsurePreviewFrames(kind)
 	local frames = GF._previewFrames[kind]
 	if not frames then frames = {} end
 	GF._previewFrames[kind] = frames
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	local template = (tonumber((select(4, GetBuildInfo()))) >= 120100) and "EQOLUFGroupUnitButtonReceiverTemplate" or "EQOLUFGroupUnitButtonTemplate"
 	for i = 1, #samples do
 		local btn = frames[i]
 		if not btn then
-			btn = CreateFrame("Button", nil, anchor, "EQOLUFGroupUnitButtonTemplate")
+			btn = CreateFrame("Button", nil, anchor, template)
 			frames[i] = btn
 		end
 		btn._eqolGroupKind = kind
@@ -13297,9 +13498,12 @@ local function forEachChild(header, fn)
 	end
 end
 
-local function syncHeaderChild(child, kind, cfg, frameW, frameH, fitScale)
+local function syncHeaderChild(child, kind, cfg, frameW, frameH, fitScale, options)
 	if not (child and cfg) then return end
+	local skipUnchangedUnitUpdate = options and options.skipUnchangedUnitUpdate == true
 
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	if tonumber((select(4, GetBuildInfo()))) >= 120100 and child.SetAttribute then child:SetAttribute("ping-receiver", true) end
 	child._eqolGroupKind = kind
 	child._eqolUseSecureUnitAttribute = true
 	child._eqolCfg = cfg
@@ -13326,9 +13530,27 @@ local function syncHeaderChild(child, kind, cfg, frameW, frameH, fitScale)
 			end
 		end
 	end
+	local st = child._eqolUFState
+	local unit = getUnit(child)
+	local guid
+	if skipUnchangedUnitUpdate and unit and unit ~= "" then
+		guid = UnitGUID and UnitGUID(unit) or nil
+		if issecretvalue and issecretvalue(guid) then guid = nil end
+	end
+	local cachedGuid = st and st._guid or nil
+	if issecretvalue and issecretvalue(cachedGuid) then
+		cachedGuid = nil
+		if st then st._guid = nil end
+	end
+	local unitUnchanged = skipUnchangedUnitUpdate and guid ~= nil and st and child.unit == unit and st._unitToken == unit and cachedGuid == guid
+	if unitUnchanged then
+		if child.unit then GF:UnitButton_RegisterUnitEvents(child, child.unit) end
+		return
+	end
+
 	GF:LayoutAuras(child)
 	if child.unit then GF:UnitButton_RegisterUnitEvents(child, child.unit) end
-	if child._eqolUFState then
+	if st then
 		GF:CacheUnitStatic(child)
 		GF:LayoutButton(child)
 		GF:UpdateAll(child)
@@ -13649,20 +13871,19 @@ end
 function GF:RefreshGroupIndicators()
 	if not isFeatureEnabled() then return end
 	local cfg = getCfg("raid")
-	if not cfg then return end
+	if not (cfg and cfg.enabled == true) then return end
 	local def = DEFAULTS.raid or {}
 	local header = GF.headers and GF.headers.raid
 	local sortMethod = resolveSortMethod(cfg)
 	local customSort = GFH and GFH.EnsureCustomSortConfig and GFH.EnsureCustomSortConfig(cfg)
 	local useGroupedHeaders = GF:IsRaidGroupedLayout(cfg) and (sortMethod ~= "NAMELIST" or (customSort and customSort.enabled == true))
 	if useGroupedHeaders and GF._raidGroupHeaders then
+		hideGroupIndicators(header)
 		for _, gh in ipairs(GF._raidGroupHeaders) do
 			if gh and not gh._eqolSpecialHide then
-				local frames = {}
-				forEachChild(gh, function(child)
-					if child then frames[#frames + 1] = child end
-				end)
-				updateGroupIndicatorsForFrames(gh, frames, cfg, def, false, gh._eqolDisplayGroup)
+				GF.UpdateGroupIndicatorForHeader(gh, cfg, def, gh._eqolDisplayGroup)
+			else
+				hideGroupIndicators(gh)
 			end
 		end
 	elseif header then
@@ -14032,8 +14253,8 @@ function GF:RefreshCustomSortNameList(kind)
 	end
 end
 
-local function syncRaidGroupHeaderChildren(header, cfg, layout)
-	forEachChild(header, function(child) syncHeaderChild(child, "raid", cfg, layout and layout.w, layout and layout.h, layout and layout.fitScale) end)
+local function syncRaidGroupHeaderChildren(header, cfg, layout, options)
+	forEachChild(header, function(child) syncHeaderChild(child, "raid", cfg, layout and layout.w, layout and layout.h, layout and layout.fitScale, options) end)
 end
 
 function GF.UpdateHeaderChildLayoutKey(header, key)
@@ -14049,11 +14270,22 @@ local function applyRaidGroupHeaders(cfg, layout, groupSpecs, forceShow, forceHi
 	if not (headers and anchor) then return end
 	local skipChildSync = options and options.skipChildSync == true
 	groupSpecs = groupSpecs or {}
-	local maxIndex = tonumber(maxGroups)
-	if maxIndex == nil then maxIndex = #groupSpecs end
+	local maxIndex = floor((tonumber(maxGroups) or #groupSpecs) + 0.5)
 	if maxIndex < 0 then maxIndex = 0 end
 	if maxIndex > 8 then maxIndex = 8 end
-	if maxIndex > #groupSpecs then maxIndex = #groupSpecs end
+	local activeGroups, activeCount = {}, 0
+	for specIndex = 1, #groupSpecs do
+		if activeCount >= maxIndex then break end
+		local spec = groupSpecs[specIndex]
+		local groupIndex = tonumber(spec and spec.group)
+		if groupIndex and groupIndex >= 1 and groupIndex <= 8 and not activeGroups[groupIndex] then
+			activeCount = activeCount + 1
+			activeGroups[groupIndex] = {
+				spec = spec,
+				slot = activeCount,
+			}
+		end
+	end
 	local groupScale = GF.NormalizeRaidAutoFitScale(layout and layout.fitScale or layout and layout.groupScale)
 
 	for i = 1, 8 do
@@ -14061,96 +14293,161 @@ local function applyRaidGroupHeaders(cfg, layout, groupSpecs, forceShow, forceHi
 		if header then
 			header._eqolFitScale = 1
 			if header.SetScale then header:SetScale(1) end
-			local spec = groupSpecs[i]
-			local active = (i <= maxIndex) and (spec ~= nil)
+			local function setAttr(key, value) GF:SetHeaderAttributeIfChanged(header, key, value) end
+			local groupState = activeGroups[i]
+			local spec = groupState and groupState.spec
+			local active = spec ~= nil
 			header._eqolForceShow = forceShow
 			header._eqolForceHide = forceHide
-			header._eqolSpecialHide = not active
+			header._eqolSpecialHide = nil
+			GF.PrepareSecureHeaderLayoutChange(
+				header,
+				GF.BuildSecureHeaderLayoutKey(layout.point, layout.xOffset, layout.yOffset, layout.columnSpacing, layout.columnAnchorPoint, 1, layout.unitsPerColumn)
+			)
+			setAttr("showParty", false)
+			setAttr("showRaid", true)
+			setAttr("showPlayer", true)
+			setAttr("showSolo", false)
+			setAttr("groupBy", nil)
+			setAttr("sortDir", cfg.sortDir or "ASC")
+			setAttr("unitsPerColumn", layout.unitsPerColumn)
+			setAttr("maxColumns", 1)
+			setAttr("minWidth", layout.minWidth)
+			setAttr("minHeight", layout.minHeight)
+			setAttr("xOffset", layout.xOffset)
+			setAttr("yOffset", layout.yOffset)
+			setAttr("columnSpacing", layout.columnSpacing)
+			setAttr("columnAnchorPoint", layout.columnAnchorPoint)
+			setAttr("template", layout.buttonTemplate or "EQOLUFGroupUnitButtonTemplate")
+			setAttr("initialConfigFunction", layout.initConfigFunction)
+			setAttr("point", layout.point)
+
+			local unitGrowth = (GFH.NormalizeGrowthDirection and GFH.NormalizeGrowthDirection(layout.growth, "DOWN")) or "DOWN"
+			local defaultGroupGrowth = DEFAULTS and DEFAULTS.raid and DEFAULTS.raid.groupGrowth
+			local groupGrowth
+			if GFH.ResolveGroupGrowthDirection then
+				groupGrowth = GFH.ResolveGroupGrowthDirection(layout.groupGrowth, unitGrowth, defaultGroupGrowth)
+			else
+				groupGrowth = (GFH.NormalizeGrowthDirection and GFH.NormalizeGrowthDirection(layout.groupGrowth, nil)) or ((unitGrowth == "RIGHT" or unitGrowth == "LEFT") and "DOWN" or "RIGHT")
+			end
+			local groupStartPoint = (GFH.GetGroupGrowthStartPoint and GFH.GetGroupGrowthStartPoint(groupGrowth)) or getGrowthStartPoint(groupGrowth)
+			local anchorRelativePoint = layout and layout.centerRelativePoint or groupStartPoint
+			local anchorOffsetX = tonumber(layout and layout.centerOffsetX) or 0
+			local anchorOffsetY = tonumber(layout and layout.centerOffsetY) or 0
+			local groupsPerRow = GF.NormalizeRaidGroupsPerRow(layout and layout.groupsPerRow, 8)
+			local visualIndex = (groupState and groupState.slot) or i
+			local groupSlot = (visualIndex - 1) % groupsPerRow
+			local groupLine = floor((visualIndex - 1) / groupsPerRow)
+			local groupSpacing = tonumber(layout.columnSpacing) or 0
+			local perHeaderW = tonumber((layout and layout.perHeaderW) or (layout and layout.w)) or 0
+			local perHeaderH = tonumber((layout and layout.perHeaderH) or (layout and layout.h)) or 0
+			local groupOffsetX, groupOffsetY = 0, 0
+			if groupGrowth == "LEFT" then
+				groupOffsetX = groupSlot * (perHeaderW + groupSpacing) * -1
+				groupOffsetY = groupLine * (perHeaderH + groupSpacing) * -1
+			elseif groupGrowth == "UP" then
+				groupOffsetY = groupSlot * (perHeaderH + groupSpacing)
+				groupOffsetX = groupLine * (perHeaderW + groupSpacing)
+			elseif groupGrowth == "RIGHT" then
+				groupOffsetX = groupSlot * (perHeaderW + groupSpacing)
+				groupOffsetY = groupLine * (perHeaderH + groupSpacing) * -1
+			else
+				groupOffsetY = groupSlot * (perHeaderH + groupSpacing) * -1
+				groupOffsetX = groupLine * (perHeaderW + groupSpacing)
+			end
+			local finalOffsetX = anchorOffsetX + groupOffsetX
+			local finalOffsetY = anchorOffsetY + groupOffsetY
+			local pointKey = table.concat({
+				tostring(groupStartPoint),
+				tostring(anchor),
+				tostring(anchorRelativePoint),
+				string.format("%.4f", finalOffsetX),
+				string.format("%.4f", finalOffsetY),
+			}, "|")
+			if header._eqolRaidGroupPointKey ~= pointKey then
+				header:ClearAllPoints()
+				header:SetPoint(groupStartPoint, anchor, anchorRelativePoint, finalOffsetX, finalOffsetY)
+				header._eqolRaidGroupPointKey = pointKey
+			end
 
 			if active then
-				local function setAttr(key, value) GF:SetHeaderAttributeIfChanged(header, key, value) end
 				local specSortMethod = tostring(spec.sortMethod or "INDEX"):upper()
 				header._eqolDisplayGroup = tonumber(spec.group) or i
-				setAttr("showParty", false)
-				setAttr("showRaid", true)
-				setAttr("showPlayer", true)
-				setAttr("showSolo", false)
-				setAttr("groupBy", nil)
-				setAttr("sortDir", cfg.sortDir or "ASC")
-				setAttr("unitsPerColumn", layout.unitsPerColumn)
-				setAttr("maxColumns", 1)
-				setAttr("minWidth", layout.minWidth)
-				setAttr("minHeight", layout.minHeight)
+				local specNameList
+				local specRoleFilter
+				local specStrictFiltering = false
+				if specSortMethod == "NAMELIST" then
+					specNameList = spec.nameList
+					if not specNameList or specNameList == "" then specNameList = EMPTY_NAMELIST_TOKEN end
+				else
+					specRoleFilter = cfg.roleFilter
+					if specRoleFilter == "" then specRoleFilter = nil end
+					if specSortMethod ~= "NAME" and specSortMethod ~= "INDEX" then specSortMethod = "INDEX" end
+					specStrictFiltering = cfg.strictFiltering == true
+				end
+				local groupSortKey = table.concat({
+					tostring(header._eqolDisplayGroup or ""),
+					tostring(specSortMethod or ""),
+					tostring(cfg.sortDir or "ASC"),
+					tostring(specNameList or ""),
+					tostring(specRoleFilter or ""),
+					tostring(specStrictFiltering),
+				}, "\031")
+				if header._eqolRaidGroupSortKey ~= groupSortKey then
+					GF.ClearSecureHeaderChildPoints(header)
+					header._eqolRaidGroupSortKey = groupSortKey
+				end
 
 				if specSortMethod == "NAMELIST" then
-					local nameList = spec.nameList
-					if not nameList or nameList == "" then nameList = EMPTY_NAMELIST_TOKEN end
 					setAttr("groupFilter", nil)
 					setAttr("roleFilter", nil)
 					setAttr("strictFiltering", false)
 					setAttr("sortMethod", "NAMELIST")
-					setAttr("nameList", nameList)
+					setAttr("nameList", specNameList)
 				else
-					local roleFilter = cfg.roleFilter
-					if roleFilter == "" then roleFilter = nil end
-					if specSortMethod ~= "NAME" and specSortMethod ~= "INDEX" then specSortMethod = "INDEX" end
 					setAttr("groupFilter", tostring(spec.group or i))
-					setAttr("roleFilter", roleFilter)
-					setAttr("strictFiltering", cfg.strictFiltering == true)
+					setAttr("roleFilter", specRoleFilter)
+					setAttr("strictFiltering", specStrictFiltering)
 					setAttr("sortMethod", specSortMethod)
 					setAttr("nameList", nil)
 				end
 
-				GF.PrepareSecureHeaderLayoutChange(
-					header,
-					GF.BuildSecureHeaderLayoutKey(layout.point, layout.xOffset, layout.yOffset, layout.columnSpacing, layout.columnAnchorPoint, 1, layout.unitsPerColumn)
-				)
-				setAttr("point", layout.point)
-				setAttr("xOffset", layout.xOffset)
-				setAttr("yOffset", layout.yOffset)
-				setAttr("columnSpacing", layout.columnSpacing)
-				setAttr("columnAnchorPoint", layout.columnAnchorPoint)
-				setAttr("template", "EQOLUFGroupUnitButtonTemplate")
-				setAttr("initialConfigFunction", layout.initConfigFunction)
-
-				header:ClearAllPoints()
-				local unitGrowth = (GFH.NormalizeGrowthDirection and GFH.NormalizeGrowthDirection(layout.growth, "DOWN")) or "DOWN"
-				local defaultGroupGrowth = DEFAULTS and DEFAULTS.raid and DEFAULTS.raid.groupGrowth
-				local groupGrowth
-				if GFH.ResolveGroupGrowthDirection then
-					groupGrowth = GFH.ResolveGroupGrowthDirection(layout.groupGrowth, unitGrowth, defaultGroupGrowth)
-				else
-					groupGrowth = (GFH.NormalizeGrowthDirection and GFH.NormalizeGrowthDirection(layout.groupGrowth, nil)) or ((unitGrowth == "RIGHT" or unitGrowth == "LEFT") and "DOWN" or "RIGHT")
+				local proxy = header._eqolGroupIndicatorProxy
+				local proxyParent = (header.GetParent and header:GetParent()) or anchor
+				if not proxy and CreateFrame then
+					proxy = CreateFrame("Frame", nil, proxyParent)
+					proxy:EnableMouse(false)
+					header._eqolGroupIndicatorProxy = proxy
 				end
-				local groupStartPoint = (GFH.GetGroupGrowthStartPoint and GFH.GetGroupGrowthStartPoint(groupGrowth)) or getGrowthStartPoint(groupGrowth)
-				local anchorRelativePoint = layout and layout.centerRelativePoint or groupStartPoint
-				local anchorOffsetX = tonumber(layout and layout.centerOffsetX) or 0
-				local anchorOffsetY = tonumber(layout and layout.centerOffsetY) or 0
-				local groupsPerRow = GF.NormalizeRaidGroupsPerRow(layout and layout.groupsPerRow, 8)
-				local groupSlot = (i - 1) % groupsPerRow
-				local groupLine = floor((i - 1) / groupsPerRow)
-				local spacing = roundToPixel(layout.columnSpacing or 0, layout.scale)
-				local perHeaderW = roundToPixel((layout and layout.perHeaderW) or (layout and layout.w) or 0, layout and layout.scale)
-				local perHeaderH = roundToPixel((layout and layout.perHeaderH) or (layout and layout.h) or 0, layout and layout.scale)
-				local groupOffsetX, groupOffsetY = 0, 0
-				if groupGrowth == "LEFT" then
-					groupOffsetX = roundToPixel(groupSlot * (perHeaderW + spacing) * -1, layout.scale)
-					groupOffsetY = roundToPixel(groupLine * (perHeaderH + spacing) * -1, layout.scale)
-				elseif groupGrowth == "UP" then
-					groupOffsetY = roundToPixel(groupSlot * (perHeaderH + spacing), layout.scale)
-					groupOffsetX = roundToPixel(groupLine * (perHeaderW + spacing), layout.scale)
-				elseif groupGrowth == "RIGHT" then
-					groupOffsetX = roundToPixel(groupSlot * (perHeaderW + spacing), layout.scale)
-					groupOffsetY = roundToPixel(groupLine * (perHeaderH + spacing) * -1, layout.scale)
-				else
-					groupOffsetY = roundToPixel(groupSlot * (perHeaderH + spacing) * -1, layout.scale)
-					groupOffsetX = roundToPixel(groupLine * (perHeaderW + spacing), layout.scale)
+				if proxy then
+					if proxyParent and proxy.GetParent and proxy:GetParent() ~= proxyParent then proxy:SetParent(proxyParent) end
+					local proxyKey = table.concat({
+						tostring(groupStartPoint),
+						tostring(anchor),
+						tostring(anchorRelativePoint),
+						string.format("%.4f", finalOffsetX),
+						string.format("%.4f", finalOffsetY),
+						string.format("%.4f", perHeaderW),
+						string.format("%.4f", perHeaderH),
+						tostring(proxyParent),
+					}, "|")
+					if proxy._eqolRaidGroupPointKey ~= proxyKey then
+						proxy:ClearAllPoints()
+						proxy:SetSize(perHeaderW, perHeaderH)
+						proxy:SetPoint(groupStartPoint, anchor, anchorRelativePoint, finalOffsetX, finalOffsetY)
+						proxy._eqolRaidGroupPointKey = proxyKey
+					end
+					if proxy.SetFrameLevel and header.GetFrameLevel then proxy:SetFrameLevel(GF.ClampFrameLevel((header:GetFrameLevel() or 1) + 20)) end
+					proxy:Show()
 				end
-				if Pixel and Pixel.SetPoint then
-					Pixel.SetPoint(header, groupStartPoint, anchor, anchorRelativePoint, anchorOffsetX + groupOffsetX, anchorOffsetY + groupOffsetY)
-				else
-					header:SetPoint(groupStartPoint, anchor, anchorRelativePoint, anchorOffsetX + groupOffsetX, anchorOffsetY + groupOffsetY)
-				end
+				GF.PrecreateSecureHeaderChildren(header, layout.unitsPerColumn or 5, false)
+			else
+				setAttr("groupFilter", tostring(i))
+				setAttr("roleFilter", nil)
+				setAttr("strictFiltering", false)
+				setAttr("sortMethod", "INDEX")
+				setAttr("nameList", nil)
+				GF.PrecreateSecureHeaderChildren(header, layout.unitsPerColumn or 5, false)
 			end
 
 			applyVisibility(header, "raid", cfg)
@@ -14168,7 +14465,7 @@ local function applyRaidGroupHeaders(cfg, layout, groupSpecs, forceShow, forceHi
 				)
 			end
 			local layoutChanged = GF.UpdateHeaderChildLayoutKey(header, childLayoutKey)
-			if active and (not skipChildSync or layoutChanged) then syncRaidGroupHeaderChildren(header, cfg, layout) end
+			if active and (not skipChildSync or layoutChanged) then syncRaidGroupHeaderChildren(header, cfg, layout, options) end
 
 			if header.IsShown and header:IsShown() then
 				nudgeHeaderLayout(header)
@@ -14176,8 +14473,11 @@ local function applyRaidGroupHeaders(cfg, layout, groupSpecs, forceShow, forceHi
 				header._eqolPendingLayout = true
 			end
 
-			if not active and header.Hide then header:Hide() end
-			if not active then header._eqolDisplayGroup = nil end
+			if not active then
+				header._eqolDisplayGroup = nil
+				header._eqolRaidGroupSortKey = nil
+				if header._eqolGroupIndicatorProxy then header._eqolGroupIndicatorProxy:Hide() end
+			end
 		end
 	end
 end
@@ -14214,6 +14514,9 @@ function GF:ApplyHeaderAttributes(kind, options)
 	local raidFramesEnabled = db and db.raid and db.raid.enabled == true
 	local function setAttr(key, value) GF:SetHeaderAttributeIfChanged(header, key, value) end
 	local skipChildSync = options and options.skipChildSync == true
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	local usePingReceiver = tonumber((select(4, GetBuildInfo()))) >= 120100
+	local unitButtonTemplate = usePingReceiver and "EQOLUFGroupUnitButtonReceiverTemplate" or "EQOLUFGroupUnitButtonTemplate"
 
 	if kind == "party" then
 		local partySortState = GF.BuildPartyRuntimeSortState(cfg)
@@ -14334,7 +14637,7 @@ function GF:ApplyHeaderAttributes(kind, options)
 		layoutColumnSpacing = roundToPixel(columnSpacing, scale)
 		layoutColumnAnchorPoint = (kind == "raid" and not centerGrowthActive) and GF.GetRaidColumnAnchorPoint(growth, cfg.groupGrowth) or "LEFT"
 	end
-	setAttr("template", "EQOLUFGroupUnitButtonTemplate")
+	setAttr("template", unitButtonTemplate)
 
 	-- Pixel-perfect size: snap width/height to (even) screen pixels to avoid half-pixel centers -> text jitter.
 	local w = clampNumber(tonumber(cfg.width) or 100, 40, 600, 100)
@@ -14404,8 +14707,23 @@ function GF:ApplyHeaderAttributes(kind, options)
 	local initConfigKey = wStr .. "x" .. hStr
 	local initConfigFunction = header._eqolInitConfigFunction
 	if header._eqolInitConfigKey ~= initConfigKey then
-		initConfigFunction = string.format(
-			[[
+		if usePingReceiver then
+			initConfigFunction = string.format(
+				[[
+		self:ClearAllPoints()
+		self:SetWidth(%s)
+		self:SetHeight(%s)
+		self:SetAttribute('*type1','target')
+		self:SetAttribute('*type2','togglemenu')
+		self:SetAttribute('ping-receiver', true)
+		RegisterUnitWatch(self)
+	]],
+				wStr,
+				hStr
+			)
+		else
+			initConfigFunction = string.format(
+				[[
 		self:ClearAllPoints()
 		self:SetWidth(%s)
 		self:SetHeight(%s)
@@ -14413,9 +14731,10 @@ function GF:ApplyHeaderAttributes(kind, options)
 		self:SetAttribute('*type2','togglemenu')
 		RegisterUnitWatch(self)
 	]],
-			wStr,
-			hStr
-		)
+				wStr,
+				hStr
+			)
+		end
 		header._eqolInitConfigKey = initConfigKey
 		header._eqolInitConfigFunction = initConfigFunction
 	end
@@ -14434,7 +14753,7 @@ function GF:ApplyHeaderAttributes(kind, options)
 	)
 	local layoutChanged = GF.UpdateHeaderChildLayoutKey(header, headerChildLayoutKey)
 	if not skipChildSync or layoutChanged then
-		forEachChild(header, function(child) syncHeaderChild(child, kind, cfg, renderW, renderH, (kind == "raid" and not useGroupHeaders) and raidViewportScale or 1) end)
+		forEachChild(header, function(child) syncHeaderChild(child, kind, cfg, renderW, renderH, (kind == "raid" and not useGroupHeaders) and raidViewportScale or 1, options) end)
 	end
 
 	local anchor = GF.anchors and GF.anchors[kind]
@@ -14490,6 +14809,16 @@ function GF:ApplyHeaderAttributes(kind, options)
 		if kind == "party" then GF.HideGroupBorder("party") end
 	end
 
+	local precreateFrames
+	if kind == "party" then
+		precreateFrames = 5
+	elseif kind == "raid" and not useGroupHeaders then
+		precreateFrames = (raidRuntimeMaxColumns or raidMaxColumns or 1) * (raidUnitsPerColumn or 5)
+	elseif isSplitRoleKind(kind) then
+		precreateFrames = (raidMaxColumns or header:GetAttribute("maxColumns") or 1) * (raidUnitsPerColumn or header:GetAttribute("unitsPerColumn") or 1)
+	end
+	if precreateFrames then GF.PrecreateSecureHeaderChildren(header, precreateFrames, false) end
+
 	local forceHide = header._eqolForceHide
 	local forceShow = header._eqolForceShow
 	if kind == "raid" then
@@ -14502,9 +14831,13 @@ function GF:ApplyHeaderAttributes(kind, options)
 	applyVisibility(header, kind, cfg)
 	if kind == "party" then
 		local border = GF.groupBorders and GF.groupBorders.party
-		if border and RegisterStateDriver then
+		if border then
 			if UnregisterStateDriver then UnregisterStateDriver(border, "visibility") end
-			RegisterStateDriver(border, "visibility", header._eqolVisibilityCond or "hide")
+			if header._eqolVisibilityCond and RegisterStateDriver then
+				RegisterStateDriver(border, "visibility", header._eqolVisibilityCond)
+			elseif border.SetShown and header.IsShown then
+				border:SetShown(header:IsShown())
+			end
 		end
 	end
 
@@ -14584,18 +14917,21 @@ function GF:ApplyHeaderAttributes(kind, options)
 				groupCenterOffsetX = groupCenterOffsetX + crossOffsetX
 				groupCenterOffsetY = groupCenterOffsetY + crossOffsetY
 			end
-			local groupInitConfigFunction = string.format(
-				[[
-		self:ClearAllPoints()
-		self:SetWidth(%s)
-		self:SetHeight(%s)
+			local groupInitConfigFunction
+			if usePingReceiver then
+				groupInitConfigFunction = [[
+		self:SetAttribute('*type1','target')
+		self:SetAttribute('*type2','togglemenu')
+		self:SetAttribute('ping-receiver', true)
+		RegisterUnitWatch(self)
+	]]
+			else
+				groupInitConfigFunction = [[
 		self:SetAttribute('*type1','target')
 		self:SetAttribute('*type2','togglemenu')
 		RegisterUnitWatch(self)
-	]],
-				("%.3f"):format(groupRenderW),
-				("%.3f"):format(groupRenderH)
-			)
+	]]
+			end
 			local layout = {
 				scale = scale,
 				w = groupRenderW,
@@ -14620,6 +14956,7 @@ function GF:ApplyHeaderAttributes(kind, options)
 				centerOffsetX = groupCenterOffsetX,
 				centerOffsetY = groupCenterOffsetY,
 				initConfigFunction = groupInitConfigFunction,
+				buttonTemplate = unitButtonTemplate,
 			}
 
 			applyRaidGroupHeaders(cfg, layout, groupSpecs, forceShow, forceHide, runtimeGroupCount, options)
@@ -14663,7 +15000,9 @@ function GF:EnsureHeaders()
 	if not isFeatureEnabled() then return end
 	if GF.headers.party and GF.headers.raid and GF.headers.mt and GF.headers.ma and GF.anchors.party and GF.anchors.raid and GF.anchors.mt and GF.anchors.ma then return end
 
-	local parent = _G.PetBattleFrameHider or UIParent
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	local usePingReceiver = tonumber((select(4, GetBuildInfo()))) >= 120100
+	local parent = (usePingReceiver and UIParent) or _G.PetBattleFrameHider or UIParent
 
 	if not GF.anchors.party then ensureAnchor("party", parent) end
 	if not GF.anchors.raid then ensureAnchor("raid", parent) end
@@ -14673,6 +15012,7 @@ function GF:EnsureHeaders()
 	if not GF.headers.party then
 		GF.headers.party = CreateFrame("Frame", "EQOLUFPartyHeader", parent, "SecureGroupHeaderTemplate")
 		GF.headers.party._eqolKind = "party"
+		if usePingReceiver and type(GF.headers.party.SetRolesets) == "function" then GF.headers.party:SetRolesets("unitFrames") end
 		if GF.headers.party.SetClampedToScreen then GF.headers.party:SetClampedToScreen(true) end
 		GF.headers.party:Hide()
 	end
@@ -14680,6 +15020,7 @@ function GF:EnsureHeaders()
 	if not GF.headers.raid then
 		GF.headers.raid = CreateFrame("Frame", "EQOLUFRaidHeader", parent, "SecureGroupHeaderTemplate")
 		GF.headers.raid._eqolKind = "raid"
+		if usePingReceiver and type(GF.headers.raid.SetRolesets) == "function" then GF.headers.raid:SetRolesets("unitFrames") end
 		if GF.headers.raid.SetClampedToScreen then GF.headers.raid:SetClampedToScreen(true) end
 		GF.headers.raid:Hide()
 	end
@@ -14687,6 +15028,7 @@ function GF:EnsureHeaders()
 	if not GF.headers.mt then
 		GF.headers.mt = CreateFrame("Frame", "EQOLUFMTHeader", parent, "SecureGroupHeaderTemplate")
 		GF.headers.mt._eqolKind = "mt"
+		if usePingReceiver and type(GF.headers.mt.SetRolesets) == "function" then GF.headers.mt:SetRolesets("unitFrames") end
 		if GF.headers.mt.SetClampedToScreen then GF.headers.mt:SetClampedToScreen(true) end
 		GF.headers.mt:Hide()
 	end
@@ -14694,6 +15036,7 @@ function GF:EnsureHeaders()
 	if not GF.headers.ma then
 		GF.headers.ma = CreateFrame("Frame", "EQOLUFMAHeader", parent, "SecureGroupHeaderTemplate")
 		GF.headers.ma._eqolKind = "ma"
+		if usePingReceiver and type(GF.headers.ma.SetRolesets) == "function" then GF.headers.ma:SetRolesets("unitFrames") end
 		if GF.headers.ma.SetClampedToScreen then GF.headers.ma:SetClampedToScreen(true) end
 		GF.headers.ma:Hide()
 	end
@@ -17193,6 +17536,26 @@ local function buildEditModeSettings(kind, editModeId)
 		if not (typeCfg and typeCfg.enabled == true) then return false end
 		if typeCfg.showCooldownText == nil then return def.showCooldownText ~= false end
 		return typeCfg.showCooldownText ~= false
+	end
+	local function normalizeDurationTextProfile(value, fallback)
+		local durationText = addon.DurationText
+		if durationText and durationText.GetProfileKey then return durationText:GetProfileKey(value or fallback or "MINIMAL") end
+		return type(value) == "string" and value ~= "" and value or fallback or "MINIMAL"
+	end
+	local function getAuraDurationTextProfile(typeKey)
+		local typeCfg, def = getAuraTypeConfig(typeKey)
+		return normalizeDurationTextProfile(typeCfg and typeCfg.durationTextProfile, def and def.durationTextProfile or "MINIMAL")
+	end
+	local function setAuraDurationTextProfile(typeKey, value, editModeField)
+		local cfg = getCfg(kind)
+		if not cfg then return end
+		local ac = ensureAuraConfig(cfg)
+		ac[typeKey].durationTextProfile = normalizeDurationTextProfile(value, "MINIMAL")
+		if EditMode and EditMode.SetValue and editModeField then EditMode:SetValue(editModeId, editModeField, ac[typeKey].durationTextProfile, nil, true) end
+		GF:ApplyHeaderAttributes(kind)
+	end
+	local function durationTextProfileOptions()
+		return addon.DurationText and addon.DurationText.GetProfileOptions and addon.DurationText:GetProfileOptions() or {}
 	end
 	local function isAuraStackTextEnabled(typeKey)
 		local typeCfg, def = getAuraTypeConfig(typeKey)
@@ -21552,6 +21915,63 @@ local function buildEditModeSettings(kind, editModeId)
 				local cfg = getCfg(kind)
 				local hc = cfg and cfg.health or {}
 				return hc.backdrop and hc.backdrop.enabled ~= false
+			end,
+		},
+		{
+			name = L["Use dead background color"] or "Use dead background color",
+			kind = SettingType.Checkbox,
+			field = "healthDeadBackdropColorEnabled",
+			parentId = "health",
+			get = function()
+				local cfg = getCfg(kind)
+				local hc = cfg and cfg.health or {}
+				local def = DEFAULTS[kind] and DEFAULTS[kind].health or {}
+				local defBackdrop = def and def.backdrop or {}
+				local value = hc.backdrop and hc.backdrop.deadColorEnabled
+				if value == nil then value = defBackdrop.deadColorEnabled end
+				return value == true
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not cfg then return end
+				cfg.health = cfg.health or {}
+				cfg.health.backdrop = cfg.health.backdrop or {}
+				cfg.health.backdrop.deadColorEnabled = value and true or false
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "healthDeadBackdropColorEnabled", cfg.health.backdrop.deadColorEnabled, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+		},
+		{
+			name = L["Dead background color"] or "Dead background color",
+			kind = SettingType.Color,
+			field = "healthDeadBackdropColor",
+			parentId = "health",
+			hasOpacity = true,
+			default = (DEFAULTS[kind] and DEFAULTS[kind].health and DEFAULTS[kind].health.backdrop and DEFAULTS[kind].health.backdrop.deadColor) or { 0.35, 0.05, 0.05, 0.85 },
+			get = function()
+				local cfg = getCfg(kind)
+				local hc = cfg and cfg.health or {}
+				local def = (DEFAULTS[kind] and DEFAULTS[kind].health and DEFAULTS[kind].health.backdrop and DEFAULTS[kind].health.backdrop.deadColor) or { 0.35, 0.05, 0.05, 0.85 }
+				local r, g, b, a = unpackColor(hc.backdrop and hc.backdrop.deadColor, def)
+				return { r = r, g = g, b = b, a = a }
+			end,
+			set = function(_, value)
+				local cfg = getCfg(kind)
+				if not (cfg and value) then return end
+				cfg.health = cfg.health or {}
+				cfg.health.backdrop = cfg.health.backdrop or {}
+				cfg.health.backdrop.deadColor = { value.r or 0.35, value.g or 0.05, value.b or 0.05, value.a or 0.85 }
+				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "healthDeadBackdropColor", cfg.health.backdrop.deadColor, nil, true) end
+				GF:ApplyHeaderAttributes(kind)
+			end,
+			isEnabled = function()
+				local cfg = getCfg(kind)
+				local hc = cfg and cfg.health or {}
+				local def = DEFAULTS[kind] and DEFAULTS[kind].health or {}
+				local defBackdrop = def and def.backdrop or {}
+				local value = hc.backdrop and hc.backdrop.deadColorEnabled
+				if value == nil then value = defBackdrop.deadColorEnabled end
+				return value == true
 			end,
 		},
 		{
@@ -26504,6 +26924,21 @@ local function buildEditModeSettings(kind, editModeId)
 			end,
 		},
 		{
+			name = L["durationTextProfile"] or "Duration text profile",
+			kind = SettingType.Dropdown,
+			field = "buffDurationTextProfile",
+			parentId = "buffs",
+			height = 180,
+			get = function() return getAuraDurationTextProfile("buff") end,
+			set = function(_, value) setAuraDurationTextProfile("buff", value, "buffDurationTextProfile") end,
+			generator = function(_, root)
+				for _, option in ipairs(durationTextProfileOptions()) do
+					root:CreateRadio(option.label, function() return getAuraDurationTextProfile("buff") == option.value end, function() setAuraDurationTextProfile("buff", option.value, "buffDurationTextProfile") end)
+				end
+			end,
+			isEnabled = function() return isAuraCooldownTextEnabled("buff") end,
+		},
+		{
 			name = L["Cooldown text anchor"] or "Cooldown text anchor",
 			kind = SettingType.Dropdown,
 			field = "buffCooldownTextAnchor",
@@ -27312,6 +27747,21 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "debuffCooldownTextEnabled", ac.debuff.showCooldownText, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+		},
+		{
+			name = L["durationTextProfile"] or "Duration text profile",
+			kind = SettingType.Dropdown,
+			field = "debuffDurationTextProfile",
+			parentId = "debuffs",
+			height = 180,
+			get = function() return getAuraDurationTextProfile("debuff") end,
+			set = function(_, value) setAuraDurationTextProfile("debuff", value, "debuffDurationTextProfile") end,
+			generator = function(_, root)
+				for _, option in ipairs(durationTextProfileOptions()) do
+					root:CreateRadio(option.label, function() return getAuraDurationTextProfile("debuff") == option.value end, function() setAuraDurationTextProfile("debuff", option.value, "debuffDurationTextProfile") end)
+				end
+			end,
+			isEnabled = function() return isAuraCooldownTextEnabled("debuff") end,
 		},
 		{
 			name = L["Cooldown text anchor"] or "Cooldown text anchor",
@@ -28186,6 +28636,21 @@ local function buildEditModeSettings(kind, editModeId)
 				if EditMode and EditMode.SetValue then EditMode:SetValue(editModeId, "externalCooldownTextEnabled", ac.externals.showCooldownText, nil, true) end
 				GF:ApplyHeaderAttributes(kind)
 			end,
+		},
+		{
+			name = L["durationTextProfile"] or "Duration text profile",
+			kind = SettingType.Dropdown,
+			field = "externalDurationTextProfile",
+			parentId = "externals",
+			height = 180,
+			get = function() return getAuraDurationTextProfile("externals") end,
+			set = function(_, value) setAuraDurationTextProfile("externals", value, "externalDurationTextProfile") end,
+			generator = function(_, root)
+				for _, option in ipairs(durationTextProfileOptions()) do
+					root:CreateRadio(option.label, function() return getAuraDurationTextProfile("externals") == option.value end, function() setAuraDurationTextProfile("externals", option.value, "externalDurationTextProfile") end)
+				end
+			end,
+			isEnabled = function() return isAuraCooldownTextEnabled("externals") end,
 		},
 		{
 			name = L["Cooldown text anchor"] or "Cooldown text anchor",
@@ -29968,6 +30433,13 @@ local function buildEditModeSettings(kind, editModeId)
 		end
 	end
 
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	if tonumber((select(4, GetBuildInfo()))) >= 120100 then
+		for i = #settings, 1, -1 do
+			if settings[i] and settings[i].field == "hideInClientScene" then table.remove(settings, i) end
+		end
+	end
+
 	settings = GF.ReorderGroupEditModeSettings(settings)
 	GF.ApplyBlizzardAuraSettingVisibility(settings, kind)
 	return settings
@@ -30388,6 +30860,16 @@ local function applyEditModeData(kind, data)
 		cfg.health = cfg.health or {}
 		cfg.health.backdrop = cfg.health.backdrop or {}
 		cfg.health.backdrop.color = data.healthBackdropColor
+	end
+	if data.healthDeadBackdropColorEnabled ~= nil then
+		cfg.health = cfg.health or {}
+		cfg.health.backdrop = cfg.health.backdrop or {}
+		cfg.health.backdrop.deadColorEnabled = data.healthDeadBackdropColorEnabled and true or false
+	end
+	if data.healthDeadBackdropColor ~= nil then
+		cfg.health = cfg.health or {}
+		cfg.health.backdrop = cfg.health.backdrop or {}
+		cfg.health.backdrop.deadColor = data.healthDeadBackdropColor
 	end
 	if data.healthBackdropTexture ~= nil then
 		cfg.health = cfg.health or {}
@@ -31030,6 +31512,7 @@ local function applyEditModeData(kind, data)
 	if data.buffCooldownTextSize ~= nil then ac.buff.cooldownFontSize = data.buffCooldownTextSize end
 	if data.buffCooldownTextFont ~= nil then ac.buff.cooldownFont = data.buffCooldownTextFont end
 	if data.buffCooldownTextOutline ~= nil then ac.buff.cooldownFontOutline = data.buffCooldownTextOutline end
+	if data.buffDurationTextProfile ~= nil then ac.buff.durationTextProfile = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(data.buffDurationTextProfile) or data.buffDurationTextProfile end
 	if data.buffStackTextEnabled ~= nil then ac.buff.showStacks = data.buffStackTextEnabled and true or false end
 	if data.buffStackAnchor ~= nil then ac.buff.countAnchor = data.buffStackAnchor end
 	if data.buffStackOffsetX ~= nil or data.buffStackOffsetY ~= nil then
@@ -31078,6 +31561,7 @@ local function applyEditModeData(kind, data)
 	if data.debuffCooldownTextSize ~= nil then ac.debuff.cooldownFontSize = data.debuffCooldownTextSize end
 	if data.debuffCooldownTextFont ~= nil then ac.debuff.cooldownFont = data.debuffCooldownTextFont end
 	if data.debuffCooldownTextOutline ~= nil then ac.debuff.cooldownFontOutline = data.debuffCooldownTextOutline end
+	if data.debuffDurationTextProfile ~= nil then ac.debuff.durationTextProfile = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(data.debuffDurationTextProfile) or data.debuffDurationTextProfile end
 	if data.debuffStackTextEnabled ~= nil then ac.debuff.showStacks = data.debuffStackTextEnabled and true or false end
 	if data.debuffStackAnchor ~= nil then ac.debuff.countAnchor = data.debuffStackAnchor end
 	if data.debuffStackOffsetX ~= nil or data.debuffStackOffsetY ~= nil then
@@ -31129,6 +31613,7 @@ local function applyEditModeData(kind, data)
 	if data.externalCooldownTextSize ~= nil then ac.externals.cooldownFontSize = data.externalCooldownTextSize end
 	if data.externalCooldownTextFont ~= nil then ac.externals.cooldownFont = data.externalCooldownTextFont end
 	if data.externalCooldownTextOutline ~= nil then ac.externals.cooldownFontOutline = data.externalCooldownTextOutline end
+	if data.externalDurationTextProfile ~= nil then ac.externals.durationTextProfile = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(data.externalDurationTextProfile) or data.externalDurationTextProfile end
 	if data.externalStackTextEnabled ~= nil then ac.externals.showStacks = data.externalStackTextEnabled and true or false end
 	if data.externalStackAnchor ~= nil then ac.externals.countAnchor = data.externalStackAnchor end
 	if data.externalStackOffsetX ~= nil or data.externalStackOffsetY ~= nil then
@@ -31568,6 +32053,8 @@ function GF:EnsureEditMode()
 				healthBackdropEnabled = (hcBackdrop.enabled ~= nil) and (hcBackdrop.enabled ~= false) or (defHBackdrop.enabled ~= false),
 				healthBackdropClampToFill = (hcBackdrop.clampToFill ~= nil) and (hcBackdrop.clampToFill == true) or ((hcBackdrop.clampToFill == nil) and (defHBackdrop.clampToFill == true)),
 				healthBackdropColor = hcBackdrop.color or defHBackdrop.color or { 0, 0, 0, 0.6 },
+				healthDeadBackdropColorEnabled = (hcBackdrop.deadColorEnabled ~= nil) and (hcBackdrop.deadColorEnabled == true) or ((hcBackdrop.deadColorEnabled == nil) and (defHBackdrop.deadColorEnabled == true)),
+				healthDeadBackdropColor = hcBackdrop.deadColor or defHBackdrop.deadColor or { 0.35, 0.05, 0.05, 0.85 },
 				healthBackdropTexture = hcBackdrop.texture or defHBackdrop.texture or "DEFAULT",
 				healthLeftX = (cfg.health and cfg.health.offsetLeft and cfg.health.offsetLeft.x) or 0,
 				healthLeftY = (cfg.health and cfg.health.offsetLeft and cfg.health.offsetLeft.y) or 0,
@@ -31890,6 +32377,7 @@ function GF:EnsureEditMode()
 				buffCooldownTextSize = ac.buff.cooldownFontSize or defBuff.cooldownFontSize or 12,
 				buffCooldownTextFont = ac.buff.cooldownFont or defBuff.cooldownFont or nil,
 				buffCooldownTextOutline = ac.buff.cooldownFontOutline or defBuff.cooldownFontOutline or "OUTLINE",
+				buffDurationTextProfile = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(ac.buff.durationTextProfile or defBuff.durationTextProfile or "MINIMAL") or (ac.buff.durationTextProfile or defBuff.durationTextProfile or "MINIMAL"),
 				buffStackTextEnabled = (ac.buff.showStacks ~= nil and ac.buff.showStacks ~= false) or (ac.buff.showStacks == nil and defBuff.showStacks ~= false),
 				buffStackAnchor = ac.buff.countAnchor or defBuff.countAnchor or "BOTTOMRIGHT",
 				buffStackOffsetX = (ac.buff.countOffset and ac.buff.countOffset.x) or (defBuff.countOffset and defBuff.countOffset.x) or -2,
@@ -31923,6 +32411,7 @@ function GF:EnsureEditMode()
 				debuffCooldownTextSize = ac.debuff.cooldownFontSize or defDebuff.cooldownFontSize or 12,
 				debuffCooldownTextFont = ac.debuff.cooldownFont or defDebuff.cooldownFont or nil,
 				debuffCooldownTextOutline = ac.debuff.cooldownFontOutline or defDebuff.cooldownFontOutline or "OUTLINE",
+				debuffDurationTextProfile = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(ac.debuff.durationTextProfile or defDebuff.durationTextProfile or "MINIMAL") or (ac.debuff.durationTextProfile or defDebuff.durationTextProfile or "MINIMAL"),
 				debuffStackTextEnabled = (ac.debuff.showStacks ~= nil and ac.debuff.showStacks ~= false) or (ac.debuff.showStacks == nil and defDebuff.showStacks ~= false),
 				debuffStackAnchor = ac.debuff.countAnchor or defDebuff.countAnchor or "BOTTOMRIGHT",
 				debuffStackOffsetX = (ac.debuff.countOffset and ac.debuff.countOffset.x) or (defDebuff.countOffset and defDebuff.countOffset.x) or -2,
@@ -31960,6 +32449,7 @@ function GF:EnsureEditMode()
 				externalCooldownTextSize = ac.externals.cooldownFontSize or defExt.cooldownFontSize or 12,
 				externalCooldownTextFont = ac.externals.cooldownFont or defExt.cooldownFont or nil,
 				externalCooldownTextOutline = ac.externals.cooldownFontOutline or defExt.cooldownFontOutline or "OUTLINE",
+				externalDurationTextProfile = addon.DurationText and addon.DurationText.GetProfileKey and addon.DurationText:GetProfileKey(ac.externals.durationTextProfile or defExt.durationTextProfile or "MINIMAL") or (ac.externals.durationTextProfile or defExt.durationTextProfile or "MINIMAL"),
 				externalStackTextEnabled = (ac.externals.showStacks ~= nil and ac.externals.showStacks ~= false) or (ac.externals.showStacks == nil and defExt.showStacks ~= false),
 				externalStackAnchor = ac.externals.countAnchor or defExt.countAnchor or "BOTTOMRIGHT",
 				externalStackOffsetX = (ac.externals.countOffset and ac.externals.countOffset.x) or (defExt.countOffset and defExt.countOffset.x) or -2,
@@ -32414,7 +32904,7 @@ do
 			end
 		elseif event == "CLIENT_SCENE_OPENED" then
 			local sceneType = ...
-			GF._clientSceneActive = (sceneType == 1)
+			GF._clientSceneActive = addon.functions and addon.functions.IsMinigameClientScene and addon.functions.IsMinigameClientScene(sceneType) or false
 			if isFeatureEnabled() then GF:RefreshClientSceneVisibility() end
 		elseif event == "CLIENT_SCENE_CLOSED" then
 			GF._clientSceneActive = false

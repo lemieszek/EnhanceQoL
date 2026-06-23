@@ -671,8 +671,10 @@ local function runTransmogWeaponSearch(rawQuery, rawCategoryID)
 end
 
 local function handleItemLink(text)
+	if type(text) ~= "string" or not text:find("item:", 1, true) then return end
 	local _, link = C_Item.GetItemInfo(text)
 	local itemID = text and text:match("item:(%d+)") and tonumber(text:match("item:(%d+)")) or nil
+	if not itemID then return end
 	local classID, subClassID = C_Item.GetItemInfoInstant(itemID)
 	local kind = currentMode
 	if kind == "auto" then kind = classifyItemByIDs(itemID) or "drink" end
@@ -1137,7 +1139,8 @@ end
 local function onEvent(self, event, ...)
 	if event == "ADDON_LOADED" then
 		-- Ensure slash command is registered as soon as the addon loads
-		onAddonLoaded(event, ...)
+		local loadedAddonName = ...
+		onAddonLoaded(event, loadedAddonName)
 		ensureProfilerDefaults()
 		seedKnownItems()
 	elseif event == "PLAYER_LOGIN" then

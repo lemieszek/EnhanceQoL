@@ -13,6 +13,7 @@ addon.MythicPlus.Buttons = addon.MythicPlus.Buttons or {}
 addon.MythicPlus.nrOfButtons = addon.MythicPlus.nrOfButtons or 0
 addon.MythicPlus.variables = addon.MythicPlus.variables or {}
 local L = LibStub("AceLocale-3.0"):GetLocale("EnhanceQoL")
+local MouseIsOver = addon.functions.MouseIsOver
 
 _G["BINDING_NAME_CLICK EQOLRandomHearthstoneButton:LeftButton"] = L["teleportsRandomHearthstoneBinding"] or "Random Hearthstone"
 
@@ -97,6 +98,7 @@ function addon.MythicPlus.functions.InitDB()
 	init("mythicPlusBRTrackerCooldownTextPoint", "CENTER")
 	init("mythicPlusBRTrackerCooldownTextOffsetX", 0)
 	init("mythicPlusBRTrackerCooldownTextOffsetY", 0)
+	init("mythicPlusBRTrackerDurationTextProfile", "MINIMAL")
 	init("mythicPlusBRTrackerChargesEnabled", true)
 	init("mythicPlusBRTrackerChargesFontFace", globalFontKey)
 	init("mythicPlusBRTrackerChargesTextSize", 16)
@@ -115,6 +117,15 @@ function addon.MythicPlus.functions.InitDB()
 	init("mythicPlusBloodlustTrackerX", 0)
 	init("mythicPlusBloodlustTrackerY", 0)
 	init("mythicPlusBloodlustTrackerOnlyInInstances", true)
+	init("mythicPlusBloodlustTrackerShowActiveDuration", false)
+	init("mythicPlusBloodlustTrackerGlowOnActive", false)
+	init("mythicPlusBloodlustTrackerActiveGlowStyle", "MARCHING_ANTS")
+	init("mythicPlusBloodlustTrackerActiveGlowColor", { 1, 0.82, 0.2, 1 })
+	init("mythicPlusBloodlustTrackerActiveGlowInset", 0)
+	init("mythicPlusBloodlustTrackerActiveGlowPixelBorder", false)
+	init("mythicPlusBloodlustTrackerActiveGlowPixelCount", 8)
+	init("mythicPlusBloodlustTrackerActiveGlowPixelSpeed", 0.25)
+	init("mythicPlusBloodlustTrackerActiveGlowPixelThickness", 2)
 	init("mythicPlusBloodlustTrackerIcon", 136090)
 	init("mythicPlusBloodlustTrackerIconZoom", 0)
 	init("mythicPlusBloodlustTrackerIconShape", "DEFAULT")
@@ -132,6 +143,7 @@ function addon.MythicPlus.functions.InitDB()
 	init("mythicPlusBloodlustTrackerCooldownTextColor", { 1, 1, 1, 1 })
 	init("mythicPlusBloodlustTrackerCooldownTextOffsetX", 0)
 	init("mythicPlusBloodlustTrackerCooldownTextOffsetY", 0)
+	init("mythicPlusBloodlustTrackerDurationTextProfile", "MINIMAL")
 	init("mythicPlusBloodlustTrackerSoundOnDebuffActive", false)
 	init("mythicPlusBloodlustTrackerUseCustomDebuffSound", false)
 	init("mythicPlusBloodlustTrackerDebuffSoundFile", "")
@@ -572,17 +584,19 @@ addon.MythicPlus.variables.portalCompendium = {
 			[1254559] = { text = "MC", cId = { [560] = true }, mapID = 2501, locID = 2437, x = 0.4368, y = 0.3963, zoneID = 2501 },
 			[1254563] = { text = "NPX", cId = { [559] = true }, mapID = 2556, locID = 2405, x = 0.6484, y = 0.6158, zoneID = 2556 },
 			[1254572] = { text = "MT", cId = { [558] = true }, mapID = 2511, locID = 2424, x = 0.6329, y = 0.1549, zoneID = 2511 },
-			-- [1254580] = { text = "DON", mapID = 2514, locID = 2437, x = 0.2969, y = 0.8454, zoneID = 2514 },
+			[1286807] = { text = "DON", cId = { [586] = true }, mapID = 2514, locID = 2437, x = 0.2963, y = 0.8415, zoneID = 2514 }, -- Den of Nalorakk
 			[1254400] = { text = "WS", cId = { [557] = true }, mapID = 2494, locID = 2395, x = 0.3543, y = 0.7908, zoneID = 2494 },
+			[1286801] = { text = "TBV", cId = { [584] = true }, mapID = 2500, locID = 2413, x = 0.2618, y = 0.7791, zoneID = 2500 }, -- The Blinding Vale
+			[1286804] = { text = "VSA", cId = { [585] = true }, mapID = 2572, locID = 2405, x = 0.5143, y = 0.1872, zoneID = 2572 }, -- Voidscar Arena
+			[1286809] = { text = "MR", cId = { [587] = true }, mapID = 2433, locID = 2393, x = 0.5703, y = 0.6069, zoneID = 2433 }, -- Murder Row
+			[1286812] = { text = "AOF", cId = { [588] = true }, zoneID = 2588 }, -- TODO 12.1 PTR: add locID/x/y once Altar of Fangs exists on PTR.
 			[1271425] = { text = "ABUN", isItem = true, itemID = 252607, icon = 1362642, locID = 2437, x = 0.31263855520737, y = 0.26260265863074, zoneID = 2437 }, -- Abundont Beacon
 			[1278093] = { text = "ABUN", isItem = true, itemID = 266370, icon = 236521, locID = 2437, x = 0.31263855520737, y = 0.26260265863074, zoneID = 2437 }, -- Dundun's Abundant Travel Method
+			[1299515] = { text = "LV", isItem = true, itemID = 276371 }, -- Lightveil Recall Beacon
 			[1259190] = { text = "SMC", isClassTP = "MAGE", locID = 2393, x = 0.5279, y = 0.6556, zoneID = 2393 }, -- Teleport: Silvermoon City
 			[1259194] = { text = "SMC", isMagePortal = true, locID = 2393, x = 0.5279, y = 0.6556, zoneID = 2393 }, -- Portal: Silvermoon City
 			[1255801] = { text = "ARC", isToy = true, toyID = 253629, isHearthstone = true, icon = 7322718, locID = 2541, x = 0.50215210538362, y = 0.755379994799, zoneID = 2541 }, -- Personal Key to the Arcantina
 			[1247149] = { text = "ENGI", modern = "Quel'Thalas", isToy = true, toyID = 248485, isEngineering = true, zoneID = 2437 }, -- Wormhole Generator: Quel'Thalas
-			-- [1254569] = { text = "MR", mapID = 2433, locID = 2393, x = 0.5719, y = 0.6097, zoneID = 2433 },
-			-- [1254577] = { text = "TBV", mapID = 2500, locID = 2413, x = 0.2635, y = 0.7790, zoneID = 2500 },
-			-- [1254567] = { text = "VSA", mapID = 2572, locID = 2405, x = 0.5145, y = 0.1918, zoneID = 2572 },
 		},
 	},
 	[120] = {
@@ -681,6 +695,8 @@ addon.MythicPlus.variables.portalCompendium = {
 		spells = {
 			[410071] = { text = "FH", cId = { [245] = true }, locID = 895, x = 0.8445, y = 0.7880, zoneID = 936 },
 			[410074] = { text = "UR", cId = { [251] = true }, locID = 863, x = 0.5109, y = 0.6456, zoneID = 1041 },
+			[1286831] = { text = "KR", cId = { [249] = true }, locID = 862, x = 0.3723, y = 0.3938, zoneID = 1004 }, -- Kings' Rest
+			[1286828] = { text = "TOS", cId = { [250] = true }, locID = 864, x = 0.5187, y = 0.2518, zoneID = 1038 }, -- Temple of Sethraliss
 			[373274] = { text = "WORK", cId = { [369] = true, [370] = true }, mapID = 2097, locID = 1462, x = 0.7285, y = 0.3647, zoneID = 1490 },
 			[424167] = { text = "WM", cId = { [248] = true }, locID = 896, x = 0.3364, y = 0.1244, zoneID = 1015 },
 			[424187] = { text = "AD", cId = { [244] = true }, locID = 862, x = 0.4350, y = 0.3946, zoneID = 934 },
@@ -1446,6 +1462,11 @@ local challengeMapIDDefaults = {
 	[559] = "NPX",
 	[558] = "MT",
 	[557] = "WS",
+	[584] = "TBV",
+	[585] = "VSA",
+	[586] = "DON",
+	[587] = "MR",
+	[588] = "AOF",
 	[239] = "SEAT",
 	[556] = "POS",
 	[542] = "ED",
@@ -1479,6 +1500,8 @@ local challengeMapIDDefaults = {
 	[391] = "STREET",
 	[392] = "GAMBIT",
 	[245] = "FH",
+	[249] = "KR",
+	[250] = "TOS",
 	[251] = "UR",
 	[369] = "WORK",
 	[370] = "WORK",

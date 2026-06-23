@@ -63,6 +63,8 @@ local DEFAULT_AURA_CONFIG_SUFFIXES = {
 	"VerticalSpacing",
 	"IconsPerRow",
 	"MaxRows",
+	"FrameStrata",
+	"FrameLevel",
 	"SortMethod",
 	"SortDirection",
 	"IncludeWeapons",
@@ -83,6 +85,7 @@ local DEFAULT_AURA_CONFIG_SUFFIXES = {
 	"DurationColor",
 	"DurationAnchor",
 	"DurationOffset",
+	"DurationTextProfile",
 	"CountEnabled",
 	"CountFontFace",
 	"CountFontOutline",
@@ -116,6 +119,12 @@ local DEFAULT_FONT = "Fonts\\FRIZQT__.TTF"
 local GLOBAL_FONT_KEY = "__EQOL_GLOBAL_FONT__"
 local GLOBAL_STYLE_KEY = "__EQOL_GLOBAL_FONT_STYLE__"
 local refreshDefaultAuraIconSkin
+
+local function normalizeDefaultAuraDurationTextProfile(value)
+	local durationText = addon.DurationText
+	if durationText and durationText.GetProfileKey then return durationText:GetProfileKey(value or "MINIMAL") end
+	return type(value) == "string" and value ~= "" and value or "MINIMAL"
+end
 
 local function normalizeAuraIconShape(value)
 	if addon.IconShape and addon.IconShape.Normalize then return addon.IconShape.Normalize(value, "DEFAULT") end
@@ -335,6 +344,15 @@ local function getDefaultAuraDrawSwipe(kind)
 	return getDefaultAuraDBValue(kind, "CooldownDrawSwipe") ~= false
 end
 
+local function getDefaultAuraDurationTextProfile(kind)
+	return normalizeDefaultAuraDurationTextProfile(getDefaultAuraDBValue(kind, "DurationTextProfile"))
+end
+
+local function applyDefaultAuraDurationTextProfile(button)
+	if not (button and button.Cooldown and addon.functions and addon.functions.ApplyDurationTextProfileToCooldownFrame) then return false end
+	return addon.functions.ApplyDurationTextProfileToCooldownFrame(button.Cooldown, getDefaultAuraDurationTextProfile(button.eqolDefaultAuraKind))
+end
+
 local function getDefaultAuraIconsPerRow(value, kind)
 	local perRow = tonumber(value)
 	if perRow == nil then perRow = tonumber(getDefaultAuraDBValue(kind, "IconsPerRow")) end
@@ -351,6 +369,21 @@ local function getDefaultAuraMaxRows(value, kind)
 	if rows < 1 then rows = 1 end
 	if rows > 10 then rows = 10 end
 	return rows
+end
+
+local function normalizeDefaultAuraFrameStrata(value)
+	value = type(value) == "string" and strupper(value) or "MEDIUM"
+	if value == "BACKGROUND" or value == "LOW" or value == "MEDIUM" or value == "HIGH" or value == "DIALOG" or value == "FULLSCREEN" or value == "FULLSCREEN_DIALOG" or value == "TOOLTIP" then return value end
+	return "MEDIUM"
+end
+
+local function getDefaultAuraFrameLevel(value, kind)
+	local level = tonumber(value)
+	if level == nil then level = tonumber(getDefaultAuraDBValue(kind, "FrameLevel")) end
+	level = level or 50
+	if level < 0 then level = 0 end
+	if level > 100 then level = 100 end
+	return math.floor(level + 0.5)
 end
 
 local function normalizeDefaultAuraSortMethod(value)
@@ -441,6 +474,24 @@ local function positionAuraFontString(fontString, owner, prefix, defaultPoint, d
 	if fontString.SetDrawLayer then fontString:SetDrawLayer("OVERLAY", 7) end
 end
 
+local function buildDefaultAuraTextStyleKey(kind, prefix, fallbackColor)
+	local color = normalizeAuraTextColor(getDefaultAuraDBValue(kind, prefix .. "Color"), fallbackColor)
+	local offset = getDefaultAuraDBValue(kind, prefix .. "Offset")
+	return table.concat({
+		tostring(getDefaultAuraDBValue(kind, prefix .. "Enabled") ~= false),
+		tostring(normalizeAuraFontKey(getDefaultAuraDBValue(kind, prefix .. "FontFace"))),
+		tostring(normalizeAuraFontStyle(getDefaultAuraDBValue(kind, prefix .. "FontOutline"))),
+		tostring(getAuraTextSize(nil, tonumber(getDefaultAuraDBValue(kind, prefix .. "FontSize")) or (prefix == "Duration" and 10 or 12))),
+		tostring(color.r),
+		tostring(color.g),
+		tostring(color.b),
+		tostring(color.a),
+		tostring(normalizeAuraAnchorPoint(getDefaultAuraDBValue(kind, prefix .. "Anchor"), prefix == "Duration" and "BOTTOM" or "TOPRIGHT")),
+		tostring(getAuraTextOffset(nil, "x", type(offset) == "table" and offset.x or (prefix == "Duration" and 0 or -1))),
+		tostring(getAuraTextOffset(nil, "y", type(offset) == "table" and offset.y or -1)),
+	}, ":")
+end
+
 local function applyDefaultAuraTextStyle(button)
 	if not button then return end
 	local kind = button.eqolDefaultAuraKind
@@ -450,6 +501,7 @@ local function applyDefaultAuraTextStyle(button)
 		if button.Count and button.Count.SetParent then button.Count:SetParent(textLayer) end
 	end
 	local durationEnabled = getDefaultAuraDBValue(kind, "DurationEnabled") ~= false
+	applyDefaultAuraDurationTextProfile(button)
 	if button.Cooldown and button.Cooldown.SetHideCountdownNumbers then button.Cooldown:SetHideCountdownNumbers(not durationEnabled) end
 	local internalCooldownText = button.Cooldown and button.Cooldown.GetCountdownFontString and button.Cooldown:GetCountdownFontString()
 	if internalCooldownText then
@@ -618,8 +670,13 @@ local function applyDefaultAuraButtonStyle(button, force)
 	local zoom = normalizeAuraIconZoom(getDefaultAuraDBValue(kind, "IconZoom"))
 	local borderKey = normalizeAuraBorder(getDefaultAuraDBValue(kind, "BorderTexture"), shape)
 	local color = resolveDefaultAuraBorderColor(button, kind)
+	local iconDarkMode = getDefaultAuraDBValue(kind, "IconDarkMode") == true
+	local iconDarkness = normalizeAuraIconDarkness(getDefaultAuraDBValue(kind, "IconDarkness"))
+	local iconDesaturate = getDefaultAuraDBValue(kind, "IconDesaturate") == true
 	local hasCustomBorder = not isNoAuraBorder(borderKey)
-	local styleKey = tostring(kind) .. ":" .. tostring(size) .. ":" .. tostring(shape) .. ":" .. tostring(zoom) .. ":" .. tostring(borderKey) .. ":" .. tostring(getDefaultAuraBorderSize(nil, kind)) .. ":" .. tostring(getDefaultAuraBorderOffset(nil, kind)) .. ":" .. tostring(getDefaultAuraDrawSwipe(kind)) .. ":" .. tostring(color.r) .. ":" .. tostring(color.g) .. ":" .. tostring(color.b) .. ":" .. tostring(color.a)
+	local durationTextKey = buildDefaultAuraTextStyleKey(kind, "Duration", DEFAULT_AURA_DURATION_COLOR)
+	local countTextKey = buildDefaultAuraTextStyleKey(kind, "Count", DEFAULT_AURA_COUNT_COLOR)
+	local styleKey = tostring(kind) .. ":" .. tostring(size) .. ":" .. tostring(shape) .. ":" .. tostring(zoom) .. ":" .. tostring(borderKey) .. ":" .. tostring(getDefaultAuraBorderSize(nil, kind)) .. ":" .. tostring(getDefaultAuraBorderOffset(nil, kind)) .. ":" .. tostring(getDefaultAuraDrawSwipe(kind)) .. ":" .. tostring(getDefaultAuraDurationTextProfile(kind)) .. ":" .. tostring(addon.DurationText and addon.DurationText.version or 0) .. ":" .. tostring(color[1]) .. ":" .. tostring(color[2]) .. ":" .. tostring(color[3]) .. ":" .. tostring(color[4]) .. ":" .. tostring(iconDarkMode) .. ":" .. tostring(iconDarkness) .. ":" .. tostring(iconDesaturate) .. ":" .. durationTextKey .. ":" .. countTextKey
 	if not force and button.eqolDefaultAuraStyleKey == styleKey then return end
 	button.eqolDefaultAuraStyleKey = styleKey
 
@@ -896,6 +953,8 @@ end
 local function createDefaultAuraHeader(kind, filter)
 	local name = kind == "buff" and "EnhanceQoLCustomBuffFrame" or "EnhanceQoLCustomDebuffFrame"
 	local header = _G[name] or CreateFrame("Frame", name, UIParent, "SecureAuraHeaderTemplate")
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	if tonumber((select(4, GetBuildInfo()))) >= 120100 and type(header.SetRolesets) == "function" then header:SetRolesets("buffs") end
 	header:SetClampedToScreen(true)
 	header:UnregisterEvent("UNIT_AURA")
 	header:RegisterUnitEvent("UNIT_AURA", "player", "vehicle")
@@ -915,10 +974,12 @@ local function ensureDefaultAuraAnchor(kind)
 	local key = isBuff and "defaultBuffAnchor" or "defaultDebuffAnchor"
 	local name = isBuff and "EnhanceQoLCustomBuffFrameAnchor" or "EnhanceQoLCustomDebuffFrameAnchor"
 	local anchor = DAC.variables[key] or _G[name] or CreateFrame("Frame", name, UIParent, "BackdropTemplate")
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	if tonumber((select(4, GetBuildInfo()))) >= 120100 and type(anchor.SetRolesets) == "function" then anchor:SetRolesets("buffs") end
 	DAC.variables[key] = anchor
 	anchor:SetSize(getDefaultAuraIconsPerRow(nil, kind) * getDefaultAuraIconSize(nil, kind) + (getDefaultAuraIconsPerRow(nil, kind) - 1) * getDefaultAuraHorizontalSpacing(nil, kind), getDefaultAuraMaxRows(nil, kind) * getDefaultAuraIconSize(nil, kind) + (getDefaultAuraMaxRows(nil, kind) - 1) * getDefaultAuraVerticalSpacing(nil, kind))
-	anchor:SetFrameStrata("MEDIUM")
-	anchor:SetFrameLevel(50)
+	anchor:SetFrameStrata(normalizeDefaultAuraFrameStrata(getDefaultAuraDBValue(kind, "FrameStrata")))
+	anchor:SetFrameLevel(getDefaultAuraFrameLevel(nil, kind))
 	if anchor.SetClampedToScreen then anchor:SetClampedToScreen(true) end
 	if anchor.SetClampRectInsets then anchor:SetClampRectInsets(0, 0, 0, 0) end
 	anchor:SetMovable(true)
@@ -941,6 +1002,21 @@ local SAMPLE_AURA_ICONS = {
 	"Interface\\Icons\\Spell_Holy_Renew",
 	"Interface\\Icons\\Spell_Shadow_ShadowWordPain",
 	"Interface\\Icons\\Spell_Fire_FlameShock",
+	"Interface\\Icons\\Spell_Nature_Regeneration",
+	"Interface\\Icons\\Spell_Holy_PrayerOfMendingtga",
+	"Interface\\Icons\\Spell_Nature_ResistNature",
+	"Interface\\Icons\\Spell_Holy_SealOfSalvation",
+	"Interface\\Icons\\Spell_Magic_GreaterBlessingOfKings",
+	"Interface\\Icons\\Spell_Shadow_CurseOfSargeras",
+	"Interface\\Icons\\Spell_Shadow_CurseOfTounges",
+	"Interface\\Icons\\Spell_Shadow_AbominationExplosion",
+	"Interface\\Icons\\Spell_Frost_ChainsOfIce",
+	"Interface\\Icons\\Spell_Nature_StrangleVines",
+	"Interface\\Icons\\Ability_Creature_Cursed_02",
+	"Interface\\Icons\\Spell_Shadow_Possession",
+	"Interface\\Icons\\Spell_Shadow_PlagueCloud",
+	"Interface\\Icons\\Spell_Fire_Incinerate",
+	"Interface\\Icons\\Spell_Nature_CorrosiveBreath",
 }
 
 local function hideDefaultAuraSamples(kind)
@@ -970,7 +1046,9 @@ local function refreshDefaultAuraSamples(kind)
 	local size = getDefaultAuraIconSize(nil, kind)
 	local horizontalSpacing = getDefaultAuraHorizontalSpacing(nil, kind)
 	local perRow = getDefaultAuraIconsPerRow(nil, kind)
-	local count = math.min(5, perRow)
+	local verticalSpacing = getDefaultAuraVerticalSpacing(nil, kind)
+	local maxRows = getDefaultAuraMaxRows(nil, kind)
+	local count = perRow * maxRows
 	for i = 1, count do
 		local sample = samples[i]
 		if not sample then
@@ -984,18 +1062,23 @@ local function refreshDefaultAuraSamples(kind)
 			samples[i] = sample
 		end
 		sample.eqolDefaultAuraKind = kind
-		sample.Icon:SetTexture(SAMPLE_AURA_ICONS[i] or "Interface\\Icons\\INV_Misc_QuestionMark")
-		sample.Count:SetText(i == 1 and "3" or "")
-		sample.Count:SetShown(getDefaultAuraDBValue(kind, "CountEnabled") ~= false and i == 1)
+		if sample.SetFrameStrata then sample:SetFrameStrata(anchor:GetFrameStrata()) end
+		if sample.SetFrameLevel then sample:SetFrameLevel((anchor:GetFrameLevel() or 1) + 1) end
+		sample.Icon:SetTexture(SAMPLE_AURA_ICONS[((i - 1) % #SAMPLE_AURA_ICONS) + 1] or "Interface\\Icons\\INV_Misc_QuestionMark")
+		local showCount = getDefaultAuraDBValue(kind, "CountEnabled") ~= false and (i == 1 or i == 6 or i == 13)
+		sample.Count:SetText(showCount and tostring((i % 4) + 2) or "")
+		sample.Count:SetShown(showCount)
 		setDefaultAuraCooldownDuration(sample, GetTime() - i, 30 + i * 8)
 		sample:ClearAllPoints()
 		sample:SetSize(size, size)
-		if i == 1 then
-			sample:SetPoint("TOPRIGHT", anchor, "TOPRIGHT", 0, 0)
+		local column = (i - 1) % perRow
+		local row = math.floor((i - 1) / perRow)
+		if column == 0 then
+			sample:SetPoint("TOPRIGHT", anchor, "TOPRIGHT", 0, -row * (size + verticalSpacing))
 		else
 			sample:SetPoint("RIGHT", samples[i - 1], "LEFT", -horizontalSpacing, 0)
 		end
-		applyDefaultAuraButtonStyle(sample)
+		applyDefaultAuraButtonStyle(sample, true)
 		sample:Show()
 	end
 	for i = count + 1, #samples do samples[i]:Hide() end
@@ -1051,6 +1134,10 @@ local function applyDefaultAuraEditModeSetting(kind, field, value)
 		setDefaultAuraDBValue(kind, "IconsPerRow", getDefaultAuraIconsPerRow(value, kind))
 	elseif field == "maxRows" then
 		setDefaultAuraDBValue(kind, "MaxRows", getDefaultAuraMaxRows(value, kind))
+	elseif field == "frameStrata" then
+		setDefaultAuraDBValue(kind, "FrameStrata", normalizeDefaultAuraFrameStrata(value))
+	elseif field == "frameLevel" then
+		setDefaultAuraDBValue(kind, "FrameLevel", getDefaultAuraFrameLevel(value, kind))
 	elseif field == "sortMethod" then
 		setDefaultAuraDBValue(kind, "SortMethod", normalizeDefaultAuraSortMethod(value))
 	elseif field == "sortDirection" then
@@ -1090,6 +1177,8 @@ local function applyDefaultAuraEditModeSetting(kind, field, value)
 		if type(offset) ~= "table" then offset = {} end
 		offset.y = getAuraTextOffset(nil, nil, tonumber(value) or -1)
 		setDefaultAuraDBValue(kind, "DurationOffset", offset)
+	elseif field == "durationTextProfile" then
+		setDefaultAuraDBValue(kind, "DurationTextProfile", normalizeDefaultAuraDurationTextProfile(value))
 	elseif field == "countEnabled" then
 		setDefaultAuraDBValue(kind, "CountEnabled", value == true)
 	elseif field == "countFont" then
@@ -1236,6 +1325,18 @@ local function createDefaultAuraEditModeSettings(kind)
 			{ value = "+", label = L["Ascending"] or "Ascending" },
 		}
 	end
+	local function frameStrataOptions()
+		return {
+			{ value = "BACKGROUND", label = "BACKGROUND" },
+			{ value = "LOW", label = "LOW" },
+			{ value = "MEDIUM", label = "MEDIUM" },
+			{ value = "HIGH", label = "HIGH" },
+			{ value = "DIALOG", label = "DIALOG" },
+			{ value = "FULLSCREEN", label = "FULLSCREEN" },
+			{ value = "FULLSCREEN_DIALOG", label = "FULLSCREEN_DIALOG" },
+			{ value = "TOOLTIP", label = "TOOLTIP" },
+		}
+	end
 
 	local layoutSectionId = "default-aura-containers-layout"
 	local borderSectionId = "default-aura-containers-border"
@@ -1256,6 +1357,8 @@ local function createDefaultAuraEditModeSettings(kind)
 		checkbox(L["Draw cooldown swipe"] or "Draw cooldown swipe", function() return getDefaultAuraDrawSwipe(kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "drawSwipe", value) end, nil, layoutSectionId),
 		slider(L["Aura per row"] or "Auras per row", function() return getDefaultAuraIconsPerRow(nil, kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "perRow", value) end, 1, 32, 1, nil, layoutSectionId),
 		slider(L["Max rows"] or "Max rows", function() return getDefaultAuraMaxRows(nil, kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "maxRows", value) end, 1, 10, 1, nil, layoutSectionId),
+		dropdown(L["Frame strata"] or "Frame strata", function() return normalizeDefaultAuraFrameStrata(getDefaultAuraDBValue(kind, "FrameStrata")) end, function(value) applyDefaultAuraEditModeSetting(kind, "frameStrata", value) end, frameStrataOptions, 180, nil, layoutSectionId),
+		slider(L["UFFrameLevel"] or "Frame level", function() return getDefaultAuraFrameLevel(nil, kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "frameLevel", value) end, 0, 100, 1, nil, layoutSectionId),
 		dropdown(L["Sort method"] or "Sort method", function() return normalizeDefaultAuraSortMethod(getDefaultAuraDBValue(kind, "SortMethod")) end, function(value) applyDefaultAuraEditModeSetting(kind, "sortMethod", value) end, sortMethodOptions, 120, nil, layoutSectionId),
 		dropdown(L["Sort direction"] or "Sort direction", function() return normalizeDefaultAuraSortDirection(getDefaultAuraDBValue(kind, "SortDirection")) end, function(value) applyDefaultAuraEditModeSetting(kind, "sortDirection", value) end, sortDirectionOptions, 100, nil, layoutSectionId),
 		checkbox(L["Include weapon enchants"] or "Include weapon enchants", function() return getDefaultAuraDBValue(kind, "IncludeWeapons") == true end, function(value) applyDefaultAuraEditModeSetting(kind, "includeWeapons", value) end, function() return kind == "buff" end, layoutSectionId),
@@ -1286,6 +1389,9 @@ local function createDefaultAuraEditModeSettings(kind)
 		},
 		{ name = L["Cooldown text"] or "Cooldown text", kind = SettingType.Collapsible, id = durationSectionId, defaultCollapsed = true },
 		checkbox(L["Show cooldown text"] or "Show cooldown text", durationEnabled, function(value) applyDefaultAuraEditModeSetting(kind, "durationEnabled", value) end, nil, durationSectionId),
+		dropdown(L["durationTextProfile"] or "Duration text profile", function() return getDefaultAuraDurationTextProfile(kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "durationTextProfile", value) end, function()
+			return addon.DurationText and addon.DurationText.GetProfileOptions and addon.DurationText:GetProfileOptions() or {}
+		end, 180, durationEnabled, durationSectionId),
 		dropdown(L["Font"] or "Font", function() return normalizeAuraFontKey(getDefaultAuraDBValue(kind, "DurationFontFace")) end, function(value) applyDefaultAuraEditModeSetting(kind, "durationFont", value) end, buildAuraFontOptions, 220, durationEnabled, durationSectionId),
 		dropdown(L["Font outline"] or "Font outline", function() return normalizeAuraFontStyle(getDefaultAuraDBValue(kind, "DurationFontOutline")) end, function(value) applyDefaultAuraEditModeSetting(kind, "durationOutline", value) end, buildAuraFontStyleOptions, 220, durationEnabled, durationSectionId),
 		slider(_G.FONT_SIZE or "Font size", function() return getAuraTextSize(nil, tonumber(getDefaultAuraDBValue(kind, "DurationFontSize")) or 10) end, function(value) applyDefaultAuraEditModeSetting(kind, "durationSize", value) end, 6, 64, 1, durationEnabled, durationSectionId),
@@ -1342,10 +1448,12 @@ local function registerDefaultAuraHeaderEditMode(kind, header, anchor)
 		end,
 		onApply = function()
 			attachDefaultAuraHeaderToAnchor(header, anchor)
+			applyDefaultAuraHeaderButtonStyles(header, true)
 			updateDefaultAuraHeaderButtons(header)
 		end,
 		onPositionChanged = function()
 			attachDefaultAuraHeaderToAnchor(header, anchor)
+			applyDefaultAuraHeaderButtonStyles(header, true)
 			updateDefaultAuraHeaderButtons(header)
 		end,
 		settings = createDefaultAuraEditModeSettings(kind),
@@ -1481,6 +1589,8 @@ function DAC.functions.InitDB()
 	init("skinnerDefaultAuraVerticalSpacing", getDefaultAuraIconSpacing() + 12)
 	init("skinnerDefaultAuraIconsPerRow", 8)
 	init("skinnerDefaultAuraMaxRows", 4)
+	init("skinnerDefaultAuraFrameStrata", "MEDIUM")
+	init("skinnerDefaultAuraFrameLevel", 50)
 	init("skinnerDefaultAuraSortMethod", "TIME")
 	init("skinnerDefaultAuraSortDirection", "-")
 	init("skinnerDefaultAuraIncludeWeapons", true)
@@ -1511,6 +1621,7 @@ function DAC.functions.InitDB()
 	})
 	init("skinnerDefaultAuraDurationAnchor", "BOTTOM")
 	init("skinnerDefaultAuraDurationOffset", { x = 0, y = -1 })
+	init("skinnerDefaultAuraDurationTextProfile", "MINIMAL")
 	init("skinnerDefaultAuraCountEnabled", true)
 	init("skinnerDefaultAuraCountFontFace", getGlobalFontKey())
 	init("skinnerDefaultAuraCountFontOutline", getGlobalStyleKey())

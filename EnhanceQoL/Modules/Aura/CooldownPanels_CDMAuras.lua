@@ -36,6 +36,25 @@ local function showErrorMessage(msg)
 	if UIErrorsFrame and msg then UIErrorsFrame:AddMessage(msg, 1, 0.2, 0.2, 1) end
 end
 
+function cdm.IsCooldownViewerSettingsShown()
+	local settings = _G.CooldownViewerSettings
+	if not (settings and settings.IsShown) then return false end
+	local ok, shown = pcall(settings.IsShown, settings)
+	return ok and shown == true
+end
+
+function cdm.HasCooldownManagerSyncPanel(sourceKind)
+	local root = CooldownPanels.GetRoot and CooldownPanels:GetRoot() or nil
+	local panels = root and root.panels
+	sourceKind = type(sourceKind) == "string" and sourceKind:upper() or nil
+	if not panels then return false end
+	for _, panel in pairs(panels) do
+		local panelSource = type(panel and panel.cdmSyncSource) == "string" and panel.cdmSyncSource:upper() or nil
+		if panelSource and (not sourceKind or panelSource == sourceKind) then return true end
+	end
+	return false
+end
+
 local function createTrackedUnitBuckets()
 	return {
 		player = {},
@@ -106,6 +125,7 @@ local function getRuntime()
 		runtime.frameEntries = runtime.frameEntries or {}
 		runtime.pandemicFrameEntries = runtime.pandemicFrameEntries or {}
 		runtime.cooldownViewerInfoByID = runtime.cooldownViewerInfoByID or {}
+		runtime.entryKeysByCooldownID = runtime.entryKeysByCooldownID or {}
 		runtime.spellNameByID = runtime.spellNameByID or {}
 		runtime.spellTextureByID = runtime.spellTextureByID or {}
 		runtime.scanInfoPoolByID = runtime.scanInfoPoolByID or {}
@@ -128,6 +148,7 @@ local function getRuntime()
 		frameEntries = {},
 		pandemicFrameEntries = {},
 		hookedFrames = {},
+		entryKeysByCooldownID = {},
 		cooldownViewerInfoByID = {},
 		spellNameByID = {},
 		spellTextureByID = {},
@@ -182,6 +203,76 @@ local function getRuntimePassCacheTable(field)
 	return cache, runtime
 end
 
+local function bumpPerfCounter(runtime, name, amount)
+	if cdm.perfCountersEnabled ~= true then return end
+	runtime = runtime or getRuntime()
+	local counters = runtime.cdmAuraPerfCounters
+	if type(counters) ~= "table" then
+		counters = {}
+		runtime.cdmAuraPerfCounters = counters
+		runtime.cdmAuraPerfCountersStartedAt = GetTime and GetTime() or nil
+	end
+	counters[name] = (tonumber(counters[name]) or 0) + (tonumber(amount) or 1)
+end
+
+function CDMAuras:SetPerformanceCountersEnabled(enabled, reset)
+	local runtime = getRuntime()
+	cdm.perfCountersEnabled = enabled == true
+	runtime.cdmAuraPerfCountersEnabled = cdm.perfCountersEnabled
+	if reset ~= false then
+		runtime.cdmAuraPerfCounters = {}
+		runtime.cdmAuraPerfCountersStartedAt = GetTime and GetTime() or nil
+	end
+	return cdm.perfCountersEnabled == true
+end
+
+function CDMAuras:ResetPerformanceCounters()
+	local runtime = getRuntime()
+	runtime.cdmAuraPerfCounters = {}
+	runtime.cdmAuraPerfCountersStartedAt = GetTime and GetTime() or nil
+end
+
+function CDMAuras:GetPerformanceReport()
+	local runtime = getRuntime()
+	local counters = runtime.cdmAuraPerfCounters or {}
+	local keys = {}
+	for key in pairs(counters) do
+		keys[#keys + 1] = key
+	end
+	table.sort(keys)
+
+	local startedAt = tonumber(runtime.cdmAuraPerfCountersStartedAt)
+	local elapsed = startedAt and GetTime and math.max(0, GetTime() - startedAt) or nil
+	local lines = {
+		"EQOL CDM Aura Performance Report",
+		"enabled: " .. tostring(cdm.perfCountersEnabled == true),
+	}
+	if elapsed then lines[#lines + 1] = ("windowSeconds: %.3f"):format(elapsed) end
+	lines[#lines + 1] = ""
+	if #keys == 0 then
+		lines[#lines + 1] = "No counters recorded."
+	else
+		for _, key in ipairs(keys) do
+			lines[#lines + 1] = key .. ": " .. tostring(counters[key])
+		end
+	end
+	return table.concat(lines, "\n")
+end
+
+function CDMAuras:PrintPerformanceReport()
+	print(self:GetPerformanceReport())
+end
+
+function CDMAuras:ShowPerformanceReport()
+	local report = self:GetPerformanceReport()
+	local uf = addon.Aura and addon.Aura.UF
+	if uf and uf.ShowDebugCopyBox then
+		uf.ShowDebugCopyBox(report)
+	else
+		print(report)
+	end
+end
+
 local function getEntryKey(panelId, entryId) return Helper.GetEntryKey(panelId, entryId) end
 
 local function requestPanelRefresh(panelId)
@@ -203,6 +294,11 @@ local function isValidCooldownID(value)
 	if type(value) == "number" then return value > 0 end
 	if type(value) == "string" then return value ~= "" end
 	return false
+end
+
+local function getCooldownIDKey(cooldownID)
+	if not isValidCooldownID(cooldownID) then return nil end
+	return tostring(cooldownID)
 end
 
 local function getCooldownCacheKey(cooldownID)
@@ -388,8 +484,6 @@ end
 
 local function readTotemDataSlot(totemData) return totemData and totemData.slot end
 
-local function areValuesEqual(left, right) return left == right end
-
 local function getTotemSlot(frame)
 	if not frame then return nil end
 	if frame.preferredTotemUpdateSlot then return frame.preferredTotemUpdateSlot end
@@ -448,10 +542,11 @@ end
 local function frameTrackedSpellMatchesCandidate(candidateSpellID, source, trackedSpellID, sawAssociatedSpellID, sawSecretLinkedSpellID)
 	if not candidateSpellID then return false, sawAssociatedSpellID, sawSecretLinkedSpellID end
 	sawAssociatedSpellID = true
-	local ok, matches = pcall(areValuesEqual, candidateSpellID, trackedSpellID)
-	if ok then return matches, sawAssociatedSpellID, sawSecretLinkedSpellID end
-	if source == "linkedSpellID" then sawSecretLinkedSpellID = true end
-	return false, sawAssociatedSpellID, sawSecretLinkedSpellID
+	if isSecretValue(candidateSpellID) or isSecretValue(trackedSpellID) then
+		if source == "linkedSpellID" then sawSecretLinkedSpellID = true end
+		return false, sawAssociatedSpellID, sawSecretLinkedSpellID
+	end
+	return candidateSpellID == trackedSpellID, sawAssociatedSpellID, sawSecretLinkedSpellID
 end
 
 local function frameTrackedSpellMatchesCooldownInfo(info, trackedSpellID, sawAssociatedSpellID, sawSecretLinkedSpellID)
@@ -848,11 +943,15 @@ end
 
 local function seedScanFromCategorySet(scan, category, sourceType)
 	if not (scan and category and C_CooldownViewer and C_CooldownViewer.GetCooldownViewerCategorySet) then return false end
+	if cdm.perfCountersEnabled == true then bumpPerfCounter(nil, "seedScanFromCategorySetCalls") end
 	local ok, cooldownIDs = pcall(C_CooldownViewer.GetCooldownViewerCategorySet, category, true)
 	if not ok or type(cooldownIDs) ~= "table" then return false end
+	if cdm.perfCountersEnabled == true then bumpPerfCounter(nil, "seedScanFromCategorySetCooldownIDs", #cooldownIDs) end
 	local seeded = false
+	local validCooldownIDs = 0
 	for _, cooldownID in ipairs(cooldownIDs) do
 		if isValidCooldownID(cooldownID) then
+			validCooldownIDs = validCooldownIDs + 1
 			seeded = true
 			local info = ensureScanInfo(scan, cooldownID)
 			info.availableSources[sourceType] = true
@@ -862,11 +961,13 @@ local function seedScanFromCategorySet(scan, category, sourceType)
 			end
 		end
 	end
+	if cdm.perfCountersEnabled == true then bumpPerfCounter(nil, "seedScanFromCategorySetValidCooldownIDs", validCooldownIDs) end
 	return seeded
 end
 
 local function collectFrame(scan, frame, sourceType, viewerName, seenFrames)
 	if not frame or seenFrames[frame] then return end
+
 	local cooldownID = getCooldownIDFromFrame(frame, sourceType)
 	if not cooldownID then return end
 	seenFrames[frame] = true
@@ -904,12 +1005,14 @@ local function collectFrame(scan, frame, sourceType, viewerName, seenFrames)
 
 local function collectFramesFromContainer(scan, container, sourceType, viewerName, seenFrames)
 	if not container then return end
-	if container.GetChildren then
-		local children, childCount = captureValues(getRuntime().scratchChildren, container:GetChildren())
-		for i = 1, childCount do
-			collectFrame(scan, children[i], sourceType, viewerName, seenFrames)
-		end
-	end
+
+	-- ?Because of the removal of the over container hooks, Getchildren is always nil as we are already in oldGridSettings
+	-- if container.GetChildren then
+	-- 	local children, childCount = captureValues(getRuntime().scratchChildren, container:GetChildren())
+	-- 	for i = 1, childCount do
+	-- 		collectFrame(scan, children[i], sourceType, viewerName, seenFrames)
+	-- 	end
+	-- end
 
 	local layoutChildren = container.layoutChildren
 	if type(layoutChildren) == "table" then
@@ -934,11 +1037,16 @@ end
 local function collectViewer(scan, viewerName, sourceType, seenFrames)
 	local viewer = _G[viewerName]
 	if not viewer then return end
-	collectFramesFromContainer(scan, viewer, sourceType, viewerName, seenFrames)
+	-- ?is always nil when it comes to layoutChildren subcall which means it is unneded load
+	-- collectFramesFromContainer(scan, viewer, sourceType, viewerName, seenFrames)
+
+	-- !Mainly used for aura detection
 	collectFramesFromContainer(scan, viewer.oldGridSettings, sourceType, viewerName, seenFrames)
-	collectFramesFromContainer(scan, viewer.gridSettings, sourceType, viewerName, seenFrames)
-	collectFramesFromContainer(scan, viewer.currentGridSettings, sourceType, viewerName, seenFrames)
-	collectFramesFromContainer(scan, viewer.settings, sourceType, viewerName, seenFrames)
+
+	-- ?Was never called in tracing - testing without those hooks
+	-- collectFramesFromContainer(scan, viewer.gridSettings, sourceType, viewerName, seenFrames)
+	-- collectFramesFromContainer(scan, viewer.currentGridSettings, sourceType, viewerName, seenFrames)
+	-- collectFramesFromContainer(scan, viewer.settings, sourceType, viewerName, seenFrames)
 end
 
 local function sortTrackedBuffs(a, b)
@@ -959,9 +1067,15 @@ end
 function CDMAuras:ScanTrackedBuffs(force, mode)
 	local runtime = getRuntime()
 	local runtimeMode = mode == "runtime"
+	local scanCounterPrefix = runtimeMode and "scanRuntime" or "scanFull"
+	if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, scanCounterPrefix .. (force and "ForcedCalls" or "NormalCalls")) end
 	if not force and runtime.scan and runtime.scan.list and runtime.scan.byCooldownID then
-		if runtimeMode or runtime.scan.fullDerived == true then return runtime.scan.list, runtime.scan.byCooldownID, runtime.scan.bySpellID, runtime.scan.byCooldownKey end
+		if runtimeMode or runtime.scan.fullDerived == true then
+			if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, scanCounterPrefix .. "CacheHits") end
+			return runtime.scan.list, runtime.scan.byCooldownID, runtime.scan.bySpellID, runtime.scan.byCooldownKey
+		end
 	end
+	if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, scanCounterPrefix .. "Builds") end
 
 	local scan = runtime.scan or {}
 	scan.list = scan.list or {}
@@ -989,7 +1103,7 @@ function CDMAuras:ScanTrackedBuffs(force, mode)
 	if seedScanFromCategorySet(scan, trackedBarCategory, SOURCE_BAR) then scan.hasAuthoritativeSeed = true end
 
 	collectViewer(scan, ICON_VIEWER, SOURCE_ICON, seenFrames)
-	collectViewer(scan, BAR_VIEWER, SOURCE_BAR, seenFrames)
+	-- collectViewer(scan, BAR_VIEWER, SOURCE_BAR, seenFrames)
 
 	for cooldownID, info in pairs(scan.byCooldownID) do
 		if not seenInfo[info] then
@@ -1090,6 +1204,32 @@ local function registerFrameBinding(runtime, key, frame)
 	hookFrame(frame)
 end
 
+local function unregisterStateCooldownIndex(runtime, key, state)
+	if not (runtime and key and state and state.indexedCooldownKey) then return end
+	local keys = runtime.entryKeysByCooldownID and runtime.entryKeysByCooldownID[state.indexedCooldownKey] or nil
+	if keys then
+		keys[key] = nil
+		if not next(keys) then runtime.entryKeysByCooldownID[state.indexedCooldownKey] = nil end
+	end
+	state.indexedCooldownKey = nil
+end
+
+local function registerStateCooldownIndex(runtime, key, state, cooldownID)
+	if not (runtime and key and state) then return end
+	local cooldownKey = getCooldownIDKey(cooldownID)
+	if state.indexedCooldownKey == cooldownKey then return end
+	unregisterStateCooldownIndex(runtime, key, state)
+	if not cooldownKey then return end
+	runtime.entryKeysByCooldownID = runtime.entryKeysByCooldownID or {}
+	local keys = runtime.entryKeysByCooldownID[cooldownKey]
+	if not keys then
+		keys = {}
+		runtime.entryKeysByCooldownID[cooldownKey] = keys
+	end
+	keys[key] = true
+	state.indexedCooldownKey = cooldownKey
+end
+
 local function updatePandemicFrameBinding(runtime, key, frame, wantsPandemic)
 	if not (runtime and key and frame) then return end
 	local pandemicKeys = runtime.pandemicFrameEntries[frame]
@@ -1110,6 +1250,36 @@ local function updatePandemicFrameBinding(runtime, key, frame, wantsPandemic)
 end
 
 local function clearEntryState(key, state, clearTrackedAura)
+	if not state then return end
+	local runtime = getRuntime()
+	unregisterStateCooldownIndex(runtime, key, state)
+	clearAuraMapping(runtime, key, state, clearTrackedAura == true)
+	if state.boundFrame then
+		unregisterFrameBinding(runtime, key, state.boundFrame)
+		state.boundFrame = nil
+	end
+	state.boundSource = nil
+	state.lastActive = nil
+	state.pandemicActive = nil
+	state.targetAuraEpoch = nil
+	state.cachedScanEpoch = nil
+	state.cachedScanCooldownID = nil
+	state.cachedScanSpellID = nil
+	state.cachedScanSourceType = nil
+	state.cachedScanInfo = nil
+	state.cachedResolvedCooldownID = nil
+	state.indexedCooldownKey = nil
+	state.cachedFrameMatchFrame = nil
+	state.cachedFrameMatchFrameEpoch = nil
+	state.cachedFrameMatchTargetEpoch = nil
+	state.cachedFrameMatchTrackedUnit = nil
+	state.cachedFrameMatchSpellID = nil
+	state.cachedFrameMatchCooldownID = nil
+	state.cachedFrameMatchResult = nil
+	state.frameReacquirePass = nil
+end
+
+local function invalidateEntryStateBinding(key, state, clearTrackedAura)
 	if not state then return end
 	local runtime = getRuntime()
 	clearAuraMapping(runtime, key, state, clearTrackedAura == true)
@@ -1260,6 +1430,7 @@ local function clearRuntimeTrackingState()
 	wipe(runtime.auraEntries.player)
 	wipe(runtime.auraEntries.target)
 	wipe(runtime.auraEntries.unknown)
+	wipe(runtime.entryKeysByCooldownID)
 end
 
 function CDMAuras:HasActiveTrackedPanels()
@@ -1539,18 +1710,38 @@ local function getFrameAuraUnit(frame)
 	return nil
 end
 
+local function storeFrameAuraPassCache(runtime, passCache, frame, auraData, auraUnit, auraInstanceID)
+	if not (runtime and passCache and frame) then return end
+	runtime.frameAuraPassRecordByFrame = cdm.EnsureWeakKeyTable(runtime.frameAuraPassRecordByFrame)
+	local cached = runtime.frameAuraPassRecordByFrame[frame]
+	if not cached then
+		cached = {}
+		runtime.frameAuraPassRecordByFrame[frame] = cached
+	end
+	cached.auraData = auraData
+	cached.auraUnit = auraUnit
+	cached.auraInstanceID = auraInstanceID
+	passCache[frame] = cached
+end
+
 local function getFrameAuraData(frame)
-	local passCache = frame and getRuntimePassCacheTable("runtimePassFrameAuraData") or nil
+	local passCache
+	local runtime
+	if frame then passCache, runtime = getRuntimePassCacheTable("runtimePassFrameAuraData") end
 	if passCache then
 		local cached = passCache[frame]
 		if cached then
 			local currentAuraInstanceID = frame and hasAuraInstanceID(frame.auraInstanceID) and frame.auraInstanceID or nil
 			local canReuseCachedNil = cached.auraData ~= nil or currentAuraInstanceID == nil or cached.auraInstanceID == currentAuraInstanceID
-			if canReuseCachedNil then return cached.auraData, cached.auraUnit, cached.auraInstanceID end
+			if canReuseCachedNil then
+				if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, "frameAuraDataPassHits") end
+				return cached.auraData, cached.auraUnit, cached.auraInstanceID
+			end
 		end
 	end
 	if not frame then return nil, nil, nil end
-	local runtime = getRuntime()
+	runtime = runtime or getRuntime()
+	if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, "frameAuraDataComputes") end
 	local auraUnit = getFrameAuraUnit(frame)
 	local auraInstanceID = hasAuraInstanceID(frame.auraInstanceID) and frame.auraInstanceID or nil
 	local frameEpoch = cdm.GetFrameEpoch(runtime, frame)
@@ -1565,17 +1756,16 @@ local function getFrameAuraData(frame)
 	then
 		local canReuseCachedNil = persistentCache.auraData ~= nil or auraInstanceID == nil
 		if canReuseCachedNil then
-			if passCache then
-				passCache[frame] = passCache[frame] or {}
-				passCache[frame].auraData = persistentCache.auraData
-				passCache[frame].auraUnit = persistentCache.auraUnit
-				passCache[frame].auraInstanceID = persistentCache.auraInstanceID
-			end
+			if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, "frameAuraDataPersistentHits") end
+			storeFrameAuraPassCache(runtime, passCache, frame, persistentCache.auraData, persistentCache.auraUnit, persistentCache.auraInstanceID)
 			return persistentCache.auraData, persistentCache.auraUnit, persistentCache.auraInstanceID
 		end
 	end
 	local auraData = nil
-	if auraUnit and auraInstanceID then auraData = getAuraDataByAuraInstanceIDCached(auraUnit, auraInstanceID) end
+	if auraUnit and auraInstanceID then
+		if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, "frameAuraDataAuraLookups") end
+		auraData = getAuraDataByAuraInstanceIDCached(auraUnit, auraInstanceID)
+	end
 	runtime.frameAuraSnapshotByFrame = cdm.EnsureWeakKeyTable(runtime.frameAuraSnapshotByFrame)
 	local snapshot = runtime.frameAuraSnapshotByFrame[frame]
 	if not snapshot then
@@ -1587,12 +1777,7 @@ local function getFrameAuraData(frame)
 	snapshot.auraInstanceID = auraInstanceID
 	snapshot.frameEpoch = frameEpoch
 	snapshot.unitAuraEpoch = unitAuraEpoch
-	if passCache then
-		passCache[frame] = passCache[frame] or {}
-		passCache[frame].auraData = auraData
-		passCache[frame].auraUnit = auraUnit
-		passCache[frame].auraInstanceID = auraInstanceID
-	end
+	storeFrameAuraPassCache(runtime, passCache, frame, auraData, auraUnit, auraInstanceID)
 	if auraData then return auraData, auraUnit, auraInstanceID end
 	return nil, auraUnit, auraInstanceID
 end
@@ -1965,6 +2150,21 @@ function CDMAuras:GetImportSourceLabel(sourceKind)
 	return nil
 end
 
+function cdm.GetTrackedBuffCooldownIDsFromDataProvider()
+	local settings = _G.CooldownViewerSettings
+	local dataProvider = settings and settings.GetDataProvider and settings:GetDataProvider() or nil
+	local trackedBuffCategory = Enum and Enum.CooldownViewerCategory and Enum.CooldownViewerCategory.TrackedBuff or nil
+	if not (dataProvider and dataProvider.GetOrderedCooldownIDsForCategory and trackedBuffCategory) then return nil end
+	local ok, cooldownIDs = pcall(dataProvider.GetOrderedCooldownIDsForCategory, dataProvider, trackedBuffCategory)
+	if not ok or type(cooldownIDs) ~= "table" then return nil end
+	return cooldownIDs
+end
+
+function cdm.GetScanInfoByCooldownID(byCooldownID, cooldownID)
+	if type(byCooldownID) ~= "table" then return nil end
+	return byCooldownID[cooldownID] or byCooldownID[tonumber(cooldownID)] or byCooldownID[tostring(cooldownID)]
+end
+
 function CDMAuras:ImportEntries(panelId, sourceKind)
 	local sourceType = getImportSourceType(sourceKind)
 	local sourceLabel = self:GetImportSourceLabel(sourceKind)
@@ -2034,6 +2234,116 @@ function CDMAuras:ImportEntries(panelId, sourceKind)
 	return stats
 end
 
+function CDMAuras:SyncEntries(panelId, sourceKind)
+	local sourceType = getImportSourceType(sourceKind)
+	local sourceLabel = self:GetImportSourceLabel(sourceKind)
+	if sourceType ~= SOURCE_ICON then return nil, "SOURCE_NOT_FOUND", sourceLabel end
+
+	local viewerName = ICON_VIEWER
+
+	local panel = CooldownPanels.GetPanel and CooldownPanels:GetPanel(panelId) or nil
+	if not panel then return nil, "PANEL_NOT_FOUND", sourceLabel end
+	local root = CooldownPanels.GetRoot and CooldownPanels:GetRoot() or nil
+	if not root then return nil, "NO_DB", sourceLabel end
+
+	panel.entries = panel.entries or {}
+	panel.order = panel.order or {}
+
+	local wantedByCooldownID = {}
+	local wantedOrder = {}
+	local stats = { added = 0, removed = 0, invalid = 0, seen = 0, sourceLabel = sourceLabel }
+	local cooldownIDs = cdm.GetTrackedBuffCooldownIDsFromDataProvider()
+	if type(cooldownIDs) ~= "table" then return nil, "SOURCE_NOT_FOUND", sourceLabel end
+	local _, byCooldownID = self:ScanTrackedBuffs(true)
+
+	for _, cooldownID in ipairs(cooldownIDs) do
+		stats.seen = stats.seen + 1
+		local info = cdm.GetScanInfoByCooldownID(byCooldownID, cooldownID)
+		if not (info and isValidCooldownID(info.cooldownID)) then
+			stats.invalid = stats.invalid + 1
+		else
+			local cooldownKey = tostring(info.cooldownID)
+			if not wantedByCooldownID[cooldownKey] then
+				wantedByCooldownID[cooldownKey] = {
+					cooldownID = info.cooldownID,
+					spellID = info.spellID,
+					buffName = info.buffName,
+					iconTextureID = info.iconTextureID,
+					sourceType = sourceType,
+					sourceViewer = viewerName,
+				}
+				wantedOrder[#wantedOrder + 1] = cooldownKey
+			end
+		end
+	end
+
+	local existingByCooldownID = {}
+	local otherOrder = {}
+	local runtime = CooldownPanels.runtime
+	for _, entryId in ipairs(panel.order) do
+		local entry = panel.entries[entryId]
+		if entry and entry.type == ENTRY_TYPE and isValidCooldownID(entry.cooldownID) then
+			existingByCooldownID[tostring(entry.cooldownID)] = entryId
+		elseif entry then
+			otherOrder[#otherOrder + 1] = entryId
+		end
+	end
+	for entryId, entry in pairs(panel.entries) do
+		if entry and entry.type == ENTRY_TYPE and isValidCooldownID(entry.cooldownID) then
+			local cooldownKey = tostring(entry.cooldownID)
+			if not wantedByCooldownID[cooldownKey] then
+				panel.entries[entryId] = nil
+				if runtime and runtime.actionDisplayCounts then runtime.actionDisplayCounts[Helper.GetEntryKey(panelId, entryId)] = nil end
+				if CooldownPanels.ClearEntryCustomCooldownDuration then CooldownPanels:ClearEntryCustomCooldownDuration(panelId, entryId, true) end
+				stats.removed = stats.removed + 1
+			end
+		end
+	end
+	for _, cooldownKey in ipairs(wantedOrder) do
+		local entryId = existingByCooldownID[cooldownKey]
+		local entryInfo = wantedByCooldownID[cooldownKey]
+		if entryId and panel.entries[entryId] then
+			local entry = panel.entries[entryId]
+			entry.spellID = entryInfo.spellID
+			entry.buffName = entryInfo.buffName
+			entry.iconTextureID = entryInfo.iconTextureID
+			entry.sourceType = entryInfo.sourceType
+			entry.sourceViewer = entryInfo.sourceViewer
+		elseif CooldownPanels.GetFixedEntryAddError and CooldownPanels:GetFixedEntryAddError(panel, nil) then
+			stats.invalid = stats.invalid + 1
+		else
+			entryId = Helper.GetNextNumericId(panel.entries)
+			local entry = Helper.CreateEntry(ENTRY_TYPE, entryInfo, root.defaults)
+			if entry and entry.cooldownID then
+				entry.id = entryId
+				panel.entries[entryId] = entry
+				existingByCooldownID[cooldownKey] = entryId
+				stats.added = stats.added + 1
+			else
+				stats.invalid = stats.invalid + 1
+			end
+		end
+	end
+
+	local nextOrder = {}
+	for _, cooldownKey in ipairs(wantedOrder) do
+		local entryId = existingByCooldownID[cooldownKey]
+		if entryId and panel.entries[entryId] then nextOrder[#nextOrder + 1] = entryId end
+	end
+	for _, entryId in ipairs(otherOrder) do
+		if panel.entries[entryId] then nextOrder[#nextOrder + 1] = entryId end
+	end
+	panel.order = nextOrder
+	Helper.SyncOrder(panel.order, panel.entries)
+	Helper.InvalidateFixedLayoutCache(panel)
+	if stats.added > 0 or stats.removed > 0 then
+		if CooldownPanels.RebuildSpellIndex then CooldownPanels:RebuildSpellIndex() end
+	end
+	if CooldownPanels.RefreshPanel then CooldownPanels:RefreshPanel(panelId) end
+	if CooldownPanels.BlizzardEditor and CooldownPanels.BlizzardEditor.RefreshPanel then CooldownPanels.BlizzardEditor:RefreshPanel(panelId) end
+	return stats
+end
+
 function CDMAuras:AddEntrySafe(panelId, idValue, overrides)
 	local lookupCooldownID = type(idValue) == "table" and idValue.cooldownID or idValue
 	local info = nil
@@ -2096,6 +2406,7 @@ function CDMAuras:BuildRuntimeData(panelId, entryId, entry, entryLayout, alwaysS
 	if not (entry and entry.type == ENTRY_TYPE) then return nil end
 
 	local runtime = getRuntime()
+	if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, "buildRuntimeDataCalls") end
 	local key = getEntryKey(panelId, entryId)
 	local state = runtime.entryStates[key]
 	if not state then
@@ -2132,30 +2443,35 @@ function CDMAuras:BuildRuntimeData(panelId, entryId, entry, entryLayout, alwaysS
 		and cachedScanInfo ~= nil
 	then
 		scanInfo = cachedScanInfo ~= NO_SCAN_INFO and cachedScanInfo or nil
+		if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, scanInfo and "buildRuntimeDataScanInfoHits" or "buildRuntimeDataNoScanInfoHits") end
 		resolvedCooldownID = state.cachedResolvedCooldownID
 	else
-			local scan, byCooldownID, _, byCooldownKey = self:ScanTrackedBuffs(false, "runtime")
-			scanInfo, resolvedCooldownID = resolveRuntimeEntryScanInfo(entry, scan, byCooldownID, byCooldownKey)
+		if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, "buildRuntimeDataScanInfoMisses") end
+		local scan, byCooldownID, _, byCooldownKey = self:ScanTrackedBuffs(false, "runtime")
+		scanInfo, resolvedCooldownID = resolveRuntimeEntryScanInfo(entry, scan, byCooldownID, byCooldownKey)
 		local expectedCooldownID = isValidCooldownID(resolvedCooldownID) and resolvedCooldownID or entry.cooldownID
 		local staleFrameScanInfo = scanInfoHasOnlyMismatchedFrames(scanInfo, entry.sourceType, expectedCooldownID)
+		if staleFrameScanInfo and cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, "buildRuntimeDataStaleFrameScanInfo") end
 		if not scanInfo or staleFrameScanInfo then
 			local rescanEpoch = runtime.scanEpoch or scanEpoch
-				local rescanned
-				local rescannedByCooldownKey
-				if runtime.forcedRescanEpoch == rescanEpoch then
-					local _, rescannedByCooldownID, _rescannedBySpellID, rescannedCooldownLookup = self:ScanTrackedBuffs(false, "runtime")
-					rescanned = rescannedByCooldownID
-					rescannedByCooldownKey = rescannedCooldownLookup
-				else
-					-- A negative first lookup can happen before Cooldown Viewer data or frames are ready.
-					-- Clear cached viewer info too so the forced rescan can recover once Blizzard finishes initialization.
-					self:InvalidateScan(true, "BuildRuntimeData:ForcedRescan")
-					local _, rescannedByCooldownID, rescannedBySpellLookup, rescannedCooldownLookup = self:ScanTrackedBuffs(true, "runtime")
-					rescanned = rescannedByCooldownID
-					rescannedByCooldownKey = rescannedCooldownLookup
-					runtime.forcedRescanEpoch = runtime.scanEpoch or rescanEpoch
-				end
-				scanInfo, resolvedCooldownID = resolveRuntimeEntryScanInfo(entry, runtime.scan, rescanned, rescannedByCooldownKey)
+			local rescanned
+			local rescannedByCooldownKey
+			if runtime.forcedRescanEpoch == rescanEpoch then
+				if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, "buildRuntimeDataForcedRescanReused") end
+				local _, rescannedByCooldownID, _rescannedBySpellID, rescannedCooldownLookup = self:ScanTrackedBuffs(false, "runtime")
+				rescanned = rescannedByCooldownID
+				rescannedByCooldownKey = rescannedCooldownLookup
+			else
+				if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, "buildRuntimeDataForcedRescans") end
+				-- A negative first lookup can happen before Cooldown Viewer data or frames are ready.
+				-- Clear cached viewer info too so the forced rescan can recover once Blizzard finishes initialization.
+				self:InvalidateScan(true, "BuildRuntimeData:ForcedRescan")
+				local _, rescannedByCooldownID, rescannedBySpellLookup, rescannedCooldownLookup = self:ScanTrackedBuffs(true, "runtime")
+				rescanned = rescannedByCooldownID
+				rescannedByCooldownKey = rescannedCooldownLookup
+				runtime.forcedRescanEpoch = runtime.scanEpoch or rescanEpoch
+			end
+			scanInfo, resolvedCooldownID = resolveRuntimeEntryScanInfo(entry, runtime.scan, rescanned, rescannedByCooldownKey)
 			expectedCooldownID = isValidCooldownID(resolvedCooldownID) and resolvedCooldownID or entry.cooldownID
 			if scanInfoHasOnlyMismatchedFrames(scanInfo, entry.sourceType, expectedCooldownID) then scanInfo = nil end
 		end
@@ -2175,6 +2491,7 @@ function CDMAuras:BuildRuntimeData(panelId, entryId, entry, entryLayout, alwaysS
 		state.signatureSpellID = entry.spellID
 		state.signatureSourceType = signatureSourceType
 	end
+	registerStateCooldownIndex(runtime, key, state, state.signatureCooldownID)
 	state.panelId = panelId
 	state.entryId = entryId
 
@@ -2201,30 +2518,32 @@ function CDMAuras:BuildRuntimeData(panelId, entryId, entry, entryLayout, alwaysS
 		local runtimePass = runtime.runtimePass
 		if not chosenFrameLooksActive or not chosenFrameMatchesTrackedSpell then
 			local rescannedByCooldownID
-				local rescannedByCooldownKey
-				if runtimePass and runtime.reacquireRescanPass == runtimePass then
-					local _, latestByCooldownID, _latestBySpellID, latestByCooldownKey = self:ScanTrackedBuffs(false, "runtime")
-					rescannedByCooldownID = latestByCooldownID
-					rescannedByCooldownKey = latestByCooldownKey
-				else
-					self:InvalidateScan(false, "BuildRuntimeData:Reacquire")
-					local _, latestByCooldownID, _latestBySpellID, latestByCooldownKey = self:ScanTrackedBuffs(true, "runtime")
-					rescannedByCooldownID = latestByCooldownID
-					rescannedByCooldownKey = latestByCooldownKey
-					if runtimePass then runtime.reacquireRescanPass = runtimePass end
-				end
-				scanInfo, resolvedCooldownID = resolveRuntimeEntryScanInfo(entry, runtime.scan, rescannedByCooldownID, rescannedByCooldownKey)
-				if not isValidCooldownID(resolvedCooldownID) then resolvedCooldownID = entry.cooldownID end
+			local rescannedByCooldownKey
+			if runtimePass and runtime.reacquireRescanPass == runtimePass then
+				if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, "buildRuntimeDataReacquireRescanReused") end
+				local _, latestByCooldownID, _latestBySpellID, latestByCooldownKey = self:ScanTrackedBuffs(false, "runtime")
+				rescannedByCooldownID = latestByCooldownID
+				rescannedByCooldownKey = latestByCooldownKey
+			else
+				if cdm.perfCountersEnabled == true then bumpPerfCounter(runtime, "buildRuntimeDataReacquireRescans") end
+				self:InvalidateScan(false, "BuildRuntimeData:Reacquire")
+				local _, latestByCooldownID, _latestBySpellID, latestByCooldownKey = self:ScanTrackedBuffs(true, "runtime")
+				rescannedByCooldownID = latestByCooldownID
+				rescannedByCooldownKey = latestByCooldownKey
+				if runtimePass then runtime.reacquireRescanPass = runtimePass end
+			end
+			scanInfo, resolvedCooldownID = resolveRuntimeEntryScanInfo(entry, runtime.scan, rescannedByCooldownID, rescannedByCooldownKey)
+			if not isValidCooldownID(resolvedCooldownID) then resolvedCooldownID = entry.cooldownID end
 			state.cachedScanEpoch = runtime.scanEpoch or 0
 			state.cachedScanCooldownID = entry.cooldownID
 			state.cachedScanSpellID = entry.spellID
 			state.cachedScanSourceType = entry.sourceType
 			state.cachedScanInfo = scanInfo or NO_SCAN_INFO
 			state.cachedResolvedCooldownID = resolvedCooldownID
-				local reacquiredChosenFrame, reacquiredChosenSource, _, reacquiredFallbackFrame = selectScanInfoFrame(scanInfo, preferredSource, resolvedCooldownID)
-				chosenFrame, chosenSource, fallbackFrame = reacquiredChosenFrame, reacquiredChosenSource, reacquiredFallbackFrame
-				if scanInfo then ensureScanInfoDerived(scanInfo, resolvedCooldownID, chosenFrame or fallbackFrame, false, true) end
-				trackedUnit = getEntryTrackedUnit(scanInfo, state, chosenFrame or fallbackFrame, resolvedCooldownID or entry.cooldownID, preferredSource)
+			local reacquiredChosenFrame, reacquiredChosenSource, _, reacquiredFallbackFrame = selectScanInfoFrame(scanInfo, preferredSource, resolvedCooldownID)
+			chosenFrame, chosenSource, fallbackFrame = reacquiredChosenFrame, reacquiredChosenSource, reacquiredFallbackFrame
+			if scanInfo then ensureScanInfoDerived(scanInfo, resolvedCooldownID, chosenFrame or fallbackFrame, false, true) end
+			trackedUnit = getEntryTrackedUnit(scanInfo, state, chosenFrame or fallbackFrame, resolvedCooldownID or entry.cooldownID, preferredSource)
 			if runtimePass then state.frameReacquirePass = runtimePass end
 		end
 	end
@@ -2532,17 +2851,121 @@ function CDMAuras:SchedulePostResetSettlement(event, reason)
 	end)
 end
 
+function cdm.GetCooldownViewerFrameName(frame)
+	if not frame then return nil end
+	if type(frame.GetViewerFrame) == "function" then
+		local ok, viewer = pcall(frame.GetViewerFrame, frame)
+		if ok and viewer and viewer.GetName then
+			local nameOk, name = pcall(viewer.GetName, viewer)
+			if nameOk and name then return name end
+		end
+	end
+	local parent = frame.GetParent and frame:GetParent() or nil
+	if parent and parent.GetName then
+		local ok, name = pcall(parent.GetName, parent)
+		if ok and name then return name end
+	end
+	return nil
+end
+
+function cdm.IsBuffIconViewerFrame(frame)
+	return cdm.GetCooldownViewerFrameName(frame) == ICON_VIEWER
+end
+
+function cdm.UpdateScanForBuffIconRebind(runtime, frame, oldCooldownID, newCooldownID, forceSet)
+	local scan = runtime and runtime.scan
+	if type(scan) ~= "table" or type(scan.byCooldownID) ~= "table" then return end
+	if isValidCooldownID(oldCooldownID) and not cooldownIDsEqual(oldCooldownID, newCooldownID) then
+		local oldInfo = scan.byCooldownID[oldCooldownID] or scan.byCooldownID[tonumber(oldCooldownID)] or scan.byCooldownID[tostring(oldCooldownID)]
+		if oldInfo and oldInfo.iconFrame == frame then
+			oldInfo.iconFrame = nil
+			if not oldInfo.barFrame then oldInfo.isActive = false end
+		end
+	end
+	if not isValidCooldownID(newCooldownID) then return end
+
+	local info = scan.byCooldownID[newCooldownID] or scan.byCooldownID[tonumber(newCooldownID)] or scan.byCooldownID[tostring(newCooldownID)]
+	if not info then info = ensureScanInfo(scan, newCooldownID) end
+	info.availableSources[SOURCE_ICON] = true
+	info.sourceType = SOURCE_ICON
+	info.sourceViewer = ICON_VIEWER
+	info.iconFrame = frame
+	local auraUnit = nil
+	if type(frame.GetAuraDataUnit) == "function" then
+		local ok, frameAuraUnit = pcall(frame.GetAuraDataUnit, frame)
+		if ok then auraUnit = normalizeTrackedUnit(frameAuraUnit) end
+	end
+	if not auraUnit then auraUnit = normalizeTrackedUnit(frame.auraDataUnit) end
+	if auraUnit then info.auraUnit = auraUnit end
+	info.isActive = frameHasActiveAuraOrTotem(frame)
+	ensureScanInfoDerived(info, newCooldownID, frame, forceSet == true)
+	local cooldownKey = getCooldownCacheKey(newCooldownID)
+	if cooldownKey then scan.byCooldownKey[cooldownKey] = info end
+	rememberScanInfoSpellLookup(scan, info)
+end
+
+function CDMAuras:RefreshEntriesForCooldownRebind(frame, oldCooldownID, newCooldownID, forceSet)
+	local runtime = getRuntime()
+	if not self:HasActiveTrackedPanels() then return false end
+	if not cdm.IsBuffIconViewerFrame(frame) then return false end
+
+	cdm.BumpFrameEpoch(runtime, frame)
+	cdm.UpdateScanForBuffIconRebind(runtime, frame, oldCooldownID, newCooldownID, forceSet)
+
+	local affectedKeys = runtime.scratchAffectedKeys
+	if not affectedKeys then
+		affectedKeys = {}
+		runtime.scratchAffectedKeys = affectedKeys
+	else
+		wipe(affectedKeys)
+	end
+	local function addKeys(keys)
+		if not keys then return end
+		for key in pairs(keys) do
+			affectedKeys[key] = true
+		end
+	end
+
+	addKeys(runtime.frameEntries[frame])
+	local oldKey = getCooldownIDKey(oldCooldownID)
+	local newKey = getCooldownIDKey(newCooldownID)
+	if oldKey then addKeys(runtime.entryKeysByCooldownID[oldKey]) end
+	if newKey and newKey ~= oldKey then addKeys(runtime.entryKeysByCooldownID[newKey]) end
+	if forceSet == true and newKey then addKeys(runtime.entryKeysByCooldownID[newKey]) end
+
+	local refreshedPanels = runtime.scratchRefreshedPanels
+	wipe(refreshedPanels)
+	local hasAffected = false
+	for key in pairs(affectedKeys) do
+		local state = runtime.entryStates[key]
+		if state then
+			invalidateEntryStateBinding(key, state, true)
+			if state.panelId then
+				refreshedPanels[state.panelId] = true
+				hasAffected = true
+			end
+		end
+		affectedKeys[key] = nil
+	end
+	for panelId in pairs(refreshedPanels) do
+		requestPanelRefresh(panelId)
+		refreshedPanels[panelId] = nil
+	end
+	return hasAffected
+end
+
 function CDMAuras:EnsureCooldownViewerHooks()
 	local runtime = getRuntime()
 	local installed = false
 	local cooldownViewerItemDataMixin = _G.CooldownViewerItemDataMixin
 	if cooldownViewerItemDataMixin and cooldownViewerItemDataMixin.SetCooldownID and not runtime.cooldownViewerSetHookInstalled then
-		hooksecurefunc(cooldownViewerItemDataMixin, "SetCooldownID", function(itemFrame, cooldownID)
+		hooksecurefunc(cooldownViewerItemDataMixin, "SetCooldownID", function(itemFrame, cooldownID, forceSet)
 			local previousCooldownID = itemFrame and itemFrame._eqolLastTrackedCooldownID or nil
 			itemFrame._eqolLastTrackedCooldownID = cooldownID
 			if not self:HasActiveTrackedPanels() then return end
-			if previousCooldownID ~= nil and cooldownIDsEqual(previousCooldownID, cooldownID) then return end
-			self:ScheduleTrackedPanelsRescan("SetCooldownID", itemFrame)
+			if not cdm.IsBuffIconViewerFrame(itemFrame) then return end
+			if previousCooldownID ~= nil and cooldownIDsEqual(previousCooldownID, cooldownID) and forceSet ~= true then return end
+			self:RefreshEntriesForCooldownRebind(itemFrame, previousCooldownID, cooldownID, forceSet)
 		end)
 		runtime.cooldownViewerSetHookInstalled = true
 		installed = true
@@ -2552,17 +2975,20 @@ function CDMAuras:EnsureCooldownViewerHooks()
 			local previousCooldownID = itemFrame and itemFrame._eqolLastTrackedCooldownID or itemFrame and itemFrame.cooldownID or nil
 			if itemFrame then itemFrame._eqolLastTrackedCooldownID = nil end
 			if not self:HasActiveTrackedPanels() then return end
+			if not cdm.IsBuffIconViewerFrame(itemFrame) then return end
 			if previousCooldownID == nil then return end
-			self:ScheduleTrackedPanelsRescan("ClearCooldownID", itemFrame)
+			self:RefreshEntriesForCooldownRebind(itemFrame, previousCooldownID, nil, false)
 		end)
 		runtime.cooldownViewerClearHookInstalled = true
 		installed = true
 	end
-	if EventRegistry and EventRegistry.RegisterCallback and not runtime.cooldownViewerDataChangedHookInstalled then
-		EventRegistry:RegisterCallback("CooldownViewerSettings.OnDataChanged", function()
-			if not self:HasActiveTrackedPanels() then return end
-			self:ScheduleTrackedPanelsRescan("CooldownViewerSettings.OnDataChanged")
-		end, "EnhanceQoL.CDMAuras")
+		if EventRegistry and EventRegistry.RegisterCallback and not runtime.cooldownViewerDataChangedHookInstalled then
+			EventRegistry:RegisterCallback("CooldownViewerSettings.OnDataChanged", function()
+				if not self:HasActiveTrackedPanels() then return end
+				if not cdm.IsCooldownViewerSettingsShown() then return end
+				if not cdm.HasCooldownManagerSyncPanel(IMPORT_SOURCE_ICON) then return end
+				self:ScheduleTrackedPanelsRescan("CooldownViewerSettings.OnDataChanged")
+			end, "EnhanceQoL.CDMAuras")
 		runtime.cooldownViewerDataChangedHookInstalled = true
 		installed = true
 	end

@@ -2335,7 +2335,21 @@ AuraUtil._LEGACY_AURA_SECTION_EXCLUDES = {
 	cooldownFontSize = true,
 	cooldownFontSizeBuff = true,
 	cooldownFontSizeDebuff = true,
+	durationTextProfile = true,
+	durationTextProfileBuff = true,
+	durationTextProfileDebuff = true,
 }
+
+function AuraUtil.NormalizeDurationTextProfile(value, fallback)
+	local durationText = addon.DurationText
+	if durationText and durationText.GetProfileKey then return durationText:GetProfileKey(value or fallback or "MINIMAL") end
+	return type(value) == "string" and value ~= "" and value or fallback or "MINIMAL"
+end
+
+function AuraUtil.ApplyDurationTextProfileToCooldownFrame(cooldown, profileKey)
+	if not (cooldown and addon.functions and addon.functions.ApplyDurationTextProfileToCooldownFrame) then return false end
+	return addon.functions.ApplyDurationTextProfileToCooldownFrame(cooldown, AuraUtil.NormalizeDurationTextProfile(profileKey, "MINIMAL"))
+end
 
 function AuraUtil.buildLegacyAuraSection(src, isDebuff)
 	local section = {}
@@ -2383,6 +2397,10 @@ function AuraUtil.buildLegacyAuraSection(src, isDebuff)
 	local cooldownFontSize = isDebuff and src.cooldownFontSizeDebuff or src.cooldownFontSizeBuff
 	if cooldownFontSize == nil then cooldownFontSize = src.cooldownFontSize end
 	if cooldownFontSize ~= nil then section.cooldownFontSize = cooldownFontSize end
+
+	local durationTextProfile = isDebuff and src.durationTextProfileDebuff or src.durationTextProfileBuff
+	if durationTextProfile == nil then durationTextProfile = src.durationTextProfile end
+	if durationTextProfile ~= nil then section.durationTextProfile = AuraUtil.NormalizeDurationTextProfile(durationTextProfile, "MINIMAL") end
 
 	local anchor = src.anchor
 	local growth = src.growth
@@ -3792,6 +3810,8 @@ end
 local function ensureBossContainer()
 	if bossContainer then return bossContainer end
 	bossContainer = CreateFrame("Frame", "EQOLUFBossContainer", UIParent, "BackdropTemplate")
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	if tonumber((select(4, GetBuildInfo()))) >= 120100 and type(bossContainer.SetRolesets) == "function" then bossContainer:SetRolesets("unitFrames") end
 	bossContainer:SetSize(220, 200)
 	bossContainer:SetClampedToScreen(true)
 	bossContainer:SetMovable(true)
@@ -4328,6 +4348,8 @@ function AuraUtil.getAuraButtonStyleKey(ac)
 		tostring(ac.cooldownFont),
 		tostring(ac.cooldownFontSize),
 		tostring(ac.cooldownFontOutline),
+		tostring(ac.durationTextProfile),
+		tostring(addon.DurationText and addon.DurationText.version or 0),
 		tostring(ac.iconShape),
 		tostring(ac.borderTexture),
 		tostring(ac.borderRenderMode),
@@ -4354,6 +4376,26 @@ function AuraUtil.getAuraButtonStyleKey(ac)
 	return key
 end
 
+function AuraUtil.setAuraTooltipState(btn, style)
+	if not (btn and style) then return end
+	local show = style.showTooltip == true
+	btn._tooltipUseEditMode = style.tooltipUseEditMode == true
+	btn._tooltipAnchor = style.tooltipAnchor or "ANCHOR_BOTTOMRIGHT"
+	if btn._showTooltip ~= show then btn._showTooltip = show end
+	if btn.SetMouseMotionEnabled and btn._eqolAuraMouseMotionEnabled ~= show then
+		btn:SetMouseMotionEnabled(show)
+		btn._eqolAuraMouseMotionEnabled = show
+	end
+	if btn.EnableMouse then
+		if btn._eqolAuraMouseEnabled ~= show then
+			btn:EnableMouse(show)
+			btn._eqolAuraMouseEnabled = show
+			if btn.SetMouseClickEnabled then btn:SetMouseClickEnabled(false) end
+		end
+	end
+	if not show and GameTooltip and GameTooltip.IsOwned and GameTooltip.Hide and GameTooltip:IsOwned(btn) then GameTooltip:Hide() end
+end
+
 function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulFilter, canShowPlayerDispel)
 	if not btn or not aura then return end
 	unitToken = unitToken or "target"
@@ -4375,6 +4417,7 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 	if not showBorder then
 		showBorder = borderKeyName ~= "" and borderKeyName ~= "DEFAULT" and borderKeyName ~= "NONE"
 	end
+	AuraUtil.setAuraTooltipState(btn, ac)
 	if canShowPlayerDispel == nil then canShowPlayerDispel = AuraUtil.CanUnitShowPlayerDispel(unitToken, aura.isSample) end
 	local canUseStaticSignature = not needsCooldown and not showStacks and not showBorder and not (ac and ac.blizzardDispelBorder == true) and not (ac and ac.showDR == true)
 	if
@@ -4397,10 +4440,10 @@ function AuraUtil.applyAuraToButton(btn, aura, ac, isDebuff, unitToken, harmfulF
 	btn.auraInstanceID = aura.auraInstanceID
 	btn.unitToken = unitToken
 	btn.isDebuff = isDebuff
-	btn._showTooltip = ac.showTooltip ~= false
 	btn.icon:SetTexture(aura.icon or "")
 	AuraUtil.ApplyIconShape(btn, ac and ac.iconShape, ac and ac.iconZoom)
 	btn.cd:Clear()
+	AuraUtil.ApplyDurationTextProfileToCooldownFrame(btn.cd, ac and ac.durationTextProfile)
 	local drawCooldownEdge = ac.showCooldownEdge ~= false
 	local drawCooldownSwipe = ac.showCooldownSwipe ~= false
 	local drawCooldownBling = ac.showCooldownBling ~= false
@@ -5343,11 +5386,13 @@ local function applyVisibilityDriver(unit, enabled)
 	local NormalizeVisibilityConfig = addon.functions and addon.functions.NormalizeUnitFrameVisibilityConfig
 	local BuildVisibilityDriverExpression = addon.functions and addon.functions.BuildUnitFrameDriverExpression
 	local visibilityConfig = nil
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	local useRolesets = tonumber((select(4, GetBuildInfo()))) >= 120100
 	if enabled and not inEdit and NormalizeVisibilityConfig then visibilityConfig = NormalizeVisibilityConfig(nil, cfg and cfg.visibility, { skipSave = true, ignoreOverride = true }) end
 	local visibilityNeedsManualHandling = visibilityConfig and (visibilityConfig.MOUSEOVER or visibilityConfig.PLAYER_CASTING)
 	if isBossUnit(unit) and _G.RegisterUnitWatch and _G.UnregisterUnitWatch then
 		local hideInClientScene = UFHelper and UFHelper.shouldHideInClientScene and UFHelper.shouldHideInClientScene(cfg, def)
-		local forceClientSceneHide = enabled and not inEdit and hideInClientScene and UF._clientSceneActive == true
+		local forceClientSceneHide = enabled and not useRolesets and not inEdit and hideInClientScene and UF._clientSceneActive == true
 		if UFHelper and UFHelper.applyClientSceneAlphaOverride then UFHelper.applyClientSceneAlphaOverride(st, forceClientSceneHide) end
 		if InCombatLockdown and InCombatLockdown() then
 			if UF.ScheduleEqolVisibilityDriverAlphaRefresh then UF.ScheduleEqolVisibilityDriverAlphaRefresh() end
@@ -5374,7 +5419,7 @@ local function applyVisibilityDriver(unit, enabled)
 		return
 	end
 	local hideInClientScene = UFHelper and UFHelper.shouldHideInClientScene and UFHelper.shouldHideInClientScene(cfg, def)
-	local forceClientSceneHide = enabled and not inEdit and hideInClientScene and UF._clientSceneActive == true
+	local forceClientSceneHide = enabled and not useRolesets and not inEdit and hideInClientScene and UF._clientSceneActive == true
 	if UFHelper and UFHelper.applyClientSceneAlphaOverride then UFHelper.applyClientSceneAlphaOverride(st, forceClientSceneHide) end
 	if InCombatLockdown and InCombatLockdown() then
 		if UF.ScheduleEqolVisibilityDriverAlphaRefresh then UF.ScheduleEqolVisibilityDriverAlphaRefresh() end
@@ -5390,7 +5435,7 @@ local function applyVisibilityDriver(unit, enabled)
 	end
 	if not RegisterStateDriver and not _G.RegisterAttributeDriver then return end
 	local hideInVehicle = enabled and shouldHideInVehicle(cfg, def)
-	local hideInPetBattle = enabled and shouldHideInPetBattle(cfg, def)
+	local hideInPetBattle = enabled and not useRolesets and shouldHideInPetBattle(cfg, def)
 	local cond
 	local baseCond
 	local showPrefix
@@ -5531,8 +5576,10 @@ local function applyVisibilityRules(unit)
 	local inEdit = addon.EditModeLib and addon.EditModeLib.IsInEditMode and addon.EditModeLib:IsInEditMode()
 	local useConfig = (not inEdit and cfg and cfg.enabled) and normalizeVisibilityConfig(cfg.visibility) or nil
 	local manualConfig = useConfig
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	local useRolesets = tonumber((select(4, GetBuildInfo()))) >= 120100
 	local hideInClientScene = UFHelper and UFHelper.shouldHideInClientScene and UFHelper.shouldHideInClientScene(cfg, def)
-	local forceClientSceneHide = not inEdit and cfg and cfg.enabled and hideInClientScene and UF._clientSceneActive == true
+	local forceClientSceneHide = not useRolesets and not inEdit and cfg and cfg.enabled and hideInClientScene and UF._clientSceneActive == true
 	if unit ~= "boss" and manualConfig and not manualConfig.MOUSEOVER and not manualConfig.PLAYER_CASTING then
 		manualConfig = nil
 	end
@@ -9491,13 +9538,20 @@ local function ensureFrames(unit)
 	if st.frame then return end
 	local parent = UIParent
 	if isBossUnit(unit) then parent = ensureBossContainer() or UIParent end
-	st.frame = _G[info.frameName] or CreateFrame("Button", info.frameName, parent, "BackdropTemplate,SecureUnitButtonTemplate, PingableUnitFrameTemplate")
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	local usePingReceiver = tonumber((select(4, GetBuildInfo()))) >= 120100
+	local template = usePingReceiver and "BackdropTemplate,SecureUnitButtonTemplate" or "BackdropTemplate,SecureUnitButtonTemplate,PingableUnitFrameTemplate"
+	st.frame = _G[info.frameName] or CreateFrame("Button", info.frameName, parent, template)
 	_G.ClickCastFrames = _G.ClickCastFrames or {}
 	_G.ClickCastFrames[st.frame] = true
 	if st.frame.SetParent then st.frame:SetParent(parent) end
 	st.frame:SetAttribute("unit", info.unit)
 	st.frame:SetAttribute("*type1", "target")
 	st.frame:SetAttribute("*type2", "togglemenu")
+	if usePingReceiver then
+		st.frame:SetAttribute("ping-receiver", true)
+		if type(st.frame.SetRolesets) == "function" then st.frame:SetRolesets("unitFrames") end
+	end
 	st.frame:HookScript("OnEnter", function(self)
 		st._hovered = true
 		UFHelper.updateHighlight(st, unit, UNIT.PLAYER)
@@ -10340,7 +10394,10 @@ local function layoutBossFrames(cfg)
 	local last
 	local shown = 0
 	local maxWidth = 0
+	local totalWidth = 0
+	local maxHeight = 0
 	local frameHeight = 0
+	local horizontal = growth == "LEFT" or growth == "RIGHT"
 	local bossCount = UF.GetBossFrameCount(cfg)
 	for i = 1, bossCount do
 		local unit = "boss" .. i
@@ -10348,13 +10405,19 @@ local function layoutBossFrames(cfg)
 		if st and st.frame then
 			st.frame:ClearAllPoints()
 			if not last then
-				if growth == "UP" then
+				if growth == "LEFT" then
+					st.frame:SetPoint("TOPRIGHT", bossContainer, "TOPRIGHT", 0, 0)
+				elseif growth == "UP" then
 					st.frame:SetPoint("BOTTOMLEFT", bossContainer, "BOTTOMLEFT", 0, 0)
 				else
 					st.frame:SetPoint("TOPLEFT", bossContainer, "TOPLEFT", 0, 0)
 				end
 			else
-				if growth == "UP" then
+				if growth == "RIGHT" then
+					st.frame:SetPoint("TOPLEFT", last.frame, "TOPRIGHT", spacing, 0)
+				elseif growth == "LEFT" then
+					st.frame:SetPoint("TOPRIGHT", last.frame, "TOPLEFT", -spacing, 0)
+				elseif growth == "UP" then
 					st.frame:SetPoint("BOTTOMLEFT", last.frame, "TOPLEFT", 0, spacing)
 				else
 					st.frame:SetPoint("TOPLEFT", last.frame, "BOTTOMLEFT", 0, -spacing)
@@ -10362,15 +10425,26 @@ local function layoutBossFrames(cfg)
 			end
 			last = st
 			shown = shown + 1
-			maxWidth = math.max(maxWidth, st.frame:GetWidth() or 0)
-			frameHeight = st.frame:GetHeight() or frameHeight
+			local width = st.frame:GetWidth() or 0
+			local height = st.frame:GetHeight() or 0
+			maxWidth = math.max(maxWidth, width)
+			totalWidth = totalWidth + width
+			maxHeight = math.max(maxHeight, height)
+			frameHeight = height or frameHeight
 		end
 	end
 	if shown > 0 then
-		local totalHeight = frameHeight * shown + spacing * (shown - 1)
-		if totalHeight < frameHeight then totalHeight = frameHeight end
-		bossContainer:SetHeight(totalHeight)
-		bossContainer:SetWidth(maxWidth)
+		if horizontal then
+			totalWidth = totalWidth + spacing * (shown - 1)
+			if totalWidth < maxWidth then totalWidth = maxWidth end
+			bossContainer:SetWidth(totalWidth)
+			bossContainer:SetHeight(maxHeight)
+		else
+			local totalHeight = frameHeight * shown + spacing * (shown - 1)
+			if totalHeight < frameHeight then totalHeight = frameHeight end
+			bossContainer:SetHeight(totalHeight)
+			bossContainer:SetWidth(maxWidth)
+		end
 	end
 end
 
@@ -12617,7 +12691,7 @@ onEvent = function(self, event, unit, ...)
 		UF.UpdateAllLeaderIndicators(true)
 	elseif event == "CLIENT_SCENE_OPENED" then
 		local sceneType = unit
-		UF._clientSceneActive = (sceneType == 1)
+		UF._clientSceneActive = addon.functions and addon.functions.IsMinigameClientScene and addon.functions.IsMinigameClientScene(sceneType) or false
 		UF.RefreshClientSceneVisibility()
 	elseif event == "CLIENT_SCENE_CLOSED" then
 		UF._clientSceneActive = false

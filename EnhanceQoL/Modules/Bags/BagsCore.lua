@@ -1453,6 +1453,110 @@ local function isStandardBagID(bagID)
 	return type(bagID) == "number" and bagID >= Core.BACKPACK_ID and bagID <= Core.LAST_CHARACTER_BAG_ID
 end
 
+Core.AddCategoryTransferSlot = Core.AddCategoryTransferSlot or function(slots, seen, bagID, slotID, mapping)
+	if not isStandardBagID(bagID) or type(slotID) ~= "number" then
+		return
+	end
+	if mapping and mapping.freeSlotGroup then
+		return
+	end
+
+	local info = (mapping and mapping.itemInfo) or (C_Container and C_Container.GetContainerItemInfo and C_Container.GetContainerItemInfo(bagID, slotID)) or nil
+	if not (info and info.iconFileID) or info.isLocked then
+		return
+	end
+
+	local seenBag = seen[bagID]
+	if not seenBag then
+		seenBag = {}
+		seen[bagID] = seenBag
+	end
+	if seenBag[slotID] then
+		return
+	end
+
+	seenBag[slotID] = true
+	slots[#slots + 1] = {
+		bagID = bagID,
+		slotID = slotID,
+	}
+end
+
+Core.CollectCategoryTransferSectionIDs = Core.CollectCategoryTransferSectionIDs or function(sectionID)
+	local sectionIDs = {}
+	if not sectionID or sectionID == Core.FREE_SLOTS_SECTION_ID then
+		return sectionIDs
+	end
+
+	local layoutData = state.layoutData
+	if layoutData and layoutData.sectionMap and layoutData.sectionMap[sectionID] then
+		sectionIDs[sectionID] = true
+		return sectionIDs
+	end
+
+	if layoutData and layoutData.sectionDefinitions then
+		for _, definition in ipairs(layoutData.sectionDefinitions) do
+			if definition.groupCollapseID == sectionID then
+				sectionIDs[definition.id] = true
+			end
+		end
+	end
+
+	return sectionIDs
+end
+
+Core.CollectCategoryTransferSlots = Core.CollectCategoryTransferSlots or function(sectionID)
+	local layoutData = state.layoutData
+	if not (layoutData and layoutData.sectionMap) then
+		return nil
+	end
+
+	local transferSectionIDs = Core.CollectCategoryTransferSectionIDs(sectionID)
+	if not next(transferSectionIDs) then
+		return nil
+	end
+
+	local slots = {}
+	local seen = {}
+	for transferSectionID in pairs(transferSectionIDs) do
+		local section = layoutData.sectionMap[transferSectionID]
+		for _, mappingIndex in ipairs(section and section.slotIndices or {}) do
+			local mapping = state.slotMappings[mappingIndex]
+			if mapping then
+				Core.AddCategoryTransferSlot(slots, seen, mapping.bagID, mapping.slotID, mapping)
+			end
+		end
+	end
+
+	for bagID = Core.BACKPACK_ID, Core.LAST_CHARACTER_BAG_ID do
+		local slotCount = C_Container.GetContainerNumSlots(bagID) or 0
+		local categoryBucket = state.slotCategoryCache and state.slotCategoryCache[bagID] or nil
+		for slotID = 1, slotCount do
+			local entry = categoryBucket and categoryBucket[slotID] or nil
+			if entry and transferSectionIDs[entry.sectionID] then
+				Core.AddCategoryTransferSlot(slots, seen, bagID, slotID)
+			elseif transferSectionIDs.newItems and isOpenSessionNewItem(bagID, slotID, C_Container.GetContainerItemInfo(bagID, slotID)) then
+				Core.AddCategoryTransferSlot(slots, seen, bagID, slotID)
+			end
+		end
+	end
+
+	return slots
+end
+
+Core.TransferCategoryToVisibleBank = Core.TransferCategoryToVisibleBank or function(sectionID)
+	if not addon.DepositBagSlotsIntoCustomBank then
+		return false
+	end
+
+	local slots = Core.CollectCategoryTransferSlots(sectionID)
+	if not slots or #slots == 0 then
+		return false
+	end
+
+	return addon.DepositBagSlotsIntoCustomBank(slots)
+end
+
 local function isManagedBagUpdateID(bagID)
 	if isStandardBagID(bagID) then
 		return true
@@ -1847,7 +1951,7 @@ local function acquireSectionHeader(index)
 
 	header = CreateFrame("Button", nil, state.content)
 	header:SetHeight(Core.SECTION_HEADER_HEIGHT)
-	header:RegisterForClicks("LeftButtonUp")
+	header:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 	header:EnableMouseWheel(true)
 	header:SetScript("OnMouseWheel", function(_, delta)
 		handleScrollWheel(delta)
@@ -1926,8 +2030,12 @@ local function acquireSectionHeader(index)
 	end)
 	header.AssignButton = assignButton
 
-	header:SetScript("OnClick", function(self)
+	header:SetScript("OnClick", function(self, mouseButton)
 		if receiveCursorItemIntoBags() then
+			return
+		end
+
+		if mouseButton == "RightButton" and not IsModifiedClick() and Core.TransferCategoryToVisibleBank(self.sectionID) then
 			return
 		end
 

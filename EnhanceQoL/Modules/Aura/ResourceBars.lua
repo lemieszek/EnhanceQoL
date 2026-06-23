@@ -1129,7 +1129,7 @@ end
 
 ResourceBars.NormalizeDurationTextProfile = function(value)
 	local durationText = addon.DurationText
-	if durationText and durationText.GetProfileKey then return durationText:GetProfileKey(value) end
+	if durationText and durationText.GetProfileKey then return durationText:GetProfileKey(value or "MINIMAL") end
 	if type(value) == "string" and value ~= "" then return value end
 	return "MINIMAL"
 end
@@ -1537,6 +1537,9 @@ end
 ResourceBars._sharedSlotFrames = ResourceBars._sharedSlotFrames or {}
 ResourceBars._sharedSlotResolvedTypes = ResourceBars._sharedSlotResolvedTypes or {}
 
+ResourceBars.SHARED_VISIBILITY_SLOTS = { "MAIN", "SECONDARY", "TERTIARY" }
+ResourceBars.SHARED_VISIBILITY_DRUID_FORMS = { "BEAR", "CAT", "MOONKIN", "HUMANOID" }
+
 local function normalizeSharedSlotStore(store)
 	if type(store) ~= "table" then store = {} end
 	for _, slot in ipairs({ "MAIN", "SECONDARY", "TERTIARY" }) do
@@ -1552,6 +1555,63 @@ local function normalizeSharedSlotStore(store)
 		end
 	end
 	return store
+end
+
+function ResourceBars.NormalizeDruidSharedVisibilityForm(formKey)
+	formKey = tostring(formKey or ""):upper()
+	if formKey == "BEAR" or formKey == "CAT" or formKey == "MOONKIN" then return formKey end
+	return "HUMANOID"
+end
+
+function ResourceBars.EnsureSharedVisibilityStore()
+	addon.db.sharedResourceBarVisibility = addon.db.sharedResourceBarVisibility or {}
+	return addon.db.sharedResourceBarVisibility
+end
+
+function ResourceBars.GetSharedVisibilityEntry(classTag, specIndex, create)
+	local class = classTag or addon.variables.unitClass
+	local spec = tonumber(specIndex or addon.variables.unitSpec)
+	if not class or not spec then return nil end
+	local store = create and ResourceBars.EnsureSharedVisibilityStore() or addon.db and addon.db.sharedResourceBarVisibility
+	local classStore = store and store[class]
+	if not classStore and create then
+		classStore = {}
+		store[class] = classStore
+	end
+	local entry = classStore and classStore[spec]
+	if not entry and create then
+		entry = {}
+		classStore[spec] = entry
+	end
+	return entry
+end
+
+function ResourceBars.IsSharedVisibilityEnabled(classTag, specIndex, key)
+	local entry = ResourceBars.GetSharedVisibilityEntry(classTag, specIndex, false)
+	if type(entry) ~= "table" then return true end
+	return entry[key] ~= false
+end
+
+function ResourceBars.SetSharedVisibilityEnabled(classTag, specIndex, key, enabled)
+	local entry = ResourceBars.GetSharedVisibilityEntry(classTag, specIndex, true)
+	if not entry then return end
+	if enabled == false then
+		entry[key] = false
+	else
+		entry[key] = nil
+	end
+end
+
+function ResourceBars.IsSharedSlotAllowed(classTag, specIndex, slot, formKey)
+	slot = tostring(slot or ""):upper()
+	if slot == "" then return true end
+	if classTag == "DRUID" and slot == "SECONDARY" then
+		local form = ResourceBars.NormalizeDruidSharedVisibilityForm(formKey)
+		if ResourceBars.IsSharedVisibilityEnabled(classTag, specIndex, form) == false then return false end
+		return true
+	end
+	if ResourceBars.IsSharedVisibilityEnabled(classTag, specIndex, slot) == false then return false end
+	return true
 end
 
 function ResourceBars.GetFixedSharedSlotAssignment(specIndex, classTag)
@@ -2322,6 +2382,7 @@ local function exportResourceProfile(scopeKey, profileName)
 		if db.resourceBarsHideVehicle ~= nil then globals.resourceBarsHideVehicle = db.resourceBarsHideVehicle and true or false end
 		if db.resourceBarsHidePetBattle ~= nil then globals.resourceBarsHidePetBattle = db.resourceBarsHidePetBattle and true or false end
 		if db.resourceBarsHideClientScene ~= nil then globals.resourceBarsHideClientScene = db.resourceBarsHideClientScene and true or false end
+		if db.resourceBarsHideWhenEmpty ~= nil then globals.resourceBarsHideWhenEmpty = db.resourceBarsHideWhenEmpty and true or false end
 		if type(db.globalResourceBarSettings) == "table" then
 			globals.globalResourceBarSettings = CopyTable(db.globalResourceBarSettings)
 			normalizeVisibilityPayloadMap(globals.globalResourceBarSettings)
@@ -2331,6 +2392,7 @@ local function exportResourceProfile(scopeKey, profileName)
 			globals.sharedResourceBarSettings = sharedStore
 			normalizeVisibilityPayloadMap(globals.sharedResourceBarSettings)
 		end
+		if type(db.sharedResourceBarVisibility) == "table" then globals.sharedResourceBarVisibility = CopyTable(db.sharedResourceBarVisibility) end
 		if next(globals) then return globals end
 		return nil
 	end
@@ -2439,6 +2501,7 @@ local function importResourceProfile(encoded, scopeKey)
 		if global.resourceBarsHideVehicle ~= nil then addon.db.resourceBarsHideVehicle = global.resourceBarsHideVehicle and true or false end
 		if global.resourceBarsHidePetBattle ~= nil then addon.db.resourceBarsHidePetBattle = global.resourceBarsHidePetBattle and true or false end
 		if global.resourceBarsHideClientScene ~= nil then addon.db.resourceBarsHideClientScene = global.resourceBarsHideClientScene and true or false end
+		if global.resourceBarsHideWhenEmpty ~= nil then addon.db.resourceBarsHideWhenEmpty = global.resourceBarsHideWhenEmpty and true or false end
 		if global.resourceBarsHidePetBattle == nil and global.auraHideInPetBattle ~= nil then addon.db.resourceBarsHidePetBattle = global.auraHideInPetBattle and true or false end
 		if type(global.globalResourceBarSettings) == "table" then
 			addon.db.globalResourceBarSettings = CopyTable(global.globalResourceBarSettings)
@@ -2448,6 +2511,7 @@ local function importResourceProfile(encoded, scopeKey)
 			addon.db.sharedResourceBarSettings = normalizeSharedSlotStore(CopyTable(global.sharedResourceBarSettings))
 			normalizeVisibilityPayloadMap(addon.db.sharedResourceBarSettings)
 		end
+		if type(global.sharedResourceBarVisibility) == "table" then addon.db.sharedResourceBarVisibility = CopyTable(global.sharedResourceBarVisibility) end
 	end
 
 	local function applySpecsToClass(targetClass, specs, scope)
@@ -4148,42 +4212,8 @@ end
 
 local function resolveDruidSharedMainAndSecondary(specIndex)
 	local spec = tonumber(specIndex or addon.variables.unitSpec)
-	local isBalance = spec == 1
-	local formID = GetShapeshiftFormID and GetShapeshiftFormID() or nil
-	local formKey = ResourceBars.GetCurrentDruidFormKey and ResourceBars.GetCurrentDruidFormKey() or nil
-	local currentPowerTypeId, currentPowerToken
-	if UnitPowerType then
-		currentPowerTypeId, currentPowerToken = UnitPowerType("player")
-	end
-	currentPowerToken = type(currentPowerToken) == "string" and currentPowerToken:upper() or nil
-	if currentPowerToken == "ALTERNATE" and currentPowerTypeId == (POWER_ENUM and POWER_ENUM.LUNAR_POWER) then currentPowerToken = "LUNAR_POWER" end
-	if (not currentPowerToken or currentPowerToken == "") and currentPowerTypeId ~= nil and POWER_ENUM then
-		for pType, enumId in pairs(POWER_ENUM) do
-			if enumId == currentPowerTypeId then
-				currentPowerToken = pType
-				break
-			end
-		end
-	end
-
-	if currentPowerToken == "RAGE" then return "RAGE", nil end
-	if currentPowerToken == "ENERGY" then return "ENERGY", "COMBO_POINTS" end
-	if currentPowerToken == "LUNAR_POWER" and isBalance then return "LUNAR_POWER", "MANA" end
-	if currentPowerToken == "MANA" then
-		if isBalance then return "LUNAR_POWER", "MANA" end
-		return "MANA", nil
-	end
-
-	if formID == DRUID_BEAR_FORM then return "RAGE", nil end
-	if formID == DRUID_CAT_FORM then return "ENERGY", "COMBO_POINTS" end
-	if isBalance and (formID == DRUID_MOONKIN_FORM_1 or formID == DRUID_MOONKIN_FORM_2) then return "LUNAR_POWER", "MANA" end
-	if formID == DRUID_TREE_FORM or formID == 36 then return "MANA", nil end
-	if formID == DRUID_TRAVEL_FORM or formID == DRUID_ACQUATIC_FORM or formID == DRUID_FLIGHT_FORM or formID == DRUID_SWIFT_FLIGHT_FORM then return "MANA", nil end
-
-	if formKey == "STAG" or formKey == "TRAVEL" then return "MANA", nil end
-
-	if isBalance then return "LUNAR_POWER", "MANA" end
-	return "MANA", nil
+	local formKey = ResourceBars.GetCurrentDruidFormKey and ResourceBars.GetCurrentDruidFormKey() or "HUMANOID"
+	return ResourceBars.GetDruidSharedAssignmentForForm(spec, formKey)
 end
 
 function ResourceBars.ScheduleDelayedSharedShapeshiftRefresh()
@@ -4267,6 +4297,104 @@ function ResourceBars.GetSharedSlotPossibleTypes(slot, classTag)
 	return out
 end
 
+function ResourceBars.GetDruidSharedAssignmentForForm(specIndex, formKey, specInfo)
+	local spec = tonumber(specIndex or addon.variables.unitSpec)
+	local info = type(specInfo) == "table" and specInfo or getSpecInfo(spec)
+	local specMain = info and info.MAIN or "MANA"
+	local form = ResourceBars.NormalizeDruidSharedVisibilityForm(formKey)
+	if form == "BEAR" then return "RAGE", nil end
+	if form == "CAT" then return "ENERGY", "COMBO_POINTS" end
+	if spec == 1 then return "LUNAR_POWER", "MANA" end
+	if specMain == "MANA" then return "MANA", nil end
+	return specMain, "MANA"
+end
+
+function ResourceBars.GetSharedAssignmentForClassSpec(classTag, specIndex, specInfo)
+	if classTag == "DRUID" then
+		local bearMain, bearSecondary = ResourceBars.GetDruidSharedAssignmentForForm(specIndex, "BEAR", specInfo)
+		local catMain, catSecondary = ResourceBars.GetDruidSharedAssignmentForForm(specIndex, "CAT", specInfo)
+		local moonkinMain, moonkinSecondary = ResourceBars.GetDruidSharedAssignmentForForm(specIndex, "MOONKIN", specInfo)
+		local humanoidMain, humanoidSecondary = ResourceBars.GetDruidSharedAssignmentForForm(specIndex, "HUMANOID", specInfo)
+		return {
+			MAIN = type(specInfo) == "table" and specInfo.MAIN or "MANA",
+			SECONDARY = nil,
+			druidForms = {
+				BEAR = { MAIN = bearMain, SECONDARY = bearSecondary },
+				CAT = { MAIN = catMain, SECONDARY = catSecondary },
+				MOONKIN = { MAIN = moonkinMain, SECONDARY = moonkinSecondary },
+				HUMANOID = { MAIN = humanoidMain, SECONDARY = humanoidSecondary },
+			},
+		}
+	end
+	local fixed = ResourceBars.GetFixedSharedSlotAssignment and ResourceBars.GetFixedSharedSlotAssignment(specIndex, classTag)
+	if type(fixed) == "table" then return fixed end
+	if type(specInfo) ~= "table" then return nil end
+	local assignment = { MAIN = specInfo.MAIN }
+	local secondaryTypes = {}
+	for _, pType in ipairs(classPowerTypes or {}) do
+		if pType ~= specInfo.MAIN and specInfo[pType] then secondaryTypes[#secondaryTypes + 1] = pType end
+	end
+	assignment.SECONDARY = secondaryTypes[1]
+	assignment.TERTIARY = secondaryTypes[2]
+	return assignment
+end
+
+function ResourceBars.GetClassInfoByFile(classTag)
+	if GetClassInfo then
+		for classID = 1, 20 do
+			local className, classFile = GetClassInfo(classID)
+			if classFile == classTag then return classID, className end
+		end
+	end
+	local localized = (LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[classTag])
+		or (LOCALIZED_CLASS_NAMES_FEMALE and LOCALIZED_CLASS_NAMES_FEMALE[classTag])
+	return nil, localized or classTag
+end
+
+function ResourceBars.GetSpecNameForClass(classID, specIndex)
+	if classID and C_SpecializationInfo and C_SpecializationInfo.GetSpecializationInfoForClassID then
+		local _, specName = C_SpecializationInfo.GetSpecializationInfoForClassID(classID, specIndex)
+		if specName then return specName end
+	end
+	if classID and GetSpecializationInfoForClassID then
+		local _, specName = GetSpecializationInfoForClassID(classID, specIndex)
+		if specName then return specName end
+	end
+	return tostring(specIndex)
+end
+
+function ResourceBars.BuildSharedVisibilityRows()
+	local rows = {}
+	for classTag, classSpecs in pairs(powertypeClasses or {}) do
+		if type(classSpecs) == "table" then
+			local classID, className = ResourceBars.GetClassInfoByFile(classTag)
+			for specIndex, specInfo in pairs(classSpecs) do
+				if type(specIndex) == "number" and type(specInfo) == "table" then
+					local assignment = ResourceBars.GetSharedAssignmentForClassSpec(classTag, specIndex, specInfo)
+					if assignment and assignment.MAIN then
+						rows[#rows + 1] = {
+							classTag = classTag,
+							className = className or classTag,
+							specIndex = specIndex,
+							specName = ResourceBars.GetSpecNameForClass(classID, specIndex),
+							assignments = assignment,
+							isDruid = classTag == "DRUID",
+						}
+					end
+				end
+			end
+		end
+	end
+	table.sort(rows, function(a, b)
+		local ac, bc = tostring(a.className or ""), tostring(b.className or "")
+		if ac ~= bc then return ac < bc end
+		local asn, bsn = tostring(a.specName or ""), tostring(b.specName or "")
+		if asn ~= bsn then return asn < bsn end
+		return (tonumber(a.specIndex) or 0) < (tonumber(b.specIndex) or 0)
+	end)
+	return rows
+end
+
 function ResourceBars.ResolveSharedSlotAssignments(specIndex)
 	local spec = tonumber(specIndex or addon.variables.unitSpec)
 	local cache = ResourceBars.GetRuntimeConfigBatchBucket and ResourceBars.GetRuntimeConfigBatchBucket("sharedAssignments", spec)
@@ -4285,13 +4413,15 @@ function ResourceBars.ResolveSharedSlotAssignments(specIndex)
 
 	if addon.variables.unitClass == "DRUID" then
 		local mainType, secondaryType = resolveDruidSharedMainAndSecondary(spec)
-		if mainType then
+		local formKey = ResourceBars.GetCurrentDruidFormKey and ResourceBars.GetCurrentDruidFormKey() or nil
+		if mainType and ResourceBars.IsSharedSlotAllowed(addon.variables.unitClass, spec, "MAIN", formKey) then
 			resolved.MAIN = mainType
 			resolved.byType[mainType] = "MAIN"
 			resolved.order[#resolved.order + 1] = "MAIN"
 		end
-		resolved.secondaryTypes = secondaryType and { secondaryType } or {}
-		if secondaryType then
+		resolved.secondaryTypes = {}
+		if secondaryType and ResourceBars.IsSharedSlotAllowed(addon.variables.unitClass, spec, "SECONDARY", formKey) then
+			resolved.secondaryTypes[1] = secondaryType
 			resolved.SECONDARY = secondaryType
 			resolved.byType[secondaryType] = "SECONDARY"
 			resolved.order[#resolved.order + 1] = "SECONDARY"
@@ -4304,6 +4434,7 @@ function ResourceBars.ResolveSharedSlotAssignments(specIndex)
 		local secondaryTypes = {}
 		local function assign(slot, pType)
 			if type(pType) ~= "string" or pType == "" or resolved.byType[pType] then return end
+			if not ResourceBars.IsSharedSlotAllowed(addon.variables.unitClass, spec, slot) then return end
 			resolved[slot] = pType
 			resolved.byType[pType] = slot
 			resolved.order[#resolved.order + 1] = slot
@@ -4317,7 +4448,7 @@ function ResourceBars.ResolveSharedSlotAssignments(specIndex)
 	end
 
 	local mainType = specInfo.MAIN
-	if mainType then
+	if mainType and ResourceBars.IsSharedSlotAllowed(addon.variables.unitClass, spec, "MAIN") then
 		resolved.MAIN = mainType
 		resolved.byType[mainType] = "MAIN"
 		resolved.order[#resolved.order + 1] = "MAIN"
@@ -4330,13 +4461,13 @@ function ResourceBars.ResolveSharedSlotAssignments(specIndex)
 	resolved.secondaryTypes = secondaryTypes
 
 	local secondary = secondaryTypes[1]
-	if secondary then
+	if secondary and ResourceBars.IsSharedSlotAllowed(addon.variables.unitClass, spec, "SECONDARY") then
 		resolved.SECONDARY = secondary
 		resolved.byType[secondary] = "SECONDARY"
 		resolved.order[#resolved.order + 1] = "SECONDARY"
 	end
 	local tertiary = secondaryTypes[2]
-	if tertiary then
+	if tertiary and ResourceBars.IsSharedSlotAllowed(addon.variables.unitClass, spec, "TERTIARY") then
 		resolved.TERTIARY = tertiary
 		resolved.byType[tertiary] = "TERTIARY"
 		resolved.order[#resolved.order + 1] = "TERTIARY"
@@ -4497,6 +4628,7 @@ function updateHealthBar(evt)
 		local calc = ResourceBars.RefreshHealPredictionCalculator(healthBar, "player", settings)
 		setBarValue(healthBar, curHealth, smooth)
 		healthBar._lastVal = curHealth
+		if ResourceBars.ApplyHideWhenEmptyAlphaToFrame then ResourceBars.ApplyHideWhenEmptyAlphaToFrame(healthBar, settings, curHealth) end
 		ResourceBars.UpdateHealthTempMaxHealthLoss(healthBar, settings, smooth)
 
 		local percent = getHealthPercent("player", curHealth, maxHealth, calc)
@@ -4814,8 +4946,14 @@ function ResourceBars.EnsureSharedSlotProxyFrame(slot)
 	local frameName = ResourceBars.GetSharedSlotFrameName and ResourceBars.GetSharedSlotFrameName(slot)
 	if not frameName then return nil end
 	local frame = ResourceBars.GetSharedSlotLiveFrame and ResourceBars.GetSharedSlotLiveFrame(slot) or _G[frameName]
-	if frame then return frame end
+	if frame then
+		-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+		if tonumber((select(4, GetBuildInfo()))) >= 120100 and type(frame.SetRolesets) == "function" then frame:SetRolesets("statusBars") end
+		return frame
+	end
 	frame = CreateFrame("StatusBar", frameName, UIParent, "BackdropTemplate")
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	if tonumber((select(4, GetBuildInfo()))) >= 120100 and type(frame.SetRolesets) == "function" then frame:SetRolesets("statusBars") end
 	frame:SetClampedToScreen(true)
 	frame:SetMovable(true)
 	frame:EnableMouse(false)
@@ -4927,6 +5065,9 @@ end
 function createHealthBar()
 	if mainFrame then
 		-- Ensure correct parent when re-enabling
+		-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+		if tonumber((select(4, GetBuildInfo()))) >= 120100 and type(mainFrame.SetRolesets) == "function" then mainFrame:SetRolesets("statusBars") end
+		if healthBar and tonumber((select(4, GetBuildInfo()))) >= 120100 and type(healthBar.SetRolesets) == "function" then healthBar:SetRolesets("statusBars") end
 		if mainFrame:GetParent() ~= UIParent then mainFrame:SetParent(UIParent) end
 		if healthBar and healthBar.GetParent and healthBar:GetParent() ~= UIParent then healthBar:SetParent(UIParent) end
 		if mainFrame.SetClampedToScreen then mainFrame:SetClampedToScreen(true) end
@@ -4944,9 +5085,12 @@ function createHealthBar()
 
 	-- Reuse existing named frames if they still exist from a previous enable
 	mainFrame = _G["EQOLResourceFrame"] or CreateFrame("frame", "EQOLResourceFrame", UIParent)
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	if tonumber((select(4, GetBuildInfo()))) >= 120100 and type(mainFrame.SetRolesets) == "function" then mainFrame:SetRolesets("statusBars") end
 	if mainFrame:GetParent() ~= UIParent then mainFrame:SetParent(UIParent) end
 	if mainFrame.SetClampedToScreen then mainFrame:SetClampedToScreen(true) end
 	healthBar = _G["EQOLHealthBar"] or CreateFrame("StatusBar", "EQOLHealthBar", UIParent, "BackdropTemplate")
+	if tonumber((select(4, GetBuildInfo()))) >= 120100 and type(healthBar.SetRolesets) == "function" then healthBar:SetRolesets("statusBars") end
 	if healthBar:GetParent() ~= UIParent then healthBar:SetParent(UIParent) end
 	healthBar._rbType = "HEALTH"
 	healthBar._rbSharedSlot = ResourceBars.SpecUsesSharedMode and ResourceBars.SpecUsesSharedMode(addon.variables.unitSpec) and "HEALTH" or nil
@@ -6107,6 +6251,7 @@ function updatePowerBar(type, runeSlot)
 	local smooth = cfg.smoothFill == true and type ~= "ESSENCE"
 	setBarValue(bar, barValue, smooth)
 	bar._lastVal = barValue
+	if ResourceBars.ApplyHideWhenEmptyAlphaToFrame then ResourceBars.ApplyHideWhenEmptyAlphaToFrame(bar, cfg, curPower) end
 	local percent = getPowerPercent("player", pType, curPower, maxPower)
 	local percentStr = formatPercentDisplay(percent, cfg)
 	local thresholdSampleValue = isSoulShards and displayCur or curPower
@@ -7094,6 +7239,8 @@ local function createPowerBar(type, anchor, sharedSlot)
 	end
 	local bar = existingBar
 	if not bar then bar = CreateFrame("StatusBar", sharedFrameName or ("EQOL" .. type .. "Bar"), UIParent, "BackdropTemplate") end
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	if tonumber((select(4, GetBuildInfo()))) >= 120100 and _G.type(bar.SetRolesets) == "function" then bar:SetRolesets("statusBars") end
 	if not existingBar or not existingBar._rbInitialized then ResourceBars.RequestStructuralLayoutRefresh(true) end
 	-- Ensure a valid parent when reusing frames after disable
 	if bar:GetParent() ~= UIParent then bar:SetParent(UIParent) end
@@ -8186,6 +8333,7 @@ function ResourceBars.ApplyVisibilityPreference(context)
 				releasedManualHidden = true
 			end
 			if ResourceBars.ApplyClientSceneAlphaToFrame then ResourceBars.ApplyClientSceneAlphaToFrame(frame, false) end
+			if ResourceBars.ApplyHideWhenEmptyAlphaToFrame then ResourceBars.ApplyHideWhenEmptyAlphaToFrame(frame, nil, nil) end
 		end)
 		if canApplyDriver then
 			ResourceBars._visibilityDriverActive = false
@@ -8209,6 +8357,7 @@ function ResourceBars.ApplyVisibilityPreference(context)
 				end
 				if frame and frame:IsShown() then frame:Hide() end
 				if ResourceBars.ApplyClientSceneAlphaToFrame then ResourceBars.ApplyClientSceneAlphaToFrame(frame, false) end
+				if ResourceBars.ApplyHideWhenEmptyAlphaToFrame then ResourceBars.ApplyHideWhenEmptyAlphaToFrame(frame, nil, nil) end
 				return
 			end
 
@@ -8246,6 +8395,7 @@ function ResourceBars.ApplyVisibilityPreference(context)
 				if frame:IsShown() then frame:Hide() end
 			end
 			if ResourceBars.ApplyClientSceneAlphaToFrame then ResourceBars.ApplyClientSceneAlphaToFrame(frame, false) end
+			if ResourceBars.ApplyHideWhenEmptyAlphaToFrame then ResourceBars.ApplyHideWhenEmptyAlphaToFrame(frame, nil, nil) end
 		end
 	end)
 	if canApplyDriver then
@@ -8411,7 +8561,7 @@ local function eventHandler(self, event, eventArg1, eventArg2)
 		return
 	elseif event == "CLIENT_SCENE_OPENED" then
 		local sceneType = unit
-		ResourceBars._clientSceneOpen = (sceneType == 1)
+		ResourceBars._clientSceneOpen = addon.functions and addon.functions.IsMinigameClientScene and addon.functions.IsMinigameClientScene(sceneType) or false
 		ResourceBars.ApplyVisibilityPreference(event)
 		return
 	elseif event == "CLIENT_SCENE_CLOSED" then

@@ -1,4 +1,4 @@
-## Interface: 120005, 120007
+## Interface: 120007, 120100
 ## Title: Enhance QoL Core
 ## Author: R41Z0R
 ## Version: @project-version@
@@ -86,14 +86,13 @@ Submodules\Merchant.lua
 Submodules\HealthText.lua
 Submodules\Mailbox.lua
 Submodules\Mailbox.xml
+Submodules\EnhancedWaypoint.lua
 Modules\Aura\Init.lua
 Modules\Aura\ResourceBars.lua
 Modules\Aura\ResourceBarsHelpers.lua
 Modules\Aura\ExperienceBar.lua
 Modules\Aura\TotalAbsorbTracker.lua
-#@eqol-beta@
 Modules\Aura\DefaultAuraContainers.lua
-#@end-eqol-beta@
 Modules\Skinner\Init.lua
 
 # Bags

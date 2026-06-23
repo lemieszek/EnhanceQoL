@@ -514,6 +514,7 @@ data = {
 	{
 		text = L["persistAuctionHouseFilter"],
 		var = "persistAuctionHouseFilter",
+		-- TODO 12.1 cleanup: remove this setting after confirming Blizzard native Auction House filter persistence.
 		func = function(value) addon.db["persistAuctionHouseFilter"] = value end,
 	},
 	{

@@ -99,6 +99,15 @@ local function syncEditModeSelectionStrata(frame)
 	if selection.GetFrameStrata and selection:GetFrameStrata() ~= targetStrata then selection:SetFrameStrata(targetStrata) end
 end
 
+local function normalizeDurationTextProfile(value)
+	if addon.DurationText and addon.DurationText.GetProfileKey then return addon.DurationText:GetProfileKey(value or "MINIMAL") end
+	return type(value) == "string" and value ~= "" and value or "MINIMAL"
+end
+
+local function durationTextProfileOptions()
+	return addon.DurationText and addon.DurationText.GetProfileOptions and addon.DurationText:GetProfileOptions() or {}
+end
+
 local textOptions = {
 	{ value = "PERCENT", label = L["Percent"] or "Percent" },
 	{ value = "CURMAX", label = L["Current/Max"] or "Current/Max" },
@@ -1077,6 +1086,20 @@ local function appendUnitAuraSettings(list, unit, def, refreshSelf)
 			refreshAuras()
 		end, auraDef.showCooldown ~= false, parentId)
 		list[#list].isEnabled = isSectionEnabled
+
+		list[#list + 1] = checkboxDropdown(
+			L["durationTextProfile"] or "Duration text profile",
+			durationTextProfileOptions,
+			function() return normalizeDurationTextProfile(getAuraSectionValue(sectionKey, { "durationTextProfile" }, auraDef.durationTextProfile or "MINIMAL")) end,
+			function(val)
+				setAuraSectionValue(sectionKey, { "durationTextProfile" }, normalizeDurationTextProfile(val))
+				refreshSelf()
+				refreshAuras()
+			end,
+			auraDef.durationTextProfile or "MINIMAL",
+			parentId
+		)
+		list[#list].isEnabled = function() return isSectionEnabled() and isShowCooldownText() end
 
 		list[#list + 1] = radioDropdown(
 			L["Cooldown text anchor"] or "Cooldown text anchor",
@@ -2082,6 +2105,8 @@ local function appendBossLayoutSettings(list, unit, def, refreshSelf)
 	local growthOpts = {
 		{ value = "DOWN", label = DIRECTION_DOWN_LABEL },
 		{ value = "UP", label = DIRECTION_UP_LABEL },
+		{ value = "RIGHT", label = DIRECTION_RIGHT_LABEL },
+		{ value = "LEFT", label = DIRECTION_LEFT_LABEL },
 	}
 	list[#list + 1] = radioDropdown(L["Growth direction"] or "Growth direction", growthOpts, function() return (getValue(unit, { "growth" }, def.growth or "DOWN") or "DOWN"):upper() end, function(val)
 		setValue(unit, { "growth" }, (val or "DOWN"):upper())
@@ -3982,8 +4007,11 @@ local function buildUnitSettings(unit)
 		isTooltipEnabled
 	)
 	list[#list + 1] = checkbox(L["Hide in vehicles"] or "Hide in vehicles", isHideInVehicleEnabled, setHideInVehicleEnabled, def.hideInVehicle == true, "frame")
-	list[#list + 1] = checkbox(L["Hide in pet battles"] or "Hide in pet battles", isHideInPetBattleEnabled, setHideInPetBattleEnabled, def.hideInPetBattle == true, "frame")
-	list[#list + 1] = checkbox(L["Hide in client scenes"] or "Hide in client scenes", isHideInClientSceneEnabled, setHideInClientSceneEnabled, hideInClientSceneDefault(), "frame")
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	if tonumber((select(4, GetBuildInfo()))) < 120100 then
+		list[#list + 1] = checkbox(L["Hide in pet battles"] or "Hide in pet battles", isHideInPetBattleEnabled, setHideInPetBattleEnabled, def.hideInPetBattle == true, "frame")
+		list[#list + 1] = checkbox(L["Hide in client scenes"] or "Hide in client scenes", isHideInClientSceneEnabled, setHideInClientSceneEnabled, hideInClientSceneDefault(), "frame")
+	end
 
 	if #visibilityOptions > 0 then
 		list[#list + 1] = {

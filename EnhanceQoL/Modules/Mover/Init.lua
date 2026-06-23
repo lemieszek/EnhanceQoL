@@ -9,6 +9,7 @@ end
 addon.Mover = addon.Mover or {}
 addon.Mover.functions = addon.Mover.functions or {}
 addon.Mover.variables = addon.Mover.variables or {}
+local MouseIsOver = addon.functions and addon.functions.MouseIsOver
 
 local db
 

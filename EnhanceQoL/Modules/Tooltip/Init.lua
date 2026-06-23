@@ -162,6 +162,11 @@ addon.Tooltip.variables.kindsByID = {
 }
 
 local challengeMapIDDefaults = {
+	[584] = "TBV",
+	[585] = "VSA",
+	[586] = "DON",
+	[587] = "MR",
+	[588] = "AOF",
 	[542] = "ED",
 	[501] = "SV",
 	[502] = "COT",
@@ -193,6 +198,8 @@ local challengeMapIDDefaults = {
 	[391] = "STREET",
 	[392] = "GAMBIT",
 	[245] = "FH",
+	[249] = "KR",
+	[250] = "TOS",
 	[251] = "UR",
 	[369] = "WORK",
 	[370] = "WORK",

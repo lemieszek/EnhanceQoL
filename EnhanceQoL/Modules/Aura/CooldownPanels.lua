@@ -173,22 +173,30 @@ CooldownPanels.POWER_TYPE_TOKEN_BY_ID = CooldownPanels.POWER_TYPE_TOKEN_BY_ID
 
 CooldownPanels.itemHighestRankByID = CooldownPanels.itemHighestRankByID
 	or {
-		-- Potion of Recklessness (normal rank1 -> rank2, fleeting rank1 -> rank2)
+		-- Potion of Recklessness (normal rank2 -> rank1, fleeting rank2 -> rank1)
 		[241289] = { 241289, 241288, 245903, 245902 },
 		[241288] = { 241289, 241288, 245903, 245902 },
 		[245903] = { 241289, 241288, 245903, 245902 },
 		[245902] = { 241289, 241288, 245903, 245902 },
-		-- Potion of Devoured Dreams (normal rank1 -> rank2, fleeting rank1 -> rank2)
+		-- Potion of Devoured Dreams (normal rank2 -> rank1, fleeting rank2 -> rank1)
 		[241295] = { 241295, 241294, 245905, 245904 },
 		[241294] = { 241295, 241294, 245905, 245904 },
 		[245905] = { 241295, 241294, 245905, 245904 },
 		[245904] = { 241295, 241294, 245905, 245904 },
-		-- Light's Potential (normal rank1 -> rank2, fleeting rank1 -> rank2)
+		-- Light's Potential (normal rank2 -> rank1, fleeting rank2 -> rank1)
 		[241309] = { 241309, 241308, 245897, 245898 },
 		[241308] = { 241309, 241308, 245897, 245898 },
 		[245897] = { 241309, 241308, 245897, 245898 },
 		[245898] = { 241309, 241308, 245897, 245898 },
-		-- Lightfused Mana Potion (rank1 -> rank2)
+		-- Liquid Luster (normal rank2 -> rank1, fleeting rank2 -> rank1)
+		[271887] = { 271887, 271886, 274764, 274763 },
+		[271886] = { 271887, 271886, 274764, 274763 },
+		[274764] = { 271887, 271886, 274764, 274763 },
+		[274763] = { 271887, 271886, 274764, 274763 },
+		-- Alluring Nostrum (rank2 -> rank1)
+		[271890] = { 271890, 271889 },
+		[271889] = { 271890, 271889 },
+		-- Lightfused Mana Potion (rank2 -> rank1)
 		[241301] = { 241301, 241300 },
 		[241300] = { 241301, 241300 },
 	}
@@ -925,6 +933,8 @@ function CooldownPanels:InvalidateTalentChoiceSpellVariantGroups()
 	runtime.talentChoiceVariantContext = nil
 	runtime.talentChoiceSpellVariantGroupsLoadedByConfig = nil
 	runtime.activeTalentChoiceGroupsForSpellCache = nil
+	runtime.spellAliasIDsCache = nil
+	runtime.runtimeCanonicalSpellVariantCache = nil
 	self.spellVariantGroupByID = self.staticSpellVariantGroupByID
 end
 
@@ -1003,11 +1013,7 @@ function cdp.RUNTIME.ResolveTrackedSpellID(owner, spellId)
 	return effectiveSpellID, resolvedSpellID, storedBaseSpellID, variantGroup
 end
 
-function cdp.RUNTIME.GetSpellAliasIDs(owner, spellId, outIds, seenIds, options)
-	local ids = outIds or {}
-	local seen = seenIds or {}
-	local includeTalentChoice = type(options) ~= "table" or options.includeTalentChoice ~= false
-
+function cdp.RUNTIME.CollectSpellAliasIDs(owner, spellId, ids, seen, includeTalentChoice)
 	local function addID(id)
 		local numericID = tonumber(id)
 		if not numericID or seen[numericID] then return end
@@ -1051,6 +1057,44 @@ function cdp.RUNTIME.GetSpellAliasIDs(owner, spellId, outIds, seenIds, options)
 	return ids, seen
 end
 
+function cdp.RUNTIME.BuildSpellAliasIDs(owner, spellId, includeTalentChoice)
+	local ids, seen = {}, {}
+	return cdp.RUNTIME.CollectSpellAliasIDs(owner, spellId, ids, seen, includeTalentChoice)
+end
+
+function cdp.RUNTIME.GetCachedSpellAliasIDs(owner, spellId, includeTalentChoice)
+	local numericID = tonumber(spellId)
+	if not numericID then
+		owner._emptySpellAliasIDs = owner._emptySpellAliasIDs or {}
+		return owner._emptySpellAliasIDs
+	end
+	owner.runtime = owner.runtime or {}
+	local runtime = owner.runtime
+	local cacheRoot = runtime.spellAliasIDsCache
+	if not cacheRoot then
+		cacheRoot = {}
+		runtime.spellAliasIDsCache = cacheRoot
+	end
+	local cacheKey = includeTalentChoice ~= false and "dynamic" or "static"
+	local generation = includeTalentChoice ~= false and (runtime.talentChoiceVariantGeneration or 0) or 0
+	local cache = cacheRoot[cacheKey]
+	if not cache or cache.generation ~= generation then
+		cache = { generation = generation }
+		cacheRoot[cacheKey] = cache
+	end
+	local cached = cache[numericID]
+	if cached then return cached end
+	cached = cdp.RUNTIME.BuildSpellAliasIDs(owner, numericID, includeTalentChoice)
+	cache[numericID] = cached
+	return cached
+end
+
+function cdp.RUNTIME.GetSpellAliasIDs(owner, spellId, outIds, seenIds, options)
+	local includeTalentChoice = type(options) ~= "table" or options.includeTalentChoice ~= false
+	if not outIds and not seenIds then return cdp.RUNTIME.GetCachedSpellAliasIDs(owner, spellId, includeTalentChoice) end
+	return cdp.RUNTIME.CollectSpellAliasIDs(owner, spellId, outIds or {}, seenIds or {}, includeTalentChoice)
+end
+
 function cdp.RUNTIME.AreSpellVariantsEquivalent(owner, firstSpellId, secondSpellId)
 	local firstID = tonumber(firstSpellId)
 	local secondID = tonumber(secondSpellId)
@@ -1089,16 +1133,32 @@ end
 function CooldownPanels:GetRuntimeCanonicalSpellVariantID(spellId)
 	local numericID = tonumber(spellId)
 	if not numericID then return nil, false, nil end
+	self.runtime = self.runtime or {}
+	local runtime = self.runtime
+	local generation = runtime.talentChoiceVariantGeneration or 0
+	local cache = runtime.runtimeCanonicalSpellVariantCache
+	if not cache or cache.generation ~= generation then
+		cache = { generation = generation }
+		runtime.runtimeCanonicalSpellVariantCache = cache
+	end
+	local cached = cache[numericID]
+	if cached ~= nil then
+		if cached == false then return nil, false, nil end
+		return cached.canonicalID, cached.changed, cached.group
+	end
 	local baseSpellID = getBaseSpellId(numericID) or numericID
 	local dynamicGroups = self:GetActiveTalentChoiceGroupsForSpell(numericID)
 	if type(dynamicGroups) == "table" then
 		local group = dynamicGroups[1]
 		if group then
 			local canonicalID = tonumber(group.canonicalID) or baseSpellID
+			cache[numericID] = { canonicalID = canonicalID, changed = canonicalID ~= baseSpellID, group = group }
 			return canonicalID, canonicalID ~= baseSpellID, group
 		end
 	end
-	return self:GetStaticCanonicalSpellVariantID(numericID)
+	local canonicalID, changed, group = self:GetStaticCanonicalSpellVariantID(numericID)
+	cache[numericID] = canonicalID and { canonicalID = canonicalID, changed = changed, group = group } or false
+	return canonicalID, changed, group
 end
 
 function CooldownPanels:GetCanonicalSpellVariantID(spellId, options)
@@ -1187,7 +1247,7 @@ local function setPowerInsufficient(runtime, spellId, isUsable, insufficientPowe
 	local powerValue = (insufficientPower == true) and true or nil
 	local unusableValue = (not usable and insufficientPower ~= true) and true or nil
 	local changed = false
-	local ids = CooldownPanels:GetSpellAliasIDs(spellId, {}, {})
+	local ids = CooldownPanels:GetSpellAliasIDs(spellId)
 	for i = 1, #ids do
 		local id = ids[i]
 		if runtime.powerInsufficient[id] ~= powerValue then
@@ -1771,10 +1831,14 @@ CooldownPanels._styleCacheRoots = CooldownPanels._styleCacheRoots
 		pandemicGlowEntry = setmetatable({}, { __mode = "k" }),
 		procGlowPanel = setmetatable({}, { __mode = "k" }),
 		procGlowEntry = setmetatable({}, { __mode = "k" }),
+		activationOverlayEntry = setmetatable({}, { __mode = "k" }),
+		otherAuraGlowEntry = setmetatable({}, { __mode = "k" }),
 		glowPixelOptions = setmetatable({}, { __mode = "k" }),
 		glowPixelEntry = setmetatable({}, { __mode = "k" }),
 		iconLayoutEntry = setmetatable({}, { __mode = "k" }),
 	}
+CooldownPanels._styleCacheRoots.activationOverlayEntry = CooldownPanels._styleCacheRoots.activationOverlayEntry or setmetatable({}, { __mode = "k" })
+CooldownPanels._styleCacheRoots.otherAuraGlowEntry = CooldownPanels._styleCacheRoots.otherAuraGlowEntry or setmetatable({}, { __mode = "k" })
 CooldownPanels._styleCacheRoots.glowPixelOptions = CooldownPanels._styleCacheRoots.glowPixelOptions or setmetatable({}, { __mode = "k" })
 CooldownPanels._styleCacheRoots.glowPixelEntry = CooldownPanels._styleCacheRoots.glowPixelEntry or setmetatable({}, { __mode = "k" })
 CooldownPanels.POWER_USABLE_REFRESH_DELAY = CooldownPanels.POWER_USABLE_REFRESH_DELAY or 0.05
@@ -1786,6 +1850,37 @@ function CooldownPanels.FillCachedColor(cache, r, g, b, a)
 	cache[3] = b or 1
 	cache[4] = a or 1
 	return cache
+end
+
+function CooldownPanels.ResolveCachedEntryColor(cacheRootName, entry, color, fallbackColor)
+	if not entry then return fallbackColor or Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT end
+	local roots = CooldownPanels._styleCacheRoots
+	local root = roots and roots[cacheRootName]
+	if not root then return Helper.NormalizeColor(color, fallbackColor) end
+	local cache = root[entry]
+	local fallbackR = fallbackColor and fallbackColor[1] or nil
+	local fallbackG = fallbackColor and fallbackColor[2] or nil
+	local fallbackB = fallbackColor and fallbackColor[3] or nil
+	local fallbackA = fallbackColor and fallbackColor[4] or nil
+	if
+		not cache
+		or cache.srcColor ~= color
+		or cache.fallbackR ~= fallbackR
+		or cache.fallbackG ~= fallbackG
+		or cache.fallbackB ~= fallbackB
+		or cache.fallbackA ~= fallbackA
+	then
+		cache = cache or {}
+		cache.srcColor = color
+		cache.fallbackR = fallbackR
+		cache.fallbackG = fallbackG
+		cache.fallbackB = fallbackB
+		cache.fallbackA = fallbackA
+		local r, g, b, a = Helper.ResolveColor(color, fallbackColor)
+		cache.color = CooldownPanels.FillCachedColor(cache.color, r, g, b, a)
+		root[entry] = cache
+	end
+	return cache.color
 end
 
 local function clearRuntimeLayoutShapeCache(runtime)
@@ -3583,6 +3678,27 @@ local function getEntryTypeLabel(entryType)
 	return entryType or ""
 end
 
+function CooldownPanels:GetEntryIcon(entry) return getEntryIcon(entry) end
+
+function CooldownPanels:GetEntryName(entry) return getEntryName(entry) end
+
+function CooldownPanels:GetEntryTypeLabel(entryType) return getEntryTypeLabel(entryType) end
+
+cdp.ENTRY.GetEntrySpellIDInfoText = function(entry)
+	if not entry or type(entry) ~= "table" then return nil end
+	local spellID = nil
+	if entry.type == "SPELL" then
+		spellID = entry.spellID
+	elseif entry.type == "CDM_AURA" then
+		spellID = entry.spellID
+	elseif entry.type == "MACRO" then
+		local macro = CooldownPanels.ResolveMacroEntry(entry)
+		if macro and macro.kind == "SPELL" then spellID = macro.spellID end
+	end
+	if spellID == nil or spellID == "" then return nil end
+	return string.format("%s: %s", L["SpellID"] or "SpellID", tostring(spellID))
+end
+
 function CooldownPanels:GetEntryStandaloneTitle(entry)
 	local name = getEntryName(entry)
 	local typeLabel = getEntryTypeLabel(entry and entry.type)
@@ -3820,6 +3936,7 @@ function CooldownPanels:SetPanelEditorName(panelId, value)
 	refreshStandaloneSettings()
 	CooldownPanels:RefreshPanel(panelId)
 	CooldownPanels:RefreshEditor()
+	if self.BlizzardEditor and self.BlizzardEditor.RefreshPanel then self.BlizzardEditor:RefreshPanel(panelId) end
 end
 
 function CooldownPanels:SetPanelEditorEnabled(panelId, enabled)
@@ -4293,94 +4410,22 @@ end
 
 CooldownPanels.EnsureEditorGroupStorage = function(root)
 	if not root then return nil end
-	if type(root.editorGroups) ~= "table" then
-		root.editorGroups = {}
-		root._eqolEditorGroupsReady = nil
-		root._eqolEditorGroupOrderDirty = true
-	end
-	if type(root.editorGroupOrder) ~= "table" then
-		root.editorGroupOrder = {}
-		root._eqolEditorGroupsReady = nil
-		root._eqolEditorGroupOrderDirty = true
-	end
-	if root._eqolEditorGroupsReady == true then
-		if root._eqolEditorGroupOrderDirty == true then CooldownPanels:SortEditorGroupOrder(root) end
-		return root
-	end
-
-	local groups = root.editorGroups
-	local order = root.editorGroupOrder
-	local groupsByName = {}
-
-	for groupId, group in pairs(groups) do
-		if type(group) ~= "table" then
-			groups[groupId] = { id = groupId, name = "Group " .. tostring(groupId) }
-			group = groups[groupId]
-		end
-		group.id = normalizeId(group.id) or normalizeId(groupId) or groupId
-		group.name = CooldownPanels.NormalizePanelGroupName(group.name) or ("Group " .. tostring(group.id))
-		group.parentGroupId = normalizeId(group.parentGroupId)
-		groupsByName[group.name] = group.id
-	end
-
-	for groupId, group in pairs(groups) do
-		local parentGroupId = normalizeId(group.parentGroupId)
-		if parentGroupId == groupId or not groups[parentGroupId] then parentGroupId = nil end
-		group.parentGroupId = parentGroupId
-	end
-
-	for groupId, group in pairs(groups) do
-		local seen = { [groupId] = true }
-		local parentGroupId = normalizeId(group.parentGroupId)
-		while parentGroupId do
-			if seen[parentGroupId] then
-				group.parentGroupId = nil
-				break
-			end
-			seen[parentGroupId] = true
-			local parentGroup = groups[parentGroupId]
-			parentGroupId = parentGroup and normalizeId(parentGroup.parentGroupId) or nil
-		end
-	end
-
-	Helper.SyncOrder(order, groups)
-
 	local panels = root.panels or {}
-	for panelId, panel in pairs(panels) do
+	for _, panel in pairs(panels) do
 		if type(panel) == "table" then
-			local groupId = normalizeId(panel.editorGroupId)
-			if groupId and groups[groupId] then
-				panel.editorGroupId = groupId
-			else
-				panel.editorGroupId = nil
-			end
-
-			local legacyName = CooldownPanels.NormalizePanelGroupName(panel.editorGroup)
-			if legacyName and not panel.editorGroupId then
-				local existingId = groupsByName[legacyName]
-				if not existingId then
-					existingId = Helper.GetNextNumericId(groups)
-					groups[existingId] = { id = existingId, name = legacyName }
-					order[#order + 1] = existingId
-					groupsByName[legacyName] = existingId
-				end
-				panel.editorGroupId = existingId
-			end
+			panel.editorGroupId = nil
 			panel.editorGroup = nil
 		end
 	end
-
-	Helper.SyncOrder(order, groups)
+	root.editorGroups = nil
+	root.editorGroupOrder = nil
 	root._eqolEditorGroupsReady = true
-	root._eqolEditorGroupOrderDirty = true
-	CooldownPanels:SortEditorGroupOrder(root)
+	root._eqolEditorGroupOrderDirty = nil
 	return root
 end
 
 function CooldownPanels.GetEditorGroup(root, groupId)
-	root = CooldownPanels.EnsureEditorGroupStorage(root)
-	groupId = normalizeId(groupId)
-	return root and root.editorGroups and groupId and root.editorGroups[groupId] or nil
+	return nil
 end
 
 function CooldownPanels.GetEditorGroupName(root, groupId)
@@ -4403,74 +4448,19 @@ end
 
 function CooldownPanels:SortEditorGroupOrder(root)
 	if not root then return nil end
-	if type(root.editorGroups) ~= "table" then root.editorGroups = {} end
-	if type(root.editorGroupOrder) ~= "table" then root.editorGroupOrder = {} end
-	if root._eqolEditorGroupsReady == true and root._eqolEditorGroupOrderDirty ~= true then return root.editorGroupOrder end
-	Helper.SyncOrder(root.editorGroupOrder, root.editorGroups)
-	table.sort(root.editorGroupOrder, function(leftId, rightId)
-		local leftGroup = root.editorGroups[leftId]
-		local rightGroup = root.editorGroups[rightId]
-		local leftName = leftGroup and leftGroup.name or tostring(leftId or "")
-		local rightName = rightGroup and rightGroup.name or tostring(rightId or "")
-		if leftName == rightName then return (tonumber(leftId) or 0) < (tonumber(rightId) or 0) end
-		return CooldownPanels.IsEditorGroupNameBefore(leftName, rightName)
-	end)
+	root.editorGroups = nil
+	root.editorGroupOrder = nil
 	root._eqolEditorGroupOrderDirty = nil
-	return root.editorGroupOrder
+	return nil
 end
 
 function CooldownPanels:CanSetEditorGroupParent(root, groupId, parentGroupId)
-	root = CooldownPanels.EnsureEditorGroupStorage(root)
-	groupId = normalizeId(groupId)
-	parentGroupId = normalizeId(parentGroupId)
-	if not (root and groupId and root.editorGroups and root.editorGroups[groupId]) then return false end
-	if parentGroupId == nil then return true end
-	if not root.editorGroups[parentGroupId] or parentGroupId == groupId then return false end
-	while parentGroupId do
-		if parentGroupId == groupId then return false end
-		local parentGroup = root.editorGroups[parentGroupId]
-		parentGroupId = parentGroup and normalizeId(parentGroup.parentGroupId) or nil
-	end
-	return true
+	return false
 end
 
 function CooldownPanels:BuildEditorGroupHierarchy(root)
-	root = CooldownPanels.EnsureEditorGroupStorage(root)
-	local groups = root and root.editorGroups or {}
-	local order = root and root.editorGroupOrder or {}
 	local childrenByParent = { ["__root"] = {} }
 	local depthByGroup = {}
-
-	local function getParentKey(parentGroupId)
-		parentGroupId = normalizeId(parentGroupId)
-		if parentGroupId ~= nil then return tostring(parentGroupId) end
-		return "__root"
-	end
-
-	for _, groupId in ipairs(order) do
-		local group = groups[groupId]
-		if group then
-			local key = getParentKey(group.parentGroupId)
-			local bucket = childrenByParent[key]
-			if not bucket then
-				bucket = {}
-				childrenByParent[key] = bucket
-			end
-			bucket[#bucket + 1] = groupId
-		end
-	end
-
-	local function assignDepth(parentGroupId, depth)
-		local key = getParentKey(parentGroupId)
-		for _, childGroupId in ipairs(childrenByParent[key] or {}) do
-			if depthByGroup[childGroupId] == nil then
-				depthByGroup[childGroupId] = depth
-				assignDepth(childGroupId, depth + 1)
-			end
-		end
-	end
-
-	assignDepth(nil, 0)
 	return childrenByParent, depthByGroup
 end
 
@@ -4493,51 +4483,11 @@ function CooldownPanels:GetEditorGroupDescendantIdSet(root, groupId)
 end
 
 function CooldownPanels:PopulateEditorGroupRadioMenu(menu, root, selectedGroupId, onSelect, options)
-	if not (menu and onSelect) then return false end
-	root = CooldownPanels.EnsureEditorGroupStorage(root)
-	selectedGroupId = normalizeId(selectedGroupId)
-	local childrenByParent, depthByGroup = self:BuildEditorGroupHierarchy(root)
-	local skipGroupIds = options and options.skipGroupIds or nil
-	local hasGroups = false
-
-	local function appendChoices(parentGroupId)
-		local key = parentGroupId ~= nil and tostring(parentGroupId) or "__root"
-		for _, groupId in ipairs(childrenByParent[key] or {}) do
-			local group = root.editorGroups and root.editorGroups[groupId] or nil
-			if group then
-				local skip = skipGroupIds and skipGroupIds[groupId] == true
-				if not skip then
-					hasGroups = true
-					local depth = depthByGroup[groupId] or 0
-					local prefix = depth > 0 and string.rep("> ", depth) or ""
-					local label = prefix .. (group.name or ("Group " .. tostring(groupId)))
-					local targetGroupId = normalizeId(groupId)
-					menu:CreateRadio(label, function() return selectedGroupId == targetGroupId end, function() onSelect(targetGroupId) end)
-				end
-				appendChoices(groupId)
-			end
-		end
-	end
-
-	appendChoices(nil)
-	return hasGroups
+	return false
 end
 
 function CooldownPanels:CreateEditorGroup(name, parentGroupId)
-	local root = ensureRoot()
-	if not root then return nil end
-	root = CooldownPanels.EnsureEditorGroupStorage(root)
-	local groups = root.editorGroups
-	local order = root.editorGroupOrder
-	local groupId = Helper.GetNextNumericId(groups)
-	local groupName = CooldownPanels.NormalizePanelGroupName(name) or (L["CooldownPanelNewGroup"] or "New Group")
-	parentGroupId = normalizeId(parentGroupId)
-	if parentGroupId and not groups[parentGroupId] then parentGroupId = nil end
-	groups[groupId] = { id = groupId, name = groupName, parentGroupId = parentGroupId }
-	order[#order + 1] = groupId
-	root._eqolEditorGroupOrderDirty = true
-	self:SortEditorGroupOrder(root)
-	return groupId
+	return nil
 end
 
 function CooldownPanels:RenameEditorGroup(groupId, name)
@@ -4553,39 +4503,11 @@ function CooldownPanels:RenameEditorGroup(groupId, name)
 end
 
 function CooldownPanels:DeleteEditorGroup(groupId)
-	local root = ensureRoot()
-	root = CooldownPanels.EnsureEditorGroupStorage(root)
-	groupId = normalizeId(groupId)
-	if not (root and root.editorGroups and groupId and root.editorGroups[groupId]) then return false end
-	local parentGroupId = normalizeId(root.editorGroups[groupId].parentGroupId)
-	root.editorGroups[groupId] = nil
-	Helper.SyncOrder(root.editorGroupOrder, root.editorGroups)
-	for _, group in pairs(root.editorGroups or {}) do
-		if group and normalizeId(group.parentGroupId) == groupId then group.parentGroupId = parentGroupId end
-	end
-	for _, panel in pairs(root.panels or {}) do
-		if panel and normalizeId(panel.editorGroupId) == groupId then panel.editorGroupId = parentGroupId end
-	end
-	root._eqolEditorGroupOrderDirty = true
-	return true
+	return false
 end
 
 function CooldownPanels:SetEditorGroupParent(groupId, parentGroupId)
-	local root = ensureRoot()
-	root = CooldownPanels.EnsureEditorGroupStorage(root)
-	groupId = normalizeId(groupId)
-	parentGroupId = normalizeId(parentGroupId)
-	local group = root and root.editorGroups and groupId and root.editorGroups[groupId] or nil
-	if not group then return false end
-	if parentGroupId == nil then
-		group.parentGroupId = nil
-		root._eqolEditorGroupOrderDirty = true
-		return true
-	end
-	if not self:CanSetEditorGroupParent(root, groupId, parentGroupId) then return false end
-	group.parentGroupId = parentGroupId
-	root._eqolEditorGroupOrderDirty = true
-	return true
+	return false
 end
 
 function CooldownPanels:GetEditorPanelGroupState(editor)
@@ -4622,9 +4544,8 @@ function CooldownPanels:SetPanelEditorGroup(panelId, groupId)
 	panelId = normalizeId(panelId)
 	local panel = root and root.panels and panelId and root.panels[panelId] or nil
 	if not panel then return false end
-	groupId = normalizeId(groupId)
-	if groupId and not (root.editorGroups and root.editorGroups[groupId]) then groupId = nil end
-	panel.editorGroupId = groupId
+	panel.editorGroupId = nil
+	panel.editorGroup = nil
 	return true
 end
 
@@ -4753,6 +4674,8 @@ function CooldownPanels:DuplicatePanel(panelId)
 	local panel = Helper.CopyTableDeep(source)
 	if type(panel) ~= "table" then return nil end
 	panel.id = id
+	panel.editorGroupId = nil
+	panel.editorGroup = nil
 
 	local usedNames = {}
 	for _, existingPanel in pairs(root.panels or {}) do
@@ -4926,55 +4849,7 @@ function CooldownPanels:ExportPanel(panelId)
 end
 
 function CooldownPanels:ExportEditorGroup(groupId)
-	local root = ensureRoot()
-	root = CooldownPanels.EnsureEditorGroupStorage(root)
-	groupId = normalizeId(groupId)
-	if not (root and root.editorGroups and groupId and root.editorGroups[groupId]) then return nil, "NO_DATA" end
-
-	local groupIds = { groupId }
-	local includedGroups = { [groupId] = true }
-	local descendants = self:GetEditorGroupDescendantIdSet(root, groupId)
-	for descendantId in pairs(descendants) do
-		if root.editorGroups[descendantId] then
-			includedGroups[descendantId] = true
-			groupIds[#groupIds + 1] = descendantId
-		end
-	end
-	table.sort(groupIds, function(left, right) return (tonumber(left) or 0) < (tonumber(right) or 0) end)
-
-	local groups = {}
-	for _, exportGroupId in ipairs(groupIds) do
-		local group = Helper.CopyTableDeep(root.editorGroups[exportGroupId])
-		group.parentGroupId = includedGroups[normalizeId(group.parentGroupId)] and normalizeId(group.parentGroupId) or nil
-		groups[exportGroupId] = cdp.EXPORT.SanitizeTable(group)
-	end
-
-	local panels = {}
-	local panelOrder = {}
-	for _, exportPanelId in ipairs(root.order or {}) do
-		local panel = root.panels and root.panels[exportPanelId] or nil
-		if panel and includedGroups[normalizeId(panel.editorGroupId)] then
-			panels[exportPanelId] = cdp.EXPORT.SanitizeTable(panel)
-			panelOrder[#panelOrder + 1] = exportPanelId
-		end
-	end
-
-	return cdp.EXPORT.EncodePayload({
-		meta = {
-			addon = parentAddonName,
-			kind = cdp.EXPORT.KIND,
-			version = tostring(C_AddOns.GetAddOnMetadata(parentAddonName, "Version") or ""),
-			payloadVersion = 1,
-			scope = "GROUP",
-		},
-		data = {
-			rootGroupId = groupId,
-			groups = groups,
-			groupOrder = groupIds,
-			panels = panels,
-			panelOrder = panelOrder,
-		},
-	})
+	return nil, "NO_DATA"
 end
 
 function cdp.EXPORT.ImportPanelData(data)
@@ -5003,29 +4878,7 @@ end
 function cdp.EXPORT.ImportGroupData(data)
 	local root = ensureRoot()
 	root = CooldownPanels.EnsureEditorGroupStorage(root)
-	if not root or type(data) ~= "table" or type(data.groups) ~= "table" then return nil, "NO_DATA" end
-
-	local groupIdMap = {}
-	for _, oldGroupId in ipairs(data.groupOrder or {}) do
-		local group = data.groups[oldGroupId]
-		if type(group) == "table" then
-			local newGroupId = Helper.GetNextNumericId(root.editorGroups)
-			groupIdMap[oldGroupId] = newGroupId
-			local groupName = oldGroupId == normalizeId(data.rootGroupId) and cdp.EXPORT.GetUniqueGroupName(root, group.name) or CooldownPanels.NormalizePanelGroupName(group.name)
-			root.editorGroups[newGroupId] = {
-				id = newGroupId,
-				name = groupName or (L["CooldownPanelNewGroup"] or "New Group"),
-				parentGroupId = nil,
-			}
-			root.editorGroupOrder[#root.editorGroupOrder + 1] = newGroupId
-		end
-	end
-
-	for oldGroupId, newGroupId in pairs(groupIdMap) do
-		local group = data.groups[oldGroupId]
-		local oldParentId = group and normalizeId(group.parentGroupId)
-		root.editorGroups[newGroupId].parentGroupId = oldParentId and groupIdMap[oldParentId] or nil
-	end
+	if not root or type(data) ~= "table" or type(data.panels) ~= "table" then return nil, "NO_DATA" end
 
 	local firstPanelId
 	for _, oldPanelId in ipairs(data.panelOrder or {}) do
@@ -5035,7 +4888,8 @@ function cdp.EXPORT.ImportGroupData(data)
 			local panel = cdp.EXPORT.SanitizeTable(oldPanel)
 			panel.id = newPanelId
 			panel.name = cdp.EXPORT.GetUniquePanelName(root, panel.name)
-			panel.editorGroupId = groupIdMap[normalizeId(panel.editorGroupId)] or groupIdMap[normalizeId(data.rootGroupId)]
+			panel.editorGroupId = nil
+			panel.editorGroup = nil
 			Helper.NormalizePanel(panel, root.defaults)
 			for _, entry in pairs(panel.entries or {}) do
 				Helper.NormalizeEntry(entry, root.defaults)
@@ -5046,9 +4900,7 @@ function cdp.EXPORT.ImportGroupData(data)
 		end
 	end
 
-	if not next(groupIdMap) and not firstPanelId then return nil, "NO_DATA" end
-	root._eqolEditorGroupOrderDirty = true
-	CooldownPanels:SortEditorGroupOrder(root)
+	if not firstPanelId then return nil, "NO_DATA" end
 	root.selectedPanel = firstPanelId or root.selectedPanel
 	markRootOrderDirty(root)
 	Keybinds.MarkPanelsDirty()
@@ -5278,6 +5130,7 @@ function CooldownPanels:AddEntry(panelId, entryType, idValue, overrides)
 	end
 	self:RebuildSpellIndex()
 	self:RefreshPanel(panelId)
+	if self.BlizzardEditor and self.BlizzardEditor.RefreshPanel then self.BlizzardEditor:RefreshPanel(panelId) end
 	return entryId, entry
 end
 
@@ -5344,6 +5197,7 @@ function CooldownPanels:RemoveEntry(panelId, entryId)
 	Helper.InvalidateFixedLayoutCache(panel)
 	self:RebuildSpellIndex()
 	self:RefreshPanel(panelId)
+	if self.BlizzardEditor and self.BlizzardEditor.RefreshPanel then self.BlizzardEditor:RefreshPanel(panelId) end
 end
 
 function cdp.ENTRY.EnsureSpellEntryMeta(metaByPanel, panelId, entryId)
@@ -5696,6 +5550,7 @@ function CooldownPanels:RebuildSpellIndex()
 	elseif cdmAuras and cdmAuras.UpdateEventRegistration then
 		cdmAuras:UpdateEventRegistration()
 	end
+	if self.HasCooldownManagerSyncPanels and self:HasCooldownManagerSyncPanels() then self:EnsureCooldownManagerSyncListener() end
 	if self.UpdateEventRegistration then self:UpdateEventRegistration() end
 	if self.CheckCDMAuraQuickSetup then self:CheckCDMAuraQuickSetup("RebuildSpellIndex") end
 	return index
@@ -6156,7 +6011,7 @@ function CooldownPanels:HandleCursorDrop(panelId, targetSlot)
 	added = addedEntryId ~= nil
 	if added and targetSlot and requiresPostAddMove then self:MoveEntryToFixedSlot(panelId, addedEntryId, targetSlot) end
 	if added then Api.ClearCursor() end
-	return added
+	return added, addedEntryId
 end
 
 function CooldownPanels:SelectPanel(panelId)
@@ -6186,8 +6041,8 @@ function CooldownPanels:SelectPanel(panelId)
 	end
 	self:UpdateCursorAnchorState()
 	self:RefreshEditor()
-	if openLayoutPanelDialog then self:OpenLayoutPanelStandaloneMenu(panelId) end
-end
+		if openLayoutPanelDialog and not (editor and editor._eqolSuppressLayoutPanelDialog == true) then self:OpenLayoutPanelStandaloneMenu(panelId) end
+	end
 
 function CooldownPanels:SelectEntry(entryId)
 	entryId = normalizeId(entryId)
@@ -6215,7 +6070,11 @@ function CooldownPanels:IsPanelLayoutEditActive(panelId)
 	panelId = normalizeId(panelId)
 	if not panelId then return false end
 	local editor = getEditor()
-	if not (editor and editor.frame and editor.frame:IsShown()) then return false end
+	local editorShown = editor and editor.frame and editor.frame:IsShown()
+	local blizzardEditor = self.BlizzardEditor
+	local blizzardFrame = blizzardEditor and blizzardEditor.frame or nil
+	local blizzardEditorShown = editor and editor._eqolBlizzardEditorLayoutEdit == true and blizzardFrame and blizzardFrame.IsShown and blizzardFrame:IsShown()
+	if not (editorShown or blizzardEditorShown) then return false end
 	if editor.layoutEditActive ~= true then return false end
 	if normalizeId(editor.selectedPanelId) ~= panelId then return false end
 	return self:IsPanelLayoutEditAvailable(panelId)
@@ -6223,7 +6082,11 @@ end
 
 function CooldownPanels:IsAnyPanelLayoutEditActive()
 	local editor = getEditor()
-	return editor and editor.frame and editor.frame:IsShown() and editor.layoutEditActive == true
+	if not (editor and editor.layoutEditActive == true) then return false end
+	if editor.frame and editor.frame:IsShown() then return true end
+	local blizzardEditor = self.BlizzardEditor
+	local blizzardFrame = blizzardEditor and blizzardEditor.frame or nil
+	return editor._eqolBlizzardEditorLayoutEdit == true and blizzardFrame and blizzardFrame.IsShown and blizzardFrame:IsShown() or false
 end
 
 function CooldownPanels:SetEditorLayoutEditEnabled(enabled)
@@ -6240,6 +6103,7 @@ function CooldownPanels:SetEditorLayoutEditEnabled(enabled)
 	end
 	local previousPanelId = normalizeId(editor._eqolLayoutPanelId)
 	editor.layoutEditActive = enabled
+	if not enabled then editor._eqolBlizzardEditorLayoutEdit = nil end
 	local nextPanelId = enabled and normalizeId(editor.selectedPanelId) or nil
 	editor._eqolLayoutPanelId = nextPanelId
 	if not enabled then
@@ -6264,7 +6128,7 @@ function CooldownPanels:SetEditorLayoutEditEnabled(enabled)
 	if nextPanelId and self:GetPanel(nextPanelId) then self:RefreshPanel(nextPanelId) end
 	self:UpdateCursorAnchorState()
 	self:RefreshEditor()
-	if enabled and nextPanelId then self:OpenLayoutPanelStandaloneMenu(nextPanelId) end
+	if enabled and nextPanelId and not editor._eqolSuppressLayoutPanelDialog then self:OpenLayoutPanelStandaloneMenu(nextPanelId) end
 end
 
 function CooldownPanels:PreparePanelForFixedLayoutEdit(panelId)
@@ -6475,6 +6339,30 @@ function CooldownPanels:GetFontDropdownValue(value)
 	return self:GetGlobalFontConfigKey()
 end
 
+function CooldownPanels:NormalizeDurationTextProfile(value, fallback)
+	local durationText = addon.DurationText
+	if durationText and durationText.GetProfileKey then return durationText:GetProfileKey(value or fallback or "MINIMAL") end
+	return type(value) == "string" and value ~= "" and value or fallback or "MINIMAL"
+end
+
+function CooldownPanels:GetPanelDurationTextProfile(panel)
+	if panel and panel.layout and panel.layout.durationTextProfile ~= nil then
+		return self:NormalizeDurationTextProfile(panel.layout.durationTextProfile, "MINIMAL")
+	end
+	if panel and panel.barDurationTextProfile ~= nil then return self:NormalizeDurationTextProfile(panel.barDurationTextProfile, "MINIMAL") end
+	return self:NormalizeDurationTextProfile(nil, "MINIMAL")
+end
+
+function CooldownPanels:GetLayoutDurationTextProfile(layout)
+	if layout and layout.durationTextProfile ~= nil then return self:NormalizeDurationTextProfile(layout.durationTextProfile, "MINIMAL") end
+	return self:NormalizeDurationTextProfile(nil, "MINIMAL")
+end
+
+function CooldownPanels:ApplyCooldownFrameDurationTextProfile(cooldownFrame, profileKey)
+	if not (cooldownFrame and addon.functions and addon.functions.ApplyDurationTextProfileToCooldownFrame) then return false end
+	return addon.functions.ApplyDurationTextProfileToCooldownFrame(cooldownFrame, self:NormalizeDurationTextProfile(profileKey, "MINIMAL"))
+end
+
 function CooldownPanels:ResolveEntryCooldownTextStyle(layout, entry, fallbackFontPath, fallbackFontSize, fallbackFontStyle)
 	local panelCache = CooldownPanels._styleCacheRoots.cooldownTextPanel[layout]
 	local globalFontStateVersion = addon.functions and addon.functions.GetGlobalFontStateVersion and addon.functions.GetGlobalFontStateVersion() or 0
@@ -6558,6 +6446,7 @@ function CooldownPanels:ApplyEntryCooldownTextStyle(icon, layout, entry)
 	if not (icon and icon.cooldown and icon.cooldown.GetCountdownFontString) then return end
 	local fontString = icon.cooldown:GetCountdownFontString()
 	if not fontString then return end
+	self:ApplyCooldownFrameDurationTextProfile(icon.cooldown, self:GetLayoutDurationTextProfile(layout))
 	if not icon.cooldown._eqolCooldownTextDefaults then
 		local fontPath, fontSize, fontStyle = fontString:GetFont()
 		icon.cooldown._eqolCooldownTextDefaults = {
@@ -6606,6 +6495,11 @@ function CooldownPanels:ApplyEntryCooldownTextStyle(icon, layout, entry)
 		fontString._eqolCooldownColorB = b
 		fontString._eqolCooldownColorA = a
 	end
+end
+
+function CooldownPanels:ApplyRuntimeCooldownDurationTextProfile(icon, layout)
+	if not (icon and icon.cooldown) then return false end
+	return self:ApplyCooldownFrameDurationTextProfile(icon.cooldown, self:GetLayoutDurationTextProfile(layout))
 end
 
 function CooldownPanels:ResolveEntryStackTextStyle(layout, entry, fallbackFontPath, fallbackFontSize, fallbackFontStyle)
@@ -7284,8 +7178,10 @@ function CooldownPanels:ResolveEntryIconVisualLayout(layout, entry, baseSize)
 		layout = nil
 	end
 	local fallbackSize = Helper.ClampInt(baseSize, 12, 128, Helper.PANEL_LAYOUT_DEFAULTS.iconSize)
-	local fallbackWidth = Helper.ClampInt(layout and layout.iconSizeSeparate == true and layout.iconWidth, 12, 128, fallbackSize)
-	local fallbackHeight = Helper.ClampInt(layout and layout.iconSizeSeparate == true and layout.iconHeight, 12, 128, fallbackSize)
+	local layoutBaseSize = Helper.ClampInt(layout and layout.iconSize, 12, 128, Helper.PANEL_LAYOUT_DEFAULTS.iconSize)
+	local rowScale = layoutBaseSize > 0 and (fallbackSize / layoutBaseSize) or 1
+	local fallbackWidth = layout and layout.iconSizeSeparate == true and Helper.ClampInt((tonumber(layout.iconWidth) or layoutBaseSize) * rowScale, 12, 128, fallbackSize) or fallbackSize
+	local fallbackHeight = layout and layout.iconSizeSeparate == true and Helper.ClampInt((tonumber(layout.iconHeight) or layoutBaseSize) * rowScale, 12, 128, fallbackSize) or fallbackSize
 	local layoutOffsetX = Helper.ClampInt(layout and layout.iconOffsetX, -Helper.OFFSET_RANGE, Helper.OFFSET_RANGE, 0)
 	local layoutOffsetY = Helper.ClampInt(layout and layout.iconOffsetY, -Helper.OFFSET_RANGE, Helper.OFFSET_RANGE, 0)
 	if not entry then return fallbackSize, layoutOffsetX, layoutOffsetY, fallbackWidth, fallbackHeight end
@@ -7871,12 +7767,39 @@ function cdp.RUNTIME.GetFixedContextSignature(fixedContext)
 	return tonumber(fixedContext.dynamicLocalIndex) or 0, tonumber(fixedContext.dynamicCount) or 0
 end
 
+function cdp.RUNTIME.GetTableField(tbl, key)
+	if type(tbl) ~= "table" then return nil end
+	return tbl[key]
+end
+
 function cdp.RUNTIME.HasPlacementChange(icon, snapshot, data, fixedLayoutCache, fixedGridColumns, slotColumn, slotRow, layoutEditActive)
 	if not (icon and snapshot and data) then return true end
 	if icon._eqolVisualSize == nil or icon._eqolVisualAnchor == nil or icon._eqolVisualOffsetX == nil or icon._eqolVisualOffsetY == nil then return true end
 	local entry = data.entry
 	local layout = data.layout
 	local fixedLocalIndex, fixedCount = cdp.RUNTIME.GetFixedContextSignature(data.fixedContext)
+	local entryIconSizeUseGlobal, entryIconSize, entryIconSizeSeparate, entryIconWidth, entryIconHeight, entryIconOffsetX, entryIconOffsetY, entryFixedGroupId
+	if entry then
+		entryIconSizeUseGlobal = entry.iconSizeUseGlobal
+		entryIconSize = entry.iconSize
+		entryIconSizeSeparate = entry.iconSizeSeparate
+		entryIconWidth = entry.iconWidth
+		entryIconHeight = entry.iconHeight
+		entryIconOffsetX = entry.iconOffsetX
+		entryIconOffsetY = entry.iconOffsetY
+		entryFixedGroupId = entry.fixedGroupId
+	end
+	local layoutIconOffsetX, layoutIconOffsetY, layoutIconSizeSeparate, layoutIconWidth, layoutIconHeight, layoutIconShape, layoutIconZoom, layoutSpacing
+	if layout then
+		layoutIconOffsetX = layout.iconOffsetX
+		layoutIconOffsetY = layout.iconOffsetY
+		layoutIconSizeSeparate = layout.iconSizeSeparate
+		layoutIconWidth = layout.iconWidth
+		layoutIconHeight = layout.iconHeight
+		layoutIconShape = layout.iconShape
+		layoutIconZoom = layout.iconZoom
+		layoutSpacing = layout.spacing
+	end
 	return snapshot.entryId ~= data.entryId
 		or snapshot.baseSlotSize ~= icon._eqolBaseSlotSize
 		or snapshot.fixedLayoutCache ~= fixedLayoutCache
@@ -7884,22 +7807,22 @@ function cdp.RUNTIME.HasPlacementChange(icon, snapshot, data, fixedLayoutCache, 
 		or snapshot.slotColumn ~= slotColumn
 		or snapshot.slotRow ~= slotRow
 		or snapshot.layoutEditActive ~= (layoutEditActive == true)
-		or snapshot.entryIconSizeUseGlobal ~= (entry and entry.iconSizeUseGlobal)
-		or snapshot.entryIconSize ~= (entry and entry.iconSize)
-		or snapshot.entryIconSizeSeparate ~= (entry and entry.iconSizeSeparate)
-		or snapshot.entryIconWidth ~= (entry and entry.iconWidth)
-		or snapshot.entryIconHeight ~= (entry and entry.iconHeight)
-		or snapshot.entryIconOffsetX ~= (entry and entry.iconOffsetX)
-		or snapshot.entryIconOffsetY ~= (entry and entry.iconOffsetY)
-		or snapshot.entryFixedGroupId ~= (entry and entry.fixedGroupId)
-		or snapshot.layoutIconOffsetX ~= (layout and layout.iconOffsetX)
-		or snapshot.layoutIconOffsetY ~= (layout and layout.iconOffsetY)
-		or snapshot.layoutIconSizeSeparate ~= (layout and layout.iconSizeSeparate)
-		or snapshot.layoutIconWidth ~= (layout and layout.iconWidth)
-		or snapshot.layoutIconHeight ~= (layout and layout.iconHeight)
-		or snapshot.layoutIconShape ~= (layout and layout.iconShape)
-		or snapshot.layoutIconZoom ~= (layout and layout.iconZoom)
-		or snapshot.layoutSpacing ~= (layout and layout.spacing)
+		or snapshot.entryIconSizeUseGlobal ~= entryIconSizeUseGlobal
+		or snapshot.entryIconSize ~= entryIconSize
+		or snapshot.entryIconSizeSeparate ~= entryIconSizeSeparate
+		or snapshot.entryIconWidth ~= entryIconWidth
+		or snapshot.entryIconHeight ~= entryIconHeight
+		or snapshot.entryIconOffsetX ~= entryIconOffsetX
+		or snapshot.entryIconOffsetY ~= entryIconOffsetY
+		or snapshot.entryFixedGroupId ~= entryFixedGroupId
+		or snapshot.layoutIconOffsetX ~= layoutIconOffsetX
+		or snapshot.layoutIconOffsetY ~= layoutIconOffsetY
+		or snapshot.layoutIconSizeSeparate ~= layoutIconSizeSeparate
+		or snapshot.layoutIconWidth ~= layoutIconWidth
+		or snapshot.layoutIconHeight ~= layoutIconHeight
+		or snapshot.layoutIconShape ~= layoutIconShape
+		or snapshot.layoutIconZoom ~= layoutIconZoom
+		or snapshot.layoutSpacing ~= layoutSpacing
 		or snapshot.fixedLocalIndex ~= fixedLocalIndex
 		or snapshot.fixedCount ~= fixedCount
 end
@@ -7916,22 +7839,22 @@ function cdp.RUNTIME.WritePlacementSnapshot(icon, snapshot, data, fixedLayoutCac
 	snapshot.slotColumn = slotColumn
 	snapshot.slotRow = slotRow
 	snapshot.layoutEditActive = layoutEditActive == true
-	snapshot.entryIconSizeUseGlobal = entry and entry.iconSizeUseGlobal or nil
-	snapshot.entryIconSize = entry and entry.iconSize or nil
-	snapshot.entryIconSizeSeparate = entry and entry.iconSizeSeparate or nil
-	snapshot.entryIconWidth = entry and entry.iconWidth or nil
-	snapshot.entryIconHeight = entry and entry.iconHeight or nil
-	snapshot.entryIconOffsetX = entry and entry.iconOffsetX or nil
-	snapshot.entryIconOffsetY = entry and entry.iconOffsetY or nil
-	snapshot.entryFixedGroupId = entry and entry.fixedGroupId or nil
-	snapshot.layoutIconOffsetX = layout and layout.iconOffsetX or nil
-	snapshot.layoutIconOffsetY = layout and layout.iconOffsetY or nil
-	snapshot.layoutIconSizeSeparate = layout and layout.iconSizeSeparate or nil
-	snapshot.layoutIconWidth = layout and layout.iconWidth or nil
-	snapshot.layoutIconHeight = layout and layout.iconHeight or nil
-	snapshot.layoutIconShape = layout and layout.iconShape or nil
-	snapshot.layoutIconZoom = layout and layout.iconZoom or nil
-	snapshot.layoutSpacing = layout and layout.spacing or nil
+	snapshot.entryIconSizeUseGlobal = cdp.RUNTIME.GetTableField(entry, "iconSizeUseGlobal")
+	snapshot.entryIconSize = cdp.RUNTIME.GetTableField(entry, "iconSize")
+	snapshot.entryIconSizeSeparate = cdp.RUNTIME.GetTableField(entry, "iconSizeSeparate")
+	snapshot.entryIconWidth = cdp.RUNTIME.GetTableField(entry, "iconWidth")
+	snapshot.entryIconHeight = cdp.RUNTIME.GetTableField(entry, "iconHeight")
+	snapshot.entryIconOffsetX = cdp.RUNTIME.GetTableField(entry, "iconOffsetX")
+	snapshot.entryIconOffsetY = cdp.RUNTIME.GetTableField(entry, "iconOffsetY")
+	snapshot.entryFixedGroupId = cdp.RUNTIME.GetTableField(entry, "fixedGroupId")
+	snapshot.layoutIconOffsetX = cdp.RUNTIME.GetTableField(layout, "iconOffsetX")
+	snapshot.layoutIconOffsetY = cdp.RUNTIME.GetTableField(layout, "iconOffsetY")
+	snapshot.layoutIconSizeSeparate = cdp.RUNTIME.GetTableField(layout, "iconSizeSeparate")
+	snapshot.layoutIconWidth = cdp.RUNTIME.GetTableField(layout, "iconWidth")
+	snapshot.layoutIconHeight = cdp.RUNTIME.GetTableField(layout, "iconHeight")
+	snapshot.layoutIconShape = cdp.RUNTIME.GetTableField(layout, "iconShape")
+	snapshot.layoutIconZoom = cdp.RUNTIME.GetTableField(layout, "iconZoom")
+	snapshot.layoutSpacing = cdp.RUNTIME.GetTableField(layout, "spacing")
 	snapshot.fixedLocalIndex = fixedLocalIndex
 	snapshot.fixedCount = fixedCount
 end
@@ -8041,6 +7964,8 @@ function cdp.RUNTIME.HasCooldownTextStyleChange(snapshot, data, defaultFontPath,
 		or snapshot.layoutCooldownTextColor ~= (layout and layout.cooldownTextColor)
 		or snapshot.layoutCooldownTextX ~= (layout and layout.cooldownTextX)
 		or snapshot.layoutCooldownTextY ~= (layout and layout.cooldownTextY)
+		or snapshot.layoutDurationTextProfile ~= (layout and layout.durationTextProfile)
+		or snapshot.durationTextVersion ~= (addon.DurationText and addon.DurationText.version or 0)
 end
 
 function cdp.RUNTIME.WriteCooldownTextStyleSnapshot(snapshot, data, defaultFontPath, defaultFontSize, defaultFontStyle)
@@ -8064,6 +7989,8 @@ function cdp.RUNTIME.WriteCooldownTextStyleSnapshot(snapshot, data, defaultFontP
 	snapshot.layoutCooldownTextColor = layout and layout.cooldownTextColor or nil
 	snapshot.layoutCooldownTextX = layout and layout.cooldownTextX or nil
 	snapshot.layoutCooldownTextY = layout and layout.cooldownTextY or nil
+	snapshot.layoutDurationTextProfile = layout and layout.durationTextProfile or nil
+	snapshot.durationTextVersion = addon.DurationText and addon.DurationText.version or 0
 end
 
 function cdp.RUNTIME.HasStackTextStyleChange(snapshot, data, fallbackFontPath, fallbackFontSize, fallbackFontStyle)
@@ -8745,6 +8672,8 @@ end
 
 local function shouldArmReadySoundOnCooldownDone(data)
 	if type(data) ~= "table" or data.soundReady ~= true or data.cooldownGCD == true then return false end
+	if data.spellAuraOverlayActive == true then return false end
+	if data.customCooldownDurationActive == true then return false end
 	if data.resolvedType == "SPELL" then
 		if data.chargesInfo and data.chargesInfo.maxCharges ~= nil then return false end
 		return CooldownPanels.IsSpellCooldownInfoActive(data.cooldownIsActive, data.cooldownEnabled, data.cooldownStart, data.cooldownDuration)
@@ -9237,7 +9166,7 @@ function CooldownPanels:ApplyActivationOverlayVisualState(data, entry)
 	local active = data.customCooldownDurationActive == true or data.spellAuraOverlayActive == true
 	data.activationOverlayActive = active
 	data.activationOverlayReverse = entry and entry.activationOverlayReverse ~= false or true
-	data.activationOverlayColor = Helper.NormalizeColor(entry and entry.activationOverlayColor, Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT)
+	data.activationOverlayColor = CooldownPanels.ResolveCachedEntryColor("activationOverlayEntry", entry, entry and entry.activationOverlayColor, Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT)
 	data.activationOverlayOnly = entry and entry.activationOverlayOnly == true or false
 	data.activationOverlayGlow = entry and entry.activationOverlayGlow == true or false
 	data.cooldownReverse = data.resolvedType == "CDM_AURA" or (active == true and data.activationOverlayReverse ~= false)
@@ -9758,6 +9687,10 @@ end
 function CooldownPanels:InvalidateSpellQueryCaches(kind, spellId)
 	local runtime = self.runtime
 	if not runtime then return end
+	if kind == nil and spellId == nil then
+		runtime.spellAliasIDsCache = nil
+		runtime.runtimeCanonicalSpellVariantCache = nil
+	end
 	if kind == "duration" or kind == nil then
 		if spellId ~= nil then
 			runtime.spellCooldownDurationCache = runtime.spellCooldownDurationCache or {}
@@ -9802,7 +9735,7 @@ end
 function CooldownPanels:InvalidateSpellCooldownCachesForAliases(spellId)
 	local id = tonumber(spellId)
 	if not (id and self.runtime) then return false end
-	local ids = self:GetSpellAliasIDs(id, {}, {})
+	local ids = self:GetSpellAliasIDs(id)
 	if not ids or #ids == 0 then return false end
 	for i = 1, #ids do
 		local aliasId = ids[i]
@@ -9930,6 +9863,7 @@ local function getItemCooldownInfo(itemID, slotID)
 end
 
 function CooldownPanels:GetItemUseSpellID(itemID)
+	itemID = tonumber(itemID)
 	if not itemID then return nil end
 	self.runtime = self.runtime or {}
 	local runtime = self.runtime
@@ -9939,7 +9873,13 @@ function CooldownPanels:GetItemUseSpellID(itemID)
 	if not Api.GetItemSpell then return nil end
 	local _, spellId = Api.GetItemSpell(itemID)
 	spellId = tonumber(spellId)
-	if spellId then runtime.itemUseSpellCache[itemID] = spellId end
+	if spellId then
+		runtime.itemUseSpellCache[itemID] = spellId
+	elseif C_Item and C_Item.IsItemDataCachedByID and C_Item.IsItemDataCachedByID(itemID) then
+		runtime.itemUseSpellCache[itemID] = false
+	elseif C_Item and C_Item.RequestLoadItemDataByID then
+		C_Item.RequestLoadItemDataByID(itemID)
+	end
 	return spellId
 end
 
@@ -9981,6 +9921,8 @@ local function itemHasUseSpell(itemID) return CooldownPanels.GetItemUseSpellID a
 
 local function createPanelFrame(panelId, panel)
 	local frame = CreateFrame("Button", "EQOL_CooldownPanel" .. tostring(panelId), UIParent)
+	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
+	if tonumber((select(4, GetBuildInfo()))) >= 120100 and type(frame.SetRolesets) == "function" then frame:SetRolesets("cooldownViewers") end
 	frame:SetClampedToScreen(true)
 	frame:SetMovable(true)
 	frame:EnableMouse(false)
@@ -10502,7 +10444,7 @@ end
 
 function cdp.ENTRY.GetCooldownSwipeColor(data)
 	if data and data.activationOverlayActive == true then
-		local color = Helper.NormalizeColor(data.activationOverlayColor, Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT)
+		local color = data.activationOverlayColor or Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT
 		return color[1], color[2], color[3], color[4]
 	end
 	if data and data.resolvedType == "CDM_AURA" then return 0, 0, 0, 0.7 end
@@ -10550,6 +10492,50 @@ function cdp.ENTRY.ApplyBlizzardCooldownMask(icon, maskTexture)
 	if addon.IconShape and addon.IconShape.ApplyCooldownRegionMask then addon.IconShape.ApplyCooldownRegionMask(cooldown, maskTexture, "_eqolBlizzardCooldownMask") end
 end
 
+function cdp.ENTRY.ApplyIconTextureAspect(icon, layout, force)
+	local texture = icon and icon.texture
+	if not (texture and texture.SetTexCoord and icon.GetSize) then return end
+	local width, height = icon:GetSize()
+	width = tonumber(width) or 0
+	height = tonumber(height) or 0
+	if width <= 0 or height <= 0 then return end
+
+	local shape = cdp.ENTRY.NormalizeIconShape(layout and layout.iconShape, Helper.PANEL_LAYOUT_DEFAULTS.iconShape)
+	local iconZoom = addon.IconShape and addon.IconShape.NormalizeIconZoom and addon.IconShape.NormalizeIconZoom(layout and layout.iconZoom) or Helper.ClampInt(layout and layout.iconZoom, 0, 35, 0)
+	local inset = 0
+	if addon.IconShape and shape == addon.IconShape.SQUARE then inset = 0.07 end
+	inset = inset + ((tonumber(iconZoom) or 0) / 100)
+	if inset < 0 then inset = 0 end
+	if inset > 0.45 then inset = 0.45 end
+
+	local left, right, top, bottom = inset, 1 - inset, inset, 1 - inset
+	if width > height then
+		local crop = ((bottom - top) * (1 - (height / width))) / 2
+		top = top + crop
+		bottom = bottom - crop
+	elseif height > width then
+		local crop = ((right - left) * (1 - (width / height))) / 2
+		left = left + crop
+		right = right - crop
+	end
+
+	if not force
+		and
+		icon._eqolIconTextureAspectLeft == left
+		and icon._eqolIconTextureAspectRight == right
+		and icon._eqolIconTextureAspectTop == top
+		and icon._eqolIconTextureAspectBottom == bottom
+	then
+		return
+	end
+	if addon.IconShape and addon.IconShape.StoreTextureTexCoord then addon.IconShape.StoreTextureTexCoord(texture, "_eqolCooldownPanelIconTexCoord") end
+	texture:SetTexCoord(left, right, top, bottom)
+	icon._eqolIconTextureAspectLeft = left
+	icon._eqolIconTextureAspectRight = right
+	icon._eqolIconTextureAspectTop = top
+	icon._eqolIconTextureAspectBottom = bottom
+end
+
 function cdp.ENTRY.ApplyIconShape(icon, layout)
 	if not icon then return end
 	local shape = cdp.ENTRY.NormalizeIconShape(layout and layout.iconShape, Helper.PANEL_LAYOUT_DEFAULTS.iconShape)
@@ -10562,6 +10548,7 @@ function cdp.ENTRY.ApplyIconShape(icon, layout)
 			refreshSwipe = function(frame) cdp.ENTRY.ApplyCooldownSwipeVisual(frame, frame._eqolRuntimeData) end,
 		})
 	end
+	cdp.ENTRY.ApplyIconTextureAspect(icon, layout)
 end
 
 function cdp.ENTRY.ClearBlizzardIconSkin(icon)
@@ -10868,6 +10855,14 @@ local function applyIconLayout(frame, count, layout)
 	local radialArcDegrees = nil
 	local radialStep = nil
 	local radialBaseAngle = nil
+	local function getRowIconDimensions(rowSize)
+		rowSize = Helper.ClampInt(rowSize, 12, 128, baseIconSize)
+		if layout.iconSizeSeparate == true then
+			local scale = baseIconSize > 0 and (rowSize / baseIconSize) or 1
+			return Helper.ClampInt(baseIconWidth * scale, 12, 128, baseIconWidth), Helper.ClampInt(baseIconHeight * scale, 12, 128, baseIconHeight)
+		end
+		return rowSize, rowSize
+	end
 
 	if layoutMode == "RADIAL" then
 		radialRadius = Helper.ClampInt(layout.radialRadius, 0, Helper.RADIAL_RADIUS_RANGE or 600, Helper.PANEL_LAYOUT_DEFAULTS.radialRadius)
@@ -10893,8 +10888,7 @@ local function applyIconLayout(frame, count, layout)
 				end
 				rowSizes[rowIndex] = rowSize
 				rowOffsets[rowIndex] = totalHeight
-				local rowIconWidth = layout.iconSizeSeparate == true and baseIconWidth or rowSize
-				local rowIconHeight = layout.iconSizeSeparate == true and baseIconHeight or rowSize
+				local rowIconWidth, rowIconHeight = getRowIconDimensions(rowSize)
 				local rowCols = cols
 				if wrapCount and wrapCount > 0 then
 					local fillIndex = rowIndex
@@ -10971,8 +10965,7 @@ local function applyIconLayout(frame, count, layout)
 
 	local function applyIconCommon(icon, rowSize)
 		local slotAnchor = icon.slotAnchor or icon
-		local rowWidth = layout.iconSizeSeparate == true and baseIconWidth or rowSize
-		local rowHeight = layout.iconSizeSeparate == true and baseIconHeight or rowSize
+		local rowWidth, rowHeight = getRowIconDimensions(rowSize)
 		slotAnchor:SetSize(rowWidth, rowHeight)
 		icon._eqolBaseSlotSize = rowSize
 		icon:SetSize(rowWidth, rowHeight)
@@ -11165,8 +11158,7 @@ local function applyIconLayout(frame, count, layout)
 
 		local rowIndex = row + 1
 		local rowSize = rowSizes[rowIndex] or baseIconSize
-		local rowIconWidth = layout.iconSizeSeparate == true and baseIconWidth or rowSize
-		local rowHeight = layout.iconSizeSeparate == true and baseIconHeight or rowSize
+		local rowIconWidth, rowHeight = getRowIconDimensions(rowSize)
 		local rowOffset = rowOffsets[rowIndex] or (row * (baseIconSize + spacing))
 		local rowWidth = rowWidths[rowIndex] or width
 		local rowAlignOffset = 0
@@ -11625,11 +11617,179 @@ local function getCooldownManagerLayoutChildren(sourceKind)
 	return nil, sourceLabel, "SOURCE_NOT_FOUND"
 end
 
+cdp.CDM = cdp.CDM or {}
+cdp.CDM.LOGIN_SYNC_RETRY_DELAYS = cdp.CDM.LOGIN_SYNC_RETRY_DELAYS or { 0.2, 1, 2, 4, 8 }
+cdp.CDM.ENTRY_OVERRIDE_SKIP_KEYS = {
+	id = true,
+	type = true,
+	spellID = true,
+	itemID = true,
+	slotID = true,
+	cooldownID = true,
+	buffName = true,
+	sourceType = true,
+	sourceViewer = true,
+	cdmSyncManaged = true,
+	cdmSyncSource = true,
+	cdmSyncKey = true,
+	cdmSyncSpecKey = true,
+}
+
+function cdp.CDM.IsSyncSource(sourceKind)
+	sourceKind = type(sourceKind) == "string" and sourceKind:upper() or nil
+	return sourceKind == "ESSENTIAL" or sourceKind == "UTILITY" or sourceKind == "BUFF_ICON"
+end
+
+function cdp.CDM.IsGraceSyncReason(reason)
+	if type(reason) ~= "string" then return false end
+	return reason:find("PLAYER_LOGIN", 1, true)
+		or reason:find("PLAYER_ENTERING_WORLD", 1, true)
+		or reason:find("COOLDOWN_VIEWER_DATA_LOADED", 1, true)
+		or reason:find("ADDON_LOADED:Blizzard_CooldownViewer", 1, true)
+		or reason:find("PLAYER_TALENT_UPDATE", 1, true)
+		or reason:find("ACTIVE_TALENT_GROUP_CHANGED", 1, true)
+		or reason:find("TRAIT_CONFIG_UPDATED", 1, true)
+		or reason:find("TRAIT_CONFIG_LIST_UPDATED", 1, true)
+end
+
+function cdp.CDM.IsSettingsFrameShown()
+	local settings = _G.CooldownViewerSettings
+	return settings and settings.IsShown and settings:IsShown() == true
+end
+
+function cdp.CDM.GetSpellIdsFromDataProvider(sourceKind)
+	local settings = _G.CooldownViewerSettings
+	local dataProvider = settings and settings.GetDataProvider and settings:GetDataProvider() or nil
+	if not (dataProvider and dataProvider.GetOrderedCooldownIDsForCategory and dataProvider.GetCooldownInfoForID) then return nil end
+	local category
+	if sourceKind == "UTILITY" then
+		category = Enum and Enum.CooldownViewerCategory and Enum.CooldownViewerCategory.Utility
+	else
+		category = Enum and Enum.CooldownViewerCategory and Enum.CooldownViewerCategory.Essential
+	end
+	if not category then return nil end
+	local cooldownIDs = dataProvider:GetOrderedCooldownIDsForCategory(category)
+	if type(cooldownIDs) ~= "table" or #cooldownIDs == 0 then return nil end
+	local spellIds = {}
+	for i = 1, #cooldownIDs do
+		local cooldownInfo = dataProvider:GetCooldownInfoForID(cooldownIDs[i])
+		local spellId = cooldownInfo and (cooldownInfo.linkedSpellID or cooldownInfo.overrideTooltipSpellID or cooldownInfo.overrideSpellID or cooldownInfo.spellID) or nil
+		if spellId then spellIds[#spellIds + 1] = spellId end
+	end
+	return spellIds
+end
+
+function cdp.CDM.GetSpellIdsFromSource(sourceKind)
+	sourceKind = cdp.CDM.IsSyncSource(sourceKind) and sourceKind:upper() or "ESSENTIAL"
+	local spellIds = cdp.CDM.GetSpellIdsFromDataProvider(sourceKind)
+	local sourceLabel = getCooldownManagerSourceLabel(sourceKind)
+	if spellIds then return spellIds, sourceLabel end
+
+	local layoutChildren, fallbackLabel, sourceErr = getCooldownManagerLayoutChildren(sourceKind)
+	sourceLabel = fallbackLabel or sourceLabel
+	if sourceErr then return nil, sourceLabel, sourceErr end
+
+	spellIds = {}
+	local function collect(child)
+		local spellId = getSpellIdFromCooldownManagerChild(child)
+		if spellId then spellIds[#spellIds + 1] = spellId end
+	end
+	if #layoutChildren > 0 then
+		for i = 1, #layoutChildren do
+			collect(layoutChildren[i])
+		end
+	else
+		local numericKeys = {}
+		for key in pairs(layoutChildren) do
+			if type(key) == "number" then numericKeys[#numericKeys + 1] = key end
+		end
+		table.sort(numericKeys)
+		for _, key in ipairs(numericKeys) do
+			collect(layoutChildren[key])
+		end
+	end
+	if #spellIds == 0 then return nil, sourceLabel, "SOURCE_NOT_FOUND" end
+	return spellIds, sourceLabel
+end
+
+function cdp.CDM.GetEntryOverrideSpecKey(specId)
+	specId = tonumber(specId) or queryPlayerSpecId()
+	return specId and tostring(specId) or "nospec"
+end
+
+function cdp.CDM.GetEntryOverrideBucket(panel, sourceKind, specKey)
+	if not (panel and cdp.CDM.IsSyncSource(sourceKind)) then return nil end
+	sourceKind = sourceKind:upper()
+	specKey = tostring(specKey or cdp.CDM.GetEntryOverrideSpecKey())
+	panel.cdmSyncEntryOverrides = panel.cdmSyncEntryOverrides or {}
+	panel.cdmSyncEntryOverrides[sourceKind] = panel.cdmSyncEntryOverrides[sourceKind] or {}
+	panel.cdmSyncEntryOverrides[sourceKind][specKey] = panel.cdmSyncEntryOverrides[sourceKind][specKey] or {}
+	return panel.cdmSyncEntryOverrides[sourceKind][specKey]
+end
+
+function cdp.CDM.SaveEntryOverride(panel, sourceKind, canonicalSpellID, entry, specKey)
+	local spellKey = canonicalSpellID and tostring(canonicalSpellID) or nil
+	if not (spellKey and entry and entry.type == "SPELL") then return false end
+	local bucket = cdp.CDM.GetEntryOverrideBucket(panel, sourceKind, specKey)
+	if not bucket then return false end
+	local override = {}
+	for key, value in pairs(entry) do
+		if type(key) == "string" and not cdp.CDM.ENTRY_OVERRIDE_SKIP_KEYS[key] and not key:match("^_") then
+			override[key] = Helper.CopyTableDeep(value)
+		end
+	end
+	bucket[spellKey] = next(override) and override or nil
+	return true
+end
+
+function cdp.CDM.SaveCurrentEntryOverrides(panel, sourceKind, specKey, wantedBySpellId)
+	if not (panel and type(panel.entries) == "table") then return false end
+	local changed = false
+	for _, entry in pairs(panel.entries) do
+		if entry and entry.type == "SPELL" and entry.spellID then
+			local canonicalSpellID = CooldownPanels:NormalizePersistentSpellID(entry.spellID, { allowTalentChoiceCanonical = true }) or tonumber(entry.spellID)
+			if canonicalSpellID and (not wantedBySpellId or wantedBySpellId[canonicalSpellID]) then
+				changed = cdp.CDM.SaveEntryOverride(panel, sourceKind, canonicalSpellID, entry, specKey) or changed
+			end
+		end
+	end
+	return changed
+end
+
+function cdp.CDM.ApplyEntryOverride(panel, sourceKind, canonicalSpellID, entry, specKey)
+	local spellKey = canonicalSpellID and tostring(canonicalSpellID) or nil
+	if not (spellKey and entry) then return false end
+	local overridesBySource = panel and panel.cdmSyncEntryOverrides
+	local bucket = overridesBySource and overridesBySource[sourceKind] and overridesBySource[sourceKind][tostring(specKey or cdp.CDM.GetEntryOverrideSpecKey())]
+	local override = bucket and bucket[spellKey]
+	if type(override) ~= "table" then return false end
+	for key, value in pairs(override) do
+		if type(key) == "string" and not cdp.CDM.ENTRY_OVERRIDE_SKIP_KEYS[key] and not key:match("^_") then
+			entry[key] = Helper.CopyTableDeep(value)
+		end
+	end
+	return true
+end
+
+function cdp.CDM.ResetEntryToSyncedDefault(entry, spellId, defaults)
+	if not (entry and spellId) then return false end
+	local resetEntry = Helper.CreateEntry("SPELL", spellId, defaults)
+	for key in pairs(entry) do
+		if type(key) == "string" and not cdp.CDM.ENTRY_OVERRIDE_SKIP_KEYS[key] and not key:match("^_") then entry[key] = nil end
+	end
+	for key, value in pairs(resetEntry) do
+		if type(key) == "string" and not cdp.CDM.ENTRY_OVERRIDE_SKIP_KEYS[key] and not key:match("^_") then
+			entry[key] = Helper.CopyTableDeep(value)
+		end
+	end
+	return true
+end
+
 local function importCooldownManagerSpells(panelId, sourceKind)
 	panelId = normalizeId(panelId)
 	local panel = CooldownPanels:GetPanel(panelId)
 	if not panel then return nil, "PANEL_NOT_FOUND" end
-	local layoutChildren, sourceLabel, sourceErr = getCooldownManagerLayoutChildren(sourceKind)
+	local spellIds, sourceLabel, sourceErr = cdp.CDM.GetSpellIdsFromSource(sourceKind)
 	if sourceErr then return nil, sourceErr, sourceLabel end
 	local root = ensureRoot()
 	if not root then return nil, "NO_DB" end
@@ -11675,21 +11835,9 @@ local function importCooldownManagerSpells(panelId, sourceKind)
 	end
 
 	local stats = { added = 0, duplicates = 0, invalid = 0, seen = 0 }
-	if #layoutChildren > 0 then
-		for i = 1, #layoutChildren do
-			stats.seen = stats.seen + 1
-			importChild(layoutChildren[i], stats)
-		end
-	else
-		local numericKeys = {}
-		for key in pairs(layoutChildren) do
-			if type(key) == "number" then numericKeys[#numericKeys + 1] = key end
-		end
-		table.sort(numericKeys)
-		for _, key in ipairs(numericKeys) do
-			stats.seen = stats.seen + 1
-			importChild(layoutChildren[key], stats)
-		end
+	for i = 1, #spellIds do
+		stats.seen = stats.seen + 1
+		importChild({ spellID = spellIds[i] }, stats)
 	end
 
 	if stats.added > 0 then
@@ -11699,6 +11847,240 @@ local function importCooldownManagerSpells(panelId, sourceKind)
 	end
 	stats.sourceLabel = sourceLabel
 	return stats
+end
+
+function CooldownPanels:GetCooldownManagerSourceLabel(sourceKind)
+	return getCooldownManagerSourceLabel(sourceKind)
+end
+
+function CooldownPanels:GetPanelCooldownManagerSyncSource(panelId)
+	local panel = self:GetPanel(panelId)
+	local sourceKind = type(panel and panel.cdmSyncSource) == "string" and panel.cdmSyncSource:upper() or nil
+	return cdp.CDM.IsSyncSource(sourceKind) and sourceKind or nil
+end
+
+function CooldownPanels:HasCooldownManagerSyncPanels()
+	local root = ensureRoot()
+	if not (root and root.panels) then return false end
+	for _, panel in pairs(root.panels) do
+		local sourceKind = type(panel and panel.cdmSyncSource) == "string" and panel.cdmSyncSource:upper() or nil
+		if panel and panel.enabled ~= false and cdp.CDM.IsSyncSource(sourceKind) then return true end
+	end
+	return false
+end
+
+function CooldownPanels:SetPanelCooldownManagerSyncSource(panelId, sourceKind)
+	panelId = normalizeId(panelId)
+	local panel = self:GetPanel(panelId)
+	if not panel then return false end
+	sourceKind = cdp.CDM.IsSyncSource(sourceKind) and sourceKind:upper() or nil
+	if panel.cdmSyncSource == sourceKind then return false end
+	panel.cdmSyncSource = sourceKind
+	if sourceKind then
+		self:EnsureCooldownManagerSyncListener()
+		self:SyncPanelWithCooldownManager(panelId, sourceKind)
+	end
+	if self.BlizzardEditor and self.BlizzardEditor.RefreshPanel then self.BlizzardEditor:RefreshPanel(panelId) end
+	return true
+end
+
+function CooldownPanels:SyncPanelWithCooldownManager(panelId, sourceKind)
+	panelId = normalizeId(panelId)
+	sourceKind = cdp.CDM.IsSyncSource(sourceKind) and sourceKind:upper() or nil
+	local panel = panelId and self:GetPanel(panelId) or nil
+	if not (panel and sourceKind) then return nil, "PANEL_NOT_FOUND" end
+	if sourceKind == "BUFF_ICON" then
+		local cdmAuras = self.CDMAuras
+		if cdmAuras and cdmAuras.SyncEntries then return cdmAuras:SyncEntries(panelId, sourceKind) end
+		return nil, "SOURCE_NOT_FOUND", getCooldownManagerSourceLabel(sourceKind)
+	end
+	local spellIds, sourceLabel, sourceErr = cdp.CDM.GetSpellIdsFromSource(sourceKind)
+	if sourceErr then return nil, sourceErr, sourceLabel end
+	local root = ensureRoot()
+	if not root then return nil, "NO_DB", sourceLabel end
+	panel.entries = panel.entries or {}
+	panel.order = panel.order or {}
+
+	local wantedBySpellId = {}
+	local wantedOrder = {}
+	local stats = { added = 0, removed = 0, updated = 0, invalid = 0, seen = 0, sourceLabel = sourceLabel }
+	for i = 1, #spellIds do
+		stats.seen = stats.seen + 1
+		local spellId = tonumber(spellIds[i])
+		local baseSpellId = spellId and (getBaseSpellId(spellId) or spellId) or nil
+		if not (baseSpellId and spellExistsSafe(baseSpellId)) then
+			stats.invalid = stats.invalid + 1
+		else
+			local resolvedSpellId = self:NormalizePersistentSpellID(spellId, { allowTalentChoiceCanonical = true }) or baseSpellId
+			local canonicalSpellID = self:NormalizePersistentSpellID(resolvedSpellId, { allowTalentChoiceCanonical = true }) or resolvedSpellId
+			if not wantedBySpellId[canonicalSpellID] then
+				wantedBySpellId[canonicalSpellID] = resolvedSpellId
+				wantedOrder[#wantedOrder + 1] = canonicalSpellID
+			end
+		end
+	end
+
+	local currentSpecKey = cdp.CDM.GetEntryOverrideSpecKey()
+	panel.cdmSyncActiveSpecBySource = panel.cdmSyncActiveSpecBySource or {}
+	local previousSpecKey = panel.cdmSyncActiveSpecBySource[sourceKind]
+	local specChanged = previousSpecKey and previousSpecKey ~= currentSpecKey
+	if specChanged then cdp.CDM.SaveCurrentEntryOverrides(panel, sourceKind, previousSpecKey) end
+	panel.cdmSyncActiveSpecBySource[sourceKind] = currentSpecKey
+
+	local existingBySpellId = {}
+	local otherOrder = {}
+	local runtime = self.runtime
+	for _, entryId in ipairs(panel.order) do
+		local entry = panel.entries[entryId]
+		if entry and entry.type == "SPELL" and entry.spellID then
+			local canonicalSpellID = self:NormalizePersistentSpellID(entry.spellID, { allowTalentChoiceCanonical = true }) or tonumber(entry.spellID)
+			if canonicalSpellID then
+				existingBySpellId[canonicalSpellID] = entryId
+				if wantedBySpellId[canonicalSpellID] then
+					local entrySpecKey = entry.cdmSyncSpecKey or previousSpecKey
+					local entrySpecChanged = entrySpecKey and entrySpecKey ~= currentSpecKey
+					if entrySpecChanged then cdp.CDM.SaveEntryOverride(panel, sourceKind, canonicalSpellID, entry, entrySpecKey) end
+					entry.cdmSyncManaged = true
+					entry.cdmSyncSource = sourceKind
+					entry.cdmSyncKey = canonicalSpellID
+					entry.cdmSyncSpecKey = currentSpecKey
+					if entrySpecChanged then
+						if cdp.CDM.ApplyEntryOverride(panel, sourceKind, canonicalSpellID, entry, currentSpecKey) then
+							stats.updated = stats.updated + 1
+						elseif cdp.CDM.ResetEntryToSyncedDefault(entry, wantedBySpellId[canonicalSpellID], root.defaults) then
+							stats.updated = stats.updated + 1
+						end
+					end
+				else
+					otherOrder[#otherOrder + 1] = entryId
+				end
+			end
+		elseif entry then
+			otherOrder[#otherOrder + 1] = entryId
+		end
+	end
+	for entryId, entry in pairs(panel.entries) do
+		if entry and entry.type == "SPELL" and entry.spellID then
+			local canonicalSpellID = self:NormalizePersistentSpellID(entry.spellID, { allowTalentChoiceCanonical = true }) or tonumber(entry.spellID)
+			if canonicalSpellID and not wantedBySpellId[canonicalSpellID] then
+				local syncManaged = entry.cdmSyncManaged == true and (entry.cdmSyncSource == nil or entry.cdmSyncSource == sourceKind)
+				if syncManaged then
+					local removalSpecKey = entry.cdmSyncSpecKey or previousSpecKey or currentSpecKey
+					cdp.CDM.SaveEntryOverride(panel, sourceKind, canonicalSpellID, entry, removalSpecKey)
+					panel.entries[entryId] = nil
+					if runtime and runtime.actionDisplayCounts then runtime.actionDisplayCounts[Helper.GetEntryKey(panelId, entryId)] = nil end
+					self:ClearEntryCustomCooldownDuration(panelId, entryId, true)
+					stats.removed = stats.removed + 1
+				end
+			end
+		end
+	end
+	for _, canonicalSpellID in ipairs(wantedOrder) do
+		if not existingBySpellId[canonicalSpellID] then
+			if self:GetFixedEntryAddError(panel, nil) then
+				stats.invalid = stats.invalid + 1
+			else
+				local entryId = Helper.GetNextNumericId(panel.entries)
+				local entry = Helper.CreateEntry("SPELL", wantedBySpellId[canonicalSpellID], root.defaults)
+				entry.id = entryId
+				entry.cdmSyncManaged = true
+				entry.cdmSyncSource = sourceKind
+				entry.cdmSyncKey = canonicalSpellID
+				entry.cdmSyncSpecKey = currentSpecKey
+				cdp.CDM.ApplyEntryOverride(panel, sourceKind, canonicalSpellID, entry, currentSpecKey)
+				panel.entries[entryId] = entry
+				existingBySpellId[canonicalSpellID] = entryId
+				stats.added = stats.added + 1
+			end
+		end
+	end
+
+	local nextOrder = {}
+	for _, canonicalSpellID in ipairs(wantedOrder) do
+		local entryId = existingBySpellId[canonicalSpellID]
+		if entryId and panel.entries[entryId] then nextOrder[#nextOrder + 1] = entryId end
+	end
+	for _, entryId in ipairs(otherOrder) do
+		if panel.entries[entryId] then nextOrder[#nextOrder + 1] = entryId end
+	end
+	panel.order = nextOrder
+	Helper.SyncOrder(panel.order, panel.entries)
+	Helper.InvalidateFixedLayoutCache(panel)
+	if stats.added > 0 or stats.removed > 0 or stats.updated > 0 then self:RebuildSpellIndex() end
+	self:RefreshPanel(panelId)
+	if self.BlizzardEditor and self.BlizzardEditor.RefreshPanel then self.BlizzardEditor:RefreshPanel(panelId) end
+	return stats
+end
+
+function CooldownPanels:SyncCooldownManagerPanels(reason)
+	local root = ensureRoot()
+	if not (root and root.panels) then return false end
+	local synced = false
+	local sourceMissing = false
+	for panelId, panel in pairs(root.panels) do
+		local sourceKind = type(panel and panel.cdmSyncSource) == "string" and panel.cdmSyncSource:upper() or nil
+		if cdp.CDM.IsSyncSource(sourceKind) then
+			local _, err = self:SyncPanelWithCooldownManager(panelId, sourceKind)
+			if err == "SOURCE_NOT_FOUND" then sourceMissing = true end
+			synced = true
+		end
+	end
+	return synced, sourceMissing
+end
+
+function CooldownPanels:RequestCooldownManagerSync(reason, attempt, graceGeneration)
+	self.runtime = self.runtime or {}
+	local runtime = self.runtime
+	local useGrace = cdp.CDM.IsGraceSyncReason(reason)
+	attempt = tonumber(attempt) or 1
+	if runtime.cdmSyncPending then
+		runtime.cdmSyncRerunReason = reason or runtime.cdmSyncRerunReason or "CooldownManagerSyncQueued"
+		return
+	end
+	if useGrace then
+		if not graceGeneration then
+			runtime.cdmSyncGraceGeneration = (runtime.cdmSyncGraceGeneration or 0) + 1
+			graceGeneration = runtime.cdmSyncGraceGeneration
+		end
+	else
+		runtime.cdmSyncGraceGeneration = (runtime.cdmSyncGraceGeneration or 0) + 1
+	end
+	runtime.cdmSyncPending = true
+	local function run()
+		runtime.cdmSyncPending = nil
+		if useGrace and runtime.cdmSyncGraceGeneration ~= graceGeneration then return end
+		local _, sourceMissing = CooldownPanels:SyncCooldownManagerPanels(reason)
+		local retryDelays = cdp.CDM.LOGIN_SYNC_RETRY_DELAYS
+		if useGrace and sourceMissing and type(retryDelays) == "table" and attempt < #retryDelays then
+			CooldownPanels:RequestCooldownManagerSync(reason, attempt + 1, graceGeneration)
+		elseif runtime.cdmSyncRerunReason then
+			local rerunReason = runtime.cdmSyncRerunReason
+			runtime.cdmSyncRerunReason = nil
+			CooldownPanels:RequestCooldownManagerSync(rerunReason)
+		end
+	end
+	if C_Timer and C_Timer.After then
+		local retryDelays = cdp.CDM.LOGIN_SYNC_RETRY_DELAYS
+		local delay = (useGrace and type(retryDelays) == "table" and retryDelays[attempt]) or 0.2
+		C_Timer.After(delay, run)
+	else
+		run()
+	end
+end
+
+function CooldownPanels:EnsureCooldownManagerSyncListener()
+	self.runtime = self.runtime or {}
+	local runtime = self.runtime
+	if runtime.cdmSyncListenerRegistered then return end
+	if EventRegistry and EventRegistry.RegisterCallback then
+		local function onCooldownViewerSettingsChanged()
+			if not cdp.CDM.IsSettingsFrameShown() then return end
+			CooldownPanels:RequestCooldownManagerSync("CooldownViewerSettings.OnDataChanged")
+		end
+		EventRegistry:RegisterCallback("CooldownViewerSettings.OnDataChanged", onCooldownViewerSettingsChanged, self)
+		EventRegistry:RegisterCallback("CooldownViewerSettings.OnPendingChanges", onCooldownViewerSettingsChanged, self)
+		runtime.cdmSyncListenerRegistered = true
+	end
 end
 
 local function showImportCDMMenu(owner, panelId)
@@ -11809,10 +12191,6 @@ local function showPanelFilterMenu(owner)
 			if addon.db then addon.db.cooldownPanelsFilterSpec = addon.db.cooldownPanelsFilterSpec ~= true end
 			CooldownPanels:RefreshEditor()
 		end)
-		rootDescription:CreateCheckbox(L["CooldownPanelHideEmptyGroups"] or "Hide empty groups", function() return addon.db and addon.db.cooldownPanelsHideEmptyGroups == true end, function()
-			if addon.db then addon.db.cooldownPanelsHideEmptyGroups = addon.db.cooldownPanelsHideEmptyGroups ~= true end
-			CooldownPanels:RefreshEditor()
-		end)
 	end)
 end
 
@@ -11839,6 +12217,46 @@ local function showSoundMenu(owner, panelId, entryId)
 			end)
 		end
 	end)
+end
+
+function CooldownPanels:ShowAddEntryMenu(owner, panelId) return showSlotMenu(owner, panelId) end
+
+function CooldownPanels:ShowImportCDMMenu(owner, panelId) return showImportCDMMenu(owner, panelId) end
+
+function CooldownPanels:ShowEntrySoundMenu(owner, panelId, entryId) return showSoundMenu(owner, panelId, entryId) end
+
+function CooldownPanels:NormalizeStandaloneSettingsOrder(settings, sectionOrder)
+	if type(settings) ~= "table" or type(sectionOrder) ~= "table" then return settings end
+	local order = {}
+	for index, id in ipairs(sectionOrder) do
+		order[id] = index
+	end
+	local sections, children, loose = {}, {}, {}
+	for _, setting in ipairs(settings) do
+		local id = setting and setting.id
+		local parentId = setting and setting.parentId
+		if id and order[id] then
+			sections[id] = setting
+		elseif parentId and order[parentId] then
+			children[parentId] = children[parentId] or {}
+			children[parentId][#children[parentId] + 1] = setting
+		else
+			loose[#loose + 1] = setting
+		end
+	end
+	local sorted = {}
+	for _, id in ipairs(sectionOrder) do
+		if sections[id] then sorted[#sorted + 1] = sections[id] end
+		if children[id] then
+			for _, child in ipairs(children[id]) do
+				sorted[#sorted + 1] = child
+			end
+		end
+	end
+	for _, setting in ipairs(loose) do
+		sorted[#sorted + 1] = setting
+	end
+	return sorted
 end
 
 function CooldownPanels:GetLayoutEntryStandaloneMenuState(create)
@@ -11899,14 +12317,15 @@ function CooldownPanels:RefreshLayoutEntryStandaloneMenu(rebuild)
 	local panelId = normalizeId(state.panelId)
 	local entryId = normalizeId(state.entryId)
 	local panel, entry = self:GetLayoutEntryStandaloneDialogEntry(panelId, entryId)
-	local editor = getEditor()
+	local allowOutsideLayoutEdit = state.allowOutsideLayoutEdit == true
+	local editor = not allowOutsideLayoutEdit and getEditor() or nil
 	local selectedPanelId = normalizeId(editor and editor.selectedPanelId)
 	local selectedEntryId = normalizeId(editor and editor.selectedEntryId)
-	if not panel or not entry or not self:IsPanelLayoutEditActive(panelId) or selectedPanelId ~= panelId or selectedEntryId ~= entryId then
+	if not panel or not entry or (not allowOutsideLayoutEdit and (not self:IsPanelLayoutEditActive(panelId) or selectedPanelId ~= panelId or selectedEntryId ~= entryId)) then
 		self:HideLayoutEntryStandaloneMenu(panelId)
 		return
 	end
-	if rebuild == true then self:OpenLayoutEntryStandaloneMenu(panelId, entryId, state.anchorFrame or state.dialog or state.hostFrame) end
+	if rebuild == true then self:OpenLayoutEntryStandaloneMenu(panelId, entryId, state.anchorFrame or state.dialog or state.hostFrame, allowOutsideLayoutEdit) end
 end
 
 function CooldownPanels:FocusLayoutEntryStandaloneSettingsGroup(panelId, entryId, targetGroupId)
@@ -11925,6 +12344,9 @@ function CooldownPanels:FocusEntryStaticTextStandaloneSettings(panelId)
 end
 
 function CooldownPanels:GetEditorStandaloneDialogAnchor()
+	local blizzardEditor = self.BlizzardEditor
+	local blizzardFrame = blizzardEditor and blizzardEditor.frame or nil
+	if blizzardFrame and blizzardFrame.IsShown and blizzardFrame:IsShown() then return blizzardFrame end
 	local editor = getEditor()
 	local frame = editor and editor.frame or nil
 	if frame and frame.IsShown and frame:IsShown() then return frame end
@@ -11945,10 +12367,19 @@ end
 
 function CooldownPanels:DockStandaloneDialogToEditor(dialog)
 	local frame = self:GetEditorStandaloneDialogAnchor()
-	if not (dialog and frame) then return end
+	if not dialog then return false end
+	if not frame then
+		if dialog.SetMovable then dialog:SetMovable(true) end
+		if dialog.RegisterForDrag then dialog:RegisterForDrag("LeftButton") end
+		return false
+	end
 	if dialog.SetClampedToScreen then dialog:SetClampedToScreen(false) end
+	if dialog.SetMovable then dialog:SetMovable(true) end
+	if dialog.RegisterForDrag then dialog:RegisterForDrag("LeftButton") end
+	if dialog.StopMovingOrSizing then dialog:StopMovingOrSizing() end
 	dialog:ClearAllPoints()
 	dialog:SetPoint("TOPLEFT", frame, "TOPRIGHT", 8, 0)
+	return true
 end
 
 function CooldownPanels:GetStandaloneDialogSpawnPosition(anchorFrame, fallbackFrame, offsetX, offsetY)
@@ -11990,20 +12421,27 @@ function CooldownPanels:GetStandaloneDialogSpawnPosition(anchorFrame, fallbackFr
 	}
 end
 
-function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFrame)
+function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFrame, allowOutsideLayoutEdit)
 	local lib = addon.EditModeLib
 	if not (lib and lib.ShowStandaloneSettingsDialog and SettingType) then return end
 	panelId = normalizeId(panelId)
 	entryId = normalizeId(entryId)
 	if not (panelId and entryId) then return end
-	if not self:IsPanelLayoutEditActive(panelId) then return end
+	allowOutsideLayoutEdit = allowOutsideLayoutEdit == true
+	if not allowOutsideLayoutEdit and not self:IsPanelLayoutEditActive(panelId) then return end
+	local editor = getEditor()
+	local suppressBlizzardEditorLayoutEnd = editor and editor._eqolBlizzardEditorLayoutEdit == true
+	if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = true end
 	self:HideLayoutPanelStandaloneMenu(panelId)
 	self:HideLayoutFixedGroupStandaloneMenu(panelId)
 
 	local panel, entry = self:GetLayoutEntryStandaloneDialogEntry(panelId, entryId)
 	local runtime = getRuntime(panelId)
-	local hostFrame = runtime and runtime.frame or nil
-	if not (panel and entry and hostFrame) then return end
+	local hostFrame = runtime and runtime.frame or (self.EnsurePanelFrame and self:EnsurePanelFrame(panelId)) or nil
+	if not (panel and entry and hostFrame) then
+		if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = nil end
+		return
+	end
 	local spawnPosition = self:GetStandaloneDialogSpawnPosition(anchorFrame, hostFrame, 12, 0)
 	local defaultStaticFontPath, defaultStaticFontSize, defaultStaticFontStyle = Helper.GetCountFontDefaults(hostFrame)
 	local defaultCooldownFontPath, defaultCooldownFontSize, defaultCooldownFontStyle = self:GetCooldownFontDefaults(hostFrame)
@@ -12834,16 +13272,28 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 
 	local initialEffectiveType = getEffectiveType()
 	local settings = {
-		{
-			name = L["Display"] or "Display",
-			kind = SettingType.Collapsible,
-			id = "cooldownPanelStandaloneDisplay",
-			defaultCollapsed = false,
-		},
-		{
-			name = (initialEffectiveType == "STANCE" and (L["CooldownPanelShowWhenMissing"] or "Show when missing")) or (L["Always show"] or "Always show"),
-			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneDisplay",
+			{
+				name = L["Display"] or "Display",
+				kind = SettingType.Collapsible,
+				id = "cooldownPanelStandaloneDisplay",
+				defaultCollapsed = false,
+			},
+			{
+				name = L["Icon"] or "Icon",
+				kind = SettingType.Collapsible,
+				id = "cooldownPanelStandaloneIcon",
+				defaultCollapsed = true,
+			},
+			{
+				name = L["Visibility"] or "Visibility",
+				kind = SettingType.Collapsible,
+				id = "cooldownPanelStandaloneVisibility",
+				defaultCollapsed = true,
+			},
+			{
+				name = (initialEffectiveType == "STANCE" and (L["CooldownPanelShowWhenMissing"] or "Show when missing")) or (L["Always show"] or "Always show"),
+				kind = SettingType.Checkbox,
+				parentId = "cooldownPanelStandaloneDisplay",
 			isShown = function()
 				local effectiveType = getEffectiveType()
 				return effectiveType == "ITEM" or effectiveType == "STANCE"
@@ -12859,7 +13309,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		{
 			name = L["CooldownPanelOverwritePanelCDMAuraAlwaysShow"] or "Overwrite panel tracked aura display",
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneDisplay",
+			parentId = "cooldownPanelStandaloneVisibility",
 			isShown = function() return getEffectiveType() == "CDM_AURA" end,
 			get = function()
 				local _, currentEntry = getEntry()
@@ -12870,7 +13320,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		{
 			name = L["CooldownPanelCDMAuraAlwaysShowMode"] or "Tracked aura display",
 			kind = SettingType.Dropdown,
-			parentId = "cooldownPanelStandaloneDisplay",
+			parentId = "cooldownPanelStandaloneVisibility",
 			height = 180,
 			isShown = function() return getEffectiveType() == "CDM_AURA" end,
 			disabled = function()
@@ -12888,7 +13338,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		{
 			name = L["CooldownPanelOverwriteGlobalDefault"] or "Overwrite global default",
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneDisplay",
+			parentId = "cooldownPanelStandaloneVisibility",
 			isShown = function() return getEffectiveType() ~= "CDM_AURA" end,
 			get = function()
 				local _, currentEntry = getEntry()
@@ -12899,7 +13349,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		{
 			name = L["CooldownPanelHideOnCooldown"] or "Hide on cooldown",
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneDisplay",
+			parentId = "cooldownPanelStandaloneVisibility",
 			isShown = function() return getEffectiveType() ~= "CDM_AURA" end,
 			disabled = function()
 				local _, currentEntry = getEntry()
@@ -12911,7 +13361,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		{
 			name = L["CooldownPanelShowOnCooldown"] or "Show on cooldown",
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneDisplay",
+			parentId = "cooldownPanelStandaloneVisibility",
 			isShown = function() return getEffectiveType() ~= "CDM_AURA" end,
 			disabled = function()
 				local _, currentEntry = getEntry()
@@ -12923,7 +13373,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		{
 			name = L["CooldownPanelHideBorderOnCooldown"] or "Hide border on cooldown",
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneDisplay",
+			parentId = "cooldownPanelStandaloneVisibility",
 			get = function()
 				local _, currentEntry = getEntry()
 				return currentEntry and currentEntry.hideBorderOnCooldown == true or false
@@ -12933,7 +13383,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		{
 			name = L["CooldownPanelHideBorderOffCooldown"] or "Hide border off cooldown",
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneDisplay",
+			parentId = "cooldownPanelStandaloneVisibility",
 			get = function()
 				local _, currentEntry = getEntry()
 				return currentEntry and currentEntry.hideBorderOffCooldown == true or false
@@ -12962,10 +13412,11 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			isSelected = isRacialVariantExcluded,
 			setSelected = setRacialVariantExcluded,
 		},
-		{
-			name = L["CooldownPanelShowItemCount"] or "Show item count",
-			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneDisplay",
+			{
+				name = L["CooldownPanelShowItemCount"] or "Show item count",
+				tooltip = L["CooldownPanelShowItemCountTooltip"],
+				kind = SettingType.Checkbox,
+				parentId = "cooldownPanelStandaloneStacks",
 			isShown = function() return getEffectiveType() == "ITEM" end,
 			get = function()
 				local _, currentEntry = getEntry()
@@ -12973,10 +13424,11 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			end,
 			set = function(_, value) setEntryBoolean("showItemCount", value) end,
 		},
-		{
-			name = L["CooldownPanelShowItemUses"] or "Show item uses",
-			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneDisplay",
+			{
+				name = L["CooldownPanelShowItemUses"] or "Show item uses",
+				tooltip = L["CooldownPanelShowItemUsesTooltip"],
+				kind = SettingType.Checkbox,
+				parentId = "cooldownPanelStandaloneStacks",
 			isShown = function() return getEffectiveType() == "ITEM" end,
 			get = function()
 				local _, currentEntry = getEntry()
@@ -12986,6 +13438,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		},
 		{
 			name = L["CooldownPanelUseHighestRank"] or "Use highest rank",
+				tooltip = L["CooldownPanelUseHighestRankTooltip"],
 			kind = SettingType.Checkbox,
 			parentId = "cooldownPanelStandaloneDisplay",
 			isShown = function()
@@ -13004,6 +13457,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		},
 		{
 			name = L["CooldownPanelShowWhenEmpty"] or "Show when empty",
+				tooltip = L["CooldownPanelShowWhenEmptyTooltip"],
 			kind = SettingType.Checkbox,
 			parentId = "cooldownPanelStandaloneDisplay",
 			isShown = function() return getEffectiveType() == "ITEM" end,
@@ -13027,7 +13481,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		{
 			name = L["Hide icon"] or "Hide icon",
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneDisplay",
+			parentId = "cooldownPanelStandaloneIcon",
 			get = function()
 				local _, currentEntry = getEntry()
 				return currentEntry and (currentEntry.hideIcon == true or CooldownPanels:HasConfiguredStateTexture(currentEntry)) or false
@@ -13038,7 +13492,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		{
 			name = L["CooldownPanelOverwriteGlobalDefault"] or "Overwrite global default",
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneDisplay",
+			parentId = "cooldownPanelStandaloneIcon",
 			disabled = function() return entryHasStateTexture() end,
 			get = function()
 				local _, currentEntry = getEntry()
@@ -13049,7 +13503,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		{
 			name = L["CooldownPanelOverwriteGlobalSize"] or "Overwrite global size",
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneDisplay",
+			parentId = "cooldownPanelStandaloneIcon",
 			get = function()
 				local _, currentEntry = getEntry()
 				return currentEntry and currentEntry.iconSizeUseGlobal == false or false
@@ -13059,7 +13513,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		{
 			name = L["Icon size"] or "Icon size",
 			kind = SettingType.Slider,
-			parentId = "cooldownPanelStandaloneDisplay",
+			parentId = "cooldownPanelStandaloneIcon",
 			minValue = 12,
 			maxValue = 128,
 			valueStep = 1,
@@ -13082,7 +13536,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		{
 			name = L["CooldownPanelSeparateIconSize"] or "Separate icon width/height",
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneDisplay",
+			parentId = "cooldownPanelStandaloneIcon",
 			disabled = function()
 				local _, currentEntry = getEntry()
 				return not (currentEntry and currentEntry.iconSizeUseGlobal == false)
@@ -13096,7 +13550,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		{
 			name = L["CooldownPanelIconWidth"] or "Icon width",
 			kind = SettingType.Slider,
-			parentId = "cooldownPanelStandaloneDisplay",
+			parentId = "cooldownPanelStandaloneIcon",
 			minValue = 12,
 			maxValue = 128,
 			valueStep = 1,
@@ -13122,7 +13576,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		{
 			name = L["CooldownPanelIconHeight"] or "Icon height",
 			kind = SettingType.Slider,
-			parentId = "cooldownPanelStandaloneDisplay",
+			parentId = "cooldownPanelStandaloneIcon",
 			minValue = 12,
 			maxValue = 128,
 			valueStep = 1,
@@ -13148,7 +13602,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		{
 			name = L["Icon X"] or "Icon X",
 			kind = SettingType.Slider,
-			parentId = "cooldownPanelStandaloneDisplay",
+			parentId = "cooldownPanelStandaloneIcon",
 			minValue = -Helper.OFFSET_RANGE,
 			maxValue = Helper.STATE_TEXTURE_SPACING_RANGE or 2000,
 			valueStep = 1,
@@ -13163,7 +13617,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		{
 			name = L["Icon Y"] or "Icon Y",
 			kind = SettingType.Slider,
-			parentId = "cooldownPanelStandaloneDisplay",
+			parentId = "cooldownPanelStandaloneIcon",
 			minValue = -Helper.OFFSET_RANGE,
 			maxValue = Helper.STATE_TEXTURE_SPACING_RANGE or 2000,
 			valueStep = 1,
@@ -13176,7 +13630,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 		},
 		{
-			name = L["CooldownPanelStacksHeader"] or "Stacks / Item Count",
+			name = L["CooldownPanelCountersHeader"] or "Counters",
 			kind = SettingType.Collapsible,
 			id = "cooldownPanelStandaloneStacks",
 			defaultCollapsed = true,
@@ -13184,7 +13638,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 				local effectiveType = getEffectiveType()
 				local _, currentEntry = getEntry()
 				local slotID = effectiveType == "SLOT" and tonumber(currentEntry and currentEntry.slotID) or nil
-				return effectiveType == "SPELL" or effectiveType == "CDM_AURA" or slotID == 13 or slotID == 14
+				return effectiveType == "SPELL" or effectiveType == "CDM_AURA" or effectiveType == "ITEM" or slotID == 13 or slotID == 14
 			end,
 		},
 		{
@@ -13195,7 +13649,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 				local effectiveType = getEffectiveType()
 				local _, currentEntry = getEntry()
 				local slotID = effectiveType == "SLOT" and tonumber(currentEntry and currentEntry.slotID) or nil
-				return effectiveType == "SPELL" or effectiveType == "CDM_AURA" or slotID == 13 or slotID == 14
+				return effectiveType == "SPELL" or effectiveType == "CDM_AURA" or effectiveType == "ITEM" or slotID == 13 or slotID == 14
 			end,
 			get = function()
 				local _, currentEntry = getEntry()
@@ -13212,7 +13666,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 				local effectiveType = getEffectiveType()
 				local _, currentEntry = getEntry()
 				local slotID = effectiveType == "SLOT" and tonumber(currentEntry and currentEntry.slotID) or nil
-				return effectiveType == "SPELL" or effectiveType == "CDM_AURA" or slotID == 13 or slotID == 14
+				return effectiveType == "SPELL" or effectiveType == "CDM_AURA" or effectiveType == "ITEM" or slotID == 13 or slotID == 14
 			end,
 			get = function()
 				local _, currentEntry = getEntry()
@@ -13577,17 +14031,19 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			set = function(_, value) setEntryField("chargesFontSize", Helper.ClampInt(value, 6, 64, defaultChargesFontSize or 12)) end,
 			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 		},
-		{
-			name = L["Cooldown"] or "Cooldown",
-			kind = SettingType.Collapsible,
-			id = "cooldownPanelStandaloneCooldownVisuals",
-			defaultCollapsed = true,
-			isShown = function() return getEffectiveType() ~= "STANCE" end,
-		},
+			{
+				name = L["CooldownPanelActivationHeader"] or "Activation",
+				tooltip = L["CooldownPanelActivationHeaderTooltip"],
+				kind = SettingType.Collapsible,
+				id = "cooldownPanelStandaloneActivation",
+				defaultCollapsed = true,
+				isShown = function() return getEffectiveType() ~= "STANCE" end,
+			},
 		{
 			name = L["CooldownPanelCDMAuraOverlay"] or "Show aura overlay",
+			tooltip = L["CooldownPanelCDMAuraOverlayTooltip"],
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneCooldownVisuals",
+			parentId = "cooldownPanelStandaloneActivation",
 			isShown = function()
 				local _, currentEntry = getEntry()
 				return CooldownPanels:SupportsEntryCDMAuraOverlay(currentEntry, getEffectiveType())
@@ -13601,7 +14057,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		{
 			name = L["CooldownPanelActivationOverlayColor"] or "Activation overlay color",
 			kind = SettingType.Color,
-			parentId = "cooldownPanelStandaloneCooldownVisuals",
+			parentId = "cooldownPanelStandaloneActivation",
 			hasOpacity = true,
 			isShown = function()
 				local _, currentEntry = getEntry()
@@ -13623,7 +14079,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		{
 			name = L["CooldownPanelActivationOverlayReverse"] or "Reverse activation swipe",
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneCooldownVisuals",
+			parentId = "cooldownPanelStandaloneActivation",
 			isShown = function()
 				local _, currentEntry = getEntry()
 				return CooldownPanels:SupportsEntryCustomCooldownDuration(currentEntry, getEffectiveType()) or CooldownPanels:SupportsEntryCDMAuraOverlay(currentEntry, getEffectiveType())
@@ -13642,7 +14098,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		{
 			name = L["CooldownPanelActivationOverlayOnly"] or "Only show during activation",
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneCooldownVisuals",
+			parentId = "cooldownPanelStandaloneActivation",
 			isShown = function()
 				local _, currentEntry = getEntry()
 				return CooldownPanels:EntryUsesActivationOverlay(currentEntry, getEffectiveType())
@@ -13661,7 +14117,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		{
 			name = L["CooldownPanelActivationOverlayGlow"] or "Glow during activation",
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneCooldownVisuals",
+			parentId = "cooldownPanelStandaloneActivation",
 			isShown = function()
 				local _, currentEntry = getEntry()
 				return CooldownPanels:EntryUsesActivationOverlay(currentEntry, getEffectiveType())
@@ -13680,7 +14136,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		{
 			name = L["CooldownPanelAutoDuration"] or "Automatic duration on activation",
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneCooldownVisuals",
+			parentId = "cooldownPanelStandaloneActivation",
 			isShown = function()
 				local _, currentEntry = getEntry()
 				return CooldownPanels:SupportsEntryAutoCooldownDuration(currentEntry, getEffectiveType())
@@ -13693,8 +14149,9 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		},
 		{
 			name = L["CooldownPanelCustomDuration"] or "Custom duration on activation",
+				tooltip = L["CooldownPanelCustomDurationTooltip"],
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneCooldownVisuals",
+			parentId = "cooldownPanelStandaloneActivation",
 			isShown = function()
 				local _, currentEntry = getEntry()
 				return CooldownPanels:SupportsEntryCustomCooldownDuration(currentEntry, getEffectiveType())
@@ -13708,7 +14165,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		{
 			name = L["CooldownPanelCustomDurationSeconds"] or "Custom duration (sec)",
 			kind = SettingType.Slider,
-			parentId = "cooldownPanelStandaloneCooldownVisuals",
+			parentId = "cooldownPanelStandaloneActivation",
 			minValue = 1,
 			maxValue = Helper.CUSTOM_COOLDOWN_DURATION_MAX or 300,
 			valueStep = 1,
@@ -13728,21 +14185,30 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			set = function(_, value) setCustomCooldownDuration(value) end,
 			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 		},
-		{
-			name = L["CooldownPanelOverwriteGlobalDefault"] or "Overwrite global default",
-			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneCooldownVisuals",
-			isShown = function() return getEffectiveType() ~= "STANCE" end,
-			get = function()
-				local _, currentEntry = getEntry()
+			{
+				name = L["CooldownPanelCooldownSwipeHeader"] or "Cooldown Swipe",
+				tooltip = L["CooldownPanelCooldownSwipeHeaderTooltip"],
+				kind = SettingType.Collapsible,
+				id = "cooldownPanelStandaloneCooldownSwipe",
+				defaultCollapsed = true,
+				isShown = function() return getEffectiveType() ~= "STANCE" end,
+			},
+			{
+				name = L["CooldownPanelOverwriteGlobalDefault"] or "Overwrite global default",
+				kind = SettingType.Checkbox,
+				parentId = "cooldownPanelStandaloneCooldownSwipe",
+				isShown = function() return getEffectiveType() ~= "STANCE" end,
+				get = function()
+					local _, currentEntry = getEntry()
 				return currentEntry and currentEntry.cooldownVisualsUseGlobal == false or false
 			end,
 			set = function(_, value) setCooldownVisualsOverrideEnabled(value) end,
 		},
 		{
 			name = L["CooldownPanelShowChargesCooldown"] or "Show charges cooldown",
+			tooltip = L["CooldownPanelShowChargesCooldownTooltip"],
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneCooldownVisuals",
+			parentId = "cooldownPanelStandaloneCooldownSwipe",
 			isShown = function() return getEffectiveType() == "SPELL" end,
 			disabled = function()
 				local _, currentEntry = getEntry()
@@ -13756,9 +14222,10 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			set = function(_, value) setEntryBoolean("showChargesCooldown", value) end,
 		},
 		{
-			name = L["CooldownPanelDrawEdge"] or "Draw edge",
+			name = L["CooldownPanelShowEdge"] or "Show edge",
+			tooltip = L["CooldownPanelShowEdgeTooltip"],
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneCooldownVisuals",
+			parentId = "cooldownPanelStandaloneCooldownSwipe",
 			isShown = function() return getEffectiveType() ~= "STANCE" end,
 			disabled = function()
 				local _, currentEntry = getEntry()
@@ -13772,9 +14239,10 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			set = function(_, value) setEntryBoolean("cooldownDrawEdge", value) end,
 		},
 		{
-			name = L["CooldownPanelDrawBling"] or "Draw bling",
+			name = L["CooldownPanelShowFinishFlash"] or "Show finish flash",
+			tooltip = L["CooldownPanelShowFinishFlashTooltip"],
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneCooldownVisuals",
+			parentId = "cooldownPanelStandaloneCooldownSwipe",
 			isShown = function() return getEffectiveType() ~= "STANCE" end,
 			disabled = function()
 				local _, currentEntry = getEntry()
@@ -13788,9 +14256,10 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			set = function(_, value) setEntryBoolean("cooldownDrawBling", value) end,
 		},
 		{
-			name = L["CooldownPanelDrawSwipe"] or "Draw swipe",
+			name = L["CooldownPanelShowSwipe"] or "Show swipe",
+			tooltip = L["CooldownPanelShowSwipeTooltip"],
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneCooldownVisuals",
+			parentId = "cooldownPanelStandaloneCooldownSwipe",
 			isShown = function() return getEffectiveType() ~= "STANCE" end,
 			disabled = function()
 				local _, currentEntry = getEntry()
@@ -13804,9 +14273,10 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			set = function(_, value) setEntryBoolean("cooldownDrawSwipe", value) end,
 		},
 		{
-			name = L["CooldownPanelDrawEdgeGcd"] or "Draw edge on GCD",
+			name = L["CooldownPanelShowEdgeGcd"] or "Show edge on global cooldown",
+			tooltip = L["CooldownPanelShowEdgeGcdTooltip"],
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneCooldownVisuals",
+			parentId = "cooldownPanelStandaloneCooldownSwipe",
 			isShown = function() return getEffectiveType() ~= "STANCE" end,
 			disabled = function()
 				local _, currentEntry = getEntry()
@@ -13820,9 +14290,10 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			set = function(_, value) setEntryBoolean("cooldownGcdDrawEdge", value) end,
 		},
 		{
-			name = L["CooldownPanelDrawBlingGcd"] or "Draw bling on GCD",
+			name = L["CooldownPanelShowFinishFlashGcd"] or "Show finish flash on global cooldown",
+			tooltip = L["CooldownPanelShowFinishFlashTooltip"],
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneCooldownVisuals",
+			parentId = "cooldownPanelStandaloneCooldownSwipe",
 			isShown = function() return getEffectiveType() ~= "STANCE" end,
 			disabled = function()
 				local _, currentEntry = getEntry()
@@ -13836,9 +14307,10 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			set = function(_, value) setEntryBoolean("cooldownGcdDrawBling", value) end,
 		},
 		{
-			name = L["CooldownPanelDrawSwipeGcd"] or "Draw swipe on GCD",
+			name = L["CooldownPanelShowSwipeGcd"] or "Show swipe on global cooldown",
+			tooltip = L["CooldownPanelShowSwipeTooltip"],
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneCooldownVisuals",
+			parentId = "cooldownPanelStandaloneCooldownSwipe",
 			isShown = function() return getEffectiveType() ~= "STANCE" end,
 			disabled = function()
 				local _, currentEntry = getEntry()
@@ -13851,16 +14323,17 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			end,
 			set = function(_, value) setEntryBoolean("cooldownGcdDrawSwipe", value) end,
 		},
-		{
-			name = L["CooldownPanelOverlaysHeader"] or "Overlays",
-			kind = SettingType.Collapsible,
-			id = "cooldownPanelStandaloneOverlays",
-			defaultCollapsed = true,
-		},
+			{
+				name = L["CooldownPanelAvailabilityHeader"] or "Availability",
+				tooltip = L["CooldownPanelAvailabilityHeaderTooltip"],
+				kind = SettingType.Collapsible,
+				id = "cooldownPanelStandaloneAvailability",
+				defaultCollapsed = true,
+			},
 		{
 			name = L["CooldownPanelOverwriteGlobalDefault"] or "Overwrite global default",
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneOverlays",
+			parentId = "cooldownPanelStandaloneAvailability",
 			get = function()
 				local _, currentEntry = getEntry()
 				return currentEntry and currentEntry.noDesaturationUseGlobal == false or false
@@ -13868,9 +14341,10 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			set = function(_, value) setNoDesaturationOverrideEnabled(value) end,
 		},
 		{
-			name = L["CooldownPanelNoDesaturation"] or "No desaturation",
+			name = L["CooldownPanelKeepIconSaturated"] or "Keep icon saturated",
+			tooltip = L["CooldownPanelKeepIconSaturatedTooltip"],
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneOverlays",
+			parentId = "cooldownPanelStandaloneAvailability",
 			disabled = function()
 				local _, currentEntry = getEntry()
 				return not (currentEntry and currentEntry.noDesaturationUseGlobal == false)
@@ -13879,9 +14353,9 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			set = function(_, value) setEntryBoolean("noDesaturation", value) end,
 		},
 		{
-			name = L["CooldownPanelOverwritePanelCheckPower"] or "Overwrite panel power check",
+			name = L["CooldownPanelOverridePanelAvailabilityCheck"] or "Override panel availability check",
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneOverlays",
+			parentId = "cooldownPanelStandaloneAvailability",
 			isShown = function() return getEffectiveType() == "SPELL" end,
 			get = function()
 				local _, currentEntry = getEntry()
@@ -13898,9 +14372,10 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			end,
 		},
 		{
-			name = L["Check power"] or "Check power",
+			name = L["CooldownPanelRequireEnoughResource"] or "Require enough resource",
+			tooltip = L["CooldownPanelRequireEnoughResourceTooltip"],
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneOverlays",
+			parentId = "cooldownPanelStandaloneAvailability",
 			isShown = function() return getEffectiveType() == "SPELL" end,
 			disabled = function()
 				local _, currentEntry = getEntry()
@@ -13910,9 +14385,9 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			set = function(_, value) setEntryBoolean("checkPower", value) end,
 		},
 		{
-			name = L["CooldownPanelOverwritePanelHideWhenNoResource"] or "Overwrite panel hide when no resource",
+			name = L["CooldownPanelOverrideMissingResourceVisibility"] or "Override missing-resource visibility",
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneOverlays",
+			parentId = "cooldownPanelStandaloneAvailability",
 			isShown = function() return getEffectiveType() == "SPELL" end,
 			get = function()
 				local _, currentEntry = getEntry()
@@ -13921,9 +14396,10 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			set = function(_, value) setHideWhenNoResourceOverrideEnabled(value) end,
 		},
 		{
-			name = L["CooldownPanelHideWhenNoResource"] or "Hide when no resource",
+			name = L["CooldownPanelHideWhenResourceMissing"] or "Hide when resource is missing",
+			tooltip = L["CooldownPanelHideWhenResourceMissingTooltip"],
 			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneOverlays",
+			parentId = "cooldownPanelStandaloneAvailability",
 			isShown = function() return getEffectiveType() == "SPELL" end,
 			disabled = function()
 				local _, currentEntry = getEntry()
@@ -14087,10 +14563,11 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			defaultCollapsed = true,
 			isShown = function() return true end,
 		},
-		{
-			name = L["CooldownPanelStaticText"] or "Static text",
-			kind = SettingType.Input,
-			parentId = "cooldownPanelStandaloneStaticText",
+			{
+				name = L["CooldownPanelStaticText"] or "Static text",
+				tooltip = L["CooldownPanelStaticTextTooltip"],
+				kind = SettingType.Input,
+				parentId = "cooldownPanelStandaloneStaticText",
 			inputWidth = 220,
 			isShown = function() return true end,
 			get = function()
@@ -14560,7 +15037,8 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			set = function(_, value) setGlowOverrideEnabled(value) end,
 		},
 		{
-			name = L["CooldownPanelReadyGlowCheckPower"] or "Require resource for ready glow",
+			name = L["CooldownPanelOnlyGlowWhenUsable"] or "Only glow when usable",
+			tooltip = L["CooldownPanelOnlyGlowWhenUsableTooltip"],
 			kind = SettingType.Checkbox,
 			parentId = "cooldownPanelStandaloneGlow",
 			isShown = function() return getEffectiveType() == "SPELL" end,
@@ -14888,6 +15366,22 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		},
 	}
 
+	settings = self:NormalizeStandaloneSettingsOrder(settings, {
+		"cooldownPanelStandaloneDisplay",
+		"cooldownPanelStandaloneIcon",
+		"cooldownPanelStandaloneVisibility",
+		"cooldownPanelStandaloneAvailability",
+		"cooldownPanelStandaloneActivation",
+		"cooldownPanelStandaloneCooldownSwipe",
+		"cooldownPanelStandaloneCooldownText",
+		"cooldownPanelStandaloneStaticText",
+		"cooldownPanelStandaloneStacks",
+		"cooldownPanelStandaloneCharges",
+		"cooldownPanelStandaloneStateTexture",
+		"cooldownPanelStandaloneGlow",
+		"cooldownPanelStandaloneSound",
+	})
+
 	local buttons = {}
 	local bars = self.Bars
 	local isBarEntry = bars and bars.IsBarDisplayModeValue and bars.IsBarDisplayModeValue(entry.displayMode) or false
@@ -14933,8 +15427,16 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		relativeTo = spawnPosition.relativeTo,
 		x = spawnPosition.x,
 		y = spawnPosition.y,
-		onHide = function() CooldownPanels:ClearLayoutEntryStandaloneMenuState() end,
+		onHide = function()
+			local state = CooldownPanels:GetLayoutEntryStandaloneMenuState(false)
+			local fromBlizzardEditor = state and state.blizzardEditorLayoutEdit == true
+			local editor = getEditor()
+			local suppressLayoutEnd = editor and editor._eqolSuppressBlizzardEditorLayoutEditEnd == true
+			CooldownPanels:ClearLayoutEntryStandaloneMenuState()
+			if fromBlizzardEditor and not suppressLayoutEnd and CooldownPanels.SetEditorLayoutEditEnabled then CooldownPanels:SetEditorLayoutEditEnabled(false) end
+		end,
 	})
+	if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = nil end
 	if dialog then
 		self:DockStandaloneDialogToEditor(dialog)
 		local state = self:GetLayoutEntryStandaloneMenuState()
@@ -14943,6 +15445,9 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		state.hostFrame = hostFrame
 		state.anchorFrame = anchorFrame
 		state.dialog = dialog
+		state.allowOutsideLayoutEdit = allowOutsideLayoutEdit
+		local editor = getEditor()
+		state.blizzardEditorLayoutEdit = editor and editor._eqolBlizzardEditorLayoutEdit == true or false
 	end
 end
 
@@ -15014,6 +15519,9 @@ function CooldownPanels:OpenLayoutPanelStandaloneMenu(panelId, anchorFrame)
 	if not (lib and lib.ShowStandaloneSettingsDialog and SettingType) then return end
 	panelId = normalizeId(panelId)
 	if not (panelId and self:IsLayoutPanelStandaloneMenuAvailable(panelId)) then return end
+	local editor = getEditor()
+	local suppressBlizzardEditorLayoutEnd = editor and editor._eqolBlizzardEditorLayoutEdit == true
+	if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = true end
 	self:HideLayoutEntryStandaloneMenu(panelId)
 	self:HideLayoutFixedGroupStandaloneMenu(panelId)
 
@@ -15022,7 +15530,10 @@ function CooldownPanels:OpenLayoutPanelStandaloneMenu(panelId, anchorFrame)
 	local registeredPanel = self:GetPanel(panelId)
 	local registeredHostFrame = registeredRuntime and registeredRuntime.frame or nil
 	local registeredSettings = registeredRuntime and registeredRuntime.layoutPanelSettings or nil
-	if not (registeredPanel and registeredHostFrame and registeredSettings) then return end
+	if not (registeredPanel and registeredHostFrame and registeredSettings) then
+		if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = nil end
+		return
+	end
 
 	local spawnPosition = self:GetStandaloneDialogSpawnPosition(anchorFrame, registeredHostFrame, 12, 0)
 	local dialog = lib:ShowStandaloneSettingsDialog(registeredHostFrame, {
@@ -15036,14 +15547,24 @@ function CooldownPanels:OpenLayoutPanelStandaloneMenu(panelId, anchorFrame)
 		relativeTo = spawnPosition.relativeTo,
 		x = spawnPosition.x,
 		y = spawnPosition.y,
-		onHide = function() CooldownPanels:ClearLayoutPanelStandaloneMenuState() end,
+		onHide = function()
+			local state = CooldownPanels:GetLayoutPanelStandaloneMenuState(false)
+			local fromBlizzardEditor = state and state.blizzardEditorLayoutEdit == true
+			local editor = getEditor()
+			local suppressLayoutEnd = editor and editor._eqolSuppressBlizzardEditorLayoutEditEnd == true
+			CooldownPanels:ClearLayoutPanelStandaloneMenuState()
+			if fromBlizzardEditor and not suppressLayoutEnd and CooldownPanels.SetEditorLayoutEditEnabled then CooldownPanels:SetEditorLayoutEditEnabled(false) end
+		end,
 	})
+	if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = nil end
 	if dialog then
 		self:DockStandaloneDialogToEditor(dialog)
 		local state = self:GetLayoutPanelStandaloneMenuState()
 		state.panelId = panelId
 		state.hostFrame = registeredHostFrame
 		state.dialog = dialog
+		local editor = getEditor()
+		state.blizzardEditorLayoutEdit = editor and editor._eqolBlizzardEditorLayoutEdit == true or false
 	end
 end
 
@@ -15212,12 +15733,12 @@ function CooldownPanels:BuildLayoutFixedGroupStandaloneSettings(panelId, groupId
 	end
 
 	return {
-		{
-			name = L["Group"] or "Group",
-			kind = SettingType.Collapsible,
-			id = "cooldownPanelStandaloneFixedGroupGeneral",
-			defaultCollapsed = false,
-		},
+			{
+				name = _G.GENERAL or "General",
+				kind = SettingType.Collapsible,
+				id = "cooldownPanelStandaloneFixedGroupGeneral",
+				defaultCollapsed = false,
+			},
 		{
 			name = L["CooldownPanelRename"] or "Name",
 			kind = SettingType.Input,
@@ -15256,10 +15777,16 @@ function CooldownPanels:BuildLayoutFixedGroupStandaloneSettings(panelId, groupId
 				end, function() setMode("STATIC") end)
 			end,
 		},
-		{
-			name = L["CooldownPanelStartPoint"] or "Start point",
-			kind = SettingType.Dropdown,
-			parentId = "cooldownPanelStandaloneFixedGroupGeneral",
+			{
+				name = L["Layout"] or "Layout",
+				kind = SettingType.Collapsible,
+				id = "cooldownPanelStandaloneFixedGroupLayout",
+				defaultCollapsed = true,
+			},
+			{
+				name = L["CooldownPanelStartPoint"] or "Start point",
+				kind = SettingType.Dropdown,
+				parentId = "cooldownPanelStandaloneFixedGroupLayout",
 			height = 160,
 			disabled = function()
 				local _, group = getPanelAndGroup()
@@ -15282,10 +15809,10 @@ function CooldownPanels:BuildLayoutFixedGroupStandaloneSettings(panelId, groupId
 				end
 			end,
 		},
-		{
-			name = L["Growth direction"] or "Growth direction",
-			kind = SettingType.Dropdown,
-			parentId = "cooldownPanelStandaloneFixedGroupGeneral",
+			{
+				name = L["Growth direction"] or "Growth direction",
+				kind = SettingType.Dropdown,
+				parentId = "cooldownPanelStandaloneFixedGroupLayout",
 			height = 90,
 			disabled = function()
 				local _, group = getPanelAndGroup()
@@ -15311,9 +15838,30 @@ function CooldownPanels:BuildLayoutFixedGroupStandaloneSettings(panelId, groupId
 			end,
 		},
 		{
-			name = L["Icon X"] or "Icon X",
+			name = L["Spacing"] or "Spacing",
 			kind = SettingType.Slider,
-			parentId = "cooldownPanelStandaloneFixedGroupGeneral",
+			parentId = "cooldownPanelStandaloneFixedGroupLayout",
+			minValue = 0,
+			maxValue = Helper.SPACING_RANGE or 200,
+			valueStep = 1,
+			allowInput = true,
+			get = function()
+				local layout = getLayout()
+				return Helper.ClampInt(layout and layout.spacing, 0, Helper.SPACING_RANGE or 200, Helper.PANEL_LAYOUT_DEFAULTS.spacing)
+			end,
+			set = function(_, value) setOverride("spacing", value) end,
+			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
+		},
+			{
+				name = L["Icon"] or "Icon",
+				kind = SettingType.Collapsible,
+				id = "cooldownPanelStandaloneFixedGroupIcon",
+				defaultCollapsed = true,
+			},
+			{
+				name = L["Icon X"] or "Icon X",
+				kind = SettingType.Slider,
+				parentId = "cooldownPanelStandaloneFixedGroupIcon",
 			minValue = -(Helper.OFFSET_RANGE or 200),
 			maxValue = Helper.OFFSET_RANGE or 200,
 			valueStep = 1,
@@ -15325,10 +15873,10 @@ function CooldownPanels:BuildLayoutFixedGroupStandaloneSettings(panelId, groupId
 			set = function(_, value) setOverride("iconOffsetX", value) end,
 			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 		},
-		{
-			name = L["Icon Y"] or "Icon Y",
-			kind = SettingType.Slider,
-			parentId = "cooldownPanelStandaloneFixedGroupGeneral",
+			{
+				name = L["Icon Y"] or "Icon Y",
+				kind = SettingType.Slider,
+				parentId = "cooldownPanelStandaloneFixedGroupIcon",
 			minValue = -(Helper.OFFSET_RANGE or 200),
 			maxValue = Helper.OFFSET_RANGE or 200,
 			valueStep = 1,
@@ -15340,10 +15888,10 @@ function CooldownPanels:BuildLayoutFixedGroupStandaloneSettings(panelId, groupId
 			set = function(_, value) setOverride("iconOffsetY", value) end,
 			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 		},
-		{
-			name = L["CooldownPanelUseCustomIconSize"] or "Use custom icon size",
-			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneFixedGroupGeneral",
+			{
+				name = L["CooldownPanelUseCustomIconSize"] or "Use custom icon size",
+				kind = SettingType.Checkbox,
+				parentId = "cooldownPanelStandaloneFixedGroupIcon",
 			get = function()
 				local _, group = getPanelAndGroup()
 				return group and (Helper.NormalizeFixedGroupIconSize(group.iconSize) ~= nil or group.iconSizeSeparate == true) or false
@@ -15358,10 +15906,10 @@ function CooldownPanels:BuildLayoutFixedGroupStandaloneSettings(panelId, groupId
 				if CooldownPanels:SetFixedGroupIconSize(panelId, groupId, nextSize) then refresh() end
 			end,
 		},
-		{
-			name = L["Icon size"] or "Icon size",
-			kind = SettingType.Slider,
-			parentId = "cooldownPanelStandaloneFixedGroupGeneral",
+			{
+				name = L["Icon size"] or "Icon size",
+				kind = SettingType.Slider,
+				parentId = "cooldownPanelStandaloneFixedGroupIcon",
 			minValue = 12,
 			maxValue = 128,
 			valueStep = 1,
@@ -15380,10 +15928,10 @@ function CooldownPanels:BuildLayoutFixedGroupStandaloneSettings(panelId, groupId
 			end,
 			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 		},
-		{
-			name = L["CooldownPanelSeparateIconSize"] or "Separate icon width/height",
-			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneFixedGroupGeneral",
+			{
+				name = L["CooldownPanelSeparateIconSize"] or "Separate icon width/height",
+				kind = SettingType.Checkbox,
+				parentId = "cooldownPanelStandaloneFixedGroupIcon",
 			disabled = function()
 				local _, group = getPanelAndGroup()
 				return group == nil or (Helper.NormalizeFixedGroupIconSize(group.iconSize) == nil and group.iconSizeSeparate ~= true)
@@ -15396,10 +15944,10 @@ function CooldownPanels:BuildLayoutFixedGroupStandaloneSettings(panelId, groupId
 				if CooldownPanels:SetFixedGroupSeparateIconSize(panelId, groupId, value) then refresh() end
 			end,
 		},
-		{
-			name = L["CooldownPanelIconWidth"] or "Icon width",
-			kind = SettingType.Slider,
-			parentId = "cooldownPanelStandaloneFixedGroupGeneral",
+			{
+				name = L["CooldownPanelIconWidth"] or "Icon width",
+				kind = SettingType.Slider,
+				parentId = "cooldownPanelStandaloneFixedGroupIcon",
 			minValue = 12,
 			maxValue = 128,
 			valueStep = 1,
@@ -15418,10 +15966,10 @@ function CooldownPanels:BuildLayoutFixedGroupStandaloneSettings(panelId, groupId
 			end,
 			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 		},
-		{
-			name = L["CooldownPanelIconHeight"] or "Icon height",
-			kind = SettingType.Slider,
-			parentId = "cooldownPanelStandaloneFixedGroupGeneral",
+			{
+				name = L["CooldownPanelIconHeight"] or "Icon height",
+				kind = SettingType.Slider,
+				parentId = "cooldownPanelStandaloneFixedGroupIcon",
 			minValue = 12,
 			maxValue = 128,
 			valueStep = 1,
@@ -15438,21 +15986,6 @@ function CooldownPanels:BuildLayoutFixedGroupStandaloneSettings(panelId, groupId
 			set = function(_, value)
 				if CooldownPanels:SetFixedGroupIconDimension(panelId, groupId, "iconHeight", value) then refreshLivePreview() end
 			end,
-			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
-		},
-		{
-			name = L["Spacing"] or "Spacing",
-			kind = SettingType.Slider,
-			parentId = "cooldownPanelStandaloneFixedGroupGeneral",
-			minValue = 0,
-			maxValue = Helper.SPACING_RANGE or 200,
-			valueStep = 1,
-			allowInput = true,
-			get = function()
-				local layout = getLayout()
-				return Helper.ClampInt(layout and layout.spacing, 0, Helper.SPACING_RANGE or 200, Helper.PANEL_LAYOUT_DEFAULTS.spacing)
-			end,
-			set = function(_, value) setOverride("spacing", value) end,
 			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 		},
 		{
@@ -15520,7 +16053,8 @@ function CooldownPanels:BuildLayoutFixedGroupStandaloneSettings(panelId, groupId
 			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 		},
 		{
-			name = L["CooldownPanelReadyGlowCheckPower"] or "Require resource for ready glow",
+			name = L["CooldownPanelOnlyGlowWhenUsable"] or "Only glow when usable",
+			tooltip = L["CooldownPanelOnlyGlowWhenUsableTooltip"],
 			kind = SettingType.Checkbox,
 			parentId = "cooldownPanelStandaloneFixedGroupGlow",
 			get = function()
@@ -15694,6 +16228,9 @@ function CooldownPanels:OpenLayoutFixedGroupStandaloneMenu(panelId, groupId, anc
 	panelId = normalizeId(panelId)
 	groupId = Helper.NormalizeFixedGroupId(groupId)
 	if not self:IsLayoutFixedGroupStandaloneMenuAvailable(panelId, groupId) then return end
+	local editor = getEditor()
+	local suppressBlizzardEditorLayoutEnd = editor and editor._eqolBlizzardEditorLayoutEdit == true
+	if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = true end
 	self:HideLayoutEntryStandaloneMenu(panelId)
 	self:HideLayoutPanelStandaloneMenu(panelId)
 	self:HideLayoutFixedGroupStandaloneMenu(panelId)
@@ -15703,7 +16240,10 @@ function CooldownPanels:OpenLayoutFixedGroupStandaloneMenu(panelId, groupId, anc
 	local runtime = getRuntime(panelId)
 	local hostFrame = runtime and runtime.frame or nil
 	local settings = self:BuildLayoutFixedGroupStandaloneSettings(panelId, groupId)
-	if not (group and hostFrame and settings) then return end
+	if not (group and hostFrame and settings) then
+		if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = nil end
+		return
+	end
 
 	local spawnPosition = self:GetStandaloneDialogSpawnPosition(anchorFrame, hostFrame, 12, 0)
 	local buttons = {
@@ -15731,8 +16271,16 @@ function CooldownPanels:OpenLayoutFixedGroupStandaloneMenu(panelId, groupId, anc
 		relativeTo = spawnPosition.relativeTo,
 		x = spawnPosition.x,
 		y = spawnPosition.y,
-		onHide = function() CooldownPanels:ClearLayoutFixedGroupStandaloneMenuState() end,
+		onHide = function()
+			local state = CooldownPanels:GetLayoutFixedGroupStandaloneMenuState(false)
+			local fromBlizzardEditor = state and state.blizzardEditorLayoutEdit == true
+			local currentEditor = getEditor()
+			local suppressLayoutEnd = currentEditor and currentEditor._eqolSuppressBlizzardEditorLayoutEditEnd == true
+			CooldownPanels:ClearLayoutFixedGroupStandaloneMenuState()
+			if fromBlizzardEditor and not suppressLayoutEnd and CooldownPanels.SetEditorLayoutEditEnabled then CooldownPanels:SetEditorLayoutEditEnabled(false) end
+		end,
 	})
+	if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = nil end
 	if dialog then
 		self:DockStandaloneDialogToEditor(dialog)
 		local state = self:GetLayoutFixedGroupStandaloneMenuState()
@@ -15740,6 +16288,7 @@ function CooldownPanels:OpenLayoutFixedGroupStandaloneMenu(panelId, groupId, anc
 		state.groupId = groupId
 		state.hostFrame = hostFrame
 		state.dialog = dialog
+		state.blizzardEditorLayoutEdit = editor and editor._eqolBlizzardEditorLayoutEdit == true or false
 		self:ScheduleLayoutFixedGroupStandaloneMenuRefresh(panelId, groupId)
 	end
 end
@@ -16130,9 +16679,6 @@ local function ensureEditor()
 	panelContent:SetWidth(panelScroll:GetWidth() or 1)
 	panelScroll:SetScript("OnSizeChanged", function(self) panelContent:SetWidth(self:GetWidth() or 1) end)
 
-	local addGroup = Helper.CreateButton(left, L["CooldownPanelAddGroup"] or "Add Group", 96, 22)
-	addGroup:SetPoint("BOTTOMLEFT", left, "BOTTOMLEFT", 12, 40)
-
 	local importPanel = Helper.CreateButton(left, L["CooldownPanelImportPanel"] or "Import Panel", 96, 22)
 	importPanel:SetPoint("BOTTOMRIGHT", left, "BOTTOMRIGHT", -12, 40)
 
@@ -16213,6 +16759,13 @@ local function ensureEditor()
 	local entryType = rightContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 	entryType:SetPoint("TOPLEFT", entryName, "BOTTOMLEFT", 0, -2)
 	entryType:SetJustifyH("LEFT")
+
+	local entrySpellIDInfo = rightContent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	entrySpellIDInfo:SetPoint("TOPLEFT", entryType, "BOTTOMLEFT", 0, -3)
+	entrySpellIDInfo:SetWidth(180)
+	entrySpellIDInfo:SetJustifyH("LEFT")
+	entrySpellIDInfo:SetTextColor(0.85, 0.85, 0.85, 1)
+	entrySpellIDInfo:Hide()
 
 	local entryIdBox = Helper.CreateEditBox(rightContent, 120, 20)
 	entryIdBox:SetPoint("TOPLEFT", entryIcon, "BOTTOMLEFT", 0, -8)
@@ -16437,7 +16990,6 @@ local function ensureEditor()
 		previewFrame = previewFrame,
 		previewHintLabel = previewHintLabel,
 		entryHint = entryHint,
-		addGroup = addGroup,
 		importPanel = importPanel,
 		addPanel = addPanel,
 		deletePanel = deletePanel,
@@ -16462,6 +17014,7 @@ local function ensureEditor()
 			entryIcon = entryIcon,
 			entryName = entryName,
 			entryType = entryType,
+			entrySpellIDInfo = entrySpellIDInfo,
 			entryId = entryIdBox,
 			cbCooldownText = cbCooldownText,
 			cbTrackPassiveSpell = cbTrackPassiveSpell,
@@ -16512,10 +17065,6 @@ local function ensureEditor()
 			end
 		end
 	end
-
-	addGroup:SetScript("OnClick", function()
-		if CooldownPanels.ShowEditorGroupCreatePopup then CooldownPanels:ShowEditorGroupCreatePopup() end
-	end)
 
 	addPanel:SetScript("OnClick", function()
 		local newName = L["CooldownPanelNewPanel"] or "New Panel"
@@ -16572,14 +17121,8 @@ local function ensureEditor()
 
 	local function commitPanelNameChange(self)
 		local panelId = editor.selectedPanelId
-		local panel = panelId and CooldownPanels:GetPanel(panelId)
 		local text = self:GetText()
-		if panel and text and text ~= "" and text ~= panel.name then
-			panel.name = text
-			CooldownPanels.MarkRelativeFrameEntriesDirty()
-			refreshStandaloneSettings()
-			CooldownPanels:RefreshPanel(panelId)
-		end
+		CooldownPanels:SetPanelEditorName(panelId, text)
 	end
 
 	panelNameBox:SetScript("OnEnterPressed", function(self)
@@ -16900,6 +17443,62 @@ local function ensureEditor()
 	return runtime.editor
 end
 
+	function CooldownPanels:OpenBlizzardEditorEntrySettings(panelId, entryId, anchorFrame)
+		local editor = ensureEditor()
+		panelId = normalizeId(panelId)
+		entryId = normalizeId(entryId)
+		local panel = panelId and self:GetPanel(panelId) or nil
+		local entry = panel and panel.entries and panel.entries[entryId] or nil
+		if not (editor and panel and entry) then return false end
+		editor._eqolBlizzardEditorLayoutEdit = true
+		editor._eqolSuppressBlizzardEditorLayoutEditEnd = true
+		if self.SelectPanel then self:SelectPanel(panelId) end
+		editor._eqolSuppressLayoutPanelDialog = true
+		if self.SetEditorLayoutEditEnabled then self:SetEditorLayoutEditEnabled(true) end
+		editor._eqolSuppressLayoutPanelDialog = nil
+		editor._eqolSuppressBlizzardEditorLayoutEditEnd = nil
+		if self.SelectEntry then self:SelectEntry(entryId) end
+		if self.OpenLayoutEntryStandaloneMenu then self:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFrame) end
+		return true
+	end
+
+function CooldownPanels:OpenBlizzardEditorPanelSettings(panelId, anchorFrame)
+	local editor = ensureEditor()
+		panelId = normalizeId(panelId)
+		local panel = panelId and self:GetPanel(panelId) or nil
+		if not (editor and panel) then return false end
+		editor._eqolBlizzardEditorLayoutEdit = true
+		editor._eqolSuppressBlizzardEditorLayoutEditEnd = true
+		editor._eqolSuppressLayoutPanelDialog = true
+		if self.SelectPanel then self:SelectPanel(panelId) end
+		if self.SetEditorLayoutEditEnabled then self:SetEditorLayoutEditEnabled(true) end
+		editor._eqolSuppressLayoutPanelDialog = nil
+		editor._eqolSuppressBlizzardEditorLayoutEditEnd = nil
+		if self.OpenLayoutPanelStandaloneMenu then self:OpenLayoutPanelStandaloneMenu(panelId, anchorFrame) end
+		return true
+	end
+
+function CooldownPanels:ShowDeletePanelPopup(panelId)
+	panelId = normalizeId(panelId)
+	local panel = panelId and self:GetPanel(panelId) or nil
+	if not panel then return false end
+	ensureDeletePopup()
+	StaticPopup_Show("EQOL_COOLDOWN_PANEL_DELETE", panel.name or nil, nil, { panelId = panelId })
+	return true
+end
+
+function CooldownPanels:ShowExportPanelPopup(panelId)
+	panelId = normalizeId(panelId)
+	if not (panelId and self:GetPanel(panelId)) then return false end
+	local code = self:ExportPanel(panelId)
+	if not code then
+		showErrorMessage(L["DataExportFailed"] or "Export failed.")
+		return false
+	end
+	cdp.EXPORT.ShowDialog(L["CooldownPanelExportPanel"] or "Export Panel", code)
+	return true
+end
+
 ensureDeletePopup = function()
 	if StaticPopupDialogs["EQOL_COOLDOWN_PANEL_DELETE"] then return end
 	StaticPopupDialogs["EQOL_COOLDOWN_PANEL_DELETE"] = {
@@ -16914,6 +17513,7 @@ ensureDeletePopup = function()
 			if not data or not data.panelId then return end
 			CooldownPanels:DeletePanel(data.panelId)
 			CooldownPanels:RefreshEditor()
+			if CooldownPanels.BlizzardEditor and CooldownPanels.BlizzardEditor.Refresh then CooldownPanels.BlizzardEditor:Refresh() end
 		end,
 	}
 end
@@ -16956,7 +17556,7 @@ end
 function CooldownPanels.EnsureImportPanelPopup()
 	if StaticPopupDialogs["EQOL_COOLDOWN_PANEL_IMPORT"] then return end
 	StaticPopupDialogs["EQOL_COOLDOWN_PANEL_IMPORT"] = {
-		text = L["CooldownPanelImportConfirm"] or "Import a cooldown panel or group?",
+		text = L["CooldownPanelImportConfirm"] or "Import a cooldown panel?",
 		button1 = L["Import"] or OKAY,
 		button2 = CANCEL,
 		hasEditBox = true,
@@ -16982,6 +17582,7 @@ function CooldownPanels.EnsureImportPanelPopup()
 				print("|cff00ff98Enhance QoL|r: " .. tostring(cdp.EXPORT.ImportErrorMessage(reason)))
 				return
 			end
+			if CooldownPanels.BlizzardEditor and CooldownPanels.BlizzardEditor.Refresh then CooldownPanels.BlizzardEditor:Refresh() end
 			print("|cff00ff98Enhance QoL|r: " .. (L["CooldownPanelImportSuccess"] or "Cooldown panel imported."))
 		end,
 	}
@@ -17027,6 +17628,7 @@ ensureImportCDMPopup = function()
 				)
 			end
 			CooldownPanels:RefreshEditor()
+			if CooldownPanels.BlizzardEditor and CooldownPanels.BlizzardEditor.Refresh then CooldownPanels.BlizzardEditor:Refresh() end
 		end,
 	}
 end
@@ -17141,9 +17743,7 @@ function CooldownPanels:EnsureEditorGroupDeletePopup()
 end
 
 function CooldownPanels:ShowEditorGroupCreatePopup(parentGroupId)
-	parentGroupId = normalizeId(parentGroupId)
-	self:EnsureEditorGroupCreatePopup()
-	StaticPopup_Show("EQOL_COOLDOWN_PANEL_GROUP_CREATE", nil, nil, { parentGroupId = parentGroupId })
+	return false
 end
 
 function CooldownPanels:ShowEditorGroupRenamePopup(groupId)
@@ -17275,99 +17875,8 @@ function CooldownPanels:ShowFixedGroupIconSizePopup(panelId, groupId)
 	StaticPopup_Show("EQOL_COOLDOWN_PANEL_FIXED_GROUP_ICON_SIZE", nil, nil, { panelId = panelId, groupId = groupId })
 end
 
-function CooldownPanels:ShowFixedGroupMenu(owner, panelId, groupId)
-	panelId = normalizeId(panelId)
-	groupId = Helper.NormalizeFixedGroupId(groupId)
-	if not (owner and panelId and groupId and Api.MenuUtil and Api.MenuUtil.CreateContextMenu) then return end
-	local panel = self:GetPanel(panelId)
-	local group = panel and CooldownPanels.GetFixedGroupById(panel, groupId) or nil
-	if not group then return end
-	local groupName = CooldownPanels.GetFixedGroupName(group)
-	Api.MenuUtil.CreateContextMenu(owner, function(_, rootDescription)
-		rootDescription:CreateTitle(CooldownPanels.GetFixedGroupDisplayLabel(group))
-		rootDescription:CreateDivider()
-		local modeMenu = rootDescription:CreateButton(L["Mode"] or "Mode")
-		modeMenu:CreateRadio(L["CooldownPanelDynamic"] or "Dynamic", function() return not CooldownPanels.IsFixedGroupStatic(group) end, function()
-			if CooldownPanels:SetFixedGroupMode(panelId, groupId, "DYNAMIC") then
-				CooldownPanels:RefreshPanel(panelId)
-				CooldownPanels:RefreshEditor()
-			end
-		end)
-		modeMenu:CreateRadio(L["CooldownPanelStatic"] or "Static", function() return CooldownPanels.IsFixedGroupStatic(group) end, function()
-			local changed, reason = CooldownPanels:SetFixedGroupMode(panelId, groupId, "STATIC")
-			if changed then
-				CooldownPanels:RefreshPanel(panelId)
-				CooldownPanels:RefreshEditor()
-			elseif reason == "GROUP_FULL" then
-				showErrorMessage(L["CooldownPanelFixedGroupFull"] or "Fixed group is full.")
-			end
-		end)
-		local sizeMenu = rootDescription:CreateButton(L["Icon size"] or "Icon size")
-		sizeMenu:CreateRadio(L["CooldownPanelUsePanelSize"] or "Use panel size", function() return Helper.NormalizeFixedGroupIconSize(group.iconSize) == nil and group.iconSizeSeparate ~= true end, function()
-			if CooldownPanels:SetFixedGroupIconSize(panelId, groupId, nil) then
-				CooldownPanels:RefreshPanel(panelId)
-				CooldownPanels:RefreshEditor()
-			end
-		end)
-		for _, preset in ipairs({ 24, 30, 36, 42, 48, 56 }) do
-			local size = preset
-			sizeMenu:CreateRadio(tostring(size), function() return Helper.NormalizeFixedGroupIconSize(group.iconSize) == size and group.iconSizeSeparate ~= true end, function()
-				if CooldownPanels:SetFixedGroupIconSize(panelId, groupId, size) then
-					CooldownPanels:RefreshPanel(panelId)
-					CooldownPanels:RefreshEditor()
-				end
-			end)
-		end
-		sizeMenu:CreateButton(CUSTOM or "Custom", function() CooldownPanels:ShowFixedGroupIconSizePopup(panelId, groupId) end)
-		rootDescription:CreateDivider()
-		rootDescription:CreateButton(L["CooldownPanelRename"] or "Rename", function() CooldownPanels:ShowFixedGroupRenamePopup(panelId, groupId) end)
-		rootDescription:CreateButton(DELETE or "Delete", function()
-			CooldownPanels:EnsureFixedGroupDeletePopup()
-			StaticPopup_Show("EQOL_COOLDOWN_PANEL_FIXED_GROUP_DELETE", groupName, nil, { panelId = panelId, groupId = groupId })
-		end)
-	end)
-end
-
 function CooldownPanels:ShowEditorGroupMenu(owner, groupId)
-	groupId = normalizeId(groupId)
-	if not (owner and groupId and Api.MenuUtil and Api.MenuUtil.CreateContextMenu) then return end
-	local root = ensureRoot()
-	root = CooldownPanels.EnsureEditorGroupStorage(root)
-	local group = root and root.editorGroups and root.editorGroups[groupId] or nil
-	local groupName = group and group.name or ("Group " .. tostring(groupId))
-	local currentParentId = group and normalizeId(group.parentGroupId) or nil
-	local blockedGroupIds = CooldownPanels:GetEditorGroupDescendantIdSet(root, groupId)
-	blockedGroupIds[groupId] = true
-	Api.MenuUtil.CreateContextMenu(owner, function(_, rootDescription)
-		rootDescription:CreateTitle(groupName)
-		rootDescription:CreateDivider()
-		rootDescription:CreateButton(L["CooldownPanelAddSubgroup"] or "Add Subgroup", function() CooldownPanels:ShowEditorGroupCreatePopup(groupId) end)
-		local parentMenu = rootDescription:CreateButton(L["CooldownPanelMoveToGroup"] or "Move to group")
-		parentMenu:CreateRadio(L["CooldownPanelTopLevel"] or "Top level", function() return currentParentId == nil end, function()
-			if CooldownPanels:SetEditorGroupParent(groupId, nil) then CooldownPanels:RefreshEditor() end
-		end)
-		CooldownPanels:PopulateEditorGroupRadioMenu(parentMenu, root, currentParentId, function(targetGroupId)
-			if CooldownPanels:SetEditorGroupParent(groupId, targetGroupId) then
-				local editor = getEditor()
-				if editor then CooldownPanels:GetEditorPanelGroupState(editor)[CooldownPanels:GetEditorPanelGroupStateKey(targetGroupId)] = nil end
-				CooldownPanels:RefreshEditor()
-			end
-		end, { skipGroupIds = blockedGroupIds })
-		rootDescription:CreateDivider()
-		rootDescription:CreateButton(L["CooldownPanelRename"] or "Rename", function() CooldownPanels:ShowEditorGroupRenamePopup(groupId) end)
-		rootDescription:CreateButton(L["CooldownPanelExportGroup"] or "Export Group", function()
-			local code = CooldownPanels:ExportEditorGroup(groupId)
-			if not code then
-				showErrorMessage(L["DataExportFailed"] or "Export failed.")
-				return
-			end
-			cdp.EXPORT.ShowDialog(L["CooldownPanelExportGroup"] or "Export Group", code)
-		end)
-		rootDescription:CreateButton(DELETE or "Delete", function()
-			CooldownPanels:EnsureEditorGroupDeletePopup()
-			StaticPopup_Show("EQOL_COOLDOWN_PANEL_GROUP_DELETE", groupName, nil, { groupId = groupId })
-		end)
-	end)
+	return false
 end
 
 function CooldownPanels:ShowPanelGroupAssignMenu(owner, panelId)
@@ -17394,21 +17903,6 @@ function CooldownPanels:ShowPanelGroupAssignMenu(owner, panelId)
 			end
 			cdp.EXPORT.ShowDialog(L["CooldownPanelExportPanel"] or "Export Panel", code)
 		end)
-
-		local currentGroupId = normalizeId(panel.editorGroupId)
-		local groupMenu = rootDescription:CreateButton(L["CooldownPanelAddToGroup"] or "Add to group")
-		groupMenu:CreateRadio(L["CooldownPanelUngrouped"] or "Ungrouped", function() return currentGroupId == nil end, function()
-			if CooldownPanels:SetPanelEditorGroup(panelId, nil) then CooldownPanels:RefreshEditor() end
-		end)
-
-		local hasGroups = CooldownPanels:PopulateEditorGroupRadioMenu(groupMenu, root, currentGroupId, function(targetGroupId)
-			if CooldownPanels:SetPanelEditorGroup(panelId, targetGroupId) then CooldownPanels:RefreshEditor() end
-		end)
-
-		if not hasGroups then
-			groupMenu:CreateButton(L["CooldownPanelNoGroups"] or "No groups", function() end)
-			rootDescription:CreateButton(L["CooldownPanelAddGroup"] or "Add Group", function() CooldownPanels:ShowEditorGroupCreatePopup() end)
-		end
 	end)
 end
 
@@ -17464,107 +17958,25 @@ local function refreshPanelList(editor, root, classSpecs)
 	local index = 0
 	local filterByClass = addon.db and addon.db.cooldownPanelsFilterClass == true
 	local filterBySpec = addon.db and addon.db.cooldownPanelsFilterSpec == true
-	local hideEmptyGroups = addon.db and addon.db.cooldownPanelsHideEmptyGroups == true
-	local groups = root.editorGroups or {}
-	local groupedPanelIds = {}
-	local ungroupedPanelIds = {}
 	local entries = {}
-	local showUngroupedBucket = false
-
-	CooldownPanels:SortEditorGroupOrder(root)
-	local childrenByParent = CooldownPanels:BuildEditorGroupHierarchy(root)
-
-	for _, groupId in ipairs(root.editorGroupOrder or {}) do
-		if groups[groupId] then groupedPanelIds[groupId] = {} end
-	end
 
 	for _, panelId in ipairs(root.order or {}) do
 		local panel = root.panels and root.panels[panelId]
 		if panel then
+			panel.editorGroupId = nil
+			panel.editorGroup = nil
 			local matchesClass = not filterByClass or panelMatchesPlayerClass(panel, classSpecs)
 			local matchesSpec = not filterBySpec or panelAllowsSpec(panel)
 			if matchesClass and matchesSpec then
-				local groupId = normalizeId(panel.editorGroupId)
-				if groupId and groups[groupId] then
-					local bucket = groupedPanelIds[groupId]
-					if not bucket then
-						bucket = {}
-						groupedPanelIds[groupId] = bucket
-					end
-					bucket[#bucket + 1] = panelId
-				else
-					ungroupedPanelIds[#ungroupedPanelIds + 1] = panelId
-				end
+				entries[#entries + 1] = {
+					kind = "panel",
+					groupId = nil,
+					panelId = panelId,
+					panel = panel,
+					depth = 0,
+				}
 			end
 		end
-	end
-
-	showUngroupedBucket = #ungroupedPanelIds > 0 or editor.draggingPanel == true
-
-	local function getHierarchyKey(groupId)
-		groupId = normalizeId(groupId)
-		if groupId ~= nil then return tostring(groupId) end
-		return "__root"
-	end
-
-	local visibleGroupCounts = {}
-
-	local function getVisibleGroupCount(groupId)
-		if visibleGroupCounts[groupId] ~= nil then return visibleGroupCounts[groupId] end
-		local count = #(groupedPanelIds[groupId] or {})
-		for _, childGroupId in ipairs(childrenByParent[getHierarchyKey(groupId)] or {}) do
-			count = count + getVisibleGroupCount(childGroupId)
-		end
-		visibleGroupCounts[groupId] = count
-		return count
-	end
-
-	local function appendBucket(groupId, label, count, depth)
-		local collapsed = CooldownPanels:IsEditorPanelGroupCollapsed(editor, groupId)
-		entries[#entries + 1] = {
-			kind = "bucket",
-			groupId = groupId,
-			label = label,
-			count = count or 0,
-			collapsed = collapsed,
-			depth = depth or 0,
-		}
-		return collapsed ~= true
-	end
-
-	local function appendGroup(groupId, depth)
-		local group = groups[groupId]
-		if not group then return end
-		local count = getVisibleGroupCount(groupId)
-		if hideEmptyGroups and count <= 0 and editor.draggingPanel ~= true then return end
-		if not appendBucket(groupId, group.name or ("Group " .. tostring(groupId)), count, depth) then return end
-		for _, childGroupId in ipairs(childrenByParent[getHierarchyKey(groupId)] or {}) do
-			appendGroup(childGroupId, depth + 1)
-		end
-		for _, panelId in ipairs(groupedPanelIds[groupId] or {}) do
-			entries[#entries + 1] = {
-				kind = "panel",
-				groupId = groupId,
-				panelId = panelId,
-				panel = root.panels and root.panels[panelId] or nil,
-				depth = (depth or 0) + 1,
-			}
-		end
-	end
-
-	if showUngroupedBucket and appendBucket(nil, L["CooldownPanelUngrouped"] or "Ungrouped", #ungroupedPanelIds, 0) then
-		for _, panelId in ipairs(ungroupedPanelIds) do
-			entries[#entries + 1] = {
-				kind = "panel",
-				groupId = nil,
-				panelId = panelId,
-				panel = root.panels and root.panels[panelId] or nil,
-				depth = 1,
-			}
-		end
-	end
-	for _, groupId in ipairs(childrenByParent["__root"] or {}) do
-		appendGroup(groupId, 0)
 	end
 
 	for _, entry in ipairs(entries) do
@@ -17635,22 +18047,17 @@ local function refreshPanelList(editor, root, classSpecs)
 				if sourcePanel then
 					if targetPanelId and targetPanelId ~= fromId then
 						local targetPanel = root.panels and root.panels[targetPanelId] or nil
-						if targetPanel then
-							sourcePanel.editorGroupId = normalizeId(targetPanel.editorGroupId)
-							movePanelInOrder(root, fromId, targetPanelId)
-						end
+						if targetPanel then movePanelInOrder(root, fromId, targetPanelId) end
 					elseif hasBucketTarget then
-						sourcePanel.editorGroupId = normalizeId(targetBucketId)
 						for _, candidateId in ipairs(root.order or {}) do
 							if candidateId ~= fromId then
-								local candidatePanel = root.panels and root.panels[candidateId] or nil
-								if candidatePanel and normalizeId(candidatePanel.editorGroupId) == normalizeId(targetBucketId) then
-									movePanelInOrder(root, fromId, candidateId)
-									break
-								end
+								movePanelInOrder(root, fromId, candidateId)
+								break
 							end
 						end
 					end
+					sourcePanel.editorGroupId = nil
+					sourcePanel.editorGroup = nil
 				end
 				CooldownPanels:RefreshEditor()
 			end)
@@ -18487,6 +18894,16 @@ local function refreshInspector(editor, panel, entry)
 		inspector.entryIcon:SetTexture(getEntryIcon(entry))
 		inspector.entryName:SetText(getEntryName(entry))
 		inspector.entryType:SetText(getEntryTypeLabel(entry.type))
+		local spellIDInfoText = cdp.ENTRY.GetEntrySpellIDInfoText(entry)
+		if inspector.entrySpellIDInfo then
+			if spellIDInfoText then
+				inspector.entrySpellIDInfo:SetText(spellIDInfoText)
+				inspector.entrySpellIDInfo:Show()
+			else
+				inspector.entrySpellIDInfo:SetText("")
+				inspector.entrySpellIDInfo:Hide()
+			end
+		end
 		local entryIdText = tostring(entry.spellID or entry.itemID or entry.slotID or entry.stanceID or entry.macroID or "")
 		local cdmAuras = CooldownPanels.CDMAuras
 		if entry.type == "CDM_AURA" and cdmAuras and cdmAuras.GetEntryIdText then entryIdText = tostring(cdmAuras:GetEntryIdText(entry) or "") end
@@ -18577,6 +18994,10 @@ local function refreshInspector(editor, panel, entry)
 		if inspector.entryIcon then inspector.entryIcon:Hide() end
 		if inspector.entryName then inspector.entryName:Hide() end
 		if inspector.entryType then inspector.entryType:Hide() end
+		if inspector.entrySpellIDInfo then
+			inspector.entrySpellIDInfo:SetText("")
+			inspector.entrySpellIDInfo:Hide()
+		end
 		if inspector.entryId then
 			inspector.entryId:SetText("")
 			if inspector.entryId.SetNumeric then inspector.entryId:SetNumeric(true) end
@@ -19040,11 +19461,7 @@ function CooldownPanels:ConfigureLayoutEditPanelIcon(panelId, icon, entryId, slo
 			local currentPanel = CooldownPanels:GetPanel(panelId)
 			local group = currentPanel and CooldownPanels.GetFixedGroupAtCell(currentPanel, currentColumn, currentRow) or nil
 			if group then
-				if IsControlKeyDown and IsControlKeyDown() then
-					CooldownPanels:ShowFixedGroupMenu(handle or icon, panelId, group.id)
-				else
-					CooldownPanels:OpenLayoutFixedGroupStandaloneMenu(panelId, group.id, handle or icon)
-				end
+				CooldownPanels:OpenLayoutFixedGroupStandaloneMenu(panelId, group.id, handle or icon)
 				return
 			end
 			return
@@ -19065,14 +19482,17 @@ function CooldownPanels:ConfigureLayoutEditPanelIcon(panelId, icon, entryId, slo
 		local selectedCandidate = cursorCandidates and cursorCandidates[1] or nil
 		local targetEntryId = selectedCandidate and selectedCandidate.entryId or currentEntryId
 		local targetAnchor = selectedCandidate and (selectedCandidate.anchorFrame or selectedCandidate.icon) or (handle or icon)
-		if targetEntryId then
-			CooldownPanels:SelectEntry(targetEntryId)
-			CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, targetEntryId, targetAnchor)
-		else
-			CooldownPanels:HideLayoutEntryStandaloneMenu(panelId)
-			CooldownPanels:RefreshEditor()
-		end
-	end)
+			if targetEntryId then
+				CooldownPanels:SelectEntry(targetEntryId)
+				CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, targetEntryId, targetAnchor)
+			else
+				local suppressBlizzardEditorLayoutEnd = editor and editor._eqolBlizzardEditorLayoutEdit == true
+				if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = true end
+				CooldownPanels:HideLayoutEntryStandaloneMenu(panelId)
+				if suppressBlizzardEditorLayoutEnd then editor._eqolSuppressBlizzardEditorLayoutEditEnd = nil end
+				CooldownPanels:RefreshEditor()
+			end
+		end)
 	if slotAnchorHandle then
 		slotAnchorHandle:SetScript("OnEnter", CooldownPanels.LayoutSlotAnchorHandleOnEnter)
 		slotAnchorHandle:SetScript("OnLeave", CooldownPanels.LayoutSlotAnchorHandleOnLeave)
@@ -19146,20 +19566,21 @@ function CooldownPanels:UpdatePreviewIcons(panelId, countOverride)
 				CooldownPanels:ResolveEntryStateTexture(entry)
 		end
 		local slotColumn = previewGridColumns and (((i - 1) % previewGridColumns) + 1) or (editGridColumns and (((i - 1) % editGridColumns) + 1) or i)
-		local slotRow = previewGridColumns and (math.floor((i - 1) / previewGridColumns) + 1) or (editGridColumns and (math.floor((i - 1) / editGridColumns) + 1) or 1)
-		icon:Show()
-		icon._eqolPreviewCellColumn = slotColumn
-		icon._eqolPreviewCellRow = slotRow
-		CooldownPanels:ApplyEntryIconVisualLayout(icon, entryLayout, entry, fixedLayout and panel or nil, fixedLayout and previewGridColumns or nil, slotColumn, slotRow)
-		CooldownPanels:HideEditorGhostIcon(icon)
-		icon.texture:SetTexture(entry and getEntryIcon(entry) or Helper.PREVIEW_ICON)
-		icon.texture:SetVertexColor(1, 1, 1)
-		icon.texture:SetShown(showEntryIconTexture or not entry)
+			local slotRow = previewGridColumns and (math.floor((i - 1) / previewGridColumns) + 1) or (editGridColumns and (math.floor((i - 1) / editGridColumns) + 1) or 1)
+			icon:Show()
+			icon._eqolPreviewCellColumn = slotColumn
+			icon._eqolPreviewCellRow = slotRow
+			CooldownPanels:ApplyEntryIconVisualLayout(icon, entryLayout, entry, fixedLayout and panel or nil, fixedLayout and previewGridColumns or nil, slotColumn, slotRow)
+			CooldownPanels:HideEditorGhostIcon(icon)
+			icon.texture:SetTexture(entry and getEntryIcon(entry) or Helper.PREVIEW_ICON)
+			cdp.ENTRY.ApplyIconTextureAspect(icon, entryLayout, true)
+			icon.texture:SetVertexColor(1, 1, 1)
+			icon.texture:SetShown(showEntryIconTexture or not entry)
 		local entryAuraOverlayEnabled = CooldownPanels:IsEntryCDMAuraOverlayEnabled(entryLayout, entry, resolvedType) and CooldownPanels:SupportsEntryCDMAuraOverlay(entry, resolvedType)
 		local cooldownUsesAuraDisplay = resolvedType == "CDM_AURA" or CooldownPanels:GetEntryCustomCooldownDuration(entry, resolvedType) ~= nil or entryAuraOverlayEnabled
 		local cooldownReverse = resolvedType == "CDM_AURA" or CooldownPanels:GetEntryCustomCooldownDuration(entry, resolvedType) ~= nil or (entryAuraOverlayEnabled and (not entry or entry.activationOverlayReverse ~= false))
-		if icon.cooldown.SetReverse then icon.cooldown:SetReverse(cooldownReverse) end
 		if icon.cooldown.SetUseAuraDisplayTime then icon.cooldown:SetUseAuraDisplayTime(cooldownUsesAuraDisplay) end
+		if icon.cooldown.SetReverse then icon.cooldown:SetReverse(cooldownReverse) end
 		icon.cooldown:SetHideCountdownNumbers(not showCooldownText)
 		CooldownPanels:ApplyEntryCooldownTextStyle(icon, entryLayout, entry)
 		CooldownPanels:ApplyEntryStackTextStyle(icon, entryLayout, entry, defaultCountFontPath, defaultCountFontSize, defaultCountFontStyle)
@@ -20038,7 +20459,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				if resolvedType == "CDM_AURA" then
 					pandemicGlowColor, pandemicGlowStyle, pandemicGlowInset = CooldownPanels:ResolveEntryPandemicGlowVisual(entryLayout, entry)
 				end
-				local otherAuraGlowColor = resolvedType == "CDM_AURA" and Helper.NormalizeColor(entry.glowOtherAuraColor, glowColor) or glowColor
+				local otherAuraGlowColor = resolvedType == "CDM_AURA" and CooldownPanels.ResolveCachedEntryColor("otherAuraGlowEntry", entry, entry.glowOtherAuraColor, glowColor) or glowColor
 				local soundReady = false
 				local soundName = normalizeSoundName(nil)
 				local previewSound = false
@@ -20204,10 +20625,18 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				data.liveGlowAllowed = entryLayout.hideGlowOutOfCombat ~= true or playerInCombat == true
 				data.entry = entry
 				data.entryId = entryId
-				data.fixedContext = fixedGroupDynamicRuntimeIndex and {
-					dynamicLocalIndex = fixedGroupDynamicRuntimeIndex,
-					dynamicCount = fixedGroupDynamicRuntimeIndex,
-				} or nil
+				local fixedContext = data.fixedContext
+				if fixedGroupDynamicRuntimeIndex then
+					if not fixedContext then
+						fixedContext = {}
+						data.fixedContext = fixedContext
+					end
+					fixedContext.dynamicLocalIndex = fixedGroupDynamicRuntimeIndex
+					fixedContext.dynamicCount = fixedGroupDynamicRuntimeIndex
+				elseif fixedContext then
+					fixedContext.dynamicLocalIndex = nil
+					fixedContext.dynamicCount = nil
+				end
 				data.hideOnCooldown = entryHideOnCooldown == true
 				data.showOnCooldown = entryShowOnCooldown == true
 				data.resolvedType = resolvedType
@@ -20335,9 +20764,13 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 						centerList = {}
 						fixedCenterGroupVisibleData[fixedGroup.id] = centerList
 					end
-					data.fixedContext = {
-						dynamicLocalIndex = fixedGroupVisibleCounts[fixedGroup.id] or #centerList + 1,
-					}
+					local centerFixedContext = data.fixedContext
+					if not centerFixedContext then
+						centerFixedContext = {}
+						data.fixedContext = centerFixedContext
+					end
+					centerFixedContext.dynamicLocalIndex = fixedGroupVisibleCounts[fixedGroup.id] or #centerList + 1
+					centerFixedContext.dynamicCount = nil
 					centerList[#centerList + 1] = data
 				end
 			end
@@ -20524,6 +20957,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				icon.texture:SetTexture(data.icon or Helper.PREVIEW_ICON)
 				cdp.RUNTIME.WriteTextureSnapshot(icon._eqolRuntimeSnapshot, data)
 			end
+			if data._eqolRuntimeTextureDirty or data._eqolRuntimePlacementDirty then cdp.ENTRY.ApplyIconTextureAspect(icon, data.layout, true) end
 			icon.texture:SetAlpha(1)
 			if data._eqolRuntimeBaseDecorDirty then
 				icon.texture:SetShown(data.showIconTexture ~= false)
@@ -20532,8 +20966,8 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 			local cooldownUsesAuraDisplay = data.resolvedType == "CDM_AURA" or data.customCooldownDurationActive == true or data.spellAuraOverlayActive == true
 			if data._eqolRuntimePlacementDirty or cdp.RUNTIME.HasCooldownWidgetConfigChange(icon._eqolRuntimeSnapshot, data, cooldownUsesAuraDisplay) then
 				icon.cooldown:SetHideCountdownNumbers(not data.showCooldownText)
-				if icon.cooldown.SetReverse then icon.cooldown:SetReverse(data.cooldownReverse == true) end
 				if icon.cooldown.SetUseAuraDisplayTime then icon.cooldown:SetUseAuraDisplayTime(cooldownUsesAuraDisplay) end
+				if icon.cooldown.SetReverse then icon.cooldown:SetReverse(data.cooldownReverse == true) end
 				cdp.ENTRY.ApplyCooldownSwipeVisual(icon, data)
 				cdp.RUNTIME.WriteCooldownWidgetConfigSnapshot(icon._eqolRuntimeSnapshot, data, cooldownUsesAuraDisplay)
 			end
@@ -22143,7 +22577,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 	local function isFixedLayout() return Helper.NormalizeLayoutMode(layout.layoutMode, Helper.PANEL_LAYOUT_DEFAULTS.layoutMode) == "FIXED" end
 	local function usesSeparateIconSize() return layout.iconSizeSeparate == true end
 	local function shouldShowRowSize(index)
-		if isRadialLayout() or usesSeparateIconSize() then return false end
+		if isRadialLayout() then return false end
 		local rows, primaryHorizontal = getPanelRowCount(panel, layout)
 		return primaryHorizontal and rows >= index
 	end
@@ -22188,14 +22622,15 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				height = 140,
 				get = function()
 					local currentPanel = CooldownPanels:GetPanel(panelId)
-					local bars = CooldownPanels.Bars
-					return bars and bars.GetPanelDurationTextProfile and bars.GetPanelDurationTextProfile(currentPanel) or "MINIMAL"
+					return CooldownPanels:GetPanelDurationTextProfile(currentPanel)
 				end,
 				set = function(_, value)
 					local currentPanel = CooldownPanels:GetPanel(panelId)
-					local bars = CooldownPanels.Bars
-					if not (currentPanel and bars and bars.NormalizeDurationTextProfile) then return end
-					currentPanel.barDurationTextProfile = bars.NormalizeDurationTextProfile(value, "MINIMAL")
+					if not currentPanel then return end
+					currentPanel.layout = currentPanel.layout or Helper.CopyTableShallow(Helper.PANEL_LAYOUT_DEFAULTS)
+					local profileKey = CooldownPanels:NormalizeDurationTextProfile(value, "MINIMAL")
+					currentPanel.layout.durationTextProfile = profileKey
+					currentPanel.barDurationTextProfile = profileKey
 					CooldownPanels:RefreshPanel(panelId)
 					CooldownPanels:RefreshEditor()
 				end,
@@ -22205,13 +22640,14 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 					for _, option in ipairs(options) do
 						root:CreateRadio(option.label, function()
 							local currentPanel = CooldownPanels:GetPanel(panelId)
-							local bars = CooldownPanels.Bars
-							return bars and bars.GetPanelDurationTextProfile and bars.GetPanelDurationTextProfile(currentPanel) == option.value or false
+							return CooldownPanels:GetPanelDurationTextProfile(currentPanel) == option.value
 						end, function()
 							local currentPanel = CooldownPanels:GetPanel(panelId)
-							local bars = CooldownPanels.Bars
-							if not (currentPanel and bars and bars.NormalizeDurationTextProfile) then return end
-							currentPanel.barDurationTextProfile = option.value
+							if not currentPanel then return end
+							currentPanel.layout = currentPanel.layout or Helper.CopyTableShallow(Helper.PANEL_LAYOUT_DEFAULTS)
+							local profileKey = CooldownPanels:NormalizeDurationTextProfile(option.value, "MINIMAL")
+							currentPanel.layout.durationTextProfile = profileKey
+							currentPanel.barDurationTextProfile = profileKey
 							CooldownPanels:RefreshPanel(panelId)
 							CooldownPanels:RefreshEditor()
 						end)
@@ -22238,6 +22674,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 			},
 			{
 				name = L["Copy Settings"] or "Copy Settings",
+				tooltip = L["CooldownPanelCopySettingsTooltip"],
 				kind = SettingType.Dropdown,
 				field = "copySettingsFrom",
 				parentId = "cooldownPanelCopySettings",
@@ -22431,6 +22868,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 			},
 			{
 				name = L["CooldownPanelLayoutMode"] or "Layout mode",
+				tooltip = L["CooldownPanelLayoutModeTooltip"],
 				kind = SettingType.Dropdown,
 				field = "layoutMode",
 				parentId = "cooldownPanelLayout",
@@ -22451,7 +22889,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				name = "Icon size",
 				kind = SettingType.Slider,
 				field = "iconSize",
-				parentId = "cooldownPanelLayout",
+				parentId = "cooldownPanelIcon",
 				default = layout.iconSize,
 				minValue = 12,
 				maxValue = 128,
@@ -22465,7 +22903,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				name = L["CooldownPanelSeparateIconSize"] or "Separate icon width/height",
 				kind = SettingType.Checkbox,
 				field = "iconSizeSeparate",
-				parentId = "cooldownPanelLayout",
+				parentId = "cooldownPanelIcon",
 				get = usesSeparateIconSize,
 				set = function(_, value) applyEditLayout(panelId, "iconSizeSeparate", value) end,
 			},
@@ -22473,7 +22911,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				name = L["CooldownPanelIconWidth"] or "Icon width",
 				kind = SettingType.Slider,
 				field = "iconWidth",
-				parentId = "cooldownPanelLayout",
+				parentId = "cooldownPanelIcon",
 				default = layout.iconWidth or layout.iconSize,
 				minValue = 12,
 				maxValue = 128,
@@ -22489,7 +22927,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				name = L["CooldownPanelIconHeight"] or "Icon height",
 				kind = SettingType.Slider,
 				field = "iconHeight",
-				parentId = "cooldownPanelLayout",
+				parentId = "cooldownPanelIcon",
 				default = layout.iconHeight or layout.iconSize,
 				minValue = 12,
 				maxValue = 128,
@@ -22690,19 +23128,11 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 					end
 				end,
 			},
-			{
-				name = L["CooldownPanelRowSizesHeader"] or "Row sizes",
-				kind = SettingType.Collapsible,
-				id = "cooldownPanelRowSizes",
-				parentId = "cooldownPanelLayout",
-				defaultCollapsed = true,
-				isShown = function() return not isRadialLayout() end,
-			},
-			{
-				name = (L["CooldownPanelRowSize"] or "Row %d size"):format(1),
-				kind = SettingType.Slider,
+				{
+					name = (L["CooldownPanelRowSize"] or "Row %d size"):format(1),
+					kind = SettingType.Slider,
 				field = "rowSize1",
-				parentId = "cooldownPanelRowSizes",
+				parentId = "cooldownPanelLayout",
 				default = getRowSizeValue(1),
 				minValue = 12,
 				maxValue = 128,
@@ -22717,7 +23147,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				name = (L["CooldownPanelRowSize"] or "Row %d size"):format(2),
 				kind = SettingType.Slider,
 				field = "rowSize2",
-				parentId = "cooldownPanelRowSizes",
+				parentId = "cooldownPanelLayout",
 				default = getRowSizeValue(2),
 				minValue = 12,
 				maxValue = 128,
@@ -22732,7 +23162,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				name = (L["CooldownPanelRowSize"] or "Row %d size"):format(3),
 				kind = SettingType.Slider,
 				field = "rowSize3",
-				parentId = "cooldownPanelRowSizes",
+				parentId = "cooldownPanelLayout",
 				default = getRowSizeValue(3),
 				minValue = 12,
 				maxValue = 128,
@@ -22747,7 +23177,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				name = (L["CooldownPanelRowSize"] or "Row %d size"):format(4),
 				kind = SettingType.Slider,
 				field = "rowSize4",
-				parentId = "cooldownPanelRowSizes",
+				parentId = "cooldownPanelLayout",
 				default = getRowSizeValue(4),
 				minValue = 12,
 				maxValue = 128,
@@ -22762,7 +23192,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				name = (L["CooldownPanelRowSize"] or "Row %d size"):format(5),
 				kind = SettingType.Slider,
 				field = "rowSize5",
-				parentId = "cooldownPanelRowSizes",
+				parentId = "cooldownPanelLayout",
 				default = getRowSizeValue(5),
 				minValue = 12,
 				maxValue = 128,
@@ -22777,7 +23207,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				name = (L["CooldownPanelRowSize"] or "Row %d size"):format(6),
 				kind = SettingType.Slider,
 				field = "rowSize6",
-				parentId = "cooldownPanelRowSizes",
+				parentId = "cooldownPanelLayout",
 				default = getRowSizeValue(6),
 				minValue = 12,
 				maxValue = 128,
@@ -22788,17 +23218,23 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 				isShown = function() return shouldShowRowSize(6) end,
 			},
-			{
-				name = L["Display"] or "Display",
-				kind = SettingType.Collapsible,
-				id = "cooldownPanelDisplay",
-				defaultCollapsed = true,
-			},
+				{
+					name = L["Icon"] or "Icon",
+					kind = SettingType.Collapsible,
+					id = "cooldownPanelIcon",
+					defaultCollapsed = true,
+				},
+				{
+					name = L["Visibility"] or "Visibility",
+					kind = SettingType.Collapsible,
+					id = "cooldownPanelVisibility",
+					defaultCollapsed = true,
+				},
 			{
 				name = L["CooldownPanelShowTooltips"] or "Show tooltips",
 				kind = SettingType.Checkbox,
 				field = "showTooltips",
-				parentId = "cooldownPanelDisplay",
+				parentId = "cooldownPanelVisibility",
 				default = layout.showTooltips == true,
 				get = function() return layout.showTooltips == true end,
 				set = function(_, value) applyEditLayout(panelId, "showTooltips", value) end,
@@ -22807,7 +23243,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				name = L["CooldownPanelShowIconTexture"] or "Show icon texture",
 				kind = SettingType.Checkbox,
 				field = "showIconTexture",
-				parentId = "cooldownPanelDisplay",
+				parentId = "cooldownPanelIcon",
 				default = layout.showIconTexture ~= false,
 				get = function() return layout.showIconTexture ~= false end,
 				set = function(_, value) applyEditLayout(panelId, "showIconTexture", value) end,
@@ -22816,7 +23252,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				name = L["settingsIconShapeLabel"] or "Icon shape",
 				kind = SettingType.Dropdown,
 				field = "iconShape",
-				parentId = "cooldownPanelDisplay",
+				parentId = "cooldownPanelIcon",
 				height = 80,
 				default = cdp.ENTRY.NormalizeIconShape(layout.iconShape, Helper.PANEL_LAYOUT_DEFAULTS.iconShape),
 				get = function() return cdp.ENTRY.NormalizeIconShape(layout.iconShape, Helper.PANEL_LAYOUT_DEFAULTS.iconShape) end,
@@ -22835,7 +23271,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				name = L["Icon zoom"] or "Icon zoom",
 				kind = SettingType.Slider,
 				field = "iconZoom",
-				parentId = "cooldownPanelDisplay",
+				parentId = "cooldownPanelIcon",
 				default = addon.IconShape and addon.IconShape.NormalizeIconZoom and addon.IconShape.NormalizeIconZoom(layout.iconZoom) or Helper.ClampInt(layout.iconZoom, 0, 35, 0),
 				minValue = 0,
 				maxValue = 35,
@@ -22848,7 +23284,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				name = L["CooldownPanelIconBorder"] or "Icon border",
 				kind = SettingType.CheckboxColor,
 				field = "iconBorderEnabled",
-				parentId = "cooldownPanelDisplay",
+				parentId = "cooldownPanelIcon",
 				default = layout.iconBorderEnabled == true,
 				get = function() return layout.iconBorderEnabled == true end,
 				set = function(_, value) applyEditLayout(panelId, "iconBorderEnabled", value) end,
@@ -22861,7 +23297,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				name = L["Border texture"] or "Border texture",
 				kind = SettingType.Dropdown,
 				field = "iconBorderTexture",
-				parentId = "cooldownPanelDisplay",
+				parentId = "cooldownPanelIcon",
 				height = 180,
 				disabled = function() return layout.iconBorderEnabled ~= true end,
 				default = normalizeIconBorderTexture(layout.iconBorderTexture, Helper.PANEL_LAYOUT_DEFAULTS.iconBorderTexture, layout.iconShape),
@@ -22881,7 +23317,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				name = L["Border size"] or "Border size",
 				kind = SettingType.Slider,
 				field = "iconBorderSize",
-				parentId = "cooldownPanelDisplay",
+				parentId = "cooldownPanelIcon",
 				default = Helper.ClampInt(layout.iconBorderSize, 1, 64, Helper.PANEL_LAYOUT_DEFAULTS.iconBorderSize),
 				minValue = 1,
 				maxValue = 64,
@@ -22899,7 +23335,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				name = L["Border offset"] or "Border offset",
 				kind = SettingType.Slider,
 				field = "iconBorderOffset",
-				parentId = "cooldownPanelDisplay",
+				parentId = "cooldownPanelIcon",
 				default = Helper.ClampInt(layout.iconBorderOffset, -64, 64, Helper.PANEL_LAYOUT_DEFAULTS.iconBorderOffset),
 				minValue = -64,
 				maxValue = 64,
@@ -22914,7 +23350,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				name = L["CooldownPanelHideOnCooldown"] or "Hide on cooldown",
 				kind = SettingType.Checkbox,
 				field = "hideOnCooldown",
-				parentId = "cooldownPanelDisplay",
+				parentId = "cooldownPanelVisibility",
 				default = layout.hideOnCooldown == true,
 				get = function() return layout.hideOnCooldown == true end,
 				set = function(_, value) applyEditLayout(panelId, "hideOnCooldown", value) end,
@@ -22923,7 +23359,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				name = L["CooldownPanelShowOnCooldown"] or "Show on cooldown",
 				kind = SettingType.Checkbox,
 				field = "showOnCooldown",
-				parentId = "cooldownPanelDisplay",
+				parentId = "cooldownPanelVisibility",
 				default = layout.showOnCooldown == true,
 				get = function() return layout.showOnCooldown == true end,
 				set = function(_, value) applyEditLayout(panelId, "showOnCooldown", value) end,
@@ -22932,7 +23368,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				name = L["CooldownPanelCDMAuraAlwaysShowMode"] or "Tracked aura display",
 				kind = SettingType.Dropdown,
 				field = "cdmAuraAlwaysShowMode",
-				parentId = "cooldownPanelDisplay",
+				parentId = "cooldownPanelVisibility",
 				height = 180,
 				isShown = function() return hasCDMAuraEntries() end,
 				default = CooldownPanels:ResolveEntryCDMAuraAlwaysShowMode(layout, nil),
@@ -22952,7 +23388,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				name = L["Show when"] or "Show when",
 				kind = SettingType.MultiDropdown,
 				field = "visibility",
-				parentId = "cooldownPanelDisplay",
+				parentId = "cooldownPanelVisibility",
 				height = 220,
 				values = visibilityRuleOptions,
 				hideSummary = true,
@@ -22981,7 +23417,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				name = L["Hide in vehicles"] or "Hide in vehicles",
 				kind = SettingType.Checkbox,
 				field = "hideInVehicle",
-				parentId = "cooldownPanelDisplay",
+				parentId = "cooldownPanelVisibility",
 				default = layout.hideInVehicle == true,
 				get = function() return layout.hideInVehicle == true end,
 				set = function(_, value) applyEditLayout(panelId, "hideInVehicle", value) end,
@@ -22990,7 +23426,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				name = L["Hide in pet battles"] or "Hide in pet battles",
 				kind = SettingType.Checkbox,
 				field = "hideInPetBattle",
-				parentId = "cooldownPanelDisplay",
+				parentId = "cooldownPanelVisibility",
 				default = layout.hideInPetBattle == true,
 				get = function() return layout.hideInPetBattle == true end,
 				set = function(_, value) applyEditLayout(panelId, "hideInPetBattle", value) end,
@@ -22999,7 +23435,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				name = L["Hide in client scenes"] or "Hide in client scenes",
 				kind = SettingType.Checkbox,
 				field = "hideInClientScene",
-				parentId = "cooldownPanelDisplay",
+				parentId = "cooldownPanelVisibility",
 				default = layout.hideInClientScene ~= false,
 				get = function() return layout.hideInClientScene ~= false end,
 				set = function(_, value) applyEditLayout(panelId, "hideInClientScene", value) end,
@@ -23008,7 +23444,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				name = L["CooldownPanelOpacityOutOfCombat"] or "Opacity (out of combat)",
 				kind = SettingType.Slider,
 				field = "opacityOutOfCombat",
-				parentId = "cooldownPanelDisplay",
+				parentId = "cooldownPanelVisibility",
 				default = Helper.NormalizeOpacity(layout.opacityOutOfCombat, Helper.PANEL_LAYOUT_DEFAULTS.opacityOutOfCombat),
 				minValue = 0,
 				maxValue = 1,
@@ -23025,7 +23461,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				name = L["CooldownPanelOpacityInCombat"] or "Opacity (in combat)",
 				kind = SettingType.Slider,
 				field = "opacityInCombat",
-				parentId = "cooldownPanelDisplay",
+				parentId = "cooldownPanelVisibility",
 				default = Helper.NormalizeOpacity(layout.opacityInCombat, Helper.PANEL_LAYOUT_DEFAULTS.opacityInCombat),
 				minValue = 0,
 				maxValue = 1,
@@ -23311,16 +23747,17 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				end,
 				formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 			},
+				{
+					name = L["CooldownPanelAvailabilityHeader"] or "Availability",
+					tooltip = L["CooldownPanelAvailabilityHeaderTooltip"],
+					kind = SettingType.Collapsible,
+					id = "cooldownPanelAvailability",
+					defaultCollapsed = true,
+				},
 			{
-				name = L["CooldownPanelOverlaysHeader"] or "Overlays",
-				kind = SettingType.Collapsible,
-				id = "cooldownPanelOverlays",
-				defaultCollapsed = true,
-			},
-			{
-				name = L["CooldownPanelRangeOverlay"] or "Range overlay",
+				name = L["CooldownPanelRangeIndicator"] or "Range indicator",
 				kind = SettingType.CheckboxColor,
-				parentId = "cooldownPanelOverlays",
+				parentId = "cooldownPanelAvailability",
 				default = layout.rangeOverlayEnabled == true,
 				get = function() return layout.rangeOverlayEnabled == true end,
 				set = function(_, value) applyEditLayout(panelId, "rangeOverlayEnabled", value) end,
@@ -23330,17 +23767,19 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				hasOpacity = true,
 			},
 			{
-				name = L["CooldownPanelNoDesaturation"] or "No desaturation",
+				name = L["CooldownPanelKeepIconSaturated"] or "Keep icon saturated",
+				tooltip = L["CooldownPanelKeepIconSaturatedTooltip"],
 				kind = SettingType.Checkbox,
-				parentId = "cooldownPanelOverlays",
+				parentId = "cooldownPanelAvailability",
 				default = layout.noDesaturation == true,
 				get = function() return layout.noDesaturation == true end,
 				set = function(_, value) applyEditLayout(panelId, "noDesaturation", value) end,
 			},
 			{
-				name = L["Check power"] or "Check power",
+				name = L["CooldownPanelRequireEnoughResource"] or "Require enough resource",
+				tooltip = L["CooldownPanelRequireEnoughResourceTooltip"],
 				kind = SettingType.CheckboxColor,
-				parentId = "cooldownPanelOverlays",
+				parentId = "cooldownPanelAvailability",
 				default = layout.checkPower == true,
 				get = function() return layout.checkPower == true end,
 				set = function(_, value) applyEditLayout(panelId, "checkPower", value) end,
@@ -23349,9 +23788,10 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				colorSet = function(_, value) applyEditLayout(panelId, "powerTintColor", value) end,
 			},
 			{
-				name = L["CooldownPanelHideWhenNoResource"] or "Hide when no resource",
+				name = L["CooldownPanelHideWhenResourceMissing"] or "Hide when resource is missing",
+				tooltip = L["CooldownPanelHideWhenResourceMissingTooltip"],
 				kind = SettingType.Checkbox,
-				parentId = "cooldownPanelOverlays",
+				parentId = "cooldownPanelAvailability",
 				default = layout.hideWhenNoResource == true,
 				get = function() return layout.hideWhenNoResource == true end,
 				set = function(_, value) applyEditLayout(panelId, "hideWhenNoResource", value) end,
@@ -23418,7 +23858,8 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 			},
 			{
-				name = L["CooldownPanelReadyGlowCheckPower"] or "Require resource for ready glow",
+				name = L["CooldownPanelOnlyGlowWhenUsable"] or "Only glow when usable",
+				tooltip = L["CooldownPanelOnlyGlowWhenUsableTooltip"],
 				kind = SettingType.Checkbox,
 				parentId = "cooldownPanelGlow",
 				default = layout.readyGlowCheckPower == true,
@@ -23566,7 +24007,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 			},
 			{
-				name = L["CooldownPanelStacksHeader"] or "Stacks / Item Count",
+				name = L["CooldownPanelCountersHeader"] or "Counters",
 				kind = SettingType.Collapsible,
 				id = "cooldownPanelStacks",
 				defaultCollapsed = true,
@@ -23911,86 +24352,118 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				set = function(_, value) applyEditLayout(panelId, "keybindFontSize", value) end,
 				formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 			},
+				{
+					name = L["CooldownPanelAuraBehaviorHeader"] or "Aura Behavior",
+					kind = SettingType.Collapsible,
+					id = "cooldownPanelAuraBehavior",
+					defaultCollapsed = true,
+				},
+				{
+					name = L["CooldownPanelCooldownSwipeHeader"] or "Cooldown Swipe",
+					tooltip = L["CooldownPanelCooldownSwipeHeaderTooltip"],
+					kind = SettingType.Collapsible,
+					id = "cooldownPanelCooldownSwipe",
+					defaultCollapsed = true,
+				},
+				{
+					name = L["CooldownPanelShowChargesCooldown"] or "Show charges cooldown",
+					tooltip = L["CooldownPanelShowChargesCooldownTooltip"],
+					kind = SettingType.Checkbox,
+					field = "showChargesCooldown",
+					parentId = "cooldownPanelCooldownSwipe",
+					default = layout.showChargesCooldown == true,
+					get = function() return layout.showChargesCooldown == true end,
+					set = function(_, value) applyEditLayout(panelId, "showChargesCooldown", value) end,
+				},
+				{
+					name = L["CooldownPanelCDMAuraOverlayPanel"] or "Show aura overlay for supported spells",
+					tooltip = L["CooldownPanelCDMAuraOverlayTooltip"],
+					kind = SettingType.Checkbox,
+					field = "cdmAuraOverlayEnabled",
+					parentId = "cooldownPanelAuraBehavior",
+					default = layout.cdmAuraOverlayEnabled == true,
+					get = function() return layout.cdmAuraOverlayEnabled == true end,
+					set = function(_, value) applyEditLayout(panelId, "cdmAuraOverlayEnabled", value) end,
+				},
 			{
-				name = L["Cooldown"] or "Cooldown",
-				kind = SettingType.Collapsible,
-				id = "cooldownPanelCooldown",
-				defaultCollapsed = true,
-			},
-			{
-				name = L["CooldownPanelShowChargesCooldown"] or "Show charges cooldown",
-				kind = SettingType.Checkbox,
-				field = "showChargesCooldown",
-				parentId = "cooldownPanelCooldown",
-				default = layout.showChargesCooldown == true,
-				get = function() return layout.showChargesCooldown == true end,
-				set = function(_, value) applyEditLayout(panelId, "showChargesCooldown", value) end,
-			},
-			{
-				name = L["CooldownPanelCDMAuraOverlayPanel"] or "Show aura overlay for supported spells",
-				kind = SettingType.Checkbox,
-				field = "cdmAuraOverlayEnabled",
-				parentId = "cooldownPanelCooldown",
-				default = layout.cdmAuraOverlayEnabled == true,
-				get = function() return layout.cdmAuraOverlayEnabled == true end,
-				set = function(_, value) applyEditLayout(panelId, "cdmAuraOverlayEnabled", value) end,
-			},
-			{
-				name = L["CooldownPanelDrawEdge"] or "Draw edge",
+				name = L["CooldownPanelShowEdge"] or "Show edge",
+				tooltip = L["CooldownPanelShowEdgeTooltip"],
 				kind = SettingType.Checkbox,
 				field = "cooldownDrawEdge",
-				parentId = "cooldownPanelCooldown",
+				parentId = "cooldownPanelCooldownSwipe",
 				default = layout.cooldownDrawEdge ~= false,
 				get = function() return layout.cooldownDrawEdge ~= false end,
 				set = function(_, value) applyEditLayout(panelId, "cooldownDrawEdge", value) end,
 			},
 			{
-				name = L["CooldownPanelDrawBling"] or "Draw bling",
+				name = L["CooldownPanelShowFinishFlash"] or "Show finish flash",
+				tooltip = L["CooldownPanelShowFinishFlashTooltip"],
 				kind = SettingType.Checkbox,
 				field = "cooldownDrawBling",
-				parentId = "cooldownPanelCooldown",
+				parentId = "cooldownPanelCooldownSwipe",
 				default = layout.cooldownDrawBling ~= false,
 				get = function() return layout.cooldownDrawBling ~= false end,
 				set = function(_, value) applyEditLayout(panelId, "cooldownDrawBling", value) end,
 			},
 			{
-				name = L["CooldownPanelDrawSwipe"] or "Draw swipe",
+				name = L["CooldownPanelShowSwipe"] or "Show swipe",
+				tooltip = L["CooldownPanelShowSwipeTooltip"],
 				kind = SettingType.Checkbox,
 				field = "cooldownDrawSwipe",
-				parentId = "cooldownPanelCooldown",
+				parentId = "cooldownPanelCooldownSwipe",
 				default = layout.cooldownDrawSwipe ~= false,
 				get = function() return layout.cooldownDrawSwipe ~= false end,
 				set = function(_, value) applyEditLayout(panelId, "cooldownDrawSwipe", value) end,
 			},
 			{
-				name = L["CooldownPanelDrawEdgeGcd"] or "Draw edge on GCD",
+				name = L["CooldownPanelShowEdgeGcd"] or "Show edge on global cooldown",
+				tooltip = L["CooldownPanelShowEdgeGcdTooltip"],
 				kind = SettingType.Checkbox,
 				field = "cooldownGcdDrawEdge",
-				parentId = "cooldownPanelCooldown",
+				parentId = "cooldownPanelCooldownSwipe",
 				default = layout.cooldownGcdDrawEdge == true,
 				get = function() return layout.cooldownGcdDrawEdge == true end,
 				set = function(_, value) applyEditLayout(panelId, "cooldownGcdDrawEdge", value) end,
 			},
 			{
-				name = L["CooldownPanelDrawBlingGcd"] or "Draw bling on GCD",
+				name = L["CooldownPanelShowFinishFlashGcd"] or "Show finish flash on global cooldown",
+				tooltip = L["CooldownPanelShowFinishFlashTooltip"],
 				kind = SettingType.Checkbox,
 				field = "cooldownGcdDrawBling",
-				parentId = "cooldownPanelCooldown",
+				parentId = "cooldownPanelCooldownSwipe",
 				default = layout.cooldownGcdDrawBling == true,
 				get = function() return layout.cooldownGcdDrawBling == true end,
 				set = function(_, value) applyEditLayout(panelId, "cooldownGcdDrawBling", value) end,
 			},
 			{
-				name = L["CooldownPanelDrawSwipeGcd"] or "Draw swipe on GCD",
+				name = L["CooldownPanelShowSwipeGcd"] or "Show swipe on global cooldown",
+				tooltip = L["CooldownPanelShowSwipeTooltip"],
 				kind = SettingType.Checkbox,
 				field = "cooldownGcdDrawSwipe",
-				parentId = "cooldownPanelCooldown",
+				parentId = "cooldownPanelCooldownSwipe",
 				default = layout.cooldownGcdDrawSwipe == true,
 				get = function() return layout.cooldownGcdDrawSwipe == true end,
 				set = function(_, value) applyEditLayout(panelId, "cooldownGcdDrawSwipe", value) end,
 			},
 		}
 	end
+	settings = self:NormalizeStandaloneSettingsOrder(settings, {
+		"cooldownPanelGeneral",
+		"cooldownPanelAnchor",
+		"cooldownPanelLayout",
+		"cooldownPanelIcon",
+		"cooldownPanelVisibility",
+		"cooldownPanelAvailability",
+		"cooldownPanelAuraBehavior",
+		"cooldownPanelCooldownSwipe",
+		"cooldownPanelCooldownText",
+		"cooldownPanelStaticText",
+		"cooldownPanelStacks",
+		"cooldownPanelCharges",
+		"cooldownPanelGlow",
+		"cooldownPanelKeybinds",
+		"cooldownPanelCopySettings",
+	})
 	runtime.layoutPanelSettings = settings
 	runtime.layoutPanelSettingsMaxHeight = 620
 	self:UpdateVisibility(panelId)
@@ -24072,10 +24545,8 @@ local function registerCooldownPanelsSlashCommand()
 	SlashCmdList["EQOLCP"] = function()
 		local panels = addon.Aura and addon.Aura.CooldownPanels
 		if not panels then return end
-		if panels.ToggleEditor then
-			panels:ToggleEditor()
-		elseif panels.OpenEditor then
-			panels:OpenEditor()
+		if panels.ToggleBlizzardEditor then
+			panels:ToggleBlizzardEditor()
 		end
 	end
 end
@@ -24207,8 +24678,8 @@ function cdp.ENTRY.ApplyVisibleSpellRuntime(panelId, runtime, icon, data, resolv
 	if icon.cooldown.SetAlpha then icon.cooldown:SetAlpha(1) end
 	icon.cooldown:SetHideCountdownNumbers(not data.showCooldownText)
 	local auraDisplayActive = data.customCooldownDurationActive == true or data.spellAuraOverlayActive == true
-	if icon.cooldown.SetReverse then icon.cooldown:SetReverse(data.cooldownReverse == true) end
 	if icon.cooldown.SetUseAuraDisplayTime then icon.cooldown:SetUseAuraDisplayTime(auraDisplayActive) end
+	if icon.cooldown.SetReverse then icon.cooldown:SetReverse(data.cooldownReverse == true) end
 	cdp.ENTRY.ApplyCooldownSwipeVisual(icon, data)
 
 	local cooldownStart = data.cooldownStart or 0
@@ -24420,6 +24891,8 @@ function cdp.ENTRY.ApplyVisibleSpellRuntime(panelId, runtime, icon, data, resolv
 		icon.texture:SetVertexColor(1, 1, 1)
 	end
 
+	CooldownPanels:ApplyRuntimeCooldownDurationTextProfile(icon, data.layout)
+
 	local staticTextCooldown = false
 	if data.entry and data.entry.staticTextShowOnCooldown == true then staticTextCooldown = durationActive or (cooldownEnabledOk and isCooldownActive(cooldownStart, cooldownDuration)) end
 	applyStaticText(icon, data.layout, data.entry, staticFontPath, staticFontSize, staticFontStyle, staticTextCooldown)
@@ -24537,8 +25010,8 @@ function cdp.ENTRY.ApplyVisibleItemRuntime(panelId, runtime, icon, data, resolve
 	if icon.cooldown.Resume then icon.cooldown:Resume() end
 	if icon.cooldown.SetAlpha then icon.cooldown:SetAlpha(1) end
 	icon.cooldown:SetHideCountdownNumbers(not data.showCooldownText)
-	if icon.cooldown.SetReverse then icon.cooldown:SetReverse(data.cooldownReverse == true) end
 	if icon.cooldown.SetUseAuraDisplayTime then icon.cooldown:SetUseAuraDisplayTime(customCooldownActive) end
+	if icon.cooldown.SetReverse then icon.cooldown:SetReverse(data.cooldownReverse == true) end
 	cdp.ENTRY.ApplyCooldownSwipeVisual(icon, data)
 
 	if data.showItemUses then
@@ -24593,6 +25066,8 @@ function cdp.ENTRY.ApplyVisibleItemRuntime(panelId, runtime, icon, data, resolve
 	else
 		icon.texture:SetVertexColor(1, 1, 1)
 	end
+
+	CooldownPanels:ApplyRuntimeCooldownDurationTextProfile(icon, data.layout)
 
 	if data.showItemCount and data.itemCount ~= nil then
 		icon.count:SetText(data.itemCount)
@@ -25596,7 +26071,7 @@ local function clearReadyGlowForSpell(spellId)
 	local index = CooldownPanels.runtime and CooldownPanels.runtime.spellIndex
 	if not index then return false end
 	local panels
-	local aliasIDs = CooldownPanels:GetSpellAliasIDs(id, {}, {})
+	local aliasIDs = CooldownPanels:GetSpellAliasIDs(id)
 	for i = 1, #aliasIDs do
 		local aliasPanels = index[aliasIDs[i]]
 		if aliasPanels then
@@ -25711,7 +26186,7 @@ setOverlayGlowForSpell = function(spellId, enabled)
 	runtime.overlayGlowSpells = runtime.overlayGlowSpells or {}
 	local overlayGlowSpells = runtime.overlayGlowSpells
 	if Api.IsSpellOverlayed then
-		local aliasIds = CooldownPanels:GetSpellAliasIDs(id, {}, {})
+		local aliasIds = CooldownPanels:GetSpellAliasIDs(id)
 		local wasEnabled = false
 		for i = 1, #aliasIds do
 			local aliasId = aliasIds[i]
@@ -25901,6 +26376,7 @@ CooldownPanels.UPDATE_FRAME_EVENTS = {
 	"PLAYER_ENTERING_WORLD",
 	"PLAYER_LOGIN",
 	"ADDON_LOADED",
+	"COOLDOWN_VIEWER_DATA_LOADED",
 	"CVAR_UPDATE",
 	"SPELL_UPDATE_COOLDOWN",
 	"SPELL_UPDATE_ICON",
@@ -25941,6 +26417,7 @@ CooldownPanels.UPDATE_FRAME_PASSIVE_EVENTS = {
 	"PLAYER_ENTERING_WORLD",
 	"PLAYER_LOGIN",
 	"ADDON_LOADED",
+	"COOLDOWN_VIEWER_DATA_LOADED",
 	"SPELLS_CHANGED",
 	"ACTIVE_PLAYER_SPECIALIZATION_CHANGED",
 	"ACTIVE_TALENT_GROUP_CHANGED",
@@ -25960,7 +26437,10 @@ local function hasConfiguredEnabledPanels()
 	if not root or not root.panels then return false end
 	local classSpecs = getPlayerClassSpecMap()
 	for _, panel in pairs(root.panels) do
-		if panel and panel.enabled ~= false and panelHasRuntimeEntries(panel) and panelMatchesPlayerClass(panel, classSpecs) then return true end
+		if panel and panel.enabled ~= false and panelMatchesPlayerClass(panel, classSpecs) then
+			local syncSource = type(panel.cdmSyncSource) == "string" and panel.cdmSyncSource:upper() or nil
+			if panelHasRuntimeEntries(panel) or cdp.CDM.IsSyncSource(syncSource) then return true end
+		end
 	end
 	return false
 end
@@ -26337,6 +26817,7 @@ end
 
 function CooldownPanels:UpdateEventRegistration()
 	local frame = self.runtime and self.runtime.updateFrame
+	if self.HasCooldownManagerSyncPanels and self:HasCooldownManagerSyncPanels() then self:EnsureCooldownManagerSyncListener() end
 	if not frame then return end
 	CooldownPanels.SetUpdateFrameEnabled(frame, getUpdateFrameRegistrationMode())
 end
@@ -26375,11 +26856,13 @@ function CooldownPanels.EnsureUpdateFrame()
 				if Keybinds.InvalidateButtonList then Keybinds.InvalidateButtonList() end
 				Keybinds.RequestRefresh("Event:ADDON_LOADED:" .. name)
 			end
+			if name == "Blizzard_CooldownViewer" then CooldownPanels:RequestCooldownManagerSync("Event:ADDON_LOADED:Blizzard_CooldownViewer") end
 			return
 		end
 		if event == "PLAYER_LOGIN" then
 			CooldownPanels.runtime = CooldownPanels.runtime or {}
 			CooldownPanels.runtime.cdmAuraQuickSetupLoginReady = true
+			CooldownPanels:EnsureCooldownManagerSyncListener()
 			local anchorHelper = CooldownPanels.AnchorHelper
 			if anchorHelper and anchorHelper.HandlePlayerLogin then anchorHelper:HandlePlayerLogin() end
 			CooldownPanels:InvalidateTalentChoiceSpellVariantGroups()
@@ -26388,7 +26871,13 @@ function CooldownPanels.EnsureUpdateFrame()
 			Keybinds.RequestRefresh("Event:PLAYER_LOGIN", false)
 			if CooldownPanels.refreshAssistedHighlightCVarState then CooldownPanels.refreshAssistedHighlightCVarState("Event:PLAYER_LOGIN", true) end
 			refreshPanelsForCharges()
+			CooldownPanels:RequestCooldownManagerSync("Event:PLAYER_LOGIN")
 			scheduleSpecAwareRebuild(event, false)
+			return
+		end
+		if event == "COOLDOWN_VIEWER_DATA_LOADED" then
+			CooldownPanels:EnsureCooldownManagerSyncListener()
+			CooldownPanels:RequestCooldownManagerSync("Event:COOLDOWN_VIEWER_DATA_LOADED")
 			return
 		end
 		if event == "CVAR_UPDATE" then
@@ -26577,6 +27066,7 @@ function CooldownPanels.EnsureUpdateFrame()
 			if unit and unit ~= "player" then return end
 			CooldownPanels:InvalidateTalentChoiceSpellVariantGroups()
 			CooldownPanels:InvalidateSpellQueryCaches()
+			CooldownPanels:RequestCooldownManagerSync("Event:" .. event)
 			scheduleSpecAwareRebuild(event, true)
 			return
 		end
@@ -26584,6 +27074,7 @@ function CooldownPanels.EnsureUpdateFrame()
 			CooldownPanels:InvalidateTalentChoiceSpellVariantGroups()
 			CooldownPanels:InvalidateSpellQueryCaches()
 			if CooldownPanels.runtime then CooldownPanels.runtime.iconCache = nil end
+			CooldownPanels:RequestCooldownManagerSync("Event:" .. event)
 			scheduleSpecAwareRebuild(event, true)
 			return
 		end
@@ -26651,6 +27142,7 @@ function CooldownPanels.EnsureUpdateFrame()
 			CooldownPanels:InvalidateTalentChoiceSpellVariantGroups()
 			CooldownPanels:InvalidateSpellQueryCaches()
 			updateItemCountCache()
+			CooldownPanels:RequestCooldownManagerSync("Event:PLAYER_ENTERING_WORLD")
 			scheduleSpecAwareRebuild(event)
 			return
 		end
@@ -26661,7 +27153,7 @@ function CooldownPanels.EnsureUpdateFrame()
 		if event == "CLIENT_SCENE_OPENED" then
 			local sceneType = ...
 			CooldownPanels.runtime = CooldownPanels.runtime or {}
-			CooldownPanels.runtime.clientSceneActive = (sceneType == 1)
+			CooldownPanels.runtime.clientSceneActive = addon.functions and addon.functions.IsMinigameClientScene and addon.functions.IsMinigameClientScene(sceneType) or false
 		elseif event == "CLIENT_SCENE_CLOSED" then
 			CooldownPanels.runtime = CooldownPanels.runtime or {}
 			CooldownPanels.runtime.clientSceneActive = false
