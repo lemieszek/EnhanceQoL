@@ -1291,6 +1291,10 @@ function Timer:EnsureFrame()
 	frame.borderFrame = CreateFrame("Frame", nil, frame, BackdropTemplateMixin and "BackdropTemplate")
 	frame.borderFrame:EnableMouse(false)
 	frame.borderFrame:Hide()
+	frame.panelTextFrame = CreateFrame("Frame", nil, frame)
+	frame.panelTextFrame:SetAllPoints(frame)
+	frame.panelTextFrame:EnableMouse(false)
+	frame.panelTextFrame:SetFrameLevel(frame:GetFrameLevel() + 40)
 	frame:Hide()
 	self.frame = frame
 	return frame
@@ -1333,7 +1337,8 @@ function Timer:EnsurePanelText(key)
 	local frame = self:EnsureFrame()
 	frame.panelTexts = frame.panelTexts or {}
 	if frame.panelTexts[key] then return frame.panelTexts[key] end
-	local text = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	local parent = frame.panelTextFrame or frame
+	local text = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	text:SetDrawLayer("OVERLAY", 7)
 	text:SetJustifyH("LEFT")
 	text:SetJustifyV("TOP")
@@ -1594,6 +1599,7 @@ function Timer:ApplyFrameStyle()
 			frame.borderFrame:Hide()
 		end
 	end
+	if frame.panelTextFrame then frame.panelTextFrame:SetFrameLevel(frame:GetFrameLevel() + 40) end
 
 	for _, row in ipairs(frame.rows) do
 		row:SetFrameLevel(frame:GetFrameLevel() + 2)
@@ -1630,7 +1636,7 @@ function Timer:ApplyFrameStyle()
 		applyFontString(row.value, font, fontSize, style)
 	end
 	for _, bar in pairs(frame.panelBars or {}) do
-		bar:SetFrameLevel(math.max(0, frame:GetFrameLevel() + 1))
+		bar:SetFrameLevel(math.max(0, frame:GetFrameLevel() - 1))
 		local prefix = bar.eqolBarKey == "enemy" and "panelEnemyBar" or "panelTimerBar"
 		local visibleKey = bar.eqolBarKey == "enemy" and "showPanelEnemyBar" or "showPanelTimerBar"
 		local panelTexture = resolveMedia("statusbar", self:Get(prefix .. "Texture") or self:Get("texture"), DEFAULT_STATUSBAR)
@@ -2051,7 +2057,7 @@ function Timer:SetPanelBar(key, value, maxValue, anchorKey, xKey, yKey, color)
 	local height = snapSize(clampNumber(self:Get(heightKey) or self:Get("panelBarHeight"), 1, 64, defaults[heightKey] or defaults.panelBarHeight))
 	local anchor = normalizePoint(self:Get(anchorKey))
 	bar:ClearAllPoints()
-	bar:SetFrameLevel(math.max(0, self:EnsureFrame():GetFrameLevel() + 1))
+	bar:SetFrameLevel(math.max(0, self:EnsureFrame():GetFrameLevel() - 1))
 	if bar.textFrame then bar.textFrame:SetFrameLevel(self:EnsureFrame():GetFrameLevel() + 40) end
 	if bar.chestMarkerTextFrame then bar.chestMarkerTextFrame:SetFrameLevel(self:EnsureFrame():GetFrameLevel() + 40) end
 	bar:SetPoint(anchor, self:EnsureFrame(), anchor, pointOffset(self:Get(xKey), -800, 800, defaults[xKey] or 0), pointOffset(self:Get(yKey), -800, 800, defaults[yKey] or 0))
@@ -2076,7 +2082,7 @@ function Timer:SetPanelEnemyBarText(percent)
 	local style = normalizeFontStyle(self:Get("fontOutline"))
 	local fontSize = clampNumber(self:Get("panelEnemyBarTextFontSize"), 8, 56, defaults.panelEnemyBarTextFontSize)
 	local color = normalizeColor(self:Get("panelEnemyBarTextColor"), defaults.panelEnemyBarTextColor)
-	local offsetY = pointOffset(self:Get("panelEnemyBarTextOffsetY"), -100, 100, defaults.panelEnemyBarTextOffsetY)
+	local offsetY = pointOffset(self:Get("panelEnemyBarTextOffsetY"), -800, 800, defaults.panelEnemyBarTextOffsetY)
 	bar.text:ClearAllPoints()
 	applyFontString(bar.text, font, fontSize, style)
 	bar.text:SetText(string.format("%.2f%%", tonumber(percent) or 0))
@@ -2108,8 +2114,8 @@ function Timer:SetPanelTimerBarTimeLeftText(timeLeft, state)
 	local style = normalizeFontStyle(self:Get("fontOutline"))
 	local fontSize = clampNumber(self:Get("panelTimerBarTimeLeftTextFontSize"), 8, 56, defaults.panelTimerBarTimeLeftTextFontSize)
 	local color = normalizeColor(self:Get("panelTimerBarTimeLeftTextColor"), defaults.panelTimerBarTimeLeftTextColor)
-	local offsetX = pointOffset(self:Get("panelTimerBarTimeLeftTextOffsetX"), -200, 200, defaults.panelTimerBarTimeLeftTextOffsetX)
-	local offsetY = pointOffset(self:Get("panelTimerBarTimeLeftTextOffsetY"), -100, 100, defaults.panelTimerBarTimeLeftTextOffsetY)
+	local offsetX = pointOffset(self:Get("panelTimerBarTimeLeftTextOffsetX"), -800, 800, defaults.panelTimerBarTimeLeftTextOffsetX)
+	local offsetY = pointOffset(self:Get("panelTimerBarTimeLeftTextOffsetY"), -800, 800, defaults.panelTimerBarTimeLeftTextOffsetY)
 	local timeLimit = tonumber(state and state.timeLimit) or 0
 	local elapsed = tonumber(state and state.elapsed) or 0
 	bar.timeLeftText:ClearAllPoints()
@@ -2180,7 +2186,7 @@ function Timer:UpdatePanelTimerBarChestMarkers(timeLimit, twoChest, threeChest)
 	local style = normalizeFontStyle(self:Get("fontOutline"))
 	local fontSize = clampNumber(self:Get("panelTimerBarChestTimeTextFontSize"), 8, 56, defaults.panelTimerBarChestTimeTextFontSize)
 	local textColor = normalizeColor(self:Get("panelTimerBarChestTimeTextColor"), defaults.panelTimerBarChestTimeTextColor)
-	local textOffsetY = pointOffset(self:Get("panelTimerBarChestTimeTextOffsetY"), -100, 100, defaults.panelTimerBarChestTimeTextOffsetY)
+	local textOffsetY = pointOffset(self:Get("panelTimerBarChestTimeTextOffsetY"), -800, 800, defaults.panelTimerBarChestTimeTextOffsetY)
 	for index, marker in ipairs(bar.chestMarkers) do
 		if showMarkers then
 			marker:ClearAllPoints()
@@ -2316,13 +2322,13 @@ function Timer:SetRow(index, data)
 	local iconGap = pointOffset(self:Get("iconGap"), -50, 100, defaults.iconGap)
 	local iconOffsetX = pointOffset(self:Get("iconOffsetX"), -200, 200, defaults.iconOffsetX)
 	local iconOffsetY = pointOffset(self:Get("iconOffsetY"), -200, 200, defaults.iconOffsetY)
-	local barOffsetX = pointOffset(self:Get("barOffsetX"), -200, 200, defaults.barOffsetX)
-	local barOffsetY = pointOffset(self:Get("barOffsetY"), -200, 200, defaults.barOffsetY)
+	local barOffsetX = pointOffset(self:Get("barOffsetX"), -800, 800, defaults.barOffsetX)
+	local barOffsetY = pointOffset(self:Get("barOffsetY"), -800, 800, defaults.barOffsetY)
 	local barWidthOffset = snapToPixel(clampNumber(self:Get("barWidthOffset"), -400, 400, defaults.barWidthOffset))
-	local textOffsetX = pointOffset(self:Get("textOffsetX"), -400, 400, defaults.textOffsetX)
-	local textOffsetY = pointOffset(self:Get("textOffsetY"), -200, 200, defaults.textOffsetY)
-	local valueOffsetX = pointOffset(self:Get("valueOffsetX"), -400, 400, defaults.valueOffsetX)
-	local valueOffsetY = pointOffset(self:Get("valueOffsetY"), -200, 200, defaults.valueOffsetY)
+	local textOffsetX = pointOffset(self:Get("textOffsetX"), -800, 800, defaults.textOffsetX)
+	local textOffsetY = pointOffset(self:Get("textOffsetY"), -800, 800, defaults.textOffsetY)
+	local valueOffsetX = pointOffset(self:Get("valueOffsetX"), -800, 800, defaults.valueOffsetX)
+	local valueOffsetY = pointOffset(self:Get("valueOffsetY"), -800, 800, defaults.valueOffsetY)
 	local barPosition = self:Get("barPosition")
 	if barPosition ~= "TOP" and barPosition ~= "BOTTOM" then barPosition = "BACKGROUND" end
 	local align = self:Get("align")
@@ -3045,10 +3051,10 @@ function Timer:BuildEditModeSettings()
 		sliderSetting(L["mythicPlusTimerRowSpacing"] or "Row spacing", get("rowSpacing"), set("rowSpacing", function(value) return clampNumber(value, 0, 24, defaults.rowSpacing) end), 0, 24, 1, layoutId, nil, nil, isListMode),
 		dropdownSetting(L["mythicPlusTimerGrowth"] or "Growth direction", get("growth"), set("growth"), { { value = "DOWN", label = L["damageMeterRowsGrowDown"] or "Down" }, { value = "UP", label = L["damageMeterRowsGrowUp"] or "Up" } }, layoutId, nil, nil, isListMode),
 		dropdownSetting(L["mythicPlusTimerAlign"] or "Text alignment", get("align"), set("align"), { { value = "LEFT", label = _G.LEFT or "Left" }, { value = "CENTER", label = _G.CENTER or "Center" }, { value = "RIGHT", label = _G.RIGHT or "Right" } }, layoutId, nil, nil, isListMode),
-		sliderSetting(L["mythicPlusTimerTextOffsetX"] or "Label X offset", get("textOffsetX"), set("textOffsetX", function(value) return clampNumber(value, -400, 400, defaults.textOffsetX) end), -400, 400, 1, layoutId, nil, nil, isListMode),
-		sliderSetting(L["mythicPlusTimerTextOffsetY"] or "Label Y offset", get("textOffsetY"), set("textOffsetY", function(value) return clampNumber(value, -200, 200, defaults.textOffsetY) end), -200, 200, 1, layoutId, nil, nil, isListMode),
-		sliderSetting(L["mythicPlusTimerValueOffsetX"] or "Value X offset", get("valueOffsetX"), set("valueOffsetX", function(value) return clampNumber(value, -400, 400, defaults.valueOffsetX) end), -400, 400, 1, layoutId, nil, nil, isListMode),
-		sliderSetting(L["mythicPlusTimerValueOffsetY"] or "Value Y offset", get("valueOffsetY"), set("valueOffsetY", function(value) return clampNumber(value, -200, 200, defaults.valueOffsetY) end), -200, 200, 1, layoutId, nil, nil, isListMode),
+		sliderSetting(L["mythicPlusTimerTextOffsetX"] or "Label X offset", get("textOffsetX"), set("textOffsetX", function(value) return clampNumber(value, -800, 800, defaults.textOffsetX) end), -800, 800, 1, layoutId, nil, nil, isListMode),
+		sliderSetting(L["mythicPlusTimerTextOffsetY"] or "Label Y offset", get("textOffsetY"), set("textOffsetY", function(value) return clampNumber(value, -800, 800, defaults.textOffsetY) end), -800, 800, 1, layoutId, nil, nil, isListMode),
+		sliderSetting(L["mythicPlusTimerValueOffsetX"] or "Value X offset", get("valueOffsetX"), set("valueOffsetX", function(value) return clampNumber(value, -800, 800, defaults.valueOffsetX) end), -800, 800, 1, layoutId, nil, nil, isListMode),
+		sliderSetting(L["mythicPlusTimerValueOffsetY"] or "Value Y offset", get("valueOffsetY"), set("valueOffsetY", function(value) return clampNumber(value, -800, 800, defaults.valueOffsetY) end), -800, 800, 1, layoutId, nil, nil, isListMode),
 		sliderSetting(L["mythicPlusTimerIconOffsetX"] or "Icon X offset", get("iconOffsetX"), set("iconOffsetX", function(value) return clampNumber(value, -200, 200, defaults.iconOffsetX) end), -200, 200, 1, layoutId, nil, nil, isListMode),
 		sliderSetting(L["mythicPlusTimerIconOffsetY"] or "Icon Y offset", get("iconOffsetY"), set("iconOffsetY", function(value) return clampNumber(value, -200, 200, defaults.iconOffsetY) end), -200, 200, 1, layoutId, nil, nil, isListMode),
 		sliderSetting(L["mythicPlusTimerIconGap"] or "Icon gap", get("iconGap"), set("iconGap", function(value) return clampNumber(value, -50, 100, defaults.iconGap) end), -50, 100, 1, layoutId, nil, nil, isListMode),
@@ -3112,12 +3118,12 @@ function Timer:BuildEditModeSettings()
 		colorSetting(L["mythicPlusTimerPanelTimerBarChestMarkerColor"] or "+2/+3 marker color", get("panelTimerBarChestMarkerColor"), set("panelTimerBarChestMarkerColor"), defaults.panelTimerBarChestMarkerColor, "mpt-panel-time", allEnabled("showPanelTimerBar", "panelTimerBarChestMarkers")),
 		sliderSetting(L["mythicPlusTimerPanelTimerBarChestMarkerWidth"] or "+2/+3 marker width", get("panelTimerBarChestMarkerWidth"), set("panelTimerBarChestMarkerWidth", function(value) return clampNumber(value, 1, 12, defaults.panelTimerBarChestMarkerWidth) end), 1, 12, 1, "mpt-panel-time", nil, allEnabled("showPanelTimerBar", "panelTimerBarChestMarkers")),
 		checkboxSetting(L["mythicPlusTimerPanelTimerBarChestTimeText"] or "Show +2/+3 times on bar", get("panelTimerBarChestTimeText"), set("panelTimerBarChestTimeText", nil, true), "mpt-panel-time", enabledWhen("showPanelTimerBar")),
-		sliderSetting(L["mythicPlusTimerPanelTimerBarChestTimeTextOffsetY"] or "+2/+3 time text Y offset", get("panelTimerBarChestTimeTextOffsetY"), set("panelTimerBarChestTimeTextOffsetY", function(value) return clampNumber(value, -100, 100, defaults.panelTimerBarChestTimeTextOffsetY) end), -100, 100, 1, "mpt-panel-time", nil, allEnabled("showPanelTimerBar", "panelTimerBarChestTimeText")),
+		sliderSetting(L["mythicPlusTimerPanelTimerBarChestTimeTextOffsetY"] or "+2/+3 time text Y offset", get("panelTimerBarChestTimeTextOffsetY"), set("panelTimerBarChestTimeTextOffsetY", function(value) return clampNumber(value, -800, 800, defaults.panelTimerBarChestTimeTextOffsetY) end), -800, 800, 1, "mpt-panel-time", nil, allEnabled("showPanelTimerBar", "panelTimerBarChestTimeText")),
 		sliderSetting(L["mythicPlusTimerPanelTimerBarChestTimeTextFontSize"] or "+2/+3 time text font size", get("panelTimerBarChestTimeTextFontSize"), set("panelTimerBarChestTimeTextFontSize", function(value) return clampNumber(value, 8, 56, defaults.panelTimerBarChestTimeTextFontSize) end), 8, 56, 1, "mpt-panel-time", nil, allEnabled("showPanelTimerBar", "panelTimerBarChestTimeText")),
 		colorSetting(L["mythicPlusTimerPanelTimerBarChestTimeTextColor"] or "+2/+3 time text color", get("panelTimerBarChestTimeTextColor"), set("panelTimerBarChestTimeTextColor"), defaults.panelTimerBarChestTimeTextColor, "mpt-panel-time", allEnabled("showPanelTimerBar", "panelTimerBarChestTimeText")),
 		checkboxSetting(L["mythicPlusTimerPanelTimerBarTimeLeftText"] or "Show time left on bar", get("panelTimerBarTimeLeftText"), set("panelTimerBarTimeLeftText", nil, true), "mpt-panel-time", enabledWhen("showPanelTimerBar"), shownWhen("showPanelTimerBar")),
-		sliderSetting(L["mythicPlusTimerPanelTimerBarTimeLeftTextOffsetX"] or "Time left text X offset", get("panelTimerBarTimeLeftTextOffsetX"), set("panelTimerBarTimeLeftTextOffsetX", function(value) return clampNumber(value, -200, 200, defaults.panelTimerBarTimeLeftTextOffsetX) end), -200, 200, 1, "mpt-panel-time", nil, allEnabled("showPanelTimerBar", "panelTimerBarTimeLeftText"), allShown("showPanelTimerBar", "panelTimerBarTimeLeftText")),
-		sliderSetting(L["mythicPlusTimerPanelTimerBarTimeLeftTextOffsetY"] or "Time left text Y offset", get("panelTimerBarTimeLeftTextOffsetY"), set("panelTimerBarTimeLeftTextOffsetY", function(value) return clampNumber(value, -100, 100, defaults.panelTimerBarTimeLeftTextOffsetY) end), -100, 100, 1, "mpt-panel-time", nil, allEnabled("showPanelTimerBar", "panelTimerBarTimeLeftText"), allShown("showPanelTimerBar", "panelTimerBarTimeLeftText")),
+		sliderSetting(L["mythicPlusTimerPanelTimerBarTimeLeftTextOffsetX"] or "Time left text X offset", get("panelTimerBarTimeLeftTextOffsetX"), set("panelTimerBarTimeLeftTextOffsetX", function(value) return clampNumber(value, -800, 800, defaults.panelTimerBarTimeLeftTextOffsetX) end), -800, 800, 1, "mpt-panel-time", nil, allEnabled("showPanelTimerBar", "panelTimerBarTimeLeftText"), allShown("showPanelTimerBar", "panelTimerBarTimeLeftText")),
+		sliderSetting(L["mythicPlusTimerPanelTimerBarTimeLeftTextOffsetY"] or "Time left text Y offset", get("panelTimerBarTimeLeftTextOffsetY"), set("panelTimerBarTimeLeftTextOffsetY", function(value) return clampNumber(value, -800, 800, defaults.panelTimerBarTimeLeftTextOffsetY) end), -800, 800, 1, "mpt-panel-time", nil, allEnabled("showPanelTimerBar", "panelTimerBarTimeLeftText"), allShown("showPanelTimerBar", "panelTimerBarTimeLeftText")),
 		sliderSetting(L["mythicPlusTimerPanelTimerBarTimeLeftTextFontSize"] or "Time left text size", get("panelTimerBarTimeLeftTextFontSize"), set("panelTimerBarTimeLeftTextFontSize", function(value) return clampNumber(value, 8, 56, defaults.panelTimerBarTimeLeftTextFontSize) end), 8, 56, 1, "mpt-panel-time", nil, allEnabled("showPanelTimerBar", "panelTimerBarTimeLeftText"), allShown("showPanelTimerBar", "panelTimerBarTimeLeftText")),
 		colorSetting(L["mythicPlusTimerPanelTimerBarTimeLeftTextColor"] or "Time left text color", get("panelTimerBarTimeLeftTextColor"), set("panelTimerBarTimeLeftTextColor"), defaults.panelTimerBarTimeLeftTextColor, "mpt-panel-time", allEnabled("showPanelTimerBar", "panelTimerBarTimeLeftText"), allShown("showPanelTimerBar", "panelTimerBarTimeLeftText")),
 		checkboxSetting(L["mythicPlusTimerPanelTimerBarFillUp"] or "Fill timer bar up", get("panelTimerBarFillUp"), set("panelTimerBarFillUp"), "mpt-panel-time", enabledWhen("showPanelTimerBar")),
@@ -3167,7 +3173,7 @@ function Timer:BuildEditModeSettings()
 			{ value = "CENTER", label = _G.CENTER or "Center" },
 			{ value = "RIGHT", label = _G.RIGHT or "Right" },
 		}, "mpt-panel-enemy", nil, allEnabled("showPanelEnemyBar", "panelEnemyBarTextEnabled")),
-		sliderSetting(L["mythicPlusTimerPanelEnemyBarTextOffsetY"] or L["Text Y offset"] or "Text Y offset", get("panelEnemyBarTextOffsetY"), set("panelEnemyBarTextOffsetY", function(value) return clampNumber(value, -100, 100, defaults.panelEnemyBarTextOffsetY) end), -100, 100, 1, "mpt-panel-enemy", nil, allEnabled("showPanelEnemyBar", "panelEnemyBarTextEnabled")),
+		sliderSetting(L["mythicPlusTimerPanelEnemyBarTextOffsetY"] or L["Text Y offset"] or "Text Y offset", get("panelEnemyBarTextOffsetY"), set("panelEnemyBarTextOffsetY", function(value) return clampNumber(value, -800, 800, defaults.panelEnemyBarTextOffsetY) end), -800, 800, 1, "mpt-panel-enemy", nil, allEnabled("showPanelEnemyBar", "panelEnemyBarTextEnabled")),
 		sliderSetting(L["mythicPlusTimerPanelEnemyBarTextFontSize"] or L["Text size"] or "Text size", get("panelEnemyBarTextFontSize"), set("panelEnemyBarTextFontSize", function(value) return clampNumber(value, 8, 56, defaults.panelEnemyBarTextFontSize) end), 8, 56, 1, "mpt-panel-enemy", nil, allEnabled("showPanelEnemyBar", "panelEnemyBarTextEnabled")),
 		colorSetting(L["mythicPlusTimerPanelEnemyBarTextColor"] or L["Text color"] or "Text color", get("panelEnemyBarTextColor"), set("panelEnemyBarTextColor"), defaults.panelEnemyBarTextColor, "mpt-panel-enemy", allEnabled("showPanelEnemyBar", "panelEnemyBarTextEnabled")),
 		{ name = L["mythicPlusTimerPanelBestTime"] or "Best time", kind = SettingType.Collapsible, id = "mpt-panel-best", defaultCollapsed = true },
@@ -3220,8 +3226,8 @@ function Timer:BuildEditModeSettings()
 			{ value = "BOTTOM", label = _G.BOTTOM or "Bottom" },
 		}, barId, nil, nil, isListMode),
 		sliderSetting(L["mythicPlusTimerBarHeight"] or "Bar height", get("barHeight"), set("barHeight", function(value) return clampNumber(value, 1, 96, defaults.barHeight) end), 1, 96, 1, barId, nil, nil, isListMode),
-		sliderSetting(L["mythicPlusTimerBarOffsetX"] or "Bar X offset", get("barOffsetX"), set("barOffsetX", function(value) return clampNumber(value, -200, 200, defaults.barOffsetX) end), -200, 200, 1, barId, nil, nil, isListMode),
-		sliderSetting(L["mythicPlusTimerBarOffsetY"] or "Bar Y offset", get("barOffsetY"), set("barOffsetY", function(value) return clampNumber(value, -200, 200, defaults.barOffsetY) end), -200, 200, 1, barId, nil, nil, isListMode),
+		sliderSetting(L["mythicPlusTimerBarOffsetX"] or "Bar X offset", get("barOffsetX"), set("barOffsetX", function(value) return clampNumber(value, -800, 800, defaults.barOffsetX) end), -800, 800, 1, barId, nil, nil, isListMode),
+		sliderSetting(L["mythicPlusTimerBarOffsetY"] or "Bar Y offset", get("barOffsetY"), set("barOffsetY", function(value) return clampNumber(value, -800, 800, defaults.barOffsetY) end), -800, 800, 1, barId, nil, nil, isListMode),
 		sliderSetting(L["mythicPlusTimerBarWidthOffset"] or "Bar width offset", get("barWidthOffset"), set("barWidthOffset", function(value) return clampNumber(value, -400, 400, defaults.barWidthOffset) end), -400, 400, 1, barId, nil, nil, isListMode),
 		dropdownSetting(L["mythicPlusTimerTexture"] or "Bar texture", get("texture"), set("texture"), function() return buildMediaOptions("statusbar", false) end, barId, 260),
 		dropdownSetting(L["mythicPlusTimerBarBackgroundTexture"] or "Bar background texture", get("barBackgroundTexture"), set("barBackgroundTexture"), function() return buildMediaOptions("statusbar", false) end, barId, 260),

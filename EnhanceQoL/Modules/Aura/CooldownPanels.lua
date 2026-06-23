@@ -7166,6 +7166,29 @@ function CooldownPanels:ResolveEntryCooldownVisuals(layout, entry)
 		entry.cooldownGcdDrawSwipe == true
 end
 
+function CooldownPanels:IsDefaultCooldownSwipeColor(color)
+	local defaultColor = Helper.PANEL_LAYOUT_DEFAULTS.cooldownSwipeColor or { 0, 0, 0, 0.8 }
+	color = Helper.NormalizeColor(color, defaultColor)
+	return color[1] == defaultColor[1] and color[2] == defaultColor[2] and color[3] == defaultColor[3] and color[4] == defaultColor[4]
+end
+
+function CooldownPanels:GetResolvedCooldownSwipeColor(layout, entry)
+	local defaultColor = Helper.PANEL_LAYOUT_DEFAULTS.cooldownSwipeColor or { 0, 0, 0, 0.8 }
+	local color
+	if entry and entry.cooldownVisualsUseGlobal == false then
+		color = Helper.NormalizeColor(entry.cooldownSwipeColor, Helper.ENTRY_DEFAULTS.cooldownSwipeColor or defaultColor)
+	else
+		color = Helper.NormalizeColor(layout and layout.cooldownSwipeColor, defaultColor)
+	end
+	return color
+end
+
+function CooldownPanels:GetCustomCooldownSwipeColor(layout, entry)
+	local color = self:GetResolvedCooldownSwipeColor(layout, entry)
+	if self:IsDefaultCooldownSwipeColor(color) then return nil end
+	return color
+end
+
 function CooldownPanels:ShouldIgnoreEntryCooldownGCD(layout, entry)
 	local _, _, _, _, gcdDrawEdge, gcdDrawBling, gcdDrawSwipe = self:ResolveEntryCooldownVisuals(layout, entry)
 	return gcdDrawEdge ~= true and gcdDrawBling ~= true and gcdDrawSwipe ~= true
@@ -7920,6 +7943,7 @@ end
 function cdp.RUNTIME.HasCooldownWidgetConfigChange(snapshot, data, cooldownUsesAuraDisplay)
 	if not (snapshot and data) then return true end
 	local color = data.activationOverlayColor
+	local swipeColor = data.cooldownSwipeColor
 	return snapshot.entryId ~= data.entryId
 		or snapshot.cooldownHideCountdownNumbers ~= not data.showCooldownText
 		or snapshot.cooldownUsesAuraDisplay ~= (cooldownUsesAuraDisplay == true)
@@ -7928,11 +7952,16 @@ function cdp.RUNTIME.HasCooldownWidgetConfigChange(snapshot, data, cooldownUsesA
 		or snapshot.activationOverlayColorG ~= (color and color[2] or nil)
 		or snapshot.activationOverlayColorB ~= (color and color[3] or nil)
 		or snapshot.activationOverlayColorA ~= (color and color[4] or nil)
+		or snapshot.cooldownSwipeColorR ~= (swipeColor and swipeColor[1] or nil)
+		or snapshot.cooldownSwipeColorG ~= (swipeColor and swipeColor[2] or nil)
+		or snapshot.cooldownSwipeColorB ~= (swipeColor and swipeColor[3] or nil)
+		or snapshot.cooldownSwipeColorA ~= (swipeColor and swipeColor[4] or nil)
 end
 
 function cdp.RUNTIME.WriteCooldownWidgetConfigSnapshot(snapshot, data, cooldownUsesAuraDisplay)
 	if not (snapshot and data) then return end
 	local color = data.activationOverlayColor
+	local swipeColor = data.cooldownSwipeColor
 	snapshot.entryId = data.entryId
 	snapshot.cooldownHideCountdownNumbers = not data.showCooldownText
 	snapshot.cooldownUsesAuraDisplay = cooldownUsesAuraDisplay == true
@@ -7941,6 +7970,10 @@ function cdp.RUNTIME.WriteCooldownWidgetConfigSnapshot(snapshot, data, cooldownU
 	snapshot.activationOverlayColorG = color and color[2] or nil
 	snapshot.activationOverlayColorB = color and color[3] or nil
 	snapshot.activationOverlayColorA = color and color[4] or nil
+	snapshot.cooldownSwipeColorR = swipeColor and swipeColor[1] or nil
+	snapshot.cooldownSwipeColorG = swipeColor and swipeColor[2] or nil
+	snapshot.cooldownSwipeColorB = swipeColor and swipeColor[3] or nil
+	snapshot.cooldownSwipeColorA = swipeColor and swipeColor[4] or nil
 end
 
 function cdp.RUNTIME.HasCooldownTextStyleChange(snapshot, data, defaultFontPath, defaultFontSize, defaultFontStyle)
@@ -10443,6 +10476,10 @@ local function setCooldownDrawState(cooldown, drawEdge, drawBling, drawSwipe)
 end
 
 function cdp.ENTRY.GetCooldownSwipeColor(data)
+	if data and data.cooldownSwipeColor then
+		local color = data.cooldownSwipeColor
+		return color[1], color[2], color[3], color[4]
+	end
 	if data and data.activationOverlayActive == true then
 		local color = data.activationOverlayColor or Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT
 		return color[1], color[2], color[3], color[4]
@@ -10464,7 +10501,7 @@ function cdp.ENTRY.ApplyCooldownSwipeVisual(icon, data)
 	if addon.IconShape and addon.IconShape.ApplyCooldownSwipeVisual then
 		addon.IconShape.ApplyCooldownSwipeVisual(icon.cooldown, icon, cdp.ENTRY.GetCooldownSwipeColor, data, {
 			blizzardSwipeTexture = icon._eqolBlizzardIconBorderEnabled == true and cdp.ICON_BORDER.SWIPE_TEXTURE or nil,
-			customColor = data and (data.activationOverlayActive == true or data.resolvedType == "CDM_AURA") or false,
+			customColor = data and (data.cooldownSwipeColor ~= nil or data.activationOverlayActive == true or data.resolvedType == "CDM_AURA") or false,
 		})
 	end
 end
@@ -14271,6 +14308,25 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 				return value
 			end,
 			set = function(_, value) setEntryBoolean("cooldownDrawSwipe", value) end,
+		},
+		{
+			name = L["CooldownPanelSwipeColor"] or "Swipe color",
+			tooltip = L["CooldownPanelSwipeColorTooltip"],
+			kind = SettingType.Color,
+			parentId = "cooldownPanelStandaloneCooldownSwipe",
+			hasOpacity = true,
+			isShown = function() return getEffectiveType() ~= "STANCE" end,
+			disabled = function()
+				local _, currentEntry = getEntry()
+				return not (currentEntry and currentEntry.cooldownVisualsUseGlobal == false)
+			end,
+			default = Helper.NormalizeColor(Helper.ENTRY_DEFAULTS.cooldownSwipeColor, Helper.PANEL_LAYOUT_DEFAULTS.cooldownSwipeColor),
+			get = function()
+				local _, currentEntry = getEntry()
+				local color = CooldownPanels:GetResolvedCooldownSwipeColor(getLayout(), currentEntry)
+				return { r = color[1], g = color[2], b = color[3], a = color[4] }
+			end,
+			set = function(_, value) setEntryField("cooldownSwipeColor", Helper.NormalizeColor(value, Helper.ENTRY_DEFAULTS.cooldownSwipeColor or Helper.PANEL_LAYOUT_DEFAULTS.cooldownSwipeColor)) end,
 		},
 		{
 			name = L["CooldownPanelShowEdgeGcd"] or "Show edge on global cooldown",
@@ -20703,6 +20759,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				data.cooldownDrawEdge = entryDrawEdge
 				data.cooldownDrawBling = entryDrawBling
 				data.cooldownDrawSwipe = entryDrawSwipe
+				data.cooldownSwipeColor = self:GetCustomCooldownSwipeColor(entryLayout, entry)
 				data.cooldownGcdDrawEdge = entryGcdDrawEdge
 				data.cooldownGcdDrawBling = entryGcdDrawBling
 				data.cooldownGcdDrawSwipe = entryGcdDrawSwipe
@@ -22308,6 +22365,8 @@ applyEditLayout = function(panelId, field, value, skipRefresh)
 		layout.cooldownDrawBling = value ~= false
 	elseif field == "cooldownDrawSwipe" then
 		layout.cooldownDrawSwipe = value ~= false
+	elseif field == "cooldownSwipeColor" then
+		layout.cooldownSwipeColor = Helper.NormalizeColor(value, Helper.PANEL_LAYOUT_DEFAULTS.cooldownSwipeColor)
 	elseif field == "showChargesCooldown" then
 		layout.showChargesCooldown = value == true
 	elseif field == "cooldownGcdDrawEdge" then
@@ -24414,6 +24473,19 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				default = layout.cooldownDrawSwipe ~= false,
 				get = function() return layout.cooldownDrawSwipe ~= false end,
 				set = function(_, value) applyEditLayout(panelId, "cooldownDrawSwipe", value) end,
+			},
+			{
+				name = L["CooldownPanelSwipeColor"] or "Swipe color",
+				tooltip = L["CooldownPanelSwipeColorTooltip"],
+				kind = SettingType.Color,
+				parentId = "cooldownPanelCooldownSwipe",
+				hasOpacity = true,
+				default = Helper.NormalizeColor(layout.cooldownSwipeColor, Helper.PANEL_LAYOUT_DEFAULTS.cooldownSwipeColor),
+				get = function()
+					local color = Helper.NormalizeColor(layout.cooldownSwipeColor, Helper.PANEL_LAYOUT_DEFAULTS.cooldownSwipeColor)
+					return { r = color[1], g = color[2], b = color[3], a = color[4] }
+				end,
+				set = function(_, value) applyEditLayout(panelId, "cooldownSwipeColor", value) end,
 			},
 			{
 				name = L["CooldownPanelShowEdgeGcd"] or "Show edge on global cooldown",

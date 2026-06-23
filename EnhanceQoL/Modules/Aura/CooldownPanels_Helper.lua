@@ -240,6 +240,7 @@ Helper.PANEL_LAYOUT_DEFAULTS = {
 	cooldownDrawEdge = true,
 	cooldownDrawBling = true,
 	cooldownDrawSwipe = true,
+	cooldownSwipeColor = { 0, 0, 0, 0.8 },
 	cooldownGcdDrawEdge = false,
 	cooldownGcdDrawBling = false,
 	cooldownGcdDrawSwipe = false,
@@ -305,6 +306,7 @@ Helper.ENTRY_DEFAULTS = {
 	cooldownDrawEdge = true,
 	cooldownDrawBling = true,
 	cooldownDrawSwipe = true,
+	cooldownSwipeColor = { 0, 0, 0, 0.8 },
 	cooldownGcdDrawEdge = false,
 	cooldownGcdDrawBling = false,
 	cooldownGcdDrawSwipe = false,
@@ -2322,6 +2324,7 @@ function Helper.NormalizePanel(panel, defaults)
 	panel.layout.cdmAuraAlwaysShowMode =
 		normalizeCDMAuraAlwaysShowMode(panel.layout.cdmAuraAlwaysShowMode, layoutDefaults.cdmAuraAlwaysShowMode or Helper.PANEL_LAYOUT_DEFAULTS.cdmAuraAlwaysShowMode or "HIDE")
 	panel.layout.cdmAuraOverlayEnabled = panel.layout.cdmAuraOverlayEnabled == true
+	panel.layout.cooldownSwipeColor = Helper.NormalizeColor(panel.layout.cooldownSwipeColor, layoutDefaults.cooldownSwipeColor or Helper.PANEL_LAYOUT_DEFAULTS.cooldownSwipeColor)
 	panel.layout.stackColor = Helper.NormalizeColor(panel.layout.stackColor, layoutDefaults.stackColor or Helper.PANEL_LAYOUT_DEFAULTS.stackColor or { 1, 1, 1, 1 })
 	panel.layout.chargesColor = Helper.NormalizeColor(panel.layout.chargesColor, layoutDefaults.chargesColor or Helper.PANEL_LAYOUT_DEFAULTS.chargesColor or { 1, 1, 1, 1 })
 	panel.layout.chargesHideWhenZero = panel.layout.chargesHideWhenZero == true
@@ -2470,6 +2473,7 @@ function Helper.NormalizeEntry(entry, defaults)
 	if type(entry.cooldownDrawEdge) ~= "boolean" then entry.cooldownDrawEdge = Helper.ENTRY_DEFAULTS.cooldownDrawEdge end
 	if type(entry.cooldownDrawBling) ~= "boolean" then entry.cooldownDrawBling = Helper.ENTRY_DEFAULTS.cooldownDrawBling end
 	if type(entry.cooldownDrawSwipe) ~= "boolean" then entry.cooldownDrawSwipe = Helper.ENTRY_DEFAULTS.cooldownDrawSwipe end
+	entry.cooldownSwipeColor = Helper.NormalizeColor(entry.cooldownSwipeColor, Helper.ENTRY_DEFAULTS.cooldownSwipeColor or Helper.PANEL_LAYOUT_DEFAULTS.cooldownSwipeColor)
 	if type(entry.cooldownGcdDrawEdge) ~= "boolean" then entry.cooldownGcdDrawEdge = Helper.ENTRY_DEFAULTS.cooldownGcdDrawEdge end
 	if type(entry.cooldownGcdDrawBling) ~= "boolean" then entry.cooldownGcdDrawBling = Helper.ENTRY_DEFAULTS.cooldownGcdDrawBling end
 	if type(entry.cooldownGcdDrawSwipe) ~= "boolean" then entry.cooldownGcdDrawSwipe = Helper.ENTRY_DEFAULTS.cooldownGcdDrawSwipe end

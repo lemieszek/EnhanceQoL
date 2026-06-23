@@ -1,5 +1,15 @@
 # Changelog
 
+<!--@eqol-beta@-->
+## [11.5.0-beta1] - 2026-06-23
+
+### ✨ Added
+
+- Cooldown Panels: Added a swipe color and opacity picker for cooldown swipes, including optional per-entry overrides.
+
+---
+<!--@end-eqol-beta@-->
+
 ## [11.4.0] - 2026-06-22
 
 ### ✨ Added
