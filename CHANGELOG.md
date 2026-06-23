@@ -7,6 +7,11 @@
 
 - Cooldown Panels: Added a swipe color and opacity picker for cooldown swipes, including optional per-entry overrides.
 
+### 🐛 Fixed
+
+- Cooldown Panels: Fixed the out-of-range overlay tint affecting cooldown text, icon borders, and other icon overlays.
+- Cooldown Panels: Restored Blizzard Buff Bar scanning for tracked aura entries.
+
 ---
 <!--@end-eqol-beta@-->
 

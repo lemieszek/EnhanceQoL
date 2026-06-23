@@ -1103,7 +1103,7 @@ function CDMAuras:ScanTrackedBuffs(force, mode)
 	if seedScanFromCategorySet(scan, trackedBarCategory, SOURCE_BAR) then scan.hasAuthoritativeSeed = true end
 
 	collectViewer(scan, ICON_VIEWER, SOURCE_ICON, seenFrames)
-	-- collectViewer(scan, BAR_VIEWER, SOURCE_BAR, seenFrames)
+	collectViewer(scan, BAR_VIEWER, SOURCE_BAR, seenFrames)
 
 	for cooldownID, info in pairs(scan.byCooldownID) do
 		if not seenInfo[info] then

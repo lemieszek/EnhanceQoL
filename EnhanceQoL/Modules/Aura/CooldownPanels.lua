@@ -8275,8 +8275,8 @@ local function createIconFrame(parent)
 	icon.charges:SetPoint("TOP", icon.overlay, "TOP", 0, -1)
 	icon.charges:Hide()
 
-	icon.rangeOverlay = icon.overlay:CreateTexture(nil, "BACKGROUND")
-	icon.rangeOverlay:SetAllPoints(icon.overlay)
+	icon.rangeOverlay = icon:CreateTexture(nil, "ARTWORK", nil, 1)
+	icon.rangeOverlay:SetAllPoints(icon)
 	icon.rangeOverlay:Hide()
 
 	icon.stateTexture = icon:CreateTexture(nil, "ARTWORK", nil, 1)
