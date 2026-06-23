@@ -7178,8 +7178,10 @@ function CooldownPanels:ResolveEntryIconVisualLayout(layout, entry, baseSize)
 		layout = nil
 	end
 	local fallbackSize = Helper.ClampInt(baseSize, 12, 128, Helper.PANEL_LAYOUT_DEFAULTS.iconSize)
-	local fallbackWidth = Helper.ClampInt(layout and layout.iconSizeSeparate == true and layout.iconWidth, 12, 128, fallbackSize)
-	local fallbackHeight = Helper.ClampInt(layout and layout.iconSizeSeparate == true and layout.iconHeight, 12, 128, fallbackSize)
+	local layoutBaseSize = Helper.ClampInt(layout and layout.iconSize, 12, 128, Helper.PANEL_LAYOUT_DEFAULTS.iconSize)
+	local rowScale = layoutBaseSize > 0 and (fallbackSize / layoutBaseSize) or 1
+	local fallbackWidth = layout and layout.iconSizeSeparate == true and Helper.ClampInt((tonumber(layout.iconWidth) or layoutBaseSize) * rowScale, 12, 128, fallbackSize) or fallbackSize
+	local fallbackHeight = layout and layout.iconSizeSeparate == true and Helper.ClampInt((tonumber(layout.iconHeight) or layoutBaseSize) * rowScale, 12, 128, fallbackSize) or fallbackSize
 	local layoutOffsetX = Helper.ClampInt(layout and layout.iconOffsetX, -Helper.OFFSET_RANGE, Helper.OFFSET_RANGE, 0)
 	local layoutOffsetY = Helper.ClampInt(layout and layout.iconOffsetY, -Helper.OFFSET_RANGE, Helper.OFFSET_RANGE, 0)
 	if not entry then return fallbackSize, layoutOffsetX, layoutOffsetY, fallbackWidth, fallbackHeight end
@@ -10490,6 +10492,50 @@ function cdp.ENTRY.ApplyBlizzardCooldownMask(icon, maskTexture)
 	if addon.IconShape and addon.IconShape.ApplyCooldownRegionMask then addon.IconShape.ApplyCooldownRegionMask(cooldown, maskTexture, "_eqolBlizzardCooldownMask") end
 end
 
+function cdp.ENTRY.ApplyIconTextureAspect(icon, layout, force)
+	local texture = icon and icon.texture
+	if not (texture and texture.SetTexCoord and icon.GetSize) then return end
+	local width, height = icon:GetSize()
+	width = tonumber(width) or 0
+	height = tonumber(height) or 0
+	if width <= 0 or height <= 0 then return end
+
+	local shape = cdp.ENTRY.NormalizeIconShape(layout and layout.iconShape, Helper.PANEL_LAYOUT_DEFAULTS.iconShape)
+	local iconZoom = addon.IconShape and addon.IconShape.NormalizeIconZoom and addon.IconShape.NormalizeIconZoom(layout and layout.iconZoom) or Helper.ClampInt(layout and layout.iconZoom, 0, 35, 0)
+	local inset = 0
+	if addon.IconShape and shape == addon.IconShape.SQUARE then inset = 0.07 end
+	inset = inset + ((tonumber(iconZoom) or 0) / 100)
+	if inset < 0 then inset = 0 end
+	if inset > 0.45 then inset = 0.45 end
+
+	local left, right, top, bottom = inset, 1 - inset, inset, 1 - inset
+	if width > height then
+		local crop = ((bottom - top) * (1 - (height / width))) / 2
+		top = top + crop
+		bottom = bottom - crop
+	elseif height > width then
+		local crop = ((right - left) * (1 - (width / height))) / 2
+		left = left + crop
+		right = right - crop
+	end
+
+	if not force
+		and
+		icon._eqolIconTextureAspectLeft == left
+		and icon._eqolIconTextureAspectRight == right
+		and icon._eqolIconTextureAspectTop == top
+		and icon._eqolIconTextureAspectBottom == bottom
+	then
+		return
+	end
+	if addon.IconShape and addon.IconShape.StoreTextureTexCoord then addon.IconShape.StoreTextureTexCoord(texture, "_eqolCooldownPanelIconTexCoord") end
+	texture:SetTexCoord(left, right, top, bottom)
+	icon._eqolIconTextureAspectLeft = left
+	icon._eqolIconTextureAspectRight = right
+	icon._eqolIconTextureAspectTop = top
+	icon._eqolIconTextureAspectBottom = bottom
+end
+
 function cdp.ENTRY.ApplyIconShape(icon, layout)
 	if not icon then return end
 	local shape = cdp.ENTRY.NormalizeIconShape(layout and layout.iconShape, Helper.PANEL_LAYOUT_DEFAULTS.iconShape)
@@ -10502,6 +10548,7 @@ function cdp.ENTRY.ApplyIconShape(icon, layout)
 			refreshSwipe = function(frame) cdp.ENTRY.ApplyCooldownSwipeVisual(frame, frame._eqolRuntimeData) end,
 		})
 	end
+	cdp.ENTRY.ApplyIconTextureAspect(icon, layout)
 end
 
 function cdp.ENTRY.ClearBlizzardIconSkin(icon)
@@ -10808,6 +10855,14 @@ local function applyIconLayout(frame, count, layout)
 	local radialArcDegrees = nil
 	local radialStep = nil
 	local radialBaseAngle = nil
+	local function getRowIconDimensions(rowSize)
+		rowSize = Helper.ClampInt(rowSize, 12, 128, baseIconSize)
+		if layout.iconSizeSeparate == true then
+			local scale = baseIconSize > 0 and (rowSize / baseIconSize) or 1
+			return Helper.ClampInt(baseIconWidth * scale, 12, 128, baseIconWidth), Helper.ClampInt(baseIconHeight * scale, 12, 128, baseIconHeight)
+		end
+		return rowSize, rowSize
+	end
 
 	if layoutMode == "RADIAL" then
 		radialRadius = Helper.ClampInt(layout.radialRadius, 0, Helper.RADIAL_RADIUS_RANGE or 600, Helper.PANEL_LAYOUT_DEFAULTS.radialRadius)
@@ -10833,8 +10888,7 @@ local function applyIconLayout(frame, count, layout)
 				end
 				rowSizes[rowIndex] = rowSize
 				rowOffsets[rowIndex] = totalHeight
-				local rowIconWidth = layout.iconSizeSeparate == true and baseIconWidth or rowSize
-				local rowIconHeight = layout.iconSizeSeparate == true and baseIconHeight or rowSize
+				local rowIconWidth, rowIconHeight = getRowIconDimensions(rowSize)
 				local rowCols = cols
 				if wrapCount and wrapCount > 0 then
 					local fillIndex = rowIndex
@@ -10911,8 +10965,7 @@ local function applyIconLayout(frame, count, layout)
 
 	local function applyIconCommon(icon, rowSize)
 		local slotAnchor = icon.slotAnchor or icon
-		local rowWidth = layout.iconSizeSeparate == true and baseIconWidth or rowSize
-		local rowHeight = layout.iconSizeSeparate == true and baseIconHeight or rowSize
+		local rowWidth, rowHeight = getRowIconDimensions(rowSize)
 		slotAnchor:SetSize(rowWidth, rowHeight)
 		icon._eqolBaseSlotSize = rowSize
 		icon:SetSize(rowWidth, rowHeight)
@@ -11105,8 +11158,7 @@ local function applyIconLayout(frame, count, layout)
 
 		local rowIndex = row + 1
 		local rowSize = rowSizes[rowIndex] or baseIconSize
-		local rowIconWidth = layout.iconSizeSeparate == true and baseIconWidth or rowSize
-		local rowHeight = layout.iconSizeSeparate == true and baseIconHeight or rowSize
+		local rowIconWidth, rowHeight = getRowIconDimensions(rowSize)
 		local rowOffset = rowOffsets[rowIndex] or (row * (baseIconSize + spacing))
 		local rowWidth = rowWidths[rowIndex] or width
 		local rowAlignOffset = 0
@@ -19389,15 +19441,16 @@ function CooldownPanels:UpdatePreviewIcons(panelId, countOverride)
 				CooldownPanels:ResolveEntryStateTexture(entry)
 		end
 		local slotColumn = previewGridColumns and (((i - 1) % previewGridColumns) + 1) or (editGridColumns and (((i - 1) % editGridColumns) + 1) or i)
-		local slotRow = previewGridColumns and (math.floor((i - 1) / previewGridColumns) + 1) or (editGridColumns and (math.floor((i - 1) / editGridColumns) + 1) or 1)
-		icon:Show()
-		icon._eqolPreviewCellColumn = slotColumn
-		icon._eqolPreviewCellRow = slotRow
-		CooldownPanels:ApplyEntryIconVisualLayout(icon, entryLayout, entry, fixedLayout and panel or nil, fixedLayout and previewGridColumns or nil, slotColumn, slotRow)
-		CooldownPanels:HideEditorGhostIcon(icon)
-		icon.texture:SetTexture(entry and getEntryIcon(entry) or Helper.PREVIEW_ICON)
-		icon.texture:SetVertexColor(1, 1, 1)
-		icon.texture:SetShown(showEntryIconTexture or not entry)
+			local slotRow = previewGridColumns and (math.floor((i - 1) / previewGridColumns) + 1) or (editGridColumns and (math.floor((i - 1) / editGridColumns) + 1) or 1)
+			icon:Show()
+			icon._eqolPreviewCellColumn = slotColumn
+			icon._eqolPreviewCellRow = slotRow
+			CooldownPanels:ApplyEntryIconVisualLayout(icon, entryLayout, entry, fixedLayout and panel or nil, fixedLayout and previewGridColumns or nil, slotColumn, slotRow)
+			CooldownPanels:HideEditorGhostIcon(icon)
+			icon.texture:SetTexture(entry and getEntryIcon(entry) or Helper.PREVIEW_ICON)
+			cdp.ENTRY.ApplyIconTextureAspect(icon, entryLayout, true)
+			icon.texture:SetVertexColor(1, 1, 1)
+			icon.texture:SetShown(showEntryIconTexture or not entry)
 		local entryAuraOverlayEnabled = CooldownPanels:IsEntryCDMAuraOverlayEnabled(entryLayout, entry, resolvedType) and CooldownPanels:SupportsEntryCDMAuraOverlay(entry, resolvedType)
 		local cooldownUsesAuraDisplay = resolvedType == "CDM_AURA" or CooldownPanels:GetEntryCustomCooldownDuration(entry, resolvedType) ~= nil or entryAuraOverlayEnabled
 		local cooldownReverse = resolvedType == "CDM_AURA" or CooldownPanels:GetEntryCustomCooldownDuration(entry, resolvedType) ~= nil or (entryAuraOverlayEnabled and (not entry or entry.activationOverlayReverse ~= false))
@@ -20779,6 +20832,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				icon.texture:SetTexture(data.icon or Helper.PREVIEW_ICON)
 				cdp.RUNTIME.WriteTextureSnapshot(icon._eqolRuntimeSnapshot, data)
 			end
+			if data._eqolRuntimeTextureDirty or data._eqolRuntimePlacementDirty then cdp.ENTRY.ApplyIconTextureAspect(icon, data.layout, true) end
 			icon.texture:SetAlpha(1)
 			if data._eqolRuntimeBaseDecorDirty then
 				icon.texture:SetShown(data.showIconTexture ~= false)
@@ -22398,7 +22452,7 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 	local function isFixedLayout() return Helper.NormalizeLayoutMode(layout.layoutMode, Helper.PANEL_LAYOUT_DEFAULTS.layoutMode) == "FIXED" end
 	local function usesSeparateIconSize() return layout.iconSizeSeparate == true end
 	local function shouldShowRowSize(index)
-		if isRadialLayout() or usesSeparateIconSize() then return false end
+		if isRadialLayout() then return false end
 		local rows, primaryHorizontal = getPanelRowCount(panel, layout)
 		return primaryHorizontal and rows >= index
 	end
