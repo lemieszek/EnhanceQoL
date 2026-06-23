@@ -11619,6 +11619,21 @@ end
 
 cdp.CDM = cdp.CDM or {}
 cdp.CDM.LOGIN_SYNC_RETRY_DELAYS = cdp.CDM.LOGIN_SYNC_RETRY_DELAYS or { 0.2, 1, 2, 4, 8 }
+cdp.CDM.ENTRY_OVERRIDE_SKIP_KEYS = {
+	id = true,
+	type = true,
+	spellID = true,
+	itemID = true,
+	slotID = true,
+	cooldownID = true,
+	buffName = true,
+	sourceType = true,
+	sourceViewer = true,
+	cdmSyncManaged = true,
+	cdmSyncSource = true,
+	cdmSyncKey = true,
+	cdmSyncSpecKey = true,
+}
 
 function cdp.CDM.IsSyncSource(sourceKind)
 	sourceKind = type(sourceKind) == "string" and sourceKind:upper() or nil
@@ -11695,6 +11710,79 @@ function cdp.CDM.GetSpellIdsFromSource(sourceKind)
 	end
 	if #spellIds == 0 then return nil, sourceLabel, "SOURCE_NOT_FOUND" end
 	return spellIds, sourceLabel
+end
+
+function cdp.CDM.GetEntryOverrideSpecKey(specId)
+	specId = tonumber(specId) or queryPlayerSpecId()
+	return specId and tostring(specId) or "nospec"
+end
+
+function cdp.CDM.GetEntryOverrideBucket(panel, sourceKind, specKey)
+	if not (panel and cdp.CDM.IsSyncSource(sourceKind)) then return nil end
+	sourceKind = sourceKind:upper()
+	specKey = tostring(specKey or cdp.CDM.GetEntryOverrideSpecKey())
+	panel.cdmSyncEntryOverrides = panel.cdmSyncEntryOverrides or {}
+	panel.cdmSyncEntryOverrides[sourceKind] = panel.cdmSyncEntryOverrides[sourceKind] or {}
+	panel.cdmSyncEntryOverrides[sourceKind][specKey] = panel.cdmSyncEntryOverrides[sourceKind][specKey] or {}
+	return panel.cdmSyncEntryOverrides[sourceKind][specKey]
+end
+
+function cdp.CDM.SaveEntryOverride(panel, sourceKind, canonicalSpellID, entry, specKey)
+	local spellKey = canonicalSpellID and tostring(canonicalSpellID) or nil
+	if not (spellKey and entry and entry.type == "SPELL") then return false end
+	local bucket = cdp.CDM.GetEntryOverrideBucket(panel, sourceKind, specKey)
+	if not bucket then return false end
+	local override = {}
+	for key, value in pairs(entry) do
+		if type(key) == "string" and not cdp.CDM.ENTRY_OVERRIDE_SKIP_KEYS[key] and not key:match("^_") then
+			override[key] = Helper.CopyTableDeep(value)
+		end
+	end
+	bucket[spellKey] = next(override) and override or nil
+	return true
+end
+
+function cdp.CDM.SaveCurrentEntryOverrides(panel, sourceKind, specKey, wantedBySpellId)
+	if not (panel and type(panel.entries) == "table") then return false end
+	local changed = false
+	for _, entry in pairs(panel.entries) do
+		if entry and entry.type == "SPELL" and entry.spellID then
+			local canonicalSpellID = CooldownPanels:NormalizePersistentSpellID(entry.spellID, { allowTalentChoiceCanonical = true }) or tonumber(entry.spellID)
+			if canonicalSpellID and (not wantedBySpellId or wantedBySpellId[canonicalSpellID]) then
+				changed = cdp.CDM.SaveEntryOverride(panel, sourceKind, canonicalSpellID, entry, specKey) or changed
+			end
+		end
+	end
+	return changed
+end
+
+function cdp.CDM.ApplyEntryOverride(panel, sourceKind, canonicalSpellID, entry, specKey)
+	local spellKey = canonicalSpellID and tostring(canonicalSpellID) or nil
+	if not (spellKey and entry) then return false end
+	local overridesBySource = panel and panel.cdmSyncEntryOverrides
+	local bucket = overridesBySource and overridesBySource[sourceKind] and overridesBySource[sourceKind][tostring(specKey or cdp.CDM.GetEntryOverrideSpecKey())]
+	local override = bucket and bucket[spellKey]
+	if type(override) ~= "table" then return false end
+	for key, value in pairs(override) do
+		if type(key) == "string" and not cdp.CDM.ENTRY_OVERRIDE_SKIP_KEYS[key] and not key:match("^_") then
+			entry[key] = Helper.CopyTableDeep(value)
+		end
+	end
+	return true
+end
+
+function cdp.CDM.ResetEntryToSyncedDefault(entry, spellId, defaults)
+	if not (entry and spellId) then return false end
+	local resetEntry = Helper.CreateEntry("SPELL", spellId, defaults)
+	for key in pairs(entry) do
+		if type(key) == "string" and not cdp.CDM.ENTRY_OVERRIDE_SKIP_KEYS[key] and not key:match("^_") then entry[key] = nil end
+	end
+	for key, value in pairs(resetEntry) do
+		if type(key) == "string" and not cdp.CDM.ENTRY_OVERRIDE_SKIP_KEYS[key] and not key:match("^_") then
+			entry[key] = Helper.CopyTableDeep(value)
+		end
+	end
+	return true
 end
 
 local function importCooldownManagerSpells(panelId, sourceKind)
@@ -11815,7 +11903,7 @@ function CooldownPanels:SyncPanelWithCooldownManager(panelId, sourceKind)
 
 	local wantedBySpellId = {}
 	local wantedOrder = {}
-	local stats = { added = 0, removed = 0, invalid = 0, seen = 0, sourceLabel = sourceLabel }
+	local stats = { added = 0, removed = 0, updated = 0, invalid = 0, seen = 0, sourceLabel = sourceLabel }
 	for i = 1, #spellIds do
 		stats.seen = stats.seen + 1
 		local spellId = tonumber(spellIds[i])
@@ -11832,6 +11920,13 @@ function CooldownPanels:SyncPanelWithCooldownManager(panelId, sourceKind)
 		end
 	end
 
+	local currentSpecKey = cdp.CDM.GetEntryOverrideSpecKey()
+	panel.cdmSyncActiveSpecBySource = panel.cdmSyncActiveSpecBySource or {}
+	local previousSpecKey = panel.cdmSyncActiveSpecBySource[sourceKind]
+	local specChanged = previousSpecKey and previousSpecKey ~= currentSpecKey
+	if specChanged then cdp.CDM.SaveCurrentEntryOverrides(panel, sourceKind, previousSpecKey) end
+	panel.cdmSyncActiveSpecBySource[sourceKind] = currentSpecKey
+
 	local existingBySpellId = {}
 	local otherOrder = {}
 	local runtime = self.runtime
@@ -11839,7 +11934,25 @@ function CooldownPanels:SyncPanelWithCooldownManager(panelId, sourceKind)
 		local entry = panel.entries[entryId]
 		if entry and entry.type == "SPELL" and entry.spellID then
 			local canonicalSpellID = self:NormalizePersistentSpellID(entry.spellID, { allowTalentChoiceCanonical = true }) or tonumber(entry.spellID)
-			if canonicalSpellID then existingBySpellId[canonicalSpellID] = entryId end
+			if canonicalSpellID then
+				existingBySpellId[canonicalSpellID] = entryId
+				if wantedBySpellId[canonicalSpellID] then
+					local entrySpecKey = entry.cdmSyncSpecKey or previousSpecKey
+					local entrySpecChanged = entrySpecKey and entrySpecKey ~= currentSpecKey
+					if entrySpecChanged then cdp.CDM.SaveEntryOverride(panel, sourceKind, canonicalSpellID, entry, entrySpecKey) end
+					entry.cdmSyncManaged = true
+					entry.cdmSyncSource = sourceKind
+					entry.cdmSyncKey = canonicalSpellID
+					entry.cdmSyncSpecKey = currentSpecKey
+					if entrySpecChanged then
+						if cdp.CDM.ApplyEntryOverride(panel, sourceKind, canonicalSpellID, entry, currentSpecKey) then
+							stats.updated = stats.updated + 1
+						elseif cdp.CDM.ResetEntryToSyncedDefault(entry, wantedBySpellId[canonicalSpellID], root.defaults) then
+							stats.updated = stats.updated + 1
+						end
+					end
+				end
+			end
 		elseif entry then
 			otherOrder[#otherOrder + 1] = entryId
 		end
@@ -11848,6 +11961,8 @@ function CooldownPanels:SyncPanelWithCooldownManager(panelId, sourceKind)
 		if entry and entry.type == "SPELL" and entry.spellID then
 			local canonicalSpellID = self:NormalizePersistentSpellID(entry.spellID, { allowTalentChoiceCanonical = true }) or tonumber(entry.spellID)
 			if canonicalSpellID and not wantedBySpellId[canonicalSpellID] then
+				local removalSpecKey = entry.cdmSyncSpecKey or previousSpecKey or currentSpecKey
+				cdp.CDM.SaveEntryOverride(panel, sourceKind, canonicalSpellID, entry, removalSpecKey)
 				panel.entries[entryId] = nil
 				if runtime and runtime.actionDisplayCounts then runtime.actionDisplayCounts[Helper.GetEntryKey(panelId, entryId)] = nil end
 				self:ClearEntryCustomCooldownDuration(panelId, entryId, true)
@@ -11863,6 +11978,11 @@ function CooldownPanels:SyncPanelWithCooldownManager(panelId, sourceKind)
 				local entryId = Helper.GetNextNumericId(panel.entries)
 				local entry = Helper.CreateEntry("SPELL", wantedBySpellId[canonicalSpellID], root.defaults)
 				entry.id = entryId
+				entry.cdmSyncManaged = true
+				entry.cdmSyncSource = sourceKind
+				entry.cdmSyncKey = canonicalSpellID
+				entry.cdmSyncSpecKey = currentSpecKey
+				cdp.CDM.ApplyEntryOverride(panel, sourceKind, canonicalSpellID, entry, currentSpecKey)
 				panel.entries[entryId] = entry
 				existingBySpellId[canonicalSpellID] = entryId
 				stats.added = stats.added + 1
@@ -11881,7 +12001,7 @@ function CooldownPanels:SyncPanelWithCooldownManager(panelId, sourceKind)
 	panel.order = nextOrder
 	Helper.SyncOrder(panel.order, panel.entries)
 	Helper.InvalidateFixedLayoutCache(panel)
-	if stats.added > 0 or stats.removed > 0 then self:RebuildSpellIndex() end
+	if stats.added > 0 or stats.removed > 0 or stats.updated > 0 then self:RebuildSpellIndex() end
 	self:RefreshPanel(panelId)
 	if self.BlizzardEditor and self.BlizzardEditor.RefreshPanel then self.BlizzardEditor:RefreshPanel(panelId) end
 	return stats
