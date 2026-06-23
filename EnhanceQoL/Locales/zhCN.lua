@@ -3326,6 +3326,7 @@ L["ResourceBarsEnableSharedAllClassesConfirm"] = "要为所有职业的所有专
 L["ResourceBarsEnableSharedAllClassesDesc"] = "将所有职业和专精切换为共享模式，并创建共享资源条槽位。"
 L["ResourceBarsEnableSharedAllSpecs"] = "为所有专精启用共享模式"
 L["ResourceBarsEnableSharedAllSpecsConfirm"] = "要为该职业的所有专精启用共享模式吗？"
+L["ResourceBarsHideWhenEmpty"] = "为空时隐藏"
 L["ResourceBarsModeDesc"] = "选择资源条的布局模式。"
 L["ResourceBarsModeForSpec"] = "%s 模式"
 L["ResourceBarsModeNote"] = "共享模式为当前职业使用一套资源条。经典模式允许每个专精单独选择启用的资源条。"

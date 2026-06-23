@@ -3327,6 +3327,7 @@ L["ResourceBarsEnableSharedAllClassesConfirm"] = "Activer le mode Partagé pour 
 L["ResourceBarsEnableSharedAllClassesDesc"] = "Passe toutes les classes et spécialisations en mode Partagé et crée les emplacements de barres partagés."
 L["ResourceBarsEnableSharedAllSpecs"] = "Activer Partagé pour toutes les spécialisations"
 L["ResourceBarsEnableSharedAllSpecsConfirm"] = "Activer le mode Partagé pour toutes les spécialisations de cette classe ?"
+L["ResourceBarsHideWhenEmpty"] = "Masquer quand vide"
 L["ResourceBarsModeDesc"] = "Sélectionnez le mode de mise en page des barres de ressources."
 L["ResourceBarsModeForSpec"] = "Mode de %s"
 L["ResourceBarsModeNote"] = "Partagé utilise un seul ensemble de barres pour la classe actuelle. Classique permet à chaque spécialisation de choisir ses barres actives."

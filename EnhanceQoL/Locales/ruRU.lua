@@ -3327,6 +3327,7 @@ L["ResourceBarsEnableSharedAllClassesConfirm"] = "Включить общий р
 L["ResourceBarsEnableSharedAllClassesDesc"] = "Переключает все классы и специализации в общий режим и создает общие слоты полос."
 L["ResourceBarsEnableSharedAllSpecs"] = "Включить общий режим для всех специализаций"
 L["ResourceBarsEnableSharedAllSpecsConfirm"] = "Включить общий режим для всех специализаций этого класса?"
+L["ResourceBarsHideWhenEmpty"] = "Скрывать, когда пусто"
 L["ResourceBarsModeDesc"] = "Выберите режим макета для полос ресурсов."
 L["ResourceBarsModeForSpec"] = "Режим для %s"
 L["ResourceBarsModeNote"] = "Общий режим использует один набор полос для текущего класса. Классический позволяет каждой специализации выбирать свои активные полосы."

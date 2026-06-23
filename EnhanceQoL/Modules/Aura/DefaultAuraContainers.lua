@@ -63,6 +63,8 @@ local DEFAULT_AURA_CONFIG_SUFFIXES = {
 	"VerticalSpacing",
 	"IconsPerRow",
 	"MaxRows",
+	"FrameStrata",
+	"FrameLevel",
 	"SortMethod",
 	"SortDirection",
 	"IncludeWeapons",
@@ -367,6 +369,21 @@ local function getDefaultAuraMaxRows(value, kind)
 	if rows < 1 then rows = 1 end
 	if rows > 10 then rows = 10 end
 	return rows
+end
+
+local function normalizeDefaultAuraFrameStrata(value)
+	value = type(value) == "string" and strupper(value) or "MEDIUM"
+	if value == "BACKGROUND" or value == "LOW" or value == "MEDIUM" or value == "HIGH" or value == "DIALOG" or value == "FULLSCREEN" or value == "FULLSCREEN_DIALOG" or value == "TOOLTIP" then return value end
+	return "MEDIUM"
+end
+
+local function getDefaultAuraFrameLevel(value, kind)
+	local level = tonumber(value)
+	if level == nil then level = tonumber(getDefaultAuraDBValue(kind, "FrameLevel")) end
+	level = level or 50
+	if level < 0 then level = 0 end
+	if level > 100 then level = 100 end
+	return math.floor(level + 0.5)
 end
 
 local function normalizeDefaultAuraSortMethod(value)
@@ -961,8 +978,8 @@ local function ensureDefaultAuraAnchor(kind)
 	if tonumber((select(4, GetBuildInfo()))) >= 120100 and type(anchor.SetRolesets) == "function" then anchor:SetRolesets("buffs") end
 	DAC.variables[key] = anchor
 	anchor:SetSize(getDefaultAuraIconsPerRow(nil, kind) * getDefaultAuraIconSize(nil, kind) + (getDefaultAuraIconsPerRow(nil, kind) - 1) * getDefaultAuraHorizontalSpacing(nil, kind), getDefaultAuraMaxRows(nil, kind) * getDefaultAuraIconSize(nil, kind) + (getDefaultAuraMaxRows(nil, kind) - 1) * getDefaultAuraVerticalSpacing(nil, kind))
-	anchor:SetFrameStrata("MEDIUM")
-	anchor:SetFrameLevel(50)
+	anchor:SetFrameStrata(normalizeDefaultAuraFrameStrata(getDefaultAuraDBValue(kind, "FrameStrata")))
+	anchor:SetFrameLevel(getDefaultAuraFrameLevel(nil, kind))
 	if anchor.SetClampedToScreen then anchor:SetClampedToScreen(true) end
 	if anchor.SetClampRectInsets then anchor:SetClampRectInsets(0, 0, 0, 0) end
 	anchor:SetMovable(true)
@@ -1045,6 +1062,8 @@ local function refreshDefaultAuraSamples(kind)
 			samples[i] = sample
 		end
 		sample.eqolDefaultAuraKind = kind
+		if sample.SetFrameStrata then sample:SetFrameStrata(anchor:GetFrameStrata()) end
+		if sample.SetFrameLevel then sample:SetFrameLevel((anchor:GetFrameLevel() or 1) + 1) end
 		sample.Icon:SetTexture(SAMPLE_AURA_ICONS[((i - 1) % #SAMPLE_AURA_ICONS) + 1] or "Interface\\Icons\\INV_Misc_QuestionMark")
 		local showCount = getDefaultAuraDBValue(kind, "CountEnabled") ~= false and (i == 1 or i == 6 or i == 13)
 		sample.Count:SetText(showCount and tostring((i % 4) + 2) or "")
@@ -1115,6 +1134,10 @@ local function applyDefaultAuraEditModeSetting(kind, field, value)
 		setDefaultAuraDBValue(kind, "IconsPerRow", getDefaultAuraIconsPerRow(value, kind))
 	elseif field == "maxRows" then
 		setDefaultAuraDBValue(kind, "MaxRows", getDefaultAuraMaxRows(value, kind))
+	elseif field == "frameStrata" then
+		setDefaultAuraDBValue(kind, "FrameStrata", normalizeDefaultAuraFrameStrata(value))
+	elseif field == "frameLevel" then
+		setDefaultAuraDBValue(kind, "FrameLevel", getDefaultAuraFrameLevel(value, kind))
 	elseif field == "sortMethod" then
 		setDefaultAuraDBValue(kind, "SortMethod", normalizeDefaultAuraSortMethod(value))
 	elseif field == "sortDirection" then
@@ -1302,6 +1325,18 @@ local function createDefaultAuraEditModeSettings(kind)
 			{ value = "+", label = L["Ascending"] or "Ascending" },
 		}
 	end
+	local function frameStrataOptions()
+		return {
+			{ value = "BACKGROUND", label = "BACKGROUND" },
+			{ value = "LOW", label = "LOW" },
+			{ value = "MEDIUM", label = "MEDIUM" },
+			{ value = "HIGH", label = "HIGH" },
+			{ value = "DIALOG", label = "DIALOG" },
+			{ value = "FULLSCREEN", label = "FULLSCREEN" },
+			{ value = "FULLSCREEN_DIALOG", label = "FULLSCREEN_DIALOG" },
+			{ value = "TOOLTIP", label = "TOOLTIP" },
+		}
+	end
 
 	local layoutSectionId = "default-aura-containers-layout"
 	local borderSectionId = "default-aura-containers-border"
@@ -1322,6 +1357,8 @@ local function createDefaultAuraEditModeSettings(kind)
 		checkbox(L["Draw cooldown swipe"] or "Draw cooldown swipe", function() return getDefaultAuraDrawSwipe(kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "drawSwipe", value) end, nil, layoutSectionId),
 		slider(L["Aura per row"] or "Auras per row", function() return getDefaultAuraIconsPerRow(nil, kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "perRow", value) end, 1, 32, 1, nil, layoutSectionId),
 		slider(L["Max rows"] or "Max rows", function() return getDefaultAuraMaxRows(nil, kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "maxRows", value) end, 1, 10, 1, nil, layoutSectionId),
+		dropdown(L["Frame strata"] or "Frame strata", function() return normalizeDefaultAuraFrameStrata(getDefaultAuraDBValue(kind, "FrameStrata")) end, function(value) applyDefaultAuraEditModeSetting(kind, "frameStrata", value) end, frameStrataOptions, 180, nil, layoutSectionId),
+		slider(L["UFFrameLevel"] or "Frame level", function() return getDefaultAuraFrameLevel(nil, kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "frameLevel", value) end, 0, 100, 1, nil, layoutSectionId),
 		dropdown(L["Sort method"] or "Sort method", function() return normalizeDefaultAuraSortMethod(getDefaultAuraDBValue(kind, "SortMethod")) end, function(value) applyDefaultAuraEditModeSetting(kind, "sortMethod", value) end, sortMethodOptions, 120, nil, layoutSectionId),
 		dropdown(L["Sort direction"] or "Sort direction", function() return normalizeDefaultAuraSortDirection(getDefaultAuraDBValue(kind, "SortDirection")) end, function(value) applyDefaultAuraEditModeSetting(kind, "sortDirection", value) end, sortDirectionOptions, 100, nil, layoutSectionId),
 		checkbox(L["Include weapon enchants"] or "Include weapon enchants", function() return getDefaultAuraDBValue(kind, "IncludeWeapons") == true end, function(value) applyDefaultAuraEditModeSetting(kind, "includeWeapons", value) end, function() return kind == "buff" end, layoutSectionId),
@@ -1552,6 +1589,8 @@ function DAC.functions.InitDB()
 	init("skinnerDefaultAuraVerticalSpacing", getDefaultAuraIconSpacing() + 12)
 	init("skinnerDefaultAuraIconsPerRow", 8)
 	init("skinnerDefaultAuraMaxRows", 4)
+	init("skinnerDefaultAuraFrameStrata", "MEDIUM")
+	init("skinnerDefaultAuraFrameLevel", 50)
 	init("skinnerDefaultAuraSortMethod", "TIME")
 	init("skinnerDefaultAuraSortDirection", "-")
 	init("skinnerDefaultAuraIncludeWeapons", true)

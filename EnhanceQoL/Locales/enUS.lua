@@ -3332,6 +3332,7 @@ L["ResourceBarsEnableSharedAllClassesConfirm"] = "Enable Shared mode for all spe
 L["ResourceBarsEnableSharedAllClassesDesc"] = "Switch every class and specialization to Shared mode and create the shared bar slots."
 L["ResourceBarsEnableSharedAllSpecs"] = "Enable Shared for all specs"
 L["ResourceBarsEnableSharedAllSpecsConfirm"] = "Enable Shared mode for all specs of this class?"
+L["ResourceBarsHideWhenEmpty"] = "Hide when empty"
 L["ResourceBarsModeDesc"] = "Select the layout mode for resource bars."
 L["ResourceBarsModeForSpec"] = "%s mode"
 L["ResourceBarsModeNote"] = "Shared uses one set of bars for the current class. Classic lets each specialization choose its own enabled bars."

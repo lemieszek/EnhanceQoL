@@ -3327,6 +3327,7 @@ L["ResourceBarsEnableSharedAllClassesConfirm"] = "Attivare la modalità Condivis
 L["ResourceBarsEnableSharedAllClassesDesc"] = "Passa tutte le classi e specializzazioni alla modalità Condivisa e crea gli slot delle barre condivise."
 L["ResourceBarsEnableSharedAllSpecs"] = "Attiva Condivisa per tutte le specializzazioni"
 L["ResourceBarsEnableSharedAllSpecsConfirm"] = "Attivare la modalità Condivisa per tutte le specializzazioni di questa classe?"
+L["ResourceBarsHideWhenEmpty"] = "Nascondi quando vuota"
 L["ResourceBarsModeDesc"] = "Seleziona la modalità layout per le barre risorsa."
 L["ResourceBarsModeForSpec"] = "Modalità di %s"
 L["ResourceBarsModeNote"] = "Condivisa usa un unico set di barre per la classe attuale. Classica permette a ogni specializzazione di scegliere le proprie barre attive."

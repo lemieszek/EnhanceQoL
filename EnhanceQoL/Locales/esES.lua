@@ -3327,6 +3327,7 @@ L["ResourceBarsEnableSharedAllClassesConfirm"] = "¿Activar el modo Compartido p
 L["ResourceBarsEnableSharedAllClassesDesc"] = "Cambia todas las clases y especializaciones al modo Compartido y crea los espacios de barras compartidas."
 L["ResourceBarsEnableSharedAllSpecs"] = "Activar Compartido para todas las especializaciones"
 L["ResourceBarsEnableSharedAllSpecsConfirm"] = "¿Activar el modo Compartido para todas las especializaciones de esta clase?"
+L["ResourceBarsHideWhenEmpty"] = "Ocultar cuando esté vacía"
 L["ResourceBarsModeDesc"] = "Selecciona el modo de diseño para las barras de recurso."
 L["ResourceBarsModeForSpec"] = "Modo de %s"
 L["ResourceBarsModeNote"] = "Compartido usa un único conjunto de barras para la clase actual. Clásico permite que cada especialización elija sus barras activas."

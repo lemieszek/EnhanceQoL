@@ -3327,6 +3327,7 @@ L["ResourceBarsEnableSharedAllClassesConfirm"] = "Shared-Modus für alle Spezial
 L["ResourceBarsEnableSharedAllClassesDesc"] = "Stellt alle Klassen und Spezialisierungen auf Shared um und erstellt die gemeinsamen Leistenplätze."
 L["ResourceBarsEnableSharedAllSpecs"] = "Shared für alle Spezialisierungen aktivieren"
 L["ResourceBarsEnableSharedAllSpecsConfirm"] = "Shared-Modus für alle Spezialisierungen dieser Klasse aktivieren?"
+L["ResourceBarsHideWhenEmpty"] = "Ausblenden, wenn leer"
 L["ResourceBarsModeDesc"] = "Wähle den Layoutmodus für Ressourcenleisten."
 L["ResourceBarsModeForSpec"] = "Modus für %s"
 L["ResourceBarsModeNote"] = "Shared nutzt einen gemeinsamen Leistensatz für die aktuelle Klasse. Klassisch lässt jede Spezialisierung selbst wählen, welche Leisten aktiv sind."

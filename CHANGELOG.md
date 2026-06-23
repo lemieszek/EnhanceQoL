@@ -9,8 +9,8 @@
 - Mythic Plus: Added Midnight Season 2 dungeon, teleport, currency, health potion, buff food, trinket, and combat potion support.
 - Quest Tracker: Added optional Blizzard quest tracker text styling with font, outline, size, color, hover color, and header visibility controls.
 - Map & Minimap: Added an enhanced in-world waypoint display with destination label, tracked icon handling, highlight toggle, and scale control.
-- Resource Bars: Added a Shared Resource Bar visibility matrix for class, specialization, and Druid form resources.
-- EQoL Suite: Added custom buff and debuff containers with Edit Mode movement, icon shape, zoom, border, size, spacing, and row controls.
+- Resource Bars: Added a Shared Resource Bar visibility matrix for class, specialization, and Druid form resources, plus a Hide when empty visibility option for individual bars.
+- EQoL Suite: Added custom buff and debuff containers with Edit Mode movement, icon shape, zoom, border, size, spacing, row, frame strata, and frame level controls.
 
 ### 🔄 Changed
 

@@ -74,11 +74,15 @@ function ResourceBars.ShouldHideInVehicle(cfg) return resolveVisibilityFlag(cfg,
 
 function ResourceBars.ShouldHideInPetBattle(cfg) return resolveVisibilityFlag(cfg, "hidePetBattle", "resourceBarsHidePetBattle", false) end
 
+function ResourceBars.ShouldHideWhenEmpty(cfg) return resolveVisibilityFlag(cfg, "hideWhenEmpty", "resourceBarsHideWhenEmpty", false) end
+
 local function updateManagedFrameAlpha(frame)
 	if not (frame and frame.SetAlpha) then return end
 	local shouldHide = frame._rbClientSceneAlphaHidden == true or frame._rbRuntimeForcedAlphaHidden == true
 	if shouldHide then
 		if frame.GetAlpha and frame:GetAlpha() ~= 0 then frame:SetAlpha(0) end
+	elseif frame._rbEmptyAlphaActive == true then
+		frame:SetAlpha(frame._rbEmptyAlphaValue)
 	else
 		if frame.GetAlpha and frame:GetAlpha() == 0 then frame:SetAlpha(1) end
 	end
@@ -100,6 +104,19 @@ function ResourceBars.ApplyRuntimeForceHiddenAlphaToFrame(frame, forceHide)
 		frame._rbRuntimeForcedAlphaHidden = true
 	elseif frame._rbRuntimeForcedAlphaHidden then
 		frame._rbRuntimeForcedAlphaHidden = nil
+	end
+	updateManagedFrameAlpha(frame)
+end
+
+function ResourceBars.ApplyHideWhenEmptyAlphaToFrame(frame, cfg, rawValue)
+	if not (frame and frame.SetAlpha) then return end
+	local editModeActive = addon.EditMode and addon.EditMode.IsInEditMode and addon.EditMode:IsInEditMode()
+	if rawValue ~= nil and not editModeActive and ResourceBars.ShouldHideWhenEmpty and ResourceBars.ShouldHideWhenEmpty(cfg) then
+		frame._rbEmptyAlphaActive = true
+		frame._rbEmptyAlphaValue = rawValue
+	else
+		frame._rbEmptyAlphaActive = nil
+		frame._rbEmptyAlphaValue = nil
 	end
 	updateManagedFrameAlpha(frame)
 end

@@ -2382,6 +2382,7 @@ local function exportResourceProfile(scopeKey, profileName)
 		if db.resourceBarsHideVehicle ~= nil then globals.resourceBarsHideVehicle = db.resourceBarsHideVehicle and true or false end
 		if db.resourceBarsHidePetBattle ~= nil then globals.resourceBarsHidePetBattle = db.resourceBarsHidePetBattle and true or false end
 		if db.resourceBarsHideClientScene ~= nil then globals.resourceBarsHideClientScene = db.resourceBarsHideClientScene and true or false end
+		if db.resourceBarsHideWhenEmpty ~= nil then globals.resourceBarsHideWhenEmpty = db.resourceBarsHideWhenEmpty and true or false end
 		if type(db.globalResourceBarSettings) == "table" then
 			globals.globalResourceBarSettings = CopyTable(db.globalResourceBarSettings)
 			normalizeVisibilityPayloadMap(globals.globalResourceBarSettings)
@@ -2500,6 +2501,7 @@ local function importResourceProfile(encoded, scopeKey)
 		if global.resourceBarsHideVehicle ~= nil then addon.db.resourceBarsHideVehicle = global.resourceBarsHideVehicle and true or false end
 		if global.resourceBarsHidePetBattle ~= nil then addon.db.resourceBarsHidePetBattle = global.resourceBarsHidePetBattle and true or false end
 		if global.resourceBarsHideClientScene ~= nil then addon.db.resourceBarsHideClientScene = global.resourceBarsHideClientScene and true or false end
+		if global.resourceBarsHideWhenEmpty ~= nil then addon.db.resourceBarsHideWhenEmpty = global.resourceBarsHideWhenEmpty and true or false end
 		if global.resourceBarsHidePetBattle == nil and global.auraHideInPetBattle ~= nil then addon.db.resourceBarsHidePetBattle = global.auraHideInPetBattle and true or false end
 		if type(global.globalResourceBarSettings) == "table" then
 			addon.db.globalResourceBarSettings = CopyTable(global.globalResourceBarSettings)
@@ -4626,6 +4628,7 @@ function updateHealthBar(evt)
 		local calc = ResourceBars.RefreshHealPredictionCalculator(healthBar, "player", settings)
 		setBarValue(healthBar, curHealth, smooth)
 		healthBar._lastVal = curHealth
+		if ResourceBars.ApplyHideWhenEmptyAlphaToFrame then ResourceBars.ApplyHideWhenEmptyAlphaToFrame(healthBar, settings, curHealth) end
 		ResourceBars.UpdateHealthTempMaxHealthLoss(healthBar, settings, smooth)
 
 		local percent = getHealthPercent("player", curHealth, maxHealth, calc)
@@ -6248,6 +6251,7 @@ function updatePowerBar(type, runeSlot)
 	local smooth = cfg.smoothFill == true and type ~= "ESSENCE"
 	setBarValue(bar, barValue, smooth)
 	bar._lastVal = barValue
+	if ResourceBars.ApplyHideWhenEmptyAlphaToFrame then ResourceBars.ApplyHideWhenEmptyAlphaToFrame(bar, cfg, curPower) end
 	local percent = getPowerPercent("player", pType, curPower, maxPower)
 	local percentStr = formatPercentDisplay(percent, cfg)
 	local thresholdSampleValue = isSoulShards and displayCur or curPower
@@ -8329,6 +8333,7 @@ function ResourceBars.ApplyVisibilityPreference(context)
 				releasedManualHidden = true
 			end
 			if ResourceBars.ApplyClientSceneAlphaToFrame then ResourceBars.ApplyClientSceneAlphaToFrame(frame, false) end
+			if ResourceBars.ApplyHideWhenEmptyAlphaToFrame then ResourceBars.ApplyHideWhenEmptyAlphaToFrame(frame, nil, nil) end
 		end)
 		if canApplyDriver then
 			ResourceBars._visibilityDriverActive = false
@@ -8352,6 +8357,7 @@ function ResourceBars.ApplyVisibilityPreference(context)
 				end
 				if frame and frame:IsShown() then frame:Hide() end
 				if ResourceBars.ApplyClientSceneAlphaToFrame then ResourceBars.ApplyClientSceneAlphaToFrame(frame, false) end
+				if ResourceBars.ApplyHideWhenEmptyAlphaToFrame then ResourceBars.ApplyHideWhenEmptyAlphaToFrame(frame, nil, nil) end
 				return
 			end
 
@@ -8389,6 +8395,7 @@ function ResourceBars.ApplyVisibilityPreference(context)
 				if frame:IsShown() then frame:Hide() end
 			end
 			if ResourceBars.ApplyClientSceneAlphaToFrame then ResourceBars.ApplyClientSceneAlphaToFrame(frame, false) end
+			if ResourceBars.ApplyHideWhenEmptyAlphaToFrame then ResourceBars.ApplyHideWhenEmptyAlphaToFrame(frame, nil, nil) end
 		end
 	end)
 	if canApplyDriver then

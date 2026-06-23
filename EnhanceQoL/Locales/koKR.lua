@@ -3327,6 +3327,7 @@ L["ResourceBarsEnableSharedAllClassesConfirm"] = "모든 직업의 모든 전문
 L["ResourceBarsEnableSharedAllClassesDesc"] = "모든 직업과 전문화를 공유 모드로 전환하고 공유 바 슬롯을 만듭니다."
 L["ResourceBarsEnableSharedAllSpecs"] = "모든 전문화에 공유 모드 활성화"
 L["ResourceBarsEnableSharedAllSpecsConfirm"] = "이 직업의 모든 전문화에 공유 모드를 활성화할까요?"
+L["ResourceBarsHideWhenEmpty"] = "비어 있을 때 숨기기"
 L["ResourceBarsModeDesc"] = "자원 바의 레이아웃 모드를 선택합니다."
 L["ResourceBarsModeForSpec"] = "%s 모드"
 L["ResourceBarsModeNote"] = "공유는 현재 직업에 하나의 바 구성을 사용합니다. 클래식은 각 전문화가 활성화할 바를 따로 선택합니다."

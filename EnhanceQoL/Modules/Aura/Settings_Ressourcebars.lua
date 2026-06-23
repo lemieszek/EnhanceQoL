@@ -422,6 +422,7 @@ local function notifyResourceBarSettings()
 	Settings.NotifyUpdate("EQOL_resourceBarsHideVehicle")
 	Settings.NotifyUpdate("EQOL_resourceBarsHidePetBattle")
 	Settings.NotifyUpdate("EQOL_resourceBarsHideClientScene")
+	Settings.NotifyUpdate("EQOL_resourceBarsHideWhenEmpty")
 	for var in pairs(specSettingVars) do
 		Settings.NotifyUpdate("EQOL_" .. var)
 	end
@@ -1112,6 +1113,7 @@ registerEditModeBars = function()
 			hideVehicle = "resourceBarsHideVehicle",
 			hidePetBattle = "resourceBarsHidePetBattle",
 			hideClientScene = "resourceBarsHideClientScene",
+			hideWhenEmpty = "resourceBarsHideWhenEmpty",
 		}
 		local visibilityDefaults = {
 			hideOutOfCombat = false,
@@ -1119,6 +1121,7 @@ registerEditModeBars = function()
 			hideVehicle = false,
 			hidePetBattle = false,
 			hideClientScene = true,
+			hideWhenEmpty = false,
 		}
 		local function getGlobalVisibilityFallback(field)
 			local dbKey = visibilityGlobalKeys[field]
@@ -1561,6 +1564,14 @@ registerEditModeBars = function()
 					get = function() return getBarVisibilitySetting("hidePetBattle") end,
 					set = function(_, value) setBarVisibilitySetting("hidePetBattle", value) end,
 					default = getGlobalVisibilityFallback("hidePetBattle"),
+				},
+				{
+					name = L["ResourceBarsHideWhenEmpty"] or "Hide when empty",
+					kind = settingType.Checkbox,
+					parentId = "frame",
+					get = function() return getBarVisibilitySetting("hideWhenEmpty") end,
+					set = function(_, value) setBarVisibilitySetting("hideWhenEmpty", value) end,
+					default = getGlobalVisibilityFallback("hideWhenEmpty"),
 				},
 				{
 					name = L["Hide in client scenes"] or "Hide in client scenes",
