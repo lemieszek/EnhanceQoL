@@ -1,6 +1,14 @@
 # Changelog
 
 <!--@eqol-beta@-->
+## [11.5.0-beta2] - 2026-06-23
+
+### ✨ Added
+
+- EQoL Suite: Added cooldown edge, reverse swipe, and debuff-type border color options for custom aura containers.
+
+---
+
 ## [11.5.0-beta1] - 2026-06-23
 
 ### ✨ Added
