@@ -145,6 +145,16 @@ local function normalizeScalar(opts, key, fallback)
 	return value
 end
 
+local function normalizeVisualScale(opts, fallback)
+	local explicitScale = normalizeScalar(opts, "scale", nil)
+	if explicitScale and explicitScale > 0 then return explicitScale end
+
+	local thickness = normalizeScalar(opts, "thickness", nil)
+	if thickness == nil then thickness = normalizeScalar(opts, "th", nil) end
+	if thickness == nil then return fallback or 1 end
+	return max(0.1, 1 + ((thickness - 2) * 0.1))
+end
+
 local function normalizePositiveNumber(value, fallback)
 	if issecretvalue and issecretvalue(value) then return fallback end
 	value = tonumber(value)
@@ -374,12 +384,20 @@ local function applyStateAlpha(state)
 	host:SetAlpha(tonumber(state.alphaValue) or 1)
 end
 
-local function anchorCooldownViewerAlert(frame, host, inset)
+local function anchorCooldownViewerAlertScaled(frame, host, inset, scale)
 	if not (frame and host) then return end
 	inset = roundOffset(inset)
+	scale = normalizePositiveNumber(scale, 1)
+	local width, height = getSafeFrameSize(host)
+	local left = 8 + inset
+	local right = 9 + inset
+	local top = 8 + inset
+	local bottom = 9 + inset
+	local scaledExtraX = ((width + left + right) * scale - (width + left + right)) / 2
+	local scaledExtraY = ((height + top + bottom) * scale - (height + top + bottom)) / 2
 	frame:ClearAllPoints()
-	frame:SetPoint("TOPLEFT", host, "TOPLEFT", -8 - inset, 8 + inset)
-	frame:SetPoint("BOTTOMRIGHT", host, "BOTTOMRIGHT", 9 + inset, -9 - inset)
+	frame:SetPoint("TOPLEFT", host, "TOPLEFT", -left - scaledExtraX, top + scaledExtraY)
+	frame:SetPoint("BOTTOMRIGHT", host, "BOTTOMRIGHT", right + scaledExtraX, -bottom - scaledExtraY)
 end
 
 local function ensureMarchingAntsOverlay(host)
@@ -449,10 +467,11 @@ end
 local function updateMarchingAntsOverlay(host, opts)
 	local overlay = ensureMarchingAntsOverlay(host)
 	local color = normalizeColor(type(opts) == "table" and opts.color or nil, { 1, 0.82, 0.2, 1 })
+	local scale = normalizeVisualScale(opts, 1)
 	overlay:SetParent(host)
 	overlay:SetFrameStrata(host:GetFrameStrata())
 	overlay:SetFrameLevel(max(0, (host:GetFrameLevel() or 0) + 3))
-	anchorCooldownViewerAlert(overlay, host, normalizeInset(opts))
+	anchorCooldownViewerAlertScaled(overlay, host, normalizeInset(opts), scale)
 	overlay.Texture:SetVertexColor(color[1], color[2], color[3], color[4])
 	resetMarchingAntsTexture(overlay)
 	return overlay
@@ -533,7 +552,7 @@ local function updateFlashOverlay(host, opts)
 	local overlay = ensureFlashOverlay(host)
 	local anchor = getGlowAnchorRegion(host)
 	local width, height = getSafeFrameSize(anchor)
-	local scale = normalizeScalar(opts, "scale", 1) or 1
+	local scale = normalizeVisualScale(opts, 1)
 	local inset = normalizeInset(opts)
 	local xOffset = normalizeScalar(opts, "xOffset", 0)
 	local yOffset = normalizeScalar(opts, "yOffset", 0)

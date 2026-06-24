@@ -8601,13 +8601,15 @@ local function setGlow(frame, enabled, glowColor, glowKey, glowCondition, glowAl
 	local insetChanged = state.inset ~= normalizedGlowInset
 	local pixelChanged = normalizedGlowStyle == "PIXEL"
 		and (state.pixelBorder ~= pixelBorder or state.pixelCount ~= pixelCount or state.pixelSpeed ~= pixelSpeed or state.pixelThickness ~= pixelThickness)
+	local visualThicknessChanged = (normalizedGlowStyle == "PULSING" or normalizedGlowStyle == "MARCHING_ANTS" or normalizedGlowStyle == "FLASH")
+		and state.pixelThickness ~= pixelThickness
 	local currentGlowColor = state.color
 	colorChanged = not currentGlowColor
 		or currentGlowColor[1] ~= normalizedGlowColor[1]
 		or currentGlowColor[2] ~= normalizedGlowColor[2]
 		or currentGlowColor[3] ~= normalizedGlowColor[3]
 		or currentGlowColor[4] ~= normalizedGlowColor[4]
-	if Glow and (not wasEnabled or colorChanged or styleChanged or insetChanged or pixelChanged or shapeChanged) then
+	if Glow and (not wasEnabled or colorChanged or styleChanged or insetChanged or pixelChanged or visualThicknessChanged or shapeChanged) then
 		if styleChanged or shapeChanged then Glow.Stop(frame, glowKey, true) end
 		Glow.Start(frame, glowKey, normalizedGlowStyle, {
 			color = normalizedGlowColor,
@@ -13245,9 +13247,28 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		return false
 	end
 
+	local function glowStyleUsesThickness(style)
+		style = Helper.NormalizeGlowStyle(style, Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle)
+		return style == "PIXEL" or style == "PULSING" or style == "MARCHING_ANTS" or style == "FLASH"
+	end
+
+	local function usesGlowThicknessStyle()
+		local effectiveType = getEffectiveType()
+		if effectiveType == "MACRO" then return false end
+		if glowStyleUsesThickness(getResolvedGlowStyle()) then return true end
+		if effectiveType == "SPELL" and glowStyleUsesThickness(getResolvedProcGlowStyle()) then return true end
+		if effectiveType == "CDM_AURA" and glowStyleUsesThickness(getResolvedPandemicGlowStyle()) then return true end
+		return false
+	end
+
 	local function canEditGlowPixelOptions()
 		local _, currentEntry = getEntry()
 		return currentEntry and usesPixelGlowStyle() and (currentEntry.glowUseGlobal == false or currentEntry.procGlowUseGlobal == false) or false
+	end
+
+	local function canEditGlowThicknessOption()
+		local _, currentEntry = getEntry()
+		return currentEntry and usesGlowThicknessStyle() and (currentEntry.glowUseGlobal == false or currentEntry.procGlowUseGlobal == false) or false
 	end
 
 	local function getResolvedReadyGlowCheckPower()
@@ -15342,15 +15363,15 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			formatter = function(value) return string.format("%.2f", tonumber(value) or 0) end,
 		},
 		{
-			name = L["CooldownPanelPixelGlowThickness"] or "Pixel glow thickness",
+			name = L["CooldownPanelGlowThickness"] or "Glow thickness",
 			kind = SettingType.Slider,
 			parentId = "cooldownPanelStandaloneGlow",
 			minValue = 1,
 			maxValue = 10,
 			valueStep = 1,
 			allowInput = true,
-			isShown = usesPixelGlowStyle,
-			disabled = function() return not canEditGlowPixelOptions() end,
+			isShown = usesGlowThicknessStyle,
+			disabled = function() return not canEditGlowThicknessOption() end,
 			get = function()
 				local options = getResolvedGlowPixelOptions()
 				return options and options.thickness or Helper.PANEL_LAYOUT_DEFAULTS.glowPixelThickness or 2
@@ -15876,6 +15897,19 @@ function CooldownPanels:BuildLayoutFixedGroupStandaloneSettings(panelId, groupId
 		return false
 	end
 
+	local function glowStyleUsesThickness(style)
+		style = Helper.NormalizeGlowStyle(style, Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle)
+		return style == "PIXEL" or style == "PULSING" or style == "MARCHING_ANTS" or style == "FLASH"
+	end
+
+	local function usesGlowThicknessStyle()
+		local layout = getLayout()
+		if glowStyleUsesThickness(select(3, CooldownPanels:ResolveEntryGlowStyle(layout, nil))) then return true end
+		if glowStyleUsesThickness(select(1, CooldownPanels:ResolveEntryProcGlowVisual(layout, nil))) then return true end
+		if glowStyleUsesThickness(select(2, CooldownPanels:ResolveEntryPandemicGlowVisual(layout, nil))) then return true end
+		return false
+	end
+
 	return {
 			{
 				name = _G.GENERAL or "General",
@@ -16275,14 +16309,14 @@ function CooldownPanels:BuildLayoutFixedGroupStandaloneSettings(panelId, groupId
 			formatter = function(value) return string.format("%.2f", tonumber(value) or 0) end,
 		},
 		{
-			name = L["CooldownPanelPixelGlowThickness"] or "Pixel glow thickness",
+			name = L["CooldownPanelGlowThickness"] or "Glow thickness",
 			kind = SettingType.Slider,
 			parentId = "cooldownPanelStandaloneFixedGroupGlow",
 			minValue = 1,
 			maxValue = 10,
 			valueStep = 1,
 			allowInput = true,
-			isShown = usesPixelGlowStyle,
+			isShown = usesGlowThicknessStyle,
 			get = function()
 				local layout = getLayout()
 				return Helper.NormalizeGlowPixelThickness(layout and layout.glowPixelThickness, Helper.PANEL_LAYOUT_DEFAULTS.glowPixelThickness or 2)
@@ -22672,6 +22706,18 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 		if Helper.NormalizeGlowStyle(layout.pandemicGlowStyle, layout.readyGlowStyle or Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle) == "PIXEL" then return true end
 		return false
 	end
+
+	local function glowStyleUsesThickness(style)
+		style = Helper.NormalizeGlowStyle(style, Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle)
+		return style == "PIXEL" or style == "PULSING" or style == "MARCHING_ANTS" or style == "FLASH"
+	end
+
+	local function usesGlowThicknessStyle()
+		if glowStyleUsesThickness(layout.readyGlowStyle) then return true end
+		if glowStyleUsesThickness(select(1, CooldownPanels:ResolveEntryProcGlowVisual(layout, nil))) then return true end
+		if glowStyleUsesThickness(Helper.NormalizeGlowStyle(layout.pandemicGlowStyle, layout.readyGlowStyle or Helper.PANEL_LAYOUT_DEFAULTS.readyGlowStyle)) then return true end
+		return false
+	end
 	local function setStaticTextEntryId(entryId)
 		local runtimePanel = getRuntime(panelId)
 		if runtimePanel then runtimePanel.layoutEditEntryId = normalizeId(entryId) end
@@ -24150,14 +24196,14 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				formatter = function(value) return string.format("%.2f", tonumber(value) or 0) end,
 			},
 			{
-				name = L["CooldownPanelPixelGlowThickness"] or "Pixel glow thickness",
+				name = L["CooldownPanelGlowThickness"] or "Glow thickness",
 				kind = SettingType.Slider,
 				parentId = "cooldownPanelGlow",
 				minValue = 1,
 				maxValue = 10,
 				valueStep = 1,
 				allowInput = true,
-				isShown = usesPixelGlowStyle,
+				isShown = usesGlowThicknessStyle,
 				default = Helper.PANEL_LAYOUT_DEFAULTS.glowPixelThickness or 2,
 				get = function() return Helper.NormalizeGlowPixelThickness(layout.glowPixelThickness, Helper.PANEL_LAYOUT_DEFAULTS.glowPixelThickness or 2) end,
 				set = function(_, value) applyEditLayout(panelId, "glowPixelThickness", value) end,

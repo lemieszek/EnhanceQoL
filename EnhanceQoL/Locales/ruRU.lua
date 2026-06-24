@@ -1089,6 +1089,7 @@ L["CooldownPanelGlowOtherAura"] = "Свечение, когда активна �
 L["CooldownPanelGlowPandemic"] = "Свечение пандемии"
 L["CooldownPanelGlowReady"] = "Подсветка, когда готово"
 L["CooldownPanelGlowStylePandemic"] = "Стиль свечения пандемии"
+L["CooldownPanelGlowThickness"] = "Толщина свечения"
 L["CooldownPanelGrowthPoint"] = "Точка роста"
 L["CooldownPanelHideBorderOffCooldown"] = "Скрывать рамку вне перезарядки"
 L["CooldownPanelHideBorderOnCooldown"] = "Скрывать рамку на перезарядке"
