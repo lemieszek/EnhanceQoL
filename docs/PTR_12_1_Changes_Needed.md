@@ -2,6 +2,22 @@
 
 Track EnhanceQoL changes that need follow-up before or when WoW 12.1 ships. Remove obsolete features only after verifying the behavior on the release client.
 
+## TODO: AuraContainer migration for PTR3 aura restrictions
+
+- PTR source: `origin/ptr`, build `12.1.0.68301`.
+- Migration note: `docs/PTR_12_1_AuraContainer_Migration.md`.
+- PTR status: Blizzard's new `Blizzard_AuraContainer` exists in PTR2 and the new `AuraButton` template already carries forbidden aspects. The announced PTR3 aura restriction pass is expected to make this path mandatory for normal aura rendering.
+- EnhanceQoL areas to review:
+  - `EnhanceQoL/Modules/Aura/DefaultAuraContainers.lua`
+  - `EnhanceQoL/Modules/Aura/UF_GroupFrames.lua`
+  - `EnhanceQoL/Modules/Aura/UF.lua`
+  - `EnhanceQoL/Modules/Aura/CooldownPanels_CDMAuras.lua`
+  - `EnhanceQoL/Submodules/ClassBuffReminder.lua`
+- Follow-up action:
+  - Use the migration note as the source checklist when PTR3 lands.
+  - Verify which aura query and display APIs are actually restricted in PTR3.
+  - Prefer an internal AuraContainer compatibility adapter over separate one-off rewrites.
+
 ## TODO: Midnight Season 2 Altar of Fangs portal position
 
 - PTR status: Altar of Fangs exists as a season dungeon and has a portal spell, but the dungeon location is not fully available on PTR yet.
