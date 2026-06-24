@@ -84,6 +84,8 @@ local ICON_MODE_SET = {
 	[ICON_MODE_PRIORITY] = true,
 }
 
+local DURATION_COLOR_STEP_MAX = 3
+
 local KIND_SET = {
 	[KIND_PARTY] = true,
 	[KIND_RAID] = true,
@@ -548,6 +550,29 @@ local function normalizeOptionalColor(value)
 	return normalizeColor(value, { 1, 1, 1, 1 })
 end
 
+local function normalizeDurationColorSteps(value)
+	if type(value) ~= "table" then return nil end
+	local steps = {}
+	local hasStep = false
+	for i = 1, DURATION_COLOR_STEP_MAX do
+		local step = value[i]
+		if type(step) == "table" and step.enabled == true then
+			local seconds = roundInt(clamp(step.seconds or step.threshold, 1, 3600, nil))
+			local color = normalizeOptionalColor(step.color)
+			if seconds and color then
+				hasStep = true
+				steps[i] = {
+					enabled = true,
+					seconds = seconds,
+					color = color,
+				}
+			end
+		end
+	end
+	if not hasStep then return nil end
+	return steps
+end
+
 local function normalizeKind(kind)
 	kind = tostring(kind or KIND_PARTY):lower()
 	if kind == "mt" or kind == "ma" then return KIND_RAID end
@@ -862,6 +887,8 @@ local function normalizeRule(rule, id)
 	rule.expirationPulseEnabled = rule.expirationPulseEnabled == true
 	rule.expirationPulseThreshold = roundInt(clamp(rule.expirationPulseThreshold, 1, 10, 3))
 	rule.expirationPulseCountdownOnly = rule.expirationPulseCountdownOnly == true
+	rule.durationColorSteps = normalizeDurationColorSteps(rule.durationColorSteps or rule.remainingColorSteps)
+	rule.remainingColorSteps = nil
 	if rule.enabled == nil then rule.enabled = true end
 	rule.enabled = rule.enabled ~= false
 	local appliesParty = rule.appliesParty
@@ -1492,13 +1519,18 @@ local function clearHealthTint(st)
 end
 
 local BAR_UPDATE_INTERVAL = 0.05
+local TINT_UPDATE_INTERVAL = 1
+local updateDurationColorStatusBar
+local clearBarDurationColorState
+local clearBorderDurationColorState
+local clearTintDurationColorState
 
 local function clearAnimatedBarState(bar)
 	if not bar then return end
 	bar._hbTrackedDuration = nil
 	bar._hbTrackedExpirationTime = nil
 	bar._hbBarUpdateElapsed = nil
-	if bar.SetScript then bar:SetScript("OnUpdate", nil) end
+	if bar.SetScript and bar._hbDurationColorRule == nil then bar:SetScript("OnUpdate", nil) end
 end
 
 local function getTimedBarFill(duration, expirationTime, now)
@@ -1542,6 +1574,7 @@ local function setAnimatedBarAura(bar, aura)
 			if self._hbBarUpdateElapsed < BAR_UPDATE_INTERVAL then return end
 			self._hbBarUpdateElapsed = 0
 			updateAnimatedBarValue(self)
+			if updateDurationColorStatusBar then updateDurationColorStatusBar(self) end
 		end
 	end
 	if bar.SetScript then bar:SetScript("OnUpdate", bar._hbBarOnUpdate) end
@@ -1551,19 +1584,25 @@ end
 local function hideAllVisuals(btn, st, state)
 	if not st then return end
 	if st.healerBuffTint then st.healerBuffTint:Hide() end
+	if clearTintDurationColorState then clearTintDurationColorState(st) end
 	if st.healerBuffBar then
 		clearAnimatedBarState(st.healerBuffBar)
+		if clearBarDurationColorState then clearBarDurationColorState(st.healerBuffBar) end
 		st.healerBuffBar:Hide()
 	end
 	if state and state.groupBars then
 		for _, bar in pairs(state.groupBars) do
 			if bar then
 				clearAnimatedBarState(bar)
+				if clearBarDurationColorState then clearBarDurationColorState(bar) end
 				bar:Hide()
 			end
 		end
 	end
-	if st.healerBuffBorder then st.healerBuffBorder:Hide() end
+	if st.healerBuffBorder then
+		if clearBorderDurationColorState then clearBorderDurationColorState(st.healerBuffBorder) end
+		st.healerBuffBorder:Hide()
+	end
 	local tintChanged = clearHealthTint(st)
 	if state and state.groupContainers then
 		for groupId, container in pairs(state.groupContainers) do
@@ -2118,12 +2157,57 @@ local function shouldHideCooldownText(btn, group)
 end
 
 local EXPIRATION_PULSE_INTERVAL = 0.05
+local updateExpirationPulseButton
+local updateDurationColorButton
+
+local function refreshButtonTimedOnUpdate(btn)
+	if not btn then return end
+	local wantsUpdate = btn._hbExpirationPulseRule ~= nil or btn._hbDurationColorRule ~= nil
+	if not wantsUpdate then
+		if btn.SetScript and (not btn.GetScript or btn:GetScript("OnUpdate") == btn._hbTimedOnUpdate) then btn:SetScript("OnUpdate", nil) end
+		return
+	end
+	if not btn._hbTimedOnUpdate then
+		btn._hbTimedOnUpdate = function(self, elapsed)
+			self._hbTimedUpdateElapsed = (self._hbTimedUpdateElapsed or 0) + (elapsed or 0)
+			if self._hbTimedUpdateElapsed < EXPIRATION_PULSE_INTERVAL then return end
+			self._hbTimedUpdateElapsed = 0
+			if updateExpirationPulseButton then updateExpirationPulseButton(self) end
+			if updateDurationColorButton then updateDurationColorButton(self) end
+		end
+	end
+	if btn.SetScript then btn:SetScript("OnUpdate", btn._hbTimedOnUpdate) end
+end
 
 local function getAuraRemaining(aura, now)
 	local expirationTime = aura and tonumber(aura.expirationTime) or nil
 	if not (expirationTime and expirationTime > 0) then return nil end
 	now = tonumber(now) or ((GetTime and GetTime()) or 0)
 	return expirationTime - now
+end
+
+local function getDurationColorStep(rule, aura, now)
+	local steps = rule and rule.durationColorSteps
+	if type(steps) ~= "table" then return nil, nil end
+	local remaining = getAuraRemaining(aura, now)
+	if not remaining or remaining < 0 then return nil, nil end
+	local bestStep, bestSeconds, bestIndex
+	for i = 1, DURATION_COLOR_STEP_MAX do
+		local step = steps[i]
+		local seconds = tonumber(step and step.seconds)
+		if seconds and seconds > 0 and remaining <= seconds and (not bestSeconds or seconds < bestSeconds) then
+			bestStep = step
+			bestSeconds = seconds
+			bestIndex = i
+		end
+	end
+	if bestStep then return bestStep.color, bestIndex end
+	return nil, nil
+end
+
+local function getDisplayColorToken(rule, aura)
+	local _, stepIndex = getDurationColorStep(rule, aura)
+	return stepIndex and ("step" .. tostring(stepIndex)) or "base"
 end
 
 local function clearExpirationPulse(btn, group)
@@ -2134,10 +2218,10 @@ local function clearExpirationPulse(btn, group)
 	btn._hbExpirationPulseThreshold = nil
 	btn._hbExpirationPulseCountdownOnly = nil
 	btn._hbExpirationPulseElapsed = nil
-	if btn.SetScript and (not btn.GetScript or btn:GetScript("OnUpdate") == btn._hbExpirationPulseOnUpdate) then btn:SetScript("OnUpdate", nil) end
 	hideExpirationPulseBorder(btn)
 	if btn.cd and btn.cd.SetHideCountdownNumbers then btn.cd:SetHideCountdownNumbers(shouldHideCooldownText(btn, group)) end
 	applyIndicatorBorder(btn, group)
+	refreshButtonTimedOnUpdate(btn)
 end
 
 local function applyExpirationPulseBorder(btn, group, rule, pulseAlpha)
@@ -2177,7 +2261,7 @@ local function applyExpirationPulseBorder(btn, group, rule, pulseAlpha)
 	border:Show()
 end
 
-local function updateExpirationPulseButton(btn)
+updateExpirationPulseButton = function(btn)
 	local aura = btn and btn._hbExpirationPulseAura
 	local group = btn and btn._hbExpirationPulseGroup
 	local rule = btn and btn._hbExpirationPulseRule
@@ -2201,6 +2285,40 @@ local function updateExpirationPulseButton(btn)
 	applyExpirationPulseBorder(btn, group, rule, pulse)
 end
 
+updateDurationColorButton = function(btn)
+	local group = btn and btn._hbDurationColorGroup
+	local rule = btn and btn._hbDurationColorRule
+	local aura = btn and btn._hbDurationColorAura
+	if not (btn and group and rule and aura) then return end
+	local token = getDisplayColorToken(rule, aura)
+	if btn._hbDurationColorToken == token then return end
+	btn._hbDurationColorToken = token
+	styleSquareButton(btn, getDurationColorStep(rule, aura) or (rule and rule.color) or (group and group.color))
+end
+
+local function clearDurationColorButton(btn)
+	if not btn then return end
+	btn._hbDurationColorGroup = nil
+	btn._hbDurationColorRule = nil
+	btn._hbDurationColorAura = nil
+	btn._hbDurationColorToken = nil
+	refreshButtonTimedOnUpdate(btn)
+end
+
+local function applyDurationColorButton(btn, group, rule, aura)
+	local style = tostring(group and group.style or ""):upper()
+	if not (btn and style == STYLE_SQUARE and rule and type(rule.durationColorSteps) == "table" and aura and tonumber(aura.expirationTime)) then
+		clearDurationColorButton(btn)
+		return
+	end
+	btn._hbDurationColorGroup = group
+	btn._hbDurationColorRule = rule
+	btn._hbDurationColorAura = aura
+	btn._hbDurationColorToken = nil
+	updateDurationColorButton(btn)
+	refreshButtonTimedOnUpdate(btn)
+end
+
 local function applyExpirationPulse(btn, group, rule, aura)
 	local style = tostring(group and group.style or ""):upper()
 	local enabled = (style == STYLE_ICON or style == STYLE_SQUARE) and rule and rule.expirationPulseEnabled == true
@@ -2217,15 +2335,7 @@ local function applyExpirationPulse(btn, group, rule, aura)
 	btn._hbExpirationPulseCountdownOnly = rule.expirationPulseCountdownOnly == true
 	btn._hbExpirationPulseElapsed = 0
 	updateExpirationPulseButton(btn)
-	if not btn._hbExpirationPulseOnUpdate then
-		btn._hbExpirationPulseOnUpdate = function(self, elapsed)
-			self._hbExpirationPulseElapsed = (self._hbExpirationPulseElapsed or 0) + (elapsed or 0)
-			if self._hbExpirationPulseElapsed < EXPIRATION_PULSE_INTERVAL then return end
-			self._hbExpirationPulseElapsed = 0
-			updateExpirationPulseButton(self)
-		end
-	end
-	if btn.SetScript then btn:SetScript("OnUpdate", btn._hbExpirationPulseOnUpdate) end
+	refreshButtonTimedOnUpdate(btn)
 end
 
 local function getPlaceholderAura(state, ruleId, familyId)
@@ -2274,10 +2384,53 @@ local function getPriorityActiveRuleForGroup(state, compiled, groupId)
 	return nil, nil
 end
 
-local function resolveDisplayColor(group, rule)
-	local r, g, b, a = resolveColor((rule and rule.color) or (group and group.color))
+local function resolveDisplayColor(group, rule, aura)
+	local r, g, b, a = resolveColor(getDurationColorStep(rule, aura) or (rule and rule.color) or (group and group.color))
 	if group and normalizeStyle(group.style) == STYLE_BAR and group.barAlpha ~= nil then a = clamp(group.barAlpha, 0, 1, a) or a end
 	return r, g, b, a
+end
+
+updateDurationColorStatusBar = function(bar)
+	local group = bar and bar._hbDurationColorGroup
+	local rule = bar and bar._hbDurationColorRule
+	local aura = bar and bar._hbDurationColorAura
+	if not (bar and group and rule and aura and bar.SetStatusBarColor) then return end
+	local token = getDisplayColorToken(rule, aura)
+	if bar._hbDurationColorToken == token then return end
+	bar._hbDurationColorToken = token
+	local r, g, b, a = resolveDisplayColor(group, rule, aura)
+	bar:SetStatusBarColor(r, g, b, a)
+end
+
+clearBarDurationColorState = function(bar)
+	if not bar then return end
+	bar._hbDurationColorGroup = nil
+	bar._hbDurationColorRule = nil
+	bar._hbDurationColorAura = nil
+	bar._hbDurationColorToken = nil
+	if bar.SetScript and bar._hbTrackedDuration == nil then bar:SetScript("OnUpdate", nil) end
+end
+
+local function setBarDurationColorState(bar, group, rule, aura)
+	if not (bar and group and rule and type(rule.durationColorSteps) == "table" and aura and tonumber(aura.expirationTime)) then
+		clearBarDurationColorState(bar)
+		return
+	end
+	bar._hbDurationColorGroup = group
+	bar._hbDurationColorRule = rule
+	bar._hbDurationColorAura = aura
+	bar._hbDurationColorToken = nil
+	updateDurationColorStatusBar(bar)
+	if not bar._hbBarOnUpdate then
+		bar._hbBarOnUpdate = function(self, elapsed)
+			self._hbBarUpdateElapsed = (self._hbBarUpdateElapsed or 0) + (elapsed or 0)
+			if self._hbBarUpdateElapsed < BAR_UPDATE_INTERVAL then return end
+			self._hbBarUpdateElapsed = 0
+			updateAnimatedBarValue(self)
+			if updateDurationColorStatusBar then updateDurationColorStatusBar(self) end
+		end
+	end
+	if bar.SetScript then bar:SetScript("OnUpdate", bar._hbBarOnUpdate) end
 end
 
 local function didGroupRenderStateChange(cache, compiled, group, activeRules, familyAuraInstance, styleRevision, layoutRevision)
@@ -2347,14 +2500,15 @@ local function didGroupRenderStateChange(cache, compiled, group, activeRules, fa
 	return changed
 end
 
-local function didBarRenderStateChange(cache, group, groupId, layoutRevision, trackedAura, trackedRuleId, trackedFamilyId, colorRule, colorRuleId)
+local function didBarRenderStateChange(cache, group, groupId, layoutRevision, trackedAura, trackedRuleId, trackedFamilyId, colorRule, colorRuleId, colorAura)
 	if not (group and groupId) then
 		local changed = cache.active ~= false
 		wipeTable(cache)
 		cache.active = false
 		return changed
 	end
-	local r, g, b, a = resolveDisplayColor(group, colorRule)
+	local r, g, b, a = resolveDisplayColor(group, colorRule, colorAura)
+	local colorToken = getDisplayColorToken(colorRule, colorAura)
 	local trackedAuraInstance = trackedAura and trackedAura.auraInstanceID or nil
 	local trackedDuration = trackedAura and tonumber(trackedAura.duration) or nil
 	local trackedExpirationTime = trackedAura and tonumber(trackedAura.expirationTime) or nil
@@ -2377,6 +2531,7 @@ local function didBarRenderStateChange(cache, group, groupId, layoutRevision, tr
 		or cache.x ~= group.x
 		or cache.y ~= group.y
 		or cache.colorRuleId ~= colorRuleId
+		or cache.colorToken ~= colorToken
 		or cache.r ~= r
 		or cache.g ~= g
 		or cache.b ~= b
@@ -2400,6 +2555,7 @@ local function didBarRenderStateChange(cache, group, groupId, layoutRevision, tr
 	cache.x = group.x
 	cache.y = group.y
 	cache.colorRuleId = colorRuleId
+	cache.colorToken = colorToken
 	cache.r = r
 	cache.g = g
 	cache.b = b
@@ -2426,14 +2582,15 @@ local function didBarRenderStateChange(cache, group, groupId, layoutRevision, tr
 	return changed
 end
 
-local function didBorderRenderStateChange(cache, group, groupId, layoutRevision, colorRule, colorRuleId)
+local function didBorderRenderStateChange(cache, group, groupId, layoutRevision, colorRule, colorRuleId, colorAura)
 	if not (group and groupId) then
 		local changed = cache.active ~= false
 		wipeTable(cache)
 		cache.active = false
 		return changed
 	end
-	local r, g, b, a = resolveDisplayColor(group, colorRule)
+	local r, g, b, a = resolveDisplayColor(group, colorRule, colorAura)
+	local colorToken = getDisplayColorToken(colorRule, colorAura)
 	local changed = cache.active ~= true
 		or cache.groupId ~= groupId
 		or cache.layoutRevision ~= layoutRevision
@@ -2446,6 +2603,7 @@ local function didBorderRenderStateChange(cache, group, groupId, layoutRevision,
 		or cache.x ~= group.x
 		or cache.y ~= group.y
 		or cache.colorRuleId ~= colorRuleId
+		or cache.colorToken ~= colorToken
 		or cache.r ~= r
 		or cache.g ~= g
 		or cache.b ~= b
@@ -2462,6 +2620,7 @@ local function didBorderRenderStateChange(cache, group, groupId, layoutRevision,
 	cache.x = group.x
 	cache.y = group.y
 	cache.colorRuleId = colorRuleId
+	cache.colorToken = colorToken
 	cache.r = r
 	cache.g = g
 	cache.b = b
@@ -2469,18 +2628,20 @@ local function didBorderRenderStateChange(cache, group, groupId, layoutRevision,
 	return changed
 end
 
-local function didTintRenderStateChange(cache, group, groupId, colorRule, colorRuleId)
+local function didTintRenderStateChange(cache, group, groupId, colorRule, colorRuleId, colorAura)
 	if not (group and groupId) then
 		local changed = cache.active ~= false
 		wipeTable(cache)
 		cache.active = false
 		return changed
 	end
-	local r, g, b, a = resolveDisplayColor(group, colorRule)
-	local changed = cache.active ~= true or cache.groupId ~= groupId or cache.colorRuleId ~= colorRuleId or cache.r ~= r or cache.g ~= g or cache.b ~= b or cache.a ~= a
+	local r, g, b, a = resolveDisplayColor(group, colorRule, colorAura)
+	local colorToken = getDisplayColorToken(colorRule, colorAura)
+	local changed = cache.active ~= true or cache.groupId ~= groupId or cache.colorRuleId ~= colorRuleId or cache.colorToken ~= colorToken or cache.r ~= r or cache.g ~= g or cache.b ~= b or cache.a ~= a
 	cache.active = true
 	cache.groupId = groupId
 	cache.colorRuleId = colorRuleId
+	cache.colorToken = colorToken
 	cache.r = r
 	cache.g = g
 	cache.b = b
@@ -2512,10 +2673,11 @@ local function renderIconStyleForGroup(btn, st, state, compiled, cfg, group, cha
 	local renderChanged = didGroupRenderStateChange(renderState, compiled, group, activeRules, state.familyAuraInstance, styleRevision, layoutRevision)
 	if not force and not renderChanged then return end
 
-	if #activeRules == 0 then
+		if #activeRules == 0 then
 		container:Hide()
 		for i = 1, #buttons do
 			clearExpirationPulse(buttons[i], group)
+			clearDurationColorButton(buttons[i])
 		end
 		hideButtons(buttons, 1)
 		return
@@ -2563,7 +2725,7 @@ local function renderIconStyleForGroup(btn, st, state, compiled, cfg, group, cha
 		end
 		if group.style == STYLE_SQUARE then
 			if auraApplied or button._hbVisualMode ~= STYLE_SQUARE or button._hbVisualRuleId ~= ruleId or button._hbVisualGeneration ~= compiled.generation then
-				styleSquareButton(button, (rule and rule.color) or group.color)
+				styleSquareButton(button, getDurationColorStep(rule, aura) or (rule and rule.color) or group.color)
 				button._hbVisualMode = STYLE_SQUARE
 				button._hbVisualRuleId = ruleId
 				button._hbVisualGeneration = compiled.generation
@@ -2572,9 +2734,10 @@ local function renderIconStyleForGroup(btn, st, state, compiled, cfg, group, cha
 				AuraUtil.setAuraTooltipState(button, EMPTY)
 				button._hbTooltipShown = false
 			end
-		else
-			if button._hbVisualMode ~= STYLE_ICON then
-				styleIconButton(button)
+			else
+				clearDurationColorButton(button)
+				if button._hbVisualMode ~= STYLE_ICON then
+					styleIconButton(button)
 				button._hbVisualMode = STYLE_ICON
 				button._hbVisualRuleId = nil
 				button._hbVisualGeneration = compiled.generation
@@ -2585,8 +2748,9 @@ local function renderIconStyleForGroup(btn, st, state, compiled, cfg, group, cha
 				AuraUtil.setAuraTooltipState(button, style)
 				button._hbTooltipShown = showTooltip
 			end
-		end
-		if button._hbIndicatorRevision ~= compiled.generation or button._hbIndicatorGroupId ~= group.id or button._hbIndicatorStyle ~= group.style then
+			end
+			applyDurationColorButton(button, group, rule, aura)
+			if button._hbIndicatorRevision ~= compiled.generation or button._hbIndicatorGroupId ~= group.id or button._hbIndicatorStyle ~= group.style then
 			applyIndicatorBorder(button, group)
 			button._hbIndicatorRevision = compiled.generation
 			button._hbIndicatorGroupId = group.id
@@ -2607,6 +2771,7 @@ local function renderIconStyleForGroup(btn, st, state, compiled, cfg, group, cha
 	end
 	for index = #activeRules + 1, #buttons do
 		clearExpirationPulse(buttons[index], group)
+		clearDurationColorButton(buttons[index])
 	end
 	hideButtons(buttons, #activeRules + 1)
 end
@@ -2615,6 +2780,13 @@ local function hideUnusedGroupContainers(state, activeGroups)
 	for groupId, container in pairs(state.groupContainers or EMPTY) do
 		if not activeGroups[groupId] then
 			if container then container:Hide() end
+			local buttons = state.groupButtons and state.groupButtons[groupId]
+			if buttons then
+				for i = 1, #buttons do
+					clearExpirationPulse(buttons[i], nil)
+					clearDurationColorButton(buttons[i])
+				end
+			end
 			hideButtons(state.groupButtons and state.groupButtons[groupId], 1)
 		end
 	end
@@ -2664,7 +2836,7 @@ local function getStyleAnchoredOffsets(root, group, inset)
 	return roundToPixel(x or 0, scale), roundToPixel(y or 0, scale)
 end
 
-local function renderBar(bar, st, group, trackedAura, colorRule)
+local function renderBar(bar, st, group, trackedAura, colorRule, colorAura)
 	if not bar then return end
 	if not group then
 		clearAnimatedBarState(bar)
@@ -2674,7 +2846,7 @@ local function renderBar(bar, st, group, trackedAura, colorRule)
 	local scale = getEffectiveScale(st.healerBuffRoot or bar)
 	local inset = group.inset or 0
 	inset = max(0, roundToPixel(inset, scale))
-	local r, g, b, a = resolveDisplayColor(group, colorRule)
+	local r, g, b, a = resolveDisplayColor(group, colorRule, colorAura)
 	local orientation = group.barOrientation == ORIENT_VERTICAL and ORIENT_VERTICAL or ORIENT_HORIZONTAL
 	local reverseFill = group.barDrainAnimation == true and group.barReverseFill == true
 	local root = st.healerBuffRoot
@@ -2745,6 +2917,7 @@ local function renderBar(bar, st, group, trackedAura, colorRule)
 			bar:SetValue(1)
 		end
 	end
+	setBarDurationColorState(bar, group, colorRule, colorAura)
 	if root then
 		local targetStrata = normalizeFrameStrataToken(group.barStrata)
 		if not targetStrata and root.GetFrameStrata then targetStrata = root:GetFrameStrata() end
@@ -2757,10 +2930,54 @@ local function renderBar(bar, st, group, trackedAura, colorRule)
 	bar:Show()
 end
 
-local function renderBorder(st, group, colorRule)
+local function updateDurationColorBorder(border)
+	local group = border and border._hbDurationColorGroup
+	local rule = border and border._hbDurationColorRule
+	local aura = border and border._hbDurationColorAura
+	if not (border and group and rule and aura and border.SetBackdropBorderColor) then return end
+	local token = getDisplayColorToken(rule, aura)
+	if border._hbDurationColorToken == token then return end
+	border._hbDurationColorToken = token
+	local r, g, b, a = resolveDisplayColor(group, rule, aura)
+	border:SetBackdropBorderColor(r, g, b, a)
+end
+
+clearBorderDurationColorState = function(border)
+	if not border then return end
+	border._hbDurationColorGroup = nil
+	border._hbDurationColorRule = nil
+	border._hbDurationColorAura = nil
+	border._hbDurationColorToken = nil
+	border._hbDurationColorElapsed = nil
+	if border.SetScript then border:SetScript("OnUpdate", nil) end
+end
+
+local function setBorderDurationColorState(border, group, rule, aura)
+	if not (border and group and rule and type(rule.durationColorSteps) == "table" and aura and tonumber(aura.expirationTime)) then
+		clearBorderDurationColorState(border)
+		return
+	end
+	border._hbDurationColorGroup = group
+	border._hbDurationColorRule = rule
+	border._hbDurationColorAura = aura
+	border._hbDurationColorToken = nil
+	updateDurationColorBorder(border)
+	if not border._hbDurationColorOnUpdate then
+		border._hbDurationColorOnUpdate = function(self, elapsed)
+			self._hbDurationColorElapsed = (self._hbDurationColorElapsed or 0) + (elapsed or 0)
+			if self._hbDurationColorElapsed < BAR_UPDATE_INTERVAL then return end
+			self._hbDurationColorElapsed = 0
+			updateDurationColorBorder(self)
+		end
+	end
+	if border.SetScript then border:SetScript("OnUpdate", border._hbDurationColorOnUpdate) end
+end
+
+local function renderBorder(st, group, colorRule, colorAura)
 	local border = st.healerBuffBorder
 	if not border then return end
 	if not group then
+		clearBorderDurationColorState(border)
 		border:Hide()
 		return
 	end
@@ -2776,7 +2993,7 @@ local function renderBorder(st, group, colorRule)
 	end
 	local inset = group.inset or 0
 	local size = max(1, group.borderSize or 1)
-	local r, g, b, a = resolveDisplayColor(group, colorRule)
+	local r, g, b, a = resolveDisplayColor(group, colorRule, colorAura)
 	local ox, oy = getStyleAnchoredOffsets(st.healerBuffRoot, group, inset)
 	setTwoPointsCached(border, "TOPLEFT", st.healerBuffRoot, "TOPLEFT", ox + inset, oy - inset, "BOTTOMRIGHT", st.healerBuffRoot, "BOTTOMRIGHT", ox - inset, oy + inset)
 	local key = tostring(size)
@@ -2792,6 +3009,7 @@ local function renderBorder(st, group, colorRule)
 	end
 	border:SetBackdropColor(0, 0, 0, 0)
 	border:SetBackdropBorderColor(r, g, b, a)
+	setBorderDurationColorState(border, group, colorRule, colorAura)
 	border:Show()
 end
 
@@ -2808,29 +3026,87 @@ function HB.ApplyHealthTint(st, r, g, b, a)
 	return (r * inv) + (tr * strength), (g * inv) + (tg * strength), (b * inv) + (tb * strength), a
 end
 
-local function renderTint(btn, st, group, colorRule)
+local function updateDurationColorTint(root)
+	local st = root and root._hbTintDurationColorStateRef
+	local btn = root and root._hbTintDurationColorButton
+	local group = root and root._hbTintDurationColorGroup
+	local rule = root and root._hbTintDurationColorRule
+	local aura = root and root._hbTintDurationColorAura
+	if not (root and st and group and rule and aura) then return end
+	local token = getDisplayColorToken(rule, aura)
+	if root._hbTintDurationColorToken == token then return end
+	root._hbTintDurationColorToken = token
+	local r, g, b, a = resolveDisplayColor(group, rule, aura)
+	a = clamp(a, 0, 1, 1) or 1
+	if st._hbHealthTintR ~= r or st._hbHealthTintG ~= g or st._hbHealthTintB ~= b or st._hbHealthTintA ~= a then
+		st._hbHealthTintR, st._hbHealthTintG, st._hbHealthTintB, st._hbHealthTintA = r, g, b, a
+		if btn and UF and UF.GroupFrames and UF.GroupFrames.UpdateHealthStyle then UF.GroupFrames:UpdateHealthStyle(btn) end
+	end
+end
+
+clearTintDurationColorState = function(st)
+	local root = st and st.healerBuffRoot
+	if not root then return end
+	root._hbTintDurationColorStateRef = nil
+	root._hbTintDurationColorButton = nil
+	root._hbTintDurationColorGroup = nil
+	root._hbTintDurationColorRule = nil
+	root._hbTintDurationColorAura = nil
+	root._hbTintDurationColorToken = nil
+	root._hbTintDurationColorElapsed = nil
+	if root.SetScript and (not root.GetScript or root:GetScript("OnUpdate") == root._hbTintDurationColorOnUpdate) then root:SetScript("OnUpdate", nil) end
+end
+
+local function setTintDurationColorState(btn, st, group, rule, aura)
+	local root = st and st.healerBuffRoot
+	if not (root and group and rule and type(rule.durationColorSteps) == "table" and aura and tonumber(aura.expirationTime)) then
+		clearTintDurationColorState(st)
+		return
+	end
+	root._hbTintDurationColorStateRef = st
+	root._hbTintDurationColorButton = btn
+	root._hbTintDurationColorGroup = group
+	root._hbTintDurationColorRule = rule
+	root._hbTintDurationColorAura = aura
+	root._hbTintDurationColorToken = nil
+	updateDurationColorTint(root)
+	if not root._hbTintDurationColorOnUpdate then
+		root._hbTintDurationColorOnUpdate = function(self, elapsed)
+			self._hbTintDurationColorElapsed = (self._hbTintDurationColorElapsed or 0) + (elapsed or 0)
+			if self._hbTintDurationColorElapsed < TINT_UPDATE_INTERVAL then return end
+			self._hbTintDurationColorElapsed = 0
+			updateDurationColorTint(self)
+		end
+	end
+	if root.SetScript then root:SetScript("OnUpdate", root._hbTintDurationColorOnUpdate) end
+end
+
+local function renderTint(btn, st, group, colorRule, colorAura)
 	local tint = st and st.healerBuffTint
 	local changed = false
 	if tint then tint:Hide() end
 	if not group then
+		clearTintDurationColorState(st)
 		changed = clearHealthTint(st)
 	else
-		local r, g, b, a = resolveDisplayColor(group, colorRule)
+		local r, g, b, a = resolveDisplayColor(group, colorRule, colorAura)
 		a = clamp(a, 0, 1, 1) or 1
 		if st._hbHealthTintR ~= r or st._hbHealthTintG ~= g or st._hbHealthTintB ~= b or st._hbHealthTintA ~= a then
 			st._hbHealthTintR, st._hbHealthTintG, st._hbHealthTintB, st._hbHealthTintA = r, g, b, a
 			changed = true
 		end
+		setTintDurationColorState(btn, st, group, colorRule, colorAura)
 	end
 	if changed and btn and UF and UF.GroupFrames and UF.GroupFrames.UpdateHealthStyle then UF.GroupFrames:UpdateHealthStyle(btn) end
 end
 
 local function hideUnusedBars(state, activeBars, renderHashes)
 	for groupId, bar in pairs(state.groupBars or EMPTY) do
-		if not activeBars[groupId] then
-			clearAnimatedBarState(bar)
-			bar:Hide()
-			if renderHashes then renderHashes[groupId] = nil end
+			if not activeBars[groupId] then
+				clearAnimatedBarState(bar)
+				if clearBarDurationColorState then clearBarDurationColorState(bar) end
+				bar:Hide()
+				if renderHashes then renderHashes[groupId] = nil end
 		end
 	end
 end
@@ -2840,25 +3116,27 @@ local function renderBarGroups(st, state, compiled, layoutRevision, renderHashes
 	for i = 1, #compiled.groupOrder do
 		local groupId = compiled.groupOrder[i]
 		local group = compiled.groupsById[groupId]
-		if group and group.style == STYLE_BAR and state.groupActive[groupId] then
-			activeBars[groupId] = true
-			local bar = ensureBarForGroup(state, st, groupId)
-			local barTrackedAura, barTrackedRuleId, barTrackedFamilyId
-			local barColorRule, barColorRuleId = getPriorityActiveRuleForGroup(state, compiled, groupId)
-			if group.barDrainAnimation == true then barTrackedAura, barTrackedRuleId, barTrackedFamilyId = getTrackedAuraForBarGroup(state, compiled, groupId) end
-			local renderState = renderHashes[groupId]
+			if group and group.style == STYLE_BAR and state.groupActive[groupId] then
+				activeBars[groupId] = true
+				local bar = ensureBarForGroup(state, st, groupId)
+				local barTrackedAura, barTrackedRuleId, barTrackedFamilyId
+				local barColorRule, barColorRuleId = getPriorityActiveRuleForGroup(state, compiled, groupId)
+				local barColorAura = barColorRule and barColorRule.spellFamilyId and state.familyAura[barColorRule.spellFamilyId] or nil
+				if group.barDrainAnimation == true then barTrackedAura, barTrackedRuleId, barTrackedFamilyId = getTrackedAuraForBarGroup(state, compiled, groupId) end
+				local renderState = renderHashes[groupId]
 			if not renderState then
 				renderState = {}
 				renderHashes[groupId] = renderState
 			end
-			if didBarRenderStateChange(renderState, group, groupId, layoutRevision, barTrackedAura, barTrackedRuleId, barTrackedFamilyId, barColorRule, barColorRuleId) then
-				renderBar(bar, st, group, barTrackedAura, barColorRule)
+				if didBarRenderStateChange(renderState, group, groupId, layoutRevision, barTrackedAura, barTrackedRuleId, barTrackedFamilyId, barColorRule, barColorRuleId, barColorAura) then
+					renderBar(bar, st, group, barTrackedAura, barColorRule, barColorAura)
+				end
 			end
-		end
 	end
 	hideUnusedBars(state, activeBars, renderHashes)
 	if st.healerBuffBar and st.healerBuffBar:IsShown() then
 		clearAnimatedBarState(st.healerBuffBar)
+		if clearBarDurationColorState then clearBarDurationColorState(st.healerBuffBar) end
 		st.healerBuffBar:Hide()
 	end
 end
@@ -2877,15 +3155,22 @@ local function renderAll(btn, st, state, compiled, cfg, changedFamilies)
 		local groupId = compiled.groupOrder[i]
 		local group = compiled.groupsById[groupId]
 		if group and (group.style == STYLE_ICON or group.style == STYLE_SQUARE) then
-			if state.groupActive[groupId] then
-				activeContainers[groupId] = true
-				renderIconStyleForGroup(btn, st, state, compiled, cfg, group, changedFamilies, renderHash[group.style])
-			else
-				local container = state.groupContainers[groupId]
-				if container then container:Hide() end
-				hideButtons(state.groupButtons[groupId], 1)
-				renderHash[group.style][groupId] = nil
-			end
+				if state.groupActive[groupId] then
+					activeContainers[groupId] = true
+					renderIconStyleForGroup(btn, st, state, compiled, cfg, group, changedFamilies, renderHash[group.style])
+				else
+					local container = state.groupContainers[groupId]
+					if container then container:Hide() end
+					local buttons = state.groupButtons[groupId]
+					if buttons then
+						for i = 1, #buttons do
+							clearExpirationPulse(buttons[i], group)
+							clearDurationColorButton(buttons[i])
+						end
+					end
+					hideButtons(state.groupButtons[groupId], 1)
+					renderHash[group.style][groupId] = nil
+				end
 		end
 	end
 	hideUnusedGroupContainers(state, activeContainers)
@@ -2894,12 +3179,14 @@ local function renderAll(btn, st, state, compiled, cfg, changedFamilies)
 	local tintGroup, tintGroupId = winnerForStyle(compiled, state.groupActive, STYLE_TINT)
 	local borderColorRule, borderColorRuleId = getPriorityActiveRuleForGroup(state, compiled, borderGroupId)
 	local tintColorRule, tintColorRuleId = getPriorityActiveRuleForGroup(state, compiled, tintGroupId)
+	local borderColorAura = borderColorRule and borderColorRule.spellFamilyId and state.familyAura[borderColorRule.spellFamilyId] or nil
+	local tintColorAura = tintColorRule and tintColorRule.spellFamilyId and state.familyAura[tintColorRule.spellFamilyId] or nil
 
 	renderBarGroups(st, state, compiled, layoutRevision, renderHash[STYLE_BAR])
 
-	if didBorderRenderStateChange(renderHash[STYLE_BORDER], borderGroup, borderGroupId, layoutRevision, borderColorRule, borderColorRuleId) then renderBorder(st, borderGroup, borderColorRule) end
+	if didBorderRenderStateChange(renderHash[STYLE_BORDER], borderGroup, borderGroupId, layoutRevision, borderColorRule, borderColorRuleId, borderColorAura) then renderBorder(st, borderGroup, borderColorRule, borderColorAura) end
 
-	if didTintRenderStateChange(renderHash[STYLE_TINT], tintGroup, tintGroupId, tintColorRule, tintColorRuleId) then renderTint(btn, st, tintGroup, tintColorRule) end
+	if didTintRenderStateChange(renderHash[STYLE_TINT], tintGroup, tintGroupId, tintColorRule, tintColorRuleId, tintColorAura) then renderTint(btn, st, tintGroup, tintColorRule, tintColorAura) end
 end
 
 function HB.BuildButton(btn)
