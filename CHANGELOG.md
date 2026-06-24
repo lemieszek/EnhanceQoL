@@ -1,6 +1,7 @@
 # Changelog
 
 <!--@eqol-beta@-->
+
 ## [11.5.0-beta2] - 2026-06-23
 
 ### ✨ Added
@@ -9,6 +10,10 @@
 - EQoL Suite: Added cooldown edge, reverse swipe, and debuff-type border color options for custom aura containers.
 - Cooldown Panels: Added a panel-wide color and opacity picker for supported aura overlays, with optional per-entry overrides.
 - Group Frames / Healer Buff Placement: Added optional per-spell duration color steps for Square, Bar, Border, and Tint indicators.
+
+### 🔄 Changed
+
+Mythic+ Timer: Offset increased to 800, strata/level of some fontstring
 
 ---
 
@@ -24,6 +29,7 @@
 - Cooldown Panels: Restored Blizzard Buff Bar scanning for tracked aura entries.
 
 ---
+
 <!--@end-eqol-beta@-->
 
 ## [11.4.0] - 2026-06-22
