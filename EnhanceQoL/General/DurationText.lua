@@ -10,8 +10,12 @@ local BUILTIN_COOLDOWN_STYLE_MIGRATION_FLAG = "builtinCooldownStyleMigrationV1"
 local BINDING_UPDATE_INTERVAL = 0.1
 local MIN_INTERVAL = "SECONDS"
 local MAX_INTERVAL = "DAYS"
+local MAX_COLOR_BREAKPOINTS = 5
+local DEFAULT_TEXT_COLOR = { r = 1, g = 1, b = 1, a = 1 }
 
 DurationText.defaults = {
+	colorBreakpointCount = 0,
+	colorBreakpoints = {},
 	expiredText = "",
 	millisecondsThreshold = 0,
 	zeroDurationText = "",
@@ -24,11 +28,15 @@ DurationText.protectedProfileKeys = {
 }
 DurationText.profileDefaults = {
 	MINIMAL = {
+		colorBreakpointCount = 0,
+		colorBreakpoints = {},
 		expiredText = "",
 		millisecondsThreshold = 0,
 		zeroDurationText = "",
 	},
 	PRECISE = {
+		colorBreakpointCount = 0,
+		colorBreakpoints = {},
 		expiredText = "",
 		millisecondsThreshold = 6,
 		zeroDurationText = "",
@@ -84,9 +92,53 @@ local DURATION_TEXT_BINDING_PROPERTY_ALIASES = {
 local function copyDefaultTable(source)
 	local target = {}
 	for key, value in pairs(source or EMPTY_TABLE) do
-		target[key] = value
+		if type(value) == "table" then
+			target[key] = copyDefaultTable(value)
+		else
+			target[key] = value
+		end
 	end
 	return target
+end
+
+local function clamp(value, minValue, maxValue)
+	value = tonumber(value) or minValue
+	if value < minValue then return minValue end
+	if value > maxValue then return maxValue end
+	return value
+end
+
+local function roundNumber(value, fallback)
+	value = tonumber(value)
+	if not value then return fallback end
+	return math.floor(value + 0.5)
+end
+
+local function normalizeColor(color, fallback)
+	fallback = fallback or DEFAULT_TEXT_COLOR
+	if type(color) ~= "table" then color = EMPTY_TABLE end
+	return {
+		r = clamp(color.r or color[1] or fallback.r or fallback[1] or 1, 0, 1),
+		g = clamp(color.g or color[2] or fallback.g or fallback[2] or 1, 0, 1),
+		b = clamp(color.b or color[3] or fallback.b or fallback[3] or 1, 0, 1),
+		a = clamp(color.a or color[4] or fallback.a or fallback[4] or 1, 0, 1),
+	}
+end
+
+local function normalizeColorBreakpoints(profile)
+	local breakpoints = type(profile.colorBreakpoints) == "table" and profile.colorBreakpoints or {}
+	local normalized = {}
+	local count = roundNumber(profile.colorBreakpointCount, 0)
+	count = clamp(count, 0, MAX_COLOR_BREAKPOINTS)
+	for i = 1, MAX_COLOR_BREAKPOINTS do
+		local breakpoint = type(breakpoints[i]) == "table" and breakpoints[i] or EMPTY_TABLE
+		normalized[i] = {
+			seconds = clamp(breakpoint.seconds or i * 5, 1, 3600),
+			color = normalizeColor(breakpoint.color, DEFAULT_TEXT_COLOR),
+		}
+	end
+	profile.colorBreakpointCount = count
+	profile.colorBreakpoints = normalized
 end
 
 local function trimProfileName(name)
@@ -120,14 +172,19 @@ local function normalizeProfileConfig(profile, defaults)
 	if type(profile) ~= "table" then profile = {} end
 	defaults = defaults or DurationText.defaults
 	for key, value in pairs(defaults) do
-		if profile[key] == nil then profile[key] = value end
+		if profile[key] == nil then
+			profile[key] = type(value) == "table" and copyDefaultTable(value) or value
+		end
 	end
 	for key, value in pairs(DurationText.defaults) do
-		if profile[key] == nil then profile[key] = value end
+		if profile[key] == nil then
+			profile[key] = type(value) == "table" and copyDefaultTable(value) or value
+		end
 	end
 	for key in pairs(profile) do
 		if not isConfigKey(key) then profile[key] = nil end
 	end
+	normalizeColorBreakpoints(profile)
 	return profile
 end
 
@@ -485,6 +542,7 @@ function DurationText:SetProfileValue(profileKey, key, value)
 	local profile = self:GetProfileConfig(profileKey)
 	if not profile then return end
 	profile[key] = value
+	normalizeColorBreakpoints(profile)
 	self:Invalidate()
 end
 
@@ -589,9 +647,141 @@ end
 
 function DurationText:GetCacheKey(config)
 	config = config or self:GetGlobalConfig()
-	return table.concat({
+	local parts = {
 		tostring(config.millisecondsThreshold),
-	}, "|")
+		tostring(config.colorBreakpointCount),
+	}
+	local count = roundNumber(config.colorBreakpointCount, 0)
+	count = clamp(count, 0, MAX_COLOR_BREAKPOINTS)
+	for i = 1, count do
+		local breakpoint = type(config.colorBreakpoints) == "table" and config.colorBreakpoints[i] or nil
+		local color = breakpoint and normalizeColor(breakpoint.color, DEFAULT_TEXT_COLOR) or DEFAULT_TEXT_COLOR
+		parts[#parts + 1] = table.concat({
+			tostring(breakpoint and breakpoint.seconds or ""),
+			tostring(color.r),
+			tostring(color.g),
+			tostring(color.b),
+		}, ",")
+	end
+	return table.concat(parts, "|")
+end
+
+function DurationText:GetMaxColorBreakpoints()
+	return MAX_COLOR_BREAKPOINTS
+end
+
+function DurationText:GetDefaultTextColor()
+	return copyDefaultTable(DEFAULT_TEXT_COLOR)
+end
+
+function DurationText:GetProfileColorBreakpoint(profileKey, index)
+	local profile = self:GetProfileConfig(profileKey)
+	index = roundNumber(index, 1)
+	if not profile or index < 1 or index > MAX_COLOR_BREAKPOINTS then return nil end
+	normalizeColorBreakpoints(profile)
+	return profile.colorBreakpoints[index]
+end
+
+function DurationText:SetProfileColorBreakpointValue(profileKey, index, field, value)
+	local profile = self:GetProfileConfig(profileKey)
+	index = roundNumber(index, 1)
+	if not profile or index < 1 or index > MAX_COLOR_BREAKPOINTS then return false end
+	normalizeColorBreakpoints(profile)
+	local breakpoint = profile.colorBreakpoints[index]
+	if field == "seconds" then
+		local seconds = clamp(value, 1, 3600)
+		if breakpoint.seconds == seconds then return false end
+		breakpoint.seconds = seconds
+	elseif field == "color" then
+		local color = normalizeColor(value, DEFAULT_TEXT_COLOR)
+		local oldColor = normalizeColor(breakpoint.color, DEFAULT_TEXT_COLOR)
+		if oldColor.r == color.r and oldColor.g == color.g and oldColor.b == color.b and oldColor.a == color.a then return false end
+		breakpoint.color = color
+	else
+		return false
+	end
+	self:Invalidate()
+	return true
+end
+
+local function colorEscapePrefix(color)
+	color = normalizeColor(color, DEFAULT_TEXT_COLOR)
+	local r = clamp(color.r, 0, 1)
+	local g = clamp(color.g, 0, 1)
+	local b = clamp(color.b, 0, 1)
+	if r >= 0.999 and g >= 0.999 and b >= 0.999 then return "" end
+	return ("|cff%02x%02x%02x"):format(math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5), math.floor(b * 255 + 0.5))
+end
+
+local function formatWithColor(format, color)
+	local prefix = colorEscapePrefix(color)
+	if prefix == "" then return format end
+	return prefix .. format .. "|r"
+end
+
+local function collectColorBands(config)
+	local count = roundNumber(config and config.colorBreakpointCount, 0)
+	count = clamp(count, 0, MAX_COLOR_BREAKPOINTS)
+	if count <= 0 or type(config.colorBreakpoints) ~= "table" then return nil end
+	local bands = {}
+	for i = 1, count do
+		local breakpoint = config.colorBreakpoints[i]
+		if type(breakpoint) == "table" then
+			bands[#bands + 1] = {
+				seconds = clamp(breakpoint.seconds, 1, 3600),
+				color = normalizeColor(breakpoint.color, DEFAULT_TEXT_COLOR),
+			}
+		end
+	end
+	table.sort(bands, function(a, b) return a.seconds < b.seconds end)
+	return #bands > 0 and bands or nil
+end
+
+local function getColorForThreshold(threshold, bands)
+	if not bands then return DEFAULT_TEXT_COLOR end
+	for i = 1, #bands do
+		if threshold < bands[i].seconds then return bands[i].color end
+	end
+	return DEFAULT_TEXT_COLOR
+end
+
+local function addUniqueThreshold(thresholds, threshold)
+	threshold = tonumber(threshold)
+	if not threshold or threshold < 0 then return end
+	threshold = math.floor(threshold * 10 + 0.5) / 10
+	thresholds.seen = thresholds.seen or {}
+	if thresholds.seen[threshold] then return end
+	thresholds.seen[threshold] = true
+	thresholds[#thresholds + 1] = threshold
+end
+
+local function createNumericBreakpoint(threshold, decimalThreshold, rounding, color)
+	if decimalThreshold and decimalThreshold > 0 and threshold < decimalThreshold then
+		return {
+			threshold = threshold,
+			step = 0.1,
+			format = formatWithColor("%.1f", color),
+			rounding = rounding.nearest,
+		}
+	end
+	if threshold < 60 then
+		return {
+			threshold = threshold,
+			step = 1,
+			format = formatWithColor("%.0f", color),
+			rounding = rounding.down,
+		}
+	end
+	return {
+		threshold = threshold,
+		step = 1,
+		rounding = rounding.down,
+		format = formatWithColor("%d:%02d", color),
+		components = {
+			{ div = 60, step = 1, rounding = rounding.down },
+			{ mod = 60, step = 1, rounding = rounding.down },
+		},
+	}
 end
 
 function DurationText:CreateSecondsFormatter(config)
@@ -620,33 +810,29 @@ function DurationText:CreateBindingFormatter(config)
 	local formatter = api.CreateNumericRuleFormatter()
 	if formatter.ClearBreakpoints then formatter:ClearBreakpoints() end
 	local decimalThreshold = tonumber(config.millisecondsThreshold) or self.defaults.millisecondsThreshold
-	local down = self:GetRoundingValue("DOWN") or 2
-	local nearest = self:GetRoundingValue("NEAREST") or down
-	local breakpoints = {}
-	if decimalThreshold and decimalThreshold > 0 then
-		breakpoints[#breakpoints + 1] = {
-			threshold = 0,
-			step = 0.1,
-			format = "%.1f",
-			rounding = nearest,
-		}
+	local rounding = {
+		down = self:GetRoundingValue("DOWN") or 2,
+	}
+	rounding.nearest = self:GetRoundingValue("NEAREST") or rounding.down
+	local colorBands = collectColorBands(config)
+	local thresholds = {}
+	addUniqueThreshold(thresholds, 0)
+	if decimalThreshold and decimalThreshold > 0 then addUniqueThreshold(thresholds, decimalThreshold) end
+	addUniqueThreshold(thresholds, 60)
+	if colorBands then
+		local previous = 0
+		for i = 1, #colorBands do
+			addUniqueThreshold(thresholds, previous)
+			addUniqueThreshold(thresholds, colorBands[i].seconds)
+			previous = colorBands[i].seconds
+		end
 	end
-	breakpoints[#breakpoints + 1] = {
-		threshold = decimalThreshold and decimalThreshold > 0 and decimalThreshold or 0,
-		step = 1,
-		format = "%.0f",
-		rounding = down,
-	}
-	breakpoints[#breakpoints + 1] = {
-		threshold = 60,
-		step = 1,
-		rounding = down,
-		format = "%d:%02d",
-		components = {
-			{ div = 60, step = 1, rounding = down },
-			{ mod = 60, step = 1, rounding = down },
-		},
-	}
+	table.sort(thresholds)
+	local breakpoints = {}
+	for i = 1, #thresholds do
+		local threshold = thresholds[i]
+		breakpoints[#breakpoints + 1] = createNumericBreakpoint(threshold, decimalThreshold, rounding, getColorForThreshold(threshold, colorBands))
+	end
 	if formatter.SetBreakpoints then
 		formatter:SetBreakpoints(breakpoints)
 	elseif formatter.AddBreakpoint then
@@ -826,15 +1012,17 @@ function DurationText:ApplyToCooldownFrame(cooldownFrame, config, options)
 	if not cooldownFrame then return false end
 	options = options or EMPTY_TABLE
 	config = self:GetEffectiveConfig(config)
-	if cooldownFrame.SetCountdownFormatter then cooldownFrame:SetCountdownFormatter(nil) end
+	if cooldownFrame.SetCountdownFormatter then
+		local colorBreakpointCount = roundNumber(config.colorBreakpointCount, 0)
+		cooldownFrame:SetCountdownFormatter(colorBreakpointCount > 0 and self:GetBindingFormatter(config) or nil)
+	end
 	local millisecondsThreshold = tonumber(config.millisecondsThreshold) or 0
 	if cooldownFrame.SetCountdownMillisecondsThreshold then cooldownFrame:SetCountdownMillisecondsThreshold(millisecondsThreshold) end
 	return true
 end
 
 function DurationText:ApplyProfileToCooldownFrame(cooldownFrame, profileKey, options)
-	local config = self:GetProfileConfig(profileKey)
-	return self:ApplyToCooldownFrame(cooldownFrame, config, options)
+	return self:ApplyToCooldownFrame(cooldownFrame, profileKey, options)
 end
 
 function addon.functions.IsDurationTextBindingSupported() return DurationText:IsDurationTextBindingSupported() end

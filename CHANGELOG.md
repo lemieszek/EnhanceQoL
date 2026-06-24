@@ -5,6 +5,7 @@
 
 ### ✨ Added
 
+- Duration Text: Added profile color breakpoints for cooldown and duration text.
 - EQoL Suite: Added cooldown edge, reverse swipe, and debuff-type border color options for custom aura containers.
 
 ---

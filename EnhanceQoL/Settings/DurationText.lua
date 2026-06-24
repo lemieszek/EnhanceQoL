@@ -22,6 +22,33 @@ local function getDurationTextValue(key)
 	return DurationText:GetProfileValue(DurationText:GetEditProfileKey(), key)
 end
 
+local function setDurationTextBreakpointValue(index, field, value)
+	DurationText:InitDB()
+	local changed = DurationText:SetProfileColorBreakpointValue(DurationText:GetEditProfileKey(), index, field, value)
+	if changed then addon.variables.requireReload = true end
+	invalidate()
+end
+
+local function getDurationTextBreakpoint(index)
+	DurationText:InitDB()
+	return DurationText:GetProfileColorBreakpoint(DurationText:GetEditProfileKey(), index) or {}
+end
+
+local function getDurationTextBreakpointColor(index)
+	local breakpoint = getDurationTextBreakpoint(index)
+	local color = breakpoint.color or DurationText:GetDefaultTextColor()
+	return color.r or 1, color.g or 1, color.b or 1, color.a or 1
+end
+
+local function setDurationTextBreakpointColor(index, r, g, b, a)
+	setDurationTextBreakpointValue(index, "color", { r = r, g = g, b = b, a = a })
+end
+
+local function getDurationTextBreakpointDefaultColor()
+	local color = DurationText:GetDefaultTextColor()
+	return color.r or 1, color.g or 1, color.b or 1, color.a or 1
+end
+
 local function getProfileDropdownData()
 	DurationText:InitDB()
 	return DurationText:GetProfileDropdownData()
@@ -266,6 +293,68 @@ addon.functions.SettingsCreateSlider(category, {
 	order = 20,
 	parentSection = expandable,
 })
+
+addon.functions.SettingsCreateHeadline(category, L["durationTextColorBreakpointHeader"], { parentSection = expandable, order = 30 })
+
+local breakpointCountElement = addon.functions.SettingsCreateSlider(category, {
+	var = "durationText",
+	subvar = "colorBreakpointCount",
+	text = L["durationTextColorBreakpointCount"],
+	desc = L["durationTextColorBreakpointCountDesc"],
+	min = 0,
+	max = DurationText:GetMaxColorBreakpoints(),
+	step = 1,
+	default = DurationText.defaults.colorBreakpointCount,
+	get = function() return getDurationTextValue("colorBreakpointCount") end,
+	func = function(value)
+		value = math.floor((tonumber(value) or 0) + 0.5)
+		setDurationTextValue("colorBreakpointCount", value)
+		refreshDurationTextSettings(true)
+	end,
+	order = 30,
+	parentSection = expandable,
+})
+
+for i = 1, DurationText:GetMaxColorBreakpoints() do
+	addon.functions.SettingsCreateSlider(category, {
+		var = "durationTextColorBreakpoint" .. i .. "Seconds",
+		text = (L["durationTextColorBreakpointSeconds"] or "Breakpoint %d below seconds"):format(i),
+		desc = L["durationTextColorBreakpointSecondsDesc"],
+		min = 1,
+		max = 3600,
+		step = 1,
+		default = i * 5,
+		get = function()
+			local breakpoint = getDurationTextBreakpoint(i)
+			return breakpoint.seconds or i * 5
+		end,
+		func = function(value)
+			setDurationTextBreakpointValue(i, "seconds", value)
+			refreshDurationTextSettings()
+		end,
+		order = 30 + i * 2 - 1,
+		element = breakpointCountElement,
+		parentCheck = function() return (tonumber(getDurationTextValue("colorBreakpointCount")) or 0) >= i end,
+		parentSection = expandable,
+	})
+
+	addon.functions.SettingsCreateColorPicker(category, {
+		var = "durationTextColorBreakpoint" .. i .. "Color",
+		text = (L["durationTextColorBreakpointColor"] or "Breakpoint %d color"):format(i),
+		desc = L["durationTextColorBreakpointColorDesc"],
+		getColor = function() return getDurationTextBreakpointColor(i) end,
+		setColor = function(_, r, g, b, a)
+			setDurationTextBreakpointColor(i, r, g, b, a)
+			refreshDurationTextSettings()
+		end,
+		getDefaultColor = getDurationTextBreakpointDefaultColor,
+		order = 30 + i * 2,
+		element = breakpointCountElement,
+		parentCheck = function() return (tonumber(getDurationTextValue("colorBreakpointCount")) or 0) >= i end,
+		colorizeLabel = false,
+		parentSection = expandable,
+	})
+end
 
 addon.functions.SettingsCreateHeadline(category, L["durationTextFallbackTextHeader"], { parentSection = expandable, order = 40 })
 
