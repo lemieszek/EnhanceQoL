@@ -284,16 +284,23 @@ function CooldownPanels:RegisterSpellVariantGroup(variantList, options)
 	return self:RegisterStaticSpellVariantGroup(variantList, options)
 end
 
-local function shouldShowEntryStacks(entry, resolvedType)
+local function shouldShowEntryStacks(layout, entry, resolvedType)
 	if not entry then return false end
 	if resolvedType ~= "SPELL" and resolvedType ~= "CDM_AURA" and resolvedType ~= "SLOT" then return false end
 	if resolvedType == "SLOT" then
 		local slotID = tonumber(entry.slotID)
-		return (slotID == 13 or slotID == 14) and entry.showStacks == true or false
+		if slotID ~= 13 and slotID ~= 14 then return false end
 	end
+	if entry.showStacksUseGlobal ~= false then return layout and layout.showStacks == true or false end
 	local bars = CooldownPanels.Bars
 	if bars and bars.ShouldEntryShowStacks then return bars.ShouldEntryShowStacks(entry, resolvedType) end
 	return entry.showStacks == true
+end
+
+function CooldownPanels:ShouldShowEntryCharges(layout, entry, resolvedType)
+	if not entry or resolvedType ~= "SPELL" then return false end
+	if entry.showChargesUseGlobal ~= false then return layout and layout.showCharges == true or false end
+	return entry.showCharges == true
 end
 
 function CooldownPanels.NormalizePositiveDisplayCount(value)
@@ -3738,6 +3745,7 @@ cdp.ENTRY.STYLE_CLIPBOARD = {
 	},
 	SPELL_ONLY_KEYS = {
 		showCharges = true,
+		showChargesUseGlobal = true,
 		showChargesCooldown = true,
 		trackPassiveSpell = true,
 		readyGlowCheckPower = true,
@@ -3848,6 +3856,13 @@ function cdp.ENTRY.IsStyleClipboardKeyAllowedForEntry(key, entry)
 	if style.CDM_AURA_ONLY_KEYS[key] and entryType ~= "CDM_AURA" then return false end
 	if style.STATE_TEXTURE_KEYS[key] then return entryType == "SPELL" or entryType == "CDM_AURA" end
 	if key == "showStacks" then
+		if entryType == "SLOT" then
+			local slotID = tonumber(entry and entry.slotID)
+			return slotID == 13 or slotID == 14
+		end
+		return entryType == "SPELL" or entryType == "CDM_AURA"
+	end
+	if key == "showStacksUseGlobal" then
 		if entryType == "SLOT" then
 			local slotID = tonumber(entry and entry.slotID)
 			return slotID == 13 or slotID == 14
@@ -5399,7 +5414,7 @@ function CooldownPanels:RebuildSpellIndex()
 						if shouldTrackPassiveSpell(entry) or not isSpellPassiveSafe(resolvedSpellId, effectiveId) then
 							local showCooldown = entry.showCooldown ~= false
 							local staticTextShowOnCooldown = entry.staticTextShowOnCooldown == true
-							local showCharges = entry.showCharges == true
+							local showCharges = CooldownPanels:ShouldShowEntryCharges(layout, entry, "SPELL")
 							local alwaysShow = entry.alwaysShow ~= false
 							spellEntryMetaData = cdp.ENTRY.EnsureSpellEntryMeta(spellEntryMeta, panelId, entryId)
 							spellEntryMetaData.panelId = panelId
@@ -5707,13 +5722,15 @@ function CooldownPanels:RebuildChargesIndex()
 				local panelId = enabledPanelIds[i]
 				local panel = root.panels[panelId]
 				if panel and (not enabledPanels or enabledPanels[panelId]) then
+					local layout = panel.layout
 					for _, entry in pairs(panel.entries or {}) do
 						local baseId
-						if entry and entry.showCharges == true then
+						local macro = entry and entry.type == "MACRO" and CooldownPanels.ResolveMacroEntry(entry) or nil
+						local resolvedType = (macro and macro.kind) or (entry and entry.type)
+						if CooldownPanels:ShouldShowEntryCharges(layout, entry, resolvedType) then
 							if entry.type == "SPELL" and entry.spellID then
 								baseId = tonumber(entry.spellID)
 							elseif entry.type == "MACRO" then
-								local macro = CooldownPanels.ResolveMacroEntry(entry)
 								if macro and macro.kind == "SPELL" and macro.spellID then baseId = tonumber(macro.spellID) end
 							end
 						end
@@ -5738,13 +5755,15 @@ function CooldownPanels:RebuildChargesIndex()
 		else
 			for panelId, panel in pairs(root.panels) do
 				if panel and panel.enabled ~= false and panelAllowsSpec(panel) then
+					local layout = panel.layout
 					for _, entry in pairs(panel.entries or {}) do
 						local baseId
-						if entry and entry.showCharges == true then
+						local macro = entry and entry.type == "MACRO" and CooldownPanels.ResolveMacroEntry(entry) or nil
+						local resolvedType = (macro and macro.kind) or (entry and entry.type)
+						if CooldownPanels:ShouldShowEntryCharges(layout, entry, resolvedType) then
 							if entry.type == "SPELL" and entry.spellID then
 								baseId = tonumber(entry.spellID)
 							elseif entry.type == "MACRO" then
-								local macro = CooldownPanels.ResolveMacroEntry(entry)
 								if macro and macro.kind == "SPELL" and macro.spellID then baseId = tonumber(macro.spellID) end
 							end
 						end
@@ -12579,6 +12598,8 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		local normalized = value == true
 		if (currentEntry[field] == true) == normalized then return end
 		currentEntry[field] = normalized and true or false
+		if field == "showCharges" then currentEntry.showChargesUseGlobal = false end
+		if field == "showStacks" then currentEntry.showStacksUseGlobal = false end
 		CooldownPanels:HandleEntryBooleanMutation(panelId, entryId, currentEntry, field)
 		refreshEntryViews()
 	end
@@ -13021,21 +13042,28 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		refreshEntryViews()
 	end
 
-	local function setStackStyleOverrideEnabled(value)
+	local function setShowStacksOverrideEnabled(value)
+		local layout = getLayout()
 		local _, currentEntry = getEntry()
 		if not currentEntry then return end
 		local useGlobal = value ~= true
-		if currentEntry.stackStyleUseGlobal == useGlobal then return end
+		if currentEntry.showStacksUseGlobal == useGlobal and currentEntry.stackStyleUseGlobal == useGlobal then return end
+		if not useGlobal then currentEntry.showStacks = shouldShowEntryStacks(layout, currentEntry, getEffectiveType()) end
+		currentEntry.showStacksUseGlobal = useGlobal
 		currentEntry.stackStyleUseGlobal = useGlobal
 		refreshEntryViews()
 	end
 
-	local function setChargesStyleOverrideEnabled(value)
+	local function setShowChargesOverrideEnabled(value)
+		local layout = getLayout()
 		local _, currentEntry = getEntry()
 		if not currentEntry then return end
 		local useGlobal = value ~= true
-		if currentEntry.chargesStyleUseGlobal == useGlobal then return end
+		if currentEntry.showChargesUseGlobal == useGlobal and currentEntry.chargesStyleUseGlobal == useGlobal then return end
+		if not useGlobal then currentEntry.showCharges = CooldownPanels:ShouldShowEntryCharges(layout, currentEntry, getEffectiveType()) end
+		currentEntry.showChargesUseGlobal = useGlobal
 		currentEntry.chargesStyleUseGlobal = useGlobal
+		CooldownPanels:RebuildChargesIndex()
 		refreshEntryViews()
 	end
 
@@ -13705,23 +13733,6 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			end,
 		},
 		{
-			name = L["CooldownPanelShowStacks"] or "Show stack count",
-			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneStacks",
-			isShown = function()
-				local effectiveType = getEffectiveType()
-				local _, currentEntry = getEntry()
-				local slotID = effectiveType == "SLOT" and tonumber(currentEntry and currentEntry.slotID) or nil
-				return effectiveType == "SPELL" or effectiveType == "CDM_AURA" or effectiveType == "ITEM" or slotID == 13 or slotID == 14
-			end,
-			get = function()
-				local _, currentEntry = getEntry()
-				local effectiveType = getEffectiveType()
-				return shouldShowEntryStacks(currentEntry, effectiveType)
-			end,
-			set = function(_, value) setEntryBoolean("showStacks", value) end,
-		},
-		{
 			name = L["CooldownPanelOverwriteGlobalDefault"] or "Overwrite global default",
 			kind = SettingType.Checkbox,
 			parentId = "cooldownPanelStandaloneStacks",
@@ -13733,9 +13744,30 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			end,
 			get = function()
 				local _, currentEntry = getEntry()
-				return currentEntry and currentEntry.stackStyleUseGlobal == false or false
+				return currentEntry and currentEntry.showStacksUseGlobal == false or false
 			end,
-			set = function(_, value) setStackStyleOverrideEnabled(value) end,
+			set = function(_, value) setShowStacksOverrideEnabled(value) end,
+		},
+		{
+			name = L["CooldownPanelShowStacks"] or "Show stack count",
+			kind = SettingType.Checkbox,
+			parentId = "cooldownPanelStandaloneStacks",
+			isShown = function()
+				local effectiveType = getEffectiveType()
+				local _, currentEntry = getEntry()
+			local slotID = effectiveType == "SLOT" and tonumber(currentEntry and currentEntry.slotID) or nil
+				return effectiveType == "SPELL" or effectiveType == "CDM_AURA" or effectiveType == "ITEM" or slotID == 13 or slotID == 14
+			end,
+			get = function()
+				local _, currentEntry = getEntry()
+				local effectiveType = getEffectiveType()
+				return shouldShowEntryStacks(getLayout(), currentEntry, effectiveType)
+			end,
+			disabled = function()
+				local _, currentEntry = getEntry()
+				return not (currentEntry and currentEntry.showStacksUseGlobal == false)
+			end,
+			set = function(_, value) setEntryBoolean("showStacks", value) end,
 		},
 		{
 			name = L["CooldownPanelCountAnchor"] or "Count anchor",
@@ -13915,7 +13947,11 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			isShown = function() return getEffectiveType() == "SPELL" end,
 			get = function()
 				local _, currentEntry = getEntry()
-				return currentEntry and currentEntry.showCharges == true or false
+				return CooldownPanels:ShouldShowEntryCharges(getLayout(), currentEntry, getEffectiveType())
+			end,
+			disabled = function()
+				local _, currentEntry = getEntry()
+				return not (currentEntry and currentEntry.showChargesUseGlobal == false)
 			end,
 			set = function(_, value) setEntryBoolean("showCharges", value) end,
 		},
@@ -13923,15 +13959,12 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			name = L["CooldownPanelOverwriteGlobalDefault"] or "Overwrite global default",
 			kind = SettingType.Checkbox,
 			parentId = "cooldownPanelStandaloneCharges",
-			isShown = function()
-				local effectiveType = getEffectiveType()
-				return effectiveType == "SPELL" or effectiveType == "ITEM"
-			end,
+			isShown = function() return getEffectiveType() == "SPELL" end,
 			get = function()
 				local _, currentEntry = getEntry()
-				return currentEntry and currentEntry.chargesStyleUseGlobal == false or false
+				return currentEntry and currentEntry.showChargesUseGlobal == false or false
 			end,
-			set = function(_, value) setChargesStyleOverrideEnabled(value) end,
+			set = function(_, value) setShowChargesOverrideEnabled(value) end,
 		},
 		{
 			name = L["CooldownPanelChargesAnchor"] or "Charges anchor",
@@ -17340,6 +17373,8 @@ local function ensureEditor()
 			local entry = panel and panel.entries and panel.entries[entryId]
 			if not entry then return end
 			entry[field] = self:GetChecked() and true or false
+			if field == "showCharges" then entry.showChargesUseGlobal = false end
+			if field == "showStacks" then entry.showStacksUseGlobal = false end
 			CooldownPanels:HandleEntryBooleanMutation(panelId, entryId, entry, field)
 			CooldownPanels:RefreshPanel(panelId)
 			CooldownPanels:RefreshEditor()
@@ -19069,8 +19104,8 @@ local function refreshInspector(editor, panel, entry)
 			end
 			inspector.cbAlwaysShow:SetChecked(alwaysShowChecked)
 		end
-		inspector.cbCharges:SetChecked(entry.showCharges and true or false)
-		inspector.cbStacks:SetChecked(shouldShowEntryStacks(entry, effectiveType))
+		inspector.cbCharges:SetChecked(CooldownPanels:ShouldShowEntryCharges(panel and panel.layout or nil, entry, effectiveType))
+		inspector.cbStacks:SetChecked(shouldShowEntryStacks(panel and panel.layout or nil, entry, effectiveType))
 		inspector.cbItemCount:SetChecked(effectiveType == "ITEM" and entry.showItemCount ~= false)
 		inspector.cbItemUses:SetChecked(effectiveType == "ITEM" and entry.showItemUses == true)
 		if inspector.cbUseHighestRank then inspector.cbUseHighestRank:SetChecked(effectiveType == "ITEM" and entry.type == "ITEM" and entry.useHighestRank == true) end
@@ -19665,8 +19700,8 @@ function CooldownPanels:UpdatePreviewIcons(panelId, countOverride)
 		local showCooldown = entry and entry.showCooldown ~= false
 		local staticCooldown = entry and entry.staticTextShowOnCooldown == true or false
 		local showCooldownText = entry and entry.showCooldownText ~= false
-		local showCharges = entry and resolvedType == "SPELL" and entry.showCharges == true
-		local showStacks = shouldShowEntryStacks(entry, resolvedType)
+		local showCharges = entry and CooldownPanels:ShouldShowEntryCharges(entryLayout, entry, resolvedType) or false
+		local showStacks = shouldShowEntryStacks(entryLayout, entry, resolvedType)
 		local showItemCount = entry and resolvedType == "ITEM" and entry.showItemCount ~= false
 		local showItemUses = entry and resolvedType == "ITEM" and entry.showItemUses == true
 		local showEntryIconTexture = entry and CooldownPanels:ResolveEntryShowIconTexture(entryLayout, entry) or showIconTexture
@@ -19938,7 +19973,7 @@ function CooldownPanels:HandleEntryBooleanMutation(panelId, entryId, entry, fiel
 	if field == "trackPassiveSpell" then self:RebuildSpellIndex() end
 	if field == "interruptGlow" then self:RebuildSpellIndex() end
 	if field == "glowReady" or field == "checkPower" or field == "hideWhenNoResource" or field == "readyGlowCheckPower" then self:RebuildPowerIndex() end
-	if field == "showCharges" then self:RebuildChargesIndex() end
+	if field == "showCharges" or field == "showChargesUseGlobal" then self:RebuildChargesIndex() end
 	if field == "showItemUses" or field == "useHighestRank" then
 		self:RebuildSpellIndex()
 		updateItemCountCache()
@@ -20346,8 +20381,8 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 			local showCooldownText = entry.showCooldownText ~= false
 			local staticTextShowOnCooldown = entry.staticTextShowOnCooldown == true
 			local trackCooldown = showCooldown or staticTextShowOnCooldown
-			local showCharges = entry.showCharges == true and resolvedType == "SPELL"
-			local showStacks = shouldShowEntryStacks(entry, resolvedType)
+			local showCharges = CooldownPanels:ShouldShowEntryCharges(entryLayout, entry, resolvedType)
+			local showStacks = shouldShowEntryStacks(entryLayout, entry, resolvedType)
 			local showItemCount = resolvedType == "ITEM" and entry.showItemCount ~= false
 			local showItemUses = resolvedType == "ITEM" and entry.showItemUses == true
 			local showWhenEmpty = resolvedType == "ITEM" and entry.showWhenEmpty == true
@@ -20520,7 +20555,7 @@ function CooldownPanels:UpdateRuntimeIcons(panelId)
 				cooldownEnabledOk = true
 				if showCooldown then show = true end
 				canTriggerReadyGlow = canTriggerReadyGlow or showCooldown
-				if customCooldownState.stackCount and shouldShowEntryStacks(entry, resolvedType) then
+				if customCooldownState.stackCount and shouldShowEntryStacks(entryLayout, entry, resolvedType) then
 					local normalizedStackCount = CooldownPanels.NormalizePositiveDisplayCount(customCooldownState.stackCount)
 					if normalizedStackCount ~= nil then
 						stackCount = normalizedStackCount
@@ -22427,6 +22462,8 @@ applyEditLayout = function(panelId, field, value, skipRefresh)
 		layout.stackFontStyle = Helper.NormalizeFontStyleChoice(value, layout.stackFontStyle or Helper.PANEL_LAYOUT_DEFAULTS.stackFontStyle)
 	elseif field == "stackColor" then
 		layout.stackColor = Helper.NormalizeColor(value, Helper.PANEL_LAYOUT_DEFAULTS.stackColor or { 1, 1, 1, 1 })
+	elseif field == "showStacks" then
+		layout.showStacks = value == true
 	elseif field == "chargesAnchor" then
 		layout.chargesAnchor = Helper.NormalizeAnchor(value, layout.chargesAnchor or Helper.PANEL_LAYOUT_DEFAULTS.chargesAnchor)
 	elseif field == "chargesX" then
@@ -22441,6 +22478,9 @@ applyEditLayout = function(panelId, field, value, skipRefresh)
 		layout.chargesFontStyle = Helper.NormalizeFontStyleChoice(value, layout.chargesFontStyle or Helper.PANEL_LAYOUT_DEFAULTS.chargesFontStyle)
 	elseif field == "chargesColor" then
 		layout.chargesColor = Helper.NormalizeColor(value, Helper.PANEL_LAYOUT_DEFAULTS.chargesColor or { 1, 1, 1, 1 })
+	elseif field == "showCharges" then
+		layout.showCharges = value == true
+		CooldownPanels:RebuildChargesIndex()
 	elseif field == "chargesHideWhenZero" then
 		layout.chargesHideWhenZero = value == true
 	elseif field == "keybindsEnabled" then
@@ -24177,6 +24217,15 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				defaultCollapsed = true,
 			},
 			{
+				name = L["CooldownPanelShowStacks"] or "Show stack count",
+				kind = SettingType.Checkbox,
+				field = "showStacks",
+				parentId = "cooldownPanelStacks",
+				default = layout.showStacks == true,
+				get = function() return layout.showStacks == true end,
+				set = function(_, value) applyEditLayout(panelId, "showStacks", value) end,
+			},
+			{
 				name = L["CooldownPanelCountAnchor"] or "Count anchor",
 				kind = SettingType.Dropdown,
 				field = "stackAnchor",
@@ -24283,6 +24332,15 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 				kind = SettingType.Collapsible,
 				id = "cooldownPanelCharges",
 				defaultCollapsed = true,
+			},
+			{
+				name = L["Show charges"] or "Show charges",
+				kind = SettingType.Checkbox,
+				field = "showCharges",
+				parentId = "cooldownPanelCharges",
+				default = layout.showCharges == true,
+				get = function() return layout.showCharges == true end,
+				set = function(_, value) applyEditLayout(panelId, "showCharges", value) end,
 			},
 			{
 				name = L["CooldownPanelChargesAnchor"] or "Charges anchor",
@@ -25365,7 +25423,7 @@ function cdp.ENTRY.TryRefreshVisibleSpellEntry(panelId, entryId, mode)
 	local showCooldown = entry.showCooldown ~= false
 	local staticTextShowOnCooldown = entry.staticTextShowOnCooldown == true
 	local trackCooldown = showCooldown or staticTextShowOnCooldown
-	local showCharges = entry.showCharges == true
+	local showCharges = CooldownPanels:ShouldShowEntryCharges(data.layout, entry, "SPELL")
 	local spellPassState = CooldownPanels:GetSpellPassState(spellId)
 	local ignoreCooldownGCD = CooldownPanels:ShouldIgnoreEntryCooldownGCD(data.layout, entry)
 	local chargesInfo
@@ -25629,7 +25687,7 @@ function cdp.ENTRY.TryRefreshVisibleSlotEntry(panelId, entryId)
 	data.cooldownStart = cooldownStart or 0
 	data.cooldownDuration = cooldownDuration or 0
 	data.stackCount = customCooldownState and CooldownPanels.NormalizePositiveDisplayCount(customCooldownState.stackCount) or nil
-	data.showStacks = data.stackCount ~= nil and shouldShowEntryStacks(entry, "SLOT") or false
+	data.showStacks = data.stackCount ~= nil and shouldShowEntryStacks(data.layout, entry, "SLOT") or false
 	data.cooldownEnabled = cooldownEnabled
 	data.cooldownIsActive = nil
 	data.cooldownRate = 1

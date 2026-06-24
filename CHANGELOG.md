@@ -9,6 +9,7 @@
 - Duration Text: Added profile color breakpoints for cooldown and duration text.
 - EQoL Suite: Added cooldown edge, reverse swipe, and debuff-type border color options for custom aura containers.
 - Cooldown Panels: Added a panel-wide color and opacity picker for supported aura overlays, with optional per-entry overrides.
+- Cooldown Panels: Added panel-wide stack and charge display toggles, with optional per-entry overrides.
 - Group Frames / Healer Buff Placement: Added optional per-spell duration color steps for Square, Bar, Border, and Tint indicators.
 
 ### 🔄 Changed

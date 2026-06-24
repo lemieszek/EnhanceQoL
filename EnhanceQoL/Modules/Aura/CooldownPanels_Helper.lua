@@ -217,6 +217,7 @@ Helper.PANEL_LAYOUT_DEFAULTS = {
 	iconBorderSize = 1,
 	iconBorderOffset = 0,
 	iconBorderColor = { 0, 0, 0, 0.8 },
+	showStacks = false,
 	stackAnchor = "BOTTOMRIGHT",
 	stackX = -1,
 	stackY = 1,
@@ -229,6 +230,7 @@ Helper.PANEL_LAYOUT_DEFAULTS = {
 	chargesFontSize = 12,
 	chargesFontStyle = globalFontStyleKey(),
 	chargesColor = { 1, 1, 1, 1 },
+	showCharges = false,
 	chargesHideWhenZero = false,
 	keybindsEnabled = false,
 	keybindsIgnoreItems = false,
@@ -279,7 +281,9 @@ Helper.ENTRY_DEFAULTS = {
 	hideOnCooldown = false,
 	showOnCooldown = false,
 	showCharges = false,
+	showChargesUseGlobal = true,
 	showStacks = false,
+	showStacksUseGlobal = true,
 	stackStyleUseGlobal = true,
 	stackAnchor = "BOTTOMRIGHT",
 	stackX = -1,
@@ -2257,7 +2261,9 @@ function Helper.NormalizeRoot(root)
 	root.defaults.entry.hideOnCooldown = Helper.ENTRY_DEFAULTS.hideOnCooldown
 	root.defaults.entry.showOnCooldown = Helper.ENTRY_DEFAULTS.showOnCooldown
 	root.defaults.entry.showCharges = Helper.ENTRY_DEFAULTS.showCharges
+	root.defaults.entry.showChargesUseGlobal = Helper.ENTRY_DEFAULTS.showChargesUseGlobal
 	root.defaults.entry.showStacks = Helper.ENTRY_DEFAULTS.showStacks
+	root.defaults.entry.showStacksUseGlobal = Helper.ENTRY_DEFAULTS.showStacksUseGlobal
 	root.defaults.entry.glowReady = Helper.ENTRY_DEFAULTS.glowReady
 	root.defaults.entry.readyGlowCheckPower = Helper.ENTRY_DEFAULTS.readyGlowCheckPower
 	root.defaults.entry.pandemicGlow = Helper.ENTRY_DEFAULTS.pandemicGlow
@@ -2328,7 +2334,9 @@ function Helper.NormalizePanel(panel, defaults)
 	panel.layout.cdmAuraOverlayEnabled = panel.layout.cdmAuraOverlayEnabled == true
 	panel.layout.cdmAuraOverlayColor = Helper.NormalizeColor(panel.layout.cdmAuraOverlayColor, layoutDefaults.cdmAuraOverlayColor or Helper.PANEL_LAYOUT_DEFAULTS.cdmAuraOverlayColor)
 	panel.layout.cooldownSwipeColor = Helper.NormalizeColor(panel.layout.cooldownSwipeColor, layoutDefaults.cooldownSwipeColor or Helper.PANEL_LAYOUT_DEFAULTS.cooldownSwipeColor)
+	panel.layout.showStacks = panel.layout.showStacks == true
 	panel.layout.stackColor = Helper.NormalizeColor(panel.layout.stackColor, layoutDefaults.stackColor or Helper.PANEL_LAYOUT_DEFAULTS.stackColor or { 1, 1, 1, 1 })
+	panel.layout.showCharges = panel.layout.showCharges == true
 	panel.layout.chargesColor = Helper.NormalizeColor(panel.layout.chargesColor, layoutDefaults.chargesColor or Helper.PANEL_LAYOUT_DEFAULTS.chargesColor or { 1, 1, 1, 1 })
 	panel.layout.chargesHideWhenZero = panel.layout.chargesHideWhenZero == true
 	panel.layout.cooldownTextColor = Helper.NormalizeColor(panel.layout.cooldownTextColor, layoutDefaults.cooldownTextColor or Helper.PANEL_LAYOUT_DEFAULTS.cooldownTextColor)
@@ -2399,6 +2407,8 @@ function Helper.NormalizeEntry(entry, defaults)
 	if type(entry) ~= "table" then return end
 	local hadShowCharges = entry.showCharges ~= nil
 	local hadShowStacks = entry.showStacks ~= nil
+	local hadShowChargesUseGlobal = entry.showChargesUseGlobal ~= nil
+	local hadShowStacksUseGlobal = entry.showStacksUseGlobal ~= nil
 	local hadCDMAuraOverlayColorUseGlobal = entry.cdmAuraOverlayColorUseGlobal ~= nil
 	local hadCustomCDMAuraOverlayColor = entry.activationOverlayColor ~= nil or entry.cdmAuraOverlayColor ~= nil
 	defaults = defaults or {}
@@ -2415,7 +2425,10 @@ function Helper.NormalizeEntry(entry, defaults)
 	if entry.type == "SPELL" then
 		if not hadShowCharges then entry.showCharges = spellHasCharges(entry.spellID) end
 		if not hadShowStacks then entry.showStacks = false end
+		if hadShowCharges and not hadShowChargesUseGlobal then entry.showChargesUseGlobal = false end
+		if hadShowStacks and not hadShowStacksUseGlobal then entry.showStacksUseGlobal = false end
 	elseif entry.type == "CDM_AURA" then
+		if hadShowStacks and not hadShowStacksUseGlobal then entry.showStacksUseGlobal = false end
 		local cdmAuras = CooldownPanels and CooldownPanels.CDMAuras
 		if cdmAuras and cdmAuras.NormalizeEntry then cdmAuras:NormalizeEntry(entry, defaults) end
 	elseif entry.type == "MACRO" then
@@ -2425,6 +2438,8 @@ function Helper.NormalizeEntry(entry, defaults)
 	elseif entry.type == "STANCE" then
 		if CooldownPanels and CooldownPanels.NormalizeStanceEntry then CooldownPanels:NormalizeStanceEntry(entry) end
 		entry.showWhenMissing = entry.showWhenMissing == true
+	elseif entry.type == "SLOT" then
+		if hadShowStacks and not hadShowStacksUseGlobal then entry.showStacksUseGlobal = false end
 	end
 	entry.glowDuration = 0
 	local hasLegacySharedProcGlowVisual = entry.type == "SPELL" and (entry.glowStyle ~= nil or entry.glowInset ~= nil)
@@ -2453,6 +2468,8 @@ function Helper.NormalizeEntry(entry, defaults)
 	entry.iconOffsetX = Helper.ClampInt(entry.iconOffsetX, -Helper.OFFSET_RANGE, Helper.OFFSET_RANGE, Helper.ENTRY_DEFAULTS.iconOffsetX or 0)
 	entry.iconOffsetY = Helper.ClampInt(entry.iconOffsetY, -Helper.OFFSET_RANGE, Helper.OFFSET_RANGE, Helper.ENTRY_DEFAULTS.iconOffsetY or 0)
 	if type(entry.showIconTextureUseGlobal) ~= "boolean" then entry.showIconTextureUseGlobal = true end
+	if type(entry.showStacksUseGlobal) ~= "boolean" then entry.showStacksUseGlobal = true end
+	if type(entry.showChargesUseGlobal) ~= "boolean" then entry.showChargesUseGlobal = true end
 	if type(entry.stackStyleUseGlobal) ~= "boolean" then entry.stackStyleUseGlobal = true end
 	entry.stackAnchor = Helper.NormalizeAnchor(entry.stackAnchor, Helper.ENTRY_DEFAULTS.stackAnchor or Helper.PANEL_LAYOUT_DEFAULTS.stackAnchor or "BOTTOMRIGHT")
 	entry.stackX = Helper.ClampInt(entry.stackX, -Helper.OFFSET_RANGE, Helper.OFFSET_RANGE, Helper.ENTRY_DEFAULTS.stackX or 0)
