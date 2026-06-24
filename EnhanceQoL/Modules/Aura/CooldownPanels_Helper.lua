@@ -245,6 +245,7 @@ Helper.PANEL_LAYOUT_DEFAULTS = {
 	cooldownGcdDrawBling = false,
 	cooldownGcdDrawSwipe = false,
 	cdmAuraOverlayEnabled = false,
+	cdmAuraOverlayColor = Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT,
 	cooldownTextColor = { 1, 1, 1, 1 },
 	cooldownTextStyle = globalFontStyleKey(),
 	durationTextProfile = "MINIMAL",
@@ -311,6 +312,7 @@ Helper.ENTRY_DEFAULTS = {
 	cooldownGcdDrawBling = false,
 	cooldownGcdDrawSwipe = false,
 	cdmAuraOverlayEnabled = false,
+	cdmAuraOverlayColorUseGlobal = true,
 	cdmAuraOverlayReverse = true,
 	cdmAuraOverlayColor = Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT,
 	activationOverlayReverse = true,
@@ -2324,6 +2326,7 @@ function Helper.NormalizePanel(panel, defaults)
 	panel.layout.cdmAuraAlwaysShowMode =
 		normalizeCDMAuraAlwaysShowMode(panel.layout.cdmAuraAlwaysShowMode, layoutDefaults.cdmAuraAlwaysShowMode or Helper.PANEL_LAYOUT_DEFAULTS.cdmAuraAlwaysShowMode or "HIDE")
 	panel.layout.cdmAuraOverlayEnabled = panel.layout.cdmAuraOverlayEnabled == true
+	panel.layout.cdmAuraOverlayColor = Helper.NormalizeColor(panel.layout.cdmAuraOverlayColor, layoutDefaults.cdmAuraOverlayColor or Helper.PANEL_LAYOUT_DEFAULTS.cdmAuraOverlayColor)
 	panel.layout.cooldownSwipeColor = Helper.NormalizeColor(panel.layout.cooldownSwipeColor, layoutDefaults.cooldownSwipeColor or Helper.PANEL_LAYOUT_DEFAULTS.cooldownSwipeColor)
 	panel.layout.stackColor = Helper.NormalizeColor(panel.layout.stackColor, layoutDefaults.stackColor or Helper.PANEL_LAYOUT_DEFAULTS.stackColor or { 1, 1, 1, 1 })
 	panel.layout.chargesColor = Helper.NormalizeColor(panel.layout.chargesColor, layoutDefaults.chargesColor or Helper.PANEL_LAYOUT_DEFAULTS.chargesColor or { 1, 1, 1, 1 })
@@ -2396,6 +2399,8 @@ function Helper.NormalizeEntry(entry, defaults)
 	if type(entry) ~= "table" then return end
 	local hadShowCharges = entry.showCharges ~= nil
 	local hadShowStacks = entry.showStacks ~= nil
+	local hadCDMAuraOverlayColorUseGlobal = entry.cdmAuraOverlayColorUseGlobal ~= nil
+	local hadCustomCDMAuraOverlayColor = entry.activationOverlayColor ~= nil or entry.cdmAuraOverlayColor ~= nil
 	defaults = defaults or {}
 	local entryDefaults = defaults.entry or {}
 	for key, value in pairs(entryDefaults) do
@@ -2479,6 +2484,7 @@ function Helper.NormalizeEntry(entry, defaults)
 	if type(entry.cooldownGcdDrawSwipe) ~= "boolean" then entry.cooldownGcdDrawSwipe = Helper.ENTRY_DEFAULTS.cooldownGcdDrawSwipe end
 	if entry.type == "CDM_AURA" or entry.type == "STANCE" then
 		entry.cdmAuraOverlayEnabled = false
+		entry.cdmAuraOverlayColorUseGlobal = true
 		entry.cdmAuraOverlayReverse = Helper.ENTRY_DEFAULTS.cdmAuraOverlayReverse
 		entry.cdmAuraOverlayColor = Helper.NormalizeColor(entry.cdmAuraOverlayColor, Helper.ENTRY_DEFAULTS.cdmAuraOverlayColor)
 		entry.activationOverlayReverse = Helper.ENTRY_DEFAULTS.activationOverlayReverse
@@ -2490,6 +2496,11 @@ function Helper.NormalizeEntry(entry, defaults)
 		entry.customCooldownDuration = Helper.ENTRY_DEFAULTS.customCooldownDuration
 	else
 		if type(entry.cdmAuraOverlayEnabled) ~= "boolean" then entry.cdmAuraOverlayEnabled = Helper.ENTRY_DEFAULTS.cdmAuraOverlayEnabled end
+		if not hadCDMAuraOverlayColorUseGlobal then
+			entry.cdmAuraOverlayColorUseGlobal = hadCustomCDMAuraOverlayColor and false or Helper.ENTRY_DEFAULTS.cdmAuraOverlayColorUseGlobal
+		elseif type(entry.cdmAuraOverlayColorUseGlobal) ~= "boolean" then
+			entry.cdmAuraOverlayColorUseGlobal = Helper.ENTRY_DEFAULTS.cdmAuraOverlayColorUseGlobal
+		end
 		if type(entry.cdmAuraOverlayReverse) ~= "boolean" then entry.cdmAuraOverlayReverse = Helper.ENTRY_DEFAULTS.cdmAuraOverlayReverse end
 		entry.cdmAuraOverlayColor = Helper.NormalizeColor(entry.cdmAuraOverlayColor, Helper.ENTRY_DEFAULTS.cdmAuraOverlayColor)
 		if type(entry.activationOverlayReverse) ~= "boolean" then entry.activationOverlayReverse = entry.cdmAuraOverlayReverse ~= false end

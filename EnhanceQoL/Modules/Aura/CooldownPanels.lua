@@ -8948,6 +8948,14 @@ function CooldownPanels:IsEntryCDMAuraOverlayEnabled(layout, entry, resolvedType
 	return entry.cdmAuraOverlayEnabled == true or (layout and layout.cdmAuraOverlayEnabled == true)
 end
 
+function CooldownPanels:ResolveEntryCDMAuraOverlayColor(layout, entry)
+	local panelColor = Helper.NormalizeColor(layout and layout.cdmAuraOverlayColor, Helper.PANEL_LAYOUT_DEFAULTS.cdmAuraOverlayColor or Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT)
+	if entry and entry.cdmAuraOverlayColorUseGlobal == false then
+		return CooldownPanels.ResolveCachedEntryColor("activationOverlayEntry", entry, entry.activationOverlayColor or entry.cdmAuraOverlayColor, panelColor)
+	end
+	return panelColor
+end
+
 function CooldownPanels:GetEntryCustomCooldownDuration(entry, resolvedType)
 	if not self:SupportsEntryCustomCooldownDuration(entry, resolvedType) then return nil end
 	if entry.autoCooldownDurationEnabled == true then
@@ -9197,9 +9205,11 @@ end
 function CooldownPanels:ApplyActivationOverlayVisualState(data, entry)
 	if not data then return end
 	local active = data.customCooldownDurationActive == true or data.spellAuraOverlayActive == true
+	local spellAuraOverlayActive = data.spellAuraOverlayActive == true and data.customCooldownDurationActive ~= true
 	data.activationOverlayActive = active
 	data.activationOverlayReverse = entry and entry.activationOverlayReverse ~= false or true
-	data.activationOverlayColor = CooldownPanels.ResolveCachedEntryColor("activationOverlayEntry", entry, entry and entry.activationOverlayColor, Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT)
+	data.activationOverlayColor = spellAuraOverlayActive and CooldownPanels:ResolveEntryCDMAuraOverlayColor(data.layout, entry)
+		or CooldownPanels.ResolveCachedEntryColor("activationOverlayEntry", entry, entry and entry.activationOverlayColor, Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT)
 	data.activationOverlayOnly = entry and entry.activationOverlayOnly == true or false
 	data.activationOverlayGlow = entry and entry.activationOverlayGlow == true or false
 	data.cooldownReverse = data.resolvedType == "CDM_AURA" or (active == true and data.activationOverlayReverse ~= false)
@@ -12712,6 +12722,13 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		refreshEntryViews()
 	end
 
+	local function setActivationOverlayColor(_, value)
+		local _, currentEntry = getEntry()
+		if not currentEntry then return end
+		currentEntry.activationOverlayColor = Helper.NormalizeColor(value, Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT)
+		CooldownPanels:RefreshEntryActivationOverlayColor(panelId, entryId)
+	end
+
 	local function setGlowOtherAura(_, value)
 		local _, currentEntry = getEntry()
 		if not currentEntry then return end
@@ -12840,6 +12857,15 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		end
 		CooldownPanels:ClearEntryCustomCooldownDuration(panelId, entryId, true)
 		CooldownPanels:RebuildSpellIndex()
+		refreshEntryViews()
+	end
+
+	local function setCDMAuraOverlayColorOverrideEnabled(value)
+		local _, currentEntry = getEntry()
+		if not currentEntry then return end
+		local useGlobal = value ~= true
+		if currentEntry.cdmAuraOverlayColorUseGlobal == useGlobal then return end
+		currentEntry.cdmAuraOverlayColorUseGlobal = useGlobal
 		refreshEntryViews()
 	end
 
@@ -14092,6 +14118,25 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			set = function(_, value) setCDMAuraOverlayEnabled(value) end,
 		},
 		{
+			name = L["CooldownPanelOverwriteGlobalDefault"] or "Overwrite global default",
+			kind = SettingType.Checkbox,
+			parentId = "cooldownPanelStandaloneActivation",
+			isShown = function()
+				local _, currentEntry = getEntry()
+				return CooldownPanels:SupportsEntryCDMAuraOverlay(currentEntry, getEffectiveType())
+			end,
+			disabled = function()
+				local layout = getLayout()
+				local _, currentEntry = getEntry()
+				return not (currentEntry and (currentEntry.cdmAuraOverlayEnabled == true or (layout and layout.cdmAuraOverlayEnabled == true)))
+			end,
+			get = function()
+				local _, currentEntry = getEntry()
+				return currentEntry and currentEntry.cdmAuraOverlayColorUseGlobal == false or false
+			end,
+			set = function(_, value) setCDMAuraOverlayColorOverrideEnabled(value) end,
+		},
+		{
 			name = L["CooldownPanelActivationOverlayColor"] or "Activation overlay color",
 			kind = SettingType.Color,
 			parentId = "cooldownPanelStandaloneActivation",
@@ -14102,16 +14147,26 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 			end,
 			disabled = function()
 				local _, currentEntry = getEntry()
-				local panelOverlay = getLayout() and getLayout().cdmAuraOverlayEnabled == true and CooldownPanels:SupportsEntryCDMAuraOverlay(currentEntry, getEffectiveType())
-				return not (currentEntry and (currentEntry.customCooldownDurationEnabled == true or currentEntry.autoCooldownDurationEnabled == true or currentEntry.cdmAuraOverlayEnabled == true or panelOverlay))
+				local layout = getLayout()
+				local panelOverlay = layout and layout.cdmAuraOverlayEnabled == true and CooldownPanels:SupportsEntryCDMAuraOverlay(currentEntry, getEffectiveType())
+				local cdmAuraOverlay = currentEntry and (currentEntry.cdmAuraOverlayEnabled == true or panelOverlay)
+				if cdmAuraOverlay and not (currentEntry.customCooldownDurationEnabled == true or currentEntry.autoCooldownDurationEnabled == true) then
+					return currentEntry.cdmAuraOverlayColorUseGlobal ~= false
+				end
+				return not (currentEntry and (currentEntry.customCooldownDurationEnabled == true or currentEntry.autoCooldownDurationEnabled == true or cdmAuraOverlay))
 			end,
 			default = Helper.NormalizeColor(Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT, Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT),
 			get = function()
 				local _, currentEntry = getEntry()
-				local color = Helper.NormalizeColor(currentEntry and currentEntry.activationOverlayColor, Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT)
+				local layout = getLayout()
+				local panelOverlay = layout and layout.cdmAuraOverlayEnabled == true and CooldownPanels:SupportsEntryCDMAuraOverlay(currentEntry, getEffectiveType())
+				local cdmAuraOverlay = currentEntry and (currentEntry.cdmAuraOverlayEnabled == true or panelOverlay)
+				local usePanelColor = cdmAuraOverlay and currentEntry.customCooldownDurationEnabled ~= true and currentEntry.autoCooldownDurationEnabled ~= true and currentEntry.cdmAuraOverlayColorUseGlobal ~= false
+				local color = usePanelColor and CooldownPanels:ResolveEntryCDMAuraOverlayColor(layout, currentEntry)
+					or Helper.NormalizeColor(currentEntry and currentEntry.activationOverlayColor, Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT)
 				return { r = color[1], g = color[2], b = color[3], a = color[4] }
 			end,
-			set = function(_, value) setEntryField("activationOverlayColor", Helper.NormalizeColor(value, Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT)) end,
+			set = setActivationOverlayColor,
 		},
 		{
 			name = L["CooldownPanelActivationOverlayReverse"] or "Reverse activation swipe",
@@ -22195,6 +22250,50 @@ function CooldownPanels:RefreshPanelIconZoom(panelId)
 	return true
 end
 
+function CooldownPanels:RefreshPanelCDMAuraOverlayColor(panelId)
+	local panel = self:GetPanel(panelId)
+	local runtime = panel and getRuntime(panelId)
+	local icons = runtime and runtime.frame and runtime.frame.icons
+	if not (panel and icons) then return false end
+	local refreshed = false
+	for i = 1, #icons do
+		local icon = icons[i]
+		local data = icon and icon._eqolRuntimeData
+		local entry = data and data.entry
+		if
+			data
+			and data.spellAuraOverlayActive == true
+			and data.customCooldownDurationActive ~= true
+			and data.resolvedType == "SPELL"
+			and entry
+			and entry.cdmAuraOverlayColorUseGlobal ~= false
+		then
+			data.activationOverlayColor = self:ResolveEntryCDMAuraOverlayColor(panel.layout, entry)
+			cdp.ENTRY.ApplyCooldownSwipeVisual(icon, data)
+			if icon._eqolRuntimeSnapshot then cdp.RUNTIME.WriteCooldownWidgetConfigSnapshot(icon._eqolRuntimeSnapshot, data, true) end
+			refreshed = true
+		end
+	end
+	return refreshed
+end
+
+function CooldownPanels:RefreshEntryActivationOverlayColor(panelId, entryId)
+	local panel = self:GetPanel(panelId)
+	local runtime = panel and getRuntime(panelId)
+	local icon = runtime and runtime.entryToIcon and runtime.entryToIcon[entryId] or nil
+	local data = icon and icon._eqolRuntimeData
+	local entry = data and data.entry
+	if not (icon and data and entry) then return false end
+	if data.activationOverlayActive ~= true then return false end
+	self:ApplyActivationOverlayVisualState(data, entry)
+	cdp.ENTRY.ApplyCooldownSwipeVisual(icon, data)
+	if icon._eqolRuntimeSnapshot then
+		local cooldownUsesAuraDisplay = data.resolvedType == "CDM_AURA" or data.customCooldownDurationActive == true or data.spellAuraOverlayActive == true
+		cdp.RUNTIME.WriteCooldownWidgetConfigSnapshot(icon._eqolRuntimeSnapshot, data, cooldownUsesAuraDisplay)
+	end
+	return true
+end
+
 applyEditLayout = function(panelId, field, value, skipRefresh)
 	local panel = CooldownPanels:GetPanel(panelId)
 	if not panel then return end
@@ -22305,6 +22404,8 @@ applyEditLayout = function(panelId, field, value, skipRefresh)
 	elseif field == "cdmAuraOverlayEnabled" then
 		layout.cdmAuraOverlayEnabled = value == true
 		CooldownPanels:RebuildSpellIndex()
+	elseif field == "cdmAuraOverlayColor" then
+		layout.cdmAuraOverlayColor = Helper.NormalizeColor(value, Helper.PANEL_LAYOUT_DEFAULTS.cdmAuraOverlayColor or Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT)
 	elseif field == "checkPower" then
 		layout.checkPower = value == true
 		CooldownPanels:RebuildPowerIndex()
@@ -22456,6 +22557,10 @@ applyEditLayout = function(panelId, field, value, skipRefresh)
 
 	if field == "iconZoom" and not skipRefresh then
 		CooldownPanels:RefreshPanelIconZoom(panelId)
+		return
+	end
+	if field == "cdmAuraOverlayColor" and not skipRefresh then
+		CooldownPanels:RefreshPanelCDMAuraOverlayColor(panelId)
 		return
 	end
 	if not skipRefresh then CooldownPanels:RefreshPanelForCurrentEditContext(panelId, false) end
@@ -24443,6 +24548,19 @@ function CooldownPanels:PrepareLayoutPanelStandaloneSettings(panelId)
 					default = layout.cdmAuraOverlayEnabled == true,
 					get = function() return layout.cdmAuraOverlayEnabled == true end,
 					set = function(_, value) applyEditLayout(panelId, "cdmAuraOverlayEnabled", value) end,
+				},
+				{
+					name = L["CooldownPanelActivationOverlayColor"] or "Activation overlay color",
+					kind = SettingType.Color,
+					parentId = "cooldownPanelAuraBehavior",
+					hasOpacity = true,
+					disabled = function() return layout.cdmAuraOverlayEnabled ~= true end,
+					default = Helper.NormalizeColor(layout.cdmAuraOverlayColor, Helper.PANEL_LAYOUT_DEFAULTS.cdmAuraOverlayColor or Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT),
+					get = function()
+						local color = Helper.NormalizeColor(layout.cdmAuraOverlayColor, Helper.PANEL_LAYOUT_DEFAULTS.cdmAuraOverlayColor or Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT)
+						return { r = color[1], g = color[2], b = color[3], a = color[4] }
+					end,
+					set = function(_, value) applyEditLayout(panelId, "cdmAuraOverlayColor", value) end,
 				},
 			{
 				name = L["CooldownPanelShowEdge"] or "Show edge",
