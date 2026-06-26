@@ -944,8 +944,8 @@ end
 local function seedScanFromCategorySet(scan, category, sourceType)
 	if not (scan and category and C_CooldownViewer and C_CooldownViewer.GetCooldownViewerCategorySet) then return false end
 	if cdm.perfCountersEnabled == true then bumpPerfCounter(nil, "seedScanFromCategorySetCalls") end
-	local ok, cooldownIDs = pcall(C_CooldownViewer.GetCooldownViewerCategorySet, category, true)
-	if not ok or type(cooldownIDs) ~= "table" then return false end
+	local cooldownIDs = C_CooldownViewer.GetCooldownViewerCategorySet(category, false)
+	if type(cooldownIDs) ~= "table" then return false end
 	if cdm.perfCountersEnabled == true then bumpPerfCounter(nil, "seedScanFromCategorySetCooldownIDs", #cooldownIDs) end
 	local seeded = false
 	local validCooldownIDs = 0
@@ -2150,13 +2150,30 @@ function CDMAuras:GetImportSourceLabel(sourceKind)
 	return nil
 end
 
-function cdm.GetTrackedBuffCooldownIDsFromDataProvider()
-	local settings = _G.CooldownViewerSettings
-	local dataProvider = settings and settings.GetDataProvider and settings:GetDataProvider() or nil
-	local trackedBuffCategory = Enum and Enum.CooldownViewerCategory and Enum.CooldownViewerCategory.TrackedBuff or nil
-	if not (dataProvider and dataProvider.GetOrderedCooldownIDsForCategory and trackedBuffCategory) then return nil end
-	local ok, cooldownIDs = pcall(dataProvider.GetOrderedCooldownIDsForCategory, dataProvider, trackedBuffCategory)
-	if not ok or type(cooldownIDs) ~= "table" then return nil end
+function cdm.GetTrackedBuffCooldownIDsFromViewer()
+	local viewer = _G[ICON_VIEWER]
+	local container = viewer and viewer.oldGridSettings or nil
+	local layoutChildren = container and container.layoutChildren or nil
+	if type(layoutChildren) ~= "table" then return nil end
+
+	local cooldownIDs = {}
+	if #layoutChildren > 0 then
+		for i = 1, #layoutChildren do
+			local cooldownID = getCooldownIDFromFrame(layoutChildren[i], SOURCE_ICON)
+			if isValidCooldownID(cooldownID) then cooldownIDs[#cooldownIDs + 1] = cooldownID end
+		end
+	else
+		local numericKeys = getRuntime().scratchNumericKeys
+		wipe(numericKeys)
+		for key in pairs(layoutChildren) do
+			if type(key) == "number" then numericKeys[#numericKeys + 1] = key end
+		end
+		table.sort(numericKeys)
+		for _, key in ipairs(numericKeys) do
+			local cooldownID = getCooldownIDFromFrame(layoutChildren[key], SOURCE_ICON)
+			if isValidCooldownID(cooldownID) then cooldownIDs[#cooldownIDs + 1] = cooldownID end
+		end
+	end
 	return cooldownIDs
 end
 
@@ -2192,7 +2209,8 @@ function CDMAuras:ImportEntries(panelId, sourceKind)
 	local stats = { added = 0, duplicates = 0, invalid = 0, seen = 0, sourceLabel = sourceLabel }
 
 	for _, info in ipairs(list or {}) do
-		if info and info.availableSources and info.availableSources[sourceType] then
+		local sourceFrame = info and (sourceType == SOURCE_ICON and info.iconFrame or info.barFrame) or nil
+		if info and info.availableSources and info.availableSources[sourceType] and sourceFrame then
 			stats.seen = stats.seen + 1
 			if not isValidCooldownID(info.cooldownID) then
 				stats.invalid = stats.invalid + 1
@@ -2252,7 +2270,7 @@ function CDMAuras:SyncEntries(panelId, sourceKind)
 	local wantedByCooldownID = {}
 	local wantedOrder = {}
 	local stats = { added = 0, removed = 0, invalid = 0, seen = 0, sourceLabel = sourceLabel }
-	local cooldownIDs = cdm.GetTrackedBuffCooldownIDsFromDataProvider()
+	local cooldownIDs = cdm.GetTrackedBuffCooldownIDsFromViewer()
 	if type(cooldownIDs) ~= "table" then return nil, "SOURCE_NOT_FOUND", sourceLabel end
 	local _, byCooldownID = self:ScanTrackedBuffs(true)
 

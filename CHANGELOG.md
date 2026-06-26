@@ -6,6 +6,7 @@
 
 ### 🐛 Fixed
 
+- Cooldown Panels: Fixed Buff Icon Cooldown Manager sync pulling hidden tracked buffs and touching Blizzard's cooldown data provider.
 - Map & Minimap / Landing Page: Fixed the Landing Page minimap button being reset on login or reload while custom positioning is disabled.
 
 ### ❌ Removed
