@@ -4277,6 +4277,7 @@ L["UIInput"] = "UI & Eingabe"
 L["uiScaleCustomValue"] = "Benutzerdefinierte Skalierung"
 L["uiScaleCustomValueDesc"] = "Gib eine beliebige Zahl zwischen 0,1 und 2 ein."
 L["uiScalePreset"] = "UI-Skalierung beim Login"
+L["uiScalePresetAuto"] = "Automatisch (768 / Bildschirmhöhe)"
 L["uiScalePresetCustom"] = "Benutzerdefiniert"
 L["uiScalePresetDesc"] = "Legt fest, wie die UI-Skalierung beim Einloggen behandelt wird.\
 |cffff0000Warnung:|r Eine Änderung lädt dein UI neu."

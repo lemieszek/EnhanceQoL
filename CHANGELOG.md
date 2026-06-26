@@ -4,6 +4,10 @@
 
 ## [11.5.0-beta3] - 2026-06-26
 
+### ✨ Added
+
+- UI & Input: Added an automatic login UI scale option that sets the scale from the current screen height.
+
 ### 🐛 Fixed
 
 - Cooldown Panels: Fixed Buff Icon Cooldown Manager sync pulling hidden tracked buffs and touching Blizzard's cooldown data provider.

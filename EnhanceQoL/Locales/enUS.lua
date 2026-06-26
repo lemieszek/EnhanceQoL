@@ -4284,6 +4284,7 @@ L["UIInput"] = "UI & Input"
 L["uiScaleCustomValue"] = "Custom scale"
 L["uiScaleCustomValueDesc"] = "Enter any number between 0.1 and 2."
 L["uiScalePreset"] = "Login UI scaling"
+L["uiScalePresetAuto"] = "Auto (768 / screen height)"
 L["uiScalePresetCustom"] = "Custom"
 L["uiScalePresetDesc"] = "Controls how UI scaling is handled when you log in.\
 |cffff0000Warning:|r Changing this will reload your UI."

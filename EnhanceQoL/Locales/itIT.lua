@@ -4277,6 +4277,7 @@ L["UIInput"] = "UI e input"
 L["uiScaleCustomValue"] = "Scala personalizzata"
 L["uiScaleCustomValueDesc"] = "Inserisci qualsiasi numero tra 0,1 e 2."
 L["uiScalePreset"] = "Scala UI all'accesso"
+L["uiScalePresetAuto"] = "Automatica (768 / altezza dello schermo)"
 L["uiScalePresetCustom"] = "Personalizzato"
 L["uiScalePresetDesc"] = "Definisce come viene gestita la scala dell'interfaccia all'accesso.\
 |cffff0000Avviso:|r Modificare questa opzione ricaricherà la UI."

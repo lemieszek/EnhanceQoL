@@ -4276,6 +4276,7 @@ L["UIInput"] = "界面与输入"
 L["uiScaleCustomValue"] = "自定义缩放"
 L["uiScaleCustomValueDesc"] = "输入 0.1 到 2 之间的任意数字。"
 L["uiScalePreset"] = "登录时UI缩放"
+L["uiScalePresetAuto"] = "自动 (768 / 屏幕高度)"
 L["uiScalePresetCustom"] = "自定义"
 L["uiScalePresetDesc"] = "控制登录时如何处理UI缩放。\
 |cffff0000警告:|r 更改将重新载入界面。"

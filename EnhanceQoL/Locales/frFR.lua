@@ -4277,6 +4277,7 @@ L["UIInput"] = "IU et saisie"
 L["uiScaleCustomValue"] = "Échelle personnalisée"
 L["uiScaleCustomValueDesc"] = "Saisissez n'importe quel nombre entre 0,1 et 2."
 L["uiScalePreset"] = "Mise à l'échelle de l'IU à la connexion"
+L["uiScalePresetAuto"] = "Automatique (768 / hauteur de l'écran)"
 L["uiScalePresetCustom"] = "Personnalisé"
 L["uiScalePresetDesc"] = "Définit comment la mise à l'échelle de l'IU est gérée à la connexion.\
 |cffff0000Attention:|r Modifier ceci rechargera votre IU."

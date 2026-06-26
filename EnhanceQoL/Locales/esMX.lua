@@ -4277,6 +4277,7 @@ L["UIInput"] = "IU y entrada"
 L["uiScaleCustomValue"] = "Escala personalizada"
 L["uiScaleCustomValueDesc"] = "Introduce cualquier número entre 0.1 y 2."
 L["uiScalePreset"] = "Escalado de IU al iniciar sesión"
+L["uiScalePresetAuto"] = "Automático (768 / altura de pantalla)"
 L["uiScalePresetCustom"] = "Personalizado"
 L["uiScalePresetDesc"] = "Controla cómo se gestiona el escalado de la IU al iniciar sesión.\
 |cffff0000Aviso:|r Cambiar esto recargará tu IU."
