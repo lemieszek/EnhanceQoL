@@ -2,6 +2,14 @@
 
 <!--@eqol-beta@-->
 
+## [11.5.0-beta3] - 2026-06-26
+
+### 🐛 Fixed
+
+- Map & Minimap / Landing Page: Fixed the Landing Page minimap button being reset on login or reload while custom positioning is disabled.
+
+---
+
 ## [11.5.0-beta2] - 2026-06-23
 
 ### ✨ Added

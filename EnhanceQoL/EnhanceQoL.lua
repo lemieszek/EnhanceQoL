@@ -3645,7 +3645,7 @@ local function initMisc()
 		end
 	end
 
-	local function applyLandingPageButtonPlacement(button)
+	local function applyLandingPageButtonPlacement(button, resetDefault)
 		if not button or not addon.db then return end
 
 		if addon.db["landingPageButtonCustomPosition"] == true then
@@ -3660,7 +3660,7 @@ local function initMisc()
 		end
 
 		if not addon.db["enableSquareMinimap"] then
-			resetLandingPageButtonPlacement(button)
+			if resetDefault then resetLandingPageButtonPlacement(button) end
 			return
 		end
 
@@ -3688,6 +3688,12 @@ local function initMisc()
 
 	function addon.functions.applyLandingPageButtonPlacement()
 		refreshLandingPageButtonFix()
+	end
+
+	function addon.functions.resetLandingPageButtonPlacement()
+		local button = _G.ExpansionLandingPageMinimapButton
+		if not button then return end
+		applyLandingPageButtonPlacement(button, true)
 	end
 
 	if ExpansionLandingPageMinimapButton and not addon.variables._eqolLandingPageButtonHooked then

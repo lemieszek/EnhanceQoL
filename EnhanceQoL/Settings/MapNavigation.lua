@@ -1900,7 +1900,11 @@ data = {
 		desc = L["landingPageButtonCustomPositionDesc"] or "Allows the expansion landing page minimap button to be moved and scaled.",
 		func = function(key)
 			addon.db["landingPageButtonCustomPosition"] = key and true or false
-			if addon.functions.applyLandingPageButtonPlacement then addon.functions.applyLandingPageButtonPlacement() end
+			if key then
+				if addon.functions.applyLandingPageButtonPlacement then addon.functions.applyLandingPageButtonPlacement() end
+			elseif addon.functions.resetLandingPageButtonPlacement then
+				addon.functions.resetLandingPageButtonPlacement()
+			end
 		end,
 		default = false,
 		parent = true,
