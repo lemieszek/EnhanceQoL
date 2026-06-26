@@ -83,6 +83,7 @@ local LEGACY_PROFILE_KEYS = {
 	"talentReminderActiveBuildLocked",
 	"soundMutedSounds",
 	"unclampDamageMeter",
+	"confirmPatronOrderDialog",
 	"confirmReplaceEnchant",
 	"optionsFrameScale",
 	"showLeaderIconRaidFrame",

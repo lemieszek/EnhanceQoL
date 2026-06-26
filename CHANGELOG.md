@@ -8,6 +8,10 @@
 
 - Map & Minimap / Landing Page: Fixed the Landing Page minimap button being reset on login or reload while custom positioning is disabled.
 
+### ❌ Removed
+
+- Professions / Patron Orders: Removed the auto-confirm option for using your own materials because it could taint Blizzard's profession cast bar.
+
 ---
 
 ## [11.5.0-beta2] - 2026-06-23

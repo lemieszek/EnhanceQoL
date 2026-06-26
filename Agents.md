@@ -39,6 +39,11 @@
 - Do not introduce redundant locale aliases like `LMain`, `LCore`, `LVendor`, or `LMP` when they all point to the same `EnhanceQoL` locale table.
 - Prefer Blizzard globals such as `_G.NONE` or `_G.STATUS_TEXT_BOTH` when the game already provides the text, instead of creating duplicate locale keys for them.
 
+## SavedVariables Cleanup
+
+- When removing an option or stored setting, add a matching cleanup path in `EnhanceQoL/Core/Cleanup.lua` in the same change.
+- Do not leave removed options behind as inert SavedVariables keys unless there is a deliberate compatibility reason and it is documented in the change.
+
 ### Validation
 
 - Before finishing locale work, verify that every `EnhanceQoL/Locales/*.lua` file has the same keys.

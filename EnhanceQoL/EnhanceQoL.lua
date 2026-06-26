@@ -3443,7 +3443,6 @@ local function initMisc()
 	local globalFontStyleKey = addon.functions.GetGlobalFontStyleConfigKey and addon.functions.GetGlobalFontStyleConfigKey() or "__EQOL_GLOBAL_FONT_STYLE__"
 
 	addon.functions.InitDBValue("confirmTimerRemovalTrade", false)
-	addon.functions.InitDBValue("confirmPatronOrderDialog", false)
 	addon.functions.InitDBValue("deleteItemFillDialog", false)
 	addon.functions.InitDBValue("confirmSocketReplace", false)
 	addon.functions.InitDBValue("confirmHighCostItem", false)
@@ -3550,9 +3549,6 @@ local function initMisc()
 						editBox:SetText(DELETE_ITEM_CONFIRM_STRING)
 						editBox:ClearFocus()
 						editBox:SetAutoFocus(false)
-					elseif addon.db["confirmPatronOrderDialog"] and self.data and type(self.data) == "table" and self.data.text == CRAFTING_ORDERS_OWN_REAGENTS_CONFIRMATION and self.GetButton then
-						local order = C_CraftingOrders.GetClaimedOrder()
-						if order and order.npcCustomerCreatureID and order.npcCustomerCreatureID > 0 then self:GetButton(1):Click() end
 					elseif addon.db["confirmTimerRemovalTrade"] and self.which == "CONFIRM_MERCHANT_TRADE_TIMER_REMOVAL" and self.GetButton then
 						self:GetButton(1):Click()
 					elseif addon.db["confirmSocketReplace"] and self.which == "CONFIRM_ACCEPT_SOCKETS" and self.numButtons > 0 and self.GetButton then
