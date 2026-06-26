@@ -11650,6 +11650,19 @@ local function getSpellIdFromCooldownManagerChild(child)
 		if ok and type(data) == "table" then spellId = tonumber(data.spellID or data.spellId or data.spell) end
 	end
 	if not spellId and type(child) == "table" then spellId = tonumber(child.spellID or child.spellId or child.spell) end
+	if not spellId and type(child) == "table" then
+		local cooldownID = tonumber(child.cooldownID)
+		if not cooldownID and type(child.GetCooldownID) == "function" then
+			local ok, value = pcall(child.GetCooldownID, child)
+			if ok then cooldownID = tonumber(value) end
+		end
+		if cooldownID and C_CooldownViewer and C_CooldownViewer.GetCooldownViewerCooldownInfo then
+			local cooldownInfo = C_CooldownViewer.GetCooldownViewerCooldownInfo(cooldownID)
+			spellId = cooldownInfo
+				and (cooldownInfo.linkedSpellID or cooldownInfo.overrideTooltipSpellID or cooldownInfo.overrideSpellID or cooldownInfo.spellID)
+				or nil
+		end
+	end
 	return spellId
 end
 
@@ -11725,10 +11738,8 @@ function cdp.CDM.IsSettingsFrameShown()
 	return settings and settings.IsShown and settings:IsShown() == true
 end
 
-function cdp.CDM.GetSpellIdsFromDataProvider(sourceKind)
-	local settings = _G.CooldownViewerSettings
-	local dataProvider = settings and settings.GetDataProvider and settings:GetDataProvider() or nil
-	if not (dataProvider and dataProvider.GetOrderedCooldownIDsForCategory and dataProvider.GetCooldownInfoForID) then return nil end
+function cdp.CDM.GetSpellIdsFromAPI(sourceKind)
+	if not (C_CooldownViewer and C_CooldownViewer.GetCooldownViewerCategorySet and C_CooldownViewer.GetCooldownViewerCooldownInfo) then return nil end
 	local category
 	if sourceKind == "UTILITY" then
 		category = Enum and Enum.CooldownViewerCategory and Enum.CooldownViewerCategory.Utility
@@ -11736,12 +11747,14 @@ function cdp.CDM.GetSpellIdsFromDataProvider(sourceKind)
 		category = Enum and Enum.CooldownViewerCategory and Enum.CooldownViewerCategory.Essential
 	end
 	if not category then return nil end
-	local cooldownIDs = dataProvider:GetOrderedCooldownIDsForCategory(category)
+	local cooldownIDs = C_CooldownViewer.GetCooldownViewerCategorySet(category, false)
 	if type(cooldownIDs) ~= "table" or #cooldownIDs == 0 then return nil end
 	local spellIds = {}
 	for i = 1, #cooldownIDs do
-		local cooldownInfo = dataProvider:GetCooldownInfoForID(cooldownIDs[i])
-		local spellId = cooldownInfo and (cooldownInfo.linkedSpellID or cooldownInfo.overrideTooltipSpellID or cooldownInfo.overrideSpellID or cooldownInfo.spellID) or nil
+		local cooldownInfo = C_CooldownViewer.GetCooldownViewerCooldownInfo(cooldownIDs[i])
+		local spellId = cooldownInfo and cooldownInfo.isKnown == true
+			and (cooldownInfo.linkedSpellID or cooldownInfo.overrideTooltipSpellID or cooldownInfo.overrideSpellID or cooldownInfo.spellID)
+			or nil
 		if spellId then spellIds[#spellIds + 1] = spellId end
 	end
 	return spellIds
@@ -11749,35 +11762,36 @@ end
 
 function cdp.CDM.GetSpellIdsFromSource(sourceKind)
 	sourceKind = cdp.CDM.IsSyncSource(sourceKind) and sourceKind:upper() or "ESSENTIAL"
-	local spellIds = cdp.CDM.GetSpellIdsFromDataProvider(sourceKind)
 	local sourceLabel = getCooldownManagerSourceLabel(sourceKind)
-	if spellIds then return spellIds, sourceLabel end
 
 	local layoutChildren, fallbackLabel, sourceErr = getCooldownManagerLayoutChildren(sourceKind)
 	sourceLabel = fallbackLabel or sourceLabel
-	if sourceErr then return nil, sourceLabel, sourceErr end
+	if not sourceErr then
+		local spellIds = {}
+		local function collect(child)
+			local spellId = getSpellIdFromCooldownManagerChild(child)
+			if spellId then spellIds[#spellIds + 1] = spellId end
+		end
+		if #layoutChildren > 0 then
+			for i = 1, #layoutChildren do
+				collect(layoutChildren[i])
+			end
+		else
+			local numericKeys = {}
+			for key in pairs(layoutChildren) do
+				if type(key) == "number" then numericKeys[#numericKeys + 1] = key end
+			end
+			table.sort(numericKeys)
+			for _, key in ipairs(numericKeys) do
+				collect(layoutChildren[key])
+			end
+		end
+		if #spellIds > 0 then return spellIds, sourceLabel end
+	end
 
-	spellIds = {}
-	local function collect(child)
-		local spellId = getSpellIdFromCooldownManagerChild(child)
-		if spellId then spellIds[#spellIds + 1] = spellId end
-	end
-	if #layoutChildren > 0 then
-		for i = 1, #layoutChildren do
-			collect(layoutChildren[i])
-		end
-	else
-		local numericKeys = {}
-		for key in pairs(layoutChildren) do
-			if type(key) == "number" then numericKeys[#numericKeys + 1] = key end
-		end
-		table.sort(numericKeys)
-		for _, key in ipairs(numericKeys) do
-			collect(layoutChildren[key])
-		end
-	end
-	if #spellIds == 0 then return nil, sourceLabel, "SOURCE_NOT_FOUND" end
-	return spellIds, sourceLabel
+	local spellIds = cdp.CDM.GetSpellIdsFromAPI(sourceKind)
+	if spellIds then return spellIds, sourceLabel end
+	return nil, sourceLabel, sourceErr or "SOURCE_NOT_FOUND"
 end
 
 function cdp.CDM.GetEntryOverrideSpecKey(specId)
