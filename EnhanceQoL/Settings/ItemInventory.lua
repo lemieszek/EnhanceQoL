@@ -3446,7 +3446,13 @@ local eventHandlers = {
 
 local function registerEvents(frame)
 	for event in pairs(eventHandlers) do
-		frame:RegisterEvent(event)
+		if event == "ENCHANT_SPELL_COMPLETED" and not CharOpt("enchants") then
+			-- Registered dynamically when character enchant display is enabled.
+		elseif (event == "PLAYER_DEAD" or event == "PLAYER_UNGHOST" or event == "UPDATE_INVENTORY_DURABILITY") and not addon.db["showDurabilityOnCharframe"] then
+			-- Registered dynamically when character durability display is enabled.
+		else
+			frame:RegisterEvent(event)
+		end
 	end
 end
 
@@ -3458,6 +3464,24 @@ local frameLoad = CreateFrame("Frame")
 
 registerEvents(frameLoad)
 frameLoad:SetScript("OnEvent", eventHandler)
+
+function addon.functions.SyncItemInventoryEventRegistration()
+	if not frameLoad then return end
+	if CharOpt("enchants") then
+		frameLoad:RegisterEvent("ENCHANT_SPELL_COMPLETED")
+	else
+		frameLoad:UnregisterEvent("ENCHANT_SPELL_COMPLETED")
+	end
+	if addon.db["showDurabilityOnCharframe"] then
+		frameLoad:RegisterEvent("PLAYER_DEAD")
+		frameLoad:RegisterEvent("PLAYER_UNGHOST")
+		frameLoad:RegisterEvent("UPDATE_INVENTORY_DURABILITY")
+	else
+		frameLoad:UnregisterEvent("PLAYER_DEAD")
+		frameLoad:UnregisterEvent("PLAYER_UNGHOST")
+		frameLoad:UnregisterEvent("UPDATE_INVENTORY_DURABILITY")
+	end
+end
 
 -- If Blizzard_UIPanels_Game is already loaded, wire up immediately.
 if _G.PaperDollFrame then ensureCharFrameOnShowHook() end

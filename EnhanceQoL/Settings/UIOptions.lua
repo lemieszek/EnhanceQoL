@@ -772,6 +772,7 @@ local function createLabelControls(category, expandable)
 		desc = L["actionBarHotkeyFontOverrideDesc"],
 		func = function(value)
 			addon.db.actionBarHotkeyFontOverride = value and true or false
+			if ActionBarLabels and ActionBarLabels.EnsureRangeIndicatorHook then ActionBarLabels.EnsureRangeIndicatorHook() end
 			if ActionBarLabels and ActionBarLabels.RefreshAllHotkeyVisibility then ActionBarLabels.RefreshAllHotkeyVisibility() end
 			if ActionBarLabels and ActionBarLabels.RefreshAllHotkeyStyles then ActionBarLabels.RefreshAllHotkeyStyles() end
 		end,
@@ -1144,6 +1145,7 @@ local function createLabelControls(category, expandable)
 			else
 				addon.db.actionBarHiddenHotkeys[key] = nil
 			end
+			if ActionBarLabels and ActionBarLabels.EnsureRangeIndicatorHook then ActionBarLabels.EnsureRangeIndicatorHook() end
 			if ActionBarLabels and ActionBarLabels.RefreshAllHotkeyStyles then ActionBarLabels.RefreshAllHotkeyStyles() end
 		end,
 		desc = L["actionBarHideHotkeysDesc"],

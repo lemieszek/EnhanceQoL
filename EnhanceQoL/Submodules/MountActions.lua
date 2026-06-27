@@ -326,6 +326,7 @@ function MountActions:BuildRandomMountCache(useAll)
 end
 
 function MountActions:GetRandomMountSpell()
+	self:RegisterRandomCacheEvents()
 	local useAll = self:IsRandomAllEnabled()
 	local cacheMode = useAll and "all" or "favorites"
 	if self.randomMountDirty or not self.randomMountCache or self.randomMountCacheMode ~= cacheMode then
@@ -495,14 +496,18 @@ end
 
 local function handleMountEvents() MountActions:MarkRandomCacheDirty() end
 
-local eventFrame = CreateFrame("Frame")
-eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
-eventFrame:RegisterEvent("MOUNT_JOURNAL_SEARCH_UPDATED")
-eventFrame:RegisterEvent("MOUNT_JOURNAL_USABILITY_CHANGED")
-eventFrame:RegisterEvent("COMPANION_LEARNED")
-eventFrame:RegisterEvent("COMPANION_UNLEARNED")
-eventFrame:RegisterEvent("COMPANION_UPDATE")
-eventFrame:SetScript("OnEvent", handleMountEvents)
+function MountActions:RegisterRandomCacheEvents()
+	if self.randomCacheEventFrame then return end
+	local eventFrame = CreateFrame("Frame")
+	eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+	eventFrame:RegisterEvent("MOUNT_JOURNAL_SEARCH_UPDATED")
+	eventFrame:RegisterEvent("MOUNT_JOURNAL_USABILITY_CHANGED")
+	eventFrame:RegisterEvent("COMPANION_LEARNED")
+	eventFrame:RegisterEvent("COMPANION_UNLEARNED")
+	eventFrame:RegisterEvent("COMPANION_UPDATE")
+	eventFrame:SetScript("OnEvent", handleMountEvents)
+	self.randomCacheEventFrame = eventFrame
+end
 
 local initFrame = CreateFrame("Frame")
 initFrame:RegisterEvent("PLAYER_LOGIN")

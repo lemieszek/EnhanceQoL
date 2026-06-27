@@ -972,6 +972,7 @@ local function updateRegistration()
 	LOGIN_FRAME:UnregisterAllEvents()
 	if Ignore.enabled then
 		hookIgnoreApi()
+		Ignore:InstallTooltipHook()
 		LOGIN_FRAME:RegisterEvent("PLAYER_LOGIN")
 		for _, e in ipairs(CHAT_EVENTS) do
 			if not Ignore.registeredFilters[e] then
@@ -1215,7 +1216,8 @@ local function EQOL_FormatNote(note, maxChars, wordsPerLine)
 	return cut .. "..."
 end
 
-if not Ignore.tooltipHookInstalled then
+function Ignore:InstallTooltipHook()
+	if Ignore.tooltipHookInstalled then return end
 	GameTooltip:HookScript("OnShow", function(tooltip)
 		if tooltip:IsForbidden() or tooltip:IsProtected() then return end
 		if not addon.db or not addon.db.ignoreTooltipNote then return end

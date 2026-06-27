@@ -1453,6 +1453,89 @@ local function CreateRioScore()
 	updateRioScoreFrame()
 end
 
+local function ShouldInstallDungeonPortalTooltipHooks()
+	return addon.db and (addon.db["teleportFrame"] == true or addon.db["groupfinderShowDungeonScoreFrame"] == true)
+end
+
+local function EnsureDungeonPortalTooltipHooks()
+	if not GameTooltip or addon.MythicPlus.variables.dungeonPortalTooltipHooked or not ShouldInstallDungeonPortalTooltipHooks() then return end
+
+	GameTooltip:HookScript("OnShow", function(self)
+		if PVEFrame:IsVisible() then
+			ensureCurrentSeasonPortalCache()
+			selectedMapId = nil
+			local owner = self:GetOwner()
+			if
+				owner
+				and owner.GetParent
+				and LFGListFrame
+				and LFGListFrame.SearchPanel
+				and LFGListFrame.SearchPanel.ScrollBox
+				and LFGListFrame.SearchPanel.ScrollBox.ScrollTarget
+				and owner:GetParent() == LFGListFrame.SearchPanel.ScrollBox.ScrollTarget
+			then
+				local resultID = owner.resultID
+				if resultID then
+					local searchResultInfo = C_LFGList.GetSearchResultInfo(resultID)
+					if searchResultInfo and not issecretvalue(searchResultInfo.activityIDs) then
+						local mapData = C_LFGList.GetActivityInfoTable(searchResultInfo.activityIDs[1])
+						if mapData then
+							if mapIDInfo[mapData.mapID] then selectedMapId = mapIDInfo[mapData.mapID] end
+						end
+					end
+				end
+				CreateRioScore()
+				local offsetX = 0
+				if nil ~= RaiderIO_ProfileTooltip then offsetX = GetSafeFrameWidth(RaiderIO_ProfileTooltip) end
+				if gFrameAnchorScore and addon.db["dungeonScoreFrameLocked"] then gFrameAnchorScore:SetPoint("TOPLEFT", GameTooltip, "TOPRIGHT", offsetX, 0) end
+
+				if addon.db["teleportFrame"] then frameAnchor:SetAlpha(0) end
+			end
+		end
+	end)
+	GameTooltip:HookScript("OnHide", function(self)
+		if PVEFrame:IsVisible() then
+			selectedMapId = nil
+			CreateRioScore()
+			if addon.db["teleportFrame"] then frameAnchor:SetAlpha(1) end
+		end
+	end)
+	addon.MythicPlus.variables.dungeonPortalTooltipHooked = true
+end
+
+local function SyncDungeonPortalEventRegistration()
+	if not frameAnchor or not addon.db then return end
+
+	local teleportEnabled = addon.db["teleportFrame"] == true
+	local partyKeystoneEnabled = addon.db["groupfinderShowPartyKeystone"] == true
+
+	if teleportEnabled then
+		frameAnchor:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+		frameAnchor:RegisterEvent("ENCOUNTER_END")
+		frameAnchor:RegisterEvent("ADDON_LOADED")
+		frameAnchor:RegisterEvent("SPELL_DATA_LOAD_RESULT")
+		frameAnchor:RegisterEvent("GROUP_JOINED")
+	else
+		frameAnchor:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+		frameAnchor:UnregisterEvent("ENCOUNTER_END")
+		frameAnchor:UnregisterEvent("ADDON_LOADED")
+		frameAnchor:UnregisterEvent("SPELL_DATA_LOAD_RESULT")
+		frameAnchor:UnregisterEvent("GROUP_JOINED")
+	end
+
+	if teleportEnabled or partyKeystoneEnabled then
+		frameAnchor:RegisterEvent("PLAYER_REGEN_ENABLED")
+	else
+		frameAnchor:UnregisterEvent("PLAYER_REGEN_ENABLED")
+	end
+
+	if partyKeystoneEnabled then
+		frameAnchor:RegisterEvent("GROUP_ROSTER_UPDATE")
+	else
+		frameAnchor:UnregisterEvent("GROUP_ROSTER_UPDATE")
+	end
+end
+
 local keyStoneFrame
 EnsureMeasureFontString = function()
 	if measureFontString then return measureFontString end
@@ -1630,6 +1713,7 @@ end
 local isRegistered = false
 function addon.MythicPlus.functions.togglePartyKeystone()
 	local shouldEnable = addon.db["groupfinderShowPartyKeystone"] and not IsInRaid()
+	SyncDungeonPortalEventRegistration()
 	if openRaidLib and openRaidLib.SetEnabled then openRaidLib.SetEnabled(shouldEnable) end
 
 	if InCombatLockdown() then
@@ -1661,6 +1745,7 @@ function addon.MythicPlus.triggerRequest()
 end
 
 function addon.MythicPlus.functions.toggleFrame()
+	SyncDungeonPortalEventRegistration()
 	if InCombatLockdown() then
 		doAfterCombat = true
 	else
@@ -1681,13 +1766,16 @@ function addon.MythicPlus.functions.toggleFrame()
 				if InCombatLockdown() then
 					doAfterCombat = true
 				else
+					EnsureDungeonPortalTooltipHooks()
 					CreateRioScore()
 				end
 			end)
 		else
+			EnsureDungeonPortalTooltipHooks()
 			CreateRioScore()
 		end
 		if addon.db["teleportFrame"] then
+			EnsureDungeonPortalTooltipHooks()
 			ensureCurrentSeasonPortalCache()
 			checkCooldown()
 
@@ -1794,58 +1882,8 @@ function addon.MythicPlus.functions.InitDungeonPortal()
 
 	if addon.db["groupfinderShowPartyKeystone"] then addon.MythicPlus.functions.togglePartyKeystone() end
 
-	frameAnchor:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
-	frameAnchor:RegisterEvent("ENCOUNTER_END")
-	frameAnchor:RegisterEvent("ADDON_LOADED")
-	frameAnchor:RegisterEvent("SPELL_DATA_LOAD_RESULT")
-	frameAnchor:RegisterEvent("PLAYER_REGEN_ENABLED")
-	frameAnchor:RegisterEvent("GROUP_ROSTER_UPDATE")
-	frameAnchor:RegisterEvent("GROUP_JOINED")
-
-	if GameTooltip and not addon.MythicPlus.variables.dungeonPortalTooltipHooked then
-		GameTooltip:HookScript("OnShow", function(self)
-			if PVEFrame:IsVisible() then
-				ensureCurrentSeasonPortalCache()
-				selectedMapId = nil
-				local owner = self:GetOwner()
-				if
-					owner
-					and owner.GetParent
-					and LFGListFrame
-					and LFGListFrame.SearchPanel
-					and LFGListFrame.SearchPanel.ScrollBox
-					and LFGListFrame.SearchPanel.ScrollBox.ScrollTarget
-					and owner:GetParent() == LFGListFrame.SearchPanel.ScrollBox.ScrollTarget
-				then
-					local resultID = owner.resultID
-					if resultID then
-						local searchResultInfo = C_LFGList.GetSearchResultInfo(resultID)
-						if searchResultInfo and not issecretvalue(searchResultInfo.activityIDs) then
-							local mapData = C_LFGList.GetActivityInfoTable(searchResultInfo.activityIDs[1])
-							if mapData then
-								if mapIDInfo[mapData.mapID] then selectedMapId = mapIDInfo[mapData.mapID] end
-							end
-						end
-					end
-					CreateRioScore()
-					local offsetX = 0
-					if nil ~= RaiderIO_ProfileTooltip then offsetX = GetSafeFrameWidth(RaiderIO_ProfileTooltip) end
-					if gFrameAnchorScore and addon.db["dungeonScoreFrameLocked"] then gFrameAnchorScore:SetPoint("TOPLEFT", GameTooltip, "TOPRIGHT", offsetX, 0) end
-
-					if addon.db["teleportFrame"] then frameAnchor:SetAlpha(0) end
-				end
-			end
-		end)
-		GameTooltip:HookScript("OnHide", function(self)
-			if PVEFrame:IsVisible() then
-				selectedMapId = nil
-				local owner = self:GetOwner()
-				CreateRioScore()
-				if addon.db["teleportFrame"] then frameAnchor:SetAlpha(1) end
-			end
-		end)
-		addon.MythicPlus.variables.dungeonPortalTooltipHooked = true
-	end
+	SyncDungeonPortalEventRegistration()
+	EnsureDungeonPortalTooltipHooks()
 
 	-- Setze den Event-Handler
 	frameAnchor:SetScript("OnEvent", eventHandler)
