@@ -36,6 +36,7 @@ local LABEL_OFFSET_Y = -22
 local GLOW_OFFSET_Y = 82
 local GLOW_WIDTH = 300
 local GLOW_HEIGHT = 32
+local ALPHA_CACHE_TTL = 0.05
 local TARGET_ICON_SIZE = 35
 
 local AVAILABLE_QUEST_ATLAS = {
@@ -211,10 +212,19 @@ local function updateAlphaBehavior(frame)
 	frame.__eqolEnhancedWaypointAlphaHooked = true
 	frame.__eqolOriginalGetTargetAlphaBaseValue = frame.GetTargetAlphaBaseValue
 	frame.GetTargetAlphaBaseValue = function(self)
-		if not C_SuperTrack or not C_SuperTrack.IsSuperTrackingAnything or not C_SuperTrack.IsSuperTrackingAnything() then return 0 end
-		local navState = C_Navigation and C_Navigation.GetTargetState and C_Navigation.GetTargetState()
-		local alpha = NAVIGATION_ALPHA[navState]
-		if navState == Enum.NavigationState.Invalid and C_Navigation and C_Navigation.HasValidScreenPosition and not C_Navigation.HasValidScreenPosition() then alpha = 1 end
+		local now = (_G.GetTimePreciseSec and _G.GetTimePreciseSec()) or (GetTime and GetTime()) or 0
+		local alpha = state.alphaCacheValue
+		if not state.alphaCacheUntil or now >= state.alphaCacheUntil then
+			if not C_SuperTrack or not C_SuperTrack.IsSuperTrackingAnything or not C_SuperTrack.IsSuperTrackingAnything() then
+				alpha = 0
+			else
+				local navState = C_Navigation and C_Navigation.GetTargetState and C_Navigation.GetTargetState()
+				alpha = NAVIGATION_ALPHA[navState]
+				if navState == Enum.NavigationState.Invalid and C_Navigation and C_Navigation.HasValidScreenPosition and not C_Navigation.HasValidScreenPosition() then alpha = 1 end
+			end
+			state.alphaCacheValue = alpha
+			state.alphaCacheUntil = now + ALPHA_CACHE_TTL
+		end
 		if alpha and alpha > 0 and self.isClamped then return 1 end
 		return alpha
 	end
@@ -283,6 +293,7 @@ end
 
 function EnhancedWaypoint:Update()
 	if not self.enabled then return end
+	state.alphaCacheUntil = nil
 	local frame = _G.SuperTrackedFrame
 	if not (frame and frame.Icon and frame.DistanceText and C_SuperTrack and C_SuperTrack.IsSuperTrackingAnything) then return end
 

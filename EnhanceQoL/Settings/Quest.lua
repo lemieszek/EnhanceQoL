@@ -297,13 +297,24 @@ local function ApplyQuestTrackerTextStyleFont(fontString, role)
 end
 
 local function ApplyQuestTrackerTextStyleFontString(fontString, role, block, line)
-	if not fontString then return end
+	if not fontString then return false end
+	local completeObjective = role == "objective" and IsQuestTrackerTextStyleCompleteLine(line) or nil
+	local highlighted = block and block.isHighlighted or nil
 	fontString._eqolQuestTrackerTextRole = role
 	fontString._eqolQuestTrackerBlock = block
-	fontString._eqolQuestTrackerCompleteObjective = role == "objective" and IsQuestTrackerTextStyleCompleteLine(line) or nil
+	fontString._eqolQuestTrackerCompleteObjective = completeObjective
 	HookQuestTrackerTextStyleColor(fontString)
 	if not IsQuestTrackerTextStyleEnabled() then
-		return
+		return false
+	end
+	if
+		fontString._eqolQuestTrackerAppliedVersion == questTrackerTextStyleState.version
+		and fontString._eqolQuestTrackerAppliedRole == role
+		and fontString._eqolQuestTrackerAppliedBlock == block
+		and fontString._eqolQuestTrackerAppliedHighlighted == highlighted
+		and fontString._eqolQuestTrackerAppliedCompleteObjective == completeObjective
+	then
+		return false
 	end
 
 	ApplyQuestTrackerTextStyleFont(fontString, role)
@@ -312,6 +323,12 @@ local function ApplyQuestTrackerTextStyleFontString(fontString, role, block, lin
 		fontString._eqolQuestTrackerWordWrap = true
 	end
 	ApplyQuestTrackerTextStyleColor(fontString)
+	fontString._eqolQuestTrackerAppliedVersion = questTrackerTextStyleState.version
+	fontString._eqolQuestTrackerAppliedRole = role
+	fontString._eqolQuestTrackerAppliedBlock = block
+	fontString._eqolQuestTrackerAppliedHighlighted = highlighted
+	fontString._eqolQuestTrackerAppliedCompleteObjective = completeObjective
+	return true
 end
 
 local function UpdateQuestTrackerFontStringHeight(fontString, padding)
@@ -325,26 +342,36 @@ end
 
 local function HandleQuestTrackerTextStyleLine(block, line)
 	if not line then return end
-	if line.Text then ApplyQuestTrackerTextStyleFontString(line.Text, "objective", block, line) end
-	if line.Dash then ApplyQuestTrackerTextStyleFontString(line.Dash, "objective", block, line) end
+	local textChanged = false
+	local dashChanged = false
+	local textValue = line.Text and line.Text.GetText and line.Text:GetText() or nil
+	if line.Text then textChanged = ApplyQuestTrackerTextStyleFontString(line.Text, "objective", block, line) end
+	if line.Dash then dashChanged = ApplyQuestTrackerTextStyleFontString(line.Dash, "objective", block, line) end
 	if line.SetHeight and line.Text and line.Text.GetHeight then
+		if not (textChanged or dashChanged or line._eqolQuestTrackerTextValue ~= textValue or line._eqolQuestTrackerHeight == nil) then return end
 		local height = math.max(1, line.Text:GetHeight() or 1)
 		if line._eqolQuestTrackerHeight ~= height then
 			line:SetHeight(height)
 			line._eqolQuestTrackerHeight = height
 		end
+		line._eqolQuestTrackerTextValue = textValue
 	end
 end
 
 local function HandleQuestTrackerTextStyleBlock(block)
 	if not block then return end
 	if block.HeaderText then
-		ApplyQuestTrackerTextStyleFontString(block.HeaderText, "title", block)
+		local headerTextValue = block.HeaderText.GetText and block.HeaderText:GetText() or nil
+		local headerChanged = ApplyQuestTrackerTextStyleFontString(block.HeaderText, "title", block)
 		if block.HeaderText.SetWordWrap and block.HeaderText._eqolQuestTrackerWordWrap ~= true then
 			block.HeaderText:SetWordWrap(true)
 			block.HeaderText._eqolQuestTrackerWordWrap = true
+			headerChanged = true
 		end
-		UpdateQuestTrackerFontStringHeight(block.HeaderText, 2)
+		if headerChanged or block.HeaderText._eqolQuestTrackerTextValue ~= headerTextValue or block.HeaderText._eqolQuestTrackerHeight == nil then
+			UpdateQuestTrackerFontStringHeight(block.HeaderText, 2)
+			block.HeaderText._eqolQuestTrackerTextValue = headerTextValue
+		end
 	end
 	if block.ForEachUsedLine then block:ForEachUsedLine(function(line) HandleQuestTrackerTextStyleLine(block, line) end) end
 	if block.AddObjective and not block._eqolQuestTrackerAddObjectiveHooked and hooksecurefunc then
