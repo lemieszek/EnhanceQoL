@@ -4,6 +4,10 @@
 
 ## [11.5.0-beta4] - 2026-06-27
 
+### 🔄 Changed
+
+- Performance: Reduced repeated runtime work in Class Buff Reminder, Default Aura Containers, Resource Bars, Quest Tracker text styling, Enhanced Waypoints, and Map/Minimap stats.
+
 ### 🐛 Fixed
 
 - Class Buff Reminder: Improved Rogue poison tracking, Paladin Rites, Shaman weapon imbues, and weapon-oil checks in restricted aura states.
