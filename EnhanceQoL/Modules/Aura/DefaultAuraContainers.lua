@@ -259,6 +259,12 @@ local function normalizeAuraTextColor(value, fallback)
 	}
 end
 
+local function getAuraTextColorComponents(value, fallback)
+	fallback = fallback or DEFAULT_AURA_DURATION_COLOR
+	if type(value) ~= "table" then value = fallback end
+	return tonumber(value.r or value[1]) or fallback.r or 1, tonumber(value.g or value[2]) or fallback.g or 1, tonumber(value.b or value[3]) or fallback.b or 1, value.a ~= nil and value.a or value[4] or fallback.a or 1
+end
+
 local function getGlobalFontKey()
 	return addon.functions and addon.functions.GetGlobalFontConfigKey and addon.functions.GetGlobalFontConfigKey() or GLOBAL_FONT_KEY
 end
@@ -472,6 +478,89 @@ local function normalizeAuraAnchorPoint(value, fallback)
 	return fallback or "CENTER"
 end
 
+local function getDefaultAuraTextStyleCache()
+	local cache = DAC.variables.defaultAuraTextStyleCache
+	if not cache then
+		cache = {}
+		DAC.variables.defaultAuraTextStyleCache = cache
+	end
+	return cache
+end
+
+local function getDefaultAuraTextStyleConfig(kind, prefix, fallbackColor)
+	kind = normalizeDefaultAuraKind(kind)
+	prefix = prefix or "Duration"
+	local cache = getDefaultAuraTextStyleCache()
+	local cacheKey = kind .. ":" .. prefix
+	local entry = cache[cacheKey]
+	if not entry then
+		entry = {}
+		cache[cacheKey] = entry
+	end
+
+	local offset = getDefaultAuraDBValue(kind, prefix .. "Offset")
+	local r, g, b, a = getAuraTextColorComponents(getDefaultAuraDBValue(kind, prefix .. "Color"), fallbackColor)
+	local fontKey = normalizeAuraFontKey(getDefaultAuraDBValue(kind, prefix .. "FontFace"))
+	local outlineKey = normalizeAuraFontStyle(getDefaultAuraDBValue(kind, prefix .. "FontOutline"))
+	local size = getAuraTextSize(nil, tonumber(getDefaultAuraDBValue(kind, prefix .. "FontSize")) or (prefix == "Duration" and 10 or 12))
+	local point = normalizeAuraAnchorPoint(getDefaultAuraDBValue(kind, prefix .. "Anchor"), prefix == "Duration" and "BOTTOM" or "TOPRIGHT")
+	local x = getAuraTextOffset(nil, "x", type(offset) == "table" and offset.x or (prefix == "Duration" and 0 or -1))
+	local y = getAuraTextOffset(nil, "y", type(offset) == "table" and offset.y or -1)
+	local enabled = getDefaultAuraDBValue(kind, prefix .. "Enabled") ~= false
+	local fontVersion = addon.functions and addon.functions.GetGlobalFontStateVersion and addon.functions.GetGlobalFontStateVersion() or 0
+
+	if
+		entry.enabled == enabled
+		and entry.fontKey == fontKey
+		and entry.outlineKey == outlineKey
+		and entry.size == size
+		and entry.r == r
+		and entry.g == g
+		and entry.b == b
+		and entry.a == a
+		and entry.point == point
+		and entry.x == x
+		and entry.y == y
+		and entry.fontVersion == fontVersion
+		and entry.key
+	then
+		return entry
+	end
+
+	entry.enabled = enabled
+	entry.fontKey = fontKey
+	entry.outlineKey = outlineKey
+	entry.size = size
+	entry.r = r
+	entry.g = g
+	entry.b = b
+	entry.a = a
+	entry.point = point
+	entry.x = x
+	entry.y = y
+	entry.fontVersion = fontVersion
+	entry.font = resolveAuraFont(fontKey)
+	entry.outline = resolveAuraFontStyle(outlineKey)
+	entry.fontStyleKey = tostring(fontVersion) .. ":" .. tostring(entry.font) .. ":" .. tostring(size) .. ":" .. tostring(entry.outline)
+	entry.colorKey = tostring(r) .. ":" .. tostring(g) .. ":" .. tostring(b) .. ":" .. tostring(a)
+	entry.positionKey = tostring(point) .. ":" .. tostring(x) .. ":" .. tostring(y)
+	entry.key = table.concat({
+		tostring(enabled),
+		tostring(fontKey),
+		tostring(outlineKey),
+		tostring(size),
+		tostring(r),
+		tostring(g),
+		tostring(b),
+		tostring(a),
+		tostring(point),
+		tostring(x),
+		tostring(y),
+		tostring(fontVersion),
+	}, ":")
+	return entry
+end
+
 local function buildAuraAnchorOptions()
 	return {
 		{ value = "TOPLEFT", label = "Top left" },
@@ -488,18 +577,19 @@ end
 
 local function setAuraFontStringStyle(fontString, prefix, fallbackColor, kind)
 	if not fontString then return end
-	local fontKey = getDefaultAuraDBValue(kind, prefix .. "FontFace")
-	local styleKey = getDefaultAuraDBValue(kind, prefix .. "FontOutline")
-	local size = getAuraTextSize(nil, tonumber(getDefaultAuraDBValue(kind, prefix .. "FontSize")) or (prefix == "Duration" and 10 or 12))
-	local color = normalizeAuraTextColor(getDefaultAuraDBValue(kind, prefix .. "Color"), fallbackColor)
-	local font = resolveAuraFont(fontKey)
-	local style = resolveAuraFontStyle(styleKey)
-	if addon.functions and addon.functions.SetFontWithFallback then
-		addon.functions.SetFontWithFallback(fontString, font, size, style, DEFAULT_FONT)
-	else
-		fontString:SetFont(font, size, style)
+	local config = getDefaultAuraTextStyleConfig(kind, prefix, fallbackColor)
+	if fontString.eqolDefaultAuraFontStyleKey ~= config.fontStyleKey then
+		if addon.functions and addon.functions.SetFontWithFallback then
+			addon.functions.SetFontWithFallback(fontString, config.font, config.size, config.outline, DEFAULT_FONT)
+		else
+			fontString:SetFont(config.font, config.size, config.outline)
+		end
+		fontString.eqolDefaultAuraFontStyleKey = config.fontStyleKey
 	end
-	fontString:SetTextColor(color.r, color.g, color.b, color.a)
+	if fontString.eqolDefaultAuraColorKey ~= config.colorKey then
+		fontString:SetTextColor(config.r, config.g, config.b, config.a)
+		fontString.eqolDefaultAuraColorKey = config.colorKey
+	end
 end
 
 local function ensureDefaultAuraTextLayer(button)
@@ -509,9 +599,16 @@ local function ensureDefaultAuraTextLayer(button)
 		layer = CreateFrame("Frame", nil, button)
 		button.eqolDefaultAuraTextLayer = layer
 	end
-	layer:ClearAllPoints()
-	layer:SetAllPoints(button)
-	layer:SetFrameLevel((button:GetFrameLevel() or 1) + 10)
+	local level = (button:GetFrameLevel() or 1) + 10
+	if layer.eqolDefaultAuraTextLayerOwner ~= button then
+		layer:ClearAllPoints()
+		layer:SetAllPoints(button)
+		layer.eqolDefaultAuraTextLayerOwner = button
+	end
+	if layer.eqolDefaultAuraTextLayerLevel ~= level then
+		layer:SetFrameLevel(level)
+		layer.eqolDefaultAuraTextLayerLevel = level
+	end
 	return layer
 end
 
@@ -521,27 +618,22 @@ local function positionAuraFontString(fontString, owner, prefix, defaultPoint, d
 	local offset = getDefaultAuraDBValue(kind, prefix .. "Offset")
 	local x = getAuraTextOffset(nil, "x", type(offset) == "table" and offset.x or defaultX)
 	local y = getAuraTextOffset(nil, "y", type(offset) == "table" and offset.y or defaultY)
-	fontString:ClearAllPoints()
-	fontString:SetPoint(point, owner, point, x, y)
-	if fontString.SetDrawLayer then fontString:SetDrawLayer("OVERLAY", 7) end
+	if fontString.eqolDefaultAuraPositionOwner ~= owner or fontString.eqolDefaultAuraPositionPoint ~= point or fontString.eqolDefaultAuraPositionX ~= x or fontString.eqolDefaultAuraPositionY ~= y then
+		fontString:ClearAllPoints()
+		fontString:SetPoint(point, owner, point, x, y)
+		fontString.eqolDefaultAuraPositionOwner = owner
+		fontString.eqolDefaultAuraPositionPoint = point
+		fontString.eqolDefaultAuraPositionX = x
+		fontString.eqolDefaultAuraPositionY = y
+	end
+	if fontString.SetDrawLayer and fontString.eqolDefaultAuraDrawLayerKey ~= "OVERLAY:7" then
+		fontString:SetDrawLayer("OVERLAY", 7)
+		fontString.eqolDefaultAuraDrawLayerKey = "OVERLAY:7"
+	end
 end
 
 local function buildDefaultAuraTextStyleKey(kind, prefix, fallbackColor)
-	local color = normalizeAuraTextColor(getDefaultAuraDBValue(kind, prefix .. "Color"), fallbackColor)
-	local offset = getDefaultAuraDBValue(kind, prefix .. "Offset")
-	return table.concat({
-		tostring(getDefaultAuraDBValue(kind, prefix .. "Enabled") ~= false),
-		tostring(normalizeAuraFontKey(getDefaultAuraDBValue(kind, prefix .. "FontFace"))),
-		tostring(normalizeAuraFontStyle(getDefaultAuraDBValue(kind, prefix .. "FontOutline"))),
-		tostring(getAuraTextSize(nil, tonumber(getDefaultAuraDBValue(kind, prefix .. "FontSize")) or (prefix == "Duration" and 10 or 12))),
-		tostring(color.r),
-		tostring(color.g),
-		tostring(color.b),
-		tostring(color.a),
-		tostring(normalizeAuraAnchorPoint(getDefaultAuraDBValue(kind, prefix .. "Anchor"), prefix == "Duration" and "BOTTOM" or "TOPRIGHT")),
-		tostring(getAuraTextOffset(nil, "x", type(offset) == "table" and offset.x or (prefix == "Duration" and 0 or -1))),
-		tostring(getAuraTextOffset(nil, "y", type(offset) == "table" and offset.y or -1)),
-	}, ":")
+	return getDefaultAuraTextStyleConfig(kind, prefix, fallbackColor).key
 end
 
 local function applyDefaultAuraTextStyle(button)
@@ -549,16 +641,19 @@ local function applyDefaultAuraTextStyle(button)
 	local kind = button.eqolDefaultAuraKind
 	local textLayer = ensureDefaultAuraTextLayer(button)
 	if textLayer then
-		if button.Duration and button.Duration.SetParent then button.Duration:SetParent(textLayer) end
-		if button.Count and button.Count.SetParent then button.Count:SetParent(textLayer) end
+		if button.Duration and button.Duration.SetParent and button.Duration:GetParent() ~= textLayer then button.Duration:SetParent(textLayer) end
+		if button.Count and button.Count.SetParent and button.Count:GetParent() ~= textLayer then button.Count:SetParent(textLayer) end
 	end
 	local durationEnabled = getDefaultAuraDBValue(kind, "DurationEnabled") ~= false
 	applyDefaultAuraDurationTextProfile(button)
-	if button.Cooldown and button.Cooldown.SetHideCountdownNumbers then button.Cooldown:SetHideCountdownNumbers(not durationEnabled) end
+	if button.Cooldown and button.Cooldown.SetHideCountdownNumbers and button.eqolDefaultAuraHideCountdownNumbers ~= not durationEnabled then
+		button.Cooldown:SetHideCountdownNumbers(not durationEnabled)
+		button.eqolDefaultAuraHideCountdownNumbers = not durationEnabled
+	end
 	local internalCooldownText = button.Cooldown and button.Cooldown.GetCountdownFontString and button.Cooldown:GetCountdownFontString()
 	if internalCooldownText then
 		if not durationEnabled then
-			internalCooldownText:Hide()
+			if internalCooldownText:IsShown() then internalCooldownText:Hide() end
 		else
 			setAuraFontStringStyle(internalCooldownText, "Duration", DEFAULT_AURA_DURATION_COLOR, kind)
 			positionAuraFontString(internalCooldownText, button, "Duration", "BOTTOM", 0, -1, kind)
@@ -567,7 +662,7 @@ local function applyDefaultAuraTextStyle(button)
 
 	setAuraFontStringStyle(button.Duration, "Duration", DEFAULT_AURA_DURATION_COLOR, kind)
 	positionAuraFontString(button.Duration, button, "Duration", "BOTTOM", 0, -1, kind)
-	button.Duration:Hide()
+	if button.Duration:IsShown() then button.Duration:Hide() end
 
 	setAuraFontStringStyle(button.Count, "Count", DEFAULT_AURA_COUNT_COLOR, kind)
 	positionAuraFontString(button.Count, button, "Count", "TOPRIGHT", -1, -1, kind)

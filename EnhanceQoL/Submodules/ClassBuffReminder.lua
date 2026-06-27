@@ -269,6 +269,18 @@ function Reminder.NormalizeTrackingContentSelection(value, legacyInstanceOnly, f
 	return Reminder.CreateDefaultTrackingContentSelection(), true
 end
 
+function Reminder.InvalidateTrackingContentSelectionCache(dbKey)
+	local cache = Reminder.trackingContentSelectionCache
+	if type(cache) ~= "table" then return end
+	if dbKey then
+		cache[dbKey] = nil
+	else
+		for key in pairs(cache) do
+			cache[key] = nil
+		end
+	end
+end
+
 Reminder.defaults = Reminder.defaults
 	or {
 		enabled = false,
@@ -749,8 +761,17 @@ end
 function Reminder.GetTrackingContentSelection(dbKey, legacyKey, defaultSelection)
 	local stored = addon.db and addon.db[dbKey] or nil
 	local legacy = addon.db and addon.db[legacyKey] or nil
+	Reminder.trackingContentSelectionCache = Reminder.trackingContentSelectionCache or {}
+	local cached = Reminder.trackingContentSelectionCache[dbKey]
+	if cached and cached.stored == stored and cached.legacy == legacy and cached.defaultSelection == defaultSelection then return cached.normalized end
 	local normalized, changed = Reminder.NormalizeTrackingContentSelection(stored, legacy, defaultSelection)
 	if addon.db and changed then addon.db[dbKey] = Reminder.CopyTrackingContentSelection(normalized) end
+	Reminder.trackingContentSelectionCache[dbKey] = {
+		stored = addon.db and addon.db[dbKey] or stored,
+		legacy = legacy,
+		defaultSelection = defaultSelection,
+		normalized = normalized,
+	}
 	return normalized
 end
 
@@ -1410,6 +1431,7 @@ end
 
 function Reminder:SetFlaskTrackingContentSelection(selection)
 	if addon.db then addon.db[TRACKING_CONTENT.db.FLASKS] = select(1, Reminder.NormalizeTrackingContentSelection(selection, nil, defaults.trackFlasksContent)) end
+	Reminder.InvalidateTrackingContentSelectionCache(TRACKING_CONTENT.db.FLASKS)
 	self:InvalidateFlaskCache()
 	self:RequestUpdate(true)
 end
@@ -1422,6 +1444,7 @@ end
 
 function Reminder:SetFoodTrackingContentSelection(selection)
 	if addon.db then addon.db[TRACKING_CONTENT.db.FOOD] = select(1, Reminder.NormalizeTrackingContentSelection(selection, nil, defaults.trackFoodContent)) end
+	Reminder.InvalidateTrackingContentSelectionCache(TRACKING_CONTENT.db.FOOD)
 	self:InvalidateFoodCache()
 	self:RequestUpdate(true)
 end
@@ -1434,6 +1457,7 @@ end
 
 function Reminder:SetRuneTrackingContentSelection(selection)
 	if addon.db then addon.db[TRACKING_CONTENT.db.RUNES] = select(1, Reminder.NormalizeTrackingContentSelection(selection, nil, defaults.trackRunesContent)) end
+	Reminder.InvalidateTrackingContentSelectionCache(TRACKING_CONTENT.db.RUNES)
 	self:InvalidateRuneCache()
 	self:RequestUpdate(true)
 end
@@ -1446,6 +1470,7 @@ end
 
 function Reminder:SetWeaponBuffTrackingContentSelection(selection)
 	if addon.db then addon.db[TRACKING_CONTENT.db.WEAPON_BUFFS] = select(1, Reminder.NormalizeTrackingContentSelection(selection, nil, defaults.trackWeaponBuffsContent)) end
+	Reminder.InvalidateTrackingContentSelectionCache(TRACKING_CONTENT.db.WEAPON_BUFFS)
 	self:InvalidateWeaponBuffCache()
 	self:RequestUpdate(true)
 end
@@ -1473,6 +1498,7 @@ end
 
 function Reminder:SetPetTrackingContentSelection(selection)
 	if addon.db then addon.db[TRACKING_CONTENT.db.PETS] = select(1, Reminder.NormalizeTrackingContentSelection(selection, nil, defaults.trackPetsContent)) end
+	Reminder.InvalidateTrackingContentSelectionCache(TRACKING_CONTENT.db.PETS)
 	self:RequestUpdate(true)
 end
 
@@ -3798,13 +3824,18 @@ end
 function Reminder:ApplyIconShape(frame, texture, shape)
 	if not (addon.IconShape and addon.IconShape.ApplyFrameShape and frame) then return end
 	shape = Reminder.NormalizeIconShape(shape or self:GetIconShape(), defaults.iconShape or "DEFAULT")
+	local iconZoom = self:GetIconZoom()
+	local shapeKey = tostring(shape) .. ":" .. tostring(iconZoom)
+	if frame._eqolClassBuffReminderShapeKey == shapeKey and frame._eqolClassBuffReminderShapeTexture == texture then return end
 	addon.IconShape.ApplyFrameShape(frame, shape, {
 		textures = { texture },
 		maskKey = "_eqolClassBuffReminderMask",
 		textureMaskKey = "_eqolClassBuffReminderTextureMask",
 		textureTexCoordKey = "_eqolClassBuffReminderTexCoord",
-		iconZoom = self:GetIconZoom(),
+		iconZoom = iconZoom,
 	})
+	frame._eqolClassBuffReminderShapeKey = shapeKey
+	frame._eqolClassBuffReminderShapeTexture = texture
 end
 
 function Reminder:ApplyShapeBorder(frame, backdropFrame, enabled, borderTexture, borderSize, borderOffset, r, g, b, a, shape)
@@ -5599,6 +5630,35 @@ function Reminder:ApplyVisualSettings()
 	local scaledXYOffsetY = math.floor((xyOffsetY * scale) + 0.5)
 	local textGap = scaledIconGap
 	local framePadding = math.max(4, math.floor((6 * scale) + 0.5))
+	local visualKey = table.concat({
+		tostring(scale),
+		tostring(iconSize),
+		tostring(fontSize),
+		tostring(iconGap),
+		tostring(displayMode),
+		tostring(growthDirection),
+		tostring(iconShape),
+		tostring(self:GetIconZoom()),
+		tostring(xyTextSize),
+		tostring(xyTextOutline),
+		tostring(xyTextR),
+		tostring(xyTextG),
+		tostring(xyTextB),
+		tostring(xyTextA),
+		tostring(xyOffsetX),
+		tostring(xyOffsetY),
+		tostring(borderEnabled),
+		tostring(borderTexture),
+		tostring(borderSize),
+		tostring(borderOffset),
+		tostring(borderR),
+		tostring(borderG),
+		tostring(borderB),
+		tostring(borderA),
+		tostring(frame.nameText and frame.nameText:GetText() or ""),
+		tostring(frame.countText and frame.countText:GetText() or ""),
+		tostring(self.editModeActive == true),
+	}, "\031")
 
 	if addon.db then
 		if addon.db[DB_DISPLAY_MODE] ~= displayMode then addon.db[DB_DISPLAY_MODE] = displayMode end
@@ -5625,6 +5685,9 @@ function Reminder:ApplyVisualSettings()
 			addon.db[DB_XY_TEXT_COLOR] = { r = xyTextR, g = xyTextG, b = xyTextB, a = xyTextA }
 		end
 	end
+
+	if frame._eqolClassBuffReminderVisualKey == visualKey then return end
+	frame._eqolClassBuffReminderVisualKey = visualKey
 
 	frame:SetScale(1)
 	frame.iconHolder:SetSize(scaledIconSize, scaledIconSize)
