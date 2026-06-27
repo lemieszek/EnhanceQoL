@@ -1542,7 +1542,7 @@ ResourceBars.SHARED_VISIBILITY_DRUID_FORMS = { "BEAR", "CAT", "MOONKIN", "HUMANO
 
 local function normalizeSharedSlotStore(store)
 	if type(store) ~= "table" then store = {} end
-	for _, slot in ipairs({ "MAIN", "SECONDARY", "TERTIARY" }) do
+	for _, slot in ipairs(ResourceBars.SHARED_VISIBILITY_SLOTS) do
 		local cfg = store[slot]
 		if type(cfg) == "table" then
 			cfg.powerTypeOverrides = cfg.powerTypeOverrides or {}
@@ -7507,7 +7507,8 @@ local function setPowerbars(opts)
 	powerfrequent = {}
 	local isDruid = addon.variables.unitClass == "DRUID"
 	local editModeActive = addon.EditMode and addon.EditMode.IsInEditMode and addon.EditMode:IsInEditMode()
-	opts = opts or {}
+	RB.EMPTY_OPTS = RB.EMPTY_OPTS or {}
+	opts = opts or RB.EMPTY_OPTS
 	local forceAllDruidBars = isDruid and ((opts.forceAllDruidBars == true) or editModeActive)
 	local druidForm = isDruid and ResourceBars.GetCurrentDruidFormKey and ResourceBars.GetCurrentDruidFormKey() or nil
 	local mainPowerBar
@@ -7522,7 +7523,11 @@ local function setPowerbars(opts)
 		createPowerBar(pType, anchorFrame, sharedSlot)
 	end
 
-	local desiredVisibility = {}
+	RB.desiredVisibility = RB.desiredVisibility or {}
+	local desiredVisibility = RB.desiredVisibility
+	for pType in pairs(desiredVisibility) do
+		desiredVisibility[pType] = nil
+	end
 	ResourceBars._barBuildBatchDepth = (ResourceBars._barBuildBatchDepth or 0) + 1
 	for _, pType in ipairs(classPowerTypes) do
 		desiredVisibility[pType] = false
