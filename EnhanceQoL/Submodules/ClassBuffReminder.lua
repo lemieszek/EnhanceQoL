@@ -1675,6 +1675,7 @@ end
 function Reminder:IsFlaskEnvironmentRestricted()
 	if self.consumableTrackingBlockedByCombat == true then return true end
 	if InCombatLockdown and InCombatLockdown() then return true end
+	if self:AreConsumableAuraChecksRestricted() then return true end
 	-- Generic addon restrictions can include transient states unrelated to local consumable checks.
 	-- Basic combat restrictions also cover Mythic+, which resolves to its own tracking content token.
 	return false
@@ -1891,6 +1892,23 @@ end
 function Reminder:InvalidatePlayerAuraPresenceSnapshot()
 	self.playerAuraPresenceSnapshot = nil
 	self:InvalidateSelfProviderStatus()
+end
+
+function Reminder:RefreshAuraSecretState()
+	local secret = false
+	if C_Secrets and C_Secrets.ShouldAurasBeSecret then secret = C_Secrets.ShouldAurasBeSecret() == true end
+	local changed = self.auraQueriesSecret ~= secret
+	self.auraQueriesSecret = secret
+	return changed
+end
+
+function Reminder:AreAuraQueriesSecret()
+	if self.auraQueriesSecret == nil then self:RefreshAuraSecretState() end
+	return self.auraQueriesSecret == true
+end
+
+function Reminder:AreConsumableAuraChecksRestricted()
+	return self:AreAuraQueriesSecret()
 end
 
 function Reminder:PrepareConsumableCandidateAuraData(candidates, fallbackLabel)
@@ -2333,6 +2351,7 @@ function Reminder:GetWeaponBuffCandidates()
 end
 
 function Reminder:GetFlaskMissingEntry(evalContext)
+	if self:AreConsumableAuraChecksRestricted() then return nil end
 	local candidates = self:GetFlaskCandidatesForCurrentSpec()
 	if type(candidates) ~= "table" or #candidates <= 0 then return nil end
 
@@ -2362,6 +2381,7 @@ function Reminder:GetFlaskMissingEntry(evalContext)
 end
 
 function Reminder:GetFoodMissingEntry(evalContext)
+	if self:AreConsumableAuraChecksRestricted() then return nil end
 	if self:IsEarthenPlayer() then return nil end
 
 	local candidates = self:GetFoodCandidatesForCurrentSpec()
@@ -2394,6 +2414,7 @@ function Reminder:GetFoodMissingEntry(evalContext)
 end
 
 function Reminder:GetRuneMissingEntry(evalContext)
+	if self:AreConsumableAuraChecksRestricted() then return nil end
 	local candidates = self:GetRuneCandidates()
 	if type(candidates) ~= "table" or #candidates <= 0 then return nil end
 
@@ -4997,6 +5018,7 @@ function Reminder:SupplementalAuraMatches(aura)
 end
 
 function Reminder:SupplementalAuraUpdateTouchesPlayer(updateInfo)
+	if self:AreConsumableAuraChecksRestricted() then return false end
 	if not (self:CanCheckFlaskReminder() or self:CanCheckFoodReminder() or self:CanCheckRuneReminder()) then return false end
 	if Reminder.IsFullAuraUpdate(updateInfo) then return true end
 
@@ -6259,6 +6281,7 @@ function Reminder:HandleEvent(event, unit, updateInfo)
 	if not self:ShouldRegisterRuntimeEvents() then return end
 
 	if event == "PLAYER_LOGIN" or event == "PLAYER_ENTERING_WORLD" then
+		self:RefreshAuraSecretState()
 		self.consumableTrackingBlockedByCombat = InCombatLockdown and InCombatLockdown() == true or false
 		self:ScheduleInitialSoundSync()
 		self:InvalidateProviderAvailabilityCache()
@@ -6270,6 +6293,17 @@ function Reminder:HandleEvent(event, unit, updateInfo)
 		self:InvalidateWeaponBuffCache()
 		self:RequestUpdate(false)
 		self:ScheduleDeferredAuraResync(0.35)
+		return
+	end
+
+	if event == "ADDON_RESTRICTION_STATE_CHANGED" then
+		if self:RefreshAuraSecretState() then
+			self:InvalidatePlayerAuraPresenceSnapshot()
+			self:InvalidateFlaskCache()
+			self:InvalidateFoodCache()
+			self:InvalidateRuneCache()
+			self:RequestUpdate(false, Reminder.RUNTIME_UPDATE_DELAY, true)
+		end
 		return
 	end
 
@@ -6493,6 +6527,7 @@ function Reminder:RegisterEvents()
 	self.eventFrame:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED")
 	self.eventFrame:RegisterEvent("SPELLS_CHANGED")
 	self.eventFrame:RegisterEvent("UNIT_AURA")
+	self.eventFrame:RegisterEvent("ADDON_RESTRICTION_STATE_CHANGED")
 	self.eventFrame:RegisterEvent("UNIT_INVENTORY_CHANGED")
 	self.eventFrame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 	self.eventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
