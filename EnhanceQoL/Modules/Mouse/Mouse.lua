@@ -1135,6 +1135,7 @@ local function applyRingStyle(inCombat)
 	ringFrame._eqolAppliedRingAlphaMultiplier = nil
 	ringFrame.texture1:SetSize(size, size)
 	ringFrame.texture1:SetVertexColor(r, g, b, a)
+	if ringFrame.dot then ringFrame.dot:SetVertexColor(r, g, b, a) end
 	updateProgressIndicatorLayout(ringFrame, size)
 
 	if combatActive and db["mouseRingCombatOverlay"] then

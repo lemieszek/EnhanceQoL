@@ -2,6 +2,15 @@
 
 <!--@eqol-beta@-->
 
+## [11.5.0-beta4] - 2026-06-27
+
+### 🐛 Fixed
+
+- Class Buff Reminder: Improved Rogue poison tracking, Paladin Rites, Shaman weapon imbues, and weapon-oil checks in restricted aura states.
+- Mouse Cursor: Fixed the ring center dot keeping stale color/alpha after ring style changes.
+
+---
+
 ## [11.5.0-beta3] - 2026-06-26
 
 ### ✨ Added
