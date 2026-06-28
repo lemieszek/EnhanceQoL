@@ -12,6 +12,7 @@
 
 - Bags / Vendor: Reduced performance spikes while switching between merchant and NPC interactions by cutting unnecessary bag refresh, vendor scan, and merchant item highlight work.
 - Class Buff Reminder: Fixed Evoker Blessing of the Bronze reminders not appearing when the spellbook spell ID differs from the active buff aura ID.
+- Cooldown Panels: Reduced runtime overhead for Cooldown Manager aura tracking, especially in profiles with many panels and tracked auras.
 - Mythic Plus: Fixed Mythic+ Timer panel bars disappearing behind selected background textures after switching from a custom background to a dropdown texture.
 
 ---
