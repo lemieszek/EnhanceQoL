@@ -1219,6 +1219,7 @@ local function unregisterFrameBinding(runtime, key, frame)
 		if not next(pandemicKeys) then
 			runtime.pandemicFrameEntries[frame] = nil
 			frame._eqolCdmPandemicTracked = nil
+			frame._eqolCdmPandemicActive = nil
 		end
 	end
 	if not runtime.frameEntries[frame] then
@@ -1293,6 +1294,7 @@ local function updatePandemicFrameBinding(runtime, key, frame, wantsPandemic)
 		if not next(pandemicKeys) then
 			runtime.pandemicFrameEntries[frame] = nil
 			frame._eqolCdmPandemicTracked = nil
+			frame._eqolCdmPandemicActive = nil
 		end
 	end
 end
@@ -1837,6 +1839,11 @@ local function frameHasPandemicState(frame)
 	return ok and shown == true
 end
 
+local function targetIsAttackable()
+	if not (UnitExists and UnitCanAttack) then return false end
+	return UnitExists("target") and UnitCanAttack("player", "target") == true
+end
+
 local function clearTrackedAuraState(runtime, key, state)
 	if not state then return false end
 	local hadTrackedState = state.trackedAuraInstanceID ~= nil or state.trackedAuraUnit ~= nil or state.pandemicActive ~= nil or state.targetAuraEpoch ~= nil
@@ -1876,7 +1883,7 @@ function CDMAuras:HandleFrameAuraMutation(frame, wasCleared)
 				elseif frameMatchesTrackedSpell then
 					local nextTrackUnit = normalizedAuraUnit or state.trackUnit
 					local nextTrackedAuraUnit = auraUnit or state.trackedAuraUnit
-					local nextPandemicActive = normalizedAuraUnit == "target" and frameHasPandemicState(frame) or nil
+					local nextPandemicActive = normalizedAuraUnit == "target" and targetIsAttackable() and frameHasPandemicState(frame) or nil
 					local nextTargetAuraEpoch = normalizedAuraUnit == "target" and (runtime.targetEpoch or 0) or nil
 
 					if state.trackUnit ~= nextTrackUnit then
@@ -1893,6 +1900,7 @@ function CDMAuras:HandleFrameAuraMutation(frame, wasCleared)
 					end
 					if state.pandemicActive ~= nextPandemicActive then
 						state.pandemicActive = nextPandemicActive
+						frame._eqolCdmPandemicActive = nextPandemicActive and true or nil
 						changed = true
 					end
 					if state.targetAuraEpoch ~= nextTargetAuraEpoch then
@@ -1960,7 +1968,9 @@ function CDMAuras:HandleFramePandemicStateChanged(frame, isActive)
 	end
 
 	local auraUnit = normalizeTrackedUnit(getFrameAuraUnit(frame))
-	local pandemicActive = isActive == true and frameHasPandemicState(frame) and auraUnit == "target"
+	local pandemicActive = isActive == true and auraUnit == "target" and targetIsAttackable() and frameHasPandemicState(frame)
+	if not pandemicActive and frame._eqolCdmPandemicActive ~= true then return end
+	frame._eqolCdmPandemicActive = pandemicActive and true or nil
 	local refreshedPanels = runtime.scratchRefreshedPanels
 	wipe(refreshedPanels)
 
@@ -2687,7 +2697,7 @@ function CDMAuras:BuildRuntimeData(panelId, entryId, entry, entryLayout, alwaysS
 	local active = auraData ~= nil or hasTotemData
 	local trackedAuraUnit = normalizeTrackedUnit(auraUnit) or normalizedTrackUnit or normalizeTrackedUnit(state.trackedAuraUnit) or normalizeTrackedUnit(state.mappedAuraUnit)
 	local pandemicActive = false
-	if active and trackedAuraUnit == "target" then
+	if active and trackedAuraUnit == "target" and targetIsAttackable() then
 		if chosenFrame and canUseTargetAuraCache and frameMatchesTrackedSpell then
 			pandemicActive = frameHasPandemicState(chosenFrame)
 		else
@@ -2695,6 +2705,7 @@ function CDMAuras:BuildRuntimeData(panelId, entryId, entry, entryLayout, alwaysS
 		end
 	end
 	state.pandemicActive = pandemicActive or nil
+	if chosenFrame then chosenFrame._eqolCdmPandemicActive = pandemicActive and true or nil end
 	local iconTextureID = auraData and auraData.icon
 		or getFrameIconTexture(chosenFrame)
 		or entry.iconTextureID
@@ -2815,10 +2826,11 @@ function CDMAuras:BuildSpellAuraOverlayData(panelId, entryId, sourceEntry, spell
 	return self:BuildRuntimeData(panelId, entryId, entry, entryLayout, "HIDE")
 end
 
-refreshAllTrackedPanels = function(unit)
+refreshAllTrackedPanels = function(unit, includeUnknown)
 	unit = normalizeTrackedUnit(unit)
 	local runtime = getRuntime()
 	local refreshed = false
+	if includeUnknown == nil then includeUnknown = true end
 	if unit and runtime.unitPanels then
 		local unitPanels = runtime.unitPanels[unit]
 		if unitPanels then
@@ -2827,7 +2839,7 @@ refreshAllTrackedPanels = function(unit)
 				refreshed = true
 			end
 		end
-		local unknownPanels = runtime.unitPanels.unknown
+		local unknownPanels = includeUnknown and runtime.unitPanels.unknown or nil
 		if unknownPanels then
 			for panelId in pairs(unknownPanels) do
 				requestPanelRefresh(panelId)
@@ -3178,7 +3190,7 @@ function CDMAuras:HandleResetEvent(event, ...)
 	self:SchedulePostResetSettlement(event, reason)
 end
 
-function CDMAuras:HandleTotemUpdate() refreshAllTrackedPanels("player") end
+function CDMAuras:HandleTotemUpdate() refreshAllTrackedPanels("player", false) end
 
 function CDMAuras:EnsureEventFrame()
 	if self.eventFrame then return end
