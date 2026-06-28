@@ -45,6 +45,7 @@ local questTrackerTextStyleRefreshing
 local questTrackerTextStyleState = {
 	color = {},
 	font = {},
+	tracker = setmetatable({}, { __mode = "k" }),
 	version = 0,
 }
 local QUEST_TRACKER_TEXT_STYLE_TRACKER_NAMES = {
@@ -349,22 +350,51 @@ local function UpdateQuestTrackerFontStringHeight(fontString, padding)
 	end
 end
 
+local function QuestTrackerTextStyleLineUnchanged(block, line, textValue, dashValue, completeObjective, highlighted)
+	return line._eqolQuestTrackerLineReady == true
+		and line._eqolQuestTrackerAppliedVersion == questTrackerTextStyleState.version
+		and line._eqolQuestTrackerAppliedBlock == block
+		and line._eqolQuestTrackerAppliedHighlighted == highlighted
+		and line._eqolQuestTrackerAppliedCompleteObjective == completeObjective
+		and line._eqolQuestTrackerTextValue == textValue
+		and line._eqolQuestTrackerDashValue == dashValue
+		and line._eqolQuestTrackerHasDash == (line.Dash ~= nil)
+		and line._eqolQuestTrackerHeight ~= nil
+end
+
 local function HandleQuestTrackerTextStyleLine(block, line)
 	if not line then return end
+	if not IsQuestTrackerTextStyleEnabled() then return end
 	local textChanged = false
 	local dashChanged = false
 	local textValue = line.Text and line.Text.GetText and line.Text:GetText() or nil
+	local dashValue = line.Dash and line.Dash.GetText and line.Dash:GetText() or nil
+	local completeObjective = IsQuestTrackerTextStyleCompleteLine(line)
+	local highlighted = block and block.isHighlighted or nil
+	if QuestTrackerTextStyleLineUnchanged(block, line, textValue, dashValue, completeObjective, highlighted) then return end
 	if line.Text then textChanged = ApplyQuestTrackerTextStyleFontString(line.Text, "objective", block, line) end
 	if line.Dash then dashChanged = ApplyQuestTrackerTextStyleFontString(line.Dash, "objective", block, line) end
 	if line.SetHeight and line.Text and line.Text.GetHeight then
-		if not (textChanged or dashChanged or line._eqolQuestTrackerTextValue ~= textValue or line._eqolQuestTrackerHeight == nil) then return end
-		local height = math.max(1, line.Text:GetHeight() or 1)
-		if line._eqolQuestTrackerHeight ~= height then
-			line:SetHeight(height)
-			line._eqolQuestTrackerHeight = height
+		if textChanged or dashChanged or line._eqolQuestTrackerTextValue ~= textValue or line._eqolQuestTrackerHeight == nil then
+			local height = math.max(1, line.Text:GetHeight() or 1)
+			if line._eqolQuestTrackerHeight ~= height then
+				line:SetHeight(height)
+				line._eqolQuestTrackerHeight = height
+			end
 		end
-		line._eqolQuestTrackerTextValue = textValue
 	end
+	line._eqolQuestTrackerLineReady = true
+	line._eqolQuestTrackerAppliedVersion = questTrackerTextStyleState.version
+	line._eqolQuestTrackerAppliedBlock = block
+	line._eqolQuestTrackerAppliedHighlighted = highlighted
+	line._eqolQuestTrackerAppliedCompleteObjective = completeObjective
+	line._eqolQuestTrackerTextValue = textValue
+	line._eqolQuestTrackerDashValue = dashValue
+	line._eqolQuestTrackerHasDash = line.Dash ~= nil
+end
+
+local function HandleQuestTrackerTextStyleUsedLine(line)
+	HandleQuestTrackerTextStyleLine(questTrackerTextStyleState.iterationBlock, line)
 end
 
 local function HandleQuestTrackerTextStyleBlock(block)
@@ -382,7 +412,11 @@ local function HandleQuestTrackerTextStyleBlock(block)
 			block.HeaderText._eqolQuestTrackerTextValue = headerTextValue
 		end
 	end
-	if block.ForEachUsedLine then block:ForEachUsedLine(function(line) HandleQuestTrackerTextStyleLine(block, line) end) end
+	if block.ForEachUsedLine then
+		questTrackerTextStyleState.iterationBlock = block
+		block:ForEachUsedLine(HandleQuestTrackerTextStyleUsedLine)
+		questTrackerTextStyleState.iterationBlock = nil
+	end
 	if block.AddObjective and not block._eqolQuestTrackerAddObjectiveHooked and hooksecurefunc then
 		block._eqolQuestTrackerAddObjectiveHooked = true
 		hooksecurefunc(block, "AddObjective", function(hookedBlock)
@@ -392,10 +426,18 @@ local function HandleQuestTrackerTextStyleBlock(block)
 end
 
 local function IsQuestTrackerTextStyleTracker(tracker)
+	if not tracker then return false end
+	local cached = questTrackerTextStyleState.tracker[tracker]
+	if cached ~= nil then return cached end
+	local isTracker = false
 	for _, name in ipairs(QUEST_TRACKER_TEXT_STYLE_TRACKER_NAMES) do
-		if tracker == _G[name] then return true end
+		if tracker == _G[name] then
+			isTracker = true
+			break
+		end
 	end
-	return false
+	questTrackerTextStyleState.tracker[tracker] = isTracker
+	return isTracker
 end
 
 local function HandleQuestTrackerTextStyleModule(tracker)

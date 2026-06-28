@@ -318,16 +318,27 @@ function EnhancedWaypoint:Update()
 	self:ApplyScale()
 end
 
-function EnhancedWaypoint:TryAttach()
+function EnhancedWaypoint:TryAttach(forceUpdate)
 	local frame = _G.SuperTrackedFrame
 	if not (frame and frame.Icon and frame.UpdateIcon) then return false end
+	local frameChanged = state.frame ~= frame
+	if frameChanged then
+		state.frame = frame
+		state.label = nil
+		state.highlight = nil
+		state.fontPrepared = false
+		state.lastAppliedFrame = nil
+	end
+	local attached = frame.__eqolEnhancedWaypointHooked == true
 	if not frame.__eqolEnhancedWaypointHooked then
 		frame.__eqolEnhancedWaypointHooked = true
 		hooksecurefunc(frame, "UpdateIcon", function() EnhancedWaypoint:Update() end)
 	end
 	updateAlphaBehavior(frame)
-	self:Update()
-	self:QueueDelayedUpdate()
+	if frameChanged or not attached or forceUpdate == true then
+		self:Update()
+		self:QueueDelayedUpdate()
+	end
 	return true
 end
 
@@ -351,10 +362,13 @@ function EnhancedWaypoint:SetEnabled(enabled)
 						EnhancedWaypoint:Update()
 					end)
 				end
+				EnhancedWaypoint:QueueDelayedUpdate()
+			elseif event == "SUPER_TRACKING_PATH_UPDATED" then
+				EnhancedWaypoint:TryAttach(false)
 			else
-				EnhancedWaypoint:TryAttach()
+				EnhancedWaypoint:TryAttach(true)
+				EnhancedWaypoint:QueueDelayedUpdate()
 			end
-			EnhancedWaypoint:QueueDelayedUpdate()
 		end)
 	end
 
@@ -363,5 +377,5 @@ function EnhancedWaypoint:SetEnabled(enabled)
 	for i = 1, #EVENT_NAMES do
 		self.eventFrame:RegisterEvent(EVENT_NAMES[i])
 	end
-	self:TryAttach()
+	self:TryAttach(true)
 end

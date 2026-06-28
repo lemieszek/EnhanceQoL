@@ -1418,7 +1418,7 @@ function Timer:EnsurePanelBar(key)
 	if frame.panelBars[key] then return frame.panelBars[key] end
 	local bar = CreateFrame("StatusBar", nil, frame, BackdropTemplateMixin and "BackdropTemplate")
 	bar.eqolBarKey = key
-	bar:SetFrameLevel(math.max(0, frame:GetFrameLevel() - 1))
+	bar:SetFrameLevel(frame:GetFrameLevel() + 2)
 	bar:SetMinMaxValues(0, 100)
 	bar:SetValue(0)
 	bar.bg = bar:CreateTexture(nil, "BACKGROUND")
@@ -1636,7 +1636,7 @@ function Timer:ApplyFrameStyle()
 		applyFontString(row.value, font, fontSize, style)
 	end
 	for _, bar in pairs(frame.panelBars or {}) do
-		bar:SetFrameLevel(math.max(0, frame:GetFrameLevel() - 1))
+		bar:SetFrameLevel(frame:GetFrameLevel() + 2)
 		local prefix = bar.eqolBarKey == "enemy" and "panelEnemyBar" or "panelTimerBar"
 		local visibleKey = bar.eqolBarKey == "enemy" and "showPanelEnemyBar" or "showPanelTimerBar"
 		local panelTexture = resolveMedia("statusbar", self:Get(prefix .. "Texture") or self:Get("texture"), DEFAULT_STATUSBAR)
@@ -2057,7 +2057,7 @@ function Timer:SetPanelBar(key, value, maxValue, anchorKey, xKey, yKey, color)
 	local height = snapSize(clampNumber(self:Get(heightKey) or self:Get("panelBarHeight"), 1, 64, defaults[heightKey] or defaults.panelBarHeight))
 	local anchor = normalizePoint(self:Get(anchorKey))
 	bar:ClearAllPoints()
-	bar:SetFrameLevel(math.max(0, self:EnsureFrame():GetFrameLevel() - 1))
+	bar:SetFrameLevel(self:EnsureFrame():GetFrameLevel() + 2)
 	if bar.textFrame then bar.textFrame:SetFrameLevel(self:EnsureFrame():GetFrameLevel() + 40) end
 	if bar.chestMarkerTextFrame then bar.chestMarkerTextFrame:SetFrameLevel(self:EnsureFrame():GetFrameLevel() + 40) end
 	bar:SetPoint(anchor, self:EnsureFrame(), anchor, pointOffset(self:Get(xKey), -800, 800, defaults[xKey] or 0), pointOffset(self:Get(yKey), -800, 800, defaults[yKey] or 0))
