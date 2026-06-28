@@ -4,6 +4,10 @@
 
 ## [11.5.0-beta4] - 2026-06-27
 
+### ✨ Added
+
+- EQoL Suite: Added growth direction and icon alpha controls for custom aura containers.
+
 ### 🔄 Changed
 
 - Performance: Reduced repeated runtime work in Class Buff Reminder, Default Aura Containers, Resource Bars, Quest Tracker text styling, Enhanced Waypoints, and Map/Minimap stats.

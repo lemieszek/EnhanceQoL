@@ -67,12 +67,14 @@ end
 
 local DEFAULT_AURA_CONFIG_SUFFIXES = {
 	"IconShape",
+	"IconAlpha",
 	"IconSize",
 	"IconSpacing",
 	"HorizontalSpacing",
 	"VerticalSpacing",
 	"IconsPerRow",
 	"MaxRows",
+	"Growth",
 	"FrameStrata",
 	"FrameLevel",
 	"SortMethod",
@@ -173,18 +175,27 @@ local function normalizeAuraIconDarkness(value)
 	return math.floor(value + 0.5)
 end
 
+local function normalizeAuraIconAlpha(value)
+	value = tonumber(value)
+	if value == nil then value = 1 end
+	if value < 0 then value = 0 end
+	if value > 1 then value = 1 end
+	return value
+end
+
 local function applyDefaultAuraIconDarkMode(button, config)
 	local icon = button and (button.Icon or button.icon)
 	if not icon then return end
 	config = config or getDefaultAuraStyleConfig(button and button.eqolDefaultAuraKind)
+	local alpha = config.iconAlpha or 1
 	if config.iconDarkMode == true then
 		local darkness = config.iconDarkness
 		local value = 1 - (darkness / 100)
 		if icon.SetDesaturated then icon:SetDesaturated(config.iconDesaturate == true) end
-		if icon.SetVertexColor then icon:SetVertexColor(value, value, value, 1) end
+		if icon.SetVertexColor then icon:SetVertexColor(value, value, value, alpha) end
 	else
 		if icon.SetDesaturated then icon:SetDesaturated(false) end
-		if icon.SetVertexColor then icon:SetVertexColor(1, 1, 1, 1) end
+		if icon.SetVertexColor then icon:SetVertexColor(1, 1, 1, alpha) end
 	end
 end
 
@@ -485,6 +496,53 @@ local function normalizeDefaultAuraSortDirection(value)
 	return "-"
 end
 
+local DEFAULT_AURA_GROWTH_OPTIONS = {
+	"LEFTDOWN",
+	"LEFTUP",
+	"RIGHTDOWN",
+	"RIGHTUP",
+	"DOWNLEFT",
+	"DOWNRIGHT",
+	"UPLEFT",
+	"UPRIGHT",
+}
+
+local function parseDefaultAuraGrowth(value)
+	local raw = type(value) == "string" and strupper(value):gsub("[%s_%-]+", "") or ""
+	local first, second = raw:match("^(LEFT)(UP)$")
+	if not first then first, second = raw:match("^(LEFT)(DOWN)$") end
+	if not first then first, second = raw:match("^(RIGHT)(UP)$") end
+	if not first then first, second = raw:match("^(RIGHT)(DOWN)$") end
+	if not first then first, second = raw:match("^(UP)(LEFT)$") end
+	if not first then first, second = raw:match("^(UP)(RIGHT)$") end
+	if not first then first, second = raw:match("^(DOWN)(LEFT)$") end
+	if not first then first, second = raw:match("^(DOWN)(RIGHT)$") end
+	if not first then first, second = "LEFT", "DOWN" end
+	return first, second
+end
+
+local function normalizeDefaultAuraGrowth(value)
+	local first, second = parseDefaultAuraGrowth(value)
+	return first .. second
+end
+
+local function getDefaultAuraGrowth(kind)
+	return normalizeDefaultAuraGrowth(getDefaultAuraDBValue(kind, "Growth"))
+end
+
+local function getDefaultAuraGrowthLayout(kind)
+	local primary, secondary = parseDefaultAuraGrowth(getDefaultAuraGrowth(kind))
+	local primaryHorizontal = primary == "LEFT" or primary == "RIGHT"
+	local horizontal = primaryHorizontal and primary or secondary
+	local vertical = primaryHorizontal and secondary or primary
+	local startPoint = (vertical == "UP" and "BOTTOM" or "TOP") .. (horizontal == "LEFT" and "RIGHT" or "LEFT")
+	return primary, secondary, primaryHorizontal, startPoint
+end
+
+local function getDefaultAuraLayoutSize(kind, size, horizontalSpacing, verticalSpacing, perRow, maxRows)
+	return perRow * size + (perRow - 1) * horizontalSpacing, maxRows * size + (maxRows - 1) * verticalSpacing
+end
+
 local function getAuraTextSize(key, fallback)
 	local size = tonumber(addon.db and addon.db[key]) or fallback
 	if size < 6 then size = 6 end
@@ -697,6 +755,7 @@ getDefaultAuraStyleConfig = function(kind)
 	local colorKey = dynamicBorderColor and "dynamic" or (tostring(color[1]) .. ":" .. tostring(color[2]) .. ":" .. tostring(color[3]) .. ":" .. tostring(color[4]))
 	local iconDarkMode = getDefaultAuraDBValue(kind, "IconDarkMode") == true
 	local iconDarkness = normalizeAuraIconDarkness(getDefaultAuraDBValue(kind, "IconDarkness"))
+	local iconAlpha = normalizeAuraIconAlpha(getDefaultAuraDBValue(kind, "IconAlpha"))
 	local iconDesaturate = getDefaultAuraDBValue(kind, "IconDesaturate") == true
 	local durationTextKey = buildDefaultAuraTextStyleKey(kind, "Duration", DEFAULT_AURA_DURATION_COLOR)
 	local countTextKey = buildDefaultAuraTextStyleKey(kind, "Count", DEFAULT_AURA_COUNT_COLOR)
@@ -724,12 +783,13 @@ getDefaultAuraStyleConfig = function(kind)
 	entry.colorKey = colorKey
 	entry.iconDarkMode = iconDarkMode
 	entry.iconDarkness = iconDarkness
+	entry.iconAlpha = iconAlpha
 	entry.iconDesaturate = iconDesaturate
 	entry.hasCustomBorder = not isNoAuraBorder(borderKey)
 	entry.hideCountdownNumbers = getDefaultAuraDBValue(kind, "DurationEnabled") == false
 	entry.durationTextKey = durationTextKey
 	entry.countTextKey = countTextKey
-	entry.styleKey = tostring(kind) .. ":" .. tostring(size) .. ":" .. tostring(shape) .. ":" .. tostring(zoom) .. ":" .. tostring(borderKey) .. ":" .. tostring(entry.borderSize) .. ":" .. tostring(entry.borderOffset) .. ":" .. tostring(entry.drawSwipe) .. ":" .. tostring(entry.drawEdge) .. ":" .. tostring(entry.cooldownReverse) .. ":" .. tostring(entry.durationTextProfile) .. ":" .. tostring(entry.durationTextVersion) .. ":" .. tostring(useDebuffTypeBorderColor) .. ":" .. colorKey .. ":" .. tostring(iconDarkMode) .. ":" .. tostring(iconDarkness) .. ":" .. tostring(iconDesaturate) .. ":" .. durationTextKey .. ":" .. countTextKey
+	entry.styleKey = tostring(kind) .. ":" .. tostring(size) .. ":" .. tostring(shape) .. ":" .. tostring(zoom) .. ":" .. tostring(borderKey) .. ":" .. tostring(entry.borderSize) .. ":" .. tostring(entry.borderOffset) .. ":" .. tostring(entry.drawSwipe) .. ":" .. tostring(entry.drawEdge) .. ":" .. tostring(entry.cooldownReverse) .. ":" .. tostring(entry.durationTextProfile) .. ":" .. tostring(entry.durationTextVersion) .. ":" .. tostring(useDebuffTypeBorderColor) .. ":" .. colorKey .. ":" .. tostring(iconDarkMode) .. ":" .. tostring(iconDarkness) .. ":" .. tostring(iconAlpha) .. ":" .. tostring(iconDesaturate) .. ":" .. durationTextKey .. ":" .. countTextKey
 	return entry
 end
 
@@ -1233,6 +1293,10 @@ local function configureDefaultAuraHeader(header, filter, kind)
 	local verticalSpacing = getDefaultAuraVerticalSpacing(nil, kind)
 	local perRow = getDefaultAuraIconsPerRow(nil, kind)
 	local maxRows = getDefaultAuraMaxRows(nil, kind)
+	local primary, _, primaryHorizontal, startPoint = getDefaultAuraGrowthLayout(kind)
+	local layoutWidth, layoutHeight = getDefaultAuraLayoutSize(kind, size, horizontalSpacing, verticalSpacing, perRow, maxRows)
+	local wrapAfter = primaryHorizontal and perRow or maxRows
+	local maxWraps = primaryHorizontal and maxRows or perRow
 	header:SetAttribute("unit", "player")
 	header.eqolDefaultAuraUnit = "player"
 	header:SetAttribute("filter", filter)
@@ -1243,19 +1307,19 @@ local function configureDefaultAuraHeader(header, filter, kind)
 	header:SetAttribute("initialConfigFunction", DEFAULT_AURA_INITIAL_CONFIG)
 	header:SetAttribute("sortMethod", normalizeDefaultAuraSortMethod(getDefaultAuraDBValue(kind, "SortMethod")))
 	header:SetAttribute("sortDirection", normalizeDefaultAuraSortDirection(getDefaultAuraDBValue(kind, "SortDirection")))
-	header:SetAttribute("wrapAfter", perRow)
-	header:SetAttribute("maxWraps", maxRows)
-	header:SetAttribute("point", "TOPRIGHT")
-	header:SetAttribute("xOffset", -(size + horizontalSpacing))
-	header:SetAttribute("yOffset", 0)
-	header:SetAttribute("wrapXOffset", 0)
-	header:SetAttribute("wrapYOffset", -(size + verticalSpacing))
-	header:SetAttribute("minWidth", perRow * size + (perRow - 1) * horizontalSpacing)
-	header:SetAttribute("minHeight", maxRows * size + (maxRows - 1) * verticalSpacing)
+	header:SetAttribute("wrapAfter", wrapAfter)
+	header:SetAttribute("maxWraps", maxWraps)
+	header:SetAttribute("point", startPoint)
+	header:SetAttribute("xOffset", primaryHorizontal and ((primary == "LEFT" and -1 or 1) * (size + horizontalSpacing)) or 0)
+	header:SetAttribute("yOffset", primaryHorizontal and 0 or ((primary == "UP" and 1 or -1) * (size + verticalSpacing)))
+	header:SetAttribute("wrapXOffset", primaryHorizontal and 0 or ((startPoint:find("RIGHT", 1, true) and -1 or 1) * (size + horizontalSpacing)))
+	header:SetAttribute("wrapYOffset", primaryHorizontal and ((startPoint:find("BOTTOM", 1, true) and 1 or -1) * (size + verticalSpacing)) or 0)
+	header:SetAttribute("minWidth", layoutWidth)
+	header:SetAttribute("minHeight", layoutHeight)
 	if filter == "HELPFUL" then
 		header:SetAttribute("includeWeapons", getDefaultAuraDBValue(kind, "IncludeWeapons") == true and 1 or 0)
 	end
-	header:SetSize(perRow * size + (perRow - 1) * horizontalSpacing, maxRows * size + (maxRows - 1) * verticalSpacing)
+	header:SetSize(layoutWidth, layoutHeight)
 	applyDefaultAuraHeaderButtonStyles(header, true)
 	updateDefaultAuraHeaderButtons(header)
 end
@@ -1284,7 +1348,12 @@ local function ensureDefaultAuraAnchor(kind)
 	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
 	if tonumber((select(4, GetBuildInfo()))) >= 120100 and type(anchor.SetRolesets) == "function" then anchor:SetRolesets("buffs") end
 	DAC.variables[key] = anchor
-	anchor:SetSize(getDefaultAuraIconsPerRow(nil, kind) * getDefaultAuraIconSize(nil, kind) + (getDefaultAuraIconsPerRow(nil, kind) - 1) * getDefaultAuraHorizontalSpacing(nil, kind), getDefaultAuraMaxRows(nil, kind) * getDefaultAuraIconSize(nil, kind) + (getDefaultAuraMaxRows(nil, kind) - 1) * getDefaultAuraVerticalSpacing(nil, kind))
+	local size = getDefaultAuraIconSize(nil, kind)
+	local horizontalSpacing = getDefaultAuraHorizontalSpacing(nil, kind)
+	local verticalSpacing = getDefaultAuraVerticalSpacing(nil, kind)
+	local perRow = getDefaultAuraIconsPerRow(nil, kind)
+	local maxRows = getDefaultAuraMaxRows(nil, kind)
+	anchor:SetSize(getDefaultAuraLayoutSize(kind, size, horizontalSpacing, verticalSpacing, perRow, maxRows))
 	anchor:SetFrameStrata(normalizeDefaultAuraFrameStrata(getDefaultAuraDBValue(kind, "FrameStrata")))
 	anchor:SetFrameLevel(getDefaultAuraFrameLevel(nil, kind))
 	if anchor.SetClampedToScreen then anchor:SetClampedToScreen(true) end
@@ -1298,7 +1367,9 @@ local function attachDefaultAuraHeaderToAnchor(header, anchor)
 	if not (header and anchor) then return end
 	if header:GetParent() ~= anchor then header:SetParent(anchor) end
 	header:ClearAllPoints()
-	header:SetPoint("TOPRIGHT", anchor, "TOPRIGHT", 0, 0)
+	local kind = header.eqolDefaultAuraKind or "buff"
+	local _, _, _, startPoint = getDefaultAuraGrowthLayout(kind)
+	header:SetPoint(startPoint, anchor, startPoint, 0, 0)
 	header:SetFrameStrata(anchor:GetFrameStrata())
 	header:SetFrameLevel((anchor:GetFrameLevel() or 1) + 1)
 end
@@ -1355,6 +1426,7 @@ local function refreshDefaultAuraSamples(kind)
 	local perRow = getDefaultAuraIconsPerRow(nil, kind)
 	local verticalSpacing = getDefaultAuraVerticalSpacing(nil, kind)
 	local maxRows = getDefaultAuraMaxRows(nil, kind)
+	local primary, _, primaryHorizontal, startPoint = getDefaultAuraGrowthLayout(kind)
 	local count = perRow * maxRows
 	for i = 1, count do
 		local sample = samples[i]
@@ -1380,13 +1452,23 @@ local function refreshDefaultAuraSamples(kind)
 		setDefaultAuraCooldownDuration(sample, GetTime() - i, 30 + i * 8)
 		sample:ClearAllPoints()
 		sample:SetSize(size, size)
-		local column = (i - 1) % perRow
-		local row = math.floor((i - 1) / perRow)
-		if column == 0 then
-			sample:SetPoint("TOPRIGHT", anchor, "TOPRIGHT", 0, -row * (size + verticalSpacing))
+		local column, row
+		if primaryHorizontal then
+			column = (i - 1) % perRow
+			row = math.floor((i - 1) / perRow)
 		else
-			sample:SetPoint("RIGHT", samples[i - 1], "LEFT", -horizontalSpacing, 0)
+			column = math.floor((i - 1) / maxRows)
+			row = (i - 1) % maxRows
 		end
+		local xOffset, yOffset
+		if primaryHorizontal then
+			xOffset = column * (primary == "LEFT" and -1 or 1) * (size + horizontalSpacing)
+			yOffset = row * (startPoint:find("BOTTOM", 1, true) and 1 or -1) * (size + verticalSpacing)
+		else
+			xOffset = column * (startPoint:find("RIGHT", 1, true) and -1 or 1) * (size + horizontalSpacing)
+			yOffset = row * (primary == "UP" and 1 or -1) * (size + verticalSpacing)
+		end
+		sample:SetPoint(startPoint, anchor, startPoint, xOffset, yOffset)
 		applyDefaultAuraButtonStyle(sample, true)
 		sample:Show()
 	end
@@ -1429,6 +1511,8 @@ local function applyDefaultAuraEditModeSetting(kind, field, value)
 		setDefaultAuraDBValue(kind, "IconDarkMode", value == true)
 	elseif field == "iconDarkness" then
 		setDefaultAuraDBValue(kind, "IconDarkness", normalizeAuraIconDarkness(value))
+	elseif field == "iconAlpha" then
+		setDefaultAuraDBValue(kind, "IconAlpha", normalizeAuraIconAlpha(value))
 	elseif field == "iconDesaturate" then
 		setDefaultAuraDBValue(kind, "IconDesaturate", value == true)
 	elseif field == "size" then
@@ -1449,6 +1533,8 @@ local function applyDefaultAuraEditModeSetting(kind, field, value)
 		setDefaultAuraDBValue(kind, "IconsPerRow", getDefaultAuraIconsPerRow(value, kind))
 	elseif field == "maxRows" then
 		setDefaultAuraDBValue(kind, "MaxRows", getDefaultAuraMaxRows(value, kind))
+	elseif field == "growth" then
+		setDefaultAuraDBValue(kind, "Growth", normalizeDefaultAuraGrowth(value))
 	elseif field == "frameStrata" then
 		setDefaultAuraDBValue(kind, "FrameStrata", normalizeDefaultAuraFrameStrata(value))
 	elseif field == "frameLevel" then
@@ -1630,6 +1716,21 @@ local function createDefaultAuraEditModeSettings(kind)
 	local function cooldownSwipeEnabled() return getDefaultAuraDrawSwipe(kind) end
 	local function iconDarkModeEnabled() return getDefaultAuraDBValue(kind, "IconDarkMode") == true end
 	local function anchorOptions() return buildAuraAnchorOptions() end
+	local function growthOptions()
+		local labels = {
+			LEFT = _G.HUD_EDIT_MODE_SETTING_BAGS_DIRECTION_LEFT or _G.LEFT or L["Left"] or "Left",
+			RIGHT = _G.HUD_EDIT_MODE_SETTING_BAGS_DIRECTION_RIGHT or _G.RIGHT or L["Right"] or "Right",
+			UP = _G.HUD_EDIT_MODE_SETTING_BAGS_DIRECTION_UP or _G.UP or L["Up"] or "Up",
+			DOWN = _G.HUD_EDIT_MODE_SETTING_BAGS_DIRECTION_DOWN or _G.DOWN or L["Down"] or "Down",
+		}
+		local options = {}
+		for i = 1, #DEFAULT_AURA_GROWTH_OPTIONS do
+			local value = DEFAULT_AURA_GROWTH_OPTIONS[i]
+			local first, second = parseDefaultAuraGrowth(value)
+			options[#options + 1] = { value = value, label = ("%s %s"):format(labels[first] or first, labels[second] or second) }
+		end
+		return options
+	end
 	local function sortMethodOptions()
 		return {
 			{ value = "TIME", label = L["Time"] or "Time" },
@@ -1668,6 +1769,7 @@ local function createDefaultAuraEditModeSettings(kind)
 		slider(L["Icon zoom"] or "Icon zoom", function() return normalizeAuraIconZoom(getDefaultAuraDBValue(kind, "IconZoom")) end, function(value) applyDefaultAuraEditModeSetting(kind, "zoom", value) end, 0, 35, 1, nil, layoutSectionId),
 		checkbox(L["Icon dark mode"] or "Icon dark mode", function() return getDefaultAuraDBValue(kind, "IconDarkMode") == true end, function(value) applyDefaultAuraEditModeSetting(kind, "iconDarkMode", value) end, nil, layoutSectionId),
 		slider(L["Icon darkness"] or "Icon darkness", function() return normalizeAuraIconDarkness(getDefaultAuraDBValue(kind, "IconDarkness")) end, function(value) applyDefaultAuraEditModeSetting(kind, "iconDarkness", value) end, 0, 100, 1, iconDarkModeEnabled, layoutSectionId),
+		slider(L["Alpha"] or "Alpha", function() return math.floor((normalizeAuraIconAlpha(getDefaultAuraDBValue(kind, "IconAlpha")) * 100) + 0.5) end, function(value) applyDefaultAuraEditModeSetting(kind, "iconAlpha", (tonumber(value) or 100) / 100) end, 0, 100, 1, nil, layoutSectionId),
 		checkbox(L["Desaturate icon"] or "Desaturate icon", function() return getDefaultAuraDBValue(kind, "IconDesaturate") == true end, function(value) applyDefaultAuraEditModeSetting(kind, "iconDesaturate", value) end, iconDarkModeEnabled, layoutSectionId),
 		slider(L["Icon size"] or "Icon size", function() return getDefaultAuraIconSize(nil, kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "size", value) end, 16, 80, 1, nil, layoutSectionId),
 		slider(L["Horizontal spacing"] or "Horizontal spacing", function() return getDefaultAuraHorizontalSpacing(nil, kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "horizontalSpacing", value) end, 0, 100, 1, nil, layoutSectionId),
@@ -1677,6 +1779,7 @@ local function createDefaultAuraEditModeSettings(kind)
 		checkbox(L["Reverse cooldown swipe"] or "Reverse cooldown swipe", function() return getDefaultAuraCooldownReverse(kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "cooldownReverse", value) end, cooldownSwipeEnabled, layoutSectionId),
 		slider(L["Aura per row"] or "Auras per row", function() return getDefaultAuraIconsPerRow(nil, kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "perRow", value) end, 1, 32, 1, nil, layoutSectionId),
 		slider(L["Max rows"] or "Max rows", function() return getDefaultAuraMaxRows(nil, kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "maxRows", value) end, 1, 10, 1, nil, layoutSectionId),
+		dropdown(L["Growth direction"] or "Growth direction", function() return getDefaultAuraGrowth(kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "growth", value) end, growthOptions, 180, nil, layoutSectionId),
 		dropdown(L["Frame strata"] or "Frame strata", function() return normalizeDefaultAuraFrameStrata(getDefaultAuraDBValue(kind, "FrameStrata")) end, function(value) applyDefaultAuraEditModeSetting(kind, "frameStrata", value) end, frameStrataOptions, 180, nil, layoutSectionId),
 		slider(L["UFFrameLevel"] or "Frame level", function() return getDefaultAuraFrameLevel(nil, kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "frameLevel", value) end, 0, 100, 1, nil, layoutSectionId),
 		dropdown(L["Sort method"] or "Sort method", function() return normalizeDefaultAuraSortMethod(getDefaultAuraDBValue(kind, "SortMethod")) end, function(value) applyDefaultAuraEditModeSetting(kind, "sortMethod", value) end, sortMethodOptions, 120, nil, layoutSectionId),
@@ -1906,12 +2009,14 @@ function DAC.functions.InitDB()
 	init("skinnerDefaultDebuffIconsEnabled", false)
 	init("skinnerDefaultAuraSyncBuffDebuff", true)
 	init("skinnerDefaultAuraIconShape", "DEFAULT")
+	init("skinnerDefaultAuraIconAlpha", 1)
 	init("skinnerDefaultAuraIconSize", 32)
 	init("skinnerDefaultAuraIconSpacing", 4)
 	init("skinnerDefaultAuraHorizontalSpacing", getDefaultAuraIconSpacing())
 	init("skinnerDefaultAuraVerticalSpacing", getDefaultAuraIconSpacing() + 12)
 	init("skinnerDefaultAuraIconsPerRow", 8)
 	init("skinnerDefaultAuraMaxRows", 4)
+	init("skinnerDefaultAuraGrowth", "LEFTDOWN")
 	init("skinnerDefaultAuraFrameStrata", "MEDIUM")
 	init("skinnerDefaultAuraFrameLevel", 50)
 	init("skinnerDefaultAuraSortMethod", "TIME")
