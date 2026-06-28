@@ -1607,7 +1607,7 @@ local function ShouldRunTooltipPostCall()
 		or db["TooltipBuffHideInCombat"]
 end
 
-if TooltipDataProcessor and ShouldRunTooltipPostCall() then
+if TooltipDataProcessor then
 	TooltipDataProcessor.AddLinePreCall(Enum.TooltipDataLineType.SellPrice, function(tooltip, lineData)
 		if not ShouldRunTooltipPostCall() then return end
 		tooltip:AddLine(SELL_PRICE .. ": " .. GetMoneyString(lineData.price), WHITE_FONT_COLOR:GetRGB())
