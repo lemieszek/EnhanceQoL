@@ -398,6 +398,25 @@ local function HandleQuestTrackerTextStyleModule(tracker)
 	end
 end
 
+local function ApplyQuestTrackerQuestCountStyle()
+	if not questTrackerQuestCountText then return end
+	if IsQuestTrackerTextStyleEnabled() then
+		ApplyQuestTrackerTextStyleFontString(questTrackerQuestCountText, "moduleHeader", nil)
+		return
+	end
+
+	local header = _G.QuestObjectiveTracker and _G.QuestObjectiveTracker.Header
+	local referenceFont = header and header.Text and header.Text:GetFontObject()
+	if referenceFont then
+		questTrackerQuestCountText:SetFontObject(referenceFont)
+	else
+		questTrackerQuestCountText:SetFont(addon.variables.defaultFont or "Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
+	end
+	questTrackerQuestCountText._eqolQuestTrackerFontKey = nil
+	questTrackerQuestCountText._eqolQuestTrackerColorKey = nil
+	questTrackerQuestCountText:SetTextColor(QUEST_TRACKER_QUEST_COUNT_COLOR.r, QUEST_TRACKER_QUEST_COUNT_COLOR.g, QUEST_TRACKER_QUEST_COUNT_COLOR.b)
+end
+
 local function EnsureQuestTrackerTextStyleHooks()
 	if not IsQuestTrackerTextStyleEnabled() then return end
 	if not hooksecurefunc then return end
@@ -419,6 +438,7 @@ local function RefreshQuestTrackerTextStyle(skipLayoutUpdate)
 		if tracker and tracker.EnumerateActiveBlocks then tracker:EnumerateActiveBlocks(function(block) HandleQuestTrackerTextStyleBlock(block) end) end
 		HandleQuestTrackerTextStyleModule(tracker)
 	end
+	ApplyQuestTrackerQuestCountStyle()
 	if not skipLayoutUpdate and not questTrackerTextStyleRefreshing and _G.ObjectiveTrackerManager and _G.ObjectiveTrackerManager.UpdateAll then
 		questTrackerTextStyleRefreshing = true
 		_G.ObjectiveTrackerManager:UpdateAll()
@@ -535,13 +555,7 @@ local function EnsureQuestTrackerQuestCountFrame()
 		questTrackerQuestCountText:SetJustifyH("LEFT")
 		questTrackerQuestCountText:SetJustifyV("TOP")
 	end
-	local referenceFont = header.Text and header.Text:GetFontObject()
-	if referenceFont then
-		questTrackerQuestCountText:SetFontObject(referenceFont)
-	else
-		questTrackerQuestCountText:SetFont(addon.variables.defaultFont or "Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
-	end
-	questTrackerQuestCountText:SetTextColor(QUEST_TRACKER_QUEST_COUNT_COLOR.r, QUEST_TRACKER_QUEST_COUNT_COLOR.g, QUEST_TRACKER_QUEST_COUNT_COLOR.b)
+	ApplyQuestTrackerQuestCountStyle()
 	return questTrackerQuestCountFrame
 end
 
