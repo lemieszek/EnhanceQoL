@@ -2,6 +2,14 @@
 
 <!--@eqol-beta@-->
 
+## [11.5.0-beta5] - 2026-06-28
+
+### 🐛 Fixed
+
+- Mythic Plus: Fixed Mythic+ Timer panel bars disappearing behind selected background textures after switching from a custom background to a dropdown texture.
+
+---
+
 ## [11.5.0-beta4] - 2026-06-27
 
 ### ✨ Added

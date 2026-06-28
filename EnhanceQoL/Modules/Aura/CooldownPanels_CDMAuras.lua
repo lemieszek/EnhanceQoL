@@ -1237,6 +1237,7 @@ local function hookFrame(frame)
 	if frame.SetAuraInstanceInfo then hooksecurefunc(frame, "SetAuraInstanceInfo", function(self) CDMAuras:HandleFrameAuraMutation(self, false) end) end
 	if frame.ClearAuraInstanceInfo then hooksecurefunc(frame, "ClearAuraInstanceInfo", function(self) CDMAuras:HandleFrameAuraMutation(self, true) end) end
 	if frame.RefreshTotemData then hooksecurefunc(frame, "RefreshTotemData", function(self) CDMAuras:HandleFrameTotemMutation(self) end) end
+	if frame.OnNewTarget then hooksecurefunc(frame, "OnNewTarget", function(self) CDMAuras:HandleFrameTargetChanged(self) end) end
 	if frame.ShowPandemicStateFrame then hooksecurefunc(frame, "ShowPandemicStateFrame", function(self) CDMAuras:HandleFramePandemicStateChanged(self, true) end) end
 	if frame.HidePandemicStateFrame then hooksecurefunc(frame, "HidePandemicStateFrame", function(self) CDMAuras:HandleFramePandemicStateChanged(self, false) end) end
 end
@@ -1550,14 +1551,13 @@ function CDMAuras:UpdateEventRegistration()
 		frame:RegisterEvent("COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED")
 		frame:RegisterEvent("PLAYER_LOGIN")
 		frame:RegisterEvent("PLAYER_ENTERING_WORLD")
-		frame:RegisterEvent("PLAYER_TARGET_CHANGED")
 		frame:RegisterEvent("PLAYER_TOTEM_UPDATE")
 		frame:RegisterEvent("ACTIVE_PLAYER_SPECIALIZATION_CHANGED")
 		frame:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED")
 		frame:RegisterEvent("PLAYER_TALENT_UPDATE")
 		frame:RegisterEvent("TRAIT_CONFIG_UPDATED")
 		frame:RegisterEvent("TRAIT_CONFIG_LIST_UPDATED")
-		frame:RegisterUnitEvent("UNIT_AURA", "player", "target")
+		frame:RegisterUnitEvent("UNIT_AURA", "player")
 		frame:RegisterUnitEvent("PLAYER_SPECIALIZATION_CHANGED", "player")
 		self.eventsRegistered = true
 	end
@@ -1918,6 +1918,14 @@ function CDMAuras:HandleFrameAuraMutation(frame, wasCleared)
 		requestPanelRefresh(panelId)
 		refreshedPanels[panelId] = nil
 	end
+end
+
+function CDMAuras:HandleFrameTargetChanged(frame)
+	if not frame then return end
+	local runtime = getRuntime()
+	runtime.targetEpoch = (runtime.targetEpoch or 0) + 1
+	cdm.BumpUnitAuraEpoch(runtime, "target")
+	self:HandleFrameAuraMutation(frame, false)
 end
 
 function CDMAuras:ApplyFrameTotemMutation(frame)
@@ -3156,14 +3164,6 @@ function CDMAuras:HandleUnitAura(_, unit, updateInfo)
 	end
 end
 
-function CDMAuras:HandleTargetChanged()
-	local runtime = getRuntime()
-	runtime.targetEpoch = (runtime.targetEpoch or 0) + 1
-	cdm.BumpUnitAuraEpoch(runtime, "target")
-	clearTrackedUnitAuraIndex("target")
-	refreshAllTrackedPanels("target")
-end
-
 function CDMAuras:HandleResetEvent(event, ...)
 	if event == "ADDON_LOADED" then
 		local addonName = ...
@@ -3198,8 +3198,6 @@ function CDMAuras:EnsureEventFrame()
 	frame:SetScript("OnEvent", function(_, event, ...)
 		if event == "UNIT_AURA" then
 			CDMAuras:HandleUnitAura(event, ...)
-		elseif event == "PLAYER_TARGET_CHANGED" then
-			CDMAuras:HandleTargetChanged(event, ...)
 		elseif event == "PLAYER_TOTEM_UPDATE" then
 			CDMAuras:HandleTotemUpdate(event, ...)
 		else
