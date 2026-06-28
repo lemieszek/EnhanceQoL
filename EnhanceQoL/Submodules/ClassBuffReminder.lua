@@ -433,6 +433,10 @@ local EVOKER_BLESSING_OF_BRONZE_IDS = {
 	381758,
 }
 
+local EVOKER_BLESSING_OF_BRONZE_KNOWN_IDS = {
+	364342, -- Blessing of the Bronze
+}
+
 local EVOKER_SOURCE_OF_MAGIC_IDS = {
 	369459, -- Source of Magic
 }
@@ -478,6 +482,7 @@ local PROVIDER_BY_CLASS = {
 	EVOKER = {
 		scope = PROVIDER_SCOPE_GROUP,
 		spellIds = EVOKER_BLESSING_OF_BRONZE_IDS,
+		knownSpellIds = EVOKER_BLESSING_OF_BRONZE_KNOWN_IDS,
 		fallbackName = "Blessing of the Bronze",
 	},
 	SHAMAN = {
@@ -3344,6 +3349,11 @@ function Reminder:GetEvokerSupportProvider()
 				381757,
 				381758,
 			},
+			knownSpellIds = {
+				369459,
+				360827,
+				364342,
+			},
 			sourceSpellIds = EVOKER_SOURCE_OF_MAGIC_IDS,
 			sourceKnownSpellIds = EVOKER_SOURCE_OF_MAGIC_IDS,
 			sourceAuraNames = { "Source of Magic" },
@@ -3355,7 +3365,7 @@ function Reminder:GetEvokerSupportProvider()
 			blisteringLabel = "Blistering Scales",
 			blisteringDisplaySpellId = 360827,
 			bronzeSpellIds = EVOKER_BLESSING_OF_BRONZE_IDS,
-			bronzeKnownSpellIds = EVOKER_BLESSING_OF_BRONZE_IDS,
+			bronzeKnownSpellIds = EVOKER_BLESSING_OF_BRONZE_KNOWN_IDS,
 			bronzeLabel = "Blessing of the Bronze",
 			bronzeDisplaySpellId = 381748,
 			fallbackName = "Source of Magic",

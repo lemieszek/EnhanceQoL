@@ -3435,3 +3435,40 @@ function CooldownPanels:RequestPanelRefresh(panelId)
 		if startedRuntimeQueryBatch and CooldownPanels.EndRuntimeQueryBatch then CooldownPanels:EndRuntimeQueryBatch() end
 	end)
 end
+
+function CooldownPanels:RequestEntryRefresh(panelId, entryId)
+	if not (panelId and entryId) then return end
+	self.runtime = self.runtime or {}
+	local rt = self.runtime
+
+	rt._eqolEntryRefreshQueue = rt._eqolEntryRefreshQueue or {}
+	local panelQueue = rt._eqolEntryRefreshQueue[panelId]
+	if not panelQueue then
+		panelQueue = {}
+		rt._eqolEntryRefreshQueue[panelId] = panelQueue
+	end
+	panelQueue[entryId] = true
+
+	if rt._eqolEntryRefreshPending then return end
+	rt._eqolEntryRefreshPending = true
+
+	RunNextFrame(function()
+		local runtime = CooldownPanels.runtime
+		if not runtime then return end
+		runtime._eqolEntryRefreshPending = nil
+
+		local q = runtime._eqolEntryRefreshQueue
+		if not q then return end
+		runtime._eqolEntryRefreshQueue = nil
+
+		for queuedPanelId, entries in pairs(q) do
+			local needsPanelRefresh = false
+			for queuedEntryId in pairs(entries) do
+				if not (CooldownPanels.RefreshRuntimeEntry and CooldownPanels:RefreshRuntimeEntry(queuedPanelId, queuedEntryId)) then
+					needsPanelRefresh = true
+				end
+			end
+			if needsPanelRefresh then CooldownPanels:RequestPanelRefresh(queuedPanelId) end
+		end
+	end)
+end
