@@ -11,6 +11,7 @@
 ### 🐛 Fixed
 
 - Class Buff Reminder: Improved Rogue poison tracking, Paladin Rites, Shaman weapon imbues, and weapon-oil checks in restricted aura states.
+- Default Aura Containers: Fixed custom borders after reload and improved safe handling for shared media borders.
 - Mouse Cursor: Fixed the ring center dot keeping stale color/alpha after ring style changes.
 
 ---

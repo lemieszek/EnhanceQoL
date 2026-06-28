@@ -6741,6 +6741,28 @@ local function setAllHooks()
 		reminder:RequestUpdate(true)
 	end
 
+	local function refreshDefaultAuraContainersForMedia(mediaType, mediaKey)
+		if mediaType ~= "border" and mediaType ~= "font" then return end
+		if not (addon.DefaultAuraContainers and addon.DefaultAuraContainers.functions and addon.DefaultAuraContainers.functions.RefreshDefaultAuraIconSkin) then return end
+		if not addon.db then return end
+		if not (addon.db.skinnerDefaultBuffIconsEnabled == true or addon.db.skinnerDefaultDebuffIconsEnabled == true) then return end
+
+		local sync = addon.db.skinnerDefaultAuraSyncBuffDebuff ~= false
+		local function uses(prefix, suffix)
+			return addon.db[prefix .. suffix] == mediaKey
+		end
+
+		local shouldRefresh
+		if mediaType == "border" then
+			shouldRefresh = uses("skinnerDefaultAura", "BorderTexture") or (not sync and uses("skinnerDefaultDebuffAura", "BorderTexture"))
+		else
+			shouldRefresh = uses("skinnerDefaultAura", "DurationFontFace")
+				or uses("skinnerDefaultAura", "CountFontFace")
+				or (not sync and (uses("skinnerDefaultDebuffAura", "DurationFontFace") or uses("skinnerDefaultDebuffAura", "CountFontFace")))
+		end
+		if shouldRefresh then addon.DefaultAuraContainers.functions.RefreshDefaultAuraIconSkin() end
+	end
+
 	local function refreshSquareMinimapBorderForMedia(mediaType, mediaKey)
 		if mediaType ~= "border" then return end
 		if not (addon and addon.db and addon.functions and addon.functions.applySquareMinimapBorder) then return end
@@ -6800,6 +6822,7 @@ local function setAllHooks()
 			if addon.Aura.UF and addon.Aura.UF.Refresh then addon.Aura.UF.Refresh() end
 			if addon.Aura.UF and addon.Aura.UF.GroupFrames and addon.Aura.UF.GroupFrames.RefreshTextStyles then addon.Aura.UF.GroupFrames:RefreshTextStyles() end
 		end
+		if addon.DefaultAuraContainers and addon.DefaultAuraContainers.functions and addon.DefaultAuraContainers.functions.RefreshDefaultAuraIconSkin then addon.DefaultAuraContainers.functions.RefreshDefaultAuraIconSkin() end
 		if addon.functions and addon.functions.applySquareMinimapStats then addon.functions.applySquareMinimapStats(true) end
 		if addon.MythicPlus and addon.MythicPlus.functions then
 			if addon.MythicPlus.functions.refreshBRMedia then addon.MythicPlus.functions.refreshBRMedia("font") end
@@ -6852,12 +6875,14 @@ local function setAllHooks()
 			refreshActionTrackerForMedia(mediaType, mediaKey)
 			refreshBRTrackerForMedia(mediaType)
 			refreshClassBuffReminderForMedia(mediaType, mediaKey)
+			refreshDefaultAuraContainersForMedia(mediaType, mediaKey)
 			refreshSquareMinimapBorderForMedia(mediaType, mediaKey)
 			refreshCooldownPanelsForMedia(mediaType)
 			if addon.MythicPlus and addon.MythicPlus.functions and addon.MythicPlus.functions.refreshBloodlustMedia then addon.MythicPlus.functions.refreshBloodlustMedia(mediaType, mediaKey) end
 		elseif mediaType == "font" then
 			refreshExperienceBarForMedia(mediaType, mediaKey)
 			refreshTotalAbsorbTrackerForMedia(mediaType, mediaKey)
+			refreshDefaultAuraContainersForMedia(mediaType, mediaKey)
 			refreshBRTrackerForMedia(mediaType)
 			if addon.MythicPlus and addon.MythicPlus.functions and addon.MythicPlus.functions.refreshBloodlustMedia then addon.MythicPlus.functions.refreshBloodlustMedia(mediaType, mediaKey) end
 			queueGlobalFontRefresh()

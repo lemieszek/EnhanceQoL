@@ -92,6 +92,9 @@
 
 - When handling Blizzard secret values, do not do Lua arithmetic, comparisons, `tonumber`, `min`, `max`, sorting, modulo, or similar numeric operations on the secret value.
 - Pass secret values through to Blizzard APIs that can consume them directly, such as status bar setters, instead of converting or deriving values in Lua.
+- For borders on frames whose size, parent, aura data, or update path can be secret-tainted, do not use `BackdropTemplate`, `SetBackdrop`, or `SetBackdropBorderColor`. Use `addon.functions.SetSafeBorder(frame, enabled, textureKey, size, r, g, b, a, options)` from `EnhanceQoL/General/functions.lua` instead.
+- `SetSafeBorder` is only for verified or plausibly secret-sensitive icon/aura/statusbar border paths. Do not migrate ordinary non-secret panels, standalone UI, or regular untainted frames just for style consistency.
+- When using `SetSafeBorder`, pass a stable `stateKey` per callsite, `defaultTexture = "Interface\\Buttons\\WHITE8x8"` unless a different default is required, and `mediaType = "border"` when `textureKey` is an LSM border key. Pass secret color values directly; do not compare, stringify, cache-key, or otherwise inspect them.
 
 ## Large Lua Files and Local Limits
 

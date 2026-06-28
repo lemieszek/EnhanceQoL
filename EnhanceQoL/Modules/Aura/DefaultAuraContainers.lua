@@ -1,4 +1,4 @@
--- luacheck: globals BackdropTemplate CreateFrame UIParent MinimapCluster InCombatLockdown RegisterAttributeDriver GameTooltip C_UnitAuras CooldownFrame_Set GetTime GetInventoryItemTexture GetInventoryItemID GetInventoryItemLink GetInventorySlotInfo GetWeaponEnchantInfo C_Item C_DurationUtil C_Timer C_CurveUtil Enum DEBUFF_TYPE_MAGIC_COLOR DEBUFF_TYPE_CURSE_COLOR DEBUFF_TYPE_DISEASE_COLOR DEBUFF_TYPE_POISON_COLOR DEBUFF_TYPE_BLEED_COLOR DEBUFF_TYPE_NONE_COLOR
+-- luacheck: globals BackdropTemplate CreateFrame UIParent MinimapCluster InCombatLockdown RegisterAttributeDriver GameTooltip C_UnitAuras CooldownFrame_Set GetTime GetInventoryItemTexture GetInventoryItemID GetInventoryItemLink GetInventorySlotInfo GetWeaponEnchantInfo C_Item C_DurationUtil C_CurveUtil Enum DEBUFF_TYPE_MAGIC_COLOR DEBUFF_TYPE_CURSE_COLOR DEBUFF_TYPE_DISEASE_COLOR DEBUFF_TYPE_POISON_COLOR DEBUFF_TYPE_BLEED_COLOR DEBUFF_TYPE_NONE_COLOR GetFrameHandleFrame
 local parentAddonName = "EnhanceQoL"
 local addonName, addon = ...
 
@@ -126,6 +126,7 @@ local function copyDefaultAuraConfig(fromKind, toKind)
 end
 
 local DEFAULT_AURA_BORDER_COLOR = { r = 0, g = 0, b = 0, a = 1 }
+local DEFAULT_AURA_BACKDROP_BORDER = "Interface\\Buttons\\WHITE8x8"
 local DEFAULT_AURA_DURATION_COLOR = { r = 1, g = 0.82, b = 0, a = 1 }
 local DEFAULT_AURA_COUNT_COLOR = { r = 1, g = 1, b = 1, a = 1 }
 local DEFAULT_AURA_DEBUFF_TYPE_COLORS = {
@@ -269,6 +270,10 @@ local function resolveDefaultAuraBorderColorFromConfig(button, config)
 		return getDefaultAuraOriginalBorderColor(button) or config.color or getDefaultAuraBorderColor(config.kind)
 	end
 	return config.color
+end
+
+local function shouldUpdateDefaultAuraStyleForAura(config)
+	return config and config.kind == "debuff" and config.useDebuffTypeBorderColor == true
 end
 
 local function normalizeAuraTextColor(value, fallback)
@@ -687,7 +692,7 @@ getDefaultAuraStyleConfig = function(kind)
 	local borderKey = normalizeAuraBorder(getDefaultAuraDBValue(kind, "BorderTexture"), shape)
 	local useDebuffTypeBorderColor = getDefaultAuraUseDebuffTypeBorderColor(kind)
 	local useOriginalBorderColor = getDefaultAuraUseOriginalBorderColor(kind)
-	local dynamicBorderColor = useDebuffTypeBorderColor or useOriginalBorderColor
+	local dynamicBorderColor = kind == "debuff" and useDebuffTypeBorderColor
 	local color = dynamicBorderColor and nil or getDefaultAuraBorderColor(kind)
 	local colorKey = dynamicBorderColor and "dynamic" or (tostring(color[1]) .. ":" .. tostring(color[2]) .. ":" .. tostring(color[3]) .. ":" .. tostring(color[4]))
 	local iconDarkMode = getDefaultAuraDBValue(kind, "IconDarkMode") == true
@@ -714,6 +719,7 @@ getDefaultAuraStyleConfig = function(kind)
 	entry.useDebuffTypeBorderColor = useDebuffTypeBorderColor
 	entry.useOriginalBorderColor = useOriginalBorderColor
 	entry.dynamicBorderColor = dynamicBorderColor
+	entry.updateStyleOnAura = shouldUpdateDefaultAuraStyleForAura(entry)
 	entry.color = color
 	entry.colorKey = colorKey
 	entry.iconDarkMode = iconDarkMode
@@ -792,7 +798,7 @@ end
 
 local function resolveAuraBackdropBorder(borderKey)
 	if not borderKey or borderKey == "" or isNoAuraBorder(borderKey) then return nil end
-	if borderKey == "DEFAULT" then return "Interface\\Buttons\\WHITE8X8" end
+	if borderKey == "DEFAULT" then return DEFAULT_AURA_BACKDROP_BORDER end
 	if addon.functions and addon.functions.GetLSMMediaHash then
 		local media = addon.functions.GetLSMMediaHash("border")
 		if type(media) == "table" and type(media[borderKey]) == "string" and media[borderKey] ~= "" then return media[borderKey] end
@@ -815,24 +821,26 @@ local function ensureDefaultAuraWatcher()
 end
 
 local function applyDefaultAuraBackdropBorder(button, icon, borderKey, color, config)
-	if not (button and icon) then return false end
-	local borderTexture = resolveAuraBackdropBorder(borderKey)
-	if not borderTexture then return false end
+	if not (button and icon and addon.functions and addon.functions.SetSafeBorder) then return false end
+	if not resolveAuraBackdropBorder(borderKey) then return false end
 	config = config or getDefaultAuraStyleConfig(button.eqolDefaultAuraKind)
 	local size = config.borderSize
 	local offset = config.borderOffset
 	local border = button.eqolDefaultAuraBackdropBorder
 	if not border then
-		border = CreateFrame("Frame", nil, button, "BackdropTemplate")
+		border = CreateFrame("Frame", nil, button)
 		button.eqolDefaultAuraBackdropBorder = border
 	end
 	border:ClearAllPoints()
 	border:SetPoint("TOPLEFT", icon, "TOPLEFT", -offset, offset)
 	border:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", offset, -offset)
-	border:SetBackdrop({ edgeFile = borderTexture, edgeSize = size })
-	border:SetBackdropBorderColor(color[1], color[2], color[3], color[4])
 	border:SetFrameLevel((button:GetFrameLevel() or 1) + 4)
-	border:Show()
+
+	addon.functions.SetSafeBorder(border, true, borderKey, size, color[1], color[2], color[3], color[4], {
+		defaultTexture = DEFAULT_AURA_BACKDROP_BORDER,
+		mediaType = "border",
+		stateKey = "_eqolDefaultAuraSafeBorder",
+	})
 	ensureDefaultAuraTextLayer(button)
 	return true
 end
@@ -897,22 +905,35 @@ end
 
 local function clearDefaultAuraCustomBorder(button)
 	if not button then return end
-	if button.eqolDefaultAuraBackdropBorder then button.eqolDefaultAuraBackdropBorder:Hide() end
+	if button.eqolDefaultAuraBackdropBorder then
+		if addon.functions and addon.functions.SetSafeBorder then
+			addon.functions.SetSafeBorder(button.eqolDefaultAuraBackdropBorder, false, nil, nil, nil, nil, nil, nil, { stateKey = "_eqolDefaultAuraSafeBorder" })
+		else
+			button.eqolDefaultAuraBackdropBorder:Hide()
+		end
+	end
 	if addon.IconShape and addon.IconShape.HideBorderTextures then
 		addon.IconShape.HideBorderTextures(button, { texturesKey = "_eqolDefaultAuraShapeBorderTextures" })
 	end
 end
 
-local function applyDefaultAuraButtonStyle(button, force)
+local function applyDefaultAuraCooldownSwipeVisual(button, config, force)
+	if not (button and addon.IconShape and addon.IconShape.ApplyCooldownSwipeVisual) then return end
+	local key = config and config.styleKey or button.eqolDefaultAuraStyleKey
+	if not force and button.eqolDefaultAuraCooldownSwipeVisualKey == key then return end
+	addon.IconShape.ApplyCooldownSwipeVisual(button.Cooldown, button, nil, nil, { customColor = false })
+	button.eqolDefaultAuraCooldownSwipeVisualKey = key
+end
+
+local function applyDefaultAuraButtonStyle(button, force, config)
 	if not button then return end
 	ensureDefaultAuraButtonVisuals(button)
 	local icon = button.Icon or button.icon
 	if not icon then return end
 
-	local config = getDefaultAuraStyleConfig(button.eqolDefaultAuraKind)
+	config = config or getDefaultAuraStyleConfig(button.eqolDefaultAuraKind)
 	local color = resolveDefaultAuraBorderColorFromConfig(button, config)
-	local colorKey = config.dynamicBorderColor and (tostring(color[1]) .. ":" .. tostring(color[2]) .. ":" .. tostring(color[3]) .. ":" .. tostring(color[4])) or config.colorKey
-	local styleKey = config.dynamicBorderColor and (config.styleKey .. ":" .. colorKey) or config.styleKey
+	local styleKey = config.styleKey
 	if not force and button.eqolDefaultAuraStyleKey == styleKey then return end
 	button.eqolDefaultAuraStyleKey = styleKey
 
@@ -934,9 +955,7 @@ local function applyDefaultAuraButtonStyle(button, force)
 			textureTexCoordKey = "_eqolDefaultAuraIconTexCoord",
 			maskKey = "_eqolDefaultAuraMask",
 			refreshSwipe = function(owner)
-				if addon.IconShape and addon.IconShape.ApplyCooldownSwipeVisual then
-					addon.IconShape.ApplyCooldownSwipeVisual(owner and owner.Cooldown, owner, nil, nil, { customColor = false })
-				end
+				applyDefaultAuraCooldownSwipeVisual(owner, config, true)
 			end,
 		})
 	elseif icon.SetTexCoord then
@@ -951,6 +970,25 @@ local function applyDefaultAuraButtonStyle(button, force)
 		else
 			applyDefaultAuraShapeBorder(button, icon, config.borderKey, config.shape, color, config)
 		end
+	end
+end
+
+local function updateDefaultAuraDynamicBorderColor(button, config)
+	if not (button and config and config.updateStyleOnAura and config.hasCustomBorder) then return end
+	local icon = button.Icon or button.icon
+	if not icon then return end
+	local color = resolveDefaultAuraBorderColorFromConfig(button, config)
+	if isBackdropAuraBorderCompatible(config.shape) then
+		local border = button.eqolDefaultAuraBackdropBorder
+		if border and addon.functions and addon.functions.SetSafeBorder then
+			addon.functions.SetSafeBorder(border, true, config.borderKey, config.borderSize, color[1], color[2], color[3], color[4], {
+				defaultTexture = DEFAULT_AURA_BACKDROP_BORDER,
+				mediaType = "border",
+				stateKey = "_eqolDefaultAuraSafeBorder",
+			})
+		end
+	elseif addon.IconShape and addon.IconShape.ApplyBorder then
+		applyDefaultAuraShapeBorder(button, icon, config.borderKey, config.shape, color, config)
 	end
 end
 
@@ -982,13 +1020,13 @@ local function resolveDefaultTempEnchantIcon(slot)
 	return nil
 end
 
-local function updateDefaultTempEnchantButton(button, kind)
+local function updateDefaultTempEnchantButton(button, kind, slot)
 	if not button or not button:IsShown() then return end
 	button.eqolDefaultAuraKind = normalizeDefaultAuraKind(kind)
 	ensureDefaultAuraButtonVisuals(button)
 	if not button.eqolDefaultAuraStyleKey then applyDefaultAuraButtonStyle(button, true) end
 
-	local slot = button:GetAttribute("target-slot")
+	slot = slot or button.eqolDefaultAuraTargetSlot or button:GetAttribute("target-slot")
 	if not slot then return end
 
 	local mainSlot = GetInventorySlotInfo and GetInventorySlotInfo("MainHandSlot")
@@ -1025,7 +1063,7 @@ local function updateDefaultTempEnchantButton(button, kind)
 	local timeLeft = (tonumber(expirationMS) or 0) / 1000
 	if timeLeft > 0 then
 		setDefaultAuraCooldownDuration(button, GetTime(), timeLeft)
-		if addon.IconShape and addon.IconShape.ApplyCooldownSwipeVisual then addon.IconShape.ApplyCooldownSwipeVisual(button.Cooldown, button, nil, nil, { customColor = false }) end
+		applyDefaultAuraCooldownSwipeVisual(button, config)
 		button.Cooldown:Show()
 	else
 		button.Cooldown:Hide()
@@ -1038,29 +1076,32 @@ end
 local function applyDefaultAuraDataToButton(button, unit, kind, aura)
 	if not (button and aura) then return end
 	ensureDefaultAuraButtonVisuals(button)
-	if not button.eqolDefaultAuraStyleKey then applyDefaultAuraButtonStyle(button, true) end
-
+	local config = getDefaultAuraStyleConfig(kind)
 	button.eqolAuraUnit = unit
 	button.eqolAuraInstanceID = aura.auraInstanceID
+	if not button.eqolDefaultAuraStyleKey then
+		applyDefaultAuraButtonStyle(button, true, config)
+	elseif config.updateStyleOnAura then
+		updateDefaultAuraDynamicBorderColor(button, config)
+	end
+
 	button.Icon:SetTexture(aura.icon)
-	applyDefaultAuraButtonStyle(button)
 
 	local countText = ""
 	if C_UnitAuras.GetAuraApplicationDisplayCount and aura.auraInstanceID then
 		countText = C_UnitAuras.GetAuraApplicationDisplayCount(unit, aura.auraInstanceID, 2) or ""
 	end
 	button.Count:SetText(countText)
-	button.Count:SetShown(getDefaultAuraStyleConfig(kind).countEnabled)
+	button.Count:SetShown(config.countEnabled)
 
 	local auraDuration
 	if C_UnitAuras.GetAuraDuration and aura.auraInstanceID then
-		local ok, durationObject = pcall(C_UnitAuras.GetAuraDuration, unit, aura.auraInstanceID)
-		if ok then auraDuration = durationObject end
+		auraDuration = C_UnitAuras.GetAuraDuration(unit, aura.auraInstanceID)
 	end
 	if auraDuration and button.Cooldown.SetCooldownFromDurationObject then
 		button.Duration:Hide()
 		button.Cooldown:SetCooldownFromDurationObject(auraDuration)
-		if addon.IconShape and addon.IconShape.ApplyCooldownSwipeVisual then addon.IconShape.ApplyCooldownSwipeVisual(button.Cooldown, button, nil, nil, { customColor = false }) end
+		applyDefaultAuraCooldownSwipeVisual(button, config)
 		button.Cooldown:Show()
 	else
 		button.Cooldown:Hide()
@@ -1070,21 +1111,22 @@ local function applyDefaultAuraDataToButton(button, unit, kind, aura)
 	if GameTooltip:IsOwned(button) and aura.auraInstanceID then GameTooltip:SetUnitAuraByAuraInstanceID(unit, aura.auraInstanceID) end
 end
 
-local function updateDefaultAuraButton(button, unit, filter, kind)
+local function updateDefaultAuraButton(button, index)
 	if not button or not button:IsShown() then return end
-	button.eqolDefaultAuraKind = normalizeDefaultAuraKind(kind)
-	if button:GetAttribute("target-slot") then
-		updateDefaultTempEnchantButton(button, kind)
+	local kind = button.eqolDefaultAuraKind or "buff"
+	local unit = button.eqolDefaultAuraUnit or "player"
+	local filter = button.eqolDefaultAuraFilter or (kind == "debuff" and "HARMFUL" or "HELPFUL")
+	if button.eqolDefaultAuraTargetSlot then
+		updateDefaultTempEnchantButton(button, kind, button.eqolDefaultAuraTargetSlot)
 		return
 	end
 	ensureDefaultAuraButtonVisuals(button)
 	if not button.eqolDefaultAuraStyleKey then applyDefaultAuraButtonStyle(button, true) end
 
-	local index = button:GetAttribute("index") or button:GetID()
+	index = index or button.eqolDefaultAuraIndex or button:GetAttribute("index") or button:GetID()
 	local aura
 	if index and C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
-		local ok, data = pcall(C_UnitAuras.GetAuraDataByIndex, unit, index, filter)
-		if ok then aura = data end
+		aura = C_UnitAuras.GetAuraDataByIndex(unit, index, filter)
 	end
 	if not aura then
 		button.Icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
@@ -1115,132 +1157,84 @@ local function forEachDefaultAuraHeaderChild(header, func, ...)
 	end
 end
 
-local function getDefaultAuraHeaderButtonCache(header, reset)
-	if not header then return nil end
-	local cache = header.eqolDefaultAuraButtonsByInstanceID
-	if not cache then
-		cache = {}
-		header.eqolDefaultAuraButtonsByInstanceID = cache
-	elseif reset then
-		for auraInstanceID in pairs(cache) do
-			cache[auraInstanceID] = nil
-		end
-	end
-	return cache
+local function applyDefaultAuraHeaderContextToButton(button, header)
+	if not (button and header) then return end
+	button.eqolDefaultAuraKind = header.eqolDefaultAuraKind
+	button.eqolDefaultAuraFilter = header.eqolDefaultAuraFilter
+	button.eqolDefaultAuraUnit = header.eqolDefaultAuraUnit or "player"
+	button.eqolDefaultAuraTargetSlot = button:GetAttribute("target-slot")
 end
 
-local updateDefaultAuraHeaderTempEnchantButtons
+local function updateDefaultAuraButtonFromAttribute(button, attr, value)
+	if not button then return end
+	if attr == "index" then
+		button.eqolDefaultAuraIndex = value
+		button.eqolDefaultAuraTargetSlot = nil
+		updateDefaultAuraButton(button, value)
+	elseif attr == "target-slot" then
+		button.eqolAuraInstanceID = nil
+		button.eqolDefaultAuraTargetSlot = value
+		button.eqolDefaultAuraIndex = nil
+		updateDefaultTempEnchantButton(button, button.eqolDefaultAuraKind, value)
+	end
+end
+
+local function ensureDefaultAuraButtonAttributeHook(button, header)
+	if not button then return end
+	applyDefaultAuraHeaderContextToButton(button, header)
+	if button.eqolDefaultAuraAttributeHooked then return end
+	button.eqolDefaultAuraAttributeHooked = true
+	ensureDefaultAuraButtonVisuals(button)
+	button:HookScript("OnAttributeChanged", updateDefaultAuraButtonFromAttribute)
+end
+
+local function handleDefaultAuraHeaderAttributeChanged(header, attr, value)
+	if type(attr) ~= "string" then return end
+	if attr == "unit" then
+		header.eqolDefaultAuraUnit = value or "player"
+		forEachDefaultAuraHeaderChild(header, applyDefaultAuraHeaderContextToButton, header)
+		return
+	end
+	if not (attr:match("^child%d+$") or attr:match("^temp[Ee]nchant%d+$")) then return end
+	if type(value) == "userdata" and GetFrameHandleFrame then value = GetFrameHandleFrame(value) end
+	if value then
+		ensureDefaultAuraButtonAttributeHook(value, header)
+		if value:GetAttribute("index") then
+			updateDefaultAuraButtonFromAttribute(value, "index", value:GetAttribute("index"))
+		elseif value:GetAttribute("target-slot") then
+			updateDefaultAuraButtonFromAttribute(value, "target-slot", value:GetAttribute("target-slot"))
+		end
+	end
+end
 
 local function applyDefaultAuraHeaderButtonStyles(header, force)
 	if not header then return end
-	local filter = header:GetAttribute("filter") or "HELPFUL"
-	local kind = header.eqolDefaultAuraKind or (filter == "HARMFUL" and "debuff" or "buff")
 	forEachDefaultAuraHeaderChild(header, function(child)
-		child.eqolDefaultAuraKind = kind
+		ensureDefaultAuraButtonAttributeHook(child, header)
 		applyDefaultAuraButtonStyle(child, force)
 	end)
 end
 
 local function updateDefaultAuraHeaderButtons(header)
 	if not header then return end
-	local unit = header:GetAttribute("unit") or "player"
-	local filter = header:GetAttribute("filter") or "HELPFUL"
-	local kind = header.eqolDefaultAuraKind or (filter == "HARMFUL" and "debuff" or "buff")
-	local cache = getDefaultAuraHeaderButtonCache(header, true)
 	forEachDefaultAuraHeaderChild(header, function(child)
-		updateDefaultAuraButton(child, unit, filter, kind)
-		if cache and child.eqolAuraInstanceID then cache[child.eqolAuraInstanceID] = child end
+		ensureDefaultAuraButtonAttributeHook(child, header)
+		updateDefaultAuraButton(child, child:GetAttribute("index"))
 	end)
-end
-
-local function hasDefaultAuraUpdateEntries(entries)
-	return type(entries) == "table" and next(entries) ~= nil
-end
-
-local function updateDefaultAuraHeaderUpdatedButtons(header, updatedAuraInstanceIDs)
-	if not hasDefaultAuraUpdateEntries(updatedAuraInstanceIDs) then return true end
-	local cache = header and header.eqolDefaultAuraButtonsByInstanceID
-	if not cache then return false end
-
-	local unit = header:GetAttribute("unit") or "player"
-	local filter = header:GetAttribute("filter") or "HELPFUL"
-	local kind = header.eqolDefaultAuraKind or (filter == "HARMFUL" and "debuff" or "buff")
-	for _, auraInstanceID in pairs(updatedAuraInstanceIDs) do
-		local button = cache[auraInstanceID]
-		if not (button and button:IsShown()) then return false end
-		local aura
-		if C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID then
-			local ok, data = pcall(C_UnitAuras.GetAuraDataByAuraInstanceID, unit, auraInstanceID)
-			if ok then aura = data end
-		end
-		if aura then
-			button.eqolDefaultAuraKind = normalizeDefaultAuraKind(kind)
-			applyDefaultAuraDataToButton(button, unit, kind, aura)
-		else
-			updateDefaultAuraButton(button, unit, filter, kind)
-			if button.eqolAuraInstanceID ~= auraInstanceID then return false end
-		end
-	end
-	return true
-end
-
-local function handleDefaultAuraHeaderEvent(header, event, unit, updateInfo)
-	if event == "UNIT_AURA" and unit and unit ~= "player" and unit ~= "vehicle" then return end
-	if event == "UNIT_AURA" and type(updateInfo) == "table" then
-		if
-			updateInfo.isFullUpdate ~= true
-			and not hasDefaultAuraUpdateEntries(updateInfo.addedAuras)
-			and not hasDefaultAuraUpdateEntries(updateInfo.removedAuraInstanceIDs)
-			and hasDefaultAuraUpdateEntries(updateInfo.updatedAuraInstanceIDs)
-		then
-			if updateDefaultAuraHeaderUpdatedButtons(header, updateInfo.updatedAuraInstanceIDs) then return end
-		end
-	elseif event == "WEAPON_ENCHANT_CHANGED" then
-		updateDefaultAuraHeaderTempEnchantButtons(header)
-		return
-	end
-	updateDefaultAuraHeaderButtons(header)
-end
-
-updateDefaultAuraHeaderTempEnchantButtons = function(header)
-	if not header then return end
-	local kind = header.eqolDefaultAuraKind or "buff"
-	local index = 1
-	local child = header:GetAttribute("tempEnchant" .. index)
-	while child do
-		updateDefaultTempEnchantButton(child, kind)
-		index = index + 1
-		child = header:GetAttribute("tempEnchant" .. index)
-	end
-end
-
-local function scheduleDefaultTempEnchantUpdate()
-	DAC.variables.defaultTempEnchantUpdateToken = (DAC.variables.defaultTempEnchantUpdateToken or 0) + 1
-	local token = DAC.variables.defaultTempEnchantUpdateToken
-	C_Timer.After(0.5, function()
-		if token ~= DAC.variables.defaultTempEnchantUpdateToken then return end
-		updateDefaultAuraHeaderTempEnchantButtons(DAC.variables.defaultBuffHeader)
-	end)
-end
-
-local function ensureDefaultTempEnchantWatcher()
-	if DAC.variables.defaultTempEnchantWatcher then return DAC.variables.defaultTempEnchantWatcher end
-	local watcher = CreateFrame("Frame")
-	watcher:SetScript("OnEvent", scheduleDefaultTempEnchantUpdate)
-	watcher:RegisterEvent("WEAPON_ENCHANT_CHANGED")
-	DAC.variables.defaultTempEnchantWatcher = watcher
-	return watcher
 end
 
 local function configureDefaultAuraHeader(header, filter, kind)
 	kind = normalizeDefaultAuraKind(kind)
 	header.eqolDefaultAuraKind = kind
+	header.eqolDefaultAuraFilter = filter
+	header.eqolDefaultAuraUnit = "player"
 	local size = getDefaultAuraIconSize(nil, kind)
 	local horizontalSpacing = getDefaultAuraHorizontalSpacing(nil, kind)
 	local verticalSpacing = getDefaultAuraVerticalSpacing(nil, kind)
 	local perRow = getDefaultAuraIconsPerRow(nil, kind)
 	local maxRows = getDefaultAuraMaxRows(nil, kind)
 	header:SetAttribute("unit", "player")
+	header.eqolDefaultAuraUnit = "player"
 	header:SetAttribute("filter", filter)
 	header:SetAttribute("template", "SecureAuraButtonTemplate")
 	header:SetAttribute("weaponTemplate", filter == "HELPFUL" and "SecureAuraButtonTemplate" or nil)
@@ -1262,7 +1256,6 @@ local function configureDefaultAuraHeader(header, filter, kind)
 		header:SetAttribute("includeWeapons", getDefaultAuraDBValue(kind, "IncludeWeapons") == true and 1 or 0)
 	end
 	header:SetSize(perRow * size + (perRow - 1) * horizontalSpacing, maxRows * size + (maxRows - 1) * verticalSpacing)
-	if filter == "HELPFUL" then ensureDefaultTempEnchantWatcher() end
 	applyDefaultAuraHeaderButtonStyles(header, true)
 	updateDefaultAuraHeaderButtons(header)
 end
@@ -1273,13 +1266,10 @@ local function createDefaultAuraHeader(kind, filter)
 	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
 	if tonumber((select(4, GetBuildInfo()))) >= 120100 and type(header.SetRolesets) == "function" then header:SetRolesets("buffs") end
 	header:SetClampedToScreen(true)
-	header:UnregisterEvent("UNIT_AURA")
-	header:RegisterUnitEvent("UNIT_AURA", "player", "vehicle")
-	if filter == "HELPFUL" then header:RegisterEvent("WEAPON_ENCHANT_CHANGED") end
 	if RegisterAttributeDriver then RegisterAttributeDriver(header, "unit", "[vehicleui] vehicle; player") end
 	if not header.eqolDefaultAuraHooksInstalled then
 		header.eqolDefaultAuraHooksInstalled = true
-		header:HookScript("OnEvent", handleDefaultAuraHeaderEvent)
+		header:HookScript("OnAttributeChanged", handleDefaultAuraHeaderAttributeChanged)
 		header:HookScript("OnShow", updateDefaultAuraHeaderButtons)
 	end
 	configureDefaultAuraHeader(header, filter, kind)
