@@ -38,6 +38,7 @@ local objectiveTrackerMinimizeWatcher
 local objectiveTrackerMinimizeHooked
 local objectiveTrackerCollapseHooked
 local questTrackerTextStyleHooked = {}
+local questTrackerMainHeaderTextStyleHooked
 local questTrackerTextStyleWatcher
 local questTrackerTextStyleFontOrder = {}
 local questTrackerTextStyleRefreshing
@@ -47,8 +48,16 @@ local questTrackerTextStyleState = {
 	version = 0,
 }
 local QUEST_TRACKER_TEXT_STYLE_TRACKER_NAMES = {
-	"QuestObjectiveTracker",
+	"UIWidgetObjectiveTracker",
 	"CampaignQuestObjectiveTracker",
+	"QuestObjectiveTracker",
+	"AdventureObjectiveTracker",
+	"AchievementObjectiveTracker",
+	"MonthlyActivitiesObjectiveTracker",
+	"InitiativeTasksObjectiveTracker",
+	"ProfessionsRecipeTracker",
+	"BonusObjectiveTracker",
+	"WorldQuestObjectiveTracker",
 }
 local OBJECTIVE_TRACKER_MINIMIZE_ANCHORS = {
 	TOPLEFT = { point = "TOPLEFT", x = 1, y = 0 },
@@ -398,6 +407,11 @@ local function HandleQuestTrackerTextStyleModule(tracker)
 	end
 end
 
+local function ApplyQuestTrackerMainHeaderTextStyle()
+	local headerText = _G.ObjectiveTrackerFrame and _G.ObjectiveTrackerFrame.Header and _G.ObjectiveTrackerFrame.Header.Text
+	if headerText then ApplyQuestTrackerTextStyleFontString(headerText, "moduleHeader", nil) end
+end
+
 local function ApplyQuestTrackerQuestCountStyle()
 	if not questTrackerQuestCountText then return end
 	if IsQuestTrackerTextStyleEnabled() then
@@ -428,6 +442,11 @@ local function EnsureQuestTrackerTextStyleHooks()
 			hooksecurefunc(tracker, "AddBlock", function(_, block) HandleQuestTrackerTextStyleBlock(block) end)
 		end
 	end
+	local trackerFrame = _G.ObjectiveTrackerFrame
+	if not questTrackerMainHeaderTextStyleHooked and trackerFrame and type(trackerFrame.Update) == "function" then
+		questTrackerMainHeaderTextStyleHooked = true
+		hooksecurefunc(trackerFrame, "Update", ApplyQuestTrackerMainHeaderTextStyle)
+	end
 end
 
 local function RefreshQuestTrackerTextStyle(skipLayoutUpdate)
@@ -438,6 +457,7 @@ local function RefreshQuestTrackerTextStyle(skipLayoutUpdate)
 		if tracker and tracker.EnumerateActiveBlocks then tracker:EnumerateActiveBlocks(function(block) HandleQuestTrackerTextStyleBlock(block) end) end
 		HandleQuestTrackerTextStyleModule(tracker)
 	end
+	ApplyQuestTrackerMainHeaderTextStyle()
 	ApplyQuestTrackerQuestCountStyle()
 	if not skipLayoutUpdate and not questTrackerTextStyleRefreshing and _G.ObjectiveTrackerManager and _G.ObjectiveTrackerManager.UpdateAll then
 		questTrackerTextStyleRefreshing = true
