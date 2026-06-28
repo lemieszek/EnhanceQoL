@@ -3071,6 +3071,58 @@ function CDMAuras:RefreshEntriesForCooldownRebind(frame, oldCooldownID, newCoold
 	return hasAffected
 end
 
+
+function CDMAuras:HandleSpellOverrideUpdated(baseSpellID, overrideSpellID)
+	local runtime = getRuntime()
+	if not self:HasActiveTrackedPanels() then return true end
+	baseSpellID = tonumber(baseSpellID)
+	overrideSpellID = tonumber(overrideSpellID)
+	if not (isUsableSpellID(baseSpellID) or isUsableSpellID(overrideSpellID)) then return true end
+
+	self:InvalidateScan(true, "HandleSpellOverrideUpdated")
+	local affectedKeys = runtime.scratchAffectedKeys
+	wipe(affectedKeys)
+	local root = CooldownPanels.GetRoot and CooldownPanels:GetRoot() or nil
+	local sharedRuntime = CooldownPanels.runtime
+	local cdmAuraPanelIds = sharedRuntime and sharedRuntime.cdmAuraPanelIds or nil
+	local cdmAuraEntryIdsByPanel = sharedRuntime and sharedRuntime.cdmAuraEntryIdsByPanel or nil
+
+	local function spellMatches(value)
+		value = tonumber(value)
+		return value and ((baseSpellID and value == baseSpellID) or (overrideSpellID and value == overrideSpellID))
+	end
+
+	if root and root.panels and cdmAuraPanelIds and cdmAuraEntryIdsByPanel then
+		for i = 1, #cdmAuraPanelIds do
+			local panelId = cdmAuraPanelIds[i]
+			local panel = root.panels[panelId]
+			local entries = panel and panel.entries
+			local entryIds = cdmAuraEntryIdsByPanel[panelId]
+			if entries and entryIds then
+				for j = 1, #entryIds do
+					local entryId = entryIds[j]
+					local entry = entries[entryId]
+					if entry and entry.type == ENTRY_TYPE then
+						local key = getEntryKey(panelId, entryId)
+						local state = runtime.entryStates[key]
+						if spellMatches(entry.spellID) or spellMatches(state and state.signatureSpellID) or spellMatches(state and state.cachedScanSpellID) then affectedKeys[key] = true end
+					end
+				end
+			end
+		end
+	end
+
+	for key in pairs(affectedKeys) do
+		local state = runtime.entryStates[key]
+		if state then
+			invalidateEntryStateBinding(key, state, true)
+			requestEntryRefresh(state)
+		end
+		affectedKeys[key] = nil
+	end
+	return true
+end
+
 function CDMAuras:EnsureCooldownViewerHooks()
 	local runtime = getRuntime()
 	local installed = false
@@ -3182,6 +3234,10 @@ function CDMAuras:HandleUnitAura(_, unit, updateInfo)
 end
 
 function CDMAuras:HandleResetEvent(event, ...)
+	if event == "COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED" then
+		self:HandleSpellOverrideUpdated(...)
+		return
+	end
 	if event == "ADDON_LOADED" then
 		local addonName = ...
 		if addonName ~= "Blizzard_CooldownViewer" then return end

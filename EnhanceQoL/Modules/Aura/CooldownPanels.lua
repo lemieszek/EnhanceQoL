@@ -5521,6 +5521,26 @@ function CooldownPanels:RebuildSpellIndex()
 	for panelId in pairs(runtime.enabledPanels or {}) do
 		if not enabledPanels[panelId] then runtime.disabledPanelIds[#runtime.disabledPanelIds + 1] = panelId end
 	end
+	local cdmAuraRuntimeIndexChanged = true
+	local function shallowMapsEqual(left, right)
+		if left == right then return true end
+		if type(left) ~= "table" or type(right) ~= "table" then return false end
+		for key, value in pairs(left) do
+			if right[key] ~= value then return false end
+		end
+		for key, value in pairs(right) do
+			if left[key] ~= value then return false end
+		end
+		return true
+	end
+	if runtime.cdmAuraEntryCount == cdmAuraEntryCount
+		and runtime.cdmAuraHasSpellOnlyEntries == cdmAuraHasSpellOnlyEntries
+		and shallowMapsEqual(runtime.cdmAuraPanels, cdmAuraPanels)
+		and shallowMapsEqual(runtime.cdmAuraCooldownKeys, cdmAuraCooldownKeys)
+		and shallowMapsEqual(runtime.cdmAuraSpellIds, cdmAuraSpellIds)
+	then
+		cdmAuraRuntimeIndexChanged = false
+	end
 	runtime.activeSpecId = activeSpecId
 	runtime.enabledPanelsBySpec = enabledPanelsBySpec
 	runtime.enabledPanelIdsBySpec = enabledPanelIdsBySpec
@@ -5560,7 +5580,7 @@ function CooldownPanels:RebuildSpellIndex()
 	self:RebuildChargesIndex()
 	self:PrimeReadySoundStates()
 	local cdmAuras = self.CDMAuras
-	if cdmAuras and cdmAuras.HandleRuntimeIndexChanged then
+	if cdmAuraRuntimeIndexChanged and cdmAuras and cdmAuras.HandleRuntimeIndexChanged then
 		cdmAuras:HandleRuntimeIndexChanged("RebuildSpellIndex", false)
 	elseif cdmAuras and cdmAuras.UpdateEventRegistration then
 		cdmAuras:UpdateEventRegistration()
