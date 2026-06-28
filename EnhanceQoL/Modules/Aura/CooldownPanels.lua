@@ -22350,6 +22350,101 @@ function CooldownPanels:PrepareStaticCDMAuraRuntimeEntry(panelId, entryId, entry
 	return done("success")
 end
 
+
+function CooldownPanels:ClearStaticCDMAuraRuntimeEntry(panelId, entryId, entry, runtime, frame)
+	local function fail()
+		return false
+	end
+	local function done()
+		return true
+	end
+
+	if not (panelId and entryId and entry and runtime and frame) then return fail() end
+	if entry.type ~= "CDM_AURA" then return fail() end
+	if self:IsPanelLayoutEditActive(panelId) then return fail() end
+	if runtime.initialized ~= true then return fail() end
+	local panel = self:GetPanel(panelId)
+	if not (panel and type(panel.layout) == "table" and Helper.IsFixedLayout and Helper.IsFixedLayout(panel.layout)) then return fail() end
+	local fixedLayoutCache = Helper.GetFixedLayoutCache and Helper.GetFixedLayoutCache(panel) or nil
+	local targetIndex = fixedLayoutCache and fixedLayoutCache.staticTargetIndexByEntryId and fixedLayoutCache.staticTargetIndexByEntryId[entryId] or nil
+	local fixedSlotCount = fixedLayoutCache and fixedLayoutCache.slotCount or 0
+	if not (targetIndex and targetIndex > 0 and fixedSlotCount > 0 and targetIndex <= fixedSlotCount) then return fail() end
+	if fixedLayoutCache.slotEntryIds and fixedLayoutCache.slotEntryIds[targetIndex] ~= entryId then return fail() end
+	local fixedGroupById = fixedLayoutCache.groupById
+	local groupId = entry.fixedGroupId
+	local fixedGroup = groupId and fixedGroupById and fixedGroupById[groupId] or nil
+	if fixedGroup and Helper.FixedGroupUsesStaticSlots and Helper.FixedGroupUsesStaticSlots(fixedGroup) ~= true then return fail() end
+
+	local icon = runtime.entryToIcon and runtime.entryToIcon[entryId] or nil
+	if not icon then icon = frame.icons and frame.icons[targetIndex] or nil end
+	if not icon then return fail() end
+	local visible = runtime.visibleEntries
+	local visibleData = visible and visible[targetIndex] or nil
+	if visibleData and visibleData.entryId ~= entryId then return fail() end
+	if icon.entryId and icon.entryId ~= entryId then return fail() end
+	if icon._eqolRuntimeData and icon._eqolRuntimeData.entryId ~= entryId then return fail() end
+
+	if visible then visible[targetIndex] = nil end
+	if runtime.entryToIcon then runtime.entryToIcon[entryId] = nil end
+	local occupiedSlots = runtime._eqolOccupiedSlots
+	if occupiedSlots then occupiedSlots[targetIndex] = nil end
+	local occupiedSlotIndices = runtime._eqolOccupiedSlotIndices
+	if occupiedSlotIndices then
+		for i = #occupiedSlotIndices, 1, -1 do
+			if occupiedSlotIndices[i] == targetIndex then table.remove(occupiedSlotIndices, i) end
+		end
+	end
+
+	cdp.RUNTIME.ClearIconSnapshot(icon)
+	icon.entryId = nil
+	icon._eqolRuntimeData = nil
+	self:HideEditorGhostIcon(icon)
+	clearPreviewCooldown(icon.cooldown)
+	icon.cooldown:Clear()
+	icon.cooldown._eqolPanelId = nil
+	icon.cooldown._eqolEntryId = nil
+	icon.cooldown._eqolCooldownIsGCD = nil
+	icon.cooldown._eqolSoundReady = nil
+	icon.cooldown._eqolSoundReadyIgnoreGCD = nil
+	icon.cooldown._eqolSoundName = nil
+	icon.cooldown._eqolGlowReady = nil
+	icon.cooldown._eqolGlowDuration = nil
+	icon.cooldown._eqolSpellId = nil
+	icon.cooldown._eqolBaseSpellId = nil
+	icon.cooldown._eqolEffectiveSpellId = nil
+	icon.cooldown._eqolCustomCooldownKey = nil
+	if icon.cooldown.SetScript then icon.cooldown:SetScript("OnCooldownDone", nil) end
+	if icon.cooldown.Resume then icon.cooldown:Resume() end
+	icon.count:Hide()
+	icon.charges:Hide()
+	if icon.rangeOverlay then icon.rangeOverlay:Hide() end
+	if icon.keybind then icon.keybind:Hide() end
+	if icon.staticText then icon.staticText:Hide() end
+	if icon.stateTexture then icon.stateTexture:Hide() end
+	if icon.stateTextureSecond then icon.stateTextureSecond:Hide() end
+	CooldownPanels.HidePreviewGlowBorder(icon)
+	if icon.previewBling then icon.previewBling:Hide() end
+	if icon.previewSoundBorder then icon.previewSoundBorder:Hide() end
+	icon._eqolLayoutDragRangePreview = nil
+	icon.texture:SetDesaturated(false)
+	icon.texture:SetAlpha(1)
+	CooldownPanels.ApplyIconTooltip(icon, nil, false)
+	setAssistedHighlight(icon, false)
+	CooldownPanels.StopAllIconGlows(icon)
+	icon:Hide()
+	icon._eqolRuntimeEmpty = true
+
+	local visibleCount = 0
+	if visible then
+		for i = 1, fixedSlotCount do
+			if visible[i] then visibleCount = visibleCount + 1 end
+		end
+	end
+	runtime.visibleCount = visibleCount
+	self:UpdateVisibility(panelId)
+	return done()
+end
+
 function CooldownPanels:RefreshRuntimeEntry(panelId, entryId)
 	local function fallback()
 		return false
@@ -22380,7 +22475,10 @@ function CooldownPanels:RefreshRuntimeEntry(panelId, entryId)
 	if not (cdmAuras and cdmAuras.BuildRuntimeData) then return fallback() end
 	local cdmAuraData = cdmAuras:BuildRuntimeData(panelId, entryId, entry, data.layout, nil)
 	if not cdmAuraData then return fallback() end
-	if cdmAuraData.show ~= true then return fallback() end
+	if cdmAuraData.show ~= true then
+		if frame and self.ClearStaticCDMAuraRuntimeEntry and self:ClearStaticCDMAuraRuntimeEntry(panelId, entryId, entry, runtime, frame) then return true end
+		return fallback()
+	end
 
 	local hasStateTexture = entry.stateTextureType ~= nil or (type(entry.stateTextureInput) == "string" and entry.stateTextureInput ~= "")
 	if entry.pandemicGlow == true then return fallback() end

@@ -2799,7 +2799,15 @@ function CDMAuras:BuildRuntimeData(panelId, entryId, entry, entryLayout, alwaysS
 	data.auraUnit = auraUnit
 	data.sourceType = chosenSource or preferredSource
 
-	if state.lastActive == true and not active then requestPanelRefresh(panelId) end
+	if state.lastActive == true and not active then
+		local clearedStaticEntry = false
+		if show ~= true and CooldownPanels.ClearStaticCDMAuraRuntimeEntry then
+			local panelRuntime = CooldownPanels.runtime and CooldownPanels.runtime[panelId] or nil
+			local frame = panelRuntime and panelRuntime.frame or nil
+			if frame then clearedStaticEntry = CooldownPanels:ClearStaticCDMAuraRuntimeEntry(panelId, entryId, entry, panelRuntime, frame) == true end
+		end
+		if not clearedStaticEntry then requestPanelRefresh(panelId) end
+	end
 	state.lastActive = active
 	return data
 end
