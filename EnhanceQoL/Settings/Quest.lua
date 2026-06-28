@@ -44,6 +44,11 @@ local questTrackerTextStyleFontOrder = {}
 local questTrackerTextStyleRefreshing
 local questTrackerTextStyleState = {
 	color = {},
+	dirtyBlocks = {},
+	dirtyLines = {},
+	dirtyMainHeader = false,
+	dirtyTrackers = {},
+	flushQueued = false,
 	font = {},
 	tracker = setmetatable({}, { __mode = "k" }),
 	version = 0,
@@ -401,6 +406,8 @@ local function HandleQuestTrackerTextStyleUsedLine(line)
 	HandleQuestTrackerTextStyleLine(questTrackerTextStyleState.iterationBlock, line)
 end
 
+local QueueQuestTrackerTextStyleLine
+
 local function HandleQuestTrackerTextStyleBlock(block)
 	if not block then return end
 	if block.HeaderText then
@@ -424,7 +431,11 @@ local function HandleQuestTrackerTextStyleBlock(block)
 	if block.AddObjective and not block._eqolQuestTrackerAddObjectiveHooked and hooksecurefunc then
 		block._eqolQuestTrackerAddObjectiveHooked = true
 		hooksecurefunc(block, "AddObjective", function(hookedBlock)
-			HandleQuestTrackerTextStyleLine(hookedBlock, hookedBlock and hookedBlock.lastRegion)
+			if QueueQuestTrackerTextStyleLine then
+				QueueQuestTrackerTextStyleLine(hookedBlock, hookedBlock and hookedBlock.lastRegion)
+			else
+				HandleQuestTrackerTextStyleLine(hookedBlock, hookedBlock and hookedBlock.lastRegion)
+			end
 		end)
 	end
 end
@@ -462,6 +473,76 @@ local function ApplyQuestTrackerMainHeaderTextStyle()
 	if headerText then ApplyQuestTrackerTextStyleFontString(headerText, "moduleHeader", nil) end
 end
 
+local function ClearQuestTrackerDirtyState()
+	for tracker in pairs(questTrackerTextStyleState.dirtyTrackers) do
+		questTrackerTextStyleState.dirtyTrackers[tracker] = nil
+	end
+	for block in pairs(questTrackerTextStyleState.dirtyBlocks) do
+		questTrackerTextStyleState.dirtyBlocks[block] = nil
+	end
+	for line in pairs(questTrackerTextStyleState.dirtyLines) do
+		questTrackerTextStyleState.dirtyLines[line] = nil
+	end
+	questTrackerTextStyleState.dirtyMainHeader = false
+end
+
+local function FlushQuestTrackerTextStyleDirty()
+	questTrackerTextStyleState.flushQueued = false
+	if not IsQuestTrackerTextStyleEnabled() then
+		ClearQuestTrackerDirtyState()
+		return
+	end
+	for tracker in pairs(questTrackerTextStyleState.dirtyTrackers) do
+		HandleQuestTrackerTextStyleModule(tracker)
+		questTrackerTextStyleState.dirtyTrackers[tracker] = nil
+	end
+	for block in pairs(questTrackerTextStyleState.dirtyBlocks) do
+		HandleQuestTrackerTextStyleBlock(block)
+		questTrackerTextStyleState.dirtyBlocks[block] = nil
+	end
+	for line, block in pairs(questTrackerTextStyleState.dirtyLines) do
+		HandleQuestTrackerTextStyleLine(block ~= false and block or nil, line)
+		questTrackerTextStyleState.dirtyLines[line] = nil
+	end
+	if questTrackerTextStyleState.dirtyMainHeader then
+		questTrackerTextStyleState.dirtyMainHeader = false
+		ApplyQuestTrackerMainHeaderTextStyle()
+	end
+end
+
+local function QueueQuestTrackerTextStyleFlush()
+	if questTrackerTextStyleState.flushQueued then return end
+	questTrackerTextStyleState.flushQueued = true
+	if C_Timer and C_Timer.After then
+		C_Timer.After(0, FlushQuestTrackerTextStyleDirty)
+	else
+		FlushQuestTrackerTextStyleDirty()
+	end
+end
+
+local function QueueQuestTrackerTextStyleTracker(tracker)
+	if not tracker then return end
+	questTrackerTextStyleState.dirtyTrackers[tracker] = true
+	QueueQuestTrackerTextStyleFlush()
+end
+
+local function QueueQuestTrackerTextStyleBlock(block)
+	if not block then return end
+	questTrackerTextStyleState.dirtyBlocks[block] = true
+	QueueQuestTrackerTextStyleFlush()
+end
+
+QueueQuestTrackerTextStyleLine = function(block, line)
+	if not line then return end
+	questTrackerTextStyleState.dirtyLines[line] = block or false
+	QueueQuestTrackerTextStyleFlush()
+end
+
+local function QueueQuestTrackerMainHeaderTextStyle()
+	questTrackerTextStyleState.dirtyMainHeader = true
+	QueueQuestTrackerTextStyleFlush()
+end
+
 local function ApplyQuestTrackerQuestCountStyle()
 	if not questTrackerQuestCountText then return end
 	if IsQuestTrackerTextStyleEnabled() then
@@ -488,14 +569,14 @@ local function EnsureQuestTrackerTextStyleHooks()
 		local tracker = _G[name]
 		if not questTrackerTextStyleHooked[name] and tracker and type(tracker.Update) == "function" and type(tracker.AddBlock) == "function" then
 			questTrackerTextStyleHooked[name] = true
-			hooksecurefunc(tracker, "Update", function(hookedTracker) HandleQuestTrackerTextStyleModule(hookedTracker) end)
-			hooksecurefunc(tracker, "AddBlock", function(_, block) HandleQuestTrackerTextStyleBlock(block) end)
+			hooksecurefunc(tracker, "Update", function(hookedTracker) QueueQuestTrackerTextStyleTracker(hookedTracker) end)
+			hooksecurefunc(tracker, "AddBlock", function(_, block) QueueQuestTrackerTextStyleBlock(block) end)
 		end
 	end
 	local trackerFrame = _G.ObjectiveTrackerFrame
 	if not questTrackerMainHeaderTextStyleHooked and trackerFrame and type(trackerFrame.Update) == "function" then
 		questTrackerMainHeaderTextStyleHooked = true
-		hooksecurefunc(trackerFrame, "Update", ApplyQuestTrackerMainHeaderTextStyle)
+		hooksecurefunc(trackerFrame, "Update", QueueQuestTrackerMainHeaderTextStyle)
 	end
 end
 
