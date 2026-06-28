@@ -1254,6 +1254,11 @@ local function hookFrame(frame)
 	if frame.ClearAuraInstanceInfo then hooksecurefunc(frame, "ClearAuraInstanceInfo", function(self) CDMAuras:HandleFrameAuraMutation(self, true) end) end
 	if frame.RefreshTotemData then hooksecurefunc(frame, "RefreshTotemData", function(self) CDMAuras:HandleFrameTotemMutation(self) end) end
 	if frame.OnNewTarget then hooksecurefunc(frame, "OnNewTarget", function(self) CDMAuras:HandleFrameTargetChanged(self) end) end
+end
+
+local function hookPandemicFrame(frame)
+	if not (frame and frame._eqolCdmPandemicHooked ~= true) then return end
+	frame._eqolCdmPandemicHooked = true
 	if frame.ShowPandemicStateFrame then hooksecurefunc(frame, "ShowPandemicStateFrame", function(self) CDMAuras:HandleFramePandemicStateChanged(self, true) end) end
 	if frame.HidePandemicStateFrame then hooksecurefunc(frame, "HidePandemicStateFrame", function(self) CDMAuras:HandleFramePandemicStateChanged(self, false) end) end
 end
@@ -1300,6 +1305,7 @@ local function updatePandemicFrameBinding(runtime, key, frame, wantsPandemic)
 	if not (runtime and key and frame) then return end
 	local pandemicKeys = runtime.pandemicFrameEntries[frame]
 	if wantsPandemic then
+		hookPandemicFrame(frame)
 		if not pandemicKeys then
 			pandemicKeys = {}
 			runtime.pandemicFrameEntries[frame] = pandemicKeys
