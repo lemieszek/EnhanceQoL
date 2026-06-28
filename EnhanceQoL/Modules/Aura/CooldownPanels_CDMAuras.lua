@@ -124,6 +124,11 @@ function cdm.ResetPersistentFrameCaches(runtime)
 	else
 		runtime.frameTotemRefreshPendingByFrame = cdm.EnsureWeakKeyTable(nil)
 	end
+	if type(runtime.pandemicFrameActiveByFrame) == "table" then
+		wipe(runtime.pandemicFrameActiveByFrame)
+	else
+		runtime.pandemicFrameActiveByFrame = cdm.EnsureWeakKeyTable(nil)
+	end
 end
 
 local function getRuntime()
@@ -133,7 +138,10 @@ local function getRuntime()
 		if not (runtime.auraEntries and runtime.auraEntries.player and runtime.auraEntries.target and runtime.auraEntries.unknown) then runtime.auraEntries = createTrackedUnitBuckets() end
 		if not (runtime.unitPanels and runtime.unitPanels.player and runtime.unitPanels.target and runtime.unitPanels.unknown) then runtime.unitPanels = createTrackedUnitBuckets() end
 		runtime.frameEntries = runtime.frameEntries or {}
-		runtime.pandemicFrameEntries = runtime.pandemicFrameEntries or {}
+		runtime.pandemicFrameEntries = cdm.EnsureWeakKeyTable(runtime.pandemicFrameEntries)
+		runtime.pandemicFrameActiveByFrame = cdm.EnsureWeakKeyTable(runtime.pandemicFrameActiveByFrame)
+		runtime.hookedPandemicFrames = cdm.EnsureWeakKeyTable(runtime.hookedPandemicFrames)
+		runtime.hookedTotemCooldownFrames = cdm.EnsureWeakKeyTable(runtime.hookedTotemCooldownFrames)
 		runtime.cooldownViewerInfoByID = runtime.cooldownViewerInfoByID or {}
 		runtime.entryKeysByCooldownID = runtime.entryKeysByCooldownID or {}
 		runtime.spellNameByID = runtime.spellNameByID or {}
@@ -159,8 +167,10 @@ local function getRuntime()
 		auraEntries = createTrackedUnitBuckets(),
 		unitPanels = createTrackedUnitBuckets(),
 		frameEntries = {},
-		pandemicFrameEntries = {},
+		pandemicFrameEntries = cdm.EnsureWeakKeyTable(nil),
 		hookedFrames = {},
+		hookedPandemicFrames = cdm.EnsureWeakKeyTable(nil),
+		hookedTotemCooldownFrames = cdm.EnsureWeakKeyTable(nil),
 		entryKeysByCooldownID = {},
 		cooldownViewerInfoByID = {},
 		spellNameByID = {},
@@ -176,6 +186,7 @@ local function getRuntime()
 		frameAuraSnapshotByFrame = cdm.EnsureWeakKeyTable(nil),
 		frameActiveStateByFrame = cdm.EnsureWeakKeyTable(nil),
 		frameTotemRefreshPendingByFrame = cdm.EnsureWeakKeyTable(nil),
+		pandemicFrameActiveByFrame = cdm.EnsureWeakKeyTable(nil),
 		unitAuraEpoch = { player = 0, target = 0 },
 		scanEpoch = 0,
 		targetEpoch = 0,
@@ -1234,8 +1245,7 @@ local function unregisterFrameBinding(runtime, key, frame)
 		pandemicKeys[key] = nil
 		if not next(pandemicKeys) then
 			runtime.pandemicFrameEntries[frame] = nil
-			frame._eqolCdmPandemicTracked = nil
-			frame._eqolCdmPandemicActive = nil
+			if runtime.pandemicFrameActiveByFrame then runtime.pandemicFrameActiveByFrame[frame] = nil end
 		end
 	end
 	if not runtime.frameEntries[frame] then
@@ -1252,13 +1262,27 @@ local function hookFrame(frame)
 
 	if frame.SetAuraInstanceInfo then hooksecurefunc(frame, "SetAuraInstanceInfo", function(self) CDMAuras:HandleFrameAuraMutation(self, false) end) end
 	if frame.ClearAuraInstanceInfo then hooksecurefunc(frame, "ClearAuraInstanceInfo", function(self) CDMAuras:HandleFrameAuraMutation(self, true) end) end
-	if frame.RefreshTotemData then hooksecurefunc(frame, "RefreshTotemData", function(self) CDMAuras:HandleFrameTotemMutation(self) end) end
+	if frame.OnPlayerTotemUpdateEvent then hooksecurefunc(frame, "OnPlayerTotemUpdateEvent", function(self) CDMAuras:HandleFrameTotemMutation(self) end) end
 	if frame.OnNewTarget then hooksecurefunc(frame, "OnNewTarget", function(self) CDMAuras:HandleFrameTargetChanged(self) end) end
 end
 
+local function hookTotemCooldownDoneFrame(frame)
+	if not (frame and frame.totemData ~= nil and frame.Cooldown and frame.Cooldown.HookScript) then return end
+	local runtime = getRuntime()
+	runtime.hookedTotemCooldownFrames = cdm.EnsureWeakKeyTable(runtime.hookedTotemCooldownFrames)
+	if runtime.hookedTotemCooldownFrames[frame] then return end
+	runtime.hookedTotemCooldownFrames[frame] = true
+	frame.Cooldown:HookScript("OnCooldownDone", function()
+		RunNextFrame(function() CDMAuras:HandleFrameTotemMutation(frame) end)
+	end)
+end
+
 local function hookPandemicFrame(frame)
-	if not (frame and frame._eqolCdmPandemicHooked ~= true) then return end
-	frame._eqolCdmPandemicHooked = true
+	if not frame then return end
+	local runtime = getRuntime()
+	runtime.hookedPandemicFrames = cdm.EnsureWeakKeyTable(runtime.hookedPandemicFrames)
+	if runtime.hookedPandemicFrames[frame] then return end
+	runtime.hookedPandemicFrames[frame] = true
 	if frame.ShowPandemicStateFrame then hooksecurefunc(frame, "ShowPandemicStateFrame", function(self) CDMAuras:HandleFramePandemicStateChanged(self, true) end) end
 	if frame.HidePandemicStateFrame then hooksecurefunc(frame, "HidePandemicStateFrame", function(self) CDMAuras:HandleFramePandemicStateChanged(self, false) end) end
 end
@@ -1272,6 +1296,7 @@ local function registerFrameBinding(runtime, key, frame)
 	end
 	keys[key] = true
 	hookFrame(frame)
+	hookTotemCooldownDoneFrame(frame)
 	seedFrameActiveState(runtime, frame)
 end
 
@@ -1311,13 +1336,12 @@ local function updatePandemicFrameBinding(runtime, key, frame, wantsPandemic)
 			runtime.pandemicFrameEntries[frame] = pandemicKeys
 		end
 		pandemicKeys[key] = true
-		frame._eqolCdmPandemicTracked = true
 	elseif pandemicKeys then
 		pandemicKeys[key] = nil
 		if not next(pandemicKeys) then
 			runtime.pandemicFrameEntries[frame] = nil
-			frame._eqolCdmPandemicTracked = nil
-			frame._eqolCdmPandemicActive = nil
+			runtime.pandemicFrameActiveByFrame = cdm.EnsureWeakKeyTable(runtime.pandemicFrameActiveByFrame)
+			runtime.pandemicFrameActiveByFrame[frame] = nil
 		end
 	end
 end
@@ -1920,7 +1944,8 @@ function CDMAuras:HandleFrameAuraMutation(frame, wasCleared)
 					end
 					if state.pandemicActive ~= nextPandemicActive then
 						state.pandemicActive = nextPandemicActive
-						frame._eqolCdmPandemicActive = nextPandemicActive and true or nil
+						runtime.pandemicFrameActiveByFrame = cdm.EnsureWeakKeyTable(runtime.pandemicFrameActiveByFrame)
+						runtime.pandemicFrameActiveByFrame[frame] = nextPandemicActive and true or nil
 						changed = true
 					end
 					if state.targetAuraEpoch ~= nextTargetAuraEpoch then
@@ -1945,6 +1970,7 @@ end
 
 function CDMAuras:ApplyFrameTotemMutation(frame)
 	if not frame then return end
+	hookTotemCooldownDoneFrame(frame)
 	local runtime = getRuntime()
 	if runtime.frameTotemRefreshPendingByFrame then runtime.frameTotemRefreshPendingByFrame[frame] = nil end
 	local keys = runtime.frameEntries[frame]
@@ -1975,26 +2001,20 @@ function CDMAuras:HandleFrameTotemMutation(frame)
 		return
 	end
 	runtime.frameTotemRefreshPendingByFrame[frame] = true
-	if C_Timer and C_Timer.After then
-		C_Timer.After(0, function() CDMAuras:ApplyFrameTotemMutation(frame) end)
-	else
-		self:ApplyFrameTotemMutation(frame)
-	end
+	RunNextFrame(function() CDMAuras:ApplyFrameTotemMutation(frame) end)
 end
 
 function CDMAuras:HandleFramePandemicStateChanged(frame, isActive)
-	if not (frame and frame._eqolCdmPandemicTracked == true) then return end
+	if not frame then return end
 	local runtime = getRuntime()
 	local keys = runtime.pandemicFrameEntries[frame]
-	if not keys then
-		frame._eqolCdmPandemicTracked = nil
-		return
-	end
+	if not keys then return end
 
 	local auraUnit = normalizeTrackedUnit(getFrameAuraUnit(frame))
 	local pandemicActive = isActive == true and auraUnit == "target" and targetIsAttackable() and frameHasPandemicState(frame)
-	if not pandemicActive and frame._eqolCdmPandemicActive ~= true then return end
-	frame._eqolCdmPandemicActive = pandemicActive and true or nil
+	runtime.pandemicFrameActiveByFrame = cdm.EnsureWeakKeyTable(runtime.pandemicFrameActiveByFrame)
+	if not pandemicActive and runtime.pandemicFrameActiveByFrame[frame] ~= true then return end
+	runtime.pandemicFrameActiveByFrame[frame] = pandemicActive and true or nil
 	for key in pairs(keys) do
 		local state = runtime.entryStates[key]
 		if state then
@@ -2710,6 +2730,7 @@ function CDMAuras:BuildRuntimeData(panelId, entryId, entry, entryLayout, alwaysS
 	registerAuraMapping(runtime, key, state, auraInstanceID, auraUnit)
 
 	local hasTotemData = chosenFrame and chosenFrame.totemData ~= nil
+	if hasTotemData then hookTotemCooldownDoneFrame(chosenFrame) end
 	local active = auraData ~= nil or hasTotemData
 	local trackedAuraUnit = normalizeTrackedUnit(auraUnit) or normalizedTrackUnit or normalizeTrackedUnit(state.trackedAuraUnit) or normalizeTrackedUnit(state.mappedAuraUnit)
 	local pandemicActive = false
@@ -2721,7 +2742,10 @@ function CDMAuras:BuildRuntimeData(panelId, entryId, entry, entryLayout, alwaysS
 		end
 	end
 	state.pandemicActive = pandemicActive or nil
-	if chosenFrame then chosenFrame._eqolCdmPandemicActive = pandemicActive and true or nil end
+	if chosenFrame then
+		runtime.pandemicFrameActiveByFrame = cdm.EnsureWeakKeyTable(runtime.pandemicFrameActiveByFrame)
+		runtime.pandemicFrameActiveByFrame[chosenFrame] = pandemicActive and true or nil
+	end
 	local iconTextureID = auraData and auraData.icon
 		or getFrameIconTexture(chosenFrame)
 		or entry.iconTextureID
