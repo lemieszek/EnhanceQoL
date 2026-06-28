@@ -368,6 +368,24 @@ addon.Sounds.soundFiles = {
 		},
 	},
 	["mounts"] = {
+		["soundMutePterodactyl"] = {
+			838877,
+			838879,
+			838881,
+			838883,
+			838885,
+			838887,
+			838903,
+			838905,
+			838907,
+			838909,
+			838911,
+			838913,
+			838915,
+			838917,
+			838919,
+			838921,
+		},
 		["banlu"] = {
 			1593212, --Good to see you again, Grandmaster.
 			1593213, --Lay off the manabuns.

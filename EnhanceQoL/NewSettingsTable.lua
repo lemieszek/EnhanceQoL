@@ -8,6 +8,7 @@ addon.variables.NewVersionTableEQOL = {
 	questTrackerHideMainHeader = true,
 	questTrackerTextStyleEnabled = true,
 	sounds_interface_general_bnetNotificationToast = true,
+	sounds_mounts_soundMutePterodactyl = true,
 	enhancedWaypoint = true,
 	hideMinimapButtonBinToggle = true,
 	mythicPlusBloodlustTrackerGlowOnActive = true,
