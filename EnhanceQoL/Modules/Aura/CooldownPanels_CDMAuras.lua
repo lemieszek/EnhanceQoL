@@ -144,6 +144,7 @@ local function getRuntime()
 		runtime.scratchNumericKeys = runtime.scratchNumericKeys or {}
 		runtime.scratchChildren = runtime.scratchChildren or {}
 		runtime.scratchRefreshedPanels = runtime.scratchRefreshedPanels or {}
+		runtime.scratchAffectedKeys = runtime.scratchAffectedKeys or {}
 		runtime.frameEpochByFrame = cdm.EnsureWeakKeyTable(runtime.frameEpochByFrame)
 		runtime.frameAuraSnapshotByFrame = cdm.EnsureWeakKeyTable(runtime.frameAuraSnapshotByFrame)
 		runtime.frameActiveStateByFrame = cdm.EnsureWeakKeyTable(runtime.frameActiveStateByFrame)
@@ -170,6 +171,7 @@ local function getRuntime()
 		scratchNumericKeys = {},
 		scratchChildren = {},
 		scratchRefreshedPanels = {},
+		scratchAffectedKeys = {},
 		frameEpochByFrame = cdm.EnsureWeakKeyTable(nil),
 		frameAuraSnapshotByFrame = cdm.EnsureWeakKeyTable(nil),
 		frameActiveStateByFrame = cdm.EnsureWeakKeyTable(nil),
@@ -295,6 +297,20 @@ local function requestPanelRefresh(panelId)
 		CooldownPanels:RequestPanelRefresh(panelId)
 	elseif CooldownPanels.GetPanel and CooldownPanels:GetPanel(panelId) and CooldownPanels.RefreshPanel then
 		CooldownPanels:RefreshPanel(panelId)
+	end
+end
+
+local function requestEntryRefresh(state)
+	if not (state and state.panelId and state.entryId) then
+		requestPanelRefresh(state and state.panelId or nil)
+		return
+	end
+	if CooldownPanels.RequestEntryRefresh then
+		CooldownPanels:RequestEntryRefresh(state.panelId, state.entryId)
+	elseif CooldownPanels.RequestPanelRefresh then
+		CooldownPanels:RequestPanelRefresh(state.panelId)
+	elseif CooldownPanels.GetPanel and CooldownPanels:GetPanel(state.panelId) and CooldownPanels.RefreshPanel then
+		CooldownPanels:RefreshPanel(state.panelId)
 	end
 end
 
@@ -924,7 +940,7 @@ local function setFrameActiveState(runtime, frame)
 	local active = frameHasActiveCooldownAuraOrTotem(frame)
 	local previous = runtime.frameActiveStateByFrame[frame]
 	runtime.frameActiveStateByFrame[frame] = active
-	return previous ~= nil and previous ~= active
+	return previous ~= nil and previous ~= active, active, previous
 end
 
 local function frameIsShown(frame)
@@ -1866,9 +1882,6 @@ function CDMAuras:HandleFrameAuraMutation(frame, wasCleared)
 	if not keys then return end
 	local auraData, auraUnit, newAuraID = getFrameAuraData(frame)
 	local normalizedAuraUnit = normalizeTrackedUnit(auraUnit)
-	local refreshedPanels = runtime.scratchRefreshedPanels
-	wipe(refreshedPanels)
-
 	for key in pairs(keys) do
 		local state = runtime.entryStates[key]
 		if state then
@@ -1911,13 +1924,8 @@ function CDMAuras:HandleFrameAuraMutation(frame, wasCleared)
 					if registerAuraMapping(runtime, key, state, newAuraID, auraUnit) then changed = true end
 				end
 			end
-			if changed then refreshedPanels[state.panelId] = true end
+			if changed then requestEntryRefresh(state) end
 		end
-	end
-
-	for panelId in pairs(refreshedPanels) do
-		requestPanelRefresh(panelId)
-		refreshedPanels[panelId] = nil
 	end
 end
 
@@ -1935,23 +1943,19 @@ function CDMAuras:ApplyFrameTotemMutation(frame)
 	if runtime.frameTotemRefreshPendingByFrame then runtime.frameTotemRefreshPendingByFrame[frame] = nil end
 	local keys = runtime.frameEntries[frame]
 	if not keys then return end
-	if not setFrameActiveState(runtime, frame) then return end
+	local changed = setFrameActiveState(runtime, frame)
+	if not changed then
+		return
+	end
 
 	-- Totem-backed tracked buffs can change state on an existing viewer frame without
 	-- touching aura instance data or cooldownID. Force the next runtime build to rescan.
 	cdm.BumpFrameEpoch(runtime, frame)
 	self:InvalidateScan(false, "HandleFrameTotemMutation")
 
-	local refreshedPanels = runtime.scratchRefreshedPanels
-	wipe(refreshedPanels)
 	for key in pairs(keys) do
 		local state = runtime.entryStates[key]
-		if state then refreshedPanels[state.panelId] = true end
-	end
-
-	for panelId in pairs(refreshedPanels) do
-		requestPanelRefresh(panelId)
-		refreshedPanels[panelId] = nil
+		if state then requestEntryRefresh(state) end
 	end
 end
 
@@ -1961,10 +1965,15 @@ function CDMAuras:HandleFrameTotemMutation(frame)
 	local keys = runtime.frameEntries[frame]
 	if not keys then return end
 	runtime.frameTotemRefreshPendingByFrame = cdm.EnsureWeakKeyTable(runtime.frameTotemRefreshPendingByFrame)
-	if runtime.frameTotemRefreshPendingByFrame[frame] then return end
+	if runtime.frameTotemRefreshPendingByFrame[frame] then
+		return
+	end
 	runtime.frameTotemRefreshPendingByFrame[frame] = true
-	bumpPerfCounter(runtime, "frameActiveTotemDeferred")
-	C_Timer.After(0, function() CDMAuras:ApplyFrameTotemMutation(frame) end)
+	if C_Timer and C_Timer.After then
+		C_Timer.After(0, function() CDMAuras:ApplyFrameTotemMutation(frame) end)
+	else
+		self:ApplyFrameTotemMutation(frame)
+	end
 end
 
 function CDMAuras:HandleFramePandemicStateChanged(frame, isActive)
@@ -1980,9 +1989,6 @@ function CDMAuras:HandleFramePandemicStateChanged(frame, isActive)
 	local pandemicActive = isActive == true and auraUnit == "target" and targetIsAttackable() and frameHasPandemicState(frame)
 	if not pandemicActive and frame._eqolCdmPandemicActive ~= true then return end
 	frame._eqolCdmPandemicActive = pandemicActive and true or nil
-	local refreshedPanels = runtime.scratchRefreshedPanels
-	wipe(refreshedPanels)
-
 	for key in pairs(keys) do
 		local state = runtime.entryStates[key]
 		if state then
@@ -1990,14 +1996,9 @@ function CDMAuras:HandleFramePandemicStateChanged(frame, isActive)
 			if pandemicActive and cdm.GetCachedFrameSpellMatch(runtime, state, frame, state.trackUnit or auraUnit) then nextPandemicActive = true end
 			if (state.pandemicActive == true) ~= nextPandemicActive then
 				state.pandemicActive = nextPandemicActive or nil
-				refreshedPanels[state.panelId] = true
+				requestEntryRefresh(state)
 			end
 		end
-	end
-
-	for panelId in pairs(refreshedPanels) do
-		requestPanelRefresh(panelId)
-		refreshedPanels[panelId] = nil
 	end
 end
 
@@ -3084,13 +3085,13 @@ function CDMAuras:EnsureCooldownViewerHooks()
 		runtime.cooldownViewerClearHookInstalled = true
 		installed = true
 	end
-		if EventRegistry and EventRegistry.RegisterCallback and not runtime.cooldownViewerDataChangedHookInstalled then
-			EventRegistry:RegisterCallback("CooldownViewerSettings.OnDataChanged", function()
-				if not self:HasActiveTrackedPanels() then return end
-				if not cdm.IsCooldownViewerSettingsShown() then return end
-				if not cdm.HasCooldownManagerSyncPanel(IMPORT_SOURCE_ICON) then return end
-				self:ScheduleTrackedPanelsRescan("CooldownViewerSettings.OnDataChanged")
-			end, "EnhanceQoL.CDMAuras")
+	if EventRegistry and EventRegistry.RegisterCallback and not runtime.cooldownViewerDataChangedHookInstalled then
+		EventRegistry:RegisterCallback("CooldownViewerSettings.OnDataChanged", function()
+			if not self:HasActiveTrackedPanels() then return end
+			if not cdm.IsCooldownViewerSettingsShown() then return end
+			if not cdm.HasCooldownManagerSyncPanel(IMPORT_SOURCE_ICON) then return end
+			self:ScheduleTrackedPanelsRescan("CooldownViewerSettings.OnDataChanged")
+		end, "EnhanceQoL.CDMAuras")
 		runtime.cooldownViewerDataChangedHookInstalled = true
 		installed = true
 	end
@@ -3103,7 +3104,7 @@ end
 
 local function clearTrackedUnitAuraIndex(unit)
 	unit = normalizeTrackedUnit(unit)
-	if not unit then return end
+	if not unit or unit == "target" then return end
 	local runtime = getRuntime()
 	wipe(runtime.auraEntries[unit])
 end
@@ -3121,8 +3122,8 @@ function CDMAuras:HandleUnitAura(_, unit, updateInfo)
 		return
 	end
 
-	local panelsToRefresh = runtime.scratchRefreshedPanels
-	wipe(panelsToRefresh)
+	local entriesToRefresh = runtime.scratchAffectedKeys
+	wipe(entriesToRefresh)
 
 	if updateInfo.updatedAuraInstanceIDs then
 		for _, auraID in ipairs(updateInfo.updatedAuraInstanceIDs) do
@@ -3130,7 +3131,7 @@ function CDMAuras:HandleUnitAura(_, unit, updateInfo)
 			if mapped then
 				for key in pairs(mapped) do
 					local state = runtime.entryStates[key]
-					if state then panelsToRefresh[state.panelId] = true end
+					if state then entriesToRefresh[key] = true end
 				end
 			end
 		end
@@ -3151,7 +3152,7 @@ function CDMAuras:HandleUnitAura(_, unit, updateInfo)
 						end
 						state.mappedAuraInstanceID = nil
 						state.mappedAuraUnit = nil
-						panelsToRefresh[state.panelId] = true
+						entriesToRefresh[key] = true
 					end
 				end
 				auraEntries[auraID] = nil
@@ -3159,9 +3160,10 @@ function CDMAuras:HandleUnitAura(_, unit, updateInfo)
 		end
 	end
 
-	for panelId in pairs(panelsToRefresh) do
-		requestPanelRefresh(panelId)
-		panelsToRefresh[panelId] = nil
+	for key in pairs(entriesToRefresh) do
+		local state = runtime.entryStates[key]
+		if state then requestEntryRefresh(state) end
+		entriesToRefresh[key] = nil
 	end
 end
 
