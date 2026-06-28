@@ -1611,8 +1611,9 @@ function Editor:EnsureFrame()
 	controls.MaxLabel, controls.MaxCount, controls.MaxValue = createSettingSlider(controls.PerRowLabel, tr("Max", "Max"), 0, 40, 1)
 	controls.SpacingLabel, controls.Spacing, controls.SpacingValue = createSettingSlider(controls.MaxLabel, tr("Spacing", "Spacing"), 0, 20, 1)
 	controls.SizeLabel, controls.Size, controls.SizeValue = createSettingSlider(controls.SpacingLabel, tr("UFGroupHealerBuffEditorIconSize", "Icon Size"), 4, 64, 1)
+	controls.IconZoomLabel, controls.IconZoom, controls.IconZoomValue = createSettingSlider(controls.SizeLabel, tr("Icon zoom", "Icon zoom"), 0, 35, 1)
 	controls.CooldownTextSizeLabel, controls.CooldownTextSize, controls.CooldownTextSizeValue =
-		createSettingSlider(controls.SizeLabel, tr("UFGroupHealerBuffEditorCooldownTextSize", "Cooldown Size"), 6, 64, 1)
+		createSettingSlider(controls.IconZoomLabel, tr("UFGroupHealerBuffEditorCooldownTextSize", "Cooldown Size"), 6, 64, 1)
 	controls.ChargeTextSizeLabel, controls.ChargeTextSize, controls.ChargeTextSizeValue =
 		createSettingSlider(controls.CooldownTextSizeLabel, tr("UFGroupHealerBuffEditorChargeTextSize", "Charge Size"), 6, 64, 1)
 	controls.XLabel, controls.XOffset, controls.XValue = createSettingSlider(controls.ChargeTextSizeLabel, tr("X Offset", "X Offset"), -200, 200, 1)
@@ -1762,6 +1763,7 @@ function Editor:EnsureFrame()
 		placeSlider(controls.MaxLabel, controls.MaxCount, controls.MaxValue)
 		placeSlider(controls.SpacingLabel, controls.Spacing, controls.SpacingValue)
 		placeSlider(controls.SizeLabel, controls.Size, controls.SizeValue)
+		placeSlider(controls.IconZoomLabel, controls.IconZoom, controls.IconZoomValue)
 		placeSlider(controls.CooldownTextSizeLabel, controls.CooldownTextSize, controls.CooldownTextSizeValue)
 		placeSlider(controls.ChargeTextSizeLabel, controls.ChargeTextSize, controls.ChargeTextSizeValue)
 		placeSlider(controls.XLabel, controls.XOffset, controls.XValue)
@@ -2505,6 +2507,7 @@ function Editor:EnsureFrame()
 	updateGroupFromSlider("max", controls.MaxCount, controls.MaxValue, 0, 40, 1)
 	updateGroupFromSlider("spacing", controls.Spacing, controls.SpacingValue, 0, 20, 1)
 	updateGroupFromSlider("size", controls.Size, controls.SizeValue, 4, 64, 1)
+	updateGroupFromSlider("iconZoom", controls.IconZoom, controls.IconZoomValue, 0, 35, 1)
 	updateGroupFromSlider("cooldownTextSize", controls.CooldownTextSize, controls.CooldownTextSizeValue, 6, 64, 1)
 	updateGroupFromSlider("chargeTextSize", controls.ChargeTextSize, controls.ChargeTextSizeValue, 6, 64, 1)
 	updateGroupFromSlider("x", controls.XOffset, controls.XValue, -200, 200, 1)
@@ -3417,10 +3420,11 @@ function Editor:RefreshGroupControls()
 		local showBarFillFrame = showBar
 		local showBarDimensions = showBar and group.barFillFrame ~= true
 		local showAnchor = style ~= "TINT" and not (showBar and group.barFillFrame == true)
-		local showGrowth = (style == "ICON" or style == "SQUARE") and not isPriorityIconMode
-		local showGrid = showGrowth
-		local showSize = style == "ICON" or style == "SQUARE"
-		local showOffsets = style ~= "TINT" and not (showBar and group.barFillFrame == true)
+			local showGrowth = (style == "ICON" or style == "SQUARE") and not isPriorityIconMode
+			local showGrid = showGrowth
+			local showSize = style == "ICON" or style == "SQUARE"
+			local showIconZoom = style == "ICON"
+			local showOffsets = style ~= "TINT" and not (showBar and group.barFillFrame == true)
 		local showInset = style == "BAR" or style == "BORDER"
 		local showBorder = style == "BORDER"
 		local showColor = style == "SQUARE" or style == "BAR" or style == "BORDER" or style == "TINT"
@@ -3451,6 +3455,17 @@ function Editor:RefreshGroupControls()
 		controls.SpacingValue:SetText(tostring(group.spacing or 0))
 		controls.Size:SetValue(group.size or 16)
 		controls.SizeValue:SetText(tostring(group.size or 16))
+		local iconZoom = group.iconZoom
+		if addon.IconShape and addon.IconShape.NormalizeIconZoom then
+			iconZoom = addon.IconShape.NormalizeIconZoom(iconZoom)
+		else
+			iconZoom = roundInt(tonumber(iconZoom) or 0)
+			if iconZoom < 0 then iconZoom = 0 end
+			if iconZoom > 35 then iconZoom = 35 end
+		end
+		group.iconZoom = iconZoom
+		controls.IconZoom:SetValue(iconZoom)
+		controls.IconZoomValue:SetText(tostring(iconZoom))
 
 		local cooldownTextSize = tonumber(group.cooldownTextSize)
 		if cooldownTextSize == nil then cooldownTextSize = tonumber(ac.cooldownFontSize) or 12 end
@@ -3555,6 +3570,7 @@ function Editor:RefreshGroupControls()
 		setSliderState(controls.MaxLabel, controls.MaxCount, controls.MaxValue, showGrid, true)
 		setSliderState(controls.SpacingLabel, controls.Spacing, controls.SpacingValue, showGrid, true)
 		setSliderState(controls.SizeLabel, controls.Size, controls.SizeValue, showSize, true)
+		setSliderState(controls.IconZoomLabel, controls.IconZoom, controls.IconZoomValue, showIconZoom, true)
 		setSliderState(controls.CooldownTextSizeLabel, controls.CooldownTextSize, controls.CooldownTextSizeValue, showTextSizeOverrides, true)
 		setSliderState(controls.ChargeTextSizeLabel, controls.ChargeTextSize, controls.ChargeTextSizeValue, showTextSizeOverrides, true)
 		setSliderState(controls.XLabel, controls.XOffset, controls.XValue, showOffsets, true)
@@ -3593,6 +3609,7 @@ function Editor:RefreshGroupControls()
 		setSliderState(controls.MaxLabel, controls.MaxCount, controls.MaxValue, false, false)
 		setSliderState(controls.SpacingLabel, controls.Spacing, controls.SpacingValue, false, false)
 		setSliderState(controls.SizeLabel, controls.Size, controls.SizeValue, false, false)
+		setSliderState(controls.IconZoomLabel, controls.IconZoom, controls.IconZoomValue, false, false)
 		setSliderState(controls.CooldownTextSizeLabel, controls.CooldownTextSize, controls.CooldownTextSizeValue, false, false)
 		setSliderState(controls.ChargeTextSizeLabel, controls.ChargeTextSize, controls.ChargeTextSizeValue, false, false)
 		setSliderState(controls.XLabel, controls.XOffset, controls.XValue, false, false)
@@ -3725,6 +3742,27 @@ local function setPreviewFont(fontString, size, outline)
 	end
 	if ok == false then fontString:SetFont(fallbackFont, size, resolvedFlags) end
 	if addon.functions and addon.functions.ApplyFontStyleShadow then addon.functions.ApplyFontStyleShadow(fontString, styleChoice, "OUTLINE") end
+end
+
+local function applyPreviewIconZoom(icon, iconZoom)
+	local texture = icon and icon.Texture
+	if not (texture and texture.SetTexCoord) then return end
+	if addon.IconShape and addon.IconShape.NormalizeIconZoom then
+		iconZoom = addon.IconShape.NormalizeIconZoom(iconZoom)
+	else
+		iconZoom = roundInt(tonumber(iconZoom) or 0)
+		if iconZoom < 0 then iconZoom = 0 end
+		if iconZoom > 35 then iconZoom = 35 end
+	end
+	if iconZoom <= 0 then
+		texture:SetTexCoord(0, 1, 0, 1)
+		return
+	end
+	if addon.IconShape and addon.IconShape.ApplyTextureZoom then
+		addon.IconShape.ApplyTextureZoom(texture, iconZoom, "_hbPreviewIconTexCoord", 0)
+	else
+		texture:SetTexCoord(0, 1, 0, 1)
+	end
 end
 
 local function getPreviewCooldownTiming(sampleIndex, now, loopEnabled, loopOrigin)
@@ -4197,10 +4235,12 @@ function Editor:RefreshPreview()
 							local squareColor = (rule and rule.color) or group.color
 							local r, g, b, a = resolveColor(squareColor)
 							icon.Texture:SetTexture("Interface\\Buttons\\WHITE8x8")
+							applyPreviewIconZoom(icon, 0)
 							icon.Texture:SetVertexColor(r, g, b, a)
 							if icon.Texture.SetDesaturated then icon.Texture:SetDesaturated(false) end
 						else
 							icon.Texture:SetTexture(iconTex or 134400)
+							applyPreviewIconZoom(icon, group.iconZoom)
 							icon.Texture:SetVertexColor(1, 1, 1, 1)
 							if icon.Texture.SetDesaturated then icon.Texture:SetDesaturated(HB.ShouldDesaturateRuleIcon and HB.ShouldDesaturateRuleIcon(group, rule) or false) end
 						end

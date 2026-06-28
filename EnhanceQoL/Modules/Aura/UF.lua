@@ -2045,6 +2045,7 @@ local defaults = {
 			debuffOffset = nil, -- falls back to offset
 			countAnchor = "BOTTOMRIGHT",
 			countOffset = { x = -2, y = 2 },
+			countFont = "__EQOL_GLOBAL_FONT__",
 			countFontSize = nil,
 			countFontSizeBuff = nil,
 			countFontSizeDebuff = nil,
@@ -2332,6 +2333,7 @@ AuraUtil._LEGACY_AURA_SECTION_EXCLUDES = {
 	countFontSize = true,
 	countFontSizeBuff = true,
 	countFontSizeDebuff = true,
+	countFont = true,
 	cooldownFontSize = true,
 	cooldownFontSizeBuff = true,
 	cooldownFontSizeDebuff = true,
@@ -2393,6 +2395,7 @@ function AuraUtil.buildLegacyAuraSection(src, isDebuff)
 	local countFontSize = isDebuff and src.countFontSizeDebuff or src.countFontSizeBuff
 	if countFontSize == nil then countFontSize = src.countFontSize end
 	if countFontSize ~= nil then section.countFontSize = countFontSize end
+	if src.countFont ~= nil then section.countFont = src.countFont end
 
 	local cooldownFontSize = isDebuff and src.cooldownFontSizeDebuff or src.cooldownFontSizeBuff
 	if cooldownFontSize == nil then cooldownFontSize = src.cooldownFontSize end
@@ -5726,6 +5729,7 @@ do
 		debuffGrowth = nil,
 		countAnchor = "BOTTOMRIGHT",
 		countOffset = { x = -2, y = 2 },
+		countFont = "__EQOL_GLOBAL_FONT__",
 		countFontSize = nil,
 		countFontSizeBuff = nil,
 		countFontSizeDebuff = nil,

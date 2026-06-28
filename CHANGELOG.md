@@ -4,6 +4,10 @@
 
 ## [11.5.0-beta5] - 2026-06-28
 
+### ✨ Added
+
+- Unit Frames: Added font selection for target aura stack text and icon zoom control for Healer Buff Placement icons.
+
 ### 🐛 Fixed
 
 - Bags / Vendor: Reduced performance spikes while switching between merchant and NPC interactions by cutting unnecessary bag refresh, vendor scan, and merchant item highlight work.

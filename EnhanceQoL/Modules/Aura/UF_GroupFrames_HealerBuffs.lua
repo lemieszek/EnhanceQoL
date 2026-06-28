@@ -797,6 +797,11 @@ local function normalizeGroup(group, id)
 	group.max = roundInt(clamp(group.max, 0, 40, 3))
 	group.spacing = roundInt(clamp(group.spacing, 0, 40, 0))
 	group.size = roundInt(clamp(group.size, 4, 96, 16))
+	if addon.IconShape and addon.IconShape.NormalizeIconZoom then
+		group.iconZoom = addon.IconShape.NormalizeIconZoom(group.iconZoom)
+	else
+		group.iconZoom = roundInt(clamp(group.iconZoom, 0, 35, 0))
+	end
 	group.barOrientation = normalizeOrientation(group.barOrientation)
 	group.barThickness = roundInt(clamp(group.barThickness, 1, 96, 6))
 	local barWidth = clamp(group.barWidth, 1, BAR_SIZE_MAX, nil)
@@ -1944,6 +1949,7 @@ local function getAuraStyleForGroup(state, cfg, group)
 	local countFontSize = group.chargeTextSize ~= nil and group.chargeTextSize or ac.countFontSize
 	local changed = styleCache._cfgSize ~= group.size
 		or styleCache._cfgPadding ~= group.spacing
+		or styleCache._cfgIconZoom ~= group.iconZoom
 		or styleCache._cfgShowTooltip ~= showTooltip
 		or styleCache._cfgShowCooldownSwipe ~= showCooldownSwipe
 		or styleCache._cfgShowCooldownEdge ~= showCooldownEdge
@@ -1968,6 +1974,7 @@ local function getAuraStyleForGroup(state, cfg, group)
 
 	styleCache._cfgSize = group.size
 	styleCache._cfgPadding = group.spacing
+	styleCache._cfgIconZoom = group.iconZoom
 	styleCache._cfgShowTooltip = showTooltip
 	styleCache._cfgShowCooldownSwipe = showCooldownSwipe
 	styleCache._cfgShowCooldownEdge = showCooldownEdge
@@ -1998,6 +2005,7 @@ local function getAuraStyleForGroup(state, cfg, group)
 	styleCache._cfgCountFontOutline = ac.countFontOutline
 	styleCache.size = group.size
 	styleCache.padding = group.spacing
+	styleCache.iconZoom = group.iconZoom
 	styleCache.showTooltip = showTooltip
 	styleCache.showCooldownSwipe = showCooldownSwipe
 	styleCache.showCooldownEdge = showCooldownEdge
@@ -2037,7 +2045,24 @@ local function resolveColor(color)
 	return 1, 1, 1, 1
 end
 
-local function styleSquareButton(btn, color)
+local function applyButtonIconZoom(btn, iconZoom, baseInset)
+	if addon.IconShape and addon.IconShape.NormalizeIconZoom then
+		iconZoom = addon.IconShape.NormalizeIconZoom(iconZoom)
+	else
+		iconZoom = roundInt(clamp(iconZoom, 0, 35, 0))
+	end
+	if iconZoom <= 0 then
+		if btn and btn.icon and btn.icon.SetTexCoord then btn.icon:SetTexCoord(0, 1, 0, 1) end
+		return
+	end
+	if addon.IconShape and addon.IconShape.ApplyTextureZoom then
+		addon.IconShape.ApplyTextureZoom(btn and btn.icon, iconZoom, "_hbIconTexCoord", baseInset)
+		return
+	end
+	if btn and btn.icon and btn.icon.SetTexCoord then btn.icon:SetTexCoord(0, 1, 0, 1) end
+end
+
+local function styleSquareButton(btn, color, iconZoom)
 	if not btn then return end
 	local r, g, b, a = resolveColor(color)
 	if btn.icon then
@@ -2046,7 +2071,7 @@ local function styleSquareButton(btn, color)
 		else
 			btn.icon:SetTexture("Interface\\Buttons\\WHITE8x8")
 		end
-		btn.icon:SetTexCoord(0, 1, 0, 1)
+		applyButtonIconZoom(btn, iconZoom, 0)
 		btn.icon:SetVertexColor(r, g, b, a)
 		if btn.icon.SetDesaturated then btn.icon:SetDesaturated(false) end
 	end
@@ -2293,7 +2318,7 @@ updateDurationColorButton = function(btn)
 	local token = getDisplayColorToken(rule, aura)
 	if btn._hbDurationColorToken == token then return end
 	btn._hbDurationColorToken = token
-	styleSquareButton(btn, getDurationColorStep(rule, aura) or (rule and rule.color) or (group and group.color))
+	styleSquareButton(btn, getDurationColorStep(rule, aura) or (rule and rule.color) or (group and group.color), group and group.iconZoom)
 end
 
 local function clearDurationColorButton(btn)
@@ -2436,6 +2461,7 @@ end
 local function didGroupRenderStateChange(cache, compiled, group, activeRules, familyAuraInstance, styleRevision, layoutRevision)
 	local changed = cache.groupId ~= group.id
 		or cache.groupStyle ~= group.style
+		or cache.iconZoom ~= group.iconZoom
 		or cache.compiledGeneration ~= compiled.generation
 		or cache.styleRevision ~= styleRevision
 		or cache.layoutRevision ~= layoutRevision
@@ -2484,6 +2510,7 @@ local function didGroupRenderStateChange(cache, compiled, group, activeRules, fa
 
 	cache.groupId = group.id
 	cache.groupStyle = group.style
+	cache.iconZoom = group.iconZoom
 	cache.compiledGeneration = compiled.generation
 	cache.styleRevision = styleRevision
 	cache.layoutRevision = layoutRevision
@@ -2725,7 +2752,7 @@ local function renderIconStyleForGroup(btn, st, state, compiled, cfg, group, cha
 		end
 		if group.style == STYLE_SQUARE then
 			if auraApplied or button._hbVisualMode ~= STYLE_SQUARE or button._hbVisualRuleId ~= ruleId or button._hbVisualGeneration ~= compiled.generation then
-				styleSquareButton(button, getDurationColorStep(rule, aura) or (rule and rule.color) or group.color)
+				styleSquareButton(button, getDurationColorStep(rule, aura) or (rule and rule.color) or group.color, group.iconZoom)
 				button._hbVisualMode = STYLE_SQUARE
 				button._hbVisualRuleId = ruleId
 				button._hbVisualGeneration = compiled.generation

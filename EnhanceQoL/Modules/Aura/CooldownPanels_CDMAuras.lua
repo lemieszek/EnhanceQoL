@@ -1557,6 +1557,7 @@ function CDMAuras:UpdateEventRegistration()
 		frame:RegisterEvent("PLAYER_TALENT_UPDATE")
 		frame:RegisterEvent("TRAIT_CONFIG_UPDATED")
 		frame:RegisterEvent("TRAIT_CONFIG_LIST_UPDATED")
+		-- !Keep this until we have verified whether Cooldown Viewer frame hooks fully cover aura updates/removals.
 		frame:RegisterUnitEvent("UNIT_AURA", "player")
 		frame:RegisterUnitEvent("PLAYER_SPECIALIZATION_CHANGED", "player")
 		self.eventsRegistered = true
