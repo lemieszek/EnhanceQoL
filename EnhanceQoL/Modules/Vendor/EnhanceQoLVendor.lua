@@ -306,6 +306,28 @@ local function shouldUseVendorMarkUpdates()
 		or addon.db["vendorDestroyEnable"]
 end
 
+local function tableHasEntries(tbl)
+	if type(tbl) ~= "table" then return false end
+	return next(tbl) ~= nil
+end
+
+local function hasAutoSellScanWork()
+	if not addon.db then return false end
+	if tableHasEntries(addon.db["vendorIncludeSellList"]) then return true end
+	local qualityFilter = addon.Vendor.variables.itemQualityFilter
+	for quality, enabled in pairs(qualityFilter or {}) do
+		if enabled and addon.Vendor.variables.tabNames and addon.Vendor.variables.tabNames[quality] then
+			return true
+		end
+	end
+	return false
+end
+
+local function shouldApplyIntegratedBagsVendorMarks(searchOnly)
+	if searchOnly then return vendorMarksActive == true end
+	return vendorMarksActive == true or shouldUseVendorMarkUpdates()
+end
+
 local function requestBaganatorItemWidgetRefresh()
 	local api = _G.Baganator and _G.Baganator.API
 	local constants = _G.Baganator and _G.Baganator.Constants
@@ -915,6 +937,10 @@ function addon.Vendor.functions.RefreshIntegratedBagsVendorMarks(searchOnly)
 	end
 end
 
+function addon.Vendor.functions.ShouldApplyIntegratedBagsVendorMarks(searchOnly)
+	return shouldApplyIntegratedBagsVendorMarks(searchOnly == true)
+end
+
 local function setDestroyButtonVisibility(button, visible)
 	if not button then return end
 	local inCombat = InCombatLockdown and InCombatLockdown() or false
@@ -1494,7 +1520,8 @@ local function lookupDestroyItemsFast()
 	return itemsToDestroy
 end
 
-local function lookupItems()
+local function lookupItems(includeDestroyItems)
+	includeDestroyItems = includeDestroyItems ~= false
 	local _, avgItemLevelEquipped = GetAverageItemLevel()
 	local itemsToSell = {}
 	local itemsToDestroy = {}
@@ -1517,7 +1544,7 @@ local function lookupItems()
 				if isCosmeticItem(itemID, itemLink) then
 					processed = true
 				end
-				if not processed and hasNoValue and (inDestroyList or inSellList) then
+				if includeDestroyItems and not processed and hasNoValue and (inDestroyList or inSellList) then
 					local reason = getDestroyProtectionReason(itemID, bagInfo, qualityFromBag)
 					if reason then
 						notifyDestroyProtection(itemID, itemLink or itemNameFromBag, reason)
@@ -1542,12 +1569,14 @@ local function lookupItems()
 						if isCosmeticItem(itemID, itemLink, classID, subclassID) then
 							-- Cosmetics can have a vendor price, but should never be auto-vendored.
 						elseif inDestroyList then
-							reason = getDestroyProtectionReason(itemID, bagInfo, quality)
-							if reason then
-								notifyDestroyProtection(itemID, itemLink or resolvedName, reason)
-								if addon.db["vendorIncludeDestroyList"] then addon.db["vendorIncludeDestroyList"][itemID] = nil end
-							else
-								table.insert(itemsToDestroy, createDestroyEntry(bag, slot, itemID, resolvedName, bagInfo))
+							if includeDestroyItems then
+								reason = getDestroyProtectionReason(itemID, bagInfo, quality)
+								if reason then
+									notifyDestroyProtection(itemID, itemLink or resolvedName, reason)
+									if addon.db["vendorIncludeDestroyList"] then addon.db["vendorIncludeDestroyList"][itemID] = nil end
+								else
+									table.insert(itemsToDestroy, createDestroyEntry(bag, slot, itemID, resolvedName, bagInfo))
+								end
 							end
 						elseif addon.db["vendorExcludeSellList"][itemID] then
 							-- skip
@@ -1559,7 +1588,7 @@ local function lookupItems()
 								if reason then
 									notifyDestroyProtection(itemID, itemLink or resolvedName, reason)
 									if addon.db["vendorIncludeSellList"] then addon.db["vendorIncludeSellList"][itemID] = nil end
-								else
+								elseif includeDestroyItems then
 									table.insert(itemsToDestroy, createDestroyEntry(bag, slot, itemID, resolvedName, bagInfo))
 								end
 							end
@@ -1617,8 +1646,8 @@ end
 local function checkItem()
 	hasMoreItems = false
 	updateSellMoreButton()
-	local _, avgItemLevelEquipped = GetAverageItemLevel()
-	local itemsToSell = select(1, lookupItems()) or {}
+	if not hasAutoSellScanWork() then return end
+	local itemsToSell = select(1, lookupItems(false)) or {}
 
 	if #itemsToSell > 0 then
 		if addon.db["vendorOnly12Items"] then

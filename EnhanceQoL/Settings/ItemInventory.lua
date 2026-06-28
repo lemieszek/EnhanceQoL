@@ -2300,6 +2300,15 @@ local function merchantHousingOwnedTextMatches(text)
 end
 
 local ITEM_CLASS_HOUSING = Enum and Enum.ItemClass and Enum.ItemClass.Housing or 20
+local merchantKnownStateCache = {}
+
+local function clearMerchantKnownStateCache()
+	if wipe then
+		wipe(merchantKnownStateCache)
+	else
+		merchantKnownStateCache = {}
+	end
+end
 
 local function merchantTooltipHasKnownState(tooltipData, isHousingItem)
 	if not tooltipData then return false end
@@ -2322,6 +2331,7 @@ local function merchantItemIsKnown(itemIndex)
 	if not C_TooltipInfo or (not C_TooltipInfo.GetMerchantItem and not C_TooltipInfo.GetHyperlink) then return false end
 
 	local itemLink = GetMerchantItemLink and GetMerchantItemLink(itemIndex) or nil
+	if itemLink and merchantKnownStateCache[itemLink] ~= nil then return merchantKnownStateCache[itemLink] end
 	local itemClassID = itemLink and C_Item and C_Item.GetItemInfoInstant and select(6, C_Item.GetItemInfoInstant(itemLink)) or nil
 	local isHousingItem = itemClassID == ITEM_CLASS_HOUSING
 	local tooltipData
@@ -2331,7 +2341,9 @@ local function merchantItemIsKnown(itemIndex)
 		if itemLink then tooltipData = C_TooltipInfo.GetHyperlink(itemLink) end
 	end
 
-	return merchantTooltipHasKnownState(tooltipData, isHousingItem)
+	local isKnown = merchantTooltipHasKnownState(tooltipData, isHousingItem)
+	if itemLink then merchantKnownStateCache[itemLink] = isKnown end
+	return isKnown
 end
 
 local petCollectedCache = {}
@@ -2790,6 +2802,12 @@ function addon.functions.initItemInventory()
 	for _, frame in ipairs(ContainerFrameContainer.ContainerFrames) do
 		hooksecurefunc(frame, "UpdateItems", addon.functions.updateBags)
 	end
+
+	local merchantKnownCacheFrame = CreateFrame("Frame")
+	merchantKnownCacheFrame:RegisterEvent("MERCHANT_SHOW")
+	merchantKnownCacheFrame:RegisterEvent("MERCHANT_CLOSED")
+	merchantKnownCacheFrame:RegisterEvent("BAG_UPDATE_DELAYED")
+	merchantKnownCacheFrame:SetScript("OnEvent", clearMerchantKnownStateCache)
 
 	hooksecurefunc("MerchantFrame_UpdateMerchantInfo", updateMerchantButtonInfo)
 	hooksecurefunc("MerchantFrame_UpdateBuybackInfo", updateBuybackButtonInfo)

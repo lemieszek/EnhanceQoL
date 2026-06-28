@@ -6,6 +6,7 @@
 
 ### 🐛 Fixed
 
+- Bags / Vendor: Reduced performance spikes while switching between merchant and NPC interactions by cutting unnecessary bag refresh, vendor scan, and merchant item highlight work.
 - Mythic Plus: Fixed Mythic+ Timer panel bars disappearing behind selected background textures after switching from a custom background to a dropdown texture.
 
 ---
