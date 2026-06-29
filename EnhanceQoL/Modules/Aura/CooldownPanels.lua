@@ -13426,6 +13426,19 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 		return width or size, height or size
 	end
 
+	local function shouldShowStandaloneDisplayGroup()
+		local effectiveType = getEffectiveType()
+		return effectiveType == "SPELL" or effectiveType == "ITEM" or effectiveType == "SLOT" or effectiveType == "STANCE"
+	end
+
+	local function shouldShowStandaloneActivationGroup()
+		local _, currentEntry = getEntry()
+		local effectiveType = getEffectiveType()
+		return CooldownPanels:SupportsEntryCDMAuraOverlay(currentEntry, effectiveType)
+			or CooldownPanels:SupportsEntryAutoCooldownDuration(currentEntry, effectiveType)
+			or CooldownPanels:SupportsEntryCustomCooldownDuration(currentEntry, effectiveType)
+	end
+
 	local initialEffectiveType = getEffectiveType()
 	local settings = {
 			{
@@ -13433,6 +13446,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 				kind = SettingType.Collapsible,
 				id = "cooldownPanelStandaloneDisplay",
 				defaultCollapsed = false,
+				isShown = shouldShowStandaloneDisplayGroup,
 			},
 			{
 				name = L["Icon"] or "Icon",
@@ -14198,7 +14212,7 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 				kind = SettingType.Collapsible,
 				id = "cooldownPanelStandaloneActivation",
 				defaultCollapsed = true,
-				isShown = function() return getEffectiveType() ~= "STANCE" end,
+				isShown = shouldShowStandaloneActivationGroup,
 			},
 		{
 			name = L["CooldownPanelCDMAuraOverlay"] or "Show aura overlay",
@@ -14214,6 +14228,58 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 				return currentEntry and currentEntry.cdmAuraOverlayEnabled == true or false
 			end,
 			set = function(_, value) setCDMAuraOverlayEnabled(value) end,
+		},
+		{
+			name = L["CooldownPanelAutoDuration"] or "Automatic duration on activation",
+			kind = SettingType.Checkbox,
+			parentId = "cooldownPanelStandaloneActivation",
+			isShown = function()
+				local _, currentEntry = getEntry()
+				return CooldownPanels:SupportsEntryAutoCooldownDuration(currentEntry, getEffectiveType())
+			end,
+			get = function()
+				local _, currentEntry = getEntry()
+				return currentEntry and currentEntry.autoCooldownDurationEnabled == true or false
+			end,
+			set = function(_, value) setAutoCooldownDurationEnabled(value) end,
+		},
+		{
+			name = L["CooldownPanelCustomDuration"] or "Custom duration on activation",
+				tooltip = L["CooldownPanelCustomDurationTooltip"],
+			kind = SettingType.Checkbox,
+			parentId = "cooldownPanelStandaloneActivation",
+			isShown = function()
+				local _, currentEntry = getEntry()
+				return CooldownPanels:SupportsEntryCustomCooldownDuration(currentEntry, getEffectiveType())
+			end,
+			get = function()
+				local _, currentEntry = getEntry()
+				return currentEntry and currentEntry.customCooldownDurationEnabled == true or false
+			end,
+			set = function(_, value) setCustomCooldownDurationEnabled(value) end,
+		},
+		{
+			name = L["CooldownPanelCustomDurationSeconds"] or "Custom duration (sec)",
+			kind = SettingType.Slider,
+			parentId = "cooldownPanelStandaloneActivation",
+			minValue = 1,
+			maxValue = Helper.CUSTOM_COOLDOWN_DURATION_MAX or 300,
+			valueStep = 1,
+			allowInput = true,
+			isShown = function()
+				local _, currentEntry = getEntry()
+				return CooldownPanels:SupportsEntryCustomCooldownDuration(currentEntry, getEffectiveType())
+			end,
+			disabled = function()
+				local _, currentEntry = getEntry()
+				return not (currentEntry and currentEntry.customCooldownDurationEnabled == true)
+			end,
+			get = function()
+				local _, currentEntry = getEntry()
+				return Helper.ClampNumber(currentEntry and currentEntry.customCooldownDuration, 1, Helper.CUSTOM_COOLDOWN_DURATION_MAX or 300, 60)
+			end,
+			set = function(_, value) setCustomCooldownDuration(value) end,
+			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 		},
 		{
 			name = L["CooldownPanelOverwriteGlobalDefault"] or "Overwrite global default",
@@ -14341,58 +14407,6 @@ function CooldownPanels:OpenLayoutEntryStandaloneMenu(panelId, entryId, anchorFr
 				return currentEntry and currentEntry.activationOverlayGlow == true or false
 			end,
 			set = function(_, value) setEntryField("activationOverlayGlow", value == true) end,
-		},
-		{
-			name = L["CooldownPanelAutoDuration"] or "Automatic duration on activation",
-			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneActivation",
-			isShown = function()
-				local _, currentEntry = getEntry()
-				return CooldownPanels:SupportsEntryAutoCooldownDuration(currentEntry, getEffectiveType())
-			end,
-			get = function()
-				local _, currentEntry = getEntry()
-				return currentEntry and currentEntry.autoCooldownDurationEnabled == true or false
-			end,
-			set = function(_, value) setAutoCooldownDurationEnabled(value) end,
-		},
-		{
-			name = L["CooldownPanelCustomDuration"] or "Custom duration on activation",
-				tooltip = L["CooldownPanelCustomDurationTooltip"],
-			kind = SettingType.Checkbox,
-			parentId = "cooldownPanelStandaloneActivation",
-			isShown = function()
-				local _, currentEntry = getEntry()
-				return CooldownPanels:SupportsEntryCustomCooldownDuration(currentEntry, getEffectiveType())
-			end,
-			get = function()
-				local _, currentEntry = getEntry()
-				return currentEntry and currentEntry.customCooldownDurationEnabled == true or false
-			end,
-			set = function(_, value) setCustomCooldownDurationEnabled(value) end,
-		},
-		{
-			name = L["CooldownPanelCustomDurationSeconds"] or "Custom duration (sec)",
-			kind = SettingType.Slider,
-			parentId = "cooldownPanelStandaloneActivation",
-			minValue = 1,
-			maxValue = Helper.CUSTOM_COOLDOWN_DURATION_MAX or 300,
-			valueStep = 1,
-			allowInput = true,
-			isShown = function()
-				local _, currentEntry = getEntry()
-				return CooldownPanels:SupportsEntryCustomCooldownDuration(currentEntry, getEffectiveType())
-			end,
-			disabled = function()
-				local _, currentEntry = getEntry()
-				return not (currentEntry and currentEntry.customCooldownDurationEnabled == true)
-			end,
-			get = function()
-				local _, currentEntry = getEntry()
-				return Helper.ClampNumber(currentEntry and currentEntry.customCooldownDuration, 1, Helper.CUSTOM_COOLDOWN_DURATION_MAX or 300, 60)
-			end,
-			set = function(_, value) setCustomCooldownDuration(value) end,
-			formatter = function(value) return tostring(math.floor((tonumber(value) or 0) + 0.5)) end,
 		},
 			{
 				name = L["CooldownPanelCooldownSwipeHeader"] or "Cooldown Swipe",
