@@ -1,5 +1,13 @@
 # Changelog
 
+## [11.5.1] - 2026-06-29
+
+### 🐛 Fixed
+
+- Cooldown Panels: Fixed tracked aura icons sometimes staying visible after their timed buff had already expired.
+
+---
+
 ## [11.5.0] - 2026-06-29
 
 ### ✨ Added

@@ -2553,6 +2553,7 @@ function CDMAuras:BuildRuntimeData(panelId, entryId, entry, entryLayout, alwaysS
 			targetAuraEpoch = nil,
 			trackUnit = nil,
 			lastActive = nil,
+			lastDurationActive = nil,
 			runtimeData = { availableSources = {} },
 		}
 		runtime.entryStates[key] = state
@@ -2787,6 +2788,22 @@ function CDMAuras:BuildRuntimeData(panelId, entryId, entry, entryLayout, alwaysS
 		if cooldownDurationObject then durationActive = true end
 	end
 
+	if active == true and durationActive ~= true and hasTotemData ~= true and state.lastActive == true and state.lastDurationActive == true then
+		clearAuraMapping(runtime, key, state, false)
+		state.trackedAuraInstanceID = nil
+		state.trackedAuraUnit = nil
+		state.pandemicActive = nil
+		state.targetAuraEpoch = nil
+		auraData = nil
+		auraUnit = nil
+		auraInstanceID = nil
+		applications = nil
+		stackCount = nil
+		rawDuration = nil
+		rawExpirationTime = nil
+		active = false
+	end
+
 	local fallbackAlwaysShowMode = normalizeAlwaysShowMode(entry.cdmAuraAlwaysShowMode, entry.alwaysShow == true and "SHOW" or "HIDE")
 	if alwaysShowMode == nil then
 		local resolvedLayout = entryLayout
@@ -2833,6 +2850,7 @@ function CDMAuras:BuildRuntimeData(panelId, entryId, entry, entryLayout, alwaysS
 		if not clearedStaticEntry then requestPanelRefresh(panelId) end
 	end
 	state.lastActive = active
+	state.lastDurationActive = durationActive == true
 	return data
 end
 
