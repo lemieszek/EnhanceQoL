@@ -6252,8 +6252,6 @@ function updatePowerBar(type, runeSlot)
 	setBarValue(bar, barValue, smooth)
 	bar._lastVal = barValue
 	if ResourceBars.ApplyHideWhenEmptyAlphaToFrame then ResourceBars.ApplyHideWhenEmptyAlphaToFrame(bar, cfg, curPower) end
-	local percent = getPowerPercent("player", pType, curPower, maxPower)
-	local percentStr = formatPercentDisplay(percent, cfg)
 	local thresholdSampleValue = isSoulShards and displayCur or curPower
 	if bar.text then
 		local useShortNumbers = cfg.shortNumbers ~= false
@@ -6277,12 +6275,17 @@ function updatePowerBar(type, runeSlot)
 				currentText = formatNumber(curPower, useShortNumbers)
 				maxText = formatNumber(maxPower, useShortNumbers)
 			end
+			local percentStr
+			if style == "PERCENT" or style == "CURPERCENT" then
+				percentStr = formatPercentDisplay(getPowerPercent("player", pType, curPower, maxPower), cfg)
+			end
 			local text = ResourceBars.FormatBarTextByStyle(style, currentText, maxText, percentStr)
-			if (not addon.variables.isMidnight or (issecretvalue and not issecretvalue(text))) and bar._lastText ~= text then
+			if addon.variables.isMidnight and issecretvalue and issecretvalue(text) then
+				bar.text:SetText(text)
+				bar._lastText = nil
+			elseif bar._lastText ~= text then
 				bar.text:SetText(text)
 				bar._lastText = text
-			else
-				bar.text:SetText(text)
 			end
 			if not bar._textShown then
 				bar.text:Show()

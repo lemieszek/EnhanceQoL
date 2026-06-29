@@ -111,13 +111,15 @@ end
 function ResourceBars.ApplyHideWhenEmptyAlphaToFrame(frame, cfg, rawValue)
 	if not (frame and frame.SetAlpha) then return end
 	local editModeActive = addon.EditMode and addon.EditMode.IsInEditMode and addon.EditMode:IsInEditMode()
+	local emptyAlphaActive
+	local emptyAlphaValue
 	if rawValue ~= nil and not editModeActive and ResourceBars.ShouldHideWhenEmpty and ResourceBars.ShouldHideWhenEmpty(cfg) then
-		frame._rbEmptyAlphaActive = true
-		frame._rbEmptyAlphaValue = rawValue
-	else
-		frame._rbEmptyAlphaActive = nil
-		frame._rbEmptyAlphaValue = nil
+		emptyAlphaActive = true
+		emptyAlphaValue = rawValue
 	end
+	if frame._rbEmptyAlphaActive == emptyAlphaActive and frame._rbEmptyAlphaValue == emptyAlphaValue then return end
+	frame._rbEmptyAlphaActive = emptyAlphaActive
+	frame._rbEmptyAlphaValue = emptyAlphaValue
 	updateManagedFrameAlpha(frame)
 end
 
@@ -1251,6 +1253,17 @@ end
 function ResourceBars.SetStatusBarColorWithGradient(bar, cfg, r, g, b, a)
 	if not bar then return end
 	local alpha = a or 1
+	if
+		bar._lastColor
+		and bar._lastColor[1] == r
+		and bar._lastColor[2] == g
+		and bar._lastColor[3] == b
+		and bar._lastColor[4] == alpha
+		and not (cfg and cfg.useGradient == true)
+		and not bar._rbGradientEnabled
+	then
+		return
+	end
 	bar:SetStatusBarColor(r, g, b, alpha)
 	bar._lastColor = bar._lastColor or {}
 	bar._lastColor[1], bar._lastColor[2], bar._lastColor[3], bar._lastColor[4] = r, g, b, alpha

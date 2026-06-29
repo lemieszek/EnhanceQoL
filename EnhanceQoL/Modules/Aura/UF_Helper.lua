@@ -2155,51 +2155,61 @@ local function getSpecPowerInfo(classTag, specIndex)
 	return info
 end
 
+H.secondaryPowerCache = H.secondaryPowerCache or { spec = {}, auto = {} }
+
+function H.GetSpecPowerCacheKey(classTag, specIndex)
+	local class = classTag or addon.variables.unitClass
+	local spec = tonumber(specIndex or addon.variables.unitSpec)
+	if not class or not spec then return nil end
+	return tostring(class) .. ":" .. tostring(spec), class, spec
+end
+
 function H.GetSpecMainPowerToken(classTag, specIndex)
 	local info = getSpecPowerInfo(classTag, specIndex)
 	return normalizeSecondaryPowerToken(info and info.MAIN)
 end
 
 function H.GetSpecSecondaryPowerTokens(classTag, specIndex)
+	local cacheKey, class, spec = H.GetSpecPowerCacheKey(classTag, specIndex)
+	local cache = H.secondaryPowerCache.spec
+	if cacheKey and cache[cacheKey] then return cache[cacheKey] end
 	local rb = addon.Aura and addon.Aura.ResourceBars
 	local classPowerTypes = rb and rb.classPowerTypes
-	local info = getSpecPowerInfo(classTag, specIndex)
+	local info = getSpecPowerInfo(class, spec)
 	local list = {}
-	if not info then return list end
+	if not info then
+		if cacheKey then cache[cacheKey] = list end
+		return list
+	end
 	local main = normalizeSecondaryPowerToken(info.MAIN)
-	if type(classPowerTypes) ~= "table" then return list end
+	if type(classPowerTypes) ~= "table" then
+		if cacheKey then cache[cacheKey] = list end
+		return list
+	end
 	for i = 1, #classPowerTypes do
 		local token = normalizeSecondaryPowerToken(classPowerTypes[i])
 		if token and token ~= main and info[token] == true then list[#list + 1] = token end
 	end
+	if cacheKey then cache[cacheKey] = list end
 	return list
 end
 
 function H.GetDefaultSecondaryPowerAllowedTypes()
+	if H.secondaryPowerCache.defaultAllowedTypes then return H.secondaryPowerCache.defaultAllowedTypes end
 	local defaults = {}
 	for _, token in ipairs(getSecondaryPowerTokens()) do
 		defaults[token] = true
 	end
+	H.secondaryPowerCache.defaultAllowedTypes = defaults
 	return defaults
 end
 
-local function getSecondaryAllowedTypes(cfg, def)
+local function isSecondaryPowerAllowed(cfg, def, token)
 	local src = cfg and cfg.allowedTypes
-	local allowed = {}
-	if type(src) == "table" then
-		for _, token in ipairs(getSecondaryPowerTokens()) do
-			if src[token] == true then allowed[token] = true end
-		end
-		return allowed
-	end
+	if type(src) == "table" then return src[token] == true end
 	src = def and def.allowedTypes
-	if type(src) == "table" then
-		for _, token in ipairs(getSecondaryPowerTokens()) do
-			if src[token] == true then allowed[token] = true end
-		end
-		return allowed
-	end
-	return H.GetDefaultSecondaryPowerAllowedTypes()
+	if type(src) == "table" then return src[token] == true end
+	return H.GetDefaultSecondaryPowerAllowedTypes()[token] == true
 end
 
 function H.IsSecondaryPowerSupportedForSpec(powerToken, classTag, specIndex)
@@ -2223,25 +2233,49 @@ function H.IsSecondaryPowerSupportedForSpec(powerToken, classTag, specIndex)
 end
 
 local function resolveAutoSecondaryToken(classTag, specIndex)
-	local class = classTag or addon.variables.unitClass
-	local spec = tonumber(specIndex or addon.variables.unitSpec)
+	local cacheKey, class, spec = H.GetSpecPowerCacheKey(classTag, specIndex)
+	local cache = H.secondaryPowerCache.auto
+	if cacheKey then
+		local cached = cache[cacheKey]
+		if cached ~= nil then return cached or nil end
+	end
 	local info = getSpecPowerInfo(class, spec)
-	if not info then return nil end
-
-	if class == "DRUID" then
-		if spec == 4 then return nil end
-		if info.MAIN == "MANA" then return nil end
-		if info.MANA == true then return "MANA" end
+	if not info then
+		if cacheKey then cache[cacheKey] = false end
 		return nil
 	end
 
-	if class == "DEMONHUNTER" and spec == 3 then return "VOID_METAMORPHOSIS" end
+	if class == "DRUID" then
+		if spec == 4 then
+			if cacheKey then cache[cacheKey] = false end
+			return nil
+		end
+		if info.MAIN == "MANA" then
+			if cacheKey then cache[cacheKey] = false end
+			return nil
+		end
+		if info.MANA == true then
+			if cacheKey then cache[cacheKey] = "MANA" end
+			return "MANA"
+		end
+		if cacheKey then cache[cacheKey] = false end
+		return nil
+	end
+
+	if class == "DEMONHUNTER" and spec == 3 then
+		if cacheKey then cache[cacheKey] = "VOID_METAMORPHOSIS" end
+		return "VOID_METAMORPHOSIS"
+	end
 
 	local secondaries = H.GetSpecSecondaryPowerTokens(class, spec)
 	for i = 1, #secondaries do
 		local token = secondaries[i]
-		if isTrackedSecondaryToken(token) then return token end
+		if isTrackedSecondaryToken(token) then
+			if cacheKey then cache[cacheKey] = token end
+			return token
+		end
 	end
+	if cacheKey then cache[cacheKey] = false end
 	return nil
 end
 
@@ -2257,8 +2291,7 @@ function H.ResolveSecondaryPowerToken(cfg, def, classTag, specIndex)
 	if not isTrackedSecondaryToken(normalized) then return nil end
 	local currentPrimary = getCurrentPlayerPrimaryPowerToken()
 	if currentPrimary and currentPrimary == normalized then return nil end
-	local allowed = getSecondaryAllowedTypes(cfg, def)
-	if allowed[normalized] == true then return normalized end
+	if isSecondaryPowerAllowed(cfg, def, normalized) then return normalized end
 	return nil
 end
 
