@@ -2,6 +2,14 @@
 
 <!--@eqol-beta@-->
 
+## [11.5.0-beta6] - 2026-06-29
+
+### 🐛 Fixed
+
+- Cooldown Panels: Reduced performance spikes when opening entry settings in the layout editor, especially for large panels with many entries and aura options.
+
+---
+
 ## [11.5.0-beta5] - 2026-06-28
 
 ### ✨ Added

@@ -3399,30 +3399,32 @@ function Dialog:UpdateSettings()
 		for index, data in next, settings do
 			local pool = Pools:Get(data.kind)
 			if pool then
-				local setting = pool:Acquire(self.Settings)
-				setting.layoutIndex = index
-				ApplySettingsRowWidth(setting, self.Settings)
-				setting:Setup(data, self.selection)
-				local visible = evaluateVisibility(data, layoutName, layoutIndex)
-				if data.parentId and collapsedById[data.parentId] then visible = false end
-				if setting.SetEnabled then
-					local enabled = true
-					if data.isEnabled then
-						local ok, result = pcall(data.isEnabled, layoutName, layoutIndex)
-						enabled = ok and result ~= false
-					elseif data.disabled then
-						local ok, result = pcall(data.disabled, layoutName, layoutIndex)
-						enabled = not (ok and result == true)
+				local shown = evaluateVisibility(data, layoutName, layoutIndex)
+				if shown then
+					local visible = not (data.parentId and collapsedById[data.parentId])
+					local setting = pool:Acquire(self.Settings)
+					setting.layoutIndex = index
+					ApplySettingsRowWidth(setting, self.Settings)
+					setting:Setup(data, self.selection)
+					if setting.SetEnabled then
+						local enabled = true
+						if data.isEnabled then
+							local ok, result = pcall(data.isEnabled, layoutName, layoutIndex)
+							enabled = ok and result ~= false
+						elseif data.disabled then
+							local ok, result = pcall(data.disabled, layoutName, layoutIndex)
+							enabled = not (ok and result == true)
+						end
+						setting:SetEnabled(enabled)
+						setting._eqolEnabled = enabled
 					end
-					setting:SetEnabled(enabled)
-					setting._eqolEnabled = enabled
-				end
-				if visible then
-					setting.ignoreInLayout = nil
-					setting:Show()
-				else
-					setting.ignoreInLayout = true
-					setting:Hide()
+					if visible then
+						setting.ignoreInLayout = nil
+						setting:Show()
+					else
+						setting.ignoreInLayout = true
+						setting:Hide()
+					end
 				end
 			end
 		end

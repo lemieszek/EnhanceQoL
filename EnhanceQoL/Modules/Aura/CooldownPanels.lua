@@ -6079,7 +6079,9 @@ function CooldownPanels:SelectPanel(panelId)
 		if layoutEditActive then editor._eqolLayoutPanelId = panelId end
 	end
 	local openLayoutPanelDialog = layoutEditActive and previousPanelId ~= panelId
-	local needsLiveRefresh = self:IsAnyPanelLayoutEditActive()
+	local panelChanged = previousPanelId ~= panelId
+	local layoutPanelChanged = layoutEditActive and previousLayoutPanelId ~= panelId
+	local needsLiveRefresh = self:IsAnyPanelLayoutEditActive() and (panelChanged or layoutPanelChanged)
 	if needsLiveRefresh then
 		if previousLayoutPanelId and previousLayoutPanelId ~= panelId and self:GetPanel(previousLayoutPanelId) then self:RefreshPanel(previousLayoutPanelId) end
 		if previousPanelId and previousPanelId ~= panelId and previousPanelId ~= previousLayoutPanelId and self:GetPanel(previousPanelId) then self:RefreshPanel(previousPanelId) end
@@ -6087,8 +6089,8 @@ function CooldownPanels:SelectPanel(panelId)
 	end
 	self:UpdateCursorAnchorState()
 	self:RefreshEditor()
-		if openLayoutPanelDialog and not (editor and editor._eqolSuppressLayoutPanelDialog == true) then self:OpenLayoutPanelStandaloneMenu(panelId) end
-	end
+	if openLayoutPanelDialog and not (editor and editor._eqolSuppressLayoutPanelDialog == true) then self:OpenLayoutPanelStandaloneMenu(panelId) end
+end
 
 function CooldownPanels:SelectEntry(entryId)
 	entryId = normalizeId(entryId)
