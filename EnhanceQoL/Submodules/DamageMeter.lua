@@ -1,4 +1,4 @@
--- luacheck: globals C_DamageMeter C_DeathRecap C_LFGInfo C_Spell C_StringUtil C_CVar C_RestrictedActions C_ChallengeMode SetCVar StaticPopupDialogs StaticPopup_Show YES CANCEL OKAY MenuUtil Menu GameTooltip SecondsToClock DAMAGE_METER_COMBAT_NUMBER CLASS_ICON_TCOORDS UnitClass UnitExists UnitGUID UnitName UnitCanAttack UnitIsPlayer UnitAffectingCombat UnitDetailedThreatSituation GetNumGroupMembers GetNumSubgroupMembers IsInRaid IsInInstance GetInstanceInfo Ambiguate UISpecialFrames GetCursorPosition GetTime C_Timer ACTION_SWING ACTION_ENVIRONMENTAL_DAMAGE_DROWNING ACTION_ENVIRONMENTAL_DAMAGE_FALLING ACTION_ENVIRONMENTAL_DAMAGE_FIRE ACTION_ENVIRONMENTAL_DAMAGE_LAVA ACTION_ENVIRONMENTAL_DAMAGE_SLIME ACTION_ENVIRONMENTAL_DAMAGE_FATIGUE DEATH_RECAP_TITLE CreateAbbreviateConfig
+-- luacheck: globals C_DamageMeter C_DeathRecap C_LFGInfo C_Spell C_StringUtil C_CVar C_RestrictedActions C_ChallengeMode C_ChatInfo SetCVar StaticPopupDialogs StaticPopup_Show YES CANCEL OKAY MenuUtil Menu GameTooltip SecondsToClock DAMAGE_METER_COMBAT_NUMBER CLASS_ICON_TCOORDS UnitClass UnitExists UnitGUID UnitName UnitCanAttack UnitIsPlayer UnitAffectingCombat UnitDetailedThreatSituation GetNumGroupMembers GetNumSubgroupMembers IsInRaid IsInInstance GetInstanceInfo Ambiguate UISpecialFrames GetCursorPosition GetTime C_Timer ACTION_SWING ACTION_ENVIRONMENTAL_DAMAGE_DROWNING ACTION_ENVIRONMENTAL_DAMAGE_FALLING ACTION_ENVIRONMENTAL_DAMAGE_FIRE ACTION_ENVIRONMENTAL_DAMAGE_LAVA ACTION_ENVIRONMENTAL_DAMAGE_SLIME ACTION_ENVIRONMENTAL_DAMAGE_FATIGUE DEATH_RECAP_TITLE CreateAbbreviateConfig
 local addonName, addon = ...
 
 local host = addon.DamageMeterHost or {}
@@ -5230,9 +5230,14 @@ function DamageMeter:SetReportDialogChannel(frame, chatType)
 end
 
 function DamageMeter:SendReport(index, chatType, lineLimit, target)
-	if not _G.SendChatMessage then return end
+	if not C_ChatInfo or not C_ChatInfo.SendChatMessage then return end
 	if not self:IsReportChannelAvailable(chatType, target) then
 		print(L["damageMeterReportChannelUnavailable"] or "That report channel is not available right now.")
+		return
+	end
+	self:RefreshReportRestrictionState()
+	if self:IsReportRestricted() then
+		print(L["damageMeterReportRestricted"] or "Report data is restricted right now.")
 		return
 	end
 	local lines, errorText = self:BuildReportLines(index, lineLimit)
@@ -5240,15 +5245,20 @@ function DamageMeter:SendReport(index, chatType, lineLimit, target)
 		print(errorText or (L["damageMeterReportNoData"] or "No reportable Damage Meter data."))
 		return
 	end
+	local function sendReportLine(message, sendChatType, sendTarget)
+		DamageMeter:RefreshReportRestrictionState()
+		if DamageMeter:IsReportRestricted() then return end
+		C_ChatInfo.SendChatMessage(message, sendChatType, nil, sendTarget)
+	end
 	for lineIndex, line in ipairs(lines) do
 		local message = sanitizeReportChatMessage(line)
 		local sendTarget = chatType == "WHISPER" and target or nil
 		if C_Timer and C_Timer.NewTimer then
 			C_Timer.NewTimer(lineIndex * 0.2, function()
-				_G.SendChatMessage(message, chatType, nil, sendTarget)
+				sendReportLine(message, chatType, sendTarget)
 			end)
 		else
-			_G.SendChatMessage(message, chatType, nil, sendTarget)
+			sendReportLine(message, chatType, sendTarget)
 		end
 	end
 end
@@ -6858,8 +6868,11 @@ function DamageMeter:Init()
 		elseif event == "PLAYER_ROLES_ASSIGNED" or event == "PLAYER_SPECIALIZATION_CHANGED" or event == "ACTIVE_PLAYER_SPECIALIZATION_CHANGED" then
 			self:InvalidateLiveEventWatch()
 		elseif event == "PLAYER_REGEN_DISABLED" then
+			self:RefreshReportRestrictionState()
 			self:MarkPartyClassFallbackCurrent()
 			self:InvalidateDerivedTargetCache(true)
+		elseif event == "PLAYER_REGEN_ENABLED" then
+			self:RefreshReportRestrictionState()
 		elseif event == "DAMAGE_METER_RESET" then
 			self:InvalidatePartyClassFallback()
 			self:MarkPartyClassFallbackCurrent()
