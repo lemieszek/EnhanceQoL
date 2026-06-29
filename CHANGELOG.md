@@ -4,7 +4,7 @@
 
 ### 🐛 Fixed
 
-- Cooldown Panels: Reduced resource-check refresh work for tracked spells by limiting checks to spells with resource costs and updating affected entries directly where possible.
+- Cooldown Panels: Reduced resource-check refresh work for tracked spells by limiting checks to spells with resource costs, caching power aliases, and updating affected entries directly where possible.
 - Resource Bars / Unit Frames: Reduced repeated power update work by caching secondary power lookups and skipping unchanged display updates.
 
 ---

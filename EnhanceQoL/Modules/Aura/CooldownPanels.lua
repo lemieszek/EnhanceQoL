@@ -1254,7 +1254,12 @@ local function setPowerInsufficient(runtime, spellId, isUsable, insufficientPowe
 	local powerValue = (insufficientPower == true) and true or nil
 	local unusableValue = (not usable and insufficientPower ~= true) and true or nil
 	local changed = false
-	local ids = CooldownPanels:GetSpellAliasIDs(spellId)
+	local aliasCache = runtime.powerAliasIdsBySpell
+	local ids = aliasCache and aliasCache[spellId]
+	if not ids then
+		ids = CooldownPanels:GetSpellAliasIDs(spellId)
+		if aliasCache then aliasCache[spellId] = ids end
+	end
 	for i = 1, #ids do
 		local id = ids[i]
 		if runtime.powerInsufficient[id] ~= powerValue then
@@ -1848,7 +1853,7 @@ CooldownPanels._styleCacheRoots.activationOverlayEntry = CooldownPanels._styleCa
 CooldownPanels._styleCacheRoots.otherAuraGlowEntry = CooldownPanels._styleCacheRoots.otherAuraGlowEntry or setmetatable({}, { __mode = "k" })
 CooldownPanels._styleCacheRoots.glowPixelOptions = CooldownPanels._styleCacheRoots.glowPixelOptions or setmetatable({}, { __mode = "k" })
 CooldownPanels._styleCacheRoots.glowPixelEntry = CooldownPanels._styleCacheRoots.glowPixelEntry or setmetatable({}, { __mode = "k" })
-CooldownPanels.POWER_USABLE_REFRESH_DELAY = CooldownPanels.POWER_USABLE_REFRESH_DELAY or 0.20
+CooldownPanels.POWER_USABLE_REFRESH_DELAY = CooldownPanels.POWER_USABLE_REFRESH_DELAY or 0.30
 
 function CooldownPanels.FillCachedColor(cache, r, g, b, a)
 	cache = cache or {}
@@ -5612,6 +5617,7 @@ function CooldownPanels:RebuildPowerIndex()
 	local powerCostNames = {}
 	local powerCheckSpells = {}
 	local powerPanelsBySpell = {}
+	local powerAliasIdsBySpell = {}
 	local powerCheckActive = false
 	if root and root.panels then
 		if enabledPanelIds then
@@ -5646,10 +5652,11 @@ function CooldownPanels:RebuildPowerIndex()
 									if type(costs) == "table" then
 										local names = getSpellPowerCostNamesFromCosts(costs)
 										if names then
-											powerCheckActive = true
-											powerCheckSpells[effectiveId] = true
-											powerPanelsBySpell[effectiveId] = powerPanelsBySpell[effectiveId] or {}
-											powerPanelsBySpell[effectiveId][panelId] = true
+												powerCheckActive = true
+												powerCheckSpells[effectiveId] = true
+												if not powerAliasIdsBySpell[effectiveId] then powerAliasIdsBySpell[effectiveId] = self:GetSpellAliasIDs(effectiveId) end
+												powerPanelsBySpell[effectiveId] = powerPanelsBySpell[effectiveId] or {}
+												powerPanelsBySpell[effectiveId][panelId] = true
 											powerCostNames[baseId] = names
 											for _, name in ipairs(names) do
 												local key = string.upper(name)
@@ -5697,10 +5704,11 @@ function CooldownPanels:RebuildPowerIndex()
 									if type(costs) == "table" then
 										local names = getSpellPowerCostNamesFromCosts(costs)
 										if names then
-											powerCheckActive = true
-											powerCheckSpells[effectiveId] = true
-											powerPanelsBySpell[effectiveId] = powerPanelsBySpell[effectiveId] or {}
-											powerPanelsBySpell[effectiveId][normalizedPanelId] = true
+												powerCheckActive = true
+												powerCheckSpells[effectiveId] = true
+												if not powerAliasIdsBySpell[effectiveId] then powerAliasIdsBySpell[effectiveId] = self:GetSpellAliasIDs(effectiveId) end
+												powerPanelsBySpell[effectiveId] = powerPanelsBySpell[effectiveId] or {}
+												powerPanelsBySpell[effectiveId][normalizedPanelId] = true
 											powerCostNames[baseId] = names
 											for _, name in ipairs(names) do
 												local key = string.upper(name)
@@ -5725,6 +5733,7 @@ function CooldownPanels:RebuildPowerIndex()
 	runtime.powerIndex = powerIndex
 	runtime.powerCostNames = powerCostNames
 	runtime.powerCheckSpells = powerCheckSpells
+	runtime.powerAliasIdsBySpell = powerAliasIdsBySpell
 	runtime.powerPanelsBySpell = powerPanelsBySpell
 	runtime.powerCheckActive = powerCheckActive == true
 	runtime.powerInsufficient = runtime.powerInsufficient or {}

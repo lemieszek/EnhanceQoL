@@ -6268,12 +6268,53 @@ function updatePowerBar(type, runeSlot)
 		else
 			local currentText
 			local maxText
+			local textCacheSafe = not (addon.variables.isMidnight and issecretvalue and (issecretvalue(curPower) or issecretvalue(maxPower) or issecretvalue(displayCur) or issecretvalue(displayMax)))
+			local currentValue = isSoulShards and displayCur or curPower
+			local maxValue = isSoulShards and displayMax or maxPower
 			if isSoulShards then
-				currentText = formatSoulShardValue(displayCur)
-				maxText = formatSoulShardValue(displayMax)
+				if textCacheSafe and bar._rbPowerTextCurrentValue == currentValue and bar._rbPowerTextCurrentSoul == true then
+					currentText = bar._rbPowerTextCurrent
+				else
+					currentText = formatSoulShardValue(displayCur)
+					if textCacheSafe then
+						bar._rbPowerTextCurrentValue = currentValue
+						bar._rbPowerTextCurrentSoul = true
+						bar._rbPowerTextCurrent = currentText
+					end
+				end
+				if textCacheSafe and bar._rbPowerTextMaxValue == maxValue and bar._rbPowerTextMaxSoul == true then
+					maxText = bar._rbPowerTextMax
+				else
+					maxText = formatSoulShardValue(displayMax)
+					if textCacheSafe then
+						bar._rbPowerTextMaxValue = maxValue
+						bar._rbPowerTextMaxSoul = true
+						bar._rbPowerTextMax = maxText
+					end
+				end
 			else
-				currentText = formatNumber(curPower, useShortNumbers)
-				maxText = formatNumber(maxPower, useShortNumbers)
+				if textCacheSafe and bar._rbPowerTextCurrentValue == currentValue and bar._rbPowerTextCurrentShort == useShortNumbers and bar._rbPowerTextCurrentSoul ~= true then
+					currentText = bar._rbPowerTextCurrent
+				else
+					currentText = formatNumber(curPower, useShortNumbers)
+					if textCacheSafe then
+						bar._rbPowerTextCurrentValue = currentValue
+						bar._rbPowerTextCurrentShort = useShortNumbers
+						bar._rbPowerTextCurrentSoul = false
+						bar._rbPowerTextCurrent = currentText
+					end
+				end
+				if textCacheSafe and bar._rbPowerTextMaxValue == maxValue and bar._rbPowerTextMaxShort == useShortNumbers and bar._rbPowerTextMaxSoul ~= true then
+					maxText = bar._rbPowerTextMax
+				else
+					maxText = formatNumber(maxPower, useShortNumbers)
+					if textCacheSafe then
+						bar._rbPowerTextMaxValue = maxValue
+						bar._rbPowerTextMaxShort = useShortNumbers
+						bar._rbPowerTextMaxSoul = false
+						bar._rbPowerTextMax = maxText
+					end
+				end
 			end
 			local percentStr
 			if style == "PERCENT" or style == "CURPERCENT" then
