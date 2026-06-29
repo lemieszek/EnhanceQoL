@@ -2300,6 +2300,15 @@ local function merchantHousingOwnedTextMatches(text)
 end
 
 local ITEM_CLASS_HOUSING = Enum and Enum.ItemClass and Enum.ItemClass.Housing or 20
+local merchantKnownStateCache = {}
+
+local function clearMerchantKnownStateCache()
+	if wipe then
+		wipe(merchantKnownStateCache)
+	else
+		merchantKnownStateCache = {}
+	end
+end
 
 local function merchantTooltipHasKnownState(tooltipData, isHousingItem)
 	if not tooltipData then return false end
@@ -2322,6 +2331,7 @@ local function merchantItemIsKnown(itemIndex)
 	if not C_TooltipInfo or (not C_TooltipInfo.GetMerchantItem and not C_TooltipInfo.GetHyperlink) then return false end
 
 	local itemLink = GetMerchantItemLink and GetMerchantItemLink(itemIndex) or nil
+	if itemLink and merchantKnownStateCache[itemLink] ~= nil then return merchantKnownStateCache[itemLink] end
 	local itemClassID = itemLink and C_Item and C_Item.GetItemInfoInstant and select(6, C_Item.GetItemInfoInstant(itemLink)) or nil
 	local isHousingItem = itemClassID == ITEM_CLASS_HOUSING
 	local tooltipData
@@ -2331,7 +2341,9 @@ local function merchantItemIsKnown(itemIndex)
 		if itemLink then tooltipData = C_TooltipInfo.GetHyperlink(itemLink) end
 	end
 
-	return merchantTooltipHasKnownState(tooltipData, isHousingItem)
+	local isKnown = merchantTooltipHasKnownState(tooltipData, isHousingItem)
+	if itemLink then merchantKnownStateCache[itemLink] = isKnown end
+	return isKnown
 end
 
 local petCollectedCache = {}
@@ -2790,6 +2802,12 @@ function addon.functions.initItemInventory()
 	for _, frame in ipairs(ContainerFrameContainer.ContainerFrames) do
 		hooksecurefunc(frame, "UpdateItems", addon.functions.updateBags)
 	end
+
+	local merchantKnownCacheFrame = CreateFrame("Frame")
+	merchantKnownCacheFrame:RegisterEvent("MERCHANT_SHOW")
+	merchantKnownCacheFrame:RegisterEvent("MERCHANT_CLOSED")
+	merchantKnownCacheFrame:RegisterEvent("BAG_UPDATE_DELAYED")
+	merchantKnownCacheFrame:SetScript("OnEvent", clearMerchantKnownStateCache)
 
 	hooksecurefunc("MerchantFrame_UpdateMerchantInfo", updateMerchantButtonInfo)
 	hooksecurefunc("MerchantFrame_UpdateBuybackInfo", updateBuybackButtonInfo)
@@ -3446,7 +3464,13 @@ local eventHandlers = {
 
 local function registerEvents(frame)
 	for event in pairs(eventHandlers) do
-		frame:RegisterEvent(event)
+		if event == "ENCHANT_SPELL_COMPLETED" and not CharOpt("enchants") then
+			-- Registered dynamically when character enchant display is enabled.
+		elseif (event == "PLAYER_DEAD" or event == "PLAYER_UNGHOST" or event == "UPDATE_INVENTORY_DURABILITY") and not addon.db["showDurabilityOnCharframe"] then
+			-- Registered dynamically when character durability display is enabled.
+		else
+			frame:RegisterEvent(event)
+		end
 	end
 end
 
@@ -3458,6 +3482,24 @@ local frameLoad = CreateFrame("Frame")
 
 registerEvents(frameLoad)
 frameLoad:SetScript("OnEvent", eventHandler)
+
+function addon.functions.SyncItemInventoryEventRegistration()
+	if not frameLoad then return end
+	if CharOpt("enchants") then
+		frameLoad:RegisterEvent("ENCHANT_SPELL_COMPLETED")
+	else
+		frameLoad:UnregisterEvent("ENCHANT_SPELL_COMPLETED")
+	end
+	if addon.db["showDurabilityOnCharframe"] then
+		frameLoad:RegisterEvent("PLAYER_DEAD")
+		frameLoad:RegisterEvent("PLAYER_UNGHOST")
+		frameLoad:RegisterEvent("UPDATE_INVENTORY_DURABILITY")
+	else
+		frameLoad:UnregisterEvent("PLAYER_DEAD")
+		frameLoad:UnregisterEvent("PLAYER_UNGHOST")
+		frameLoad:UnregisterEvent("UPDATE_INVENTORY_DURABILITY")
+	end
+end
 
 -- If Blizzard_UIPanels_Game is already loaded, wire up immediately.
 if _G.PaperDollFrame then ensureCharFrameOnShowHook() end

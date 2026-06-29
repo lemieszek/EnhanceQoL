@@ -1,4 +1,4 @@
--- luacheck: globals BackdropTemplate CreateFrame UIParent MinimapCluster InCombatLockdown RegisterAttributeDriver GameTooltip C_UnitAuras CooldownFrame_Set GetTime GetInventoryItemTexture GetInventoryItemID GetInventoryItemLink GetInventorySlotInfo GetWeaponEnchantInfo C_Item C_DurationUtil C_Timer
+-- luacheck: globals BackdropTemplate CreateFrame UIParent MinimapCluster InCombatLockdown RegisterAttributeDriver GameTooltip C_UnitAuras CooldownFrame_Set GetTime GetInventoryItemTexture GetInventoryItemID GetInventoryItemLink GetInventorySlotInfo GetWeaponEnchantInfo C_Item C_DurationUtil C_CurveUtil Enum DEBUFF_TYPE_MAGIC_COLOR DEBUFF_TYPE_CURSE_COLOR DEBUFF_TYPE_DISEASE_COLOR DEBUFF_TYPE_POISON_COLOR DEBUFF_TYPE_BLEED_COLOR DEBUFF_TYPE_NONE_COLOR GetFrameHandleFrame
 local parentAddonName = "EnhanceQoL"
 local addonName, addon = ...
 
@@ -55,14 +55,26 @@ local function setDefaultAuraDBValue(kind, suffix, value)
 	addon.db[getDefaultAuraDBPrefix(kind) .. suffix] = value
 end
 
+local function getDefaultAuraStyleVersion()
+	return DAC.variables.defaultAuraStyleVersion or 0
+end
+
+local function invalidateDefaultAuraStyleCache()
+	DAC.variables.defaultAuraStyleVersion = (DAC.variables.defaultAuraStyleVersion or 0) + 1
+	DAC.variables.defaultAuraStyleConfigCache = nil
+	DAC.variables.defaultAuraTextStyleCache = nil
+end
+
 local DEFAULT_AURA_CONFIG_SUFFIXES = {
 	"IconShape",
+	"IconAlpha",
 	"IconSize",
 	"IconSpacing",
 	"HorizontalSpacing",
 	"VerticalSpacing",
 	"IconsPerRow",
 	"MaxRows",
+	"Growth",
 	"FrameStrata",
 	"FrameLevel",
 	"SortMethod",
@@ -73,10 +85,13 @@ local DEFAULT_AURA_CONFIG_SUFFIXES = {
 	"IconDarkness",
 	"IconDesaturate",
 	"CooldownDrawSwipe",
+	"CooldownDrawEdge",
+	"CooldownReverse",
 	"BorderTexture",
 	"BorderSize",
 	"BorderOffset",
 	"UseOriginalBorderColor",
+	"UseDebuffTypeBorderColor",
 	"BorderColor",
 	"DurationEnabled",
 	"DurationFontFace",
@@ -113,12 +128,23 @@ local function copyDefaultAuraConfig(fromKind, toKind)
 end
 
 local DEFAULT_AURA_BORDER_COLOR = { r = 0, g = 0, b = 0, a = 1 }
+local DEFAULT_AURA_BACKDROP_BORDER = "Interface\\Buttons\\WHITE8x8"
 local DEFAULT_AURA_DURATION_COLOR = { r = 1, g = 0.82, b = 0, a = 1 }
 local DEFAULT_AURA_COUNT_COLOR = { r = 1, g = 1, b = 1, a = 1 }
+local DEFAULT_AURA_DEBUFF_TYPE_COLORS = {
+	[1] = DEBUFF_TYPE_MAGIC_COLOR,
+	[2] = DEBUFF_TYPE_CURSE_COLOR,
+	[3] = DEBUFF_TYPE_DISEASE_COLOR,
+	[4] = DEBUFF_TYPE_POISON_COLOR,
+	[5] = DEBUFF_TYPE_BLEED_COLOR,
+	[0] = DEBUFF_TYPE_NONE_COLOR,
+}
 local DEFAULT_FONT = "Fonts\\FRIZQT__.TTF"
 local GLOBAL_FONT_KEY = "__EQOL_GLOBAL_FONT__"
 local GLOBAL_STYLE_KEY = "__EQOL_GLOBAL_FONT_STYLE__"
 local refreshDefaultAuraIconSkin
+local getDefaultAuraStyleConfig
+local isNoAuraBorder
 
 local function normalizeDefaultAuraDurationTextProfile(value)
 	local durationText = addon.DurationText
@@ -149,17 +175,27 @@ local function normalizeAuraIconDarkness(value)
 	return math.floor(value + 0.5)
 end
 
-local function applyDefaultAuraIconDarkMode(button, kind)
+local function normalizeAuraIconAlpha(value)
+	value = tonumber(value)
+	if value == nil then value = 1 end
+	if value < 0 then value = 0 end
+	if value > 1 then value = 1 end
+	return value
+end
+
+local function applyDefaultAuraIconDarkMode(button, config)
 	local icon = button and (button.Icon or button.icon)
 	if not icon then return end
-	if getDefaultAuraDBValue(kind, "IconDarkMode") == true then
-		local darkness = normalizeAuraIconDarkness(getDefaultAuraDBValue(kind, "IconDarkness"))
+	config = config or getDefaultAuraStyleConfig(button and button.eqolDefaultAuraKind)
+	local alpha = config.iconAlpha or 1
+	if config.iconDarkMode == true then
+		local darkness = config.iconDarkness
 		local value = 1 - (darkness / 100)
-		if icon.SetDesaturated then icon:SetDesaturated(getDefaultAuraDBValue(kind, "IconDesaturate") == true) end
-		if icon.SetVertexColor then icon:SetVertexColor(value, value, value, 1) end
+		if icon.SetDesaturated then icon:SetDesaturated(config.iconDesaturate == true) end
+		if icon.SetVertexColor then icon:SetVertexColor(value, value, value, alpha) end
 	else
 		if icon.SetDesaturated then icon:SetDesaturated(false) end
-		if icon.SetVertexColor then icon:SetVertexColor(1, 1, 1, 1) end
+		if icon.SetVertexColor then icon:SetVertexColor(1, 1, 1, alpha) end
 	end
 end
 
@@ -188,20 +224,67 @@ local function getDefaultAuraUseOriginalBorderColor(kind)
 	return getDefaultAuraDBValue(kind, "UseOriginalBorderColor") == true
 end
 
+local function getDefaultAuraUseDebuffTypeBorderColor(kind)
+	return normalizeDefaultAuraKind(kind) == "debuff" and getDefaultAuraDBValue(kind, "UseDebuffTypeBorderColor") == true
+end
+
 local function getDefaultAuraOriginalBorderColor(button)
 	local border = button and (button.Border or button.border)
 	if border and border.GetVertexColor then
-		local r, g, b, a = border:GetVertexColor()
-		if r and g and b then return { r, g, b, a ~= nil and a or 1 } end
+		return { border:GetVertexColor() }
+	end
+	return nil
+end
+
+local function ensureDefaultAuraDispelColorCurve()
+	local curve = DAC.variables.dispelColorCurve
+	if curve ~= nil then return curve end
+	curve = C_CurveUtil and C_CurveUtil.CreateColorCurve and C_CurveUtil.CreateColorCurve() or false
+	if curve and Enum and Enum.LuaCurveType and Enum.LuaCurveType.Step then
+		curve:SetType(Enum.LuaCurveType.Step)
+		for dispelType, color in pairs(DEFAULT_AURA_DEBUFF_TYPE_COLORS) do
+			if color then curve:AddPoint(dispelType, color) end
+		end
+	end
+	DAC.variables.dispelColorCurve = curve
+	return curve
+end
+
+local function getDefaultAuraDebuffTypeBorderColor(button)
+	if not (button and button.eqolAuraUnit and button.eqolAuraInstanceID and C_UnitAuras and C_UnitAuras.GetAuraDispelTypeColor) then return nil end
+	local curve = ensureDefaultAuraDispelColorCurve()
+	if not curve then return nil end
+	local color = C_UnitAuras.GetAuraDispelTypeColor(button.eqolAuraUnit, button.eqolAuraInstanceID, curve)
+	if color and color.GetRGBA then
+		return { color:GetRGBA() }
+	elseif color and color.r then
+		return { color.r, color.g, color.b, color.a }
 	end
 	return nil
 end
 
 local function resolveDefaultAuraBorderColor(button, kind)
+	if getDefaultAuraUseDebuffTypeBorderColor(kind) then
+		return getDefaultAuraDebuffTypeBorderColor(button) or getDefaultAuraOriginalBorderColor(button) or getDefaultAuraBorderColor(kind)
+	end
 	if getDefaultAuraUseOriginalBorderColor(kind) then
-		return getDefaultAuraOriginalBorderColor(button) or getDefaultAuraBorderColor()
+		return getDefaultAuraOriginalBorderColor(button) or getDefaultAuraBorderColor(kind)
 	end
 	return getDefaultAuraBorderColor(kind)
+end
+
+local function resolveDefaultAuraBorderColorFromConfig(button, config)
+	if config.useDebuffTypeBorderColor then
+		return getDefaultAuraDebuffTypeBorderColor(button) or getDefaultAuraOriginalBorderColor(button) or config.color or getDefaultAuraBorderColor(config.kind)
+	end
+	if config.useOriginalBorderColor then
+		return getDefaultAuraOriginalBorderColor(button) or config.color or getDefaultAuraBorderColor(config.kind)
+	end
+	return config.color
+end
+
+local function shouldUpdateDefaultAuraStyleForAura(config)
+	return config and config.kind == "debuff" and config.useDebuffTypeBorderColor == true
 end
 
 local function normalizeAuraTextColor(value, fallback)
@@ -213,6 +296,12 @@ local function normalizeAuraTextColor(value, fallback)
 		b = tonumber(value.b or value[3]) or fallback.b or 1,
 		a = value.a ~= nil and value.a or value[4] or fallback.a or 1,
 	}
+end
+
+local function getAuraTextColorComponents(value, fallback)
+	fallback = fallback or DEFAULT_AURA_DURATION_COLOR
+	if type(value) ~= "table" then value = fallback end
+	return tonumber(value.r or value[1]) or fallback.r or 1, tonumber(value.g or value[2]) or fallback.g or 1, tonumber(value.b or value[3]) or fallback.b or 1, value.a ~= nil and value.a or value[4] or fallback.a or 1
 end
 
 local function getGlobalFontKey()
@@ -344,13 +433,22 @@ local function getDefaultAuraDrawSwipe(kind)
 	return getDefaultAuraDBValue(kind, "CooldownDrawSwipe") ~= false
 end
 
+local function getDefaultAuraDrawEdge(kind)
+	return getDefaultAuraDBValue(kind, "CooldownDrawEdge") == true
+end
+
+local function getDefaultAuraCooldownReverse(kind)
+	return getDefaultAuraDBValue(kind, "CooldownReverse") == true
+end
+
 local function getDefaultAuraDurationTextProfile(kind)
 	return normalizeDefaultAuraDurationTextProfile(getDefaultAuraDBValue(kind, "DurationTextProfile"))
 end
 
-local function applyDefaultAuraDurationTextProfile(button)
+local function applyDefaultAuraDurationTextProfile(button, config)
 	if not (button and button.Cooldown and addon.functions and addon.functions.ApplyDurationTextProfileToCooldownFrame) then return false end
-	return addon.functions.ApplyDurationTextProfileToCooldownFrame(button.Cooldown, getDefaultAuraDurationTextProfile(button.eqolDefaultAuraKind))
+	config = config or getDefaultAuraStyleConfig(button.eqolDefaultAuraKind)
+	return addon.functions.ApplyDurationTextProfileToCooldownFrame(button.Cooldown, config.durationTextProfile)
 end
 
 local function getDefaultAuraIconsPerRow(value, kind)
@@ -398,6 +496,53 @@ local function normalizeDefaultAuraSortDirection(value)
 	return "-"
 end
 
+local DEFAULT_AURA_GROWTH_OPTIONS = {
+	"LEFTDOWN",
+	"LEFTUP",
+	"RIGHTDOWN",
+	"RIGHTUP",
+	"DOWNLEFT",
+	"DOWNRIGHT",
+	"UPLEFT",
+	"UPRIGHT",
+}
+
+local function parseDefaultAuraGrowth(value)
+	local raw = type(value) == "string" and strupper(value):gsub("[%s_%-]+", "") or ""
+	local first, second = raw:match("^(LEFT)(UP)$")
+	if not first then first, second = raw:match("^(LEFT)(DOWN)$") end
+	if not first then first, second = raw:match("^(RIGHT)(UP)$") end
+	if not first then first, second = raw:match("^(RIGHT)(DOWN)$") end
+	if not first then first, second = raw:match("^(UP)(LEFT)$") end
+	if not first then first, second = raw:match("^(UP)(RIGHT)$") end
+	if not first then first, second = raw:match("^(DOWN)(LEFT)$") end
+	if not first then first, second = raw:match("^(DOWN)(RIGHT)$") end
+	if not first then first, second = "LEFT", "DOWN" end
+	return first, second
+end
+
+local function normalizeDefaultAuraGrowth(value)
+	local first, second = parseDefaultAuraGrowth(value)
+	return first .. second
+end
+
+local function getDefaultAuraGrowth(kind)
+	return normalizeDefaultAuraGrowth(getDefaultAuraDBValue(kind, "Growth"))
+end
+
+local function getDefaultAuraGrowthLayout(kind)
+	local primary, secondary = parseDefaultAuraGrowth(getDefaultAuraGrowth(kind))
+	local primaryHorizontal = primary == "LEFT" or primary == "RIGHT"
+	local horizontal = primaryHorizontal and primary or secondary
+	local vertical = primaryHorizontal and secondary or primary
+	local startPoint = (vertical == "UP" and "BOTTOM" or "TOP") .. (horizontal == "LEFT" and "RIGHT" or "LEFT")
+	return primary, secondary, primaryHorizontal, startPoint
+end
+
+local function getDefaultAuraLayoutSize(kind, size, horizontalSpacing, verticalSpacing, perRow, maxRows)
+	return perRow * size + (perRow - 1) * horizontalSpacing, maxRows * size + (maxRows - 1) * verticalSpacing
+end
+
 local function getAuraTextSize(key, fallback)
 	local size = tonumber(addon.db and addon.db[key]) or fallback
 	if size < 6 then size = 6 end
@@ -420,6 +565,94 @@ local function normalizeAuraAnchorPoint(value, fallback)
 	return fallback or "CENTER"
 end
 
+local function getDefaultAuraTextStyleCache()
+	local cache = DAC.variables.defaultAuraTextStyleCache
+	if not cache then
+		cache = {}
+		DAC.variables.defaultAuraTextStyleCache = cache
+	end
+	return cache
+end
+
+local function getDefaultAuraTextStyleConfig(kind, prefix, fallbackColor)
+	kind = normalizeDefaultAuraKind(kind)
+	prefix = prefix or "Duration"
+	local cache = getDefaultAuraTextStyleCache()
+	local cacheKey = kind .. ":" .. prefix
+	local entry = cache[cacheKey]
+	if not entry then
+		entry = {}
+		cache[cacheKey] = entry
+	end
+
+	local styleVersion = getDefaultAuraStyleVersion()
+	local fontVersion = addon.functions and addon.functions.GetGlobalFontStateVersion and addon.functions.GetGlobalFontStateVersion() or 0
+	if entry.styleVersion == styleVersion and entry.fontVersion == fontVersion and entry.key then return entry end
+
+	local offset = getDefaultAuraDBValue(kind, prefix .. "Offset")
+	local r, g, b, a = getAuraTextColorComponents(getDefaultAuraDBValue(kind, prefix .. "Color"), fallbackColor)
+	local fontKey = normalizeAuraFontKey(getDefaultAuraDBValue(kind, prefix .. "FontFace"))
+	local outlineKey = normalizeAuraFontStyle(getDefaultAuraDBValue(kind, prefix .. "FontOutline"))
+	local size = getAuraTextSize(nil, tonumber(getDefaultAuraDBValue(kind, prefix .. "FontSize")) or (prefix == "Duration" and 10 or 12))
+	local point = normalizeAuraAnchorPoint(getDefaultAuraDBValue(kind, prefix .. "Anchor"), prefix == "Duration" and "BOTTOM" or "TOPRIGHT")
+	local x = getAuraTextOffset(nil, "x", type(offset) == "table" and offset.x or (prefix == "Duration" and 0 or -1))
+	local y = getAuraTextOffset(nil, "y", type(offset) == "table" and offset.y or -1)
+	local enabled = getDefaultAuraDBValue(kind, prefix .. "Enabled") ~= false
+
+	if
+		entry.styleVersion == styleVersion
+		and entry.enabled == enabled
+		and entry.fontKey == fontKey
+		and entry.outlineKey == outlineKey
+		and entry.size == size
+		and entry.r == r
+		and entry.g == g
+		and entry.b == b
+		and entry.a == a
+		and entry.point == point
+		and entry.x == x
+		and entry.y == y
+		and entry.fontVersion == fontVersion
+		and entry.key
+	then
+		return entry
+	end
+
+	entry.styleVersion = styleVersion
+	entry.enabled = enabled
+	entry.fontKey = fontKey
+	entry.outlineKey = outlineKey
+	entry.size = size
+	entry.r = r
+	entry.g = g
+	entry.b = b
+	entry.a = a
+	entry.point = point
+	entry.x = x
+	entry.y = y
+	entry.fontVersion = fontVersion
+	entry.font = resolveAuraFont(fontKey)
+	entry.outline = resolveAuraFontStyle(outlineKey)
+	entry.fontStyleKey = tostring(fontVersion) .. ":" .. tostring(entry.font) .. ":" .. tostring(size) .. ":" .. tostring(entry.outline)
+	entry.colorKey = tostring(r) .. ":" .. tostring(g) .. ":" .. tostring(b) .. ":" .. tostring(a)
+	entry.positionKey = tostring(point) .. ":" .. tostring(x) .. ":" .. tostring(y)
+	entry.key = table.concat({
+		tostring(enabled),
+		tostring(fontKey),
+		tostring(outlineKey),
+		tostring(size),
+		tostring(r),
+		tostring(g),
+		tostring(b),
+		tostring(a),
+		tostring(point),
+		tostring(x),
+		tostring(y),
+		tostring(fontVersion),
+	}, ":")
+	return entry
+end
+
 local function buildAuraAnchorOptions()
 	return {
 		{ value = "TOPLEFT", label = "Top left" },
@@ -436,18 +669,19 @@ end
 
 local function setAuraFontStringStyle(fontString, prefix, fallbackColor, kind)
 	if not fontString then return end
-	local fontKey = getDefaultAuraDBValue(kind, prefix .. "FontFace")
-	local styleKey = getDefaultAuraDBValue(kind, prefix .. "FontOutline")
-	local size = getAuraTextSize(nil, tonumber(getDefaultAuraDBValue(kind, prefix .. "FontSize")) or (prefix == "Duration" and 10 or 12))
-	local color = normalizeAuraTextColor(getDefaultAuraDBValue(kind, prefix .. "Color"), fallbackColor)
-	local font = resolveAuraFont(fontKey)
-	local style = resolveAuraFontStyle(styleKey)
-	if addon.functions and addon.functions.SetFontWithFallback then
-		addon.functions.SetFontWithFallback(fontString, font, size, style, DEFAULT_FONT)
-	else
-		fontString:SetFont(font, size, style)
+	local config = getDefaultAuraTextStyleConfig(kind, prefix, fallbackColor)
+	if fontString.eqolDefaultAuraFontStyleKey ~= config.fontStyleKey then
+		if addon.functions and addon.functions.SetFontWithFallback then
+			addon.functions.SetFontWithFallback(fontString, config.font, config.size, config.outline, DEFAULT_FONT)
+		else
+			fontString:SetFont(config.font, config.size, config.outline)
+		end
+		fontString.eqolDefaultAuraFontStyleKey = config.fontStyleKey
 	end
-	fontString:SetTextColor(color.r, color.g, color.b, color.a)
+	if fontString.eqolDefaultAuraColorKey ~= config.colorKey then
+		fontString:SetTextColor(config.r, config.g, config.b, config.a)
+		fontString.eqolDefaultAuraColorKey = config.colorKey
+	end
 end
 
 local function ensureDefaultAuraTextLayer(button)
@@ -457,9 +691,16 @@ local function ensureDefaultAuraTextLayer(button)
 		layer = CreateFrame("Frame", nil, button)
 		button.eqolDefaultAuraTextLayer = layer
 	end
-	layer:ClearAllPoints()
-	layer:SetAllPoints(button)
-	layer:SetFrameLevel((button:GetFrameLevel() or 1) + 10)
+	local level = (button:GetFrameLevel() or 1) + 10
+	if layer.eqolDefaultAuraTextLayerOwner ~= button then
+		layer:ClearAllPoints()
+		layer:SetAllPoints(button)
+		layer.eqolDefaultAuraTextLayerOwner = button
+	end
+	if layer.eqolDefaultAuraTextLayerLevel ~= level then
+		layer:SetFrameLevel(level)
+		layer.eqolDefaultAuraTextLayerLevel = level
+	end
 	return layer
 end
 
@@ -469,44 +710,108 @@ local function positionAuraFontString(fontString, owner, prefix, defaultPoint, d
 	local offset = getDefaultAuraDBValue(kind, prefix .. "Offset")
 	local x = getAuraTextOffset(nil, "x", type(offset) == "table" and offset.x or defaultX)
 	local y = getAuraTextOffset(nil, "y", type(offset) == "table" and offset.y or defaultY)
-	fontString:ClearAllPoints()
-	fontString:SetPoint(point, owner, point, x, y)
-	if fontString.SetDrawLayer then fontString:SetDrawLayer("OVERLAY", 7) end
+	if fontString.eqolDefaultAuraPositionOwner ~= owner or fontString.eqolDefaultAuraPositionPoint ~= point or fontString.eqolDefaultAuraPositionX ~= x or fontString.eqolDefaultAuraPositionY ~= y then
+		fontString:ClearAllPoints()
+		fontString:SetPoint(point, owner, point, x, y)
+		fontString.eqolDefaultAuraPositionOwner = owner
+		fontString.eqolDefaultAuraPositionPoint = point
+		fontString.eqolDefaultAuraPositionX = x
+		fontString.eqolDefaultAuraPositionY = y
+	end
+	if fontString.SetDrawLayer and fontString.eqolDefaultAuraDrawLayerKey ~= "OVERLAY:7" then
+		fontString:SetDrawLayer("OVERLAY", 7)
+		fontString.eqolDefaultAuraDrawLayerKey = "OVERLAY:7"
+	end
 end
 
 local function buildDefaultAuraTextStyleKey(kind, prefix, fallbackColor)
-	local color = normalizeAuraTextColor(getDefaultAuraDBValue(kind, prefix .. "Color"), fallbackColor)
-	local offset = getDefaultAuraDBValue(kind, prefix .. "Offset")
-	return table.concat({
-		tostring(getDefaultAuraDBValue(kind, prefix .. "Enabled") ~= false),
-		tostring(normalizeAuraFontKey(getDefaultAuraDBValue(kind, prefix .. "FontFace"))),
-		tostring(normalizeAuraFontStyle(getDefaultAuraDBValue(kind, prefix .. "FontOutline"))),
-		tostring(getAuraTextSize(nil, tonumber(getDefaultAuraDBValue(kind, prefix .. "FontSize")) or (prefix == "Duration" and 10 or 12))),
-		tostring(color.r),
-		tostring(color.g),
-		tostring(color.b),
-		tostring(color.a),
-		tostring(normalizeAuraAnchorPoint(getDefaultAuraDBValue(kind, prefix .. "Anchor"), prefix == "Duration" and "BOTTOM" or "TOPRIGHT")),
-		tostring(getAuraTextOffset(nil, "x", type(offset) == "table" and offset.x or (prefix == "Duration" and 0 or -1))),
-		tostring(getAuraTextOffset(nil, "y", type(offset) == "table" and offset.y or -1)),
-	}, ":")
+	return getDefaultAuraTextStyleConfig(kind, prefix, fallbackColor).key
 end
 
-local function applyDefaultAuraTextStyle(button)
+getDefaultAuraStyleConfig = function(kind)
+	kind = normalizeDefaultAuraKind(kind)
+	local cache = DAC.variables.defaultAuraStyleConfigCache
+	if not cache then
+		cache = {}
+		DAC.variables.defaultAuraStyleConfigCache = cache
+	end
+
+	local styleVersion = getDefaultAuraStyleVersion()
+	local fontVersion = addon.functions and addon.functions.GetGlobalFontStateVersion and addon.functions.GetGlobalFontStateVersion() or 0
+	local entry = cache[kind]
+	if entry and entry.styleVersion == styleVersion and entry.fontVersion == fontVersion then return entry end
+
+	entry = entry or {}
+	cache[kind] = entry
+
+	local size = getDefaultAuraIconSize(nil, kind)
+	local shape = normalizeAuraIconShape(getDefaultAuraDBValue(kind, "IconShape"))
+	local zoom = normalizeAuraIconZoom(getDefaultAuraDBValue(kind, "IconZoom"))
+	local borderKey = normalizeAuraBorder(getDefaultAuraDBValue(kind, "BorderTexture"), shape)
+	local useDebuffTypeBorderColor = getDefaultAuraUseDebuffTypeBorderColor(kind)
+	local useOriginalBorderColor = getDefaultAuraUseOriginalBorderColor(kind)
+	local dynamicBorderColor = kind == "debuff" and useDebuffTypeBorderColor
+	local color = dynamicBorderColor and nil or getDefaultAuraBorderColor(kind)
+	local colorKey = dynamicBorderColor and "dynamic" or (tostring(color[1]) .. ":" .. tostring(color[2]) .. ":" .. tostring(color[3]) .. ":" .. tostring(color[4]))
+	local iconDarkMode = getDefaultAuraDBValue(kind, "IconDarkMode") == true
+	local iconDarkness = normalizeAuraIconDarkness(getDefaultAuraDBValue(kind, "IconDarkness"))
+	local iconAlpha = normalizeAuraIconAlpha(getDefaultAuraDBValue(kind, "IconAlpha"))
+	local iconDesaturate = getDefaultAuraDBValue(kind, "IconDesaturate") == true
+	local durationTextKey = buildDefaultAuraTextStyleKey(kind, "Duration", DEFAULT_AURA_DURATION_COLOR)
+	local countTextKey = buildDefaultAuraTextStyleKey(kind, "Count", DEFAULT_AURA_COUNT_COLOR)
+
+	entry.styleVersion = styleVersion
+	entry.fontVersion = fontVersion
+	entry.kind = kind
+	entry.size = size
+	entry.shape = shape
+	entry.zoom = zoom
+	entry.borderKey = borderKey
+	entry.borderSize = getDefaultAuraBorderSize(nil, kind)
+	entry.borderOffset = getDefaultAuraBorderOffset(nil, kind)
+	entry.drawSwipe = getDefaultAuraDrawSwipe(kind)
+	entry.drawEdge = getDefaultAuraDrawEdge(kind)
+	entry.cooldownReverse = getDefaultAuraCooldownReverse(kind)
+	entry.durationTextProfile = getDefaultAuraDurationTextProfile(kind)
+	entry.durationTextVersion = addon.DurationText and addon.DurationText.version or 0
+	entry.countEnabled = getDefaultAuraDBValue(kind, "CountEnabled") ~= false
+	entry.useDebuffTypeBorderColor = useDebuffTypeBorderColor
+	entry.useOriginalBorderColor = useOriginalBorderColor
+	entry.dynamicBorderColor = dynamicBorderColor
+	entry.updateStyleOnAura = shouldUpdateDefaultAuraStyleForAura(entry)
+	entry.color = color
+	entry.colorKey = colorKey
+	entry.iconDarkMode = iconDarkMode
+	entry.iconDarkness = iconDarkness
+	entry.iconAlpha = iconAlpha
+	entry.iconDesaturate = iconDesaturate
+	entry.hasCustomBorder = not isNoAuraBorder(borderKey)
+	entry.hideCountdownNumbers = getDefaultAuraDBValue(kind, "DurationEnabled") == false
+	entry.durationTextKey = durationTextKey
+	entry.countTextKey = countTextKey
+	entry.styleKey = tostring(kind) .. ":" .. tostring(size) .. ":" .. tostring(shape) .. ":" .. tostring(zoom) .. ":" .. tostring(borderKey) .. ":" .. tostring(entry.borderSize) .. ":" .. tostring(entry.borderOffset) .. ":" .. tostring(entry.drawSwipe) .. ":" .. tostring(entry.drawEdge) .. ":" .. tostring(entry.cooldownReverse) .. ":" .. tostring(entry.durationTextProfile) .. ":" .. tostring(entry.durationTextVersion) .. ":" .. tostring(useDebuffTypeBorderColor) .. ":" .. colorKey .. ":" .. tostring(iconDarkMode) .. ":" .. tostring(iconDarkness) .. ":" .. tostring(iconAlpha) .. ":" .. tostring(iconDesaturate) .. ":" .. durationTextKey .. ":" .. countTextKey
+	return entry
+end
+
+local function applyDefaultAuraTextStyle(button, config)
 	if not button then return end
 	local kind = button.eqolDefaultAuraKind
+	config = config or getDefaultAuraStyleConfig(kind)
 	local textLayer = ensureDefaultAuraTextLayer(button)
 	if textLayer then
-		if button.Duration and button.Duration.SetParent then button.Duration:SetParent(textLayer) end
-		if button.Count and button.Count.SetParent then button.Count:SetParent(textLayer) end
+		if button.Duration and button.Duration.SetParent and button.Duration:GetParent() ~= textLayer then button.Duration:SetParent(textLayer) end
+		if button.Count and button.Count.SetParent and button.Count:GetParent() ~= textLayer then button.Count:SetParent(textLayer) end
 	end
-	local durationEnabled = getDefaultAuraDBValue(kind, "DurationEnabled") ~= false
-	applyDefaultAuraDurationTextProfile(button)
-	if button.Cooldown and button.Cooldown.SetHideCountdownNumbers then button.Cooldown:SetHideCountdownNumbers(not durationEnabled) end
+	local durationEnabled = not config.hideCountdownNumbers
+	applyDefaultAuraDurationTextProfile(button, config)
+	if button.Cooldown and button.Cooldown.SetHideCountdownNumbers and button.eqolDefaultAuraHideCountdownNumbers ~= config.hideCountdownNumbers then
+		button.Cooldown:SetHideCountdownNumbers(config.hideCountdownNumbers)
+		button.eqolDefaultAuraHideCountdownNumbers = config.hideCountdownNumbers
+	end
 	local internalCooldownText = button.Cooldown and button.Cooldown.GetCountdownFontString and button.Cooldown:GetCountdownFontString()
 	if internalCooldownText then
 		if not durationEnabled then
-			internalCooldownText:Hide()
+			if internalCooldownText:IsShown() then internalCooldownText:Hide() end
 		else
 			setAuraFontStringStyle(internalCooldownText, "Duration", DEFAULT_AURA_DURATION_COLOR, kind)
 			positionAuraFontString(internalCooldownText, button, "Duration", "BOTTOM", 0, -1, kind)
@@ -515,7 +820,7 @@ local function applyDefaultAuraTextStyle(button)
 
 	setAuraFontStringStyle(button.Duration, "Duration", DEFAULT_AURA_DURATION_COLOR, kind)
 	positionAuraFontString(button.Duration, button, "Duration", "BOTTOM", 0, -1, kind)
-	button.Duration:Hide()
+	if button.Duration:IsShown() then button.Duration:Hide() end
 
 	setAuraFontStringStyle(button.Count, "Count", DEFAULT_AURA_COUNT_COLOR, kind)
 	positionAuraFontString(button.Count, button, "Count", "TOPRIGHT", -1, -1, kind)
@@ -523,6 +828,9 @@ end
 
 local function setDefaultAuraCooldownDuration(button, startTime, duration)
 	if not (button and button.Cooldown and startTime and duration) then return false end
+	local kind = button.eqolDefaultAuraKind
+	if button.Cooldown.SetReverse then button.Cooldown:SetReverse(getDefaultAuraCooldownReverse(kind)) end
+	if button.Cooldown.SetDrawEdge then button.Cooldown:SetDrawEdge(getDefaultAuraDrawEdge(kind)) end
 	if button.Cooldown.SetCooldownFromDurationObject and C_DurationUtil and C_DurationUtil.CreateDuration then
 		local durationObject = button.eqolDefaultAuraDurationObject
 		if not durationObject then
@@ -533,11 +841,11 @@ local function setDefaultAuraCooldownDuration(button, startTime, duration)
 		button.Cooldown:SetCooldownFromDurationObject(durationObject)
 		return true
 	end
-	CooldownFrame_Set(button.Cooldown, startTime, duration, true)
+	CooldownFrame_Set(button.Cooldown, startTime, duration, true, getDefaultAuraDrawEdge(kind))
 	return true
 end
 
-local function isNoAuraBorder(value)
+isNoAuraBorder = function(value)
 	if addon.IconShape and addon.IconShape.IsNoBorder then return addon.IconShape.IsNoBorder(value) end
 	return type(value) == "string" and strupper(value) == "NONE"
 end
@@ -550,7 +858,7 @@ end
 
 local function resolveAuraBackdropBorder(borderKey)
 	if not borderKey or borderKey == "" or isNoAuraBorder(borderKey) then return nil end
-	if borderKey == "DEFAULT" then return "Interface\\Buttons\\WHITE8X8" end
+	if borderKey == "DEFAULT" then return DEFAULT_AURA_BACKDROP_BORDER end
 	if addon.functions and addon.functions.GetLSMMediaHash then
 		local media = addon.functions.GetLSMMediaHash("border")
 		if type(media) == "table" and type(media[borderKey]) == "string" and media[borderKey] ~= "" then return media[borderKey] end
@@ -572,36 +880,40 @@ local function ensureDefaultAuraWatcher()
 	return watcher
 end
 
-local function applyDefaultAuraBackdropBorder(button, icon, borderKey, color, kind)
-	if not (button and icon) then return false end
-	local borderTexture = resolveAuraBackdropBorder(borderKey)
-	if not borderTexture then return false end
-	local size = getDefaultAuraBorderSize(nil, kind)
-	local offset = getDefaultAuraBorderOffset(nil, kind)
+local function applyDefaultAuraBackdropBorder(button, icon, borderKey, color, config)
+	if not (button and icon and addon.functions and addon.functions.SetSafeBorder) then return false end
+	if not resolveAuraBackdropBorder(borderKey) then return false end
+	config = config or getDefaultAuraStyleConfig(button.eqolDefaultAuraKind)
+	local size = config.borderSize
+	local offset = config.borderOffset
 	local border = button.eqolDefaultAuraBackdropBorder
 	if not border then
-		border = CreateFrame("Frame", nil, button, "BackdropTemplate")
+		border = CreateFrame("Frame", nil, button)
 		button.eqolDefaultAuraBackdropBorder = border
 	end
 	border:ClearAllPoints()
 	border:SetPoint("TOPLEFT", icon, "TOPLEFT", -offset, offset)
 	border:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", offset, -offset)
-	border:SetBackdrop({ edgeFile = borderTexture, edgeSize = size })
-	border:SetBackdropBorderColor(color[1], color[2], color[3], color[4])
 	border:SetFrameLevel((button:GetFrameLevel() or 1) + 4)
-	border:Show()
+
+	addon.functions.SetSafeBorder(border, true, borderKey, size, color[1], color[2], color[3], color[4], {
+		defaultTexture = DEFAULT_AURA_BACKDROP_BORDER,
+		mediaType = "border",
+		stateKey = "_eqolDefaultAuraSafeBorder",
+	})
 	ensureDefaultAuraTextLayer(button)
 	return true
 end
 
-local function applyDefaultAuraShapeBorder(button, icon, borderKey, shape, color, kind)
+local function applyDefaultAuraShapeBorder(button, icon, borderKey, shape, color, config)
 	if not (addon.IconShape and addon.IconShape.ApplyBorder and button and icon) then return false end
+	config = config or getDefaultAuraStyleConfig(button.eqolDefaultAuraKind)
 	local applied = addon.IconShape.ApplyBorder(button, borderKey, shape, {
 		allowNone = true,
 		emptyValue = addon.IconShape.BORDER and addon.IconShape.BORDER.NONE or "NONE",
 		pointFrame = icon,
-		borderSize = getDefaultAuraBorderSize(nil, kind),
-		borderOffset = getDefaultAuraBorderOffset(nil, kind),
+		borderSize = config.borderSize,
+		borderOffset = config.borderOffset,
 		color = color,
 		texturesKey = "_eqolDefaultAuraShapeBorderTextures",
 		drawLayer = "OVERLAY",
@@ -635,7 +947,8 @@ local function ensureDefaultAuraButtonVisuals(button)
 
 	button.Cooldown = button.Cooldown or CreateFrame("Cooldown", nil, button, "CooldownFrameTemplate")
 	button.Cooldown:SetAllPoints(button)
-	button.Cooldown:SetDrawEdge(false)
+	if button.Cooldown.SetDrawEdge then button.Cooldown:SetDrawEdge(getDefaultAuraDrawEdge(button.eqolDefaultAuraKind)) end
+	if button.Cooldown.SetReverse then button.Cooldown:SetReverse(getDefaultAuraCooldownReverse(button.eqolDefaultAuraKind)) end
 	if button.Cooldown.SetDrawSwipe then button.Cooldown:SetDrawSwipe(getDefaultAuraDrawSwipe(button.eqolDefaultAuraKind)) end
 	if button.Cooldown.SetHideCountdownNumbers then button.Cooldown:SetHideCountdownNumbers(false) end
 	button.Cooldown:SetSwipeColor(0, 0, 0, 0.65)
@@ -652,67 +965,90 @@ end
 
 local function clearDefaultAuraCustomBorder(button)
 	if not button then return end
-	if button.eqolDefaultAuraBackdropBorder then button.eqolDefaultAuraBackdropBorder:Hide() end
+	if button.eqolDefaultAuraBackdropBorder then
+		if addon.functions and addon.functions.SetSafeBorder then
+			addon.functions.SetSafeBorder(button.eqolDefaultAuraBackdropBorder, false, nil, nil, nil, nil, nil, nil, { stateKey = "_eqolDefaultAuraSafeBorder" })
+		else
+			button.eqolDefaultAuraBackdropBorder:Hide()
+		end
+	end
 	if addon.IconShape and addon.IconShape.HideBorderTextures then
 		addon.IconShape.HideBorderTextures(button, { texturesKey = "_eqolDefaultAuraShapeBorderTextures" })
 	end
 end
 
-local function applyDefaultAuraButtonStyle(button, force)
+local function applyDefaultAuraCooldownSwipeVisual(button, config, force)
+	if not (button and addon.IconShape and addon.IconShape.ApplyCooldownSwipeVisual) then return end
+	local key = config and config.styleKey or button.eqolDefaultAuraStyleKey
+	if not force and button.eqolDefaultAuraCooldownSwipeVisualKey == key then return end
+	addon.IconShape.ApplyCooldownSwipeVisual(button.Cooldown, button, nil, nil, { customColor = false })
+	button.eqolDefaultAuraCooldownSwipeVisualKey = key
+end
+
+local function applyDefaultAuraButtonStyle(button, force, config)
 	if not button then return end
 	ensureDefaultAuraButtonVisuals(button)
 	local icon = button.Icon or button.icon
 	if not icon then return end
 
-	local kind = button.eqolDefaultAuraKind
-	local size = getDefaultAuraIconSize(nil, kind)
-	local shape = normalizeAuraIconShape(getDefaultAuraDBValue(kind, "IconShape"))
-	local zoom = normalizeAuraIconZoom(getDefaultAuraDBValue(kind, "IconZoom"))
-	local borderKey = normalizeAuraBorder(getDefaultAuraDBValue(kind, "BorderTexture"), shape)
-	local color = resolveDefaultAuraBorderColor(button, kind)
-	local iconDarkMode = getDefaultAuraDBValue(kind, "IconDarkMode") == true
-	local iconDarkness = normalizeAuraIconDarkness(getDefaultAuraDBValue(kind, "IconDarkness"))
-	local iconDesaturate = getDefaultAuraDBValue(kind, "IconDesaturate") == true
-	local hasCustomBorder = not isNoAuraBorder(borderKey)
-	local durationTextKey = buildDefaultAuraTextStyleKey(kind, "Duration", DEFAULT_AURA_DURATION_COLOR)
-	local countTextKey = buildDefaultAuraTextStyleKey(kind, "Count", DEFAULT_AURA_COUNT_COLOR)
-	local styleKey = tostring(kind) .. ":" .. tostring(size) .. ":" .. tostring(shape) .. ":" .. tostring(zoom) .. ":" .. tostring(borderKey) .. ":" .. tostring(getDefaultAuraBorderSize(nil, kind)) .. ":" .. tostring(getDefaultAuraBorderOffset(nil, kind)) .. ":" .. tostring(getDefaultAuraDrawSwipe(kind)) .. ":" .. tostring(getDefaultAuraDurationTextProfile(kind)) .. ":" .. tostring(addon.DurationText and addon.DurationText.version or 0) .. ":" .. tostring(color[1]) .. ":" .. tostring(color[2]) .. ":" .. tostring(color[3]) .. ":" .. tostring(color[4]) .. ":" .. tostring(iconDarkMode) .. ":" .. tostring(iconDarkness) .. ":" .. tostring(iconDesaturate) .. ":" .. durationTextKey .. ":" .. countTextKey
+	config = config or getDefaultAuraStyleConfig(button.eqolDefaultAuraKind)
+	local color = resolveDefaultAuraBorderColorFromConfig(button, config)
+	local styleKey = config.styleKey
 	if not force and button.eqolDefaultAuraStyleKey == styleKey then return end
 	button.eqolDefaultAuraStyleKey = styleKey
 
-	if force and not (InCombatLockdown and InCombatLockdown()) then button:SetSize(size, size) end
+	if force and not (InCombatLockdown and InCombatLockdown()) then button:SetSize(config.size, config.size) end
 	button.Icon:SetAllPoints(button)
 	button.Cooldown:SetAllPoints(button)
-	if button.Cooldown.SetDrawSwipe then button.Cooldown:SetDrawSwipe(getDefaultAuraDrawSwipe(kind)) end
-	if button.Cooldown.SetHideCountdownNumbers then button.Cooldown:SetHideCountdownNumbers(getDefaultAuraDBValue(kind, "DurationEnabled") == false) end
-	applyDefaultAuraTextStyle(button)
+	if button.Cooldown.SetDrawSwipe then button.Cooldown:SetDrawSwipe(config.drawSwipe) end
+	if button.Cooldown.SetDrawEdge then button.Cooldown:SetDrawEdge(config.drawEdge) end
+	if button.Cooldown.SetReverse then button.Cooldown:SetReverse(config.cooldownReverse) end
+	if button.Cooldown.SetHideCountdownNumbers then button.Cooldown:SetHideCountdownNumbers(config.hideCountdownNumbers) end
+	applyDefaultAuraTextStyle(button, config)
 
 	if addon.IconShape and addon.IconShape.ApplyFrameShape then
-		addon.IconShape.ApplyFrameShape(button, shape, {
+		addon.IconShape.ApplyFrameShape(button, config.shape, {
 			textures = { icon },
 			cooldown = button.Cooldown or button.cooldown,
-			iconZoom = zoom,
+			iconZoom = config.zoom,
 			textureMaskKey = "_eqolDefaultAuraIconMask",
 			textureTexCoordKey = "_eqolDefaultAuraIconTexCoord",
 			maskKey = "_eqolDefaultAuraMask",
 			refreshSwipe = function(owner)
-				if addon.IconShape and addon.IconShape.ApplyCooldownSwipeVisual then
-					addon.IconShape.ApplyCooldownSwipeVisual(owner and owner.Cooldown, owner, nil, nil, { customColor = false })
-				end
+				applyDefaultAuraCooldownSwipeVisual(owner, config, true)
 			end,
 		})
 	elseif icon.SetTexCoord then
 		icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 	end
-	applyDefaultAuraIconDarkMode(button, kind)
+	applyDefaultAuraIconDarkMode(button, config)
 
 	clearDefaultAuraCustomBorder(button)
-	if hasCustomBorder then
-		if isBackdropAuraBorderCompatible(shape) then
-			applyDefaultAuraBackdropBorder(button, icon, borderKey, color, kind)
+	if config.hasCustomBorder then
+		if isBackdropAuraBorderCompatible(config.shape) then
+			applyDefaultAuraBackdropBorder(button, icon, config.borderKey, color, config)
 		else
-			applyDefaultAuraShapeBorder(button, icon, borderKey, shape, color, kind)
+			applyDefaultAuraShapeBorder(button, icon, config.borderKey, config.shape, color, config)
 		end
+	end
+end
+
+local function updateDefaultAuraDynamicBorderColor(button, config)
+	if not (button and config and config.updateStyleOnAura and config.hasCustomBorder) then return end
+	local icon = button.Icon or button.icon
+	if not icon then return end
+	local color = resolveDefaultAuraBorderColorFromConfig(button, config)
+	if isBackdropAuraBorderCompatible(config.shape) then
+		local border = button.eqolDefaultAuraBackdropBorder
+		if border and addon.functions and addon.functions.SetSafeBorder then
+			addon.functions.SetSafeBorder(border, true, config.borderKey, config.borderSize, color[1], color[2], color[3], color[4], {
+				defaultTexture = DEFAULT_AURA_BACKDROP_BORDER,
+				mediaType = "border",
+				stateKey = "_eqolDefaultAuraSafeBorder",
+			})
+		end
+	elseif addon.IconShape and addon.IconShape.ApplyBorder then
+		applyDefaultAuraShapeBorder(button, icon, config.borderKey, config.shape, color, config)
 	end
 end
 
@@ -744,13 +1080,13 @@ local function resolveDefaultTempEnchantIcon(slot)
 	return nil
 end
 
-local function updateDefaultTempEnchantButton(button, kind)
+local function updateDefaultTempEnchantButton(button, kind, slot)
 	if not button or not button:IsShown() then return end
 	button.eqolDefaultAuraKind = normalizeDefaultAuraKind(kind)
 	ensureDefaultAuraButtonVisuals(button)
 	if not button.eqolDefaultAuraStyleKey then applyDefaultAuraButtonStyle(button, true) end
 
-	local slot = button:GetAttribute("target-slot")
+	slot = slot or button.eqolDefaultAuraTargetSlot or button:GetAttribute("target-slot")
 	if not slot then return end
 
 	local mainSlot = GetInventorySlotInfo and GetInventorySlotInfo("MainHandSlot")
@@ -779,14 +1115,15 @@ local function updateDefaultTempEnchantButton(button, kind)
 	button.Icon:SetTexture(texture or "Interface\\Icons\\INV_Misc_QuestionMark")
 	button.eqolAuraUnit = "player"
 	button.eqolAuraInstanceID = nil
+	local config = getDefaultAuraStyleConfig(kind)
 	local chargeText = charges and charges > 0 and tostring(charges) or ""
 	button.Count:SetText(chargeText)
-	button.Count:SetShown(getDefaultAuraDBValue(kind, "CountEnabled") ~= false and chargeText ~= "")
+	button.Count:SetShown(config.countEnabled and chargeText ~= "")
 
 	local timeLeft = (tonumber(expirationMS) or 0) / 1000
 	if timeLeft > 0 then
 		setDefaultAuraCooldownDuration(button, GetTime(), timeLeft)
-		if addon.IconShape and addon.IconShape.ApplyCooldownSwipeVisual then addon.IconShape.ApplyCooldownSwipeVisual(button.Cooldown, button, nil, nil, { customColor = false }) end
+		applyDefaultAuraCooldownSwipeVisual(button, config)
 		button.Cooldown:Show()
 	else
 		button.Cooldown:Hide()
@@ -796,21 +1133,60 @@ local function updateDefaultTempEnchantButton(button, kind)
 	if GameTooltip:IsOwned(button) then GameTooltip:SetInventoryItem("player", slot) end
 end
 
-local function updateDefaultAuraButton(button, unit, filter, kind)
+local function applyDefaultAuraDataToButton(button, unit, kind, aura)
+	if not (button and aura) then return end
+	ensureDefaultAuraButtonVisuals(button)
+	local config = getDefaultAuraStyleConfig(kind)
+	button.eqolAuraUnit = unit
+	button.eqolAuraInstanceID = aura.auraInstanceID
+	if not button.eqolDefaultAuraStyleKey then
+		applyDefaultAuraButtonStyle(button, true, config)
+	elseif config.updateStyleOnAura then
+		updateDefaultAuraDynamicBorderColor(button, config)
+	end
+
+	button.Icon:SetTexture(aura.icon)
+
+	local countText = ""
+	if C_UnitAuras.GetAuraApplicationDisplayCount and aura.auraInstanceID then
+		countText = C_UnitAuras.GetAuraApplicationDisplayCount(unit, aura.auraInstanceID, 2) or ""
+	end
+	button.Count:SetText(countText)
+	button.Count:SetShown(config.countEnabled)
+
+	local auraDuration
+	if C_UnitAuras.GetAuraDuration and aura.auraInstanceID then
+		auraDuration = C_UnitAuras.GetAuraDuration(unit, aura.auraInstanceID)
+	end
+	if auraDuration and button.Cooldown.SetCooldownFromDurationObject then
+		button.Duration:Hide()
+		button.Cooldown:SetCooldownFromDurationObject(auraDuration)
+		applyDefaultAuraCooldownSwipeVisual(button, config)
+		button.Cooldown:Show()
+	else
+		button.Cooldown:Hide()
+		button.Duration:Hide()
+	end
+
+	if GameTooltip:IsOwned(button) and aura.auraInstanceID then GameTooltip:SetUnitAuraByAuraInstanceID(unit, aura.auraInstanceID) end
+end
+
+local function updateDefaultAuraButton(button, index)
 	if not button or not button:IsShown() then return end
-	button.eqolDefaultAuraKind = normalizeDefaultAuraKind(kind)
-	if button:GetAttribute("target-slot") then
-		updateDefaultTempEnchantButton(button, kind)
+	local kind = button.eqolDefaultAuraKind or "buff"
+	local unit = button.eqolDefaultAuraUnit or "player"
+	local filter = button.eqolDefaultAuraFilter or (kind == "debuff" and "HARMFUL" or "HELPFUL")
+	if button.eqolDefaultAuraTargetSlot then
+		updateDefaultTempEnchantButton(button, kind, button.eqolDefaultAuraTargetSlot)
 		return
 	end
 	ensureDefaultAuraButtonVisuals(button)
 	if not button.eqolDefaultAuraStyleKey then applyDefaultAuraButtonStyle(button, true) end
 
-	local index = button:GetAttribute("index") or button:GetID()
+	index = index or button.eqolDefaultAuraIndex or button:GetAttribute("index") or button:GetID()
 	local aura
 	if index and C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
-		local ok, data = pcall(C_UnitAuras.GetAuraDataByIndex, unit, index, filter)
-		if ok then aura = data end
+		aura = C_UnitAuras.GetAuraDataByIndex(unit, index, filter)
 	end
 	if not aura then
 		button.Icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
@@ -820,33 +1196,7 @@ local function updateDefaultAuraButton(button, unit, filter, kind)
 		return
 	end
 
-	button.eqolAuraUnit = unit
-	button.eqolAuraInstanceID = aura.auraInstanceID
-	button.Icon:SetTexture(aura.icon)
-
-	local countText = ""
-	if C_UnitAuras.GetAuraApplicationDisplayCount and aura.auraInstanceID then
-		countText = C_UnitAuras.GetAuraApplicationDisplayCount(unit, aura.auraInstanceID, 2) or ""
-	end
-	button.Count:SetText(countText)
-	button.Count:SetShown(getDefaultAuraDBValue(kind, "CountEnabled") ~= false)
-
-	local auraDuration
-	if C_UnitAuras.GetAuraDuration and aura.auraInstanceID then
-		local ok, durationObject = pcall(C_UnitAuras.GetAuraDuration, unit, aura.auraInstanceID)
-		if ok then auraDuration = durationObject end
-	end
-	if auraDuration and button.Cooldown.SetCooldownFromDurationObject then
-		button.Duration:Hide()
-		button.Cooldown:SetCooldownFromDurationObject(auraDuration)
-		if addon.IconShape and addon.IconShape.ApplyCooldownSwipeVisual then addon.IconShape.ApplyCooldownSwipeVisual(button.Cooldown, button, nil, nil, { customColor = false }) end
-		button.Cooldown:Show()
-	else
-		button.Cooldown:Hide()
-		button.Duration:Hide()
-	end
-
-	if GameTooltip:IsOwned(button) and aura.auraInstanceID then GameTooltip:SetUnitAuraByAuraInstanceID(unit, aura.auraInstanceID) end
+	applyDefaultAuraDataToButton(button, unit, kind, aura)
 end
 
 local function forEachDefaultAuraHeaderChild(header, func, ...)
@@ -867,63 +1217,88 @@ local function forEachDefaultAuraHeaderChild(header, func, ...)
 	end
 end
 
+local function applyDefaultAuraHeaderContextToButton(button, header)
+	if not (button and header) then return end
+	button.eqolDefaultAuraKind = header.eqolDefaultAuraKind
+	button.eqolDefaultAuraFilter = header.eqolDefaultAuraFilter
+	button.eqolDefaultAuraUnit = header.eqolDefaultAuraUnit or "player"
+	button.eqolDefaultAuraTargetSlot = button:GetAttribute("target-slot")
+end
+
+local function updateDefaultAuraButtonFromAttribute(button, attr, value)
+	if not button then return end
+	if attr == "index" then
+		button.eqolDefaultAuraIndex = value
+		button.eqolDefaultAuraTargetSlot = nil
+		updateDefaultAuraButton(button, value)
+	elseif attr == "target-slot" then
+		button.eqolAuraInstanceID = nil
+		button.eqolDefaultAuraTargetSlot = value
+		button.eqolDefaultAuraIndex = nil
+		updateDefaultTempEnchantButton(button, button.eqolDefaultAuraKind, value)
+	end
+end
+
+local function ensureDefaultAuraButtonAttributeHook(button, header)
+	if not button then return end
+	applyDefaultAuraHeaderContextToButton(button, header)
+	if button.eqolDefaultAuraAttributeHooked then return end
+	button.eqolDefaultAuraAttributeHooked = true
+	ensureDefaultAuraButtonVisuals(button)
+	button:HookScript("OnAttributeChanged", updateDefaultAuraButtonFromAttribute)
+end
+
+local function handleDefaultAuraHeaderAttributeChanged(header, attr, value)
+	if type(attr) ~= "string" then return end
+	if attr == "unit" then
+		header.eqolDefaultAuraUnit = value or "player"
+		forEachDefaultAuraHeaderChild(header, applyDefaultAuraHeaderContextToButton, header)
+		return
+	end
+	if not (attr:match("^child%d+$") or attr:match("^temp[Ee]nchant%d+$")) then return end
+	if type(value) == "userdata" and GetFrameHandleFrame then value = GetFrameHandleFrame(value) end
+	if value then
+		ensureDefaultAuraButtonAttributeHook(value, header)
+		if value:GetAttribute("index") then
+			updateDefaultAuraButtonFromAttribute(value, "index", value:GetAttribute("index"))
+		elseif value:GetAttribute("target-slot") then
+			updateDefaultAuraButtonFromAttribute(value, "target-slot", value:GetAttribute("target-slot"))
+		end
+	end
+end
+
 local function applyDefaultAuraHeaderButtonStyles(header, force)
 	if not header then return end
-	local filter = header:GetAttribute("filter") or "HELPFUL"
-	local kind = header.eqolDefaultAuraKind or (filter == "HARMFUL" and "debuff" or "buff")
 	forEachDefaultAuraHeaderChild(header, function(child)
-		child.eqolDefaultAuraKind = kind
+		ensureDefaultAuraButtonAttributeHook(child, header)
 		applyDefaultAuraButtonStyle(child, force)
 	end)
 end
 
 local function updateDefaultAuraHeaderButtons(header)
 	if not header then return end
-	local unit = header:GetAttribute("unit") or "player"
-	local filter = header:GetAttribute("filter") or "HELPFUL"
-	local kind = header.eqolDefaultAuraKind or (filter == "HARMFUL" and "debuff" or "buff")
-	forEachDefaultAuraHeaderChild(header, updateDefaultAuraButton, unit, filter, kind)
-end
-
-local function updateDefaultAuraHeaderTempEnchantButtons(header)
-	if not header then return end
-	local kind = header.eqolDefaultAuraKind or "buff"
-	local index = 1
-	local child = header:GetAttribute("tempEnchant" .. index)
-	while child do
-		updateDefaultTempEnchantButton(child, kind)
-		index = index + 1
-		child = header:GetAttribute("tempEnchant" .. index)
-	end
-end
-
-local function scheduleDefaultTempEnchantUpdate()
-	DAC.variables.defaultTempEnchantUpdateToken = (DAC.variables.defaultTempEnchantUpdateToken or 0) + 1
-	local token = DAC.variables.defaultTempEnchantUpdateToken
-	C_Timer.After(0.5, function()
-		if token ~= DAC.variables.defaultTempEnchantUpdateToken then return end
-		updateDefaultAuraHeaderTempEnchantButtons(DAC.variables.defaultBuffHeader)
+	forEachDefaultAuraHeaderChild(header, function(child)
+		ensureDefaultAuraButtonAttributeHook(child, header)
+		updateDefaultAuraButton(child, child:GetAttribute("index"))
 	end)
-end
-
-local function ensureDefaultTempEnchantWatcher()
-	if DAC.variables.defaultTempEnchantWatcher then return DAC.variables.defaultTempEnchantWatcher end
-	local watcher = CreateFrame("Frame")
-	watcher:SetScript("OnEvent", scheduleDefaultTempEnchantUpdate)
-	watcher:RegisterEvent("WEAPON_ENCHANT_CHANGED")
-	DAC.variables.defaultTempEnchantWatcher = watcher
-	return watcher
 end
 
 local function configureDefaultAuraHeader(header, filter, kind)
 	kind = normalizeDefaultAuraKind(kind)
 	header.eqolDefaultAuraKind = kind
+	header.eqolDefaultAuraFilter = filter
+	header.eqolDefaultAuraUnit = "player"
 	local size = getDefaultAuraIconSize(nil, kind)
 	local horizontalSpacing = getDefaultAuraHorizontalSpacing(nil, kind)
 	local verticalSpacing = getDefaultAuraVerticalSpacing(nil, kind)
 	local perRow = getDefaultAuraIconsPerRow(nil, kind)
 	local maxRows = getDefaultAuraMaxRows(nil, kind)
+	local primary, _, primaryHorizontal, startPoint = getDefaultAuraGrowthLayout(kind)
+	local layoutWidth, layoutHeight = getDefaultAuraLayoutSize(kind, size, horizontalSpacing, verticalSpacing, perRow, maxRows)
+	local wrapAfter = primaryHorizontal and perRow or maxRows
+	local maxWraps = primaryHorizontal and maxRows or perRow
 	header:SetAttribute("unit", "player")
+	header.eqolDefaultAuraUnit = "player"
 	header:SetAttribute("filter", filter)
 	header:SetAttribute("template", "SecureAuraButtonTemplate")
 	header:SetAttribute("weaponTemplate", filter == "HELPFUL" and "SecureAuraButtonTemplate" or nil)
@@ -932,20 +1307,19 @@ local function configureDefaultAuraHeader(header, filter, kind)
 	header:SetAttribute("initialConfigFunction", DEFAULT_AURA_INITIAL_CONFIG)
 	header:SetAttribute("sortMethod", normalizeDefaultAuraSortMethod(getDefaultAuraDBValue(kind, "SortMethod")))
 	header:SetAttribute("sortDirection", normalizeDefaultAuraSortDirection(getDefaultAuraDBValue(kind, "SortDirection")))
-	header:SetAttribute("wrapAfter", perRow)
-	header:SetAttribute("maxWraps", maxRows)
-	header:SetAttribute("point", "TOPRIGHT")
-	header:SetAttribute("xOffset", -(size + horizontalSpacing))
-	header:SetAttribute("yOffset", 0)
-	header:SetAttribute("wrapXOffset", 0)
-	header:SetAttribute("wrapYOffset", -(size + verticalSpacing))
-	header:SetAttribute("minWidth", perRow * size + (perRow - 1) * horizontalSpacing)
-	header:SetAttribute("minHeight", maxRows * size + (maxRows - 1) * verticalSpacing)
+	header:SetAttribute("wrapAfter", wrapAfter)
+	header:SetAttribute("maxWraps", maxWraps)
+	header:SetAttribute("point", startPoint)
+	header:SetAttribute("xOffset", primaryHorizontal and ((primary == "LEFT" and -1 or 1) * (size + horizontalSpacing)) or 0)
+	header:SetAttribute("yOffset", primaryHorizontal and 0 or ((primary == "UP" and 1 or -1) * (size + verticalSpacing)))
+	header:SetAttribute("wrapXOffset", primaryHorizontal and 0 or ((startPoint:find("RIGHT", 1, true) and -1 or 1) * (size + horizontalSpacing)))
+	header:SetAttribute("wrapYOffset", primaryHorizontal and ((startPoint:find("BOTTOM", 1, true) and 1 or -1) * (size + verticalSpacing)) or 0)
+	header:SetAttribute("minWidth", layoutWidth)
+	header:SetAttribute("minHeight", layoutHeight)
 	if filter == "HELPFUL" then
 		header:SetAttribute("includeWeapons", getDefaultAuraDBValue(kind, "IncludeWeapons") == true and 1 or 0)
 	end
-	header:SetSize(perRow * size + (perRow - 1) * horizontalSpacing, maxRows * size + (maxRows - 1) * verticalSpacing)
-	if filter == "HELPFUL" then ensureDefaultTempEnchantWatcher() end
+	header:SetSize(layoutWidth, layoutHeight)
 	applyDefaultAuraHeaderButtonStyles(header, true)
 	updateDefaultAuraHeaderButtons(header)
 end
@@ -956,13 +1330,10 @@ local function createDefaultAuraHeader(kind, filter)
 	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
 	if tonumber((select(4, GetBuildInfo()))) >= 120100 and type(header.SetRolesets) == "function" then header:SetRolesets("buffs") end
 	header:SetClampedToScreen(true)
-	header:UnregisterEvent("UNIT_AURA")
-	header:RegisterUnitEvent("UNIT_AURA", "player", "vehicle")
-	if filter == "HELPFUL" then header:RegisterEvent("WEAPON_ENCHANT_CHANGED") end
 	if RegisterAttributeDriver then RegisterAttributeDriver(header, "unit", "[vehicleui] vehicle; player") end
 	if not header.eqolDefaultAuraHooksInstalled then
 		header.eqolDefaultAuraHooksInstalled = true
-		header:HookScript("OnEvent", updateDefaultAuraHeaderButtons)
+		header:HookScript("OnAttributeChanged", handleDefaultAuraHeaderAttributeChanged)
 		header:HookScript("OnShow", updateDefaultAuraHeaderButtons)
 	end
 	configureDefaultAuraHeader(header, filter, kind)
@@ -977,7 +1348,12 @@ local function ensureDefaultAuraAnchor(kind)
 	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
 	if tonumber((select(4, GetBuildInfo()))) >= 120100 and type(anchor.SetRolesets) == "function" then anchor:SetRolesets("buffs") end
 	DAC.variables[key] = anchor
-	anchor:SetSize(getDefaultAuraIconsPerRow(nil, kind) * getDefaultAuraIconSize(nil, kind) + (getDefaultAuraIconsPerRow(nil, kind) - 1) * getDefaultAuraHorizontalSpacing(nil, kind), getDefaultAuraMaxRows(nil, kind) * getDefaultAuraIconSize(nil, kind) + (getDefaultAuraMaxRows(nil, kind) - 1) * getDefaultAuraVerticalSpacing(nil, kind))
+	local size = getDefaultAuraIconSize(nil, kind)
+	local horizontalSpacing = getDefaultAuraHorizontalSpacing(nil, kind)
+	local verticalSpacing = getDefaultAuraVerticalSpacing(nil, kind)
+	local perRow = getDefaultAuraIconsPerRow(nil, kind)
+	local maxRows = getDefaultAuraMaxRows(nil, kind)
+	anchor:SetSize(getDefaultAuraLayoutSize(kind, size, horizontalSpacing, verticalSpacing, perRow, maxRows))
 	anchor:SetFrameStrata(normalizeDefaultAuraFrameStrata(getDefaultAuraDBValue(kind, "FrameStrata")))
 	anchor:SetFrameLevel(getDefaultAuraFrameLevel(nil, kind))
 	if anchor.SetClampedToScreen then anchor:SetClampedToScreen(true) end
@@ -991,7 +1367,9 @@ local function attachDefaultAuraHeaderToAnchor(header, anchor)
 	if not (header and anchor) then return end
 	if header:GetParent() ~= anchor then header:SetParent(anchor) end
 	header:ClearAllPoints()
-	header:SetPoint("TOPRIGHT", anchor, "TOPRIGHT", 0, 0)
+	local kind = header.eqolDefaultAuraKind or "buff"
+	local _, _, _, startPoint = getDefaultAuraGrowthLayout(kind)
+	header:SetPoint(startPoint, anchor, startPoint, 0, 0)
 	header:SetFrameStrata(anchor:GetFrameStrata())
 	header:SetFrameLevel((anchor:GetFrameLevel() or 1) + 1)
 end
@@ -1048,6 +1426,7 @@ local function refreshDefaultAuraSamples(kind)
 	local perRow = getDefaultAuraIconsPerRow(nil, kind)
 	local verticalSpacing = getDefaultAuraVerticalSpacing(nil, kind)
 	local maxRows = getDefaultAuraMaxRows(nil, kind)
+	local primary, _, primaryHorizontal, startPoint = getDefaultAuraGrowthLayout(kind)
 	local count = perRow * maxRows
 	for i = 1, count do
 		local sample = samples[i]
@@ -1062,6 +1441,8 @@ local function refreshDefaultAuraSamples(kind)
 			samples[i] = sample
 		end
 		sample.eqolDefaultAuraKind = kind
+		sample.eqolAuraUnit = nil
+		sample.eqolAuraInstanceID = nil
 		if sample.SetFrameStrata then sample:SetFrameStrata(anchor:GetFrameStrata()) end
 		if sample.SetFrameLevel then sample:SetFrameLevel((anchor:GetFrameLevel() or 1) + 1) end
 		sample.Icon:SetTexture(SAMPLE_AURA_ICONS[((i - 1) % #SAMPLE_AURA_ICONS) + 1] or "Interface\\Icons\\INV_Misc_QuestionMark")
@@ -1071,13 +1452,23 @@ local function refreshDefaultAuraSamples(kind)
 		setDefaultAuraCooldownDuration(sample, GetTime() - i, 30 + i * 8)
 		sample:ClearAllPoints()
 		sample:SetSize(size, size)
-		local column = (i - 1) % perRow
-		local row = math.floor((i - 1) / perRow)
-		if column == 0 then
-			sample:SetPoint("TOPRIGHT", anchor, "TOPRIGHT", 0, -row * (size + verticalSpacing))
+		local column, row
+		if primaryHorizontal then
+			column = (i - 1) % perRow
+			row = math.floor((i - 1) / perRow)
 		else
-			sample:SetPoint("RIGHT", samples[i - 1], "LEFT", -horizontalSpacing, 0)
+			column = math.floor((i - 1) / maxRows)
+			row = (i - 1) % maxRows
 		end
+		local xOffset, yOffset
+		if primaryHorizontal then
+			xOffset = column * (primary == "LEFT" and -1 or 1) * (size + horizontalSpacing)
+			yOffset = row * (startPoint:find("BOTTOM", 1, true) and 1 or -1) * (size + verticalSpacing)
+		else
+			xOffset = column * (startPoint:find("RIGHT", 1, true) and -1 or 1) * (size + horizontalSpacing)
+			yOffset = row * (primary == "UP" and 1 or -1) * (size + verticalSpacing)
+		end
+		sample:SetPoint(startPoint, anchor, startPoint, xOffset, yOffset)
 		applyDefaultAuraButtonStyle(sample, true)
 		sample:Show()
 	end
@@ -1120,6 +1511,8 @@ local function applyDefaultAuraEditModeSetting(kind, field, value)
 		setDefaultAuraDBValue(kind, "IconDarkMode", value == true)
 	elseif field == "iconDarkness" then
 		setDefaultAuraDBValue(kind, "IconDarkness", normalizeAuraIconDarkness(value))
+	elseif field == "iconAlpha" then
+		setDefaultAuraDBValue(kind, "IconAlpha", normalizeAuraIconAlpha(value))
 	elseif field == "iconDesaturate" then
 		setDefaultAuraDBValue(kind, "IconDesaturate", value == true)
 	elseif field == "size" then
@@ -1129,11 +1522,19 @@ local function applyDefaultAuraEditModeSetting(kind, field, value)
 	elseif field == "verticalSpacing" then
 		setDefaultAuraDBValue(kind, "VerticalSpacing", getDefaultAuraVerticalSpacing(value, kind))
 	elseif field == "drawSwipe" then
-		setDefaultAuraDBValue(kind, "CooldownDrawSwipe", value == true)
+		local enabled = value == true
+		setDefaultAuraDBValue(kind, "CooldownDrawSwipe", enabled)
+		if not enabled then setDefaultAuraDBValue(kind, "CooldownReverse", false) end
+	elseif field == "drawEdge" then
+		setDefaultAuraDBValue(kind, "CooldownDrawEdge", value == true)
+	elseif field == "cooldownReverse" then
+		setDefaultAuraDBValue(kind, "CooldownReverse", value == true and getDefaultAuraDrawSwipe(kind))
 	elseif field == "perRow" then
 		setDefaultAuraDBValue(kind, "IconsPerRow", getDefaultAuraIconsPerRow(value, kind))
 	elseif field == "maxRows" then
 		setDefaultAuraDBValue(kind, "MaxRows", getDefaultAuraMaxRows(value, kind))
+	elseif field == "growth" then
+		setDefaultAuraDBValue(kind, "Growth", normalizeDefaultAuraGrowth(value))
 	elseif field == "frameStrata" then
 		setDefaultAuraDBValue(kind, "FrameStrata", normalizeDefaultAuraFrameStrata(value))
 	elseif field == "frameLevel" then
@@ -1153,6 +1554,8 @@ local function applyDefaultAuraEditModeSetting(kind, field, value)
 		setDefaultAuraDBValue(kind, "BorderOffset", getDefaultAuraBorderOffset(value, kind))
 	elseif field == "useOriginalBorderColor" then
 		setDefaultAuraDBValue(kind, "UseOriginalBorderColor", value == true)
+	elseif field == "useDebuffTypeBorderColor" then
+		setDefaultAuraDBValue(kind, "UseDebuffTypeBorderColor", value == true)
 	elseif field == "borderColor" then
 		setDefaultAuraDBValue(kind, "BorderColor", value)
 	elseif field == "durationEnabled" then
@@ -1306,12 +1709,28 @@ local function createDefaultAuraEditModeSettings(kind)
 		return not isNoAuraBorder(borderKey)
 	end
 	local function borderColorEnabled()
-		return borderEnabled() and not getDefaultAuraUseOriginalBorderColor(kind)
+		return borderEnabled() and not getDefaultAuraUseOriginalBorderColor(kind) and not getDefaultAuraUseDebuffTypeBorderColor(kind)
 	end
 	local function durationEnabled() return getDefaultAuraDBValue(kind, "DurationEnabled") ~= false end
 	local function countEnabled() return getDefaultAuraDBValue(kind, "CountEnabled") ~= false end
+	local function cooldownSwipeEnabled() return getDefaultAuraDrawSwipe(kind) end
 	local function iconDarkModeEnabled() return getDefaultAuraDBValue(kind, "IconDarkMode") == true end
 	local function anchorOptions() return buildAuraAnchorOptions() end
+	local function growthOptions()
+		local labels = {
+			LEFT = _G.HUD_EDIT_MODE_SETTING_BAGS_DIRECTION_LEFT or _G.LEFT or L["Left"] or "Left",
+			RIGHT = _G.HUD_EDIT_MODE_SETTING_BAGS_DIRECTION_RIGHT or _G.RIGHT or L["Right"] or "Right",
+			UP = _G.HUD_EDIT_MODE_SETTING_BAGS_DIRECTION_UP or _G.UP or L["Up"] or "Up",
+			DOWN = _G.HUD_EDIT_MODE_SETTING_BAGS_DIRECTION_DOWN or _G.DOWN or L["Down"] or "Down",
+		}
+		local options = {}
+		for i = 1, #DEFAULT_AURA_GROWTH_OPTIONS do
+			local value = DEFAULT_AURA_GROWTH_OPTIONS[i]
+			local first, second = parseDefaultAuraGrowth(value)
+			options[#options + 1] = { value = value, label = ("%s %s"):format(labels[first] or first, labels[second] or second) }
+		end
+		return options
+	end
 	local function sortMethodOptions()
 		return {
 			{ value = "TIME", label = L["Time"] or "Time" },
@@ -1350,13 +1769,17 @@ local function createDefaultAuraEditModeSettings(kind)
 		slider(L["Icon zoom"] or "Icon zoom", function() return normalizeAuraIconZoom(getDefaultAuraDBValue(kind, "IconZoom")) end, function(value) applyDefaultAuraEditModeSetting(kind, "zoom", value) end, 0, 35, 1, nil, layoutSectionId),
 		checkbox(L["Icon dark mode"] or "Icon dark mode", function() return getDefaultAuraDBValue(kind, "IconDarkMode") == true end, function(value) applyDefaultAuraEditModeSetting(kind, "iconDarkMode", value) end, nil, layoutSectionId),
 		slider(L["Icon darkness"] or "Icon darkness", function() return normalizeAuraIconDarkness(getDefaultAuraDBValue(kind, "IconDarkness")) end, function(value) applyDefaultAuraEditModeSetting(kind, "iconDarkness", value) end, 0, 100, 1, iconDarkModeEnabled, layoutSectionId),
+		slider(L["Alpha"] or "Alpha", function() return math.floor((normalizeAuraIconAlpha(getDefaultAuraDBValue(kind, "IconAlpha")) * 100) + 0.5) end, function(value) applyDefaultAuraEditModeSetting(kind, "iconAlpha", (tonumber(value) or 100) / 100) end, 0, 100, 1, nil, layoutSectionId),
 		checkbox(L["Desaturate icon"] or "Desaturate icon", function() return getDefaultAuraDBValue(kind, "IconDesaturate") == true end, function(value) applyDefaultAuraEditModeSetting(kind, "iconDesaturate", value) end, iconDarkModeEnabled, layoutSectionId),
 		slider(L["Icon size"] or "Icon size", function() return getDefaultAuraIconSize(nil, kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "size", value) end, 16, 80, 1, nil, layoutSectionId),
 		slider(L["Horizontal spacing"] or "Horizontal spacing", function() return getDefaultAuraHorizontalSpacing(nil, kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "horizontalSpacing", value) end, 0, 100, 1, nil, layoutSectionId),
 		slider(L["Vertical spacing"] or "Vertical spacing", function() return getDefaultAuraVerticalSpacing(nil, kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "verticalSpacing", value) end, 0, 100, 1, nil, layoutSectionId),
 		checkbox(L["Draw cooldown swipe"] or "Draw cooldown swipe", function() return getDefaultAuraDrawSwipe(kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "drawSwipe", value) end, nil, layoutSectionId),
+		checkbox(L["Draw cooldown edge"] or "Draw cooldown edge", function() return getDefaultAuraDrawEdge(kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "drawEdge", value) end, nil, layoutSectionId),
+		checkbox(L["Reverse cooldown swipe"] or "Reverse cooldown swipe", function() return getDefaultAuraCooldownReverse(kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "cooldownReverse", value) end, cooldownSwipeEnabled, layoutSectionId),
 		slider(L["Aura per row"] or "Auras per row", function() return getDefaultAuraIconsPerRow(nil, kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "perRow", value) end, 1, 32, 1, nil, layoutSectionId),
 		slider(L["Max rows"] or "Max rows", function() return getDefaultAuraMaxRows(nil, kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "maxRows", value) end, 1, 10, 1, nil, layoutSectionId),
+		dropdown(L["Growth direction"] or "Growth direction", function() return getDefaultAuraGrowth(kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "growth", value) end, growthOptions, 180, nil, layoutSectionId),
 		dropdown(L["Frame strata"] or "Frame strata", function() return normalizeDefaultAuraFrameStrata(getDefaultAuraDBValue(kind, "FrameStrata")) end, function(value) applyDefaultAuraEditModeSetting(kind, "frameStrata", value) end, frameStrataOptions, 180, nil, layoutSectionId),
 		slider(L["UFFrameLevel"] or "Frame level", function() return getDefaultAuraFrameLevel(nil, kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "frameLevel", value) end, 0, 100, 1, nil, layoutSectionId),
 		dropdown(L["Sort method"] or "Sort method", function() return normalizeDefaultAuraSortMethod(getDefaultAuraDBValue(kind, "SortMethod")) end, function(value) applyDefaultAuraEditModeSetting(kind, "sortMethod", value) end, sortMethodOptions, 120, nil, layoutSectionId),
@@ -1369,6 +1792,7 @@ local function createDefaultAuraEditModeSettings(kind)
 		end, function(value) applyDefaultAuraEditModeSetting(kind, "border", value) end, borderOptions, 220, nil, borderSectionId),
 		slider(L["Border Size"] or "Border Size", function() return getDefaultAuraBorderSize(nil, kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "borderSize", value) end, 1, 24, 1, borderEnabled, borderSectionId),
 		slider(L["Border offset"] or "Border offset", function() return getDefaultAuraBorderOffset(nil, kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "borderOffset", value) end, -20, 100, 1, borderEnabled, borderSectionId),
+		checkbox(L["Use debuff type border color"] or "Use debuff type border color", function() return getDefaultAuraUseDebuffTypeBorderColor(kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "useDebuffTypeBorderColor", value) end, function() return kind == "debuff" and borderEnabled() end, borderSectionId),
 		checkbox(L["Use original border color"] or "Use original border color", function() return getDefaultAuraUseOriginalBorderColor(kind) end, function(value) applyDefaultAuraEditModeSetting(kind, "useOriginalBorderColor", value) end, borderEnabled, borderSectionId),
 		{
 			name = L["Border color"] or "Border color",
@@ -1507,6 +1931,8 @@ function DAC.functions.RefreshDefaultAuraIconSkin()
 		return
 	end
 
+	invalidateDefaultAuraStyleCache()
+
 	if not isDefaultAuraIconSkinEnabled() then
 		if DAC.variables.defaultBuffHeader then DAC.variables.defaultBuffHeader:Hide() end
 		if DAC.variables.defaultDebuffHeader then DAC.variables.defaultDebuffHeader:Hide() end
@@ -1583,12 +2009,14 @@ function DAC.functions.InitDB()
 	init("skinnerDefaultDebuffIconsEnabled", false)
 	init("skinnerDefaultAuraSyncBuffDebuff", true)
 	init("skinnerDefaultAuraIconShape", "DEFAULT")
+	init("skinnerDefaultAuraIconAlpha", 1)
 	init("skinnerDefaultAuraIconSize", 32)
 	init("skinnerDefaultAuraIconSpacing", 4)
 	init("skinnerDefaultAuraHorizontalSpacing", getDefaultAuraIconSpacing())
 	init("skinnerDefaultAuraVerticalSpacing", getDefaultAuraIconSpacing() + 12)
 	init("skinnerDefaultAuraIconsPerRow", 8)
 	init("skinnerDefaultAuraMaxRows", 4)
+	init("skinnerDefaultAuraGrowth", "LEFTDOWN")
 	init("skinnerDefaultAuraFrameStrata", "MEDIUM")
 	init("skinnerDefaultAuraFrameLevel", 50)
 	init("skinnerDefaultAuraSortMethod", "TIME")
@@ -1599,10 +2027,13 @@ function DAC.functions.InitDB()
 	init("skinnerDefaultAuraIconDarkness", 35)
 	init("skinnerDefaultAuraIconDesaturate", true)
 	init("skinnerDefaultAuraCooldownDrawSwipe", true)
+	init("skinnerDefaultAuraCooldownDrawEdge", false)
+	init("skinnerDefaultAuraCooldownReverse", false)
 	init("skinnerDefaultAuraBorderTexture", addon.IconShape and addon.IconShape.BORDER and addon.IconShape.BORDER.NONE or "NONE")
 	init("skinnerDefaultAuraBorderSize", 1)
 	init("skinnerDefaultAuraBorderOffset", 0)
 	init("skinnerDefaultAuraUseOriginalBorderColor", false)
+	init("skinnerDefaultAuraUseDebuffTypeBorderColor", false)
 	init("skinnerDefaultAuraBorderColor", {
 		r = DEFAULT_AURA_BORDER_COLOR.r,
 		g = DEFAULT_AURA_BORDER_COLOR.g,

@@ -2,6 +2,22 @@
 
 Track EnhanceQoL changes that need follow-up before or when WoW 12.1 ships. Remove obsolete features only after verifying the behavior on the release client.
 
+## TODO: AuraContainer migration for PTR3 aura restrictions
+
+- PTR source: `origin/ptr`, build `12.1.0.68301`.
+- Migration note: `docs/PTR_12_1_AuraContainer_Migration.md`.
+- PTR status: Blizzard's new `Blizzard_AuraContainer` exists in PTR2 and the new `AuraButton` template already carries forbidden aspects. The announced PTR3 aura restriction pass is expected to make this path mandatory for normal aura rendering.
+- EnhanceQoL areas to review:
+  - `EnhanceQoL/Modules/Aura/DefaultAuraContainers.lua`
+  - `EnhanceQoL/Modules/Aura/UF_GroupFrames.lua`
+  - `EnhanceQoL/Modules/Aura/UF.lua`
+  - `EnhanceQoL/Modules/Aura/CooldownPanels_CDMAuras.lua`
+  - `EnhanceQoL/Submodules/ClassBuffReminder.lua`
+- Follow-up action:
+  - Use the migration note as the source checklist when PTR3 lands.
+  - Verify which aura query and display APIs are actually restricted in PTR3.
+  - Prefer an internal AuraContainer compatibility adapter over separate one-off rewrites.
+
 ## TODO: Midnight Season 2 Altar of Fangs portal position
 
 - PTR status: Altar of Fangs exists as a season dungeon and has a portal spell, but the dungeon location is not fully available on PTR yet.
@@ -76,3 +92,29 @@ Track EnhanceQoL changes that need follow-up before or when WoW 12.1 ships. Remo
   - Verify whether EnhanceQoL layouts need explicit size, position, alpha, strata, or visibility handling for `pingIconFrame` and `PingIconFrame`.
   - Test compact party, raid, target, and boss frames with an actual PTR UI ping and Frame Stack open.
   - Document whether the addon should expose any setting for native ping icons or only preserve Blizzard behavior.
+
+## TODO: Cooldown Panels secure ping actions
+
+- PTR source: `origin/ptr`, build `12.1.0.68301`.
+- PTR note: `C_Ping` changed materially for macro-style ping actions.
+- API changes:
+  - `C_Ping.GetContextualPingTypeForUnit` is no longer documented in `PingManagerDocumentation.lua`.
+  - `C_Ping.SendMacroPing` now takes a single `PingMacroInfo` table instead of `(type, targetToken)`.
+  - `PingMacroInfo` fields are `type`, `targetToken`, `spellID`, and `itemID`.
+  - `C_Ping.IsPingSystemEnabled()` is available for feature/display gating.
+  - `C_Ping.GetDefaultPingOptions()` returns `PingTypeInfo` entries for available ping types.
+  - `C_Ping.GetCooldownInfo()` returns `PingCooldownInfo` for the ping system cooldown.
+- Blizzard macro/slash path:
+  - `/ping` builds `{ type = pingType, targetToken = target }`.
+  - `/pingspell` builds `{ spellID = spellID }`.
+  - `/pingitem` builds `{ itemID = itemID }`.
+  - All three route through `C_Ping.SendMacroPing(pingMacroInfo)`.
+- EnhanceQoL area to review:
+  - `EnhanceQoL/Modules/Aura/CooldownPanels.lua`
+- Why this matters: Cooldown Panels icons are currently normal frames, not `SecureActionButtonTemplate` action buttons. Adding clickable ping options is therefore a new secure-action layer, not only another entry type.
+- Follow-up action:
+  - If Cooldown Panels gets ping actions, prefer secure macro buttons using Blizzard's slash commands (`/ping`, `/pingspell`, `/pingitem`) over direct Lua `OnClick` calls to `C_Ping.SendMacroPing`.
+  - Gate ping entries or controls by feature detection, for example `C_Ping`, `C_Ping.SendMacroPing`, and `C_Ping.IsPingSystemEnabled`.
+  - Use `C_Ping.GetDefaultPingOptions()` for ping-type UI choices instead of hardcoding order.
+  - Use `C_Ping.GetCooldownInfo()` only if Cooldown Panels needs to visualize ping cooldown or disabled state.
+  - Avoid changing secure button attributes or macrotext in combat; decide how pending ping-entry changes should be deferred.

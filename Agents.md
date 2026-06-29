@@ -39,6 +39,11 @@
 - Do not introduce redundant locale aliases like `LMain`, `LCore`, `LVendor`, or `LMP` when they all point to the same `EnhanceQoL` locale table.
 - Prefer Blizzard globals such as `_G.NONE` or `_G.STATUS_TEXT_BOTH` when the game already provides the text, instead of creating duplicate locale keys for them.
 
+## SavedVariables Cleanup
+
+- When removing an option or stored setting, add a matching cleanup path in `EnhanceQoL/Core/Cleanup.lua` in the same change.
+- Do not leave removed options behind as inert SavedVariables keys unless there is a deliberate compatibility reason and it is documented in the change.
+
 ### Validation
 
 - Before finishing locale work, verify that every `EnhanceQoL/Locales/*.lua` file has the same keys.
@@ -87,6 +92,9 @@
 
 - When handling Blizzard secret values, do not do Lua arithmetic, comparisons, `tonumber`, `min`, `max`, sorting, modulo, or similar numeric operations on the secret value.
 - Pass secret values through to Blizzard APIs that can consume them directly, such as status bar setters, instead of converting or deriving values in Lua.
+- For borders on frames whose size, parent, aura data, or update path can be secret-tainted, do not use `BackdropTemplate`, `SetBackdrop`, or `SetBackdropBorderColor`. Use `addon.functions.SetSafeBorder(frame, enabled, textureKey, size, r, g, b, a, options)` from `EnhanceQoL/General/functions.lua` instead.
+- `SetSafeBorder` is only for verified or plausibly secret-sensitive icon/aura/statusbar border paths. Do not migrate ordinary non-secret panels, standalone UI, or regular untainted frames just for style consistency.
+- When using `SetSafeBorder`, pass a stable `stateKey` per callsite, `defaultTexture = "Interface\\Buttons\\WHITE8x8"` unless a different default is required, and `mediaType = "border"` when `textureKey` is an LSM border key. Pass secret color values directly; do not compare, stringify, cache-key, or otherwise inspect them.
 
 ## Large Lua Files and Local Limits
 

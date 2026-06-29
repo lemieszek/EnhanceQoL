@@ -1900,7 +1900,11 @@ data = {
 		desc = L["landingPageButtonCustomPositionDesc"] or "Allows the expansion landing page minimap button to be moved and scaled.",
 		func = function(key)
 			addon.db["landingPageButtonCustomPosition"] = key and true or false
-			if addon.functions.applyLandingPageButtonPlacement then addon.functions.applyLandingPageButtonPlacement() end
+			if key then
+				if addon.functions.applyLandingPageButtonPlacement then addon.functions.applyLandingPageButtonPlacement() end
+			elseif addon.functions.resetLandingPageButtonPlacement then
+				addon.functions.resetLandingPageButtonPlacement()
+			end
 		end,
 		default = false,
 		parent = true,
@@ -3189,8 +3193,8 @@ local function getSquareMinimapStatsFontPath()
 	return font
 end
 
-local function getSquareMinimapStatsOutlineFlag()
-	local outline = normalizeSquareMinimapStatsOutlineSelection(addon.db and addon.db.squareMinimapStatsOutline, nil)
+local function getSquareMinimapStatsOutlineFlag(outline)
+	outline = outline or normalizeSquareMinimapStatsOutlineSelection(addon.db and addon.db.squareMinimapStatsOutline, nil)
 	if addon.functions and addon.functions.GetFontFlagsForStyle then
 		return addon.functions.GetFontFlagsForStyle(outline, "OUTLINE")
 	end
@@ -3378,6 +3382,7 @@ end
 
 local handleSquareMinimapTimeClick
 local configureSquareMinimapStatFrameInteraction
+local onSquareMinimapTimeMouseUp
 
 local function ensureSquareMinimapStatFrame(statKey)
 	local state = getSquareMinimapStatsState()
@@ -3389,7 +3394,6 @@ local function ensureSquareMinimapStatFrame(statKey)
 			existing.textSecondary:SetJustifyV("MIDDLE")
 			existing.textSecondary:Hide()
 		end
-		configureSquareMinimapStatFrameInteraction(existing, statKey)
 		return existing
 	end
 	if not Minimap then return nil end
@@ -3482,20 +3486,26 @@ handleSquareMinimapTimeClick = function(button)
 	end
 end
 
+onSquareMinimapTimeMouseUp = function(_, button) handleSquareMinimapTimeClick(button) end
+
 configureSquareMinimapStatFrameInteraction = function(frame, statKey)
 	if not frame then return end
 	if statKey == "time" then
+		if frame._eqolInteractionMode == "time" then return end
 		frame:EnableMouse(true)
 		frame:SetHitRectInsets(-4, -4, -2, -2)
 		frame:SetScript("OnEnter", nil)
 		frame:SetScript("OnLeave", nil)
-		frame:SetScript("OnMouseUp", function(_, button) handleSquareMinimapTimeClick(button) end)
+		frame:SetScript("OnMouseUp", onSquareMinimapTimeMouseUp)
+		frame._eqolInteractionMode = "time"
 	else
+		if frame._eqolInteractionMode == "none" then return end
 		frame:EnableMouse(false)
 		frame:SetHitRectInsets(0, 0, 0, 0)
 		frame:SetScript("OnEnter", nil)
 		frame:SetScript("OnLeave", nil)
 		frame:SetScript("OnMouseUp", nil)
+		frame._eqolInteractionMode = "none"
 	end
 end
 
@@ -3710,6 +3720,36 @@ local function buildSquareMinimapLocationTexts(renderCfg)
 	return getSquareMinimapLocationLines(showZone, showSubzone, splitLines)
 end
 
+local function getTruncatedSquareMinimapLocationTexts(frame, topText, bottomText, maxWidth)
+	topText = topText or ""
+	bottomText = bottomText or ""
+	if not maxWidth or maxWidth <= 0 then return topText, bottomText end
+	if
+		frame._eqolLocationTopText == topText
+		and frame._eqolLocationBottomText == bottomText
+		and frame._eqolLocationMaxWidth == maxWidth
+		and frame._eqolLocationFontPath == frame._eqolFontPath
+		and frame._eqolLocationFontSize == frame._eqolFontSize
+		and frame._eqolLocationFontOutline == frame._eqolFontOutline
+		and frame._eqolLocationFontStyleChoice == frame._eqolFontStyleChoice
+	then
+		return frame._eqolLocationTruncatedTopText or "", frame._eqolLocationTruncatedBottomText or "", false
+	end
+
+	local truncatedTop = truncateSquareMinimapTextToWidth(frame.text, topText, maxWidth)
+	local truncatedBottom = bottomText ~= "" and truncateSquareMinimapTextToWidth(frame.textSecondary, bottomText, maxWidth) or ""
+	frame._eqolLocationTopText = topText
+	frame._eqolLocationBottomText = bottomText
+	frame._eqolLocationMaxWidth = maxWidth
+	frame._eqolLocationFontPath = frame._eqolFontPath
+	frame._eqolLocationFontSize = frame._eqolFontSize
+	frame._eqolLocationFontOutline = frame._eqolFontOutline
+	frame._eqolLocationFontStyleChoice = frame._eqolFontStyleChoice
+	frame._eqolLocationTruncatedTopText = truncatedTop
+	frame._eqolLocationTruncatedBottomText = truncatedBottom
+	return truncatedTop, truncatedBottom, true
+end
+
 local function getSquareMinimapFPSBucket(renderCfg, value)
 	local medium = renderCfg and renderCfg.fpsThresholdMedium or 30
 	local high = renderCfg and renderCfg.fpsThresholdHigh or 60
@@ -3843,7 +3883,8 @@ local function getSquareMinimapStatRenderConfig(statKey)
 	local lineGap = math.max(math.floor(size * 0.15), 2)
 	local justify = getSquareMinimapStatJustify(point)
 	local fontPath = getSquareMinimapStatsFontPath()
-	local outline = getSquareMinimapStatsOutlineFlag()
+	local outlineChoice = normalizeSquareMinimapStatsOutlineSelection(addon.db and addon.db.squareMinimapStatsOutline, nil)
+	local outline = getSquareMinimapStatsOutlineFlag(outlineChoice)
 	local r, g, b, a = getSquareMinimapStatsColor(cfg.colorKey)
 
 	cached = {
@@ -3858,6 +3899,7 @@ local function getSquareMinimapStatRenderConfig(statKey)
 		justify = justify,
 		fontPath = fontPath,
 		outline = outline,
+		outlineChoice = outlineChoice,
 		r = r,
 		g = g,
 		b = b,
@@ -3942,6 +3984,8 @@ local function updateSquareMinimapStat(statKey)
 	local useVerticalLatency = renderCfg.useVerticalLatency
 	local lineGap = renderCfg.lineGap
 	local justify = renderCfg.justify
+	local layoutDirty = false
+	local textMeasurementDirty = false
 
 	if frame._eqolAnchorPoint ~= point or frame._eqolAnchorX ~= x or frame._eqolAnchorY ~= y then
 		frame:ClearAllPoints()
@@ -3967,16 +4011,18 @@ local function updateSquareMinimapStat(statKey)
 		frame._eqolTextPoint = point
 		frame._eqolSecondaryPoint = point
 		frame._eqolSecondaryOffsetY = 0
+		layoutDirty = true
 	end
 	if frame._eqolTextJustify ~= justify then
 		frame.text:SetJustifyH(justify)
 		frame.textSecondary:SetJustifyH(justify)
 		frame._eqolTextJustify = justify
+		layoutDirty = true
 	end
 
 	local fontPath = renderCfg.fontPath
 	local outline = renderCfg.outline
-	local outlineChoice = normalizeSquareMinimapStatsOutlineSelection(addon.db and addon.db.squareMinimapStatsOutline, nil)
+	local outlineChoice = renderCfg.outlineChoice
 	if frame._eqolFontPath ~= fontPath or frame._eqolFontSize ~= size or frame._eqolFontOutline ~= outline or frame._eqolFontStyleChoice ~= outlineChoice then
 		local ok = frame.text:SetFont(fontPath, size, outline)
 		if not ok then frame.text:SetFont((addon.variables and addon.variables.defaultFont) or STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", size, outline) end
@@ -3990,6 +4036,7 @@ local function updateSquareMinimapStat(statKey)
 		frame._eqolFontSize = size
 		frame._eqolFontOutline = outline
 		frame._eqolFontStyleChoice = outlineChoice
+		layoutDirty = true
 	end
 	if frame._eqolTextColorR ~= r or frame._eqolTextColorG ~= g or frame._eqolTextColorB ~= b or frame._eqolTextColorA ~= a then
 		frame.text:SetTextColor(r, g, b, a)
@@ -4021,6 +4068,7 @@ local function updateSquareMinimapStat(statKey)
 			frame.textSecondary:SetPoint(point, frame, point, 0, secondaryY)
 			frame._eqolSecondaryPoint = point
 			frame._eqolSecondaryOffsetY = secondaryY
+			layoutDirty = true
 		end
 		showSecondary = true
 	else
@@ -4034,8 +4082,13 @@ local function updateSquareMinimapStat(statKey)
 			local topText, bottomText = buildSquareMinimapLocationTexts(renderCfg)
 			local maxWidth = getSquareMinimapLocationMaxWidth(point, x)
 			if maxWidth and maxWidth > 0 then
-				topText = truncateSquareMinimapTextToWidth(frame.text, topText, maxWidth)
-				if bottomText ~= "" then bottomText = truncateSquareMinimapTextToWidth(frame.textSecondary, bottomText, maxWidth) end
+				local truncatedTop, truncatedBottom, measured = getTruncatedSquareMinimapLocationTexts(frame, topText, bottomText, maxWidth)
+				topText = truncatedTop
+				bottomText = truncatedBottom
+				if measured then
+					layoutDirty = true
+					textMeasurementDirty = true
+				end
 			end
 
 			if bottomText ~= "" then
@@ -4055,6 +4108,7 @@ local function updateSquareMinimapStat(statKey)
 					frame.textSecondary:SetPoint(point, frame, point, 0, secondaryY)
 					frame._eqolSecondaryPoint = point
 					frame._eqolSecondaryOffsetY = secondaryY
+					layoutDirty = true
 				end
 				showSecondary = secondaryText ~= ""
 				if primaryText == "" and secondaryText ~= "" then
@@ -4074,21 +4128,30 @@ local function updateSquareMinimapStat(statKey)
 		end
 	end
 
-	if frame._eqolPrimaryText ~= primaryText then
+	if frame._eqolPrimaryText ~= primaryText or textMeasurementDirty then
 		frame.text:SetText(primaryText)
 		frame._eqolPrimaryText = primaryText
+		layoutDirty = true
 	end
 	if showSecondary then
-		if frame._eqolSecondaryText ~= secondaryText then
+		if frame._eqolSecondaryText ~= secondaryText or textMeasurementDirty then
 			frame.textSecondary:SetText(secondaryText)
 			frame._eqolSecondaryText = secondaryText
+			layoutDirty = true
 		end
-		if not frame.textSecondary:IsShown() then frame.textSecondary:Show() end
+		if not frame.textSecondary:IsShown() then
+			frame.textSecondary:Show()
+			layoutDirty = true
+		end
 	else
-		if frame.textSecondary:IsShown() then frame.textSecondary:Hide() end
+		if frame.textSecondary:IsShown() then
+			frame.textSecondary:Hide()
+			layoutDirty = true
+		end
 		if frame._eqolSecondaryText ~= "" then
 			frame.textSecondary:SetText("")
 			frame._eqolSecondaryText = ""
+			layoutDirty = true
 		end
 	end
 
@@ -4097,18 +4160,20 @@ local function updateSquareMinimapStat(statKey)
 		return
 	end
 
-	local width = getSquareMinimapFontStringWidth(frame.text)
-	local height = frame.text:GetStringHeight()
-	if frame.textSecondary:IsShown() then
-		width = math.max(width, getSquareMinimapFontStringWidth(frame.textSecondary))
-		height = height + frame.textSecondary:GetStringHeight() + lineGap
-	end
-	local finalW = math.max(width, 1)
-	local finalH = math.max(height, 1)
-	if frame._eqolWidth ~= finalW or frame._eqolHeight ~= finalH then
-		frame:SetSize(finalW, finalH)
-		frame._eqolWidth = finalW
-		frame._eqolHeight = finalH
+	if layoutDirty or not frame._eqolWidth or not frame._eqolHeight then
+		local width = getSquareMinimapFontStringWidth(frame.text)
+		local height = frame.text:GetStringHeight()
+		if frame.textSecondary:IsShown() then
+			width = math.max(width, getSquareMinimapFontStringWidth(frame.textSecondary))
+			height = height + frame.textSecondary:GetStringHeight() + lineGap
+		end
+		local finalW = math.max(width, 1)
+		local finalH = math.max(height, 1)
+		if frame._eqolWidth ~= finalW or frame._eqolHeight ~= finalH then
+			frame:SetSize(finalW, finalH)
+			frame._eqolWidth = finalW
+			frame._eqolHeight = finalH
+		end
 	end
 	frame:Show()
 end

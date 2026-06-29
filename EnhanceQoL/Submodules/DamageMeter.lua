@@ -2825,143 +2825,18 @@ end
 function DamageMeter:ApplyBorderFrame(border, enabled, textureKey, size, r, g, b, a)
 	if not border then return end
 	if enabled then
-		local texture = resolveMedia("border", textureKey, DEFAULT_BORDER)
-		local useSlices = texture ~= DEFAULT_BORDER
-		local backdropChanged = false
-		if border._damageMeterBackdropEnabled ~= true
-			or border._damageMeterBackdropTexture ~= textureKey
-			or border._damageMeterBackdropResolvedTexture ~= texture
-			or border._damageMeterBackdropSize ~= size
-			or border._damageMeterBackdropUseSlices ~= useSlices then
-			border._damageMeterBackdropEnabled = true
-			border._damageMeterBackdropTexture = textureKey
-			border._damageMeterBackdropResolvedTexture = texture
-			border._damageMeterBackdropSize = size
-			border._damageMeterBackdropUseSlices = useSlices
-			backdropChanged = true
-			if border.SetBackdrop then border:SetBackdrop(nil) end
-			if not border._damageMeterBorderTop then
-				border._damageMeterBorderTop = border:CreateTexture(nil, "BORDER")
-				border._damageMeterBorderBottom = border:CreateTexture(nil, "BORDER")
-				border._damageMeterBorderLeft = border:CreateTexture(nil, "BORDER")
-				border._damageMeterBorderRight = border:CreateTexture(nil, "BORDER")
-				border._damageMeterBorderTopLeft = border:CreateTexture(nil, "BORDER")
-				border._damageMeterBorderTopRight = border:CreateTexture(nil, "BORDER")
-				border._damageMeterBorderBottomLeft = border:CreateTexture(nil, "BORDER")
-				border._damageMeterBorderBottomRight = border:CreateTexture(nil, "BORDER")
-			end
-			local top = border._damageMeterBorderTop
-			local bottom = border._damageMeterBorderBottom
-			local left = border._damageMeterBorderLeft
-			local right = border._damageMeterBorderRight
-			local topLeft = border._damageMeterBorderTopLeft
-			local topRight = border._damageMeterBorderTopRight
-			local bottomLeft = border._damageMeterBorderBottomLeft
-			local bottomRight = border._damageMeterBorderBottomRight
-			top:SetTexture(texture)
-			bottom:SetTexture(texture)
-			left:SetTexture(texture)
-			right:SetTexture(texture)
-			topLeft:SetTexture(texture)
-			topRight:SetTexture(texture)
-			bottomLeft:SetTexture(texture)
-			bottomRight:SetTexture(texture)
-			if useSlices then
-				topLeft:SetTexCoord(0.5078125, 0.0625, 0.5078125, 0.9375, 0.6171875, 0.0625, 0.6171875, 0.9375)
-				topRight:SetTexCoord(0.6328125, 0.0625, 0.6328125, 0.9375, 0.7421875, 0.0625, 0.7421875, 0.9375)
-				bottomLeft:SetTexCoord(0.7578125, 0.0625, 0.7578125, 0.9375, 0.8671875, 0.0625, 0.8671875, 0.9375)
-				bottomRight:SetTexCoord(0.8828125, 0.0625, 0.8828125, 0.9375, 0.9921875, 0.0625, 0.9921875, 0.9375)
-				top:SetTexCoord(0.2578125, 0.9375, 0.3671875, 0.9375, 0.2578125, 0.0625, 0.3671875, 0.0625)
-				bottom:SetTexCoord(0.3828125, 0.9375, 0.4921875, 0.9375, 0.3828125, 0.0625, 0.4921875, 0.0625)
-				left:SetTexCoord(0.0078125, 0.0625, 0.0078125, 0.9375, 0.1171875, 0.0625, 0.1171875, 0.9375)
-				right:SetTexCoord(0.1328125, 0.0625, 0.1328125, 0.9375, 0.2421875, 0.0625, 0.2421875, 0.9375)
-			else
-				top:SetTexCoord(0, 1, 0, 1)
-				bottom:SetTexCoord(0, 1, 0, 1)
-				left:SetTexCoord(0, 1, 0, 1)
-				right:SetTexCoord(0, 1, 0, 1)
-				topLeft:SetTexCoord(0, 1, 0, 1)
-				topRight:SetTexCoord(0, 1, 0, 1)
-				bottomLeft:SetTexCoord(0, 1, 0, 1)
-				bottomRight:SetTexCoord(0, 1, 0, 1)
-			end
-			topLeft:ClearAllPoints()
-			topLeft:SetPoint("TOPLEFT", border, "TOPLEFT")
-			topLeft:SetSize(size, size)
-			topRight:ClearAllPoints()
-			topRight:SetPoint("TOPRIGHT", border, "TOPRIGHT")
-			topRight:SetSize(size, size)
-			bottomLeft:ClearAllPoints()
-			bottomLeft:SetPoint("BOTTOMLEFT", border, "BOTTOMLEFT")
-			bottomLeft:SetSize(size, size)
-			bottomRight:ClearAllPoints()
-			bottomRight:SetPoint("BOTTOMRIGHT", border, "BOTTOMRIGHT")
-			bottomRight:SetSize(size, size)
-			top:ClearAllPoints()
-			top:SetPoint("TOPLEFT", topLeft, "TOPRIGHT")
-			top:SetPoint("TOPRIGHT", topRight, "TOPLEFT")
-			top:SetHeight(size)
-			bottom:ClearAllPoints()
-			bottom:SetPoint("BOTTOMLEFT", bottomLeft, "BOTTOMRIGHT")
-			bottom:SetPoint("BOTTOMRIGHT", bottomRight, "BOTTOMLEFT")
-			bottom:SetHeight(size)
-			left:ClearAllPoints()
-			left:SetPoint("TOPLEFT", topLeft, "BOTTOMLEFT")
-			left:SetPoint("BOTTOMLEFT", bottomLeft, "TOPLEFT")
-			left:SetWidth(size)
-			right:ClearAllPoints()
-			right:SetPoint("TOPRIGHT", topRight, "BOTTOMRIGHT")
-			right:SetPoint("BOTTOMRIGHT", bottomRight, "TOPRIGHT")
-			right:SetWidth(size)
-		end
-		if backdropChanged
-			or border._damageMeterBorderColorR ~= r
-			or border._damageMeterBorderColorG ~= g
-			or border._damageMeterBorderColorB ~= b
-			or border._damageMeterBorderColorA ~= a then
-			border._damageMeterBorderColorR = r
-			border._damageMeterBorderColorG = g
-			border._damageMeterBorderColorB = b
-			border._damageMeterBorderColorA = a
-			if border._damageMeterBorderTop then border._damageMeterBorderTop:SetVertexColor(r, g, b, a) end
-			if border._damageMeterBorderBottom then border._damageMeterBorderBottom:SetVertexColor(r, g, b, a) end
-			if border._damageMeterBorderLeft then border._damageMeterBorderLeft:SetVertexColor(r, g, b, a) end
-			if border._damageMeterBorderRight then border._damageMeterBorderRight:SetVertexColor(r, g, b, a) end
-			if border._damageMeterBorderTopLeft then border._damageMeterBorderTopLeft:SetVertexColor(r, g, b, a) end
-			if border._damageMeterBorderTopRight then border._damageMeterBorderTopRight:SetVertexColor(r, g, b, a) end
-			if border._damageMeterBorderBottomLeft then border._damageMeterBorderBottomLeft:SetVertexColor(r, g, b, a) end
-			if border._damageMeterBorderBottomRight then border._damageMeterBorderBottomRight:SetVertexColor(r, g, b, a) end
-		end
-		if border._damageMeterBorderTop then border._damageMeterBorderTop:Show() end
-		if border._damageMeterBorderBottom then border._damageMeterBorderBottom:Show() end
-		if border._damageMeterBorderLeft then border._damageMeterBorderLeft:Show() end
-		if border._damageMeterBorderRight then border._damageMeterBorderRight:Show() end
-		if border._damageMeterBorderTopLeft then border._damageMeterBorderTopLeft:Show() end
-		if border._damageMeterBorderTopRight then border._damageMeterBorderTopRight:Show() end
-		if border._damageMeterBorderBottomLeft then border._damageMeterBorderBottomLeft:Show() end
-		if border._damageMeterBorderBottomRight then border._damageMeterBorderBottomRight:Show() end
+		r = r or 1
+		g = g or 1
+		b = b or 1
+		a = a or 1
+		addon.functions.SetSafeBorder(border, true, textureKey, size, r, g, b, a, {
+			defaultTexture = DEFAULT_BORDER,
+			mediaType = "border",
+			stateKey = "_damageMeterSafeBorder",
+		})
 		setShownIfChanged(border, true)
 	else
-		if border._damageMeterBackdropEnabled ~= false then
-			border._damageMeterBackdropEnabled = false
-			border._damageMeterBackdropTexture = nil
-			border._damageMeterBackdropResolvedTexture = nil
-			border._damageMeterBackdropSize = nil
-			border._damageMeterBackdropUseSlices = nil
-			border._damageMeterBorderColorR = nil
-			border._damageMeterBorderColorG = nil
-			border._damageMeterBorderColorB = nil
-			border._damageMeterBorderColorA = nil
-			if border._damageMeterBorderTop then border._damageMeterBorderTop:Hide() end
-			if border._damageMeterBorderBottom then border._damageMeterBorderBottom:Hide() end
-			if border._damageMeterBorderLeft then border._damageMeterBorderLeft:Hide() end
-			if border._damageMeterBorderRight then border._damageMeterBorderRight:Hide() end
-			if border._damageMeterBorderTopLeft then border._damageMeterBorderTopLeft:Hide() end
-			if border._damageMeterBorderTopRight then border._damageMeterBorderTopRight:Hide() end
-			if border._damageMeterBorderBottomLeft then border._damageMeterBorderBottomLeft:Hide() end
-			if border._damageMeterBorderBottomRight then border._damageMeterBorderBottomRight:Hide() end
-			if border.SetBackdrop then border:SetBackdrop(nil) end
-		end
+		addon.functions.SetSafeBorder(border, false, nil, nil, nil, nil, nil, nil, { stateKey = "_damageMeterSafeBorder" })
 		setShownIfChanged(border, false)
 	end
 end

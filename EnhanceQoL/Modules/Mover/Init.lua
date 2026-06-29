@@ -490,6 +490,15 @@ end
 function addon.Mover.functions.UpdateScaleWheelCaptureState()
 	local captureFrame = addon.Mover.variables.scaleCaptureFrame
 	if not captureFrame then return end
+	if db and db.enabled and db.scaleEnabled then
+		if not captureFrame._eqolModifierEventRegistered then
+			captureFrame:RegisterEvent("MODIFIER_STATE_CHANGED")
+			captureFrame._eqolModifierEventRegistered = true
+		end
+	elseif captureFrame._eqolModifierEventRegistered then
+		captureFrame:UnregisterEvent("MODIFIER_STATE_CHANGED")
+		captureFrame._eqolModifierEventRegistered = nil
+	end
 	if db and db.enabled and db.scaleEnabled and scaleModifierPressed() then
 		if captureFrame:GetScript("OnUpdate") == nil then captureFrame:SetScript("OnUpdate", addon.Mover.functions.CheckScaleWheelCapture) end
 		addon.Mover.functions.CheckScaleWheelCapture()
@@ -517,7 +526,6 @@ function addon.Mover.functions.EnsureScaleCaptureFrame()
 	captureFrame:SetFrameLevel(9999)
 	captureFrame:EnableMouseWheel(false)
 	captureFrame:SetScript("OnEvent", function() addon.Mover.functions.UpdateScaleWheelCaptureState() end)
-	captureFrame:RegisterEvent("MODIFIER_STATE_CHANGED")
 	captureFrame:SetScript("OnMouseWheel", function(_, delta) addon.Mover.functions.HandleScaleWheel(delta) end)
 	addon.Mover.variables.scaleCaptureFrame = captureFrame
 	addon.Mover.functions.UpdateScaleWheelCaptureState()

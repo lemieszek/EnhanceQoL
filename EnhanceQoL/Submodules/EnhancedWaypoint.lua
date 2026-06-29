@@ -11,10 +11,16 @@ local C_VignetteInfo = _G.C_VignetteInfo
 local state = {
 	activeAtlas = nil,
 	applyScaleQueued = false,
+	delayedUpdateQueued = false,
 	fontPrepared = false,
 	frame = nil,
 	highlight = nil,
 	label = nil,
+	lastAppliedAtlas = nil,
+	lastAppliedFrame = nil,
+	lastAppliedIconWidth = nil,
+	lastAppliedScale = nil,
+	userWaypointUpdateQueued = false,
 }
 
 local EVENT_NAMES = {
@@ -30,6 +36,7 @@ local LABEL_OFFSET_Y = -22
 local GLOW_OFFSET_Y = 82
 local GLOW_WIDTH = 300
 local GLOW_HEIGHT = 32
+local ALPHA_CACHE_TTL = 0.05
 local TARGET_ICON_SIZE = 35
 
 local AVAILABLE_QUEST_ATLAS = {
@@ -78,12 +85,32 @@ local function callLater(delay, callback)
 	end
 end
 
+local function setTextIfChanged(fontString, text)
+	if fontString:GetText() ~= text then fontString:SetText(text) end
+end
+
+local function setShownIfChanged(frame, shown)
+	shown = shown == true
+	if frame:IsShown() ~= shown then frame:SetShown(shown) end
+end
+
+local function setScaleIfChanged(frame, scale)
+	if frame:GetScale() ~= scale then
+		frame:SetScale(scale)
+	end
+end
+
+local function setAtlasIfChanged(texture, atlas, useAtlasSize)
+	if not texture.GetAtlas or texture:GetAtlas() ~= atlas then
+		texture:SetAtlas(atlas, useAtlasSize)
+	end
+end
+
 local function getQuestData(questID)
-	if not questID or questID == 0 then return nil end
-	return {
-		classification = C_QuestInfoSystem and C_QuestInfoSystem.GetQuestClassification and C_QuestInfoSystem.GetQuestClassification(questID) or nil,
-		complete = C_QuestLog and C_QuestLog.ReadyForTurnIn and C_QuestLog.ReadyForTurnIn(questID) or false,
-	}
+	if not questID or questID == 0 then return nil, false end
+	local classification = C_QuestInfoSystem and C_QuestInfoSystem.GetQuestClassification and C_QuestInfoSystem.GetQuestClassification(questID) or nil
+	local complete = C_QuestLog and C_QuestLog.ReadyForTurnIn and C_QuestLog.ReadyForTurnIn(questID) or false
+	return classification, complete
 end
 
 local function getAreaPOIInfo(poiID)
@@ -113,13 +140,13 @@ local function getSuperTrackedQuestID(pinType, poiType, poiID)
 	return nil
 end
 
-local function pickQuestAtlas(questData, activeQuest)
-	if not questData then return nil end
-	if questData.complete then
-		return TURN_IN_QUEST_ATLAS[questData.classification] or "QuestTurnin"
+local function pickQuestAtlas(hasQuestData, classification, complete, activeQuest)
+	if not hasQuestData then return nil end
+	if complete then
+		return TURN_IN_QUEST_ATLAS[classification] or "QuestTurnin"
 	end
-	if activeQuest then return ACTIVE_QUEST_ATLAS[questData.classification] or "UI-QuestPoi-QuestNumber-Pressed-SuperTracked" end
-	return AVAILABLE_QUEST_ATLAS[questData.classification] or "QuestNormal"
+	if activeQuest then return ACTIVE_QUEST_ATLAS[classification] or "UI-QuestPoi-QuestNumber-Pressed-SuperTracked" end
+	return AVAILABLE_QUEST_ATLAS[classification] or "QuestNormal"
 end
 
 local function resolveTrackedAtlas()
@@ -137,11 +164,12 @@ local function resolveTrackedAtlas()
 	local poiType, poiID
 	if C_SuperTrack.GetSuperTrackedMapPin then poiType, poiID = C_SuperTrack.GetSuperTrackedMapPin() end
 	local questID = getSuperTrackedQuestID(trackingType, poiType, poiID)
-	local questData = getQuestData(questID)
-	if trackingType == Enum.SuperTrackingType.Quest then return pickQuestAtlas(questData, true) or "Navigation-Tracked-Icon" end
+	local questClassification, questComplete = getQuestData(questID)
+	local hasQuestData = questID and questID ~= 0
+	if trackingType == Enum.SuperTrackingType.Quest then return pickQuestAtlas(hasQuestData, questClassification, questComplete, true) or "Navigation-Tracked-Icon" end
 
 	if trackingType == Enum.SuperTrackingType.MapPin then
-		if poiType == Enum.SuperTrackingMapPinType.QuestOffer then return pickQuestAtlas(questData, false) end
+		if poiType == Enum.SuperTrackingMapPinType.QuestOffer then return pickQuestAtlas(hasQuestData, questClassification, questComplete, false) end
 		if poiType == Enum.SuperTrackingMapPinType.TaxiNode then return "TaxiNode_Neutral" end
 		local poiInfo = getAreaPOIInfo(poiID)
 		if poiInfo and poiInfo.atlasName then return poiInfo.atlasName end
@@ -184,10 +212,19 @@ local function updateAlphaBehavior(frame)
 	frame.__eqolEnhancedWaypointAlphaHooked = true
 	frame.__eqolOriginalGetTargetAlphaBaseValue = frame.GetTargetAlphaBaseValue
 	frame.GetTargetAlphaBaseValue = function(self)
-		if not C_SuperTrack or not C_SuperTrack.IsSuperTrackingAnything or not C_SuperTrack.IsSuperTrackingAnything() then return 0 end
-		local navState = C_Navigation and C_Navigation.GetTargetState and C_Navigation.GetTargetState()
-		local alpha = NAVIGATION_ALPHA[navState]
-		if navState == Enum.NavigationState.Invalid and C_Navigation and C_Navigation.HasValidScreenPosition and not C_Navigation.HasValidScreenPosition() then alpha = 1 end
+		local now = (_G.GetTimePreciseSec and _G.GetTimePreciseSec()) or (GetTime and GetTime()) or 0
+		local alpha = state.alphaCacheValue
+		if not state.alphaCacheUntil or now >= state.alphaCacheUntil then
+			if not C_SuperTrack or not C_SuperTrack.IsSuperTrackingAnything or not C_SuperTrack.IsSuperTrackingAnything() then
+				alpha = 0
+			else
+				local navState = C_Navigation and C_Navigation.GetTargetState and C_Navigation.GetTargetState()
+				alpha = NAVIGATION_ALPHA[navState]
+				if navState == Enum.NavigationState.Invalid and C_Navigation and C_Navigation.HasValidScreenPosition and not C_Navigation.HasValidScreenPosition() then alpha = 1 end
+			end
+			state.alphaCacheValue = alpha
+			state.alphaCacheUntil = now + ALPHA_CACHE_TTL
+		end
 		if alpha and alpha > 0 and self.isClamped then return 1 end
 		return alpha
 	end
@@ -202,64 +239,106 @@ function EnhancedWaypoint:QueueScaleApply()
 	end)
 end
 
+function EnhancedWaypoint:QueueDelayedUpdate()
+	if state.delayedUpdateQueued then return end
+	state.delayedUpdateQueued = true
+	callLater(1, function()
+		state.delayedUpdateQueued = false
+		EnhancedWaypoint:Update()
+	end)
+end
+
 function EnhancedWaypoint:ApplyScale()
 	if not self.enabled then return end
 	local frame = _G.SuperTrackedFrame
 	if not (frame and frame.Arrow and frame.Icon and frame.DistanceText) then return end
 
 	local scale = clampScale(addon.db and addon.db.enhancedWaypointScale)
-	frame.Arrow:SetScale(scale)
-	frame.Icon:SetScale(1.2 * scale)
-	if state.activeAtlas and state.activeAtlas ~= "Navigation-Tracked-Icon" and frame.Icon:GetWidth() > 0 then
-		frame.Icon:SetScale(1.2 * scale * (TARGET_ICON_SIZE / frame.Icon:GetWidth()))
+	local atlas = state.activeAtlas
+	local iconWidth = frame.Icon:GetWidth()
+	if state.lastAppliedFrame ~= frame then state.fontPrepared = false end
+	local iconScale = 1.2 * scale
+	if state.activeAtlas and state.activeAtlas ~= "Navigation-Tracked-Icon" and iconWidth > 0 then
+		iconScale = iconScale * (TARGET_ICON_SIZE / iconWidth)
 	end
-	frame.DistanceText:SetScale(scale)
+	if
+		state.fontPrepared
+		and state.lastAppliedFrame == frame
+		and state.lastAppliedScale == scale
+		and state.lastAppliedAtlas == atlas
+		and state.lastAppliedIconWidth == iconWidth
+		and frame.Arrow:GetScale() == scale
+		and frame.Icon:GetScale() == iconScale
+		and frame.DistanceText:GetScale() == scale
+		and (not state.label or state.label:GetScale() == scale)
+	then
+		return
+	end
+	state.lastAppliedFrame = frame
+	state.lastAppliedScale = scale
+	state.lastAppliedAtlas = atlas
+	state.lastAppliedIconWidth = iconWidth
+
+	setScaleIfChanged(frame.Arrow, scale)
+	setScaleIfChanged(frame.Icon, iconScale)
+	setScaleIfChanged(frame.DistanceText, scale)
 	if not state.fontPrepared then
 		local fontFile = frame.DistanceText:GetFont()
 		if fontFile then frame.DistanceText:SetFont(fontFile, DISTANCE_TEXT_SIZE, "OUTLINE") end
 		state.fontPrepared = true
 	end
 
-	if state.label then state.label:SetScale(scale) end
+	if state.label then setScaleIfChanged(state.label, scale) end
 end
 
 function EnhancedWaypoint:Update()
 	if not self.enabled then return end
+	state.alphaCacheUntil = nil
 	local frame = _G.SuperTrackedFrame
 	if not (frame and frame.Icon and frame.DistanceText and C_SuperTrack and C_SuperTrack.IsSuperTrackingAnything) then return end
-
-	self:ApplyScale()
 
 	local isTracking = C_SuperTrack.IsSuperTrackingAnything()
 	local label = getLabel(frame)
 	local name = C_SuperTrack.GetSuperTrackedItemName and C_SuperTrack.GetSuperTrackedItemName()
-	label:SetText(isTracking and name or "")
-	label:SetScale(clampScale(addon.db and addon.db.enhancedWaypointScale))
-	label:SetShown(isTracking)
+	setTextIfChanged(label, isTracking and name or "")
+	setScaleIfChanged(label, clampScale(addon.db and addon.db.enhancedWaypointScale))
+	setShownIfChanged(label, isTracking)
 
 	local highlight = getHighlight(frame)
-	highlight:SetShown(isTracking and addon.db and addon.db.enhancedWaypointGlow ~= false)
+	setShownIfChanged(highlight, isTracking and addon.db and addon.db.enhancedWaypointGlow ~= false)
 
-	if not isTracking then return end
-
-	local atlas = resolveTrackedAtlas()
-	if atlas then
-		frame.Icon:SetAtlas(atlas, true)
-		state.activeAtlas = atlas
-		self:ApplyScale()
+	if isTracking then
+		local atlas = resolveTrackedAtlas()
+		if atlas then
+			setAtlasIfChanged(frame.Icon, atlas, true)
+			state.activeAtlas = atlas
+		end
 	end
+
+	self:ApplyScale()
 end
 
-function EnhancedWaypoint:TryAttach()
+function EnhancedWaypoint:TryAttach(forceUpdate)
 	local frame = _G.SuperTrackedFrame
 	if not (frame and frame.Icon and frame.UpdateIcon) then return false end
+	local frameChanged = state.frame ~= frame
+	if frameChanged then
+		state.frame = frame
+		state.label = nil
+		state.highlight = nil
+		state.fontPrepared = false
+		state.lastAppliedFrame = nil
+	end
+	local attached = frame.__eqolEnhancedWaypointHooked == true
 	if not frame.__eqolEnhancedWaypointHooked then
 		frame.__eqolEnhancedWaypointHooked = true
 		hooksecurefunc(frame, "UpdateIcon", function() EnhancedWaypoint:Update() end)
 	end
 	updateAlphaBehavior(frame)
-	self:Update()
-	callLater(1, function() EnhancedWaypoint:Update() end)
+	if frameChanged or not attached or forceUpdate == true then
+		self:Update()
+		self:QueueDelayedUpdate()
+	end
 	return true
 end
 
@@ -275,14 +354,21 @@ function EnhancedWaypoint:SetEnabled(enabled)
 		self.eventFrame:SetScript("OnEvent", function(_, event, addonLoadedName)
 			if event == "ADDON_LOADED" and addonLoadedName ~= "Blizzard_QuestNavigation" then return end
 			if event == "USER_WAYPOINT_UPDATED" and C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint then
-				callLater(0, function()
-					if EnhancedWaypoint.enabled and C_Map and C_Map.HasUserWaypoint and C_Map.HasUserWaypoint() then C_SuperTrack.SetSuperTrackedUserWaypoint(true) end
-					EnhancedWaypoint:Update()
-				end)
+				if not state.userWaypointUpdateQueued then
+					state.userWaypointUpdateQueued = true
+					callLater(0, function()
+						state.userWaypointUpdateQueued = false
+						if EnhancedWaypoint.enabled and C_Map and C_Map.HasUserWaypoint and C_Map.HasUserWaypoint() then C_SuperTrack.SetSuperTrackedUserWaypoint(true) end
+						EnhancedWaypoint:Update()
+					end)
+				end
+				EnhancedWaypoint:QueueDelayedUpdate()
+			elseif event == "SUPER_TRACKING_PATH_UPDATED" then
+				EnhancedWaypoint:TryAttach(false)
 			else
-				EnhancedWaypoint:TryAttach()
+				EnhancedWaypoint:TryAttach(true)
+				EnhancedWaypoint:QueueDelayedUpdate()
 			end
-			callLater(1, function() EnhancedWaypoint:Update() end)
 		end)
 	end
 
@@ -291,5 +377,5 @@ function EnhancedWaypoint:SetEnabled(enabled)
 	for i = 1, #EVENT_NAMES do
 		self.eventFrame:RegisterEvent(EVENT_NAMES[i])
 	end
-	self:TryAttach()
+	self:TryAttach(true)
 end

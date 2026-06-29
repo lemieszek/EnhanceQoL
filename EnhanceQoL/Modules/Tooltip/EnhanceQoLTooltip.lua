@@ -965,7 +965,6 @@ local function RefreshVisibleTooltipForModifier()
 end
 
 local fModifierTooltipRefresh = CreateFrame("Frame")
-fModifierTooltipRefresh:RegisterEvent("MODIFIER_STATE_CHANGED")
 fModifierTooltipRefresh:SetScript("OnEvent", function(_, _, key)
 	if key ~= "LSHIFT" and key ~= "RSHIFT" and key ~= "LCTRL" and key ~= "RCTRL" and key ~= "LALT" and key ~= "RALT" then return end
 	RefreshVisibleTooltipForModifier()
@@ -973,6 +972,17 @@ fModifierTooltipRefresh:SetScript("OnEvent", function(_, _, key)
 		addon.Tooltip.functions.UpdateQuestIDInQuestLog()
 	end
 end)
+
+addon.Tooltip = addon.Tooltip or {}
+addon.Tooltip.functions = addon.Tooltip.functions or {}
+function addon.Tooltip.functions.UpdateModifierTooltipRefreshEventRegistration()
+	if not fModifierTooltipRefresh then return end
+	if IsModifierTooltipRefreshNeeded() then
+		fModifierTooltipRefresh:RegisterEvent("MODIFIER_STATE_CHANGED")
+	else
+		fModifierTooltipRefresh:UnregisterEvent("MODIFIER_STATE_CHANGED")
+	end
+end
 
 local function HasUnitTooltipOptions()
 	local db = addon.db
@@ -1726,6 +1736,19 @@ function addon.Tooltip.functions.UpdateQuestIDInQuestLog(questID)
 	UpdateQuestIDInQuestLogLabel(questID or detailsFrame.questID)
 end
 
+local function ShouldInstallTooltipHooks()
+	local db = addon.db
+	if not db then return false end
+	if ShouldRunTooltipPostCall() then return true end
+	if IsModifierTooltipRefreshNeeded() then return true end
+	if db["TooltipAnchorType"] and db["TooltipAnchorType"] ~= 1 then return true end
+	if db["TooltipShowNPCWowheadLink"] then return true end
+	if db["TooltipShowQuestID"] or db["TooltipShowQuestIDInQuestLog"] then return true end
+	if db["TooltipUnitHideRightClickInstruction"] then return true end
+	if db["TooltipShowRealmInfo"] then return true end
+	return false
+end
+
 local function registerTooltipHooks()
 	if addon.Tooltip.variables.hooksInitialized then return end
 	addon.Tooltip.variables.hooksInitialized = true
@@ -1832,6 +1855,7 @@ local function registerTooltipHooks()
 end
 
 function addon.Tooltip.functions.InitState()
-	registerTooltipHooks()
+	if ShouldInstallTooltipHooks() then registerTooltipHooks() end
+	if addon.Tooltip.functions.UpdateModifierTooltipRefreshEventRegistration then addon.Tooltip.functions.UpdateModifierTooltipRefreshEventRegistration() end
 	UpdateInspectEventRegistration()
 end

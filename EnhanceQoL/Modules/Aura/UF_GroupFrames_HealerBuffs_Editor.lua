@@ -48,6 +48,7 @@ local GROUP_VISIBLE_ROWS = 9
 local RULE_VISIBLE_ROWS = 9
 local EMPTY = {}
 local BAR_DIMENSION_MAX = 512
+local DURATION_COLOR_STEP_MAX = 3
 
 local ASSET_BG_DARK = "Interface\\AddOns\\EnhanceQoL\\Assets\\background_dark.tga"
 local ASSET_BG_GRAY = "Interface\\AddOns\\EnhanceQoL\\Assets\\background_gray.tga"
@@ -1610,8 +1611,9 @@ function Editor:EnsureFrame()
 	controls.MaxLabel, controls.MaxCount, controls.MaxValue = createSettingSlider(controls.PerRowLabel, tr("Max", "Max"), 0, 40, 1)
 	controls.SpacingLabel, controls.Spacing, controls.SpacingValue = createSettingSlider(controls.MaxLabel, tr("Spacing", "Spacing"), 0, 20, 1)
 	controls.SizeLabel, controls.Size, controls.SizeValue = createSettingSlider(controls.SpacingLabel, tr("UFGroupHealerBuffEditorIconSize", "Icon Size"), 4, 64, 1)
+	controls.IconZoomLabel, controls.IconZoom, controls.IconZoomValue = createSettingSlider(controls.SizeLabel, tr("Icon zoom", "Icon zoom"), 0, 35, 1)
 	controls.CooldownTextSizeLabel, controls.CooldownTextSize, controls.CooldownTextSizeValue =
-		createSettingSlider(controls.SizeLabel, tr("UFGroupHealerBuffEditorCooldownTextSize", "Cooldown Size"), 6, 64, 1)
+		createSettingSlider(controls.IconZoomLabel, tr("UFGroupHealerBuffEditorCooldownTextSize", "Cooldown Size"), 6, 64, 1)
 	controls.ChargeTextSizeLabel, controls.ChargeTextSize, controls.ChargeTextSizeValue =
 		createSettingSlider(controls.CooldownTextSizeLabel, tr("UFGroupHealerBuffEditorChargeTextSize", "Charge Size"), 6, 64, 1)
 	controls.XLabel, controls.XOffset, controls.XValue = createSettingSlider(controls.ChargeTextSizeLabel, tr("X Offset", "X Offset"), -200, 200, 1)
@@ -1761,6 +1763,7 @@ function Editor:EnsureFrame()
 		placeSlider(controls.MaxLabel, controls.MaxCount, controls.MaxValue)
 		placeSlider(controls.SpacingLabel, controls.Spacing, controls.SpacingValue)
 		placeSlider(controls.SizeLabel, controls.Size, controls.SizeValue)
+		placeSlider(controls.IconZoomLabel, controls.IconZoom, controls.IconZoomValue)
 		placeSlider(controls.CooldownTextSizeLabel, controls.CooldownTextSize, controls.CooldownTextSizeValue)
 		placeSlider(controls.ChargeTextSizeLabel, controls.ChargeTextSize, controls.ChargeTextSizeValue)
 		placeSlider(controls.XLabel, controls.XOffset, controls.XValue)
@@ -1886,6 +1889,27 @@ function Editor:EnsureFrame()
 	controls.RuleColorButton:SetPoint("LEFT", controls.RuleColorLabel, "RIGHT", 10, 0)
 	controls.RuleColorLabel:Hide()
 	controls.RuleColorButton:Hide()
+
+	controls.DurationColorSteps = {}
+	local durationStepAnchor = controls.RuleColorLabel
+	for i = 1, DURATION_COLOR_STEP_MAX do
+		local stepControls = {}
+		stepControls.Enabled = createCheck(ruleControlParent, string.format(tr("UFGroupHealerBuffEditorDurationColorStep", "Duration Color %d"), i))
+		stepControls.Enabled:SetPoint("TOPLEFT", durationStepAnchor, "BOTTOMLEFT", 0, -8)
+		stepControls.Seconds = createNumberInput(ruleControlParent, 48, 4)
+		stepControls.Seconds:SetPoint("LEFT", stepControls.Enabled.Text or stepControls.Enabled, "RIGHT", 12, 0)
+		stepControls.SecondsLabel = ruleControlParent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		stepControls.SecondsLabel:SetPoint("LEFT", stepControls.Seconds, "RIGHT", 6, 0)
+		stepControls.SecondsLabel:SetText(tr("UFGroupHealerBuffEditorDurationColorSeconds", "sec left"))
+		stepControls.ColorButton = createColorSwatchButton(ruleControlParent, 24)
+		stepControls.ColorButton:SetPoint("LEFT", stepControls.SecondsLabel, "RIGHT", 10, 0)
+		stepControls.Enabled:Hide()
+		stepControls.Seconds:Hide()
+		stepControls.SecondsLabel:Hide()
+		stepControls.ColorButton:Hide()
+		controls.DurationColorSteps[i] = stepControls
+		durationStepAnchor = stepControls.Enabled
+	end
 
 	controls.RuleInfo = ruleControlParent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	controls.RuleInfo:SetPoint("TOPLEFT", controls.RuleAppliesRaid, "BOTTOMLEFT", 0, -10)
@@ -2483,6 +2507,7 @@ function Editor:EnsureFrame()
 	updateGroupFromSlider("max", controls.MaxCount, controls.MaxValue, 0, 40, 1)
 	updateGroupFromSlider("spacing", controls.Spacing, controls.SpacingValue, 0, 20, 1)
 	updateGroupFromSlider("size", controls.Size, controls.SizeValue, 4, 64, 1)
+	updateGroupFromSlider("iconZoom", controls.IconZoom, controls.IconZoomValue, 0, 35, 1)
 	updateGroupFromSlider("cooldownTextSize", controls.CooldownTextSize, controls.CooldownTextSizeValue, 6, 64, 1)
 	updateGroupFromSlider("chargeTextSize", controls.ChargeTextSize, controls.ChargeTextSizeValue, 6, 64, 1)
 	updateGroupFromSlider("x", controls.XOffset, controls.XValue, -200, 200, 1)
@@ -2744,21 +2769,120 @@ function Editor:EnsureFrame()
 		local rule = ruleFromSelection()
 		if not (group and rule) then return end
 		if not styleSupportsRuleColor(group.style) then return end
-		if mouseButton == "RightButton" then
-			rule.color = nil
-			Editor:RefreshRuleControls()
-			Editor:RefreshPreview()
-			Editor:QueueRuntimeRefresh()
+			if mouseButton == "RightButton" then
+				rule.color = nil
+				Editor:RefreshRuleControls()
+				Editor:RefreshPreview()
+				Editor:QueueRuntimeRefresh()
 			return
 		end
-		local baseColor = rule.color or group.color or { 1, 0.82, 0.1, 0.9 }
-		showColorPicker(baseColor, function(r, g, b, a)
-			rule.color = { r, g, b, a }
+			local baseColor = rule.color or group.color or { 1, 0.82, 0.1, 0.9 }
+			showColorPicker(baseColor, function(r, g, b, a)
+				rule.color = { r, g, b, a }
+				Editor:RefreshRuleControls()
+				Editor:RefreshPreview()
+				Editor:QueueRuntimeRefresh()
+		end)
+	end)
+
+	local function ensureRuleDurationStep(rule, index, group)
+		if not rule then return nil end
+		rule.durationColorSteps = rule.durationColorSteps or {}
+		local step = rule.durationColorSteps[index]
+		if type(step) ~= "table" then
+			step = {
+				enabled = true,
+				seconds = index == 1 and 20 or (index == 2 and 10 or 5),
+				color = { unpackRgba(group and group.color or rule.color or { 1, 0.82, 0.1, 0.9 }) },
+			}
+			rule.durationColorSteps[index] = step
+		end
+		if step.seconds == nil then step.seconds = index == 1 and 20 or (index == 2 and 10 or 5) end
+		if type(step.color) ~= "table" then step.color = { unpackRgba(rule.color or group and group.color or { 1, 0.82, 0.1, 0.9 }) } end
+		return step
+	end
+
+	local function pruneRuleDurationSteps(rule)
+		if not (rule and type(rule.durationColorSteps) == "table") then return end
+		local hasStep = false
+		for i = 1, DURATION_COLOR_STEP_MAX do
+			local step = rule.durationColorSteps[i]
+			if type(step) == "table" and step.enabled == true then
+				hasStep = true
+			else
+				rule.durationColorSteps[i] = nil
+			end
+		end
+		if not hasStep then rule.durationColorSteps = nil end
+	end
+
+	for i = 1, DURATION_COLOR_STEP_MAX do
+		local stepControls = controls.DurationColorSteps[i]
+		stepControls.Enabled:SetScript("OnClick", function(self)
+			local group = groupFromSelection()
+			local rule = ruleFromSelection()
+			if not (group and rule) then return end
+			local step = ensureRuleDurationStep(rule, i, group)
+			step.enabled = self:GetChecked() == true
+			pruneRuleDurationSteps(rule)
 			Editor:RefreshRuleControls()
 			Editor:RefreshPreview()
 			Editor:QueueRuntimeRefresh()
 		end)
-	end)
+		stepControls.Seconds:SetScript("OnEnterPressed", function(self)
+			local group = groupFromSelection()
+			local rule = ruleFromSelection()
+			if not (group and rule) then return end
+			local step = ensureRuleDurationStep(rule, i, group)
+			local seconds = roundInt(tonumber(self:GetText()) or step.seconds or 1)
+			if seconds < 1 then seconds = 1 end
+			if seconds > 3600 then seconds = 3600 end
+			step.seconds = seconds
+			step.enabled = true
+			self:SetText(tostring(seconds))
+			self:ClearFocus()
+			Editor:RefreshPreview()
+			Editor:QueueRuntimeRefresh()
+		end)
+		stepControls.Seconds:SetScript("OnEditFocusLost", function(self)
+			local group = groupFromSelection()
+			local rule = ruleFromSelection()
+			if not (group and rule) then return end
+			local step = ensureRuleDurationStep(rule, i, group)
+			local seconds = roundInt(tonumber(self:GetText()) or step.seconds or 1)
+			if seconds < 1 then seconds = 1 end
+			if seconds > 3600 then seconds = 3600 end
+			step.seconds = seconds
+			self:SetText(tostring(seconds))
+			Editor:QueueRuntimeRefresh()
+		end)
+		stepControls.Seconds:SetScript("OnEscapePressed", function(self)
+			local rule = ruleFromSelection()
+			local step = rule and rule.durationColorSteps and rule.durationColorSteps[i]
+			self:SetText(tostring((step and step.seconds) or (i == 1 and 20 or (i == 2 and 10 or 5))))
+			self:ClearFocus()
+		end)
+		stepControls.ColorButton:SetScript("OnClick", function(_, mouseButton)
+			local group = groupFromSelection()
+			local rule = ruleFromSelection()
+			if not (group and rule) then return end
+			local step = ensureRuleDurationStep(rule, i, group)
+			if mouseButton == "RightButton" then
+				step.color = { unpackRgba(rule.color or group.color or { 1, 0.82, 0.1, 0.9 }) }
+				Editor:RefreshRuleControls()
+				Editor:RefreshPreview()
+				Editor:QueueRuntimeRefresh()
+				return
+			end
+			showColorPicker(step.color or rule.color or group.color or { 1, 0.82, 0.1, 0.9 }, function(r, g, b, a)
+				step.color = { r, g, b, a }
+				step.enabled = true
+				Editor:RefreshRuleControls()
+				Editor:RefreshPreview()
+				Editor:QueueRuntimeRefresh()
+			end)
+		end)
+	end
 
 	controls.RuleEnabled:SetScript("OnClick", function(self)
 		local rule = ruleFromSelection()
@@ -3039,6 +3163,7 @@ function Editor:RefreshRuleControls()
 	local showExpirationPulse = showIconRuleMode and rule ~= nil and rule["not"] ~= true
 	local showTintRuleMatch = selectedGroupStyle == "TINT"
 	local showRuleColor = styleSupportsRuleColor(selectedGroupStyle)
+	local showDurationColorSteps = showRuleColor and rule ~= nil and rule["not"] ~= true
 	local showBarDrainInfo = selectedGroupStyle == "BAR" and selectedGroup and selectedGroup.barDrainAnimation == true
 	local iconModeOptions = HB.ICON_MODE_OPTIONS
 		or {
@@ -3113,8 +3238,35 @@ function Editor:RefreshRuleControls()
 		end
 	end
 
+	local lastDurationStepControl = nil
+	for i = 1, DURATION_COLOR_STEP_MAX do
+		local stepControls = controls.DurationColorSteps and controls.DurationColorSteps[i]
+		if stepControls then
+			local step = rule and rule.durationColorSteps and rule.durationColorSteps[i] or nil
+			stepControls.Enabled:ClearAllPoints()
+			if i == 1 then
+				stepControls.Enabled:SetPoint("TOPLEFT", controls.RuleColorLabel, "BOTTOMLEFT", 0, -8)
+			else
+				stepControls.Enabled:SetPoint("TOPLEFT", controls.DurationColorSteps[i - 1].Enabled, "BOTTOMLEFT", 0, -8)
+			end
+			stepControls.Enabled:SetChecked(step and step.enabled == true)
+			stepControls.Seconds:SetText(tostring((step and step.seconds) or (i == 1 and 20 or (i == 2 and 10 or 5))))
+			setColorPreview(stepControls.ColorButton, (step and step.color) or (rule and rule.color) or (selectedGroup and selectedGroup.color) or { 1, 0.82, 0.1, 0.9 })
+			setControlVisible(stepControls.Enabled, showDurationColorSteps)
+			setControlVisible(stepControls.Seconds, showDurationColorSteps)
+			setControlVisible(stepControls.SecondsLabel, showDurationColorSteps)
+			setControlVisible(stepControls.ColorButton, showDurationColorSteps)
+			setControlEnabled(stepControls.Enabled, showDurationColorSteps)
+			setControlEnabled(stepControls.Seconds, showDurationColorSteps and step and step.enabled == true)
+			setControlEnabled(stepControls.ColorButton, showDurationColorSteps and step and step.enabled == true)
+			if showDurationColorSteps then lastDurationStepControl = stepControls.Enabled end
+		end
+	end
+
 	controls.RuleInfo:ClearAllPoints()
-	if showRuleColor then
+	if lastDurationStepControl then
+		controls.RuleInfo:SetPoint("TOPLEFT", lastDurationStepControl, "BOTTOMLEFT", 0, -16)
+	elseif showRuleColor then
 		controls.RuleInfo:SetPoint("TOPLEFT", controls.RuleColorLabel, "BOTTOMLEFT", 0, -20)
 	elseif showTintRuleMatch then
 		controls.RuleInfo:SetPoint("TOPLEFT", controls.RuleMatchLabel, "BOTTOMLEFT", 0, -12)
@@ -3168,9 +3320,9 @@ function Editor:RefreshRuleControls()
 		elseif showRuleColor and showBarDrainInfo then
 			controls.RuleInfo:SetText(
 				string.format(
-					tr(
-						"UFGroupHealerBuffEditorRuleInfoBarDrainColor",
-						"Showing rules for %s. Scope is set per rule (Party/Raid). Color follows the first active rule in this list. Drain animation follows the first active timed aura in this list. Spell Color overrides are per rule (right click to reset)."
+						tr(
+							"UFGroupHealerBuffEditorRuleInfoBarDrainColor",
+							"Showing rules for %s. Scope is set per rule (Party/Raid). Color follows the first active rule in this list. Duration Color steps can override the color by remaining aura time. Drain animation follows the first active timed aura in this list. Spell Color overrides are per rule (right click to reset)."
 					),
 					groupLabel
 				)
@@ -3182,9 +3334,9 @@ function Editor:RefreshRuleControls()
 		elseif showRuleColor then
 			controls.RuleInfo:SetText(
 				string.format(
-					tr(
-						"UFGroupHealerBuffEditorRuleInfoSquare",
-						"Showing rules for %s. Scope is set per rule (Party/Raid). Priority follows the rule order in this list. Spell Color overrides are per rule (right click to reset)."
+						tr(
+							"UFGroupHealerBuffEditorRuleInfoSquare",
+							"Showing rules for %s. Scope is set per rule (Party/Raid). Priority follows the rule order in this list. Duration Color steps can override the color by remaining aura time. Spell Color overrides are per rule (right click to reset)."
 					),
 					groupLabel
 				)
@@ -3268,10 +3420,11 @@ function Editor:RefreshGroupControls()
 		local showBarFillFrame = showBar
 		local showBarDimensions = showBar and group.barFillFrame ~= true
 		local showAnchor = style ~= "TINT" and not (showBar and group.barFillFrame == true)
-		local showGrowth = (style == "ICON" or style == "SQUARE") and not isPriorityIconMode
-		local showGrid = showGrowth
-		local showSize = style == "ICON" or style == "SQUARE"
-		local showOffsets = style ~= "TINT" and not (showBar and group.barFillFrame == true)
+			local showGrowth = (style == "ICON" or style == "SQUARE") and not isPriorityIconMode
+			local showGrid = showGrowth
+			local showSize = style == "ICON" or style == "SQUARE"
+			local showIconZoom = style == "ICON"
+			local showOffsets = style ~= "TINT" and not (showBar and group.barFillFrame == true)
 		local showInset = style == "BAR" or style == "BORDER"
 		local showBorder = style == "BORDER"
 		local showColor = style == "SQUARE" or style == "BAR" or style == "BORDER" or style == "TINT"
@@ -3302,6 +3455,17 @@ function Editor:RefreshGroupControls()
 		controls.SpacingValue:SetText(tostring(group.spacing or 0))
 		controls.Size:SetValue(group.size or 16)
 		controls.SizeValue:SetText(tostring(group.size or 16))
+		local iconZoom = group.iconZoom
+		if addon.IconShape and addon.IconShape.NormalizeIconZoom then
+			iconZoom = addon.IconShape.NormalizeIconZoom(iconZoom)
+		else
+			iconZoom = roundInt(tonumber(iconZoom) or 0)
+			if iconZoom < 0 then iconZoom = 0 end
+			if iconZoom > 35 then iconZoom = 35 end
+		end
+		group.iconZoom = iconZoom
+		controls.IconZoom:SetValue(iconZoom)
+		controls.IconZoomValue:SetText(tostring(iconZoom))
 
 		local cooldownTextSize = tonumber(group.cooldownTextSize)
 		if cooldownTextSize == nil then cooldownTextSize = tonumber(ac.cooldownFontSize) or 12 end
@@ -3406,6 +3570,7 @@ function Editor:RefreshGroupControls()
 		setSliderState(controls.MaxLabel, controls.MaxCount, controls.MaxValue, showGrid, true)
 		setSliderState(controls.SpacingLabel, controls.Spacing, controls.SpacingValue, showGrid, true)
 		setSliderState(controls.SizeLabel, controls.Size, controls.SizeValue, showSize, true)
+		setSliderState(controls.IconZoomLabel, controls.IconZoom, controls.IconZoomValue, showIconZoom, true)
 		setSliderState(controls.CooldownTextSizeLabel, controls.CooldownTextSize, controls.CooldownTextSizeValue, showTextSizeOverrides, true)
 		setSliderState(controls.ChargeTextSizeLabel, controls.ChargeTextSize, controls.ChargeTextSizeValue, showTextSizeOverrides, true)
 		setSliderState(controls.XLabel, controls.XOffset, controls.XValue, showOffsets, true)
@@ -3444,6 +3609,7 @@ function Editor:RefreshGroupControls()
 		setSliderState(controls.MaxLabel, controls.MaxCount, controls.MaxValue, false, false)
 		setSliderState(controls.SpacingLabel, controls.Spacing, controls.SpacingValue, false, false)
 		setSliderState(controls.SizeLabel, controls.Size, controls.SizeValue, false, false)
+		setSliderState(controls.IconZoomLabel, controls.IconZoom, controls.IconZoomValue, false, false)
 		setSliderState(controls.CooldownTextSizeLabel, controls.CooldownTextSize, controls.CooldownTextSizeValue, false, false)
 		setSliderState(controls.ChargeTextSizeLabel, controls.ChargeTextSize, controls.ChargeTextSizeValue, false, false)
 		setSliderState(controls.XLabel, controls.XOffset, controls.XValue, false, false)
@@ -3576,6 +3742,27 @@ local function setPreviewFont(fontString, size, outline)
 	end
 	if ok == false then fontString:SetFont(fallbackFont, size, resolvedFlags) end
 	if addon.functions and addon.functions.ApplyFontStyleShadow then addon.functions.ApplyFontStyleShadow(fontString, styleChoice, "OUTLINE") end
+end
+
+local function applyPreviewIconZoom(icon, iconZoom)
+	local texture = icon and icon.Texture
+	if not (texture and texture.SetTexCoord) then return end
+	if addon.IconShape and addon.IconShape.NormalizeIconZoom then
+		iconZoom = addon.IconShape.NormalizeIconZoom(iconZoom)
+	else
+		iconZoom = roundInt(tonumber(iconZoom) or 0)
+		if iconZoom < 0 then iconZoom = 0 end
+		if iconZoom > 35 then iconZoom = 35 end
+	end
+	if iconZoom <= 0 then
+		texture:SetTexCoord(0, 1, 0, 1)
+		return
+	end
+	if addon.IconShape and addon.IconShape.ApplyTextureZoom then
+		addon.IconShape.ApplyTextureZoom(texture, iconZoom, "_hbPreviewIconTexCoord", 0)
+	else
+		texture:SetTexCoord(0, 1, 0, 1)
+	end
 end
 
 local function getPreviewCooldownTiming(sampleIndex, now, loopEnabled, loopOrigin)
@@ -4048,10 +4235,12 @@ function Editor:RefreshPreview()
 							local squareColor = (rule and rule.color) or group.color
 							local r, g, b, a = resolveColor(squareColor)
 							icon.Texture:SetTexture("Interface\\Buttons\\WHITE8x8")
+							applyPreviewIconZoom(icon, 0)
 							icon.Texture:SetVertexColor(r, g, b, a)
 							if icon.Texture.SetDesaturated then icon.Texture:SetDesaturated(false) end
 						else
 							icon.Texture:SetTexture(iconTex or 134400)
+							applyPreviewIconZoom(icon, group.iconZoom)
 							icon.Texture:SetVertexColor(1, 1, 1, 1)
 							if icon.Texture.SetDesaturated then icon.Texture:SetDesaturated(HB.ShouldDesaturateRuleIcon and HB.ShouldDesaturateRuleIcon(group, rule) or false) end
 						end

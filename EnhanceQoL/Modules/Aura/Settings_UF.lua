@@ -1256,6 +1256,21 @@ local function appendUnitAuraSettings(list, unit, def, refreshSelf)
 		)
 		list[#list].isEnabled = isSectionEnabled
 
+		if #fontOptions() > 0 then
+			list[#list + 1] = checkboxDropdown(
+				L["Font"] or "Font",
+				fontOptions,
+				function() return getAuraSectionValue(sectionKey, { "countFont" }, auraDef.countFont or globalFontConfigKey()) end,
+				function(val)
+					setAuraSectionValue(sectionKey, { "countFont" }, val)
+					refreshSelf()
+				end,
+				auraDef.countFont or globalFontConfigKey(),
+				parentId
+			)
+			list[#list].isEnabled = isSectionEnabled
+		end
+
 		list[#list + 1] = checkboxDropdown(
 			L["Aura stack outline"] or "Aura stack outline",
 			stackOutlineOptions,

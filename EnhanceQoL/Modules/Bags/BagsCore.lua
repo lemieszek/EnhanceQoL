@@ -6659,6 +6659,9 @@ function Bags.functions.ApplyVendorMarks(overlaySell, overlayDestroy, searchOnly
 	if not vendorFunctions then
 		return
 	end
+	if vendorFunctions.ShouldApplyIntegratedBagsVendorMarks and not vendorFunctions.ShouldApplyIntegratedBagsVendorMarks(searchOnly == true) then
+		return
+	end
 
 	local applyMark = vendorFunctions.ApplySellDestroyOverlayToItemButton
 	local refreshSearchState = vendorFunctions.RefreshSellDestroyOverlaySearchState

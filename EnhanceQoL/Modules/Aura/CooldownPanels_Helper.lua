@@ -217,6 +217,7 @@ Helper.PANEL_LAYOUT_DEFAULTS = {
 	iconBorderSize = 1,
 	iconBorderOffset = 0,
 	iconBorderColor = { 0, 0, 0, 0.8 },
+	showStacks = false,
 	stackAnchor = "BOTTOMRIGHT",
 	stackX = -1,
 	stackY = 1,
@@ -229,6 +230,7 @@ Helper.PANEL_LAYOUT_DEFAULTS = {
 	chargesFontSize = 12,
 	chargesFontStyle = globalFontStyleKey(),
 	chargesColor = { 1, 1, 1, 1 },
+	showCharges = false,
 	chargesHideWhenZero = false,
 	keybindsEnabled = false,
 	keybindsIgnoreItems = false,
@@ -240,10 +242,12 @@ Helper.PANEL_LAYOUT_DEFAULTS = {
 	cooldownDrawEdge = true,
 	cooldownDrawBling = true,
 	cooldownDrawSwipe = true,
+	cooldownSwipeColor = { 0, 0, 0, 0.8 },
 	cooldownGcdDrawEdge = false,
 	cooldownGcdDrawBling = false,
 	cooldownGcdDrawSwipe = false,
 	cdmAuraOverlayEnabled = false,
+	cdmAuraOverlayColor = Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT,
 	cooldownTextColor = { 1, 1, 1, 1 },
 	cooldownTextStyle = globalFontStyleKey(),
 	durationTextProfile = "MINIMAL",
@@ -277,7 +281,9 @@ Helper.ENTRY_DEFAULTS = {
 	hideOnCooldown = false,
 	showOnCooldown = false,
 	showCharges = false,
+	showChargesUseGlobal = true,
 	showStacks = false,
+	showStacksUseGlobal = true,
 	stackStyleUseGlobal = true,
 	stackAnchor = "BOTTOMRIGHT",
 	stackX = -1,
@@ -305,10 +311,12 @@ Helper.ENTRY_DEFAULTS = {
 	cooldownDrawEdge = true,
 	cooldownDrawBling = true,
 	cooldownDrawSwipe = true,
+	cooldownSwipeColor = { 0, 0, 0, 0.8 },
 	cooldownGcdDrawEdge = false,
 	cooldownGcdDrawBling = false,
 	cooldownGcdDrawSwipe = false,
 	cdmAuraOverlayEnabled = false,
+	cdmAuraOverlayColorUseGlobal = true,
 	cdmAuraOverlayReverse = true,
 	cdmAuraOverlayColor = Helper.ACTIVATION_OVERLAY_COLOR_DEFAULT,
 	activationOverlayReverse = true,
@@ -2253,7 +2261,9 @@ function Helper.NormalizeRoot(root)
 	root.defaults.entry.hideOnCooldown = Helper.ENTRY_DEFAULTS.hideOnCooldown
 	root.defaults.entry.showOnCooldown = Helper.ENTRY_DEFAULTS.showOnCooldown
 	root.defaults.entry.showCharges = Helper.ENTRY_DEFAULTS.showCharges
+	root.defaults.entry.showChargesUseGlobal = Helper.ENTRY_DEFAULTS.showChargesUseGlobal
 	root.defaults.entry.showStacks = Helper.ENTRY_DEFAULTS.showStacks
+	root.defaults.entry.showStacksUseGlobal = Helper.ENTRY_DEFAULTS.showStacksUseGlobal
 	root.defaults.entry.glowReady = Helper.ENTRY_DEFAULTS.glowReady
 	root.defaults.entry.readyGlowCheckPower = Helper.ENTRY_DEFAULTS.readyGlowCheckPower
 	root.defaults.entry.pandemicGlow = Helper.ENTRY_DEFAULTS.pandemicGlow
@@ -2322,7 +2332,11 @@ function Helper.NormalizePanel(panel, defaults)
 	panel.layout.cdmAuraAlwaysShowMode =
 		normalizeCDMAuraAlwaysShowMode(panel.layout.cdmAuraAlwaysShowMode, layoutDefaults.cdmAuraAlwaysShowMode or Helper.PANEL_LAYOUT_DEFAULTS.cdmAuraAlwaysShowMode or "HIDE")
 	panel.layout.cdmAuraOverlayEnabled = panel.layout.cdmAuraOverlayEnabled == true
+	panel.layout.cdmAuraOverlayColor = Helper.NormalizeColor(panel.layout.cdmAuraOverlayColor, layoutDefaults.cdmAuraOverlayColor or Helper.PANEL_LAYOUT_DEFAULTS.cdmAuraOverlayColor)
+	panel.layout.cooldownSwipeColor = Helper.NormalizeColor(panel.layout.cooldownSwipeColor, layoutDefaults.cooldownSwipeColor or Helper.PANEL_LAYOUT_DEFAULTS.cooldownSwipeColor)
+	panel.layout.showStacks = panel.layout.showStacks == true
 	panel.layout.stackColor = Helper.NormalizeColor(panel.layout.stackColor, layoutDefaults.stackColor or Helper.PANEL_LAYOUT_DEFAULTS.stackColor or { 1, 1, 1, 1 })
+	panel.layout.showCharges = panel.layout.showCharges == true
 	panel.layout.chargesColor = Helper.NormalizeColor(panel.layout.chargesColor, layoutDefaults.chargesColor or Helper.PANEL_LAYOUT_DEFAULTS.chargesColor or { 1, 1, 1, 1 })
 	panel.layout.chargesHideWhenZero = panel.layout.chargesHideWhenZero == true
 	panel.layout.cooldownTextColor = Helper.NormalizeColor(panel.layout.cooldownTextColor, layoutDefaults.cooldownTextColor or Helper.PANEL_LAYOUT_DEFAULTS.cooldownTextColor)
@@ -2393,6 +2407,10 @@ function Helper.NormalizeEntry(entry, defaults)
 	if type(entry) ~= "table" then return end
 	local hadShowCharges = entry.showCharges ~= nil
 	local hadShowStacks = entry.showStacks ~= nil
+	local hadShowChargesUseGlobal = entry.showChargesUseGlobal ~= nil
+	local hadShowStacksUseGlobal = entry.showStacksUseGlobal ~= nil
+	local hadCDMAuraOverlayColorUseGlobal = entry.cdmAuraOverlayColorUseGlobal ~= nil
+	local hadCustomCDMAuraOverlayColor = entry.activationOverlayColor ~= nil or entry.cdmAuraOverlayColor ~= nil
 	defaults = defaults or {}
 	local entryDefaults = defaults.entry or {}
 	for key, value in pairs(entryDefaults) do
@@ -2407,7 +2425,10 @@ function Helper.NormalizeEntry(entry, defaults)
 	if entry.type == "SPELL" then
 		if not hadShowCharges then entry.showCharges = spellHasCharges(entry.spellID) end
 		if not hadShowStacks then entry.showStacks = false end
+		if hadShowCharges and not hadShowChargesUseGlobal then entry.showChargesUseGlobal = false end
+		if hadShowStacks and not hadShowStacksUseGlobal then entry.showStacksUseGlobal = false end
 	elseif entry.type == "CDM_AURA" then
+		if hadShowStacks and not hadShowStacksUseGlobal then entry.showStacksUseGlobal = false end
 		local cdmAuras = CooldownPanels and CooldownPanels.CDMAuras
 		if cdmAuras and cdmAuras.NormalizeEntry then cdmAuras:NormalizeEntry(entry, defaults) end
 	elseif entry.type == "MACRO" then
@@ -2417,6 +2438,8 @@ function Helper.NormalizeEntry(entry, defaults)
 	elseif entry.type == "STANCE" then
 		if CooldownPanels and CooldownPanels.NormalizeStanceEntry then CooldownPanels:NormalizeStanceEntry(entry) end
 		entry.showWhenMissing = entry.showWhenMissing == true
+	elseif entry.type == "SLOT" then
+		if hadShowStacks and not hadShowStacksUseGlobal then entry.showStacksUseGlobal = false end
 	end
 	entry.glowDuration = 0
 	local hasLegacySharedProcGlowVisual = entry.type == "SPELL" and (entry.glowStyle ~= nil or entry.glowInset ~= nil)
@@ -2445,6 +2468,8 @@ function Helper.NormalizeEntry(entry, defaults)
 	entry.iconOffsetX = Helper.ClampInt(entry.iconOffsetX, -Helper.OFFSET_RANGE, Helper.OFFSET_RANGE, Helper.ENTRY_DEFAULTS.iconOffsetX or 0)
 	entry.iconOffsetY = Helper.ClampInt(entry.iconOffsetY, -Helper.OFFSET_RANGE, Helper.OFFSET_RANGE, Helper.ENTRY_DEFAULTS.iconOffsetY or 0)
 	if type(entry.showIconTextureUseGlobal) ~= "boolean" then entry.showIconTextureUseGlobal = true end
+	if type(entry.showStacksUseGlobal) ~= "boolean" then entry.showStacksUseGlobal = true end
+	if type(entry.showChargesUseGlobal) ~= "boolean" then entry.showChargesUseGlobal = true end
 	if type(entry.stackStyleUseGlobal) ~= "boolean" then entry.stackStyleUseGlobal = true end
 	entry.stackAnchor = Helper.NormalizeAnchor(entry.stackAnchor, Helper.ENTRY_DEFAULTS.stackAnchor or Helper.PANEL_LAYOUT_DEFAULTS.stackAnchor or "BOTTOMRIGHT")
 	entry.stackX = Helper.ClampInt(entry.stackX, -Helper.OFFSET_RANGE, Helper.OFFSET_RANGE, Helper.ENTRY_DEFAULTS.stackX or 0)
@@ -2470,11 +2495,13 @@ function Helper.NormalizeEntry(entry, defaults)
 	if type(entry.cooldownDrawEdge) ~= "boolean" then entry.cooldownDrawEdge = Helper.ENTRY_DEFAULTS.cooldownDrawEdge end
 	if type(entry.cooldownDrawBling) ~= "boolean" then entry.cooldownDrawBling = Helper.ENTRY_DEFAULTS.cooldownDrawBling end
 	if type(entry.cooldownDrawSwipe) ~= "boolean" then entry.cooldownDrawSwipe = Helper.ENTRY_DEFAULTS.cooldownDrawSwipe end
+	entry.cooldownSwipeColor = Helper.NormalizeColor(entry.cooldownSwipeColor, Helper.ENTRY_DEFAULTS.cooldownSwipeColor or Helper.PANEL_LAYOUT_DEFAULTS.cooldownSwipeColor)
 	if type(entry.cooldownGcdDrawEdge) ~= "boolean" then entry.cooldownGcdDrawEdge = Helper.ENTRY_DEFAULTS.cooldownGcdDrawEdge end
 	if type(entry.cooldownGcdDrawBling) ~= "boolean" then entry.cooldownGcdDrawBling = Helper.ENTRY_DEFAULTS.cooldownGcdDrawBling end
 	if type(entry.cooldownGcdDrawSwipe) ~= "boolean" then entry.cooldownGcdDrawSwipe = Helper.ENTRY_DEFAULTS.cooldownGcdDrawSwipe end
 	if entry.type == "CDM_AURA" or entry.type == "STANCE" then
 		entry.cdmAuraOverlayEnabled = false
+		entry.cdmAuraOverlayColorUseGlobal = true
 		entry.cdmAuraOverlayReverse = Helper.ENTRY_DEFAULTS.cdmAuraOverlayReverse
 		entry.cdmAuraOverlayColor = Helper.NormalizeColor(entry.cdmAuraOverlayColor, Helper.ENTRY_DEFAULTS.cdmAuraOverlayColor)
 		entry.activationOverlayReverse = Helper.ENTRY_DEFAULTS.activationOverlayReverse
@@ -2486,6 +2513,11 @@ function Helper.NormalizeEntry(entry, defaults)
 		entry.customCooldownDuration = Helper.ENTRY_DEFAULTS.customCooldownDuration
 	else
 		if type(entry.cdmAuraOverlayEnabled) ~= "boolean" then entry.cdmAuraOverlayEnabled = Helper.ENTRY_DEFAULTS.cdmAuraOverlayEnabled end
+		if not hadCDMAuraOverlayColorUseGlobal then
+			entry.cdmAuraOverlayColorUseGlobal = hadCustomCDMAuraOverlayColor and false or Helper.ENTRY_DEFAULTS.cdmAuraOverlayColorUseGlobal
+		elseif type(entry.cdmAuraOverlayColorUseGlobal) ~= "boolean" then
+			entry.cdmAuraOverlayColorUseGlobal = Helper.ENTRY_DEFAULTS.cdmAuraOverlayColorUseGlobal
+		end
 		if type(entry.cdmAuraOverlayReverse) ~= "boolean" then entry.cdmAuraOverlayReverse = Helper.ENTRY_DEFAULTS.cdmAuraOverlayReverse end
 		entry.cdmAuraOverlayColor = Helper.NormalizeColor(entry.cdmAuraOverlayColor, Helper.ENTRY_DEFAULTS.cdmAuraOverlayColor)
 		if type(entry.activationOverlayReverse) ~= "boolean" then entry.activationOverlayReverse = entry.cdmAuraOverlayReverse ~= false end
@@ -3401,5 +3433,42 @@ function CooldownPanels:RequestPanelRefresh(panelId)
 		end
 
 		if startedRuntimeQueryBatch and CooldownPanels.EndRuntimeQueryBatch then CooldownPanels:EndRuntimeQueryBatch() end
+	end)
+end
+
+function CooldownPanels:RequestEntryRefresh(panelId, entryId)
+	if not (panelId and entryId) then return end
+	self.runtime = self.runtime or {}
+	local rt = self.runtime
+
+	rt._eqolEntryRefreshQueue = rt._eqolEntryRefreshQueue or {}
+	local panelQueue = rt._eqolEntryRefreshQueue[panelId]
+	if not panelQueue then
+		panelQueue = {}
+		rt._eqolEntryRefreshQueue[panelId] = panelQueue
+	end
+	panelQueue[entryId] = true
+
+	if rt._eqolEntryRefreshPending then return end
+	rt._eqolEntryRefreshPending = true
+
+	RunNextFrame(function()
+		local runtime = CooldownPanels.runtime
+		if not runtime then return end
+		runtime._eqolEntryRefreshPending = nil
+
+		local q = runtime._eqolEntryRefreshQueue
+		if not q then return end
+		runtime._eqolEntryRefreshQueue = nil
+
+		for queuedPanelId, entries in pairs(q) do
+			local needsPanelRefresh = false
+			for queuedEntryId in pairs(entries) do
+				if not (CooldownPanels.RefreshRuntimeEntry and CooldownPanels:RefreshRuntimeEntry(queuedPanelId, queuedEntryId)) then
+					needsPanelRefresh = true
+				end
+			end
+			if needsPanelRefresh then CooldownPanels:RequestPanelRefresh(queuedPanelId) end
+		end
 	end)
 end

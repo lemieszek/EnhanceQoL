@@ -746,13 +746,18 @@ local function applyDiscreteSegmentBorder(sb, bar, enabled, texture, edgeSize, o
 	end
 
 	if border._rbTexture ~= texture or border._rbEdgeSize ~= edgeSize or (border.GetBackdrop and not border:GetBackdrop()) then
-		border:SetBackdrop({
-			bgFile = nil,
-			edgeFile = texture,
-			tile = false,
-			edgeSize = edgeSize,
-			insets = { left = 0, right = 0, top = 0, bottom = 0 },
-		})
+		local backdrop = border._rbBackdrop
+		if not backdrop then
+			backdrop = {
+				bgFile = nil,
+				tile = false,
+				insets = { left = 0, right = 0, top = 0, bottom = 0 },
+			}
+			border._rbBackdrop = backdrop
+		end
+		backdrop.edgeFile = texture
+		backdrop.edgeSize = edgeSize
+		border:SetBackdrop(backdrop)
 		border._rbTexture = texture
 		border._rbEdgeSize = edgeSize
 	end
@@ -858,12 +863,24 @@ function ResourceBars.LayoutDiscreteSegments(bar, cfg, count, texturePath, separ
 	if availablePx < count then availablePx = count end
 	local segmentBasePx = math.max(1, math.floor(availablePx / count))
 	local remainderPx = math.max(0, availablePx - (segmentBasePx * count))
-	local segmentOffsetsPx = {}
-	local segmentSizesPx = {}
+	local segmentOffsetsPx = bar._rbDiscreteSegmentOffsetsPx
+	if not segmentOffsetsPx then
+		segmentOffsetsPx = {}
+		bar._rbDiscreteSegmentOffsetsPx = segmentOffsetsPx
+	end
+	local segmentSizesPx = bar._rbDiscreteSegmentSizesPx
+	if not segmentSizesPx then
+		segmentSizesPx = {}
+		bar._rbDiscreteSegmentSizesPx = segmentSizesPx
+	end
 	for i = 1, count do
 		local extraPx = i <= remainderPx and 1 or 0
 		segmentSizesPx[i] = segmentBasePx + extraPx
 		segmentOffsetsPx[i] = ((i - 1) * (segmentBasePx + gapPx)) + math.min(i - 1, remainderPx)
+	end
+	for i = count + 1, #segmentSizesPx do
+		segmentSizesPx[i] = nil
+		segmentOffsetsPx[i] = nil
 	end
 
 	local sr, sg, sb, sa = normalizeGradientColor(separatorColor or (cfg and cfg.separatorColor))

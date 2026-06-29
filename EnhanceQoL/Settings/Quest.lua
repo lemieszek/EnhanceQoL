@@ -38,12 +38,32 @@ local objectiveTrackerMinimizeWatcher
 local objectiveTrackerMinimizeHooked
 local objectiveTrackerCollapseHooked
 local questTrackerTextStyleHooked = {}
+local questTrackerMainHeaderTextStyleHooked
 local questTrackerTextStyleWatcher
 local questTrackerTextStyleFontOrder = {}
 local questTrackerTextStyleRefreshing
+local questTrackerTextStyleState = {
+	color = {},
+	dirtyBlocks = {},
+	dirtyLines = {},
+	dirtyMainHeader = false,
+	dirtyTrackers = {},
+	flushQueued = false,
+	font = {},
+	tracker = setmetatable({}, { __mode = "k" }),
+	version = 0,
+}
 local QUEST_TRACKER_TEXT_STYLE_TRACKER_NAMES = {
-	"QuestObjectiveTracker",
+	"UIWidgetObjectiveTracker",
 	"CampaignQuestObjectiveTracker",
+	"QuestObjectiveTracker",
+	"AdventureObjectiveTracker",
+	"AchievementObjectiveTracker",
+	"MonthlyActivitiesObjectiveTracker",
+	"InitiativeTasksObjectiveTracker",
+	"ProfessionsRecipeTracker",
+	"BonusObjectiveTracker",
+	"WorldQuestObjectiveTracker",
 }
 local OBJECTIVE_TRACKER_MINIMIZE_ANCHORS = {
 	TOPLEFT = { point = "TOPLEFT", x = 1, y = 0 },
@@ -84,13 +104,10 @@ local function GetQuestTrackerDefaultFontOutline()
 	return addon.functions.GetGlobalFontStyleConfigKey and addon.functions.GetGlobalFontStyleConfigKey() or "OUTLINE"
 end
 
-local function CopyColor(color)
-	return {
-		r = color and color.r or 1,
-		g = color and color.g or 1,
-		b = color and color.b or 1,
-		a = color and color.a or 1,
-	}
+local function InvalidateQuestTrackerTextStyleCache()
+	questTrackerTextStyleState.version = questTrackerTextStyleState.version + 1
+	wipe(questTrackerTextStyleState.color)
+	wipe(questTrackerTextStyleState.font)
 end
 
 local function BuildQuestTrackerFontDropdown()
@@ -126,7 +143,7 @@ local function GetQuestTrackerTextStyleColor(key)
 	local value = addon.db and addon.db[key]
 	local fallback = QUEST_TRACKER_TEXT_STYLE_COLOR_DEFAULTS[key]
 	if type(value) ~= "table" then value = fallback end
-	return CopyColor(value or fallback)
+	return value or fallback
 end
 
 local function GetQuestTrackerTextStyleSize(key)
@@ -174,10 +191,29 @@ local function ApplyQuestTrackerTextStyleColor(fontString)
 	else
 		colorKey = highlighted and "questTrackerTextStyleObjectiveHoverColor" or "questTrackerTextStyleObjectiveColor"
 	end
-	local color = GetQuestTrackerTextStyleColor(colorKey)
+	local color = questTrackerTextStyleState.color[colorKey]
+	if not color then
+		color = GetQuestTrackerTextStyleColor(colorKey)
+		questTrackerTextStyleState.color[colorKey] = color
+	end
+	local r, g, b, a = color.r or 1, color.g or 1, color.b or 1, color.a or 1
+	if
+		fontString._eqolQuestTrackerColorKey == colorKey
+		and fontString._eqolQuestTrackerColorR == r
+		and fontString._eqolQuestTrackerColorG == g
+		and fontString._eqolQuestTrackerColorB == b
+		and fontString._eqolQuestTrackerColorA == a
+	then
+		return
+	end
 	fontString._eqolQuestTrackerApplyingColor = true
-	fontString:SetTextColor(color.r, color.g, color.b, color.a or 1)
+	fontString:SetTextColor(r, g, b, a)
 	fontString._eqolQuestTrackerApplyingColor = nil
+	fontString._eqolQuestTrackerColorKey = colorKey
+	fontString._eqolQuestTrackerColorR = r
+	fontString._eqolQuestTrackerColorG = g
+	fontString._eqolQuestTrackerColorB = b
+	fontString._eqolQuestTrackerColorA = a
 end
 
 local function HookQuestTrackerTextStyleColor(fontString)
@@ -197,72 +233,333 @@ local function IsQuestTrackerTextStyleCompleteLine(line)
 		and (line.state == _G.ObjectiveTrackerAnimLineState.Completed or line.state == _G.ObjectiveTrackerAnimLineState.Completing)
 end
 
-local function ApplyQuestTrackerTextStyleFontString(fontString, role, block, line)
-	if not fontString then return end
-	fontString._eqolQuestTrackerTextRole = role
-	fontString._eqolQuestTrackerBlock = block
-	fontString._eqolQuestTrackerCompleteObjective = role == "objective" and IsQuestTrackerTextStyleCompleteLine(line) or nil
-	HookQuestTrackerTextStyleColor(fontString)
-	if not IsQuestTrackerTextStyleEnabled() then
-		return
-	end
-
+local function GetQuestTrackerTextStyleFontConfig(role)
+	local globalFontStateVersion = addon.functions and addon.functions.GetGlobalFontStateVersion and addon.functions.GetGlobalFontStateVersion() or 0
+	local db = addon.db or {}
 	local sizeKey = role == "moduleHeader" and "questTrackerTextStyleModuleHeaderFontSize"
 		or role == "title" and "questTrackerTextStyleQuestTitleFontSize"
 		or "questTrackerTextStyleObjectiveFontSize"
-	local fontFace = addon.db.questTrackerTextStyleFontFace or GetQuestTrackerDefaultFontFace()
-	local fontOutline = addon.db.questTrackerTextStyleFontOutline or GetQuestTrackerDefaultFontOutline()
-	if addon.functions.ApplyFontString then
-		addon.functions.ApplyFontString(fontString, fontFace, GetQuestTrackerTextStyleSize(sizeKey), fontOutline, addon.variables and addon.variables.defaultFont, "OUTLINE")
-	else
-		fontString:SetFont((addon.variables and addon.variables.defaultFont) or STANDARD_TEXT_FONT, GetQuestTrackerTextStyleSize(sizeKey), "OUTLINE")
+	local fontFace = db.questTrackerTextStyleFontFace or GetQuestTrackerDefaultFontFace()
+	local fontOutline = db.questTrackerTextStyleFontOutline or GetQuestTrackerDefaultFontOutline()
+	local size = GetQuestTrackerTextStyleSize(sizeKey)
+	local cacheKey = role
+	local cached = questTrackerTextStyleState.font[cacheKey]
+	if
+		cached
+		and cached.version == questTrackerTextStyleState.version
+		and cached.globalFontStateVersion == globalFontStateVersion
+		and cached.fontFace == fontFace
+		and cached.fontOutline == fontOutline
+		and cached.size == size
+	then
+		return cached
 	end
-	if fontString.SetWordWrap and role ~= "moduleHeader" then fontString:SetWordWrap(true) end
+
+	local defaultFont = (addon.variables and addon.variables.defaultFont) or STANDARD_TEXT_FONT
+	local fallbackFace = addon.functions.ResolveFontFace and addon.functions.ResolveFontFace(defaultFont, defaultFont) or defaultFont
+	local resolvedFace = addon.functions.ResolveFontFace and addon.functions.ResolveFontFace(fontFace, fallbackFace) or fontFace
+	local styleChoice, flags, shadowAlpha, shadowX, shadowY
+	if addon.functions.ResolveFontStyle then
+		styleChoice, flags, shadowAlpha, shadowX, shadowY = addon.functions.ResolveFontStyle(fontOutline, "OUTLINE")
+	else
+		styleChoice, flags, shadowAlpha, shadowX, shadowY = fontOutline, fontOutline, 0, 0, 0
+	end
+	cached = {
+		fallbackFace = fallbackFace,
+		flags = flags,
+		fontFace = fontFace,
+		globalFontStateVersion = globalFontStateVersion,
+		key = table.concat({
+			tostring(resolvedFace or ""),
+			tostring(fallbackFace or ""),
+			tostring(size or ""),
+			tostring(flags or ""),
+			tostring(shadowAlpha or 0),
+			tostring(shadowX or 0),
+			tostring(shadowY or 0),
+		}, "\001"),
+		resolvedFace = resolvedFace,
+		shadowAlpha = shadowAlpha or 0,
+		shadowX = shadowX or 0,
+		shadowY = shadowY or 0,
+		size = size,
+		styleChoice = styleChoice,
+		fontOutline = fontOutline,
+		version = questTrackerTextStyleState.version,
+	}
+	questTrackerTextStyleState.font[cacheKey] = cached
+	return cached
+end
+
+local function ApplyQuestTrackerTextStyleFont(fontString, role)
+	if not (fontString and fontString.SetFont) then return end
+	local cfg = GetQuestTrackerTextStyleFontConfig(role)
+	if fontString._eqolQuestTrackerFontKey == cfg.key then return end
+	local ok, applied = pcall(fontString.SetFont, fontString, cfg.resolvedFace, cfg.size, cfg.flags)
+	if (not ok or applied == false) and cfg.fallbackFace and cfg.fallbackFace ~= cfg.resolvedFace then
+		pcall(fontString.SetFont, fontString, cfg.fallbackFace, cfg.size, cfg.flags)
+	end
+	if fontString.SetShadowColor and fontString.SetShadowOffset then
+		if cfg.shadowAlpha and cfg.shadowAlpha > 0 then
+			fontString:SetShadowColor(0, 0, 0, cfg.shadowAlpha)
+			fontString:SetShadowOffset(cfg.shadowX or 1, cfg.shadowY or -1)
+		else
+			fontString:SetShadowColor(0, 0, 0, 0)
+			fontString:SetShadowOffset(0, 0)
+		end
+	end
+	fontString._eqolQuestTrackerFontKey = cfg.key
+end
+
+local function ApplyQuestTrackerTextStyleFontString(fontString, role, block, line)
+	if not fontString then return false end
+	local completeObjective = role == "objective" and IsQuestTrackerTextStyleCompleteLine(line) or nil
+	local highlighted = block and block.isHighlighted or nil
+	fontString._eqolQuestTrackerTextRole = role
+	fontString._eqolQuestTrackerBlock = block
+	fontString._eqolQuestTrackerCompleteObjective = completeObjective
+	HookQuestTrackerTextStyleColor(fontString)
+	if not IsQuestTrackerTextStyleEnabled() then
+		return false
+	end
+	if
+		fontString._eqolQuestTrackerAppliedVersion == questTrackerTextStyleState.version
+		and fontString._eqolQuestTrackerAppliedRole == role
+		and fontString._eqolQuestTrackerAppliedBlock == block
+		and fontString._eqolQuestTrackerAppliedHighlighted == highlighted
+		and fontString._eqolQuestTrackerAppliedCompleteObjective == completeObjective
+	then
+		return false
+	end
+
+	ApplyQuestTrackerTextStyleFont(fontString, role)
+	if fontString.SetWordWrap and role ~= "moduleHeader" and fontString._eqolQuestTrackerWordWrap ~= true then
+		fontString:SetWordWrap(true)
+		fontString._eqolQuestTrackerWordWrap = true
+	end
 	ApplyQuestTrackerTextStyleColor(fontString)
+	fontString._eqolQuestTrackerAppliedVersion = questTrackerTextStyleState.version
+	fontString._eqolQuestTrackerAppliedRole = role
+	fontString._eqolQuestTrackerAppliedBlock = block
+	fontString._eqolQuestTrackerAppliedHighlighted = highlighted
+	fontString._eqolQuestTrackerAppliedCompleteObjective = completeObjective
+	return true
 end
 
 local function UpdateQuestTrackerFontStringHeight(fontString, padding)
 	if not (fontString and fontString.GetStringHeight and fontString.SetHeight) then return end
-	fontString:SetHeight(math.max(1, (fontString:GetStringHeight() or 0) + (padding or 0)))
+	local height = math.max(1, (fontString:GetStringHeight() or 0) + (padding or 0))
+	if fontString._eqolQuestTrackerHeight ~= height then
+		fontString:SetHeight(height)
+		fontString._eqolQuestTrackerHeight = height
+	end
+end
+
+local function QuestTrackerTextStyleLineUnchanged(block, line, textValue, dashValue, highlighted)
+	local text = line and line.Text
+	return line._eqolQuestTrackerLineReady == true
+		and line._eqolQuestTrackerAppliedVersion == questTrackerTextStyleState.version
+		and line._eqolQuestTrackerAppliedBlock == block
+		and line._eqolQuestTrackerAppliedHighlighted == highlighted
+		and line._eqolQuestTrackerTextValue == textValue
+		and line._eqolQuestTrackerDashValue == dashValue
+		and line._eqolQuestTrackerHasDash == (line.Dash ~= nil)
+		and line._eqolQuestTrackerState == line.state
+		and line._eqolQuestTrackerTextColorStyle == (text and text.colorStyle or nil)
+		and line._eqolQuestTrackerHeight ~= nil
 end
 
 local function HandleQuestTrackerTextStyleLine(block, line)
 	if not line then return end
-	if line.Text then ApplyQuestTrackerTextStyleFontString(line.Text, "objective", block, line) end
-	if line.Dash then ApplyQuestTrackerTextStyleFontString(line.Dash, "objective", block, line) end
-	if line.SetHeight and line.Text and line.Text.GetHeight then line:SetHeight(math.max(1, line.Text:GetHeight() or 1)) end
+	if not IsQuestTrackerTextStyleEnabled() then return end
+	local textChanged = false
+	local dashChanged = false
+	local textValue = line.Text and line.Text.GetText and line.Text:GetText() or nil
+	local dashValue = line.Dash and line.Dash.GetText and line.Dash:GetText() or nil
+	local highlighted = block and block.isHighlighted or nil
+	if QuestTrackerTextStyleLineUnchanged(block, line, textValue, dashValue, highlighted) then return end
+	local completeObjective = IsQuestTrackerTextStyleCompleteLine(line)
+	if line.Text then textChanged = ApplyQuestTrackerTextStyleFontString(line.Text, "objective", block, line) end
+	if line.Dash then dashChanged = ApplyQuestTrackerTextStyleFontString(line.Dash, "objective", block, line) end
+	if line.SetHeight and line.Text and line.Text.GetHeight then
+		if textChanged or dashChanged or line._eqolQuestTrackerTextValue ~= textValue or line._eqolQuestTrackerHeight == nil then
+			local height = math.max(1, line.Text:GetHeight() or 1)
+			if line._eqolQuestTrackerHeight ~= height then
+				line:SetHeight(height)
+				line._eqolQuestTrackerHeight = height
+			end
+		end
+	end
+	line._eqolQuestTrackerLineReady = true
+	line._eqolQuestTrackerAppliedVersion = questTrackerTextStyleState.version
+	line._eqolQuestTrackerAppliedBlock = block
+	line._eqolQuestTrackerAppliedHighlighted = highlighted
+	line._eqolQuestTrackerAppliedCompleteObjective = completeObjective
+	line._eqolQuestTrackerTextValue = textValue
+	line._eqolQuestTrackerDashValue = dashValue
+	line._eqolQuestTrackerHasDash = line.Dash ~= nil
+	line._eqolQuestTrackerState = line.state
+	line._eqolQuestTrackerTextColorStyle = line.Text and line.Text.colorStyle or nil
 end
+
+local function HandleQuestTrackerTextStyleUsedLine(line)
+	HandleQuestTrackerTextStyleLine(questTrackerTextStyleState.iterationBlock, line)
+end
+
+local QueueQuestTrackerTextStyleLine
 
 local function HandleQuestTrackerTextStyleBlock(block)
 	if not block then return end
 	if block.HeaderText then
-		ApplyQuestTrackerTextStyleFontString(block.HeaderText, "title", block)
-		if block.HeaderText.SetWordWrap then block.HeaderText:SetWordWrap(true) end
-		UpdateQuestTrackerFontStringHeight(block.HeaderText, 2)
+		local headerTextValue = block.HeaderText.GetText and block.HeaderText:GetText() or nil
+		local headerChanged = ApplyQuestTrackerTextStyleFontString(block.HeaderText, "title", block)
+		if block.HeaderText.SetWordWrap and block.HeaderText._eqolQuestTrackerWordWrap ~= true then
+			block.HeaderText:SetWordWrap(true)
+			block.HeaderText._eqolQuestTrackerWordWrap = true
+			headerChanged = true
+		end
+		if headerChanged or block.HeaderText._eqolQuestTrackerTextValue ~= headerTextValue or block.HeaderText._eqolQuestTrackerHeight == nil then
+			UpdateQuestTrackerFontStringHeight(block.HeaderText, 2)
+			block.HeaderText._eqolQuestTrackerTextValue = headerTextValue
+		end
 	end
-	if block.ForEachUsedLine then block:ForEachUsedLine(function(line) HandleQuestTrackerTextStyleLine(block, line) end) end
+	if block.ForEachUsedLine then
+		questTrackerTextStyleState.iterationBlock = block
+		block:ForEachUsedLine(HandleQuestTrackerTextStyleUsedLine)
+		questTrackerTextStyleState.iterationBlock = nil
+	end
 	if block.AddObjective and not block._eqolQuestTrackerAddObjectiveHooked and hooksecurefunc then
 		block._eqolQuestTrackerAddObjectiveHooked = true
 		hooksecurefunc(block, "AddObjective", function(hookedBlock)
-			HandleQuestTrackerTextStyleLine(hookedBlock, hookedBlock and hookedBlock.lastRegion)
+			if QueueQuestTrackerTextStyleLine then
+				QueueQuestTrackerTextStyleLine(hookedBlock, hookedBlock and hookedBlock.lastRegion)
+			else
+				HandleQuestTrackerTextStyleLine(hookedBlock, hookedBlock and hookedBlock.lastRegion)
+			end
 		end)
 	end
 end
 
 local function IsQuestTrackerTextStyleTracker(tracker)
+	if not tracker then return false end
+	local cached = questTrackerTextStyleState.tracker[tracker]
+	if cached ~= nil then return cached end
+	local isTracker = false
 	for _, name in ipairs(QUEST_TRACKER_TEXT_STYLE_TRACKER_NAMES) do
-		if tracker == _G[name] then return true end
+		if tracker == _G[name] then
+			isTracker = true
+			break
+		end
 	end
-	return false
+	questTrackerTextStyleState.tracker[tracker] = isTracker
+	return isTracker
 end
 
 local function HandleQuestTrackerTextStyleModule(tracker)
 	if not IsQuestTrackerTextStyleTracker(tracker) then return end
 	local headerText = tracker and tracker.Header and tracker.Header.Text
 	if headerText then
-		ApplyQuestTrackerTextStyleFontString(headerText, "moduleHeader", nil)
-		UpdateQuestTrackerFontStringHeight(headerText, 2)
+		local headerTextValue = headerText.GetText and headerText:GetText() or nil
+		local changed = ApplyQuestTrackerTextStyleFontString(headerText, "moduleHeader", nil)
+		if changed or headerText._eqolQuestTrackerTextValue ~= headerTextValue or headerText._eqolQuestTrackerHeight == nil then
+			UpdateQuestTrackerFontStringHeight(headerText, 2)
+			headerText._eqolQuestTrackerTextValue = headerTextValue
+		end
 	end
+end
+
+local function ApplyQuestTrackerMainHeaderTextStyle()
+	local headerText = _G.ObjectiveTrackerFrame and _G.ObjectiveTrackerFrame.Header and _G.ObjectiveTrackerFrame.Header.Text
+	if headerText then ApplyQuestTrackerTextStyleFontString(headerText, "moduleHeader", nil) end
+end
+
+local function ClearQuestTrackerDirtyState()
+	for tracker in pairs(questTrackerTextStyleState.dirtyTrackers) do
+		questTrackerTextStyleState.dirtyTrackers[tracker] = nil
+	end
+	for block in pairs(questTrackerTextStyleState.dirtyBlocks) do
+		questTrackerTextStyleState.dirtyBlocks[block] = nil
+	end
+	for line in pairs(questTrackerTextStyleState.dirtyLines) do
+		questTrackerTextStyleState.dirtyLines[line] = nil
+	end
+	questTrackerTextStyleState.dirtyMainHeader = false
+end
+
+local function FlushQuestTrackerTextStyleDirty()
+	questTrackerTextStyleState.flushQueued = false
+	if not IsQuestTrackerTextStyleEnabled() then
+		ClearQuestTrackerDirtyState()
+		return
+	end
+	for tracker in pairs(questTrackerTextStyleState.dirtyTrackers) do
+		HandleQuestTrackerTextStyleModule(tracker)
+		questTrackerTextStyleState.dirtyTrackers[tracker] = nil
+	end
+	for block in pairs(questTrackerTextStyleState.dirtyBlocks) do
+		HandleQuestTrackerTextStyleBlock(block)
+		questTrackerTextStyleState.dirtyBlocks[block] = nil
+	end
+	for line, block in pairs(questTrackerTextStyleState.dirtyLines) do
+		HandleQuestTrackerTextStyleLine(block ~= false and block or nil, line)
+		questTrackerTextStyleState.dirtyLines[line] = nil
+	end
+	if questTrackerTextStyleState.dirtyMainHeader then
+		questTrackerTextStyleState.dirtyMainHeader = false
+		ApplyQuestTrackerMainHeaderTextStyle()
+	end
+end
+
+local function QueueQuestTrackerTextStyleFlush()
+	if questTrackerTextStyleState.flushQueued then return end
+	questTrackerTextStyleState.flushQueued = true
+	if C_Timer and C_Timer.After then
+		C_Timer.After(0, FlushQuestTrackerTextStyleDirty)
+	else
+		FlushQuestTrackerTextStyleDirty()
+	end
+end
+
+local function QueueQuestTrackerTextStyleTracker(tracker)
+	if not tracker then return end
+	questTrackerTextStyleState.dirtyTrackers[tracker] = true
+	QueueQuestTrackerTextStyleFlush()
+end
+
+local function QueueQuestTrackerTextStyleBlock(block)
+	if not block then return end
+	questTrackerTextStyleState.dirtyBlocks[block] = true
+	QueueQuestTrackerTextStyleFlush()
+end
+
+QueueQuestTrackerTextStyleLine = function(block, line)
+	if not line then return end
+	questTrackerTextStyleState.dirtyLines[line] = block or false
+	QueueQuestTrackerTextStyleFlush()
+end
+
+local function QueueQuestTrackerMainHeaderTextStyle()
+	questTrackerTextStyleState.dirtyMainHeader = true
+	QueueQuestTrackerTextStyleFlush()
+end
+
+local function ApplyQuestTrackerQuestCountStyle()
+	if not questTrackerQuestCountText then return end
+	if IsQuestTrackerTextStyleEnabled() then
+		ApplyQuestTrackerTextStyleFontString(questTrackerQuestCountText, "moduleHeader", nil)
+		return
+	end
+
+	local header = _G.QuestObjectiveTracker and _G.QuestObjectiveTracker.Header
+	local referenceFont = header and header.Text and header.Text:GetFontObject()
+	if referenceFont then
+		questTrackerQuestCountText:SetFontObject(referenceFont)
+	else
+		questTrackerQuestCountText:SetFont(addon.variables.defaultFont or "Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
+	end
+	questTrackerQuestCountText._eqolQuestTrackerFontKey = nil
+	questTrackerQuestCountText._eqolQuestTrackerColorKey = nil
+	questTrackerQuestCountText:SetTextColor(QUEST_TRACKER_QUEST_COUNT_COLOR.r, QUEST_TRACKER_QUEST_COUNT_COLOR.g, QUEST_TRACKER_QUEST_COUNT_COLOR.b)
 end
 
 local function EnsureQuestTrackerTextStyleHooks()
@@ -272,9 +569,14 @@ local function EnsureQuestTrackerTextStyleHooks()
 		local tracker = _G[name]
 		if not questTrackerTextStyleHooked[name] and tracker and type(tracker.Update) == "function" and type(tracker.AddBlock) == "function" then
 			questTrackerTextStyleHooked[name] = true
-			hooksecurefunc(tracker, "Update", function(hookedTracker) HandleQuestTrackerTextStyleModule(hookedTracker) end)
-			hooksecurefunc(tracker, "AddBlock", function(_, block) HandleQuestTrackerTextStyleBlock(block) end)
+			hooksecurefunc(tracker, "Update", function(hookedTracker) QueueQuestTrackerTextStyleTracker(hookedTracker) end)
+			hooksecurefunc(tracker, "AddBlock", function(_, block) QueueQuestTrackerTextStyleBlock(block) end)
 		end
+	end
+	local trackerFrame = _G.ObjectiveTrackerFrame
+	if not questTrackerMainHeaderTextStyleHooked and trackerFrame and type(trackerFrame.Update) == "function" then
+		questTrackerMainHeaderTextStyleHooked = true
+		hooksecurefunc(trackerFrame, "Update", QueueQuestTrackerMainHeaderTextStyle)
 	end
 end
 
@@ -286,6 +588,8 @@ local function RefreshQuestTrackerTextStyle(skipLayoutUpdate)
 		if tracker and tracker.EnumerateActiveBlocks then tracker:EnumerateActiveBlocks(function(block) HandleQuestTrackerTextStyleBlock(block) end) end
 		HandleQuestTrackerTextStyleModule(tracker)
 	end
+	ApplyQuestTrackerMainHeaderTextStyle()
+	ApplyQuestTrackerQuestCountStyle()
 	if not skipLayoutUpdate and not questTrackerTextStyleRefreshing and _G.ObjectiveTrackerManager and _G.ObjectiveTrackerManager.UpdateAll then
 		questTrackerTextStyleRefreshing = true
 		_G.ObjectiveTrackerManager:UpdateAll()
@@ -402,13 +706,7 @@ local function EnsureQuestTrackerQuestCountFrame()
 		questTrackerQuestCountText:SetJustifyH("LEFT")
 		questTrackerQuestCountText:SetJustifyV("TOP")
 	end
-	local referenceFont = header.Text and header.Text:GetFontObject()
-	if referenceFont then
-		questTrackerQuestCountText:SetFontObject(referenceFont)
-	else
-		questTrackerQuestCountText:SetFont(addon.variables.defaultFont or "Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
-	end
-	questTrackerQuestCountText:SetTextColor(QUEST_TRACKER_QUEST_COUNT_COLOR.r, QUEST_TRACKER_QUEST_COUNT_COLOR.g, QUEST_TRACKER_QUEST_COUNT_COLOR.b)
+	ApplyQuestTrackerQuestCountStyle()
 	return questTrackerQuestCountFrame
 end
 
@@ -759,6 +1057,7 @@ local function SetQuestTrackerTextStyleDBValue(key, value)
 	else
 		addon.db[key] = value
 	end
+	InvalidateQuestTrackerTextStyleCache()
 	RefreshQuestTrackerTextStyle()
 end
 
@@ -792,6 +1091,7 @@ local function BuildQuestTrackerTextColorPicker(key, label)
 			else
 				addon.db[key] = value
 			end
+			InvalidateQuestTrackerTextStyleCache()
 			RefreshQuestTrackerTextStyle()
 		end,
 		getDefaultColor = function()
@@ -886,6 +1186,7 @@ local trackerData = {
 			local wasEnabled = addon.db and addon.db.questTrackerTextStyleEnabled == true
 			addon.db["questTrackerTextStyleEnabled"] = enabled and true or nil
 			if enabled then
+				InvalidateQuestTrackerTextStyleCache()
 				ActivateQuestTrackerTextStyle()
 			elseif wasEnabled then
 				MarkQuestTrackerTextStyleReloadRequired()

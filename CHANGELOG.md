@@ -1,5 +1,35 @@
 # Changelog
 
+## [11.5.0] - 2026-06-29
+
+### ✨ Added
+
+- Cooldown Panels: Added more aura overlay, swipe color, stack/charge display, and glow controls, with panel-wide defaults and per-entry overrides where supported.
+- EQoL Suite / Unit Frames: Added custom aura container growth, icon alpha, cooldown edge, reverse swipe, and debuff-type border color controls, plus target aura stack font selection, healer buff icon zoom, and optional healer buff duration color steps.
+- Duration Text / UI & Input: Added profile color breakpoints for cooldown and duration text, plus an automatic login UI scale option.
+
+### 🔄 Changed
+
+- Performance: Reduced repeated runtime work in Cooldown Panels, Class Buff Reminder, Default Aura Containers, Resource Bars, Quest Tracker text styling, Enhanced Waypoints, Map/Minimap stats, and Bags / Vendor interactions.
+- Cooldown Panels: Improved Cooldown Manager sync behavior for tracked aura entries while avoiding unnecessary Blizzard cooldown provider work.
+
+### 🐛 Fixed
+
+- Class Buff Reminder: Fixed Evoker Blessing of the Bronze reminders and improved Rogue poison, Paladin Rites, Shaman weapon imbue, and weapon-oil tracking.
+- Cooldown Panels: Fixed overlay tint side effects, tracked aura handling, Buff Icon sync, fixed-layout editor updates, and large-profile performance spikes while opening entry settings.
+- Default Aura Containers: Fixed custom borders after reload and improved safe handling for shared media borders.
+- Map & Minimap / Landing Page: Fixed the Landing Page minimap button being reset when custom positioning is disabled.
+- Mouse Cursor: Fixed the ring center dot keeping stale color or alpha after ring style changes.
+- Mythic Plus: Fixed Mythic+ Timer panel bars disappearing behind selected background textures.
+- Quest Tracker: Extended custom text styling to the main tracker header, quest counter, and additional non-scenario objective tracker sections.
+- Unit Frames: Fixed detached boss power bars staying visible after the boss frame disappears.
+
+### ❌ Removed
+
+- Professions / Patron Orders: Removed the auto-confirm option for using your own materials because it could taint Blizzard's profession cast bar.
+
+---
+
 ## [11.4.0] - 2026-06-22
 
 ### ✨ Added

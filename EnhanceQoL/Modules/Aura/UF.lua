@@ -2045,6 +2045,7 @@ local defaults = {
 			debuffOffset = nil, -- falls back to offset
 			countAnchor = "BOTTOMRIGHT",
 			countOffset = { x = -2, y = 2 },
+			countFont = "__EQOL_GLOBAL_FONT__",
 			countFontSize = nil,
 			countFontSizeBuff = nil,
 			countFontSizeDebuff = nil,
@@ -2332,6 +2333,7 @@ AuraUtil._LEGACY_AURA_SECTION_EXCLUDES = {
 	countFontSize = true,
 	countFontSizeBuff = true,
 	countFontSizeDebuff = true,
+	countFont = true,
 	cooldownFontSize = true,
 	cooldownFontSizeBuff = true,
 	cooldownFontSizeDebuff = true,
@@ -2393,6 +2395,7 @@ function AuraUtil.buildLegacyAuraSection(src, isDebuff)
 	local countFontSize = isDebuff and src.countFontSizeDebuff or src.countFontSizeBuff
 	if countFontSize == nil then countFontSize = src.countFontSize end
 	if countFontSize ~= nil then section.countFontSize = countFontSize end
+	if src.countFont ~= nil then section.countFont = src.countFont end
 
 	local cooldownFontSize = isDebuff and src.cooldownFontSizeDebuff or src.cooldownFontSizeBuff
 	if cooldownFontSize == nil then cooldownFontSize = src.cooldownFontSize end
@@ -5377,6 +5380,23 @@ function UF.ScheduleEqolVisibilityDriverAlphaRefresh()
 	end)
 end
 
+function UF.ApplyBossUnitWatch(frame, unit, enabled, flagName)
+	if not frame or not _G.RegisterUnitWatch or not _G.UnregisterUnitWatch then return end
+	if frame.SetAttribute then frame:SetAttribute("unit", unit) end
+	flagName = flagName or "EQOL_BossUnitWatchRegistered"
+	local registered = (_G.UnitWatchRegistered and _G.UnitWatchRegistered(frame)) or frame[flagName] == true
+	if enabled then
+		if not registered then
+			local ok = pcall(_G.RegisterUnitWatch, frame)
+			if ok then frame[flagName] = true end
+		end
+		return
+	end
+	if registered then pcall(_G.UnregisterUnitWatch, frame) end
+	frame[flagName] = nil
+	if frame.Hide then frame:Hide() end
+end
+
 local function applyVisibilityDriver(unit, enabled)
 	local st = states[unit]
 	if not st or not st.frame then return end
@@ -5405,17 +5425,8 @@ local function applyVisibilityDriver(unit, enabled)
 			frame.EQOL_VisibilityStateDriver = nil
 			st._visibilityCond = nil
 		end
-		local registered = (_G.UnitWatchRegistered and _G.UnitWatchRegistered(frame)) or frame.EQOL_BossUnitWatchRegistered == true
-		if enabled then
-			if not registered then
-				local ok = pcall(_G.RegisterUnitWatch, frame)
-				if ok then frame.EQOL_BossUnitWatchRegistered = true end
-			end
-		else
-			if registered then pcall(_G.UnregisterUnitWatch, frame) end
-			frame.EQOL_BossUnitWatchRegistered = nil
-			if frame.Hide then frame:Hide() end
-		end
+		UF.ApplyBossUnitWatch(frame, unit, enabled, "EQOL_BossUnitWatchRegistered")
+		UF.ApplyBossUnitWatch(st.powerGroup, unit, enabled, "EQOL_BossPowerUnitWatchRegistered")
 		return
 	end
 	local hideInClientScene = UFHelper and UFHelper.shouldHideInClientScene and UFHelper.shouldHideInClientScene(cfg, def)
@@ -5718,6 +5729,7 @@ do
 		debuffGrowth = nil,
 		countAnchor = "BOTTOMRIGHT",
 		countOffset = { x = -2, y = 2 },
+		countFont = "__EQOL_GLOBAL_FONT__",
 		countFontSize = nil,
 		countFontSizeBuff = nil,
 		countFontSizeDebuff = nil,

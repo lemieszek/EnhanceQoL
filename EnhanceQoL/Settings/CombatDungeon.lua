@@ -2995,7 +2995,10 @@ addon.functions.SettingsCreateHeadline(cChar, L["ReleaseTimer"], { parentSection
 data = {
 	var = "timeoutRelease",
 	text = L["timeoutRelease"],
-	func = function(value) addon.db["timeoutRelease"] = value end,
+	func = function(value)
+		addon.db["timeoutRelease"] = value
+		if addon.functions.UpdateTimeoutReleaseEventRegistration then addon.functions.UpdateTimeoutReleaseEventRegistration() end
+	end,
 	parentSection = sectionDeathRes,
 }
 table.sort(data, function(a, b) return a.text < b.text end)
@@ -3319,6 +3322,19 @@ function addon.functions.UpdateGroupFinderApplicantEventRegistration()
 	end
 end
 
+function addon.functions.UpdateTimeoutReleaseEventRegistration()
+	if not frameLoad then return end
+	if addon.db and addon.db["timeoutRelease"] then
+		if not frameLoad._eqolTimeoutReleaseEventRegistered then
+			frameLoad:RegisterEvent("MODIFIER_STATE_CHANGED")
+			frameLoad._eqolTimeoutReleaseEventRegistered = true
+		end
+	elseif frameLoad._eqolTimeoutReleaseEventRegistered then
+		frameLoad:UnregisterEvent("MODIFIER_STATE_CHANGED")
+		frameLoad._eqolTimeoutReleaseEventRegistered = nil
+	end
+end
+
 local eventHandlers = {
 
 	["LFG_LIST_APPLICANT_UPDATED"] = function()
@@ -3363,7 +3379,7 @@ local eventHandlers = {
 
 local function registerEvents(frame)
 	for event in pairs(eventHandlers) do
-		if event ~= "LFG_LIST_APPLICANT_UPDATED" then frame:RegisterEvent(event) end
+		if event ~= "LFG_LIST_APPLICANT_UPDATED" and event ~= "MODIFIER_STATE_CHANGED" then frame:RegisterEvent(event) end
 	end
 end
 
@@ -3375,4 +3391,5 @@ frameLoad = CreateFrame("Frame")
 
 registerEvents(frameLoad)
 addon.functions.UpdateGroupFinderApplicantEventRegistration()
+addon.functions.UpdateTimeoutReleaseEventRegistration()
 frameLoad:SetScript("OnEvent", eventHandler)
