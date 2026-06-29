@@ -1848,7 +1848,7 @@ CooldownPanels._styleCacheRoots.activationOverlayEntry = CooldownPanels._styleCa
 CooldownPanels._styleCacheRoots.otherAuraGlowEntry = CooldownPanels._styleCacheRoots.otherAuraGlowEntry or setmetatable({}, { __mode = "k" })
 CooldownPanels._styleCacheRoots.glowPixelOptions = CooldownPanels._styleCacheRoots.glowPixelOptions or setmetatable({}, { __mode = "k" })
 CooldownPanels._styleCacheRoots.glowPixelEntry = CooldownPanels._styleCacheRoots.glowPixelEntry or setmetatable({}, { __mode = "k" })
-CooldownPanels.POWER_USABLE_REFRESH_DELAY = CooldownPanels.POWER_USABLE_REFRESH_DELAY or 0.05
+CooldownPanels.POWER_USABLE_REFRESH_DELAY = CooldownPanels.POWER_USABLE_REFRESH_DELAY or 0.20
 
 function CooldownPanels.FillCachedColor(cache, r, g, b, a)
 	cache = cache or {}
@@ -5423,6 +5423,9 @@ function CooldownPanels:RebuildSpellIndex()
 							local staticTextShowOnCooldown = entry.staticTextShowOnCooldown == true
 							local showCharges = CooldownPanels:ShouldShowEntryCharges(layout, entry, "SPELL")
 							local alwaysShow = entry.alwaysShow ~= false
+							local trackPower = self:ResolveEntryCheckPower(layout, entry)
+								or self:ResolveEntryHideWhenNoResource(layout, entry)
+								or (entry.type == "SPELL" and entry.glowReady == true and self:ResolveEntryReadyGlowCheckPower(layout, entry))
 							spellEntryMetaData = cdp.ENTRY.EnsureSpellEntryMeta(spellEntryMeta, panelId, entryId)
 							spellEntryMetaData.panelId = panelId
 							spellEntryMetaData.entryId = entryId
@@ -5433,11 +5436,13 @@ function CooldownPanels:RebuildSpellIndex()
 							spellEntryMetaData.variantGroupKey = variantGroup and variantGroup.key or nil
 							spellEntryMetaData.trackCooldown = showCooldown or staticTextShowOnCooldown
 							spellEntryMetaData.trackCharges = showCharges
+							spellEntryMetaData.trackPower = trackPower == true
 							spellEntryMetaData.alwaysShow = alwaysShow
 							spellEntryMetaData.visibilityOnCooldown = showCooldown and not alwaysShow
 							spellEntryMetaData.visibilityOnCharges = showCharges and not alwaysShow
 							spellEntryMetaData.localCooldownSafe = spellEntryMetaData.trackCooldown == true and spellEntryMetaData.visibilityOnCooldown ~= true
 							spellEntryMetaData.localChargesSafe = spellEntryMetaData.trackCharges == true and spellEntryMetaData.visibilityOnCharges ~= true
+							spellEntryMetaData.localPowerSafe = spellEntryMetaData.trackPower == true and self:ResolveEntryHideWhenNoResource(layout, entry) ~= true
 							for _, aliasId in ipairs(self:GetSpellAliasIDs(spellId)) do
 								index[aliasId] = index[aliasId] or {}
 								index[aliasId][panelId] = true
@@ -5633,18 +5638,18 @@ function CooldownPanels:RebuildPowerIndex()
 								if macro and macro.kind == "SPELL" and macro.spellID then baseId = tonumber(macro.spellID) end
 							end
 							if baseId then
-								powerCheckActive = true
 								local effectiveId, resolvedSpellId = self:ResolveTrackedSpellID(baseId)
 								effectiveId = effectiveId or getEffectiveSpellId(baseId) or baseId
 								resolvedSpellId = resolvedSpellId or baseId
 								if shouldTrackPassiveSpell(entry) or not isSpellPassiveSafe(resolvedSpellId, effectiveId) then
-									powerCheckSpells[effectiveId] = true
-									powerPanelsBySpell[effectiveId] = powerPanelsBySpell[effectiveId] or {}
-									powerPanelsBySpell[effectiveId][panelId] = true
 									local costs = Api.GetSpellPowerCost and Api.GetSpellPowerCost(effectiveId)
 									if type(costs) == "table" then
 										local names = getSpellPowerCostNamesFromCosts(costs)
 										if names then
+											powerCheckActive = true
+											powerCheckSpells[effectiveId] = true
+											powerPanelsBySpell[effectiveId] = powerPanelsBySpell[effectiveId] or {}
+											powerPanelsBySpell[effectiveId][panelId] = true
 											powerCostNames[baseId] = names
 											for _, name in ipairs(names) do
 												local key = string.upper(name)
@@ -5684,18 +5689,18 @@ function CooldownPanels:RebuildPowerIndex()
 								if macro and macro.kind == "SPELL" and macro.spellID then baseId = tonumber(macro.spellID) end
 							end
 							if baseId then
-								powerCheckActive = true
 								local effectiveId, resolvedSpellId = self:ResolveTrackedSpellID(baseId)
 								effectiveId = effectiveId or getEffectiveSpellId(baseId) or baseId
 								resolvedSpellId = resolvedSpellId or baseId
 								if shouldTrackPassiveSpell(entry) or not isSpellPassiveSafe(resolvedSpellId, effectiveId) then
-									powerCheckSpells[effectiveId] = true
-									powerPanelsBySpell[effectiveId] = powerPanelsBySpell[effectiveId] or {}
-									powerPanelsBySpell[effectiveId][normalizedPanelId] = true
 									local costs = Api.GetSpellPowerCost and Api.GetSpellPowerCost(effectiveId)
 									if type(costs) == "table" then
 										local names = getSpellPowerCostNamesFromCosts(costs)
 										if names then
+											powerCheckActive = true
+											powerCheckSpells[effectiveId] = true
+											powerPanelsBySpell[effectiveId] = powerPanelsBySpell[effectiveId] or {}
+											powerPanelsBySpell[effectiveId][normalizedPanelId] = true
 											powerCostNames[baseId] = names
 											for _, name in ipairs(names) do
 												local key = string.upper(name)
@@ -25995,6 +26000,8 @@ function cdp.ENTRY.TryRefreshVisibleSpellEntry(panelId, entryId, mode)
 	if not meta then return false end
 	if mode == "charges" then
 		if meta.localChargesSafe ~= true then return false end
+	elseif mode == "power" then
+		if meta.localPowerSafe ~= true then return false end
 	else
 		if meta.localCooldownSafe ~= true then return false end
 	end
@@ -26022,6 +26029,12 @@ function cdp.ENTRY.TryRefreshVisibleSpellEntry(panelId, entryId, mode)
 	local staticTextShowOnCooldown = entry.staticTextShowOnCooldown == true
 	local trackCooldown = showCooldown or staticTextShowOnCooldown
 	local showCharges = CooldownPanels:ShouldShowEntryCharges(data.layout, entry, "SPELL")
+	local entryCheckPower = CooldownPanels:ResolveEntryCheckPower(data.layout, entry)
+	local readyGlowCheckPower = data.glowReady and CooldownPanels:ResolveEntryReadyGlowCheckPower(data.layout, entry)
+	local powerInsufficientSpells = CooldownPanels.runtime and CooldownPanels.runtime.powerInsufficient
+	local spellUnusableSpells = CooldownPanels.runtime and CooldownPanels.runtime.spellUnusable
+	local resourceInsufficient = isSpellFlagged(powerInsufficientSpells, baseSpellId, effectiveSpellId)
+	local unusableForReadyGlow = isSpellFlagged(spellUnusableSpells, baseSpellId, effectiveSpellId)
 	local spellPassState = CooldownPanels:GetSpellPassState(spellId)
 	local ignoreCooldownGCD = CooldownPanels:ShouldIgnoreEntryCooldownGCD(data.layout, entry)
 	local chargesInfo
@@ -26030,7 +26043,7 @@ function cdp.ENTRY.TryRefreshVisibleSpellEntry(panelId, entryId, mode)
 	local cooldownDurationObject
 	local cooldownStart, cooldownDuration, cooldownEnabled, cooldownRate, cooldownGCD, cooldownIsActive
 
-	if showCharges then
+	if mode ~= "power" and showCharges then
 		if spellPassState and spellPassState.chargesLoaded == nil then
 			spellPassState.chargesInfo = CooldownPanels:GetCachedSpellChargesInfo(spellId)
 			spellPassState.chargesLoaded = true
@@ -26038,32 +26051,34 @@ function cdp.ENTRY.TryRefreshVisibleSpellEntry(panelId, entryId, mode)
 		chargesInfo = spellPassState and spellPassState.chargesInfo or CooldownPanels:GetCachedSpellChargesInfo(spellId)
 		chargesInfoActive = CooldownPanels.IsChargeInfoActive(chargesInfo)
 	end
-	if trackCooldown or (showCooldown and chargesInfoActive) then
+	if mode ~= "power" and (trackCooldown or (showCooldown and chargesInfoActive)) then
 		cooldownStart, cooldownDuration, cooldownEnabled, cooldownRate, cooldownGCD, cooldownIsActive =
 			CooldownPanels:GetCachedSpellCooldownInfo(spellId, ignoreCooldownGCD)
 	end
-	cooldownIsActive = CooldownPanels.IsSpellCooldownInfoActive(cooldownIsActive, cooldownEnabled, cooldownStart, cooldownDuration)
-	if showCooldown and data.showChargesCooldown and chargesInfoActive then
+	cooldownIsActive = mode == "power" and data.cooldownIsActive or CooldownPanels.IsSpellCooldownInfoActive(cooldownIsActive, cooldownEnabled, cooldownStart, cooldownDuration)
+	if mode ~= "power" and showCooldown and data.showChargesCooldown and chargesInfoActive then
 		if spellPassState and spellPassState.chargeDurationLoaded == nil then
 			spellPassState.chargeDurationObject = CooldownPanels:GetCachedSpellChargeDurationObject(spellId)
 			spellPassState.chargeDurationLoaded = true
 		end
 		chargeDurationObject = spellPassState and spellPassState.chargeDurationObject or CooldownPanels:GetCachedSpellChargeDurationObject(spellId)
 	end
-	if trackCooldown and cooldownIsActive then
+	if mode ~= "power" and trackCooldown and cooldownIsActive then
 		cooldownDurationObject = CooldownPanels:GetCachedSpellCooldownDurationObject(spellId, ignoreCooldownGCD)
 	end
 
-	data.cooldownStart = cooldownStart or 0
-	data.cooldownDuration = cooldownDuration or 0
-	data.cooldownEnabled = cooldownEnabled
-	data.cooldownIsActive = cooldownIsActive
-	data.cooldownRate = cooldownRate or 1
-	data.cooldownGCD = cooldownGCD == true
+	if mode ~= "power" then
+		data.cooldownStart = cooldownStart or 0
+		data.cooldownDuration = cooldownDuration or 0
+		data.cooldownEnabled = cooldownEnabled
+		data.cooldownIsActive = cooldownIsActive
+		data.cooldownRate = cooldownRate or 1
+		data.cooldownGCD = cooldownGCD == true
+		data.chargesInfo = chargesInfo
+		data.chargeDurationObject = chargeDurationObject
+		data.cooldownDurationObject = cooldownDurationObject
+	end
 	data.cooldownIgnoreGCD = ignoreCooldownGCD == true
-	data.chargesInfo = chargesInfo
-	data.chargeDurationObject = chargeDurationObject
-	data.cooldownDurationObject = cooldownDurationObject
 	data.spellId = spellId
 	data.baseSpellId = baseSpellId
 	data.effectiveSpellId = effectiveSpellId
@@ -26081,11 +26096,15 @@ function cdp.ENTRY.TryRefreshVisibleSpellEntry(panelId, entryId, mode)
 		cooldownGCD = false
 		cooldownIsActive = true
 	end
+	data.powerInsufficient = entryCheckPower and resourceInsufficient
+	data.spellUnusable = entryCheckPower and isSpellFlagged(spellUnusableSpells, baseSpellId, effectiveSpellId)
+	data.readyGlowCheckPower = readyGlowCheckPower == true
+	data.readyGlowResourceBlocked = readyGlowCheckPower and (resourceInsufficient or unusableForReadyGlow) or false
 	if data.glowReady and showCooldown then
-		if cooldownGCD then
+		if data.cooldownGCD then
 			data.spellReadyCondition = true
-		elseif type(cooldownIsActive) == "boolean" then
-			data.spellReadyCondition = not cooldownIsActive
+		elseif type(data.cooldownIsActive) == "boolean" then
+			data.spellReadyCondition = not data.cooldownIsActive
 		else
 			data.spellReadyCondition = nil
 		end
@@ -26324,6 +26343,8 @@ function cdp.ENTRY.RefreshSpellEntries(spellId, baseSpellId, mode, panelsToRefre
 			local shouldProcess = false
 			if mode == "charges" then
 				shouldProcess = meta.trackCharges == true
+			elseif mode == "power" then
+				shouldProcess = meta.trackPower == true
 			else
 				shouldProcess = meta.trackCooldown == true
 			end
@@ -26770,6 +26791,7 @@ local function updatePowerStatesVisible(powerTokens)
 	for spellId in pairs(changedBySpell) do
 		changedBySpell[spellId] = nil
 	end
+	local panelsToRefresh = cdp.ENTRY.GetPanelRefreshScratch(runtime, "_eqolPowerEntryRefreshScratch")
 	local checkAll = true
 	if powerTokens and next(powerTokens) and powerIndex and next(powerIndex) then
 		checkAll = false
@@ -26786,32 +26808,25 @@ local function updatePowerStatesVisible(powerTokens)
 		end
 		if not checkAll and not next(spellsToCheck) then checkAll = true end
 	end
-	local panelsToRefresh
 	local spellMap = checkAll and powerCheckSpells or spellsToCheck
 	for effectiveId in pairs(spellMap) do
 		if powerCheckSpells[effectiveId] then
 			local isUsable, insufficientPower = Api.IsSpellUsableFn(effectiveId)
 			changedBySpell[effectiveId] = setPowerInsufficient(runtime, effectiveId, isUsable, insufficientPower) == true
 			if changedBySpell[effectiveId] then
-				local panels = powerPanelsBySpell and powerPanelsBySpell[effectiveId] or nil
-				if panels then
-					panelsToRefresh = panelsToRefresh or {}
-					for panelId in pairs(panels) do
-						panelsToRefresh[panelId] = true
+				local baseSpellId = getBaseSpellId(effectiveId)
+				if not refreshTrackedSpellEntries(effectiveId, baseSpellId, "power", panelsToRefresh) then
+					local panels = powerPanelsBySpell and powerPanelsBySpell[effectiveId] or nil
+					if panels then
+						for panelId in pairs(panels) do
+							panelsToRefresh[panelId] = true
+						end
 					end
 				end
 			end
 		end
 	end
-	if panelsToRefresh then
-		for panelId in pairs(panelsToRefresh) do
-			if CooldownPanels.RequestPanelRefresh then
-				CooldownPanels:RequestPanelRefresh(panelId)
-			elseif CooldownPanels:GetPanel(panelId) then
-				CooldownPanels:RefreshPanel(panelId)
-			end
-		end
-	end
+	cdp.ENTRY.FlushPanelRefreshes(panelsToRefresh)
 	return true
 end
 

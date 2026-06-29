@@ -1,5 +1,13 @@
 # Changelog
 
+## [11.5.2] - 2026-06-29
+
+### 🐛 Fixed
+
+- Cooldown Panels: Reduced resource-check refresh work for tracked spells by limiting checks to spells with resource costs and updating affected entries directly where possible.
+
+---
+
 ## [11.5.1] - 2026-06-29
 
 ### 🐛 Fixed
