@@ -1,99 +1,34 @@
 # Changelog
 
-<!--@eqol-beta@-->
-
-## [11.5.0-beta6] - 2026-06-29
-
-### 🐛 Fixed
-
-- Cooldown Panels: Reduced performance spikes when opening entry settings in the layout editor, especially for large panels with many entries and aura options.
-
----
-
-## [11.5.0-beta5] - 2026-06-28
+## [11.5.0] - 2026-06-29
 
 ### ✨ Added
 
-- Unit Frames: Added font selection for target aura stack text and icon zoom control for Healer Buff Placement icons.
-
-### 🐛 Fixed
-
-- Bags / Vendor: Reduced performance spikes while switching between merchant and NPC interactions by cutting unnecessary bag refresh, vendor scan, and merchant item highlight work.
-- Class Buff Reminder: Fixed Evoker Blessing of the Bronze reminders not appearing when the spellbook spell ID differs from the active buff aura ID.
-- Cooldown Panels: Reduced runtime overhead for Cooldown Manager aura tracking, especially in profiles with many panels and tracked auras.
-- Mythic Plus: Fixed Mythic+ Timer panel bars disappearing behind selected background textures after switching from a custom background to a dropdown texture.
-
----
-
-## [11.5.0-beta4] - 2026-06-27
-
-### ✨ Added
-
-- EQoL Suite: Added growth direction and icon alpha controls for custom aura containers.
+- Cooldown Panels: Added more aura overlay, swipe color, stack/charge display, and glow controls, with panel-wide defaults and per-entry overrides where supported.
+- EQoL Suite / Unit Frames: Added custom aura container growth, icon alpha, cooldown edge, reverse swipe, and debuff-type border color controls, plus target aura stack font selection, healer buff icon zoom, and optional healer buff duration color steps.
+- Duration Text / UI & Input: Added profile color breakpoints for cooldown and duration text, plus an automatic login UI scale option.
 
 ### 🔄 Changed
 
-- Performance: Reduced repeated runtime work in Class Buff Reminder, Default Aura Containers, Resource Bars, Quest Tracker text styling, Enhanced Waypoints, and Map/Minimap stats.
+- Performance: Reduced repeated runtime work in Cooldown Panels, Class Buff Reminder, Default Aura Containers, Resource Bars, Quest Tracker text styling, Enhanced Waypoints, Map/Minimap stats, and Bags / Vendor interactions.
+- Cooldown Panels: Improved Cooldown Manager sync behavior for tracked aura entries while avoiding unnecessary Blizzard cooldown provider work.
 
 ### 🐛 Fixed
 
-- Class Buff Reminder: Improved Rogue poison tracking, Paladin Rites, Shaman weapon imbues, and weapon-oil checks in restricted aura states.
+- Class Buff Reminder: Fixed Evoker Blessing of the Bronze reminders and improved Rogue poison, Paladin Rites, Shaman weapon imbue, and weapon-oil tracking.
+- Cooldown Panels: Fixed overlay tint side effects, tracked aura handling, Buff Icon sync, fixed-layout editor updates, and large-profile performance spikes while opening entry settings.
 - Default Aura Containers: Fixed custom borders after reload and improved safe handling for shared media borders.
-- Mouse Cursor: Fixed the ring center dot keeping stale color/alpha after ring style changes.
+- Map & Minimap / Landing Page: Fixed the Landing Page minimap button being reset when custom positioning is disabled.
+- Mouse Cursor: Fixed the ring center dot keeping stale color or alpha after ring style changes.
+- Mythic Plus: Fixed Mythic+ Timer panel bars disappearing behind selected background textures.
 - Quest Tracker: Extended custom text styling to the main tracker header, quest counter, and additional non-scenario objective tracker sections.
 - Unit Frames: Fixed detached boss power bars staying visible after the boss frame disappears.
-
----
-
-## [11.5.0-beta3] - 2026-06-26
-
-### ✨ Added
-
-- UI & Input: Added an automatic login UI scale option that sets the scale from the current screen height.
-
-### 🐛 Fixed
-
-- Cooldown Panels: Fixed Buff Icon Cooldown Manager sync pulling hidden tracked buffs and touching Blizzard's cooldown data provider.
-- Cooldown Panels: Fixed Essential and Utility Cooldown Manager sync preserving the visible Blizzard viewer order without touching Blizzard's cooldown data provider.
-- Map & Minimap / Landing Page: Fixed the Landing Page minimap button being reset on login or reload while custom positioning is disabled.
 
 ### ❌ Removed
 
 - Professions / Patron Orders: Removed the auto-confirm option for using your own materials because it could taint Blizzard's profession cast bar.
 
 ---
-
-## [11.5.0-beta2] - 2026-06-23
-
-### ✨ Added
-
-- Duration Text: Added profile color breakpoints for cooldown and duration text.
-- EQoL Suite: Added cooldown edge, reverse swipe, and debuff-type border color options for custom aura containers.
-- Cooldown Panels: Added a panel-wide color and opacity picker for supported aura overlays, with optional per-entry overrides.
-- Cooldown Panels: Added panel-wide stack and charge display toggles, with optional per-entry overrides.
-- Cooldown Panels: Added glow thickness control for Flash and Marching Ants styles.
-- Group Frames / Healer Buff Placement: Added optional per-spell duration color steps for Square, Bar, Border, and Tint indicators.
-
-### 🔄 Changed
-
-Mythic+ Timer: Offset increased to 800, strata/level of some fontstring
-
----
-
-## [11.5.0-beta1] - 2026-06-23
-
-### ✨ Added
-
-- Cooldown Panels: Added a swipe color and opacity picker for cooldown swipes, including optional per-entry overrides.
-
-### 🐛 Fixed
-
-- Cooldown Panels: Fixed the out-of-range overlay tint affecting cooldown text, icon borders, and other icon overlays.
-- Cooldown Panels: Restored Blizzard Buff Bar scanning for tracked aura entries.
-
----
-
-<!--@end-eqol-beta@-->
 
 ## [11.4.0] - 2026-06-22
 
