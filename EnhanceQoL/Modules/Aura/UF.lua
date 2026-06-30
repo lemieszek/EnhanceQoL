@@ -5409,7 +5409,7 @@ local function applyVisibilityDriver(unit, enabled)
 	-- TODO: Remove this 12.1 PTR gate after 12.1 is the supported baseline.
 	local useRolesets = tonumber((select(4, GetBuildInfo()))) >= 120100
 	if enabled and not inEdit and NormalizeVisibilityConfig then visibilityConfig = NormalizeVisibilityConfig(nil, cfg and cfg.visibility, { skipSave = true, ignoreOverride = true }) end
-	local visibilityNeedsManualHandling = visibilityConfig and (visibilityConfig.MOUSEOVER or visibilityConfig.PLAYER_CASTING)
+	local visibilityNeedsManualHandling = visibilityConfig and (visibilityConfig.MOUSEOVER or visibilityConfig.PLAYER_CASTING or visibilityConfig.SHOW_IN_INSTANCE)
 	if isBossUnit(unit) and _G.RegisterUnitWatch and _G.UnregisterUnitWatch then
 		local hideInClientScene = UFHelper and UFHelper.shouldHideInClientScene and UFHelper.shouldHideInClientScene(cfg, def)
 		local forceClientSceneHide = enabled and not useRolesets and not inEdit and hideInClientScene and UF._clientSceneActive == true
@@ -5591,7 +5591,7 @@ local function applyVisibilityRules(unit)
 	local useRolesets = tonumber((select(4, GetBuildInfo()))) >= 120100
 	local hideInClientScene = UFHelper and UFHelper.shouldHideInClientScene and UFHelper.shouldHideInClientScene(cfg, def)
 	local forceClientSceneHide = not useRolesets and not inEdit and cfg and cfg.enabled and hideInClientScene and UF._clientSceneActive == true
-	if unit ~= "boss" and manualConfig and not manualConfig.MOUSEOVER and not manualConfig.PLAYER_CASTING then
+	if unit ~= "boss" and manualConfig and not manualConfig.MOUSEOVER and not manualConfig.PLAYER_CASTING and not manualConfig.SHOW_IN_INSTANCE then
 		manualConfig = nil
 	end
 	local opts = { noStateDriver = true }

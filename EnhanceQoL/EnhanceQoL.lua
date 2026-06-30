@@ -413,6 +413,14 @@ local visibilityRuleMetadata = {
 		description = L["visibilityRule_playerHasTarget_desc"],
 		appliesTo = { actionbar = true, frame = true },
 		unitRequirement = "player",
+		order = 44,
+	},
+	SHOW_IN_INSTANCE = {
+		key = "SHOW_IN_INSTANCE",
+		label = L["Show in instance"] or "Show in instance",
+		description = L["visibilityRule_showInInstance_desc"],
+		appliesTo = { actionbar = true, frame = true },
+		contextKey = "inInstance",
 		order = 45,
 	},
 	PLAYER_IN_GROUP = {
@@ -737,6 +745,7 @@ local frameVisibilityContext = {
 	isSkyriding = false,
 	isCasting = false,
 	isMounted = false,
+	inInstance = false,
 }
 local frameVisibilityStates = {}
 local hookedUnitFrames = {}
@@ -804,6 +813,7 @@ local function UpdateFrameVisibilityContext()
 	frameVisibilityContext.isSkyriding = not deadOrGhost and addon.variables and addon.variables.isPlayerSkyriding and true or false
 	frameVisibilityContext.isCasting = IsPlayerCasting()
 	frameVisibilityContext.isMounted = IsPlayerMounted()
+	frameVisibilityContext.inInstance = (IsInInstance and IsInInstance()) and true or false
 end
 
 local function SafeRegisterUnitEvent(frame, event, ...)
@@ -818,6 +828,7 @@ addon.functions.VisibilityConfigUsesManualEvaluation = function(config, opts)
 	local allowCasting = not (opts and opts.allowCasting == false)
 	if allowMouseover and config.MOUSEOVER then return true end
 	if allowCasting and config.PLAYER_CASTING then return true end
+	if config.SHOW_IN_INSTANCE then return true end
 	return false
 end
 
@@ -1073,11 +1084,13 @@ local function EvaluateFrameVisibility(state)
 		or cfg.PLAYER_IN_GROUP
 		or cfg.PLAYER_IN_PARTY
 		or cfg.PLAYER_IN_RAID
+		or cfg.SHOW_IN_INSTANCE
 	)
 			and true
 		or false
 	if not hasShowRule and HasFrameVisibilityInactiveHideRule(cfg) then return true, "HIDE_RULES_INACTIVE" end
 
+	if cfg.SHOW_IN_INSTANCE and context.inInstance then return true, "SHOW_IN_INSTANCE" end
 	if cfg.ALWAYS_IN_COMBAT and context.inCombat then return true, "ALWAYS_IN_COMBAT" end
 	if cfg.ALWAYS_OUT_OF_COMBAT and not context.inCombat then return true, "ALWAYS_OUT_OF_COMBAT" end
 	if cfg.SKYRIDING_ACTIVE and state.supportsPlayerMountedRule and context.isSkyriding then return true, "SKYRIDING_ACTIVE" end
