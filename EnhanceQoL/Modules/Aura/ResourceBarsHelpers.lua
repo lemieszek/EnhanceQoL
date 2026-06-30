@@ -1253,8 +1253,11 @@ end
 function ResourceBars.SetStatusBarColorWithGradient(bar, cfg, r, g, b, a)
 	if not bar then return end
 	local alpha = a or 1
+	local hasSecretColor = hasSecretGradientColor(r, g, b, alpha)
 	if
-		bar._lastColor
+		not hasSecretColor
+		and not bar._lastColorHasSecret
+		and bar._lastColor
 		and bar._lastColor[1] == r
 		and bar._lastColor[2] == g
 		and bar._lastColor[3] == b
@@ -1267,6 +1270,7 @@ function ResourceBars.SetStatusBarColorWithGradient(bar, cfg, r, g, b, a)
 	bar:SetStatusBarColor(r, g, b, alpha)
 	bar._lastColor = bar._lastColor or {}
 	bar._lastColor[1], bar._lastColor[2], bar._lastColor[3], bar._lastColor[4] = r, g, b, alpha
+	bar._lastColorHasSecret = hasSecretColor or nil
 	if cfg and cfg.useGradient == true then
 		ResourceBars.ApplyBarGradient(bar, cfg, r, g, b, alpha, true)
 	elseif bar._rbGradientEnabled then
