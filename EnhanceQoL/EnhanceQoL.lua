@@ -813,7 +813,7 @@ local function UpdateFrameVisibilityContext()
 	frameVisibilityContext.isSkyriding = not deadOrGhost and addon.variables and addon.variables.isPlayerSkyriding and true or false
 	frameVisibilityContext.isCasting = IsPlayerCasting()
 	frameVisibilityContext.isMounted = IsPlayerMounted()
-	frameVisibilityContext.inInstance = (IsInInstance and IsInInstance()) and true or false
+	frameVisibilityContext.inInstance = IsInInstance()
 end
 
 local function SafeRegisterUnitEvent(frame, event, ...)
