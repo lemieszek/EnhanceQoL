@@ -25998,41 +25998,58 @@ function cdp.ENTRY.ApplyVisibleItemRuntime(panelId, runtime, icon, data, resolve
 	return true
 end
 
-function cdp.ENTRY.TryRefreshVisibleSpellEntry(panelId, entryId, mode)
+function cdp.ENTRY.GetVisibleSpellEntryRefreshBlockReason(panelId, entryId, mode)
 	local panel = CooldownPanels:GetPanel(panelId)
 	local runtime = panel and getRuntime(panelId) or nil
-	if not (panel and runtime and runtime.frame) then return false end
-	if CooldownPanels:IsPanelLayoutEditActive(panelId) then return false end
+	if not (panel and runtime and runtime.frame) then return "missingPanelRuntime" end
+	if CooldownPanels:IsPanelLayoutEditActive(panelId) then return "layoutEditActive" end
 
 	local metaByPanel = CooldownPanels.runtime and CooldownPanels.runtime.spellEntryMeta
 	local meta = metaByPanel and metaByPanel[panelId] and metaByPanel[panelId][entryId] or nil
-	if not meta then return false end
+	if not meta then return "missingMeta" end
 	if mode == "charges" then
-		if meta.localChargesSafe ~= true then return false end
+		if meta.localChargesSafe ~= true then return "localChargesUnsafe" end
 	elseif mode == "power" then
-		if meta.localPowerSafe ~= true then return false end
+		if meta.localPowerSafe ~= true then return "localPowerUnsafe" end
 	else
-		if meta.localCooldownSafe ~= true then return false end
+		if meta.localCooldownSafe ~= true then return "localCooldownUnsafe" end
 	end
 
-	local icon = runtime.entryToIcon and runtime.entryToIcon[entryId] or nil
-	local data = icon and icon._eqolRuntimeData or nil
-	if not (icon and data and data.entryId == entryId and data.resolvedType == "SPELL") then return false end
-
 	local entry = panel.entries and panel.entries[entryId] or nil
-	if not entry then return false end
-	if entry.displayMode == "BAR" then return false end
-	if CooldownPanels:IsEntryCDMAuraOverlayEnabled(panel.layout, entry, "SPELL") then return false end
-	if entry.activationOverlayOnly == true and CooldownPanels:EntryUsesActivationOverlay(entry, "SPELL") then return false end
+	if not entry then return "missingEntry" end
+	if entry.displayMode == "BAR" then return "barDisplay" end
+	if CooldownPanels:IsEntryCDMAuraOverlayEnabled(panel.layout, entry, "SPELL") then return "cdmAuraOverlay" end
+	if entry.activationOverlayOnly == true and CooldownPanels:EntryUsesActivationOverlay(entry, "SPELL") then return "activationOverlayOnly" end
 	local macro = entry.type == "MACRO" and CooldownPanels.ResolveMacroEntry(entry) or nil
 	local baseSpellId = entry.type == "SPELL" and tonumber(entry.spellID) or (macro and macro.kind == "SPELL" and tonumber(macro.spellID)) or nil
-	if not baseSpellId then return false end
+	if not baseSpellId then return "missingSpellId" end
 	local effectiveSpellId, resolvedSpellId, _, variantGroup = CooldownPanels:ResolveTrackedSpellID(baseSpellId)
 	effectiveSpellId = effectiveSpellId or getEffectiveSpellId(baseSpellId) or baseSpellId
 	local spellId = effectiveSpellId or baseSpellId
 	local spellPassive = not shouldTrackPassiveSpell(entry) and isSpellPassiveSafe(resolvedSpellId or baseSpellId, effectiveSpellId) or false
 	local talentChoiceResolved = variantGroup and variantGroup.kind == "talentChoice"
-	if spellPassive or (Api.IsSpellKnown and not talentChoiceResolved and not Api.IsSpellKnown(spellId, true)) then return false end
+	if spellPassive then return "passiveSpell" end
+	if Api.IsSpellKnown and not talentChoiceResolved and not Api.IsSpellKnown(spellId, true) then return "unknownSpell" end
+	local icon = runtime.entryToIcon and runtime.entryToIcon[entryId] or nil
+	local data = icon and icon._eqolRuntimeData or nil
+	if not (icon and data and data.entryId == entryId and data.resolvedType == "SPELL") then return "missingIconData" end
+	return nil
+end
+
+function cdp.ENTRY.TryRefreshVisibleSpellEntry(panelId, entryId, mode)
+	local blockReason = cdp.ENTRY.GetVisibleSpellEntryRefreshBlockReason(panelId, entryId, mode)
+	if blockReason then return false end
+
+	local panel = CooldownPanels:GetPanel(panelId)
+	local runtime = panel and getRuntime(panelId) or nil
+	local icon = runtime.entryToIcon and runtime.entryToIcon[entryId] or nil
+	local data = icon and icon._eqolRuntimeData or nil
+	local entry = panel.entries and panel.entries[entryId] or nil
+	local macro = entry.type == "MACRO" and CooldownPanels.ResolveMacroEntry(entry) or nil
+	local baseSpellId = entry.type == "SPELL" and tonumber(entry.spellID) or (macro and macro.kind == "SPELL" and tonumber(macro.spellID)) or nil
+	local effectiveSpellId, resolvedSpellId, _, variantGroup = CooldownPanels:ResolveTrackedSpellID(baseSpellId)
+	effectiveSpellId = effectiveSpellId or getEffectiveSpellId(baseSpellId) or baseSpellId
+	local spellId = effectiveSpellId or baseSpellId
 
 	local showCooldown = entry.showCooldown ~= false
 	local staticTextShowOnCooldown = entry.staticTextShowOnCooldown == true
@@ -26371,6 +26388,42 @@ function cdp.ENTRY.RefreshSpellEntries(spellId, baseSpellId, mode, panelsToRefre
 	end
 
 	if startedBatch and CooldownPanels.EndRuntimeQueryBatch then CooldownPanels:EndRuntimeQueryBatch() end
+	return refreshed
+end
+
+function cdp.ENTRY.RefreshAllTrackedSpellCooldownEntries()
+	local runtime = CooldownPanels.runtime
+	local metaByPanel = runtime and runtime.spellEntryMeta
+	if not metaByPanel then return false end
+	local panelsToRefresh = cdp.ENTRY.GetPanelRefreshScratch(runtime, "_eqolSpellCooldownEntryRefreshScratch")
+	local startedBatch = false
+	if CooldownPanels.BeginRuntimeQueryBatch and CooldownPanels.IsRuntimeQueryBatchActive and not CooldownPanels:IsRuntimeQueryBatchActive() then
+		CooldownPanels:BeginRuntimeQueryBatch()
+		startedBatch = true
+	end
+
+	local refreshed = false
+	for panelId, entries in pairs(metaByPanel) do
+		local panelNeedsRefresh = false
+		for entryId, meta in pairs(entries) do
+			if meta.trackCooldown == true then
+				if cdp.ENTRY.TryRefreshVisibleSpellEntry(panelId, entryId, "cooldown") then
+					refreshed = true
+				else
+					local reason = cdp.ENTRY.GetVisibleSpellEntryRefreshBlockReason(panelId, entryId, "cooldown")
+					if reason ~= "unknownSpell" and reason ~= "passiveSpell" then
+						panelNeedsRefresh = true
+						refreshed = true
+						break
+					end
+				end
+			end
+		end
+		if panelNeedsRefresh then cdp.ENTRY.QueuePanelRefresh(panelsToRefresh, panelId) end
+	end
+
+	if startedBatch and CooldownPanels.EndRuntimeQueryBatch then CooldownPanels:EndRuntimeQueryBatch() end
+	if cdp.ENTRY.FlushPanelRefreshes(panelsToRefresh) then refreshed = true end
 	return refreshed
 end
 
@@ -27983,7 +28036,11 @@ function CooldownPanels.EnsureUpdateFrame()
 			end
 			CooldownPanels:InvalidateSpellQueryCaches()
 			CooldownPanels:HandleReadySoundSpellEvent(nil, nil, true)
-			if not CooldownPanels.RequestEnabledPanelRefreshes() then CooldownPanels:RefreshAllPanels() end
+			if cdp.ENTRY.RefreshAllTrackedSpellCooldownEntries then
+				cdp.ENTRY.RefreshAllTrackedSpellCooldownEntries()
+			elseif not CooldownPanels.RequestEnabledPanelRefreshes() then
+				CooldownPanels:RefreshAllPanels()
+			end
 			return
 		end
 		if event == "SPELL_UPDATE_USES" then
