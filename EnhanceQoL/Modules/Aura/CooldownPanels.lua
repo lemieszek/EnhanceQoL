@@ -8225,23 +8225,23 @@ function cdp.RUNTIME.WriteStaticTextSnapshot(snapshot, data, staticFontPath, sta
 	snapshot.staticFontSize = staticFontSize
 	snapshot.staticFontStyle = staticFontStyle
 	snapshot.staticTextCooldown = staticTextCooldown == true
-	snapshot.entryStaticText = entry and entry.staticText or nil
-	snapshot.entryStaticTextShowOnCooldown = entry and entry.staticTextShowOnCooldown or nil
-	snapshot.entryStaticTextUseGlobal = entry and entry.staticTextUseGlobal or nil
-	snapshot.entryStaticTextFont = entry and entry.staticTextFont or nil
-	snapshot.entryStaticTextSize = entry and entry.staticTextSize or nil
-	snapshot.entryStaticTextStyle = entry and entry.staticTextStyle or nil
-	snapshot.entryStaticTextColor = entry and entry.staticTextColor or nil
-	snapshot.entryStaticTextAnchor = entry and entry.staticTextAnchor or nil
-	snapshot.entryStaticTextX = entry and entry.staticTextX or nil
-	snapshot.entryStaticTextY = entry and entry.staticTextY or nil
-	snapshot.layoutStaticTextFont = layout and layout.staticTextFont or nil
-	snapshot.layoutStaticTextSize = layout and layout.staticTextSize or nil
-	snapshot.layoutStaticTextStyle = layout and layout.staticTextStyle or nil
-	snapshot.layoutStaticTextColor = layout and layout.staticTextColor or nil
-	snapshot.layoutStaticTextAnchor = layout and layout.staticTextAnchor or nil
-	snapshot.layoutStaticTextX = layout and layout.staticTextX or nil
-	snapshot.layoutStaticTextY = layout and layout.staticTextY or nil
+	snapshot.entryStaticText = cdp.RUNTIME.GetTableField(entry, "staticText")
+	snapshot.entryStaticTextShowOnCooldown = cdp.RUNTIME.GetTableField(entry, "staticTextShowOnCooldown")
+	snapshot.entryStaticTextUseGlobal = cdp.RUNTIME.GetTableField(entry, "staticTextUseGlobal")
+	snapshot.entryStaticTextFont = cdp.RUNTIME.GetTableField(entry, "staticTextFont")
+	snapshot.entryStaticTextSize = cdp.RUNTIME.GetTableField(entry, "staticTextSize")
+	snapshot.entryStaticTextStyle = cdp.RUNTIME.GetTableField(entry, "staticTextStyle")
+	snapshot.entryStaticTextColor = cdp.RUNTIME.GetTableField(entry, "staticTextColor")
+	snapshot.entryStaticTextAnchor = cdp.RUNTIME.GetTableField(entry, "staticTextAnchor")
+	snapshot.entryStaticTextX = cdp.RUNTIME.GetTableField(entry, "staticTextX")
+	snapshot.entryStaticTextY = cdp.RUNTIME.GetTableField(entry, "staticTextY")
+	snapshot.layoutStaticTextFont = cdp.RUNTIME.GetTableField(layout, "staticTextFont")
+	snapshot.layoutStaticTextSize = cdp.RUNTIME.GetTableField(layout, "staticTextSize")
+	snapshot.layoutStaticTextStyle = cdp.RUNTIME.GetTableField(layout, "staticTextStyle")
+	snapshot.layoutStaticTextColor = cdp.RUNTIME.GetTableField(layout, "staticTextColor")
+	snapshot.layoutStaticTextAnchor = cdp.RUNTIME.GetTableField(layout, "staticTextAnchor")
+	snapshot.layoutStaticTextX = cdp.RUNTIME.GetTableField(layout, "staticTextX")
+	snapshot.layoutStaticTextY = cdp.RUNTIME.GetTableField(layout, "staticTextY")
 end
 
 function cdp.RUNTIME.HasStateTextureChange(snapshot, data)
