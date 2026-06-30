@@ -28026,7 +28026,7 @@ function CooldownPanels.EnsureUpdateFrame()
 				CooldownPanels:HandleReadySoundSpellEvent(spellId, baseSpellId, true)
 				if CooldownPanels.HandleActiveProcTriggerSpellUpdate then CooldownPanels:HandleActiveProcTriggerSpellUpdate(spellId, baseSpellId) end
 				if gcdChanged then
-					if not CooldownPanels.RequestEnabledPanelRefreshes() then CooldownPanels:RefreshAllPanels() end
+					if cdp.ENTRY.RefreshAllTrackedSpellCooldownEntries then cdp.ENTRY.RefreshAllTrackedSpellCooldownEntries() end
 				elseif spellId ~= nil then
 					refreshPanelsForSpell(spellId)
 				elseif baseSpellId ~= nil then
