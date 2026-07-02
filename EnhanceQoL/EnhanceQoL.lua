@@ -2478,6 +2478,7 @@ local function GetActionBarVisibilityContext(combatOverride)
 		isFlying = IsPlayerFlying(),
 		isCasting = IsPlayerCasting(),
 		isSkyriding = not IsPlayerDeadOrGhost() and addon.variables and addon.variables.isPlayerSkyriding,
+		inInstance = IsInInstance(),
 	}
 end
 
@@ -2494,6 +2495,7 @@ local function ActionBarShouldForceShowByConfig(config, context, combatOverride)
 	if config.PLAYER_NOT_MOUNTED and not ctx.mounted then return true end
 	if config.PLAYER_HAS_TARGET and ctx.hasTarget then return true end
 	if config.PLAYER_IN_GROUP and ctx.inGroup then return true end
+	if config.SHOW_IN_INSTANCE and ctx.inInstance then return true end
 	return false
 end
 
@@ -2587,6 +2589,7 @@ local function ApplyActionBarAlpha(bar, variable, config, combatOverride, skipFa
 		or cfg.PLAYER_NOT_MOUNTED
 		or cfg.PLAYER_HAS_TARGET
 		or cfg.PLAYER_IN_GROUP
+		or cfg.SHOW_IN_INSTANCE
 
 	if cfg.SKYRIDING_INACTIVE then
 		if ctx.isSkyriding then
